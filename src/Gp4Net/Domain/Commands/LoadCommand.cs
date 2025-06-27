@@ -1,0 +1,330 @@
+using System;
+using System.Collections.Generic;
+using JetBrains.Annotations;
+
+namespace Gp4Net.Domain.Commands
+{
+    /// <summary>
+    /// Represents the LOAD command for loading CAP file data to the card.
+    /// Used to transfer CAP file content in chunks after INSTALL [for load].
+    /// </summary>
+    [PublicAPI]
+    public class LoadCommand
+    {
+        /// <summary>
+        /// The command class byte.
+        /// </summary>
+        public const byte Cla = 0x80;
+
+        /// <summary>
+        /// The command instruction byte.
+        /// </summary>
+        public const byte Ins = 0xE8;
+
+        /// <summary>
+        /// CAP file data TLV tag.
+        /// </summary>
+        public const byte CapDataTag = 0xC4;
+
+        /// <summary>
+        /// P1 values for load operations.
+        /// </summary>
+        public enum LoadType : byte
+        {
+            /// <summary>
+            /// Continuation block.
+            /// </summary>
+            Continuation = 0x00,
+            
+            /// <summary>
+            /// Final block.
+            /// </summary>
+            Final = 0x80
+        }
+
+        /// <summary>
+        /// Gets the load type (continuation or final).
+        /// </summary>
+        public LoadType Type { get; }
+
+        /// <summary>
+        /// Gets the block number.
+        /// </summary>
+        public byte BlockNumber { get; }
+
+        /// <summary>
+        /// Gets the data to load.
+        /// </summary>
+        public byte[] Data { get; }
+
+        /// <summary>
+        /// Gets the total CAP file size (only included in first block).
+        /// </summary>
+        public uint? TotalCapSize { get; }
+
+        /// <summary>
+        /// Gets a value indicating whether this is the first block.
+        /// </summary>
+        public bool IsFirstBlock => BlockNumber == 0;
+
+        /// <summary>
+        /// Gets a value indicating whether this is the final block.
+        /// </summary>
+        public bool IsFinalBlock => Type == LoadType.Final;
+
+        /// <summary>
+        /// Initializes a new instance of the LoadCommand class.
+        /// </summary>
+        /// <param name="blockNumber">The block number (0-based).</param>
+        /// <param name="data">The data to load.</param>
+        /// <param name="isFinalBlock">Whether this is the final block.</param>
+        /// <param name="totalCapSize">The total CAP file size (required for first block).</param>
+        public LoadCommand(byte blockNumber, byte[] data, bool isFinalBlock, uint? totalCapSize = null)
+        {
+            if (data == null)
+                throw new ArgumentNullException(nameof(data));
+            if (data.Length == 0)
+                throw new ArgumentException("Data cannot be empty.", nameof(data));
+            if (blockNumber == 0 && totalCapSize == null)
+                throw new ArgumentException("Total CAP size must be provided for the first block.", nameof(totalCapSize));
+
+            BlockNumber = blockNumber;
+            Data = (byte[])data.Clone();
+            Type = isFinalBlock ? LoadType.Final : LoadType.Continuation;
+            TotalCapSize = totalCapSize;
+        }
+
+        /// <summary>
+        /// Creates a sequence of LOAD commands from CAP file data.
+        /// </summary>
+        /// <param name="capFileData">The complete CAP file data.</param>
+        /// <param name="maxBlockSize">Maximum block size (default 245 bytes to accommodate TLV overhead).</param>
+        /// <returns>The sequence of LOAD commands.</returns>
+        public static IList<LoadCommand> CreateFromCapFile(byte[] capFileData, int maxBlockSize = 245)
+        {
+            if (capFileData == null)
+                throw new ArgumentNullException(nameof(capFileData));
+            if (capFileData.Length == 0)
+                throw new ArgumentException("CAP file data cannot be empty.", nameof(capFileData));
+            if (maxBlockSize < 1 || maxBlockSize > 255)
+                throw new ArgumentException("Block size must be between 1 and 255 bytes.", nameof(maxBlockSize));
+
+            var commands = new List<LoadCommand>();
+            var totalSize = (uint)capFileData.Length;
+            var offset = 0;
+            byte blockNumber = 0;
+
+            while (offset < capFileData.Length)
+            {
+                var remainingBytes = capFileData.Length - offset;
+                var blockSize = Math.Min(remainingBytes, maxBlockSize);
+                var blockData = new byte[blockSize];
+                
+                Array.Copy(capFileData, offset, blockData, 0, blockSize);
+                
+                var isFinalBlock = offset + blockSize >= capFileData.Length;
+                var totalCapSize = blockNumber == 0 ? totalSize : (uint?)null;
+                
+                commands.Add(new LoadCommand(blockNumber, blockData, isFinalBlock, totalCapSize));
+                
+                offset += blockSize;
+                blockNumber++;
+            }
+
+            return commands;
+        }
+
+        /// <summary>
+        /// Converts this command to an APDU byte array.
+        /// </summary>
+        /// <returns>The APDU command bytes.</returns>
+        public byte[] ToApdu()
+        {
+            var data = new List<byte>();
+
+            if (IsFirstBlock)
+            {
+                // First block includes TLV header: C4 <total_length> <data>
+                data.Add(CapDataTag);
+                
+                // Encode length (up to 3 bytes for length field)
+                var totalSize = TotalCapSize!.Value;
+                if (totalSize <= 0x7F)
+                {
+                    data.Add((byte)totalSize);
+                }
+                else if (totalSize <= 0xFF)
+                {
+                    data.Add(0x81);
+                    data.Add((byte)totalSize);
+                }
+                else if (totalSize <= 0xFFFF)
+                {
+                    data.Add(0x82);
+                    data.Add((byte)(totalSize >> 8));
+                    data.Add((byte)(totalSize & 0xFF));
+                }
+                else if (totalSize <= 0xFFFFFF)
+                {
+                    data.Add(0x83);
+                    data.Add((byte)(totalSize >> 16));
+                    data.Add((byte)((totalSize >> 8) & 0xFF));
+                    data.Add((byte)(totalSize & 0xFF));
+                }
+                else
+                {
+                    data.Add(0x84);
+                    data.Add((byte)(totalSize >> 24));
+                    data.Add((byte)((totalSize >> 16) & 0xFF));
+                    data.Add((byte)((totalSize >> 8) & 0xFF));
+                    data.Add((byte)(totalSize & 0xFF));
+                }
+            }
+
+            // Add the actual data
+            data.AddRange(Data);
+
+            // Build APDU
+            var apdu = new List<byte>
+            {
+                Cla,
+                Ins,
+                (byte)Type,
+                BlockNumber,
+                (byte)data.Count // Lc
+            };
+
+            apdu.AddRange(data);
+            apdu.Add(0x00); // Le
+
+            return apdu.ToArray();
+        }
+    }
+
+    /// <summary>
+    /// Represents the response to a LOAD command.
+    /// </summary>
+    [PublicAPI]
+    public class LoadResponse
+    {
+        /// <summary>
+        /// Gets the response data (typically empty for LOAD commands).
+        /// </summary>
+        public byte[] Data { get; }
+
+        /// <summary>
+        /// Gets a value indicating whether the load was successful.
+        /// </summary>
+        public bool IsSuccessful { get; }
+
+        /// <summary>
+        /// Gets the status word from the response.
+        /// </summary>
+        public ushort StatusWord { get; }
+
+        /// <summary>
+        /// Initializes a new instance of the LoadResponse class.
+        /// </summary>
+        /// <param name="data">The response data.</param>
+        /// <param name="statusWord">The status word.</param>
+        public LoadResponse(byte[] data, ushort statusWord)
+        {
+            Data = data != null ? (byte[])data.Clone() : Array.Empty<byte>();
+            StatusWord = statusWord;
+            IsSuccessful = statusWord == 0x9000;
+        }
+
+        /// <summary>
+        /// Parses a LOAD response.
+        /// </summary>
+        /// <param name="response">The response data (excluding status word).</param>
+        /// <param name="statusWord">The status word from the response.</param>
+        /// <returns>The parsed response.</returns>
+        public static LoadResponse Parse(byte[] response, ushort statusWord)
+        {
+            return new LoadResponse(response ?? Array.Empty<byte>(), statusWord);
+        }
+    }
+
+    /// <summary>
+    /// Helper class for managing CAP file loading operations.
+    /// </summary>
+    [PublicAPI]
+    public static class CapFileLoader
+    {
+        /// <summary>
+        /// Common error status words for CAP file loading.
+        /// </summary>
+        public static class ErrorCodes
+        {
+            /// <summary>
+            /// Incorrect data (e.g., wrong AID, TLV malformed).
+            /// </summary>
+            public const ushort IncorrectData = 0x6A80;
+
+            /// <summary>
+            /// Memory error.
+            /// </summary>
+            public const ushort MemoryError = 0x6A84;
+
+            /// <summary>
+            /// Conditions not satisfied (e.g., missing INSTALL [for load]).
+            /// </summary>
+            public const ushort ConditionsNotSatisfied = 0x6985;
+
+            /// <summary>
+            /// Generic failure (possibly applet exception during install).
+            /// </summary>
+            public const ushort GenericFailure = 0x6F00;
+
+            /// <summary>
+            /// Success.
+            /// </summary>
+            public const ushort Success = 0x9000;
+        }
+
+        /// <summary>
+        /// Validates a CAP file before loading.
+        /// </summary>
+        /// <param name="capFileData">The CAP file data to validate.</param>
+        /// <returns>True if the CAP file appears valid, false otherwise.</returns>
+        public static bool ValidateCapFile(byte[] capFileData)
+        {
+            if (capFileData == null || capFileData.Length < 10)
+                return false;
+
+            try
+            {
+                // Try to parse the CAP file structure
+                var capFile = CapFile.CapFileStructure.Parse(capFileData);
+                
+                // Basic validation checks
+                return capFile.PackageAid.Length > 0 &&
+                       capFile.Components.Count > 0 &&
+                       capFile.TotalSize > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Gets a human-readable description of an error status word.
+        /// </summary>
+        /// <param name="statusWord">The status word.</param>
+        /// <returns>The error description.</returns>
+        public static string GetErrorDescription(ushort statusWord)
+        {
+            return statusWord switch
+            {
+                ErrorCodes.Success => "Success",
+                ErrorCodes.IncorrectData => "Incorrect data (wrong AID or malformed TLV)",
+                ErrorCodes.MemoryError => "Memory error",
+                ErrorCodes.ConditionsNotSatisfied => "Conditions not satisfied (missing INSTALL [for load])",
+                ErrorCodes.GenericFailure => "Generic failure (possibly applet exception)",
+                _ => $"Unknown error: {statusWord:X4}"
+            };
+        }
+    }
+}

@@ -1,0 +1,30 @@
+Manifest-Version: 1.0
+Runtime-Descriptor-Version: 3.0
+Classic-Package-AID: //aid/A000000308/00001000
+Sealed: true
+Application-Type: classic-applet
+Created-By: 1.8.0_382 (Amazon.com Inc.)
+
+Name: com/makina/security/openfips201
+Java-Card-CAP-File-Version: 2.1
+Java-Card-Imported-Package-5-Version: 1.5
+Java-Card-Imported-Package-4-AID: 0xa0:0x00:0x00:0x00:0x62:0x02:0x01
+Java-Card-Package-AID: 0xa0:0x00:0x00:0x03:0x08:0x00:0x00:0x10:0x00
+Java-Card-Integer-Support-Required: FALSE
+Java-Card-CAP-Creation-Time: Thu Aug 24 10:07:59 PDT 2023
+Java-Card-Imported-Package-2-AID: 0xa0:0x00:0x00:0x00:0x62:0x01:0x01
+Java-Card-Converter-Provider: Oracle Corporation
+Java-Card-Imported-Package-2-Version: 1.5
+Java-Card-Applet-1-AID: 0xa0:0x00:0x00:0x03:0x08:0x00:0x00:0x10:0x00:0
+ x01:0x00
+Java-Card-Imported-Package-1-Version: 1.0
+Java-Card-Package-Version: 1.10
+Java-Card-Imported-Package-5-AID: 0xa0:0x00:0x00:0x00:0x62:0x01:0x02
+Java-Card-Converter-Version:  [v3.1.0]
+Java-Card-Applet-1-Name: OpenFIPS201
+Java-Card-Package-Name: com.makina.security.openfips201
+Java-Card-Imported-Package-3-Version: 1.5
+Java-Card-Imported-Package-3-AID: 0xa0:0x00:0x00:0x01:0x51:0x00
+Java-Card-Imported-Package-4-Version: 1.5
+Java-Card-Imported-Package-1-AID: 0xa0:0x00:0x00:0x00:0x62:0x00:0x01
+

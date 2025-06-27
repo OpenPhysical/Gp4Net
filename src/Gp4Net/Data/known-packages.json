@@ -1,0 +1,311 @@
+{
+  "generatedAt": "2025-06-27T20:44:59.205316Z",
+  "packageCount": 28,
+  "description": "Unified Java Card package database containing Oracle SDK and GlobalPlatform packages",
+  "packages": {
+    "A0000000620101-v1.6": {
+      "name": "javacard.framework",
+      "version": "1.6",
+      "majorVersion": 1,
+      "minorVersion": 6,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacard/framework/javacard/framework.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912641Z",
+      "aid": "A0000000620101",
+      "originalName": "framework"
+    },
+    "A0000000620102-v1.6": {
+      "name": "javacard.security",
+      "version": "1.6",
+      "majorVersion": 1,
+      "minorVersion": 6,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacard/security/javacard/security.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912679Z",
+      "aid": "A0000000620102",
+      "originalName": "security"
+    },
+    "A0000000620201-v1.6": {
+      "name": "javacardx.crypto",
+      "version": "1.6",
+      "majorVersion": 1,
+      "minorVersion": 6,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacardx/crypto/javacard/crypto.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912679Z",
+      "aid": "A0000000620201",
+      "originalName": "crypto"
+    },
+    "A0000000620205-v1.0": {
+      "name": "javacard.security",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacardx/security/javacard/security.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.91268Z",
+      "aid": "A0000000620205",
+      "originalName": "security"
+    },
+    "A0000000620209-v1.0": {
+      "name": "javacardx.apdu",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacardx/apdu/javacard/apdu.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.91268Z",
+      "aid": "A0000000620209",
+      "originalName": "apdu"
+    },
+    "A0000000620204-v1.0": {
+      "name": "javacardx.biometry1toN",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacardx/biometry1toN/javacard/biometry1toN.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.91268Z",
+      "aid": "A0000000620204",
+      "originalName": "biometry1toN"
+    },
+    "A0000000620202-v1.3": {
+      "name": "javacardx.biometry",
+      "version": "1.3",
+      "majorVersion": 1,
+      "minorVersion": 3,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacardx/biometry/javacard/biometry.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912681Z",
+      "aid": "A0000000620202",
+      "originalName": "biometry"
+    },
+    "A0000000620203-v1.0": {
+      "name": "javacardx.external",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacardx/external/javacard/external.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912681Z",
+      "aid": "A0000000620203",
+      "originalName": "external"
+    },
+    "A0000000620002-v1.0": {
+      "name": "java.io",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/java/io/javacard/io.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912681Z",
+      "aid": "A0000000620002",
+      "originalName": "io"
+    },
+    "A0000000620001-v1.0": {
+      "name": "java.lang",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/java/lang/javacard/lang.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912681Z",
+      "aid": "A0000000620001",
+      "originalName": "lang"
+    },
+    "A0000000620003-v1.0": {
+      "name": "java.rmi",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/java/rmi/javacard/rmi.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912681Z",
+      "aid": "A0000000620003",
+      "originalName": "rmi"
+    },
+    "A000000062010101-v1.0": {
+      "name": "javacard.framework.service",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacard/framework/service/javacard/service.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912682Z",
+      "aid": "A000000062010101",
+      "originalName": "service"
+    },
+    "A000000062020803-v1.0": {
+      "name": "javacardx.framework.tlv",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacardx/framework/tlv/javacard/tlv.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912682Z",
+      "aid": "A000000062020803",
+      "originalName": "tlv"
+    },
+    "A000000062020801-v1.1": {
+      "name": "javacardx.framework.util",
+      "version": "1.1",
+      "majorVersion": 1,
+      "minorVersion": 1,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacardx/framework/util/javacard/util.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912682Z",
+      "aid": "A000000062020801",
+      "originalName": "util"
+    },
+    "A000000062020802-v1.0": {
+      "name": "javacardx.framework.math",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacardx/framework/math/javacard/math.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912682Z",
+      "aid": "A000000062020802",
+      "originalName": "math"
+    },
+    "A000000062020804-v1.0": {
+      "name": "javacardx.framework.string",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacardx/framework/string/javacard/string.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912682Z",
+      "aid": "A000000062020804",
+      "originalName": "string"
+    },
+    "A000000062020901-v1.0": {
+      "name": "javacardx.framework.util",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacardx/apdu/util/javacard/util.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912683Z",
+      "aid": "A000000062020901",
+      "originalName": "util"
+    },
+    "A000000062020807-v1.0": {
+      "name": "javacardx.framework.time",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.1.0/javacardx/framework/time/javacard/time.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912683Z",
+      "aid": "A000000062020807",
+      "originalName": "time"
+    },
+    "A000000062020806-v1.0": {
+      "name": "java.nio",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.1.0/javacardx/framework/nio/javacard/nio.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912683Z",
+      "aid": "A000000062020806",
+      "originalName": "nio"
+    },
+    "A000000062020805-v1.0": {
+      "name": "javacardx.framework.event",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.1.0/javacardx/framework/event/javacard/event.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912683Z",
+      "aid": "A000000062020805",
+      "originalName": "event"
+    },
+    "A000000062020503-v1.0": {
+      "name": "javacardx.framework.util",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.1.0/javacardx/security/util/javacard/util.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912684Z",
+      "aid": "A000000062020503",
+      "originalName": "util"
+    },
+    "A000000062020502-v1.0": {
+      "name": "javacardx.security.derivation",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.1.0/javacardx/security/derivation/javacard/derivation.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912684Z",
+      "aid": "A000000062020502",
+      "originalName": "derivation"
+    },
+    "A000000062020501-v1.0": {
+      "name": "javacardx.security.cert",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.1.0/javacardx/security/cert/javacard/cert.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912684Z",
+      "aid": "A000000062020501",
+      "originalName": "cert"
+    },
+    "A00000006202080101-v1.0": {
+      "name": "javacardx.framework.util.intx",
+      "version": "1.0",
+      "majorVersion": 1,
+      "minorVersion": 0,
+      "sourceFile": "external/oracle_javacard_sdks/jc310b43_kit/api_export_files_3.0.5/javacardx/framework/util/intx/javacard/intx.exp",
+      "sdkVersion": "jc310b43",
+      "lastUpdated": "2025-06-27T20:26:46.912684Z",
+      "aid": "A00000006202080101",
+      "originalName": "intx"
+    },
+    "A00000015100-v1.5": {
+      "name": "globalplatform",
+      "aid": "A00000015100",
+      "version": "1.5",
+      "majorVersion": 1,
+      "minorVersion": 5,
+      "sourceFile": "../../Downloads/GlobalPlatform Card API - org.globalplatform - 1.5/org/globalplatform/javacard/globalplatform.exp",
+      "sdkVersion": "globalplatform-v1.5.0",
+      "lastUpdated": "2025-06-27T20:41:42.480478Z"
+    },
+    "A00000015100-v1.6": {
+      "name": "globalplatform",
+      "aid": "A00000015100",
+      "version": "1.6",
+      "majorVersion": 1,
+      "minorVersion": 6,
+      "sourceFile": "../../Downloads/GlobalPlatform_Card_API-org.globalplatform-v1.7.1/1.6/exports/org/globalplatform/javacard/globalplatform.exp",
+      "sdkVersion": "globalplatform-v1.6.1",
+      "lastUpdated": "2025-06-27T20:41:43.737594Z"
+    },
+    "A00000015100-v1.7": {
+      "name": "globalplatform",
+      "aid": "A00000015100",
+      "version": "1.7",
+      "majorVersion": 1,
+      "minorVersion": 7,
+      "sourceFile": "../../Downloads/GlobalPlatform_Card_API-org.globalplatform-v1.7.1/1.7/exports/org/globalplatform/javacard/globalplatform.exp",
+      "sdkVersion": "globalplatform-v1.7.1",
+      "lastUpdated": "2025-06-27T20:41:45.02976Z"
+    },
+    "A00000015100-v1.8": {
+      "name": "globalplatform",
+      "aid": "A00000015100",
+      "version": "1.8",
+      "majorVersion": 1,
+      "minorVersion": 8,
+      "sourceFile": "../../Downloads/GlobalPlatform Card API - org.globalplatform - 1.8/exports23/org/globalplatform/javacard/globalplatform.exp",
+      "sdkVersion": "globalplatform-v1.8.0-jc23",
+      "lastUpdated": "2025-06-27T20:41:46.339745Z"
+    }
+  }
+}

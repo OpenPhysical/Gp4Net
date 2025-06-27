@@ -1,0 +1,34 @@
+<Project>
+  <PropertyGroup>
+    <!-- Package metadata -->
+    <Authors>Mistial Developer</Authors>
+    <Company>Mistial Developer</Company>
+    <Copyright>Copyright © 2025 Mistial Developer</Copyright>
+    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/mistial-dev/Kdf108</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/mistial-dev/Kdf108</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>KDF;NIST;SP800-108;KeyDerivation;Crypto;C#</PackageTags>
+    <Description>A .NET implementation of GlobalPlatform Secure Channel Protocols (SCP02 and SCP03) for smart card communication</Description>
+    <PackageReleaseNotes>Initial release supporting .NET Framework 2.0+ and .NET Standard.</PackageReleaseNotes>
+    <PackageIcon>logo_64x64.png</PackageIcon>
+
+
+    <!-- Build options -->
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Nerdbank.GitVersioning" Version="3.6.*" PrivateAssets="all" />
+    <None Include="$(SolutionDir)assets/logo_64x64.png" Pack="true" PackagePath="" />
+    <None Include="$(SolutionDir)docs/LICENSE" Pack="true" PackagePath="" />
+    <None Include="$(SolutionDir)docs/README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+</Project>

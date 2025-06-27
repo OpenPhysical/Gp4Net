@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <GenerateDependencyFile>false</GenerateDependencyFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="JetBrains.Annotations" Version="2024.3.0" />
+      <PackageReference Include="log4net" Version="3.0.1" />
+      <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.3" />
+      <PackageReference Include="Spectre.Console.Cli" Version="0.50.0" />
+      <PackageReference Include="Spectre.Console.Cli.Extensions.DependencyInjection" Version="0.6.0" />
+      <PackageReference Include="WSCT.Wrapper.Desktop" Version="1.4.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="../Gp4Net/Gp4Net.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Include="log4net.config">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
+    <PropertyGroup>
+      <AssemblyName>Gp4Net.Tool</AssemblyName>
+      <ToolCommandName>gp4net</ToolCommandName>
+      <PackageId>Gp4Net.Tool</PackageId>
+      <PackAsTool>false</PackAsTool>
+      <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+      <PackageDescription>GlobalPlatform 4 .NET command-line tool for smart card management</PackageDescription>
+      <PackageTags>smartcard;globalplatform;javacard;gp;apdu</PackageTags>
+    </PropertyGroup>
+
+</Project>
