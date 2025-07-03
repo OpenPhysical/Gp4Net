@@ -20,32 +20,43 @@ namespace Gp4Net.Tool.Commands.Card
         {
             return await context.ExecuteCardCommand(
                 settings,
-                ctx =>
+                async ctx =>
                 {
                     ctx.Display.Success("Successfully connected to card");
 
                     // Try to select ISD and get basic card information
                     try
                     {
-                        var selectResponse = ctx.GlobalPlatformService.SelectIsd();
-                        ctx.Display.Success("✓ ISD successfully selected");
+                        var selectResult = await ctx.GlobalPlatformService.SelectIsdAsync();
+                        
+                        await selectResult.MatchAsync<object>(
+                            selectResponse =>
+                            {
+                                ctx.Display.Success("✓ ISD successfully selected");
 
-                        if (selectResponse.RawData != null && selectResponse.RawData.Length > 0)
-                        {
-                            ctx.Display.Verbose(
-                                $"Response data: {Convert.ToHexString(selectResponse.RawData)}"
-                            );
-                        }
+                                if (selectResponse.RawData != null && selectResponse.RawData.Length > 0)
+                                {
+                                    ctx.Display.Verbose(
+                                        $"Response data: {Convert.ToHexString(selectResponse.RawData)}"
+                                    );
+                                }
 
-                        if (
-                            selectResponse.Fci?.CardData != null
-                            && selectResponse.Fci.CardData.Length > 0
-                        )
-                        {
-                            ctx.Display.Verbose(
-                                $"Card data: {Convert.ToHexString(selectResponse.Fci.CardData)}"
-                            );
-                        }
+                                if (
+                                    selectResponse.Fci?.CardData != null
+                                    && selectResponse.Fci.CardData.Length > 0
+                                )
+                                {
+                                    ctx.Display.Verbose(
+                                        $"Card data: {Convert.ToHexString(selectResponse.Fci.CardData)}"
+                                    );
+                                }
+                                return Task.FromResult<object>(null!);
+                            },
+                            error =>
+                            {
+                                ctx.Display.Warning($"Could not select ISD: {error.Message}");
+                                return Task.FromResult<object>(null!);
+                            });
                     }
                     catch (Exception ex)
                     {

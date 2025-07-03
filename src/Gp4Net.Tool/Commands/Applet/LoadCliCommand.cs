@@ -2,6 +2,9 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
+using Gp4Net.Core;
+using Gp4Net.Domain;
+using Gp4Net.Services;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
@@ -25,7 +28,7 @@ namespace Gp4Net.Tool.Commands.Applet
         /// </summary>
         public LoadCommand(
             ICardService cardService,
-            IGlobalPlatformService globalPlatformService,
+            Gp4Net.Services.IGlobalPlatformService globalPlatformService,
             IKeysetResolver keysetResolver
         )
             : base(cardService, globalPlatformService, keysetResolver) { }
@@ -72,7 +75,7 @@ namespace Gp4Net.Tool.Commands.Applet
 
                 AnsiConsole.WriteLine();
 
-                _ = await AnsiConsole
+                var progressResult = await AnsiConsole
                     .Progress()
                     .StartAsync(async ctx =>
                     {
@@ -84,43 +87,25 @@ namespace Gp4Net.Tool.Commands.Applet
                         task.Value = 10;
                         await Task.Delay(100);
 
-                        var result = GlobalPlatformService.InstallCapFile(
+                        var installOptions = new InstallOptions(
+                            InstallApplets: false,
+                            MakeSelectable: false
+                        );
+
+                        var result = await GlobalPlatformService.InstallCapFileAsync(
                             capFileData,
-                            installApplets: false,
-                            makeSelectable: false
+                            installOptions
                         );
 
                         task.Value = 100;
 
-                        if (result.IsSuccessful)
-                        {
-                            AnsiConsole.MarkupLine("[green]✓ CAP file loaded successfully[/]");
-
-                            if (result.PackageAid != null)
-                            {
-                                AnsiConsole.MarkupLine(
-                                    $"[green]Package AID:[/] {Convert.ToHexString(result.PackageAid)}"
-                                );
-
-                                if (settings.ShowDetails)
-                                {
-                                    // TODO: Show package details when available
-                                    AnsiConsole.MarkupLine(
-                                        "[dim]Use 'applet list --filter packages' to see loaded packages[/]"
-                                    );
-                                }
-                            }
-                        }
-                        else
-                        {
-                            AnsiConsole.MarkupLine($"[red]✗ Load failed: {result.ErrorMessage}[/]");
-                            return 1;
-                        }
-
-                        return 0;
+                        return await result.MatchAsync(
+                            async installResult => await DisplayLoadSuccess(installResult, settings),
+                            error => Task.FromResult(DisplayLoadError(error))
+                        );
                     });
 
-                return 0;
+                return progressResult;
             }
             catch (Exception ex)
             {
@@ -131,6 +116,31 @@ namespace Gp4Net.Tool.Commands.Applet
                 }
                 return 1;
             }
+        }
+
+        private Task<int> DisplayLoadSuccess(InstallationResult installResult, Settings settings)
+        {
+            AnsiConsole.MarkupLine("[green]✓ CAP file loaded successfully[/]");
+
+            AnsiConsole.MarkupLine(
+                $"[green]Package AID:[/] {Convert.ToHexString(installResult.PackageAid)}"
+            );
+
+            if (settings.ShowDetails)
+            {
+                // TODO: Show package details when available
+                AnsiConsole.MarkupLine(
+                    "[dim]Use 'applet list --filter packages' to see loaded packages[/]"
+                );
+            }
+
+            return Task.FromResult(0);
+        }
+
+        private int DisplayLoadError(SmartCardError error)
+        {
+            AnsiConsole.MarkupLine($"[red]✗ Load failed: {error.Message}[/]");
+            return 1;
         }
 
         /// <summary>

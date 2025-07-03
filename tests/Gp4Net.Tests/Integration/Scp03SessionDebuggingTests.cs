@@ -5,6 +5,8 @@ using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
+using Gp4Net.Tests.TestHelpers;
+using Gp4Net.Transport;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -150,15 +152,16 @@ namespace Gp4Net.Tests.Integration
 
             // Act
             var originalApdu = deleteCommand.ToApdu();
-            var wrappedApdu = session.WrapCommand(originalApdu);
+            var commandObject = TestApduCommand.FromBytes(originalApdu);
+            var (wrappedData, expectedResponseLength) = session.WrapCommand(commandObject);
 
             // Assert - Debug output
             _output.WriteLine($"Original DELETE APDU: {Convert.ToHexString(originalApdu)}");
-            _output.WriteLine($"Wrapped DELETE APDU:  {Convert.ToHexString(wrappedApdu)}");
+            _output.WriteLine($"Wrapped DELETE APDU:  {Convert.ToHexString(wrappedData)}");
             _output.WriteLine($"Expected GP Pro:      84E40080134F09A000000308000010007547C55C046E221C");
             
             // Verify CLA byte has secure messaging indicator
-            Assert.Equal(0x84, wrappedApdu[0]); // Should have secure messaging bit set
+            Assert.Equal(0x84, wrappedData[0]); // Should have secure messaging bit set
         }
 
         [Fact]

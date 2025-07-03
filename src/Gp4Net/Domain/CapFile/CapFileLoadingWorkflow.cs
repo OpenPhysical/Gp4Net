@@ -99,9 +99,17 @@ namespace Gp4Net.Domain.CapFile
             try
             {
                 // Step 1: INSTALL [for load]
-                var installForLoad = InstallCommand.CreateForLoad(
+                // Per GP specification, Load File Data Block Hash is optional unless:
+                // - A Token is present
+                // - A DAP Block is present in the Load File
+                // - The Load File Data Block is encrypted
+                // Since we don't use tokens or DAP blocks, we'll omit the hash to avoid verification errors
+                
+                var installForLoad = InstallCommandBuilder.CreateForLoad(
                     capFile.PackageAid,
-                    securityDomainAid
+                    securityDomainAid,
+                    hash: null,  // Omit hash as it's optional and may cause verification issues
+                    loadParameters: null  // No load parameters (matches GP Pro and GP Shell)
                 );
                 commands.Add(installForLoad);
 
@@ -116,15 +124,13 @@ namespace Gp4Net.Domain.CapFile
                 {
                     foreach (var applet in capFile.Applets)
                     {
-                        var installType = makeSelectableAfterInstall
-                            ? InstallCommand.InstallType.ForInstallAndMakeSelectable
-                            : InstallCommand.InstallType.ForInstall;
-
-                        var installForInstall = new InstallCommand(
-                            installType,
-                            capFile.PackageAid,
-                            applet.Aid
-                        );
+                        var installForInstall = makeSelectableAfterInstall
+                            ? InstallCommandBuilder.CreateForInstallAndMakeSelectable(
+                                capFile.PackageAid,
+                                applet.Aid)
+                            : InstallCommandBuilder.CreateForInstall(
+                                capFile.PackageAid,
+                                applet.Aid);
                         commands.Add(installForInstall);
                     }
                 }

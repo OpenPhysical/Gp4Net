@@ -24,7 +24,7 @@ namespace Gp4Net.Tool.Pipeline
         /// <summary>
         /// Gets the GlobalPlatform service for GP operations.
         /// </summary>
-        IGlobalPlatformService GlobalPlatformService { get; }
+        Gp4Net.Services.IGlobalPlatformService GlobalPlatformService { get; }
 
         /// <summary>
         /// Gets the keyset resolver for key management.

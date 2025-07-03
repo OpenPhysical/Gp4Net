@@ -107,7 +107,7 @@ namespace Gp4Net.Tool.Services
                 }
 
                 _channel = new CardChannel(_context, readerName);
-                result = _channel.Connect(ShareMode.Exclusive, Protocol.Any);
+                result = _channel.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any);
                 if (result != ErrorCode.Success)
                 {
                     // WSCT CardChannel doesn't implement IDisposable
@@ -124,7 +124,7 @@ namespace Gp4Net.Tool.Services
                 // Detect transport protocol based on actual protocol in use
                 var activeProtocol = _channel.Protocol;
                 var transportProtocol =
-                    activeProtocol == Protocol.T1 ? TransportProtocol.T1 : TransportProtocol.T0;
+                    activeProtocol == WSCT.Wrapper.Protocol.T1 ? TransportProtocol.T1 : TransportProtocol.T0;
                 _transport = _transportFactory.CreateTransport(transportProtocol);
 
                 Logger.Debug($"Using transport protocol: {transportProtocol}");
@@ -231,38 +231,10 @@ namespace Gp4Net.Tool.Services
 
             try
             {
+                // Note: Secure channel wrapping should be done through SendCommand(IApduCommand)
+                // This method is now only for raw byte array commands without secure channel
                 var commandToSend = command;
-
-                // Apply secure messaging if session is active
-                if (_secureChannelSession != null)
-                {
-                    Logger.Debug($"Original APDU: {Convert.ToHexString(command)}");
-                    commandToSend = _secureChannelSession.WrapCommand(command);
-                    
-                    // Log secure channel details
-                    if (Logger.IsDebugEnabled)
-                    {
-                        var wrapped = Convert.ToHexString(commandToSend);
-                        var original = Convert.ToHexString(command);
-                        Logger.Debug($"Secure channel wrapping:");
-                        Logger.Debug($"  Original: {original}");
-                        Logger.Debug($"  Wrapped:  {wrapped}");
-                        Logger.Debug($"  Protocol: SCP{_secureChannelSession.ProtocolVersion:X2}");
-                        Logger.Debug($"  Security Level: {_secureChannelSession.SecurityLevel}");
-                        
-                        // Extract MAC from wrapped command if present
-                        if (_secureChannelSession.SecurityLevel.HasCMac() && commandToSend.Length >= command.Length + 8)
-                        {
-                            var macOffset = commandToSend.Length - 8;
-                            var mac = commandToSend.Skip(macOffset).Take(8).ToArray();
-                            Logger.Debug($"  C-MAC: {Convert.ToHexString(mac)}");
-                        }
-                    }
-                }
-                else
-                {
-                    Logger.Debug($"Sending APDU: {Convert.ToHexString(commandToSend)}");
-                }
+                Logger.Debug($"Sending APDU: {Convert.ToHexString(commandToSend)}");
 
                 // Use WSCT built-in CommandAPDU and ResponseAPDU classes
                 var commandApdu = new CommandAPDU(commandToSend);
@@ -277,52 +249,10 @@ namespace Gp4Net.Tool.Services
                 var responseData = responseApdu.Udr ?? Array.Empty<byte>();
                 var statusWord = responseApdu.StatusWord;
 
-                // Unwrap secure messaging if session is active
-                if (_secureChannelSession != null)
-                {
-                    // Combine data and SW for unwrapping
-                    var fullResponse = new byte[responseData.Length + 2];
-                    Array.Copy(responseData, 0, fullResponse, 0, responseData.Length);
-                    fullResponse[fullResponse.Length - 2] = (byte)(statusWord >> 8);
-                    fullResponse[fullResponse.Length - 1] = (byte)(statusWord & 0xFF);
-
-                    if (Logger.IsDebugEnabled)
-                    {
-                        Logger.Debug($"Secure channel unwrapping:");
-                        Logger.Debug($"  Wrapped response: {Convert.ToHexString(fullResponse)}");
-                        
-                        // Check for R-MAC if present
-                        if (_secureChannelSession.SecurityLevel.HasRMac() && fullResponse.Length >= 10)
-                        {
-                            var rmacOffset = fullResponse.Length - 10; // 8 bytes R-MAC + 2 bytes SW
-                            var rmac = fullResponse.Skip(rmacOffset).Take(8).ToArray();
-                            Logger.Debug($"  R-MAC: {Convert.ToHexString(rmac)}");
-                        }
-                    }
-
-                    var unwrapped = _secureChannelSession.UnwrapResponse(fullResponse);
-
-                    // Extract unwrapped data and SW
-                    if (unwrapped.Length >= 2)
-                    {
-                        responseData = new byte[unwrapped.Length - 2];
-                        Array.Copy(unwrapped, 0, responseData, 0, responseData.Length);
-                        statusWord = (ushort)(
-                            (unwrapped[unwrapped.Length - 2] << 8) | unwrapped[unwrapped.Length - 1]
-                        );
-                    }
-
-                    if (Logger.IsDebugEnabled)
-                    {
-                        Logger.Debug($"  Unwrapped: Data={Convert.ToHexString(responseData)}, SW={statusWord:X4}");
-                    }
-                }
-                else
-                {
-                    Logger.Debug(
-                        $"Received response: Data={Convert.ToHexString(responseData)}, SW={statusWord:X4}"
-                    );
-                }
+                // Note: Response unwrapping is handled by SendCommand(IApduCommand) when secure channel is active
+                Logger.Debug(
+                    $"Received response: Data={Convert.ToHexString(responseData)}, SW={statusWord:X4}"
+                );
 
                 return new CardResponse(responseData, statusWord);
             }
@@ -342,54 +272,160 @@ namespace Gp4Net.Tool.Services
         {
             ArgumentNullException.ThrowIfNull(command);
 
-            // Build APDU bytes from command - this could potentially use WSCT's CommandAPDU builder
-            var apduBytes = new List<byte> { command.Cla, command.Ins, command.P1, command.P2 };
-
-            var hasData = command.Data != null && command.Data.Length > 0;
-            var hasExpectedLength = command.ExpectedResponseLength.HasValue;
-
-            if (hasData)
+            // If secure channel is established, wrap the command
+            if (_secureChannelSession != null)
             {
-                if (command.IsExtendedLength && command.Data!.Length > 255)
+                try
                 {
-                    apduBytes.Add(0x00);
-                    apduBytes.Add((byte)(command.Data.Length >> 8));
-                    apduBytes.Add((byte)(command.Data.Length & 0xFF));
-                }
-                else
-                {
-                    apduBytes.Add((byte)command.Data!.Length);
-                }
-                if (command.Data != null)
-                {
-                    apduBytes.AddRange(command.Data);
-                }
-            }
+                    // Get wrapped command data and Le from secure channel
+                    var (wrappedData, expectedResponseLength) = _secureChannelSession.WrapCommand(command);
 
-            if (hasExpectedLength)
-            {
-                var expectedLength = command.ExpectedResponseLength!.Value;
-                if (command.IsExtendedLength && expectedLength > 255)
-                {
-                    if (!hasData)
+                    if (Logger.IsDebugEnabled)
                     {
-                        apduBytes.Add(0x00);
+                        Logger.Debug($"Secure channel wrapping:");
+                        Logger.Debug($"  Original command: CLA={command.Cla:X2} INS={command.Ins:X2} P1={command.P1:X2} P2={command.P2:X2}");
+                        if (command.Data != null)
+                        {
+                            Logger.Debug($"  Original data: {Convert.ToHexString(command.Data)} (length={command.Data.Length})");
+                        }
+                        Logger.Debug($"  Expected response length: {expectedResponseLength?.ToString() ?? "none"}");
+                        Logger.Debug($"  Wrapped data: {Convert.ToHexString(wrappedData)}");
                     }
 
-                    apduBytes.Add((byte)(expectedLength >> 8));
-                    apduBytes.Add((byte)(expectedLength & 0xFF));
+                    // Build final APDU with wrapped data and Le
+                    var finalApdu = new List<byte>(wrappedData);
+                    
+                    // Add Le if needed
+                    if (expectedResponseLength.HasValue)
+                    {
+                        var le = expectedResponseLength.Value;
+                        if (command.IsExtendedLength && le > 255)
+                        {
+                            // Extended length Le
+                            if (wrappedData.Length == 4) // No data, need 00 before Le
+                            {
+                                finalApdu.Add(0x00);
+                            }
+                            finalApdu.Add((byte)(le >> 8));
+                            finalApdu.Add((byte)(le & 0xFF));
+                        }
+                        else
+                        {
+                            // Short length Le
+                            finalApdu.Add(le == 0 || le == 256 ? (byte)0x00 : (byte)le);
+                        }
+                        
+                        if (Logger.IsDebugEnabled)
+                        {
+                            Logger.Debug($"  Added Le={le} (0x{le:X2})");
+                        }
+                    }
+                    
+                    if (Logger.IsDebugEnabled)
+                    {
+                        Logger.Debug($"  Final APDU: {Convert.ToHexString([.. finalApdu])}");
+                    }
+
+                    // Send wrapped command and get response
+                    var response = SendCommand([.. finalApdu]);
+                    
+                    // Unwrap response if secure channel has R-MAC or R-ENC
+                    if (_secureChannelSession.SecurityLevel.HasRMac() || _secureChannelSession.SecurityLevel.HasREncryption())
+                    {
+                        // Combine data and SW for unwrapping
+                        var fullResponse = new byte[response.Data.Length + 2];
+                        Array.Copy(response.Data, 0, fullResponse, 0, response.Data.Length);
+                        fullResponse[fullResponse.Length - 2] = (byte)(response.StatusWord >> 8);
+                        fullResponse[fullResponse.Length - 1] = (byte)(response.StatusWord & 0xFF);
+
+                        if (Logger.IsDebugEnabled)
+                        {
+                            Logger.Debug($"Secure channel unwrapping:");
+                            Logger.Debug($"  Wrapped response: {Convert.ToHexString(fullResponse)}");
+                        }
+
+                        var unwrapped = _secureChannelSession.UnwrapResponse(fullResponse);
+
+                        // Extract unwrapped data and SW
+                        byte[] unwrappedData = Array.Empty<byte>();
+                        ushort unwrappedSw = 0x6F00;
+                        
+                        if (unwrapped.Length >= 2)
+                        {
+                            unwrappedData = new byte[unwrapped.Length - 2];
+                            Array.Copy(unwrapped, 0, unwrappedData, 0, unwrappedData.Length);
+                            unwrappedSw = (ushort)(
+                                (unwrapped[unwrapped.Length - 2] << 8) | unwrapped[unwrapped.Length - 1]
+                            );
+                        }
+
+                        if (Logger.IsDebugEnabled)
+                        {
+                            Logger.Debug($"  Unwrapped: Data={Convert.ToHexString(unwrappedData)}, SW={unwrappedSw:X4}");
+                        }
+
+                        return new CardResponse(unwrappedData, unwrappedSw);
+                    }
+                    
+                    return response;
                 }
-                else
+                catch (Exception ex)
                 {
-                    apduBytes.Add(
-                        expectedLength == 0 || expectedLength == 256
-                            ? (byte)0x00
-                            : (byte)expectedLength
-                    );
+                    Logger.Error("Failed to wrap command with secure channel", ex);
+                    throw;
                 }
             }
+            else
+            {
+                // No secure channel - build APDU normally
+                var apduBytes = new List<byte> { command.Cla, command.Ins, command.P1, command.P2 };
 
-            return SendCommand([.. apduBytes]);
+                var hasData = command.Data != null && command.Data.Length > 0;
+                var hasExpectedLength = command.ExpectedResponseLength.HasValue;
+
+                if (hasData)
+                {
+                    if (command.IsExtendedLength && command.Data!.Length > 255)
+                    {
+                        apduBytes.Add(0x00);
+                        apduBytes.Add((byte)(command.Data.Length >> 8));
+                        apduBytes.Add((byte)(command.Data.Length & 0xFF));
+                    }
+                    else
+                    {
+                        apduBytes.Add((byte)command.Data!.Length);
+                    }
+                    if (command.Data != null)
+                    {
+                        apduBytes.AddRange(command.Data);
+                    }
+                }
+
+                if (hasExpectedLength)
+                {
+                    var expectedLength = command.ExpectedResponseLength!.Value;
+                    if (command.IsExtendedLength && expectedLength > 255)
+                    {
+                        if (!hasData)
+                        {
+                            apduBytes.Add(0x00);
+                        }
+
+                        apduBytes.Add((byte)(expectedLength >> 8));
+                        apduBytes.Add((byte)(expectedLength & 0xFF));
+                    }
+                    else
+                    {
+                        apduBytes.Add(
+                            expectedLength == 0 || expectedLength == 256
+                                ? (byte)0x00
+                                : (byte)expectedLength
+                        );
+                    }
+                }
+
+                return SendCommand([.. apduBytes]);
+            }
         }
 
         /// <inheritdoc />

@@ -422,7 +422,7 @@ namespace Gp4Net.Tool.Commands.Card
                 );
 
                 // Send command
-                var response = context.CardService.SendCommand(storeCommand.ToApdu());
+                var response = context.CardService.SendCommand(storeCommand);
                 return response.IsSuccessful;
             }
             catch (Exception ex)
@@ -434,31 +434,53 @@ namespace Gp4Net.Tool.Commands.Card
 
         private static (ushort tag, byte[] data) ParseRawDataObject(string key, string value)
         {
-            if (
-                !key.StartsWith("0x")
-                || !ushort.TryParse(
+            if (key.StartsWith("0x") && key.Length > 2)
+            {
+                // Handle hex tag format: 0x9F70
+                if (!ushort.TryParse(
                     key.AsSpan(2),
                     System.Globalization.NumberStyles.HexNumber,
                     null,
                     out var tag
-                )
-            )
-            {
-                throw new ArgumentException($"Invalid hex tag format: {key}");
-            }
+                ))
+                {
+                    throw new ArgumentException($"Invalid hex tag format: {key}");
+                }
 
-            byte[] data;
-            try
-            {
-                data = Convert.FromHexString(value);
-            }
-            catch
-            {
-                // Try as UTF-8 string
-                data = System.Text.Encoding.UTF8.GetBytes(value);
-            }
+                byte[] data;
+                try
+                {
+                    data = Convert.FromHexString(value);
+                }
+                catch
+                {
+                    // Try as UTF-8 string
+                    data = System.Text.Encoding.UTF8.GetBytes(value);
+                }
 
-            return (tag, data);
+                return (tag, data);
+            }
+            else
+            {
+                // Try parsing as tag:data or tag=data format
+                try
+                {
+                    var fullString = $"{key}:{value}";
+                    return DataObjectParser.ParseRawDataObject(fullString);
+                }
+                catch
+                {
+                    try
+                    {
+                        var fullString = $"{key}={value}";
+                        return DataObjectParser.ParseRawDataObject(fullString);
+                    }
+                    catch
+                    {
+                        throw new ArgumentException($"Invalid data object format: {key}. Expected formats: 0x9F70, 9F70:040102, or 9F70=040102");
+                    }
+                }
+            }
         }
 
         private static byte[] CreateTlvData(ushort tag, byte[] data)

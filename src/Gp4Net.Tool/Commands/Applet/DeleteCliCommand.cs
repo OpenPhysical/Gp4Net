@@ -4,7 +4,11 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Gp4Net.Core;
+using Gp4Net.Domain;
 using Gp4Net.Domain.CapFile;
+using Gp4Net.Services;
+using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
 using log4net;
@@ -17,16 +21,18 @@ namespace Gp4Net.Tool.Commands.Applet
     /// Command to delete an applet from the card.
     /// </summary>
     [PublicAPI]
-    public class DeleteCommand : BaseCommand<DeleteCommand.Settings>
+    [CliCommand("delete", "Delete an applet from the card", "applet")]
+    [CliCommand("uninstall", "Uninstall an applet from the card (alias for delete)", "applet", isAlias: true)]
+    public class DeleteCliCommand : BaseCommand<DeleteCliCommand.Settings>
     {
-        private static new readonly ILog Logger = LogManager.GetLogger(typeof(DeleteCommand));
+        private static new readonly ILog Logger = LogManager.GetLogger(typeof(DeleteCliCommand));
 
         /// <summary>
-        /// Initializes a new instance of the DeleteCommand class.
+        /// Initializes a new instance of the DeleteCliCommand class.
         /// </summary>
-        public DeleteCommand(
+        public DeleteCliCommand(
             ICardService cardService,
-            IGlobalPlatformService globalPlatformService,
+            Gp4Net.Services.IGlobalPlatformService globalPlatformService,
             IKeysetResolver keysetResolver
         )
             : base(cardService, globalPlatformService, keysetResolver) { }
@@ -124,7 +130,7 @@ namespace Gp4Net.Tool.Commands.Applet
             // Option 2: CAP file specified
             if (!string.IsNullOrEmpty(settings.CapFile))
             {
-                var capAids = ExtractAidsFromCapFile(settings.CapFile).Result;
+                var capAids = ExtractAidsFromCapFile(settings.CapFile, settings.DeleteRelated).Result;
                 aidsToDelete.AddRange(capAids);
             }
 
@@ -139,7 +145,8 @@ namespace Gp4Net.Tool.Commands.Applet
         }
 
         private Task<List<(byte[] Aid, string Description, string Source)>> ExtractAidsFromCapFile(
-            string capFilePath
+            string capFilePath,
+            bool deleteRelated
         )
         {
             if (!File.Exists(capFilePath))
@@ -161,14 +168,18 @@ namespace Gp4Net.Tool.Commands.Applet
                 Path.GetFileName(capFilePath)
             ));
 
-            // Add applet AIDs
-            foreach (var applet in capFile.Applets)
+            // Add applet AIDs only if we're not deleting related objects
+            // (because deleting package with related will delete applets too)
+            if (!deleteRelated)
             {
-                aids.Add((
-                    applet.Aid,
-                    $"Applet {Convert.ToHexString(applet.Aid)}",
-                    Path.GetFileName(capFilePath)
-                ));
+                foreach (var applet in capFile.Applets)
+                {
+                    aids.Add((
+                        applet.Aid,
+                        $"Applet {Convert.ToHexString(applet.Aid)}",
+                        Path.GetFileName(capFilePath)
+                    ));
+                }
             }
 
             if (Logger.IsDebugEnabled)
@@ -178,12 +189,16 @@ namespace Gp4Net.Tool.Commands.Applet
                 {
                     Logger.Debug($"  - {Convert.ToHexString(aid)}: {desc}");
                 }
+                if (deleteRelated && capFile.Applets.Count > 0)
+                {
+                    Logger.Debug($"  (Skipped {capFile.Applets.Count} applet AIDs - will be deleted with package)");
+                }
             }
 
             return Task.FromResult(aids);
         }
 
-        private Task<List<(byte[] Aid, string Description, string Source)>> GetInteractiveAids()
+        private async Task<List<(byte[] Aid, string Description, string Source)>> GetInteractiveAids()
         {
             if (!EnsureCardConnection(new Settings { Verbose = false }))
             {
@@ -195,11 +210,20 @@ namespace Gp4Net.Tool.Commands.Applet
                 throw new InvalidOperationException("Failed to establish secure channel for interactive mode");
             }
 
-            var applications = GlobalPlatformService.GetApplications();
+            var statusResult = await GlobalPlatformService.GetStatusAsync(StatusSubset.Applications);
+            
+            var applications = await statusResult.MatchAsync<IReadOnlyList<ApplicationInfo>>(
+                apps => Task.FromResult<IReadOnlyList<ApplicationInfo>>(apps),
+                error => 
+                {
+                    AnsiConsole.MarkupLine($"[red]Error getting applications: {error.Message}[/]");
+                    return Task.FromResult<IReadOnlyList<ApplicationInfo>>(new List<ApplicationInfo>());
+                });
+
             if (applications.Count == 0)
             {
                 AnsiConsole.MarkupLine("[yellow]No applications found on card[/]");
-                return Task.FromResult(new List<(byte[] Aid, string Description, string Source)>());
+                return new List<(byte[] Aid, string Description, string Source)>();
             }
 
             // Create multi-selection prompt
@@ -218,13 +242,13 @@ namespace Gp4Net.Tool.Commands.Applet
 
             var selected = AnsiConsole.Prompt(prompt);
 
-            return Task.FromResult(selected
+            return selected
                 .Select(app => (
                     app.Aid,
                     $"{app.Type} {Convert.ToHexString(app.Aid)}",
                     "Interactive selection"
                 ))
-                .ToList());
+                .ToList();
         }
 
         private void DisplayDeletionPlan(
@@ -260,6 +284,12 @@ namespace Gp4Net.Tool.Commands.Applet
             }
 
             AnsiConsole.Write(table);
+            
+            // Show note about delete related behavior with CAP files
+            if (!string.IsNullOrEmpty(settings.CapFile) && settings.DeleteRelated && aidsToDelete.Count == 1)
+            {
+                AnsiConsole.MarkupLine("\n[dim]Note: Only deleting the package AID. Applets will be deleted automatically with 'Delete related' option.[/]");
+            }
 
             if (settings.Debug)
             {
@@ -280,7 +310,7 @@ namespace Gp4Net.Tool.Commands.Applet
             return AnsiConsole.Confirm(message);
         }
 
-        private Task<int> PerformDeletions(
+        private async Task<int> PerformDeletions(
             List<(byte[] Aid, string Description, string Source)> aidsToDelete,
             Settings settings
         )
@@ -288,8 +318,8 @@ namespace Gp4Net.Tool.Commands.Applet
             var successCount = 0;
             var failureCount = 0;
 
-            AnsiConsole.Progress()
-                .Start(ctx =>
+            await AnsiConsole.Progress()
+                .StartAsync(async ctx =>
                 {
                     var task = ctx.AddTask("[green]Deleting objects[/]", maxValue: aidsToDelete.Count);
 
@@ -305,36 +335,25 @@ namespace Gp4Net.Tool.Commands.Applet
 
                         try
                         {
-                            var result = GlobalPlatformService.DeleteApplication(aid, settings.DeleteRelated);
+                            var result = await GlobalPlatformService.DeleteApplicationAsync(aid, settings.DeleteRelated);
 
-                            if (result.IsSuccessful)
-                            {
-                                successCount++;
-                                AnsiConsole.MarkupLine($"[green]✓ Deleted {description}[/]");
-
-                                if (result.DeletedAids.Count > 1 && settings.Verbose)
+                            await result.MatchAsync<object>(
+                                async unit =>
                                 {
-                                    AnsiConsole.MarkupLine($"  [dim]Deleted {result.DeletedAids.Count} related objects[/]");
-                                }
-
-                                if (settings.Debug && result.DeletedAids.Count > 0)
+                                    successCount++;
+                                    AnsiConsole.MarkupLine($"[green]✓ Deleted {description}[/]");
+                                    return Task.CompletedTask;
+                                },
+                                async error =>
                                 {
-                                    foreach (var deletedAid in result.DeletedAids)
+                                    AnsiConsole.MarkupLine($"[red]✗ Failed to delete {description}: {error.Message}[/]");
+                                    if (settings.Debug && error.InnerException != null)
                                     {
-                                        Logger.Debug($"  Deleted: {Convert.ToHexString(deletedAid)}");
+                                        AnsiConsole.WriteException(error.InnerException);
                                     }
-                                }
-                            }
-                            else
-                            {
-                                failureCount++;
-                                AnsiConsole.MarkupLine($"[red]✗ Failed to delete {description}: {result.ErrorMessage}[/]");
-                                
-                                if (settings.Debug)
-                                {
-                                    Logger.Debug($"Delete failed for {Convert.ToHexString(aid)}: {result.ErrorMessage}");
-                                }
-                            }
+                                    return Task.CompletedTask;
+                                });
+
                         }
                         catch (Exception ex)
                         {
@@ -356,19 +375,19 @@ namespace Gp4Net.Tool.Commands.Applet
             if (failureCount == 0)
             {
                 AnsiConsole.MarkupLine($"[green]Successfully deleted {successCount} object(s)[/]");
-                return Task.FromResult(0);
+                return 0;
             }
             else if (successCount > 0)
             {
                 AnsiConsole.MarkupLine(
                     $"[yellow]Partially successful: {successCount} deleted, {failureCount} failed[/]"
                 );
-                return Task.FromResult(1);
+                return 1;
             }
             else
             {
                 AnsiConsole.MarkupLine($"[red]Failed to delete all {failureCount} object(s)[/]");
-                return Task.FromResult(1);
+                return 1;
             }
         }
 

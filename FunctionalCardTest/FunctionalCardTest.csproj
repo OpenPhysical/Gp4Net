@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../tests/Gp4Net.CardEmulator/Gp4Net.CardEmulator.csproj" />
+    <ProjectReference Include="../src/Gp4Net/Gp4Net.csproj" />
+  </ItemGroup>
+
+</Project>

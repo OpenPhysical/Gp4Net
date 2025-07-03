@@ -7,6 +7,7 @@ using System;
 using Gp4Net.Constants;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
+using Gp4Net.Tests.TestHelpers;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain
@@ -67,7 +68,7 @@ namespace Gp4Net.Tests.Domain
                 _macChainingValue
             );
 
-            var command = new byte[]
+            var commandBytes = new byte[]
             {
                 0x00,
                 0xA4,
@@ -83,12 +84,14 @@ namespace Gp4Net.Tests.Domain
                 0x00,
             };
 
+            var command = TestApduCommand.FromBytes(commandBytes);
+
             // Act
-            var wrappedCommand = session.WrapCommand(command);
+            var (wrappedData, expectedResponseLength) = session.WrapCommand(command);
 
             // Assert
-            Assert.That(wrappedCommand.Length, Is.EqualTo(command.Length + 8));
-            Assert.That(wrappedCommand[4], Is.EqualTo(0x0F)); // Updated Lc (7 + 8)
+            Assert.That(wrappedData.Length, Is.EqualTo(commandBytes.Length + 8));
+            Assert.That(wrappedData[4], Is.EqualTo(0x0F)); // Updated Lc (7 + 8)
         }
 
         [Test]
@@ -102,10 +105,10 @@ namespace Gp4Net.Tests.Domain
                 _macChainingValue
             );
 
-            var invalidCommand = new byte[] { 0x00, 0xA4 }; // Too short
+            var invalidCommandBytes = new byte[] { 0x00, 0xA4 }; // Too short
 
             // Act & Assert
-            _ = Assert.Throws<ArgumentException>(() => session.WrapCommand(invalidCommand));
+            _ = Assert.Throws<ArgumentException>(() => TestApduCommand.FromBytes(invalidCommandBytes));
         }
 
         [Test]

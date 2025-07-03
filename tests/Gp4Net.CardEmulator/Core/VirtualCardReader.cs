@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Gp4Net.CardEmulator.Functional;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Core
@@ -188,7 +189,7 @@ namespace Gp4Net.CardEmulator.Core
             const string readerName = "Virtual P71 Reader 00 00";
 
             var reader = new VirtualCardReader(readerName);
-            var p71Card = new Cards.NxpP71Scp02Card();
+            var p71Card = VirtualCardTestBuilder.P71Card();
 
             reader.InsertCard(p71Card);
             AddReader(reader);

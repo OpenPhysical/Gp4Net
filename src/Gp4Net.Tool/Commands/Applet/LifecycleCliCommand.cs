@@ -1,6 +1,8 @@
 using System;
 using System.ComponentModel;
 using System.Threading.Tasks;
+using Gp4Net.Domain;
+using Gp4Net.Services;
 using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
 using Spectre.Console;
@@ -19,7 +21,7 @@ namespace Gp4Net.Tool.Commands.Applet
         /// </summary>
         public LifecycleCommand(
             ICardService cardService,
-            IGlobalPlatformService globalPlatformService,
+            Gp4Net.Services.IGlobalPlatformService globalPlatformService,
             IKeysetResolver keysetResolver
         )
             : base(cardService, globalPlatformService, keysetResolver) { }
@@ -62,19 +64,9 @@ namespace Gp4Net.Tool.Commands.Applet
                     }
                 }
 
-                var success = GlobalPlatformService.SetLifecycleState(aid, settings.State);
-
-                if (success)
-                {
-                    AnsiConsole.MarkupLine("[green]✓ Lifecycle state updated successfully[/]");
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine("[red]✗ Failed to update lifecycle state[/]");
-                    return Task.FromResult(1);
-                }
-
-                return Task.FromResult(0);
+                // TODO: Implement SetLifecycleState in functional IGlobalPlatformService
+                AnsiConsole.MarkupLine("[yellow]Lifecycle state changes not yet implemented in functional architecture[/]");
+                return Task.FromResult(1);
             }
             catch (Exception ex)
             {
@@ -133,7 +125,7 @@ namespace Gp4Net.Tool.Commands.Applet
                     return ValidationResult.Error("AID must be a valid hex string");
                 }
 
-                if (!Enum.IsDefined(typeof(LifecycleState), State))
+                if (!Enum.IsDefined(typeof(Gp4Net.Domain.LifecycleState), State))
                 {
                     return ValidationResult.Error("Invalid lifecycle state");
                 }

@@ -1,9 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Gp4Net.Core;
+using Gp4Net.Domain;
+using Gp4Net.Services;
+using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
 using Spectre.Console;
@@ -15,18 +20,19 @@ namespace Gp4Net.Tool.Commands.Applet
     /// Command to list applications on the card.
     /// </summary>
     [PublicAPI]
+    [CliCommand("list", "List applications on the card", "applet")]
     /// <summary>
     /// Command to list applications installed on a GlobalPlatform card.
     /// </summary>
     [Description("List applications on the card")]
-    public class ListCommand : BaseCommand<ListCommand.Settings>
+    public class ListCliCommand : BaseCommand<ListCliCommand.Settings>
     {
         /// <summary>
-        /// Initializes a new instance of the ListCommand class.
+        /// Initializes a new instance of the ListCliCommand class.
         /// </summary>
-        public ListCommand(
+        public ListCliCommand(
             ICardService cardService,
-            IGlobalPlatformService globalPlatformService,
+            Gp4Net.Services.IGlobalPlatformService globalPlatformService,
             IKeysetResolver keysetResolver
         )
             : base(cardService, globalPlatformService, keysetResolver) { }
@@ -37,17 +43,17 @@ namespace Gp4Net.Tool.Commands.Applet
         /// <param name="context">The command context.</param>
         /// <param name="settings">The command settings.</param>
         /// <returns>0 if successful, 1 if failed.</returns>
-        protected override Task<int> ExecuteCommandAsync(CommandContext context, Settings settings)
+        protected override async Task<int> ExecuteCommandAsync(CommandContext context, Settings settings)
         {
             if (!EnsureCardConnection(settings))
             {
-                return Task.FromResult(1);
+                return 1;
             }
 
             // Optionally establish secure channel for more detailed information
             if (settings.RequiresSecureChannel && !EnsureSecureChannel(settings))
             {
-                return Task.FromResult(1);
+                return 1;
             }
 
             if (!settings.NoCardInfo)
@@ -55,74 +61,81 @@ namespace Gp4Net.Tool.Commands.Applet
                 DisplayCardInfo();
             }
 
-            try
-            {
-                var applications = GlobalPlatformService.GetApplications();
+            var statusResult = await GlobalPlatformService.GetStatusAsync(
+                StatusSubset.Applications);
 
-                // Apply filter
-                if (!string.IsNullOrEmpty(settings.Filter) && settings.Filter != "all")
-                {
-                    applications = FilterApplications(applications, settings.Filter);
-                }
-
-                if (applications.Count == 0)
-                {
-                    AnsiConsole.MarkupLine("[yellow]No applications found[/]");
-                    return Task.FromResult(0);
-                }
-
-                // Display based on format
-                switch (settings.Format.ToLowerInvariant())
-                {
-                    case "json":
-                        DisplayJson(applications);
-                        break;
-
-                    case "csv":
-                        DisplayCsv(applications);
-                        break;
-
-                    case "table":
-                    default:
-                        DisplayTable(applications, settings.ShowExtended);
-                        break;
-                }
-
-                if (settings.ShowSummary)
-                {
-                    AnsiConsole.WriteLine();
-                    AnsiConsole.MarkupLine($"[dim]Total: {applications.Count} application(s)[/]");
-                }
-
-                return Task.FromResult(0);
-            }
-            catch (Exception ex)
-            {
-                AnsiConsole.MarkupLine($"[red]Error listing applications: {ex.Message}[/]");
-                if (settings.Verbose)
-                {
-                    AnsiConsole.WriteException(ex);
-                }
-                return Task.FromResult(1);
-            }
+            return await statusResult.MatchAsync(
+                async applications => await ProcessApplications(applications, settings),
+                error => Task.FromResult(HandleError(error, settings)));
         }
 
-        private IList<ApplicationInfo> FilterApplications(
-            IList<ApplicationInfo> applications,
+        private Task<int> ProcessApplications(IReadOnlyList<ApplicationInfo> applications, Settings settings)
+        {
+            // Apply filter
+            var filteredApps = applications;
+            if (!string.IsNullOrEmpty(settings.Filter) && settings.Filter != "all")
+            {
+                filteredApps = FilterApplications(filteredApps, settings.Filter);
+            }
+
+            if (filteredApps.Count == 0)
+            {
+                AnsiConsole.MarkupLine("[yellow]No applications found[/]");
+                return Task.FromResult(0);
+            }
+
+            // Display based on format
+            switch (settings.Format.ToLowerInvariant())
+            {
+                case "json":
+                    DisplayJson(filteredApps);
+                    break;
+
+                case "csv":
+                    DisplayCsv(filteredApps);
+                    break;
+
+                case "table":
+                default:
+                    DisplayTable(filteredApps, settings.ShowExtended);
+                    break;
+            }
+
+            if (settings.ShowSummary)
+            {
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine($"[dim]Total: {filteredApps.Count} application(s)[/]");
+            }
+
+            return Task.FromResult(0);
+        }
+
+        private int HandleError(SmartCardError error, Settings settings)
+        {
+            AnsiConsole.MarkupLine($"[red]Error listing applications: {error.Message}[/]");
+            if (settings.Verbose && error.InnerException != null)
+            {
+                AnsiConsole.WriteException(error.InnerException);
+            }
+            return 1;
+        }
+
+        private IReadOnlyList<ApplicationInfo> FilterApplications(
+            IReadOnlyList<ApplicationInfo> applications,
             string filter
         )
         {
             return filter.ToLowerInvariant() switch
             {
-                "isd" => [.. applications.Where(a => a.Type == "ISD")],
-                "apps" or "applets" => [.. applications.Where(a => a.Type == "Application")],
-                "packages" => [.. applications.Where(a => a.Type == "Package")],
-                "ssd" => [.. applications.Where(a => a.Type == "SSD")],
+                "isd" => applications.Where(a => a.Type == ApplicationType.IssuerSecurityDomain).ToList(),
+                "apps" or "applets" => applications.Where(a => a.Type == ApplicationType.Application).ToList(),
+                "packages" => applications.Where(a => a.Type == ApplicationType.LoadFile).ToList(),
+                "ssd" => applications.Where(a => a.Type == ApplicationType.SupplementarySecurityDomain).ToList(),
                 _ => applications,
             };
         }
 
-        private void DisplayTable(IList<ApplicationInfo> applications, bool extended)
+        private void DisplayTable(IReadOnlyList<ApplicationInfo> applications, bool extended)
         {
             var table = new Table();
 
@@ -165,15 +178,15 @@ namespace Gp4Net.Tool.Commands.Applet
             AnsiConsole.Write(table);
         }
 
-        private void DisplayJson(IList<ApplicationInfo> applications)
+        private void DisplayJson(IReadOnlyList<ApplicationInfo> applications)
         {
             var json = JsonSerializer.Serialize(
                 applications.Select(a => new
                 {
-                    type = a.Type,
+                    type = a.Type.ToString(),
                     aid = Convert.ToHexString(a.Aid),
-                    state = a.LifecycleState,
-                    privileges = a.Privileges,
+                    state = a.LifecycleState.ToString(),
+                    privileges = a.Privileges.Select(p => p.ToString()).ToArray(),
                     version = a.Version,
                     associatedSD = a.AssociatedSecurityDomain != null
                         ? Convert.ToHexString(a.AssociatedSecurityDomain)
@@ -185,7 +198,7 @@ namespace Gp4Net.Tool.Commands.Applet
             Console.WriteLine(json);
         }
 
-        private void DisplayCsv(IList<ApplicationInfo> applications)
+        private void DisplayCsv(IReadOnlyList<ApplicationInfo> applications)
         {
             Console.WriteLine("Type,AID,State,Privileges,Version,AssociatedSD");
 
@@ -195,51 +208,50 @@ namespace Gp4Net.Tool.Commands.Applet
                     $"{app.Type},"
                         + $"{Convert.ToHexString(app.Aid)},"
                         + $"{app.LifecycleState},"
-                        + $"\"{string.Join(";", app.Privileges)}\","
+                        + $"\"{string.Join(";", app.Privileges.Select(p => p.ToString()))}\","
                         + $"{app.Version ?? ""},"
                         + $"{(app.AssociatedSecurityDomain != null ? Convert.ToHexString(app.AssociatedSecurityDomain) : "")}"
                 );
             }
         }
 
-        private string GetTypeDisplay(string type)
+        private string GetTypeDisplay(ApplicationType type)
         {
             return type switch
             {
-                "ISD" => "[red]ISD[/]",
-                "SSD" => "[yellow]SSD[/]",
-                "Application" => "[green]App[/]",
-                "Package" => "[blue]Pkg[/]",
-                _ => type,
+                ApplicationType.IssuerSecurityDomain => "[red]ISD[/]",
+                ApplicationType.SupplementarySecurityDomain => "[yellow]SSD[/]",
+                ApplicationType.Application => "[green]App[/]",
+                ApplicationType.LoadFile => "[blue]Pkg[/]",
+                _ => type.ToString(),
             };
         }
 
-        private string GetStateDisplay(string state)
+        private string GetStateDisplay(LifecycleState state)
         {
-            return state.ToLowerInvariant() switch
+            return state switch
             {
-                "selectable" => "[green]Selectable[/]",
-                "personalized" => "[blue]Personalized[/]",
-                "blocked" => "[red]Blocked[/]",
-                "locked" => "[red]Locked[/]",
-                _ => state,
+                LifecycleState.Selectable => "[green]Selectable[/]",
+                LifecycleState.Personalized => "[blue]Personalized[/]",
+                LifecycleState.Blocked => "[red]Blocked[/]",
+                LifecycleState.Locked => "[red]Locked[/]",
+                _ => state.ToString(),
             };
         }
 
-        private string GetPrivilegesDisplay(IEnumerable<string> privileges)
+        private string GetPrivilegesDisplay(ImmutableList<Privilege> privileges)
         {
-            var privList = privileges.ToList();
-            if (!privList.Any())
+            if (privileges.Count == 0)
             {
                 return "[dim]-[/]";
             }
 
-            if (privList.Count <= 3)
+            if (privileges.Count <= 3)
             {
-                return string.Join(", ", privList);
+                return string.Join(", ", privileges.Select(p => p.ToString()));
             }
 
-            return $"{string.Join(", ", privList.Take(2))}, [dim]+{privList.Count - 2} more[/]";
+            return $"{string.Join(", ", privileges.Take(2).Select(p => p.ToString()))}, [dim]+{privileges.Count - 2} more[/]";
         }
 
         /// <summary>

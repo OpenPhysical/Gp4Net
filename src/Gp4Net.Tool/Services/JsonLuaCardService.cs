@@ -35,24 +35,9 @@ namespace Gp4Net.Tool.Services
         /// <inheritdoc />
         public IReadOnlyList<string> GetReaders()
         {
-            var readers = new List<string>();
-            
-            // Look for JSON trace files
-            var tracesDir = Path.Combine(Directory.GetCurrentDirectory(), "traces");
-            if (Directory.Exists(tracesDir))
-            {
-                foreach (var jsonFile in Directory.GetFiles(tracesDir, "*.json"))
-                {
-                    var fileName = Path.GetFileNameWithoutExtension(jsonFile);
-                    readers.Add($"json:{fileName}.json");
-                }
-            }
-            
-            // Add examples
-            readers.Add("json:gp_pro_card_info.json?operations=info");
-            readers.Add("json:gp_pro_scp03.json?operations=info,secure_channel_establish,list");
-            
-            return readers.AsReadOnly();
+            // JSON readers are not discoverable - they must be explicitly specified
+            // Return empty list to prevent automatic detection or prompting
+            return new List<string>().AsReadOnly();
         }
 
         /// <inheritdoc />

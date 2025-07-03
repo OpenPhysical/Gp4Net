@@ -1,9 +1,11 @@
-using WSCT.Core;
+using System;
+using Gp4Net.Transport;
 using WSCT.Core.APDU;
+using WSCT.ISO7816;
 using WSCT.Wrapper;
 using WSCT.Wrapper.Desktop.Core;
 
-namespace Gp4Net.Tool.Services.CardCommunication
+namespace Gp4Net.Tool.Services.CardCommunication.Wsct
 {
     /// <summary>
     /// Concrete implementation of ICardChannelWrapper using WSCT.
@@ -13,18 +15,20 @@ namespace Gp4Net.Tool.Services.CardCommunication
         private readonly CardChannel _channel;
         private bool _disposed;
 
+
         /// <summary>
         /// Initializes a new instance of the WsctCardChannelWrapper class.
         /// </summary>
-        /// <param name="context">The card context.</param>
+        /// <param name="context">The WSCT card context.</param>
         /// <param name="readerName">The reader name.</param>
-        public WsctCardChannelWrapper(ICardContext context, string readerName)
+        /// <param name="shareMode">The share mode.</param>
+        public WsctCardChannelWrapper(CardContext context, string readerName, WSCT.Wrapper.ShareMode shareMode)
         {
             _channel = new CardChannel(context, readerName);
         }
 
         /// <inheritdoc />
-        public ErrorCode Connect(ShareMode shareMode, Protocol protocol)
+        public ErrorCode Connect(WSCT.Wrapper.ShareMode shareMode, WSCT.Wrapper.Protocol protocol)
         {
             return _channel.Connect(shareMode, protocol);
         }
@@ -32,7 +36,11 @@ namespace Gp4Net.Tool.Services.CardCommunication
         /// <inheritdoc />
         public ErrorCode Disconnect(Disposition disposition)
         {
-            return _channel.Disconnect(disposition);
+            if (!_disposed)
+            {
+                return _channel.Disconnect(disposition);
+            }
+            return ErrorCode.Success;
         }
 
         /// <inheritdoc />
@@ -60,7 +68,7 @@ namespace Gp4Net.Tool.Services.CardCommunication
             {
                 try
                 {
-                    _ = _channel.Disconnect(Disposition.UnpowerCard);
+                    _channel.Disconnect(Disposition.UnpowerCard);
                 }
                 catch
                 {

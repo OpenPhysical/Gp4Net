@@ -68,6 +68,9 @@ namespace Gp4Net.Tool
                 {
                     _ = config.SetApplicationName("gp4net");
                     _ = config.SetApplicationVersion("1.0.0");
+                    
+                    // Auto-register commands with CliCommandAttribute
+                    config.RegisterCliCommands(services);
 
                     // Add global options
                     _ = config.AddExample(new[] { "card", "list-readers" });
@@ -124,45 +127,7 @@ namespace Gp4Net.Tool
                         }
                     );
 
-                    // Applet management commands
-                    _ = config.AddBranch(
-                        "applet",
-                        applet =>
-                        {
-                            applet.SetDescription("Applet management operations");
-                            _ = applet
-                                .AddCommand<ListCommand>("list")
-                                .WithDescription("List applications on the card");
-                            _ = applet
-                                .AddCommand<StatusCommand>("status")
-                                .WithDescription(
-                                    "Get applet status from card (deprecated, use 'list')"
-                                );
-                            _ = applet
-                                .AddCommand<InstallCommand>("install")
-                                .WithDescription("Install a CAP file on the card");
-                            _ = applet
-                                .AddCommand<LoadCommand>("load")
-                                .WithDescription(
-                                    "Load a CAP file package (without installing applets)"
-                                );
-                            _ = applet
-                                .AddCommand<InstantiateCommand>("instantiate")
-                                .WithDescription("Instantiate an applet from a loaded package");
-                            _ = applet
-                                .AddCommand<DeleteCommand>("delete")
-                                .WithDescription("Delete an applet from the card");
-                            _ = applet
-                                .AddCommand<DeleteCommand>("uninstall")
-                                .WithDescription("Uninstall an applet from the card (alias for delete)");
-                            _ = applet
-                                .AddCommand<LifecycleCommand>("lifecycle")
-                                .WithDescription("Manage applet lifecycle states");
-                            _ = applet
-                                .AddCommand<ValidateCommand>("validate")
-                                .WithDescription("Validate a CAP file without installing");
-                        }
-                    );
+                    // Applet management commands are now auto-registered via CliCommandAttribute
 
                     // Script commands
                     _ = config.AddBranch(
@@ -289,7 +254,7 @@ namespace Gp4Net.Tool
                     provider.GetRequiredService<SimpleJsonCardService>()
                 );
             });
-            _ = services.AddSingleton<IGlobalPlatformService, GlobalPlatformService>();
+            _ = services.AddSingleton<Gp4Net.Services.IGlobalPlatformService, Gp4Net.Services.FunctionalGlobalPlatformService>();
             _ = services.AddSingleton<PackageRegistry>();
 
             // Register pipeline services
@@ -299,24 +264,8 @@ namespace Gp4Net.Tool
             // Register new pipeline commands automatically
             services.RegisterCommandHandlers(Assembly.GetExecutingAssembly());
 
-            // Register legacy commands (not yet refactored)
-            _ = services.AddTransient<TestSecureChannelCommand>();
-            _ = services.AddTransient<KeysChangeCommand>();
-            _ = services.AddTransient<ConvertScpCommand>();
-            _ = services.AddTransient<ListCommand>();
-            _ = services.AddTransient<StatusCommand>();
-            _ = services.AddTransient<InstallCommand>();
-            _ = services.AddTransient<LoadCommand>();
-            _ = services.AddTransient<InstantiateCommand>();
-            _ = services.AddTransient<DeleteCommand>();
-            _ = services.AddTransient<LifecycleCommand>();
-            _ = services.AddTransient<ValidateCommand>();
-            _ = services.AddTransient<ScanSdkCommand>();
-            _ = services.AddTransient<AnalyzeExpCommand>();
-            _ = services.AddTransient<ScriptCommand>();
-            _ = services.AddTransient<ReplCommand>();
-            _ = services.AddTransient<EvalCommand>();
-            _ = services.AddTransient<Commands.Trace.ConvertCommand>();
+            // TODO: Re-implement auto-registration with Scrutor package or manual registration
+            // For now, commands are registered through RegisterCommandHandlers above
 
             Logger.Debug("Services configured");
         }

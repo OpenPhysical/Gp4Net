@@ -1,9 +1,11 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using Gp4Net.Transport;
 using WSCT.Wrapper;
 using WSCT.Wrapper.Desktop.Core;
 
-namespace Gp4Net.Tool.Services.CardCommunication
+namespace Gp4Net.Tool.Services.CardCommunication.Wsct
 {
     /// <summary>
     /// Concrete implementation of ICardContextWrapper using WSCT.
@@ -22,7 +24,7 @@ namespace Gp4Net.Tool.Services.CardCommunication
         }
 
         /// <inheritdoc />
-        public IReadOnlyList<string> Readers => _context.Readers?.ToList() ?? [];
+        public IReadOnlyList<string> Readers => _context.Readers ?? Array.Empty<string>();
 
         /// <inheritdoc />
         public ErrorCode Establish()
@@ -39,14 +41,19 @@ namespace Gp4Net.Tool.Services.CardCommunication
         /// <inheritdoc />
         public ICardChannelWrapper CreateCardChannel(string readerName)
         {
-            return new WsctCardChannelWrapper(_context, readerName);
+            return new WsctCardChannelWrapper(_context, readerName, WSCT.Wrapper.ShareMode.Exclusive);
         }
 
         /// <inheritdoc />
         public ErrorCode Release()
         {
-            return _context.Release();
+            if (!_disposed)
+            {
+                return _context.Release();
+            }
+            return ErrorCode.Success;
         }
+
 
         /// <inheritdoc />
         public void Dispose()

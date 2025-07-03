@@ -1,557 +1,414 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Commands
 {
     /// <summary>
-    /// Represents the INSTALL command for loading and installing applications.
+    /// Immutable record representing the INSTALL command for loading and installing applications.
     /// Supports INSTALL [for load] and INSTALL [for install] operations.
     /// </summary>
     [PublicAPI]
-    public class InstallCommand : IApduCommand
+    public abstract record InstallCommand : IApduCommand
     {
         /// <summary>
         /// The command class byte.
         /// </summary>
-        public const byte Cla = 0x80;
+        public const byte CommandCla = 0x80;
 
         /// <summary>
         /// The command instruction byte.
         /// </summary>
-        public const byte Ins = 0xE6;
-
-        /// <summary>
-        /// Install operation types for P1 parameter.
-        /// </summary>
-        public enum InstallType : byte
-        {
-            /// <summary>
-            /// INSTALL [for load] - prepares card to receive a load file.
-            /// </summary>
-            ForLoad = 0x04,
-
-            /// <summary>
-            /// INSTALL [for install] - instantiates an applet.
-            /// </summary>
-            ForInstall = 0x04,
-
-            /// <summary>
-            /// INSTALL [for make selectable] - makes an applet selectable.
-            /// </summary>
-            ForMakeSelectable = 0x08,
-
-            /// <summary>
-            /// INSTALL [for install and make selectable] - combines install and make selectable.
-            /// </summary>
-            ForInstallAndMakeSelectable = 0x0C,
-        }
+        public const byte CommandIns = 0xE6;
 
         /// <summary>
         /// Gets the install type.
         /// </summary>
-        public InstallType Type { get; }
+        public abstract InstallType Type { get; }
 
         /// <summary>
         /// Gets the package AID.
         /// </summary>
-        public byte[] PackageAid { get; }
+        public ImmutableArray<byte> PackageAid { get; }
 
-        /// <summary>
-        /// Gets the security domain AID (optional).
-        /// </summary>
-        public byte[]? SecurityDomainAid { get; }
+        /// <inheritdoc/>
+        public byte Cla => CommandCla;
 
-        /// <summary>
-        /// Gets the hash of the load file (optional).
-        /// </summary>
-        public byte[]? Hash { get; }
+        /// <inheritdoc/>
+        public byte Ins => CommandIns;
 
-        /// <summary>
-        /// Gets the install token (optional).
-        /// </summary>
-        public byte[]? InstallToken { get; }
-
-        /// <summary>
-        /// Gets the module AID (for install operations).
-        /// </summary>
-        public byte[]? ModuleAid { get; }
-
-        /// <summary>
-        /// Gets the applet AID (for install operations).
-        /// </summary>
-        public byte[]? AppletAid { get; }
-
-        /// <summary>
-        /// Gets the privileges (for install operations).
-        /// </summary>
-        public byte[]? Privileges { get; }
-
-        /// <summary>
-        /// Gets the install parameters (for install operations).
-        /// </summary>
-        public byte[]? InstallParameters { get; }
-
-        /// <summary>
-        /// Gets the class byte.
-        /// </summary>
-        byte IApduCommand.Cla => Cla;
-
-        /// <summary>
-        /// Gets the instruction byte.
-        /// </summary>
-        byte IApduCommand.Ins => Ins;
-
-        /// <summary>
-        /// Gets the parameter 1 byte.
-        /// </summary>
+        /// <inheritdoc/>
         public byte P1 => (byte)Type;
 
-        /// <summary>
-        /// Gets the parameter 2 byte.
-        /// </summary>
+        /// <inheritdoc/>
         public byte P2 => 0x00;
 
-        /// <summary>
-        /// Gets the command data.
-        /// </summary>
-        public byte[]? Data => GetInstallData();
+        /// <inheritdoc/>
+        public abstract byte[] Data { get; }
 
-        /// <summary>
-        /// Gets the expected response length.
-        /// </summary>
-        public int? ExpectedResponseLength => null;
+        /// <inheritdoc/>
+        public int? ExpectedResponseLength => 0; // Le=00 for INSTALL commands
 
-        /// <summary>
-        /// Gets whether this command uses extended length.
-        /// </summary>
+        /// <inheritdoc/>
         public bool IsExtendedLength => false;
 
         /// <summary>
-        /// Gets the install data for the IApduCommand interface.
+        /// Base constructor for InstallCommand.
         /// </summary>
-        private byte[] GetInstallData()
+        protected InstallCommand(ImmutableArray<byte> packageAid)
         {
-            var data = new List<byte>
-            {
-                // Add package AID
-                (byte)PackageAid.Length
-            };
-            data.AddRange(PackageAid);
+            if (packageAid.IsDefaultOrEmpty)
+                throw new ArgumentException("Package AID cannot be empty.", nameof(packageAid));
 
-            // Add security domain AID (or zero length if null)
-            if (SecurityDomainAid != null)
-            {
-                data.Add((byte)SecurityDomainAid.Length);
-                data.AddRange(SecurityDomainAid);
-            }
-            else
-            {
-                data.Add(0x00);
-            }
-
-            // Add hash (or zero length if null)
-            if (Hash != null)
-            {
-                data.Add((byte)Hash.Length);
-                data.AddRange(Hash);
-            }
-            else
-            {
-                data.Add(0x00);
-            }
-
-            // Add install token (or zero length if null)
-            if (InstallToken != null)
-            {
-                data.Add((byte)InstallToken.Length);
-                data.AddRange(InstallToken);
-            }
-            else
-            {
-                data.Add(0x00);
-            }
-
-            // For install operations, add additional fields
-            if (Type == InstallType.ForInstall)
-            {
-                // Add module AID
-                if (ModuleAid != null)
-                {
-                    data.Add((byte)ModuleAid.Length);
-                    data.AddRange(ModuleAid);
-                }
-                else
-                {
-                    data.Add(0x00);
-                }
-
-                // Add applet AID
-                if (AppletAid != null)
-                {
-                    data.Add((byte)AppletAid.Length);
-                    data.AddRange(AppletAid);
-                }
-                else
-                {
-                    data.Add(0x00);
-                }
-
-                // Add privileges
-                if (Privileges != null)
-                {
-                    data.Add((byte)Privileges.Length);
-                    data.AddRange(Privileges);
-                }
-                else
-                {
-                    data.Add(0x00);
-                }
-
-                // Add install parameters
-                if (InstallParameters != null)
-                {
-                    data.Add((byte)InstallParameters.Length);
-                    data.AddRange(InstallParameters);
-                }
-                else
-                {
-                    data.Add(0x00);
-                }
-            }
-
-            return [.. data];
+            PackageAid = packageAid;
         }
 
         /// <summary>
-        /// Initializes a new instance of the InstallCommand class for INSTALL [for load].
+        /// INSTALL [for load] command implementation.
         /// </summary>
-        /// <param name="packageAid">The package AID.</param>
-        /// <param name="securityDomainAid">The security domain AID (optional).</param>
-        /// <param name="hash">The hash of the load file (optional).</param>
-        /// <param name="installToken">The install token (optional).</param>
-        public InstallCommand(
-            byte[] packageAid,
-            byte[]? securityDomainAid = null,
-            byte[]? hash = null,
-            byte[]? installToken = null
-        )
+        public sealed record InstallForLoadCommand : InstallCommand
         {
-            ArgumentNullException.ThrowIfNull(packageAid);
+            /// <inheritdoc/>
+            public override InstallType Type => InstallType.ForLoad;
 
-            if (packageAid.Length == 0)
+            /// <summary>
+            /// Gets the security domain AID (optional).
+            /// </summary>
+            public ImmutableArray<byte> SecurityDomainAid { get; }
+
+            /// <summary>
+            /// Gets the hash of the load file (optional).
+            /// </summary>
+            public ImmutableArray<byte> Hash { get; }
+
+            /// <summary>
+            /// Gets the load parameters (optional).
+            /// </summary>
+            public ImmutableArray<byte> LoadParameters { get; }
+
+            /// <summary>
+            /// Gets the install token (optional).
+            /// </summary>
+            public ImmutableArray<byte> InstallToken { get; }
+
+            /// <summary>
+            /// Initializes a new instance of InstallForLoadCommand.
+            /// </summary>
+            public InstallForLoadCommand(
+                ImmutableArray<byte> packageAid,
+                ImmutableArray<byte> securityDomainAid = default,
+                ImmutableArray<byte> hash = default,
+                ImmutableArray<byte> loadParameters = default,
+                ImmutableArray<byte> installToken = default)
+                : base(packageAid)
             {
-                throw new ArgumentException("Package AID cannot be empty.", nameof(packageAid));
+                SecurityDomainAid = securityDomainAid;
+                Hash = hash;
+                LoadParameters = loadParameters;
+                InstallToken = installToken;
             }
 
-            Type = InstallType.ForLoad;
-            PackageAid = (byte[])packageAid.Clone();
-            SecurityDomainAid = securityDomainAid?.Clone() as byte[];
-            Hash = hash?.Clone() as byte[];
-            InstallToken = installToken?.Clone() as byte[];
+            /// <inheritdoc/>
+            public override byte[] Data => BuildData();
+
+            private byte[] BuildData()
+            {
+                var builder = new List<byte>();
+
+                // Package AID
+                builder.Add((byte)PackageAid.Length);
+                builder.AddRange(PackageAid);
+
+                // Security Domain AID
+                if (!SecurityDomainAid.IsDefaultOrEmpty)
+                {
+                    builder.Add((byte)SecurityDomainAid.Length);
+                    builder.AddRange(SecurityDomainAid);
+                }
+                else
+                {
+                    builder.Add(0x00);
+                }
+
+                // Hash
+                if (!Hash.IsDefaultOrEmpty)
+                {
+                    builder.Add((byte)Hash.Length);
+                    builder.AddRange(Hash);
+                }
+                else
+                {
+                    builder.Add(0x00);
+                }
+
+                // Load Parameters - mandatory field per GP spec
+                if (!LoadParameters.IsDefaultOrEmpty)
+                {
+                    builder.Add((byte)LoadParameters.Length);
+                    builder.AddRange(LoadParameters);
+                }
+                else
+                {
+                    builder.Add(0x00);
+                }
+
+                // Install Token
+                if (!InstallToken.IsDefaultOrEmpty)
+                {
+                    builder.Add((byte)InstallToken.Length);
+                    builder.AddRange(InstallToken);
+                }
+                else
+                {
+                    builder.Add(0x00);
+                }
+
+                return builder.ToArray();
+            }
         }
 
         /// <summary>
-        /// Initializes a new instance of the InstallCommand class for INSTALL [for install].
+        /// INSTALL [for install] command implementation.
         /// </summary>
-        /// <param name="type">The install type (ForInstall, ForMakeSelectable, or ForInstallAndMakeSelectable).</param>
-        /// <param name="packageAid">The package AID.</param>
-        /// <param name="appletAid">The applet AID.</param>
-        /// <param name="moduleAid">The module AID (optional).</param>
-        /// <param name="privileges">The privileges (optional).</param>
-        /// <param name="installParameters">The install parameters (optional).</param>
-        /// <param name="installToken">The install token (optional).</param>
-        public InstallCommand(
-            InstallType type,
-            byte[] packageAid,
-            byte[] appletAid,
-            byte[]? moduleAid = null,
-            byte[]? privileges = null,
-            byte[]? installParameters = null,
-            byte[]? installToken = null
-        )
+        public sealed record InstallForInstallCommand : InstallCommand
         {
-            ArgumentNullException.ThrowIfNull(packageAid);
+            /// <inheritdoc/>
+            public override InstallType Type { get; }
 
-            ArgumentNullException.ThrowIfNull(appletAid);
+            /// <summary>
+            /// Gets the module AID (optional).
+            /// </summary>
+            public ImmutableArray<byte> ModuleAid { get; }
 
-            if (packageAid.Length == 0)
+            /// <summary>
+            /// Gets the applet AID.
+            /// </summary>
+            public ImmutableArray<byte> AppletAid { get; }
+
+            /// <summary>
+            /// Gets the privileges.
+            /// </summary>
+            public ImmutableArray<byte> Privileges { get; }
+
+            /// <summary>
+            /// Gets the install parameters (optional).
+            /// </summary>
+            public ImmutableArray<byte> InstallParameters { get; }
+
+            /// <summary>
+            /// Gets the install token (optional).
+            /// </summary>
+            public ImmutableArray<byte> InstallToken { get; }
+
+            /// <summary>
+            /// Initializes a new instance of InstallForInstallCommand.
+            /// </summary>
+            public InstallForInstallCommand(
+                InstallType type,
+                ImmutableArray<byte> packageAid,
+                ImmutableArray<byte> appletAid,
+                ImmutableArray<byte> moduleAid = default,
+                ImmutableArray<byte> privileges = default,
+                ImmutableArray<byte> installParameters = default,
+                ImmutableArray<byte> installToken = default)
+                : base(packageAid)
             {
-                throw new ArgumentException("Package AID cannot be empty.", nameof(packageAid));
+                if (type == InstallType.ForLoad)
+                    throw new ArgumentException("Use InstallForLoadCommand for INSTALL [for load].", nameof(type));
+
+                if (appletAid.IsDefaultOrEmpty)
+                    throw new ArgumentException("Applet AID cannot be empty.", nameof(appletAid));
+
+                Type = type;
+                AppletAid = appletAid;
+                ModuleAid = moduleAid;
+                Privileges = privileges.IsDefaultOrEmpty ? ImmutableArray.Create<byte>(0x00) : privileges;
+                InstallParameters = installParameters;
+                InstallToken = installToken;
             }
 
-            if (appletAid.Length == 0)
-            {
-                throw new ArgumentException("Applet AID cannot be empty.", nameof(appletAid));
-            }
+            /// <inheritdoc/>
+            public override byte[] Data => BuildData();
 
-            if (type == InstallType.ForLoad)
+            private byte[] BuildData()
             {
-                throw new ArgumentException(
-                    "Use the other constructor for INSTALL [for load].",
-                    nameof(type)
-                );
-            }
+                var builder = new List<byte>();
 
-            Type = type;
-            PackageAid = (byte[])packageAid.Clone();
-            AppletAid = (byte[])appletAid.Clone();
-            ModuleAid = moduleAid?.Clone() as byte[];
-            Privileges = privileges?.Clone() as byte[];
-            InstallParameters = installParameters?.Clone() as byte[];
-            InstallToken = installToken?.Clone() as byte[];
+                // Package AID
+                builder.Add((byte)PackageAid.Length);
+                builder.AddRange(PackageAid);
+
+                // Module AID
+                if (!ModuleAid.IsDefaultOrEmpty)
+                {
+                    builder.Add((byte)ModuleAid.Length);
+                    builder.AddRange(ModuleAid);
+                }
+                else
+                {
+                    builder.Add(0x00);
+                }
+
+                // Applet AID
+                builder.Add((byte)AppletAid.Length);
+                builder.AddRange(AppletAid);
+
+                // Privileges
+                builder.Add((byte)Privileges.Length);
+                builder.AddRange(Privileges);
+
+                // Install Parameters
+                if (!InstallParameters.IsDefaultOrEmpty)
+                {
+                    builder.Add((byte)InstallParameters.Length);
+                    builder.AddRange(InstallParameters);
+                }
+                else
+                {
+                    builder.Add(0x00);
+                }
+
+                // Install Token
+                if (!InstallToken.IsDefaultOrEmpty)
+                {
+                    builder.Add((byte)InstallToken.Length);
+                    builder.AddRange(InstallToken);
+                }
+                else
+                {
+                    builder.Add(0x00);
+                }
+
+                return builder.ToArray();
+            }
         }
+    }
 
+    /// <summary>
+    /// Install operation types for P1 parameter.
+    /// </summary>
+    public enum InstallType : byte
+    {
+        /// <summary>
+        /// INSTALL [for load] - prepares card to receive a load file.
+        /// </summary>
+        ForLoad = 0x02,
+
+        /// <summary>
+        /// INSTALL [for install] - instantiates an applet.
+        /// </summary>
+        ForInstall = 0x04,
+
+        /// <summary>
+        /// INSTALL [for make selectable] - makes an applet selectable.
+        /// </summary>
+        ForMakeSelectable = 0x08,
+
+        /// <summary>
+        /// INSTALL [for install and make selectable] - combines install and make selectable.
+        /// </summary>
+        ForInstallAndMakeSelectable = 0x0C,
+    }
+
+    /// <summary>
+    /// Builder for creating InstallCommand instances.
+    /// </summary>
+    [PublicAPI]
+    public static class InstallCommandBuilder
+    {
         /// <summary>
         /// Creates an INSTALL [for load] command.
         /// </summary>
-        /// <param name="packageAid">The package AID.</param>
-        /// <param name="securityDomainAid">The security domain AID (optional).</param>
-        /// <param name="hash">The hash of the load file (optional).</param>
-        /// <param name="installToken">The install token (optional).</param>
-        /// <returns>A new InstallCommand for load operation.</returns>
-        public static InstallCommand CreateForLoad(
+        public static InstallCommand.InstallForLoadCommand CreateForLoad(
             byte[] packageAid,
             byte[]? securityDomainAid = null,
             byte[]? hash = null,
-            byte[]? installToken = null
-        )
+            byte[]? loadParameters = null,
+            byte[]? installToken = null)
         {
-            return new InstallCommand(packageAid, securityDomainAid, hash, installToken);
+            return new InstallCommand.InstallForLoadCommand(
+                packageAid.ToImmutableArray(),
+                securityDomainAid?.ToImmutableArray() ?? default,
+                hash?.ToImmutableArray() ?? default,
+                loadParameters?.ToImmutableArray() ?? default,
+                installToken?.ToImmutableArray() ?? default);
         }
 
         /// <summary>
         /// Creates an INSTALL [for install] command.
         /// </summary>
-        /// <param name="packageAid">The package AID.</param>
-        /// <param name="appletAid">The applet AID.</param>
-        /// <param name="moduleAid">The module AID (optional).</param>
-        /// <param name="privileges">The privileges (optional, defaults to no privileges).</param>
-        /// <param name="installParameters">The install parameters (optional).</param>
-        /// <param name="installToken">The install token (optional).</param>
-        /// <returns>A new InstallCommand for install operation.</returns>
-        public static InstallCommand CreateForInstall(
+        public static InstallCommand.InstallForInstallCommand CreateForInstall(
             byte[] packageAid,
             byte[] appletAid,
             byte[]? moduleAid = null,
             byte[]? privileges = null,
             byte[]? installParameters = null,
-            byte[]? installToken = null
-        )
+            byte[]? installToken = null)
         {
-            return new InstallCommand(
+            return new InstallCommand.InstallForInstallCommand(
                 InstallType.ForInstall,
-                packageAid,
-                appletAid,
-                moduleAid,
-                privileges ?? new byte[] { 0x00 }, // Default to no privileges
-                installParameters,
-                installToken
-            );
+                packageAid.ToImmutableArray(),
+                appletAid.ToImmutableArray(),
+                moduleAid?.ToImmutableArray() ?? default,
+                privileges?.ToImmutableArray() ?? default,
+                installParameters?.ToImmutableArray() ?? default,
+                installToken?.ToImmutableArray() ?? default);
         }
 
         /// <summary>
         /// Creates an INSTALL [for install and make selectable] command.
         /// </summary>
-        /// <param name="packageAid">The package AID.</param>
-        /// <param name="appletAid">The applet AID.</param>
-        /// <param name="moduleAid">The module AID (optional).</param>
-        /// <param name="privileges">The privileges (optional, defaults to no privileges).</param>
-        /// <param name="installParameters">The install parameters (optional).</param>
-        /// <param name="installToken">The install token (optional).</param>
-        /// <returns>A new InstallCommand for install and make selectable operation.</returns>
-        public static InstallCommand CreateForInstallAndMakeSelectable(
+        public static InstallCommand.InstallForInstallCommand CreateForInstallAndMakeSelectable(
             byte[] packageAid,
             byte[] appletAid,
             byte[]? moduleAid = null,
             byte[]? privileges = null,
             byte[]? installParameters = null,
-            byte[]? installToken = null
-        )
+            byte[]? installToken = null)
         {
-            return new InstallCommand(
+            return new InstallCommand.InstallForInstallCommand(
                 InstallType.ForInstallAndMakeSelectable,
-                packageAid,
-                appletAid,
-                moduleAid,
-                privileges ?? new byte[] { 0x00 }, // Default to no privileges
-                installParameters,
-                installToken
-            );
-        }
-
-        /// <summary>
-        /// Converts this command to an APDU byte array.
-        /// </summary>
-        /// <returns>The APDU command bytes.</returns>
-        public byte[] ToApdu()
-        {
-            var data = new List<byte>();
-
-            if (Type == InstallType.ForLoad)
-            {
-                // INSTALL [for load] data format:
-                // <Len(PkgAID)> <PkgAID>
-                // <Len(SecurityDomainAID)> <SD_AID or 00>
-                // <Len(Hash)> <Hash> ; or 00
-                // <Len(InstallToken)> <Token> ; or 00
-
-                // Package AID
-                data.Add((byte)PackageAid.Length);
-                data.AddRange(PackageAid);
-
-                // Security Domain AID
-                if (SecurityDomainAid != null && SecurityDomainAid.Length > 0)
-                {
-                    data.Add((byte)SecurityDomainAid.Length);
-                    data.AddRange(SecurityDomainAid);
-                }
-                else
-                {
-                    data.Add(0x00);
-                }
-
-                // Hash
-                if (Hash != null && Hash.Length > 0)
-                {
-                    data.Add((byte)Hash.Length);
-                    data.AddRange(Hash);
-                }
-                else
-                {
-                    data.Add(0x00);
-                }
-
-                // Install Token
-                if (InstallToken != null && InstallToken.Length > 0)
-                {
-                    data.Add((byte)InstallToken.Length);
-                    data.AddRange(InstallToken);
-                }
-                else
-                {
-                    data.Add(0x00);
-                }
-            }
-            else
-            {
-                // INSTALL [for install] data format:
-                // <Len(PkgAID)> <PkgAID>
-                // <Len(ModuleAID)> <ModuleAID> ; often 00
-                // <Len(AppletAID)> <AppletAID>
-                // <Len(Privileges)> <PrivBytes> ; typically 01 00
-                // <Len(InstallParams)> <TLV or raw> ; e.g., C9 00 or 00
-                // <Len(InstallToken)> <Token> ; or 00
-
-                // Package AID
-                data.Add((byte)PackageAid.Length);
-                data.AddRange(PackageAid);
-
-                // Module AID
-                if (ModuleAid != null && ModuleAid.Length > 0)
-                {
-                    data.Add((byte)ModuleAid.Length);
-                    data.AddRange(ModuleAid);
-                }
-                else
-                {
-                    data.Add(0x00);
-                }
-
-                // Applet AID
-                data.Add((byte)AppletAid!.Length);
-                data.AddRange(AppletAid);
-
-                // Privileges
-                if (Privileges != null && Privileges.Length > 0)
-                {
-                    data.Add((byte)Privileges.Length);
-                    data.AddRange(Privileges);
-                }
-                else
-                {
-                    data.Add(0x01);
-                    data.Add(0x00); // No privileges
-                }
-
-                // Install Parameters
-                if (InstallParameters != null && InstallParameters.Length > 0)
-                {
-                    data.Add((byte)InstallParameters.Length);
-                    data.AddRange(InstallParameters);
-                }
-                else
-                {
-                    data.Add(0x00);
-                }
-
-                // Install Token
-                if (InstallToken != null && InstallToken.Length > 0)
-                {
-                    data.Add((byte)InstallToken.Length);
-                    data.AddRange(InstallToken);
-                }
-                else
-                {
-                    data.Add(0x00);
-                }
-            }
-
-            // Build APDU
-            var apdu = new List<byte>
-            {
-                Cla,
-                Ins,
-                (byte)Type,
-                0x00, // P2
-                (byte)data.Count, // Lc
-            };
-
-            apdu.AddRange(data);
-            apdu.Add(0x00); // Le
-
-            return [.. apdu];
+                packageAid.ToImmutableArray(),
+                appletAid.ToImmutableArray(),
+                moduleAid?.ToImmutableArray() ?? default,
+                privileges?.ToImmutableArray() ?? default,
+                installParameters?.ToImmutableArray() ?? default,
+                installToken?.ToImmutableArray() ?? default);
         }
     }
 
     /// <summary>
-    /// Represents the response to an INSTALL command.
+    /// Represents the response to an INSTALL APDU command.
     /// </summary>
     [PublicAPI]
-    public class InstallResponse
+    public record InstallCommandResponse(
+        ImmutableArray<byte> Data,
+        ushort StatusWord)
     {
-        /// <summary>
-        /// Gets the response data (if any).
-        /// </summary>
-        public byte[] Data { get; }
-
         /// <summary>
         /// Gets a value indicating whether the install was successful.
         /// </summary>
-        public bool IsSuccessful { get; }
+        public bool IsSuccess => StatusWord == 0x9000;
 
         /// <summary>
-        /// Initializes a new instance of the InstallResponse class.
+        /// Creates a successful response.
         /// </summary>
-        /// <param name="data">The response data.</param>
-        /// <param name="isSuccessful">Whether the install was successful.</param>
-        public InstallResponse(byte[] data, bool isSuccessful = true)
-        {
-            Data = (byte[])data.Clone();
-            IsSuccessful = isSuccessful;
-        }
+        public static InstallCommandResponse Success(byte[]? data = null) =>
+            new(data?.ToImmutableArray() ?? ImmutableArray<byte>.Empty, 0x9000);
 
         /// <summary>
-        /// Parses an INSTALL response.
+        /// Creates a failed response.
         /// </summary>
-        /// <param name="response">The response data (excluding status word).</param>
-        /// <param name="statusWord">The status word from the response.</param>
-        /// <returns>The parsed response.</returns>
-        public static InstallResponse Parse(byte[] response, ushort statusWord)
-        {
-            var isSuccessful = statusWord == 0x9000;
-            return new InstallResponse(response ?? Array.Empty<byte>(), isSuccessful);
-        }
+        public static InstallCommandResponse Failure(ushort statusWord, byte[]? data = null) =>
+            new(data?.ToImmutableArray() ?? ImmutableArray<byte>.Empty, statusWord);
+
+        /// <summary>
+        /// Parses a response from raw data.
+        /// </summary>
+        public static InstallCommandResponse Parse(byte[] responseData, ushort statusWord) =>
+            new(responseData.ToImmutableArray(), statusWord);
     }
 }

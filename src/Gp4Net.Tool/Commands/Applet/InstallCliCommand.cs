@@ -2,6 +2,10 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
+using Gp4Net.Core;
+using Gp4Net.Domain;
+using Gp4Net.Services;
+using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
 using Spectre.Console;
@@ -10,17 +14,18 @@ using Spectre.Console.Cli;
 namespace Gp4Net.Tool.Commands.Applet
 {
     /// <summary>
-    /// Command to install a CAP file on the card.
+    /// CLI command to install a CAP file on the card.
     /// </summary>
     [PublicAPI]
-    public class InstallCommand : BaseCommand<InstallCommand.Settings>
+    [CliCommand("install", "Install a CAP file on the card", "applet")]
+    public class InstallCliCommand : BaseCommand<InstallCliCommand.Settings>
     {
         /// <summary>
-        /// Initializes a new instance of the InstallCommand class.
+        /// Initializes a new instance of the InstallCliCommand class.
         /// </summary>
-        public InstallCommand(
+        public InstallCliCommand(
             ICardService cardService,
-            IGlobalPlatformService globalPlatformService,
+            Gp4Net.Services.IGlobalPlatformService globalPlatformService,
             IKeysetResolver keysetResolver
         )
             : base(cardService, globalPlatformService, keysetResolver) { }
@@ -67,7 +72,7 @@ namespace Gp4Net.Tool.Commands.Applet
 
                 AnsiConsole.WriteLine();
 
-                _ = await AnsiConsole
+                var progressResult = await AnsiConsole
                     .Progress()
                     .StartAsync(async ctx =>
                     {
@@ -78,50 +83,25 @@ namespace Gp4Net.Tool.Commands.Applet
                         task.Value = 10;
                         await Task.Delay(100);
 
-                        var result = GlobalPlatformService.InstallCapFile(
+                        var installOptions = new InstallOptions(
+                            InstallApplets: settings.InstallApplets,
+                            MakeSelectable: settings.MakeSelectable
+                        );
+
+                        var result = await GlobalPlatformService.InstallCapFileAsync(
                             capFileData,
-                            settings.InstallApplets,
-                            settings.MakeSelectable
+                            installOptions
                         );
 
                         task.Value = 100;
 
-                        if (result.IsSuccessful)
-                        {
-                            AnsiConsole.MarkupLine("[green]✓ CAP file installed successfully[/]");
-
-                            if (result.PackageAid != null)
-                            {
-                                AnsiConsole.MarkupLine(
-                                    $"[dim]Package AID: {Convert.ToHexString(result.PackageAid)}[/]"
-                                );
-                            }
-
-                            if (result.InstalledApplets.Count > 0)
-                            {
-                                AnsiConsole.MarkupLine(
-                                    $"[green]Installed {result.InstalledApplets.Count} applet(s):[/]"
-                                );
-                                foreach (var appletAid in result.InstalledApplets)
-                                {
-                                    AnsiConsole.MarkupLine(
-                                        $"  [dim]• {Convert.ToHexString(appletAid)}[/]"
-                                    );
-                                }
-                            }
-                        }
-                        else
-                        {
-                            AnsiConsole.MarkupLine(
-                                $"[red]✗ Installation failed: {result.ErrorMessage}[/]"
-                            );
-                            return 1;
-                        }
-
-                        return 0;
+                        return await result.MatchAsync(
+                            async installResult => await DisplayInstallSuccess(installResult),
+                            error => Task.FromResult(DisplayInstallError(error))
+                        );
                     });
 
-                return 0;
+                return progressResult;
             }
             catch (Exception ex)
             {
@@ -134,6 +114,36 @@ namespace Gp4Net.Tool.Commands.Applet
             }
         }
 
+        private Task<int> DisplayInstallSuccess(InstallationResult installResult)
+        {
+            AnsiConsole.MarkupLine("[green]✓ CAP file installed successfully[/]");
+
+            AnsiConsole.MarkupLine(
+                $"[dim]Package AID: {Convert.ToHexString(installResult.PackageAid)}[/]"
+            );
+
+            if (installResult.InstalledApplets.Count > 0)
+            {
+                AnsiConsole.MarkupLine(
+                    $"[green]Installed {installResult.InstalledApplets.Count} applet(s):[/]"
+                );
+                foreach (var appletAid in installResult.InstalledApplets)
+                {
+                    AnsiConsole.MarkupLine(
+                        $"  [dim]• {Convert.ToHexString(appletAid)}[/]"
+                    );
+                }
+            }
+
+            return Task.FromResult(0);
+        }
+
+        private int DisplayInstallError(SmartCardError error)
+        {
+            AnsiConsole.MarkupLine($"[red]✗ Installation failed: {error.Message}[/]");
+            return 1;
+        }
+
         /// <summary>
         /// Settings for the install command.
         /// </summary>
@@ -142,7 +152,7 @@ namespace Gp4Net.Tool.Commands.Applet
             /// <summary>
             /// Gets or sets the CAP file path.
             /// </summary>
-            [CommandArgument(0, "<CAP_FILE>")]
+            [CommandOption("--cap")]
             [Description("Path to the CAP file to install")]
             public string CapFile { get; set; } = string.Empty;
 

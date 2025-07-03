@@ -151,4 +151,15 @@ namespace Gp4Net.Transport
             StatusWord = statusWord;
         }
     }
+
+    /// <summary>
+    /// Interface for commands that provide complete APDU bytes.
+    /// </summary>
+    public interface ICompleteApduCommand : IApduCommand
+    {
+        /// <summary>
+        /// Gets the complete APDU bytes.
+        /// </summary>
+        byte[] GetCompleteApdu();
+    }
 }

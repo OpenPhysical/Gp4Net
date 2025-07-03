@@ -19,6 +19,11 @@ namespace Gp4Net.Domain.Keys
         byte KeyVersion { get; }
 
         /// <summary>
+        /// Gets the key identifier.
+        /// </summary>
+        byte KeyId { get; }
+
+        /// <summary>
         /// Gets the encryption key (Key-ENC).
         /// </summary>
         byte[] EncKey { get; }
@@ -45,6 +50,11 @@ namespace Gp4Net.Domain.Keys
         public byte KeyVersion { get; }
 
         /// <summary>
+        /// Gets the key identifier.
+        /// </summary>
+        public byte KeyId { get; }
+
+        /// <summary>
         /// Gets the encryption key (Key-ENC).
         /// </summary>
         public byte[] EncKey { get; }
@@ -65,12 +75,14 @@ namespace Gp4Net.Domain.Keys
         /// Initializes a new instance of the KeySet class.
         /// </summary>
         /// <param name="keyVersion">The key version number.</param>
+        /// <param name="keyId">The key identifier.</param>
         /// <param name="encKey">The encryption key.</param>
         /// <param name="macKey">The MAC key.</param>
         /// <param name="dekKey">The data encryption key.</param>
-        protected KeySet(byte keyVersion, byte[] encKey, byte[] macKey, byte[] dekKey)
+        protected KeySet(byte keyVersion, byte keyId, byte[] encKey, byte[] macKey, byte[] dekKey)
         {
             KeyVersion = keyVersion;
+            KeyId = keyId;
             ArgumentNullException.ThrowIfNull(encKey);
             ArgumentNullException.ThrowIfNull(macKey);
             ArgumentNullException.ThrowIfNull(dekKey);
@@ -114,8 +126,9 @@ namespace Gp4Net.Domain.Keys
         /// <param name="macKey">The 3DES MAC key (16 or 24 bytes).</param>
         /// <param name="dekKey">The 3DES data encryption key (16 or 24 bytes).</param>
         /// <param name="keyVersion">The key version number (default is 0).</param>
-        public Scp02KeySet(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0)
-            : base(keyVersion, encKey, macKey, dekKey)
+        /// <param name="keyId">The key identifier (default is 0).</param>
+        public Scp02KeySet(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
+            : base(keyVersion, keyId, encKey, macKey, dekKey)
         {
             ValidateKey(encKey, nameof(encKey));
             ValidateKey(macKey, nameof(macKey));
@@ -143,8 +156,9 @@ namespace Gp4Net.Domain.Keys
         /// <param name="macKey">The AES MAC key (16, 24, or 32 bytes).</param>
         /// <param name="dekKey">The AES data encryption key (16, 24, or 32 bytes).</param>
         /// <param name="keyVersion">The key version number (default is 0).</param>
-        public Scp03KeySet(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0)
-            : base(keyVersion, encKey, macKey, dekKey)
+        /// <param name="keyId">The key identifier (default is 0).</param>
+        public Scp03KeySet(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
+            : base(keyVersion, keyId, encKey, macKey, dekKey)
         {
             ValidateKey(encKey, nameof(encKey));
             ValidateKey(macKey, nameof(macKey));

@@ -38,8 +38,8 @@ namespace Gp4Net.Tool.Services
             // Add Lua virtual readers
             allReaders.AddRange(_luaService.GetReaders());
             
-            // Add JSON virtual readers
-            allReaders.AddRange(_jsonLuaService.GetReaders());
+            // Don't add JSON virtual readers to the discovery list
+            // JSON readers must be explicitly specified
             
             return allReaders.AsReadOnly();
         }

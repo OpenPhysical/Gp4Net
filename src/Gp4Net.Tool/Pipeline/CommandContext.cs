@@ -17,13 +17,13 @@ namespace Gp4Net.Tool.Pipeline
 
         public IDisplayService Display { get; }
         public ICardService CardService { get; }
-        public IGlobalPlatformService GlobalPlatformService { get; }
+        public Gp4Net.Services.IGlobalPlatformService GlobalPlatformService { get; }
         public IKeysetResolver KeysetResolver { get; }
 
         public CommandContext(
             IDisplayService display,
             ICardService cardService,
-            IGlobalPlatformService globalPlatformService,
+            Gp4Net.Services.IGlobalPlatformService globalPlatformService,
             IKeysetResolver keysetResolver
         )
         {

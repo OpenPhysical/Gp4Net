@@ -1,5 +1,6 @@
 using WSCT.Core.APDU;
 using WSCT.ISO7816;
+using Gp4Net.Tool.Services.CardCommunication.Wsct;
 
 namespace Gp4Net.Tool.Services.CardCommunication
 {

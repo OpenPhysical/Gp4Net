@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.OpenPhysical;
 using Gp4Net.Tool.Commands;
@@ -28,10 +29,10 @@ namespace Gp4Net.Tool.Commands.Card
         {
             var ctx = await context.WithVerbose(settings.Verbose).RequireCardConnection(settings);
 
-            return GetDataObjects(ctx, settings);
+            return await GetDataObjectsAsync(ctx, settings);
         }
 
-        private static int GetDataObjects(ICommandContext context, Settings settings)
+        private static async Task<int> GetDataObjectsAsync(ICommandContext context, Settings settings)
         {
             try
             {
@@ -40,30 +41,30 @@ namespace Gp4Net.Tool.Commands.Card
                 return dataObject switch
                 {
                     "iin"
-                        => GetSingleDataObject(
+                        => await GetSingleDataObjectAsync(
                             context,
                             settings,
                             "IIN",
                             Domain.Commands.GetDataCommand.DataObjects.IssuerIdentificationNumber
                         ),
                     "cin"
-                        => GetSingleDataObject(
+                        => await GetSingleDataObjectAsync(
                             context,
                             settings,
                             "CIN",
                             Domain.Commands.GetDataCommand.DataObjects.CardImageNumber
                         ),
                     "manager-url"
-                        => GetSingleDataObject(
+                        => await GetSingleDataObjectAsync(
                             context,
                             settings,
                             "Manager URL",
                             Domain.Commands.GetDataCommand.DataObjects.SecurityDomainManagerUrl
                         ),
-                    "opid" => GetOpidData(context, settings),
-                    "all" => GetAllData(context, settings),
+                    "opid" => await GetOpidDataAsync(context, settings),
+                    "all" => await GetAllDataAsync(context, settings),
                     _ when dataObject.StartsWith("0x")
-                        => GetRawDataObject(context, settings, dataObject),
+                        => await GetRawDataObjectAsync(context, settings, dataObject),
                     _ => HandleInvalidDataObject(context, dataObject)
                 };
             }
@@ -74,7 +75,7 @@ namespace Gp4Net.Tool.Commands.Card
             }
         }
 
-        private static int GetSingleDataObject(
+        private static async Task<int> GetSingleDataObjectAsync(
             ICommandContext context,
             Settings settings,
             string name,
@@ -83,16 +84,18 @@ namespace Gp4Net.Tool.Commands.Card
         {
             try
             {
-                var response = context.GlobalPlatformService.GetData(tag);
-                if (response != null)
-                {
-                    DisplaySingleDataObject(context, settings, name, response);
-                }
-                else
-                {
-                    context.Display.Warning($"{name} is not supported by this card");
-                }
-                return 0;
+                var dataResult = await context.GlobalPlatformService.GetDataAsync(tag);
+                return await dataResult.MatchAsync(
+                    async response =>
+                    {
+                        DisplaySingleDataObject(context, settings, name, new GetDataResponse(tag, response));
+                        return 0;
+                    },
+                    async error =>
+                    {
+                        context.Display.Warning($"Could not retrieve {name}: {error.Message}");
+                        return 1;
+                    });
             }
             catch (Exception ex)
             {
@@ -101,7 +104,7 @@ namespace Gp4Net.Tool.Commands.Card
             }
         }
 
-        private static int GetRawDataObject(
+        private static async Task<int> GetRawDataObjectAsync(
             ICommandContext context,
             Settings settings,
             string hexTag
@@ -125,21 +128,23 @@ namespace Gp4Net.Tool.Commands.Card
                     return 1;
                 }
 
-                var response = context.GlobalPlatformService.GetData(tag);
-                if (response != null)
-                {
-                    DisplaySingleDataObject(
-                        context,
-                        settings,
-                        $"Tag {hexTag.ToUpperInvariant()}",
-                        response
-                    );
-                }
-                else
-                {
-                    context.Display.Warning($"Tag {hexTag} is not supported by this card");
-                }
-                return 0;
+                var dataResult = await context.GlobalPlatformService.GetDataAsync(tag);
+                return await dataResult.MatchAsync(
+                    async response =>
+                    {
+                        DisplaySingleDataObject(
+                            context,
+                            settings,
+                            $"Tag {hexTag.ToUpperInvariant()}",
+                            new GetDataResponse(tag, response)
+                        );
+                        return 0;
+                    },
+                    async error =>
+                    {
+                        context.Display.Warning($"Tag {hexTag} is not supported by this card: {error.Message}");
+                        return 1;
+                    });
             }
             catch (Exception ex)
             {
@@ -148,30 +153,30 @@ namespace Gp4Net.Tool.Commands.Card
             }
         }
 
-        private static int GetOpidData(ICommandContext context, Settings settings)
+        private static async Task<int> GetOpidDataAsync(ICommandContext context, Settings settings)
         {
             try
             {
                 // Get all three required components
-                var iinResponse = context.GlobalPlatformService.GetData(
+                var iinResult = await context.GlobalPlatformService.GetDataAsync(
                     Domain.Commands.GetDataCommand.DataObjects.IssuerIdentificationNumber
                 );
-                var cinResponse = context.GlobalPlatformService.GetData(
+                var cinResult = await context.GlobalPlatformService.GetDataAsync(
                     Domain.Commands.GetDataCommand.DataObjects.CardImageNumber
                 );
-                var urlResponse = context.GlobalPlatformService.GetData(
+                var urlResult = await context.GlobalPlatformService.GetDataAsync(
                     Domain.Commands.GetDataCommand.DataObjects.SecurityDomainManagerUrl
                 );
 
-                if (iinResponse == null || cinResponse == null || urlResponse == null)
+                if (iinResult.IsFailure || cinResult.IsFailure || urlResult.IsFailure)
                 {
                     context.Display.Error("One or more required OPID components are not available on this card");
                     return 1;
                 }
 
-                var iin = System.Text.Encoding.ASCII.GetString(iinResponse.Data);
-                var cin = System.Text.Encoding.ASCII.GetString(cinResponse.Data);
-                var managerUrl = System.Text.Encoding.UTF8.GetString(urlResponse.Data);
+                var iin = System.Text.Encoding.ASCII.GetString(iinResult.Value);
+                var cin = System.Text.Encoding.ASCII.GetString(cinResult.Value);
+                var managerUrl = System.Text.Encoding.UTF8.GetString(urlResult.Value);
 
                 // Try to reconstruct OPID
                 if (
@@ -223,7 +228,7 @@ namespace Gp4Net.Tool.Commands.Card
             }
         }
 
-        private static int GetAllData(ICommandContext context, Settings settings)
+        private static async Task<int> GetAllDataAsync(ICommandContext context, Settings settings)
         {
             var results = new Dictionary<string, string>();
             var errors = new List<string>();
@@ -253,15 +258,19 @@ namespace Gp4Net.Tool.Commands.Card
             {
                 try
                 {
-                    var response = context.GlobalPlatformService.GetData(tag);
-                    if (response != null)
-                    {
-                        results[name] = FormatDataForDisplay(response, settings.Format);
-                    }
-                    else
-                    {
-                        errors.Add($"{name} is not supported by this card");
-                    }
+                    var dataResult = await context.GlobalPlatformService.GetDataAsync(tag);
+                    await dataResult.MatchAsync(
+                        async response =>
+                        {
+                            results[name] = FormatDataForDisplay(new GetDataResponse(tag, response), settings.Format);
+                            return Task.CompletedTask;
+                        },
+                        async error =>
+                        {
+                            errors.Add($"{name}: {error.Message}");
+                            results[name] = "[red]Not available[/]";
+                            return Task.CompletedTask;
+                        });
                 }
                 catch (Exception ex)
                 {

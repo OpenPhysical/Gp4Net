@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using Gp4Net.Core;
+using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Tool.Services;
@@ -20,7 +22,7 @@ namespace Gp4Net.Tool.Scripting
     public class GpScriptModule
     {
         private readonly ICardService _cardService;
-        private readonly IGlobalPlatformService _globalPlatformService;
+        private readonly Gp4Net.Services.IGlobalPlatformService _globalPlatformService;
         private readonly ILogger _logger;
 
         /// <summary>
@@ -28,7 +30,7 @@ namespace Gp4Net.Tool.Scripting
         /// </summary>
         public GpScriptModule(
             ICardService cardService,
-            IGlobalPlatformService globalPlatformService,
+            Gp4Net.Services.IGlobalPlatformService globalPlatformService,
             ILogger logger
         )
         {
@@ -158,24 +160,8 @@ namespace Gp4Net.Tool.Scripting
         [MoonSharpVisible(true)]
         public Table[] GetStatus(Table card, string filter = "all")
         {
-            var apps = _globalPlatformService.GetApplications();
-            var result = new List<Table>();
-
-            foreach (var app in apps)
-            {
-                var script = new Script();
-                var appTable = new Table(script)
-                {
-                    ["aid"] = app.Aid,
-                    ["type"] = app.Type,
-                    ["lifecycle_state"] = app.LifecycleState.ToString(),
-                    ["privileges"] = app.Privileges.ToArray()
-                };
-
-                result.Add(appTable);
-            }
-
-            return [.. result];
+            // TODO: Update to use functional GetStatusAsync
+            throw new NotImplementedException("GetApplications not implemented in functional architecture");
         }
 
         /// <summary>
@@ -224,22 +210,8 @@ namespace Gp4Net.Tool.Scripting
                 }
             }
 
-            var result = _globalPlatformService.InstallCapFile(
-                capData,
-                installApplets,
-                makeSelectable
-            );
-
-            var script = new Script();
-            var resultTable = new Table(script)
-            {
-                ["success"] = result.IsSuccessful,
-                ["error"] = result.ErrorMessage,
-                ["package_aid"] = result.PackageAid,
-                ["installed_aids"] = result.InstalledApplets.ToArray()
-            };
-
-            return resultTable;
+            // TODO: Update to use functional InstallCapFileAsync
+            throw new NotImplementedException("InstallCapFile not implemented in functional architecture");
         }
 
         /// <summary>
@@ -293,15 +265,27 @@ namespace Gp4Net.Tool.Scripting
                 cascade = (bool)parameters["cascade"];
             }
 
-            var result = _globalPlatformService.DeleteApplication(aid, cascade);
+            // Use async method with synchronous wait for Lua compatibility
+            var result = _globalPlatformService.DeleteApplicationAsync(aid, cascade).GetAwaiter().GetResult();
 
             var script = new Script();
-            var resultTable = new Table(script)
-            {
-                ["success"] = result.IsSuccessful,
-                ["error"] = result.ErrorMessage,
-                ["deleted_aids"] = result.DeletedAids.ToArray()
-            };
+            var resultTable = new Table(script);
+
+            result.Match<object>(
+                success =>
+                {
+                    resultTable["success"] = true;
+                    resultTable["error"] = null;
+                    resultTable["deleted_aids"] = new[] { aid }; // Simplified - just return the deleted AID
+                    return null;
+                },
+                error =>
+                {
+                    resultTable["success"] = false;
+                    resultTable["error"] = error.Message;
+                    resultTable["deleted_aids"] = new byte[0][];
+                    return null;
+                });
 
             return resultTable;
         }
@@ -312,15 +296,30 @@ namespace Gp4Net.Tool.Scripting
         [MoonSharpVisible(true)]
         public Table SetLifecycleState(Table card, byte[] aid, string state)
         {
-            if (!Enum.TryParse<LifecycleState>(state, true, out var lifecycleState))
+            if (!Enum.TryParse<Gp4Net.Domain.LifecycleState>(state, true, out var lifecycleState))
             {
                 throw new ArgumentException($"Invalid lifecycle state: {state}");
             }
 
-            var success = _globalPlatformService.SetLifecycleState(aid, lifecycleState);
+            // Use async method with synchronous wait for Lua compatibility
+            var result = _globalPlatformService.SetLifecycleStateAsync(aid, lifecycleState).GetAwaiter().GetResult();
 
             var script = new Script();
-            var resultTable = new Table(script) { ["success"] = success };
+            var resultTable = new Table(script);
+
+            result.Match<object>(
+                success =>
+                {
+                    resultTable["success"] = true;
+                    resultTable["error"] = null;
+                    return null;
+                },
+                error =>
+                {
+                    resultTable["success"] = false;
+                    resultTable["error"] = error.Message;
+                    return null;
+                });
 
             return resultTable;
         }

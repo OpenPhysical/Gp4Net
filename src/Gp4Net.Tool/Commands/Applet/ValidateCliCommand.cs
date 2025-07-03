@@ -27,7 +27,7 @@ namespace Gp4Net.Tool.Commands.Applet
         /// </summary>
         public ValidateCommand(
             ICardService cardService,
-            IGlobalPlatformService globalPlatformService,
+            Gp4Net.Services.IGlobalPlatformService globalPlatformService,
             PackageRegistry packageRegistry,
             IKeysetResolver keysetResolver
         )

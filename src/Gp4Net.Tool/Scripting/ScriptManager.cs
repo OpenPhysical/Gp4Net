@@ -18,7 +18,7 @@ namespace Gp4Net.Tool.Scripting
         private readonly ILogger<ScriptManager> _logger;
         private readonly ScriptDirectoryResolver _directoryResolver;
         private readonly ICardService _cardService;
-        private readonly IGlobalPlatformService _globalPlatformService;
+        private readonly Gp4Net.Services.IGlobalPlatformService _globalPlatformService;
         private readonly Dictionary<string, Script> _scriptCache;
 
         /// <summary>
@@ -28,7 +28,7 @@ namespace Gp4Net.Tool.Scripting
             ILogger<ScriptManager> logger,
             ScriptDirectoryResolver directoryResolver,
             ICardService cardService,
-            IGlobalPlatformService globalPlatformService
+            Gp4Net.Services.IGlobalPlatformService globalPlatformService
         )
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));

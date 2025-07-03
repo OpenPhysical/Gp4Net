@@ -28,7 +28,7 @@ namespace Gp4Net.Tool.Commands.Card
         /// </summary>
         public ConvertScpCommand(
             ICardService cardService,
-            IGlobalPlatformService globalPlatformService,
+            Gp4Net.Services.IGlobalPlatformService globalPlatformService,
             IKeysetResolver keysetResolver
         )
             : base(cardService, globalPlatformService, keysetResolver) { }

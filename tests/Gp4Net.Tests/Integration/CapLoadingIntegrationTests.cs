@@ -146,7 +146,7 @@ namespace Gp4Net.Tests.Integration
             var capFile = CapFileStructure.Parse(capFileData);
 
             // Generate INSTALL [for load] command
-            var installForLoadCmd = InstallCommand.CreateForLoad(
+            var installForLoadCmd = InstallCommandBuilder.CreateForLoad(
                 packageAid: capFile.PackageAid,
                 securityDomainAid: Convert.FromHexString("A000000151000000") // Card Manager AID from trace
             );

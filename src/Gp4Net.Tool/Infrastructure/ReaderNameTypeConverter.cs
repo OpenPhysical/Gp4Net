@@ -60,6 +60,13 @@ namespace Gp4Net.Tool.Infrastructure
                 input = "auto";
             }
 
+            // Handle explicit JSON reader specification
+            if (input.StartsWith("json:", StringComparison.OrdinalIgnoreCase))
+            {
+                // JSON readers are not discoverable, but can be explicitly used
+                return new Reader(input);
+            }
+
             // Get all available readers
             var allReaders = cardService.GetReaders();
 

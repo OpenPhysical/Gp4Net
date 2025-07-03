@@ -16,7 +16,7 @@ namespace Gp4Net.Tool.Pipeline
     {
         public IDisplayService Display { get; }
         public ICardService CardService { get; }
-        public IGlobalPlatformService GlobalPlatformService { get; }
+        public Gp4Net.Services.IGlobalPlatformService GlobalPlatformService { get; }
         public IKeysetResolver KeysetResolver { get; }
 
         /// <summary>
@@ -37,13 +37,13 @@ namespace Gp4Net.Tool.Pipeline
         public MockCommandContext(
             IDisplayService? display = null,
             ICardService? cardService = null,
-            IGlobalPlatformService? globalPlatformService = null,
+            Gp4Net.Services.IGlobalPlatformService? globalPlatformService = null,
             IKeysetResolver? keysetResolver = null
         )
         {
             Display = display ?? new MockDisplayService();
             CardService = cardService ?? new MockCardService();
-            GlobalPlatformService = globalPlatformService ?? new MockGlobalPlatformService();
+            GlobalPlatformService = globalPlatformService ?? throw new ArgumentNullException(nameof(globalPlatformService), "Must provide functional IGlobalPlatformService");
             KeysetResolver = keysetResolver ?? new MockKeysetResolver();
         }
 
@@ -145,48 +145,7 @@ namespace Gp4Net.Tool.Pipeline
         public void Dispose() { }
     }
 
-    /// <summary>
-    /// Mock implementation of IGlobalPlatformService for testing.
-    /// </summary>
-    [PublicAPI]
-    public class MockGlobalPlatformService : IGlobalPlatformService
-    {
-        public Domain.Commands.SelectResponse SelectIsd() => new(Array.Empty<byte>());
-
-        public Domain.Commands.GetStatusResponse GetStatus(
-            Domain.Commands.GetStatusCommand.StatusSubset statusSubset =
-                Domain.Commands.GetStatusCommand.StatusSubset.IssuerSecurityDomain
-        ) => new([]);
-
-        public System.Collections.Generic.IList<ApplicationInfo> GetApplications() => [];
-
-        public InstallationResult InstallCapFile(
-            byte[] capFileData,
-            bool installApplets = true,
-            bool makeSelectable = true
-        ) => new(true);
-
-        public DeletionResult DeleteApplication(byte[] aid, bool deleteRelated = true) => new(true);
-
-        public bool SetLifecycleState(byte[] aid, LifecycleState newState) => true;
-
-        public Domain.CardInfo.CplcData? GetCplc() => new();
-
-        public Domain.CardInfo.CardDataInfo? GetCardData() => new();
-
-        public Domain.CardInfo.CardCapabilities? GetCardCapabilities() => null;
-
-        public Domain.Commands.GetDataResponse? GetData(ushort dataObjectIdentifier) =>
-            new(dataObjectIdentifier, Array.Empty<byte>());
-
-        public System.Threading.Tasks.Task<PutKeyResult> PutKeysAsync(
-            Domain.Keys.IKeySet newKeySet,
-            byte newKeyVersion
-        ) => System.Threading.Tasks.Task.FromResult(new PutKeyResult(true));
-
-        public (byte[] Data, ushort StatusWord) SendCommand(IApduCommand command) =>
-            (Array.Empty<byte>(), 0x9000);
-    }
+    // MockGlobalPlatformService removed - use functional services with DI in tests
 
     /// <summary>
     /// Mock implementation of IKeysetResolver for testing.
@@ -212,6 +171,7 @@ namespace Gp4Net.Tool.Pipeline
     public class MockKeySet : Domain.Keys.IKeySet
     {
         public byte KeyVersion => 0xFF;
+        public byte KeyId => 0x00;
         public byte[] EncKey => new byte[16];
         public byte[] MacKey => new byte[16];
         public byte[] DekKey => new byte[16];

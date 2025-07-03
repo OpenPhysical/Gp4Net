@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using Gp4Net.Constants;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
+using Gp4Net.Transport;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Modes;
@@ -75,19 +76,32 @@ namespace Gp4Net.Domain
         /// <summary>
         /// Wraps an APDU command with secure messaging.
         /// </summary>
-        /// <param name="command">The command APDU to wrap.</param>
-        /// <returns>The wrapped command APDU.</returns>
-        public byte[] WrapCommand(byte[] command)
+        /// <param name="command">The command to wrap.</param>
+        /// <returns>The wrapped command data (without Le) and the expected response length.</returns>
+        public (byte[] wrappedData, int? expectedResponseLength) WrapCommand(IApduCommand command)
         {
-            if (command == null || command.Length < 4)
-            {
-                throw new ArgumentException("Invalid command APDU.", nameof(command));
-            }
+            ArgumentNullException.ThrowIfNull(command);
 
             lock (_lock)
             {
-                var wrappedCommand = new byte[command.Length];
-                Array.Copy(command, wrappedCommand, command.Length);
+                // Build command data without Le
+                var hasData = command.Data != null && command.Data.Length > 0;
+                var commandData = hasData 
+                    ? new byte[5 + command.Data!.Length]  // Header + Lc + Data
+                    : new byte[4];                        // Header only
+                
+                commandData[0] = command.Cla;
+                commandData[1] = command.Ins;
+                commandData[2] = command.P1;
+                commandData[3] = command.P2;
+                
+                if (hasData)
+                {
+                    commandData[4] = (byte)command.Data!.Length;
+                    Array.Copy(command.Data, 0, commandData, 5, command.Data.Length);
+                }
+
+                var wrappedCommand = commandData;
 
                 // Apply encryption if required
                 if (_securityLevel.HasCDecryption())
@@ -101,9 +115,11 @@ namespace Gp4Net.Domain
                     wrappedCommand = ApplyMac(wrappedCommand);
                 }
 
-                return wrappedCommand;
+                // Return wrapped data and original Le
+                return (wrappedCommand, command.ExpectedResponseLength);
             }
         }
+
 
         /// <summary>
         /// Unwraps an APDU response with secure messaging.

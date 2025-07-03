@@ -22,7 +22,7 @@ namespace Gp4Net.Tool.Commands.Card
         /// </summary>
         public KeysChangeCommand(
             ICardService cardService,
-            IGlobalPlatformService globalPlatformService,
+            Gp4Net.Services.IGlobalPlatformService globalPlatformService,
             IKeysetResolver keysetResolver
         )
             : base(cardService, globalPlatformService, keysetResolver) { }
@@ -90,37 +90,21 @@ namespace Gp4Net.Tool.Commands.Card
                 AnsiConsole.MarkupLine("[yellow]Changing keys...[/]");
 
                 var putKeyResult = await GlobalPlatformService.PutKeysAsync(
-                    newKeySet,
+                    (KeySet)newKeySet,
                     newKeySet.KeyVersion
                 );
 
-                if (putKeyResult.IsSuccessful)
-                {
-                    AnsiConsole.MarkupLine("[green]✓ Keys changed successfully[/]");
-
-                    if (
-                        putKeyResult.KeyCheckValues != null
-                        && putKeyResult.KeyCheckValues.Count > 0
-                    )
+                return await putKeyResult.MatchAsync(
+                    unit =>
                     {
-                        AnsiConsole.MarkupLine("[green]Key check values:[/]");
-                        for (int i = 0; i < putKeyResult.KeyCheckValues.Count; i++)
-                        {
-                            AnsiConsole.MarkupLine(
-                                $"[dim]  Key {i + 1}: {Convert.ToHexString(putKeyResult.KeyCheckValues[i])}[/]"
-                            );
-                        }
-                    }
-                }
-                else
-                {
-                    AnsiConsole.MarkupLine(
-                        $"[red]✗ Failed to change keys: {putKeyResult.ErrorMessage}[/]"
-                    );
-                    return 1;
-                }
-
-                return 0;
+                        AnsiConsole.MarkupLine("[green]✓ Keys changed successfully[/]");
+                        return Task.FromResult(0);
+                    },
+                    error =>
+                    {
+                        AnsiConsole.MarkupLine($"[red]✗ Failed to change keys: {error.Message}[/]");
+                        return Task.FromResult(1);
+                    });
             }
             catch (Exception ex)
             {
