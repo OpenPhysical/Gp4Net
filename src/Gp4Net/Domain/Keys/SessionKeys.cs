@@ -4,13 +4,14 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using System.Security.Cryptography;
 
 namespace Gp4Net.Domain.Keys
 {
     /// <summary>
     /// Represents the session keys derived during secure channel establishment.
     /// </summary>
-    public class SessionKeys
+    public class SessionKeys : IDisposable
     {
         /// <summary>
         /// Gets the session encryption key (S-ENC).
@@ -32,6 +33,8 @@ namespace Gp4Net.Domain.Keys
         /// </summary>
         public byte[]? Dek { get; }
 
+        private bool _disposed = false;
+
         /// <summary>
         /// Initializes a new instance of the SessionKeys class.
         /// </summary>
@@ -41,10 +44,39 @@ namespace Gp4Net.Domain.Keys
         /// <param name="dek">The data encryption key (optional).</param>
         public SessionKeys(byte[] sEnc, byte[] sMac, byte[] sRMac, byte[]? dek = null)
         {
-            SEnc = sEnc ?? throw new ArgumentNullException(nameof(sEnc));
-            SMac = sMac ?? throw new ArgumentNullException(nameof(sMac));
-            SRMac = sRMac ?? throw new ArgumentNullException(nameof(sRMac));
+            ArgumentNullException.ThrowIfNull(sEnc);
+            ArgumentNullException.ThrowIfNull(sMac);
+            ArgumentNullException.ThrowIfNull(sRMac);
+            SEnc = sEnc;
+            SMac = sMac;
+            SRMac = sRMac;
             Dek = dek;
+        }
+
+        /// <summary>
+        /// Clears all cryptographic keys from memory.
+        /// </summary>
+        public void Clear()
+        {
+            CryptographicOperations.ZeroMemory(SEnc);
+            CryptographicOperations.ZeroMemory(SMac);
+            CryptographicOperations.ZeroMemory(SRMac);
+            if (Dek != null)
+            {
+                CryptographicOperations.ZeroMemory(Dek);
+            }
+        }
+
+        /// <summary>
+        /// Disposes of the session keys, clearing sensitive data from memory.
+        /// </summary>
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                Clear();
+                _disposed = true;
+            }
         }
     }
 }

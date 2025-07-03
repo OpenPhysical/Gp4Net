@@ -1,5 +1,3 @@
-using System;
-
 namespace Gp4Net.Tool.Services.CardCommunication
 {
     /// <summary>

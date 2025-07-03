@@ -137,7 +137,8 @@ namespace Gp4Net.Domain.CapFile
             IList<AppletInfo> applets,
             ManifestInfo? manifest = null,
             CapVersion? capFileVersion = null,
-            byte headerFlags = 0)
+            byte headerFlags = 0
+        )
         {
             PackageAid = (byte[])packageAid.Clone();
             PackageVersion = packageVersion;
@@ -158,20 +159,24 @@ namespace Gp4Net.Domain.CapFile
         /// <exception cref="InvalidDataException">Thrown when the CAP file format is invalid.</exception>
         public static CapFileStructure Parse(byte[] capFileData)
         {
-            if (capFileData == null)
-                throw new ArgumentNullException(nameof(capFileData));
+            ArgumentNullException.ThrowIfNull(capFileData);
 
             // Only support ZIP/JAR format CAP files
-            if (capFileData.Length >= 4 && 
-                capFileData[0] == 0x50 && capFileData[1] == 0x4B && 
-                capFileData[2] == 0x03 && capFileData[3] == 0x04)
+            if (
+                capFileData.Length >= 4
+                && capFileData[0] == 0x50
+                && capFileData[1] == 0x4B
+                && capFileData[2] == 0x03
+                && capFileData[3] == 0x04
+            )
             {
                 return ParseZipFormat(capFileData);
             }
 
-            throw new InvalidDataException("Only ZIP/JAR format CAP files are supported. Raw binary CAP format is not supported.");
+            throw new InvalidDataException(
+                "Only ZIP/JAR format CAP files are supported. Raw binary CAP format is not supported."
+            );
         }
-
 
         /// <summary>
         /// Parses a CAP file from ZIP/JAR format.
@@ -205,14 +210,14 @@ namespace Gp4Net.Domain.CapFile
                 ["RefLocation.cap"] = ComponentTags.ReferenceLocation,
                 ["Export.cap"] = ComponentTags.Export,
                 ["Descriptor.cap"] = ComponentTags.Descriptor,
-                ["Debug.cap"] = ComponentTags.Debug
+                ["Debug.cap"] = ComponentTags.Debug,
             };
 
             // Find and parse component files and manifest
             foreach (var entry in archive.Entries)
             {
                 var fileName = Path.GetFileName(entry.FullName);
-                
+
                 // Parse manifest file
                 if (entry.FullName == "META-INF/MANIFEST.MF")
                 {
@@ -222,7 +227,7 @@ namespace Gp4Net.Domain.CapFile
                     manifest = ManifestInfo.Parse(manifestContent);
                     continue;
                 }
-                
+
                 if (componentMapping.TryGetValue(fileName, out var expectedTag))
                 {
                     using var entryStream = entry.Open();
@@ -233,11 +238,15 @@ namespace Gp4Net.Domain.CapFile
                     // Parse the component from the file data (includes tag + size + data)
                     using var componentStream = new MemoryStream(fileData);
                     var component = CapComponent.Parse(componentStream);
-                    
+
                     // Verify tag matches expected
                     if (component.Tag != expectedTag)
-                        throw new InvalidDataException($"Component file {fileName} has unexpected tag {component.Tag:X2}, expected {expectedTag:X2}");
-                    
+                    {
+                        throw new InvalidDataException(
+                            $"Component file {fileName} has unexpected tag {component.Tag:X2}, expected {expectedTag:X2}"
+                        );
+                    }
+
                     components.Add(component);
 
                     // Extract package information from header component
@@ -246,7 +255,10 @@ namespace Gp4Net.Domain.CapFile
                         var header = HeaderComponent.Parse(component.Data);
                         packageAid = header.PackageAid;
                         packageVersion = header.PackageVersion;
-                        capFileVersion = new CapVersion(header.CapFileMajorVersion, header.CapFileMinorVersion);
+                        capFileVersion = new CapVersion(
+                            header.CapFileMajorVersion,
+                            header.CapFileMinorVersion
+                        );
                         headerFlags = header.Flags;
                     }
 
@@ -260,9 +272,19 @@ namespace Gp4Net.Domain.CapFile
             }
 
             if (packageAid == null || packageVersion == null)
+            {
                 throw new InvalidDataException("CAP file missing required header component.");
+            }
 
-            return new CapFileStructure(packageAid, packageVersion.Value, components, applets, manifest, capFileVersion, headerFlags);
+            return new CapFileStructure(
+                packageAid,
+                packageVersion.Value,
+                components,
+                applets,
+                manifest,
+                capFileVersion,
+                headerFlags
+            );
         }
 
         /// <summary>
@@ -272,7 +294,8 @@ namespace Gp4Net.Domain.CapFile
         public IEnumerable<CapComponent> GetLoadingComponents()
         {
             // Standard loading order for Java Card
-            byte[] loadOrder = {
+            byte[] loadOrder =
+            {
                 ComponentTags.Header,
                 ComponentTags.Directory,
                 ComponentTags.Import,
@@ -283,7 +306,7 @@ namespace Gp4Net.Domain.CapFile
                 ComponentTags.Export,
                 ComponentTags.ConstantPool,
                 ComponentTags.ReferenceLocation,
-                ComponentTags.Descriptor
+                ComponentTags.Descriptor,
             };
 
             var componentDict = Components.ToDictionary(c => c.Tag, c => c);
@@ -304,21 +327,21 @@ namespace Gp4Net.Domain.CapFile
         public byte[] ToBinaryFormat()
         {
             var binaryData = new List<byte>();
-            
+
             foreach (var component in GetLoadingComponents())
             {
                 // Add component tag
                 binaryData.Add(component.Tag);
-                
+
                 // Add component size (2 bytes, big-endian)
                 binaryData.Add((byte)(component.Size >> 8));
                 binaryData.Add((byte)(component.Size & 0xFF));
-                
+
                 // Add component data
                 binaryData.AddRange(component.Data);
             }
-            
-            return binaryData.ToArray();
+
+            return [.. binaryData];
         }
 
         /// <summary>
@@ -341,12 +364,13 @@ namespace Gp4Net.Domain.CapFile
                     var remainingBytes = componentData.Length - offset;
                     var blockSize = Math.Min(remainingBytes, maxBlockSize);
                     var blockData = new byte[blockSize];
-                    
+
                     Array.Copy(componentData, offset, blockData, 0, blockSize);
-                    
-                    var isLastBlock = (offset + blockSize >= componentData.Length) && 
-                                     component == GetLoadingComponents().Last();
-                    
+
+                    var isLastBlock =
+                        (offset + blockSize >= componentData.Length)
+                        && component == GetLoadingComponents().Last();
+
                     blocks.Add(new LoadBlock(blockNumber++, blockData, isLastBlock));
                     offset += blockSize;
                 }
@@ -398,35 +422,60 @@ namespace Gp4Net.Domain.CapFile
         public static CapComponent Parse(Stream stream)
         {
             if (stream.Position >= stream.Length)
-                throw new InvalidDataException("Unexpected end of stream while reading component tag.");
-                
+            {
+                throw new InvalidDataException(
+                    "Unexpected end of stream while reading component tag."
+                );
+            }
+
             var tagByte = stream.ReadByte();
             if (tagByte == -1)
-                throw new InvalidDataException("Unexpected end of stream while reading component tag.");
+            {
+                throw new InvalidDataException(
+                    "Unexpected end of stream while reading component tag."
+                );
+            }
+
             var tag = (byte)tagByte;
-            
+
             // Read size (2 bytes, big-endian)
             if (stream.Position + 1 >= stream.Length)
-                throw new InvalidDataException("Unexpected end of stream while reading component size.");
-                
+            {
+                throw new InvalidDataException(
+                    "Unexpected end of stream while reading component size."
+                );
+            }
+
             var sizeHighByte = stream.ReadByte();
             var sizeLowByte = stream.ReadByte();
             if (sizeHighByte == -1 || sizeLowByte == -1)
-                throw new InvalidDataException("Unexpected end of stream while reading component size.");
-                
+            {
+                throw new InvalidDataException(
+                    "Unexpected end of stream while reading component size."
+                );
+            }
+
             var sizeHigh = (byte)sizeHighByte;
             var sizeLow = (byte)sizeLowByte;
             var size = (ushort)((sizeHigh << 8) | sizeLow);
 
             // Check if we have enough data left in the stream
             if (stream.Position + size > stream.Length)
-                throw new InvalidDataException($"Component claims size of {size} bytes, but only {stream.Length - stream.Position} bytes remaining in stream.");
+            {
+                throw new InvalidDataException(
+                    $"Component claims size of {size} bytes, but only {stream.Length - stream.Position} bytes remaining in stream."
+                );
+            }
 
             // Read component data
             var data = new byte[size];
             var bytesRead = stream.Read(data, 0, size);
             if (bytesRead != size)
-                throw new InvalidDataException("Unexpected end of stream while reading component data.");
+            {
+                throw new InvalidDataException(
+                    "Unexpected end of stream while reading component data."
+                );
+            }
 
             return new CapComponent(tag, size, data);
         }
@@ -544,11 +593,12 @@ namespace Gp4Net.Domain.CapFile
         public byte Flags { get; }
 
         private HeaderComponent(
-            byte[] packageAid, 
+            byte[] packageAid,
             CapVersion packageVersion,
             byte capFileMinorVersion,
             byte capFileMajorVersion,
-            byte flags)
+            byte flags
+        )
         {
             PackageAid = packageAid;
             PackageVersion = packageVersion;
@@ -560,20 +610,28 @@ namespace Gp4Net.Domain.CapFile
         public static HeaderComponent Parse(byte[] data)
         {
             if (data.Length < 10) // Minimum header size
+            {
                 throw new InvalidDataException("Invalid header component data.");
+            }
 
             var offset = 0;
 
             // Check for magic number (4 bytes: 0xDECAFFED)
-            if (data.Length >= 4 && data[0] == 0xDE && data[1] == 0xCA && data[2] == 0xFF && data[3] == 0xED)
+            if (
+                data.Length >= 4
+                && data[0] == 0xDE
+                && data[1] == 0xCA
+                && data[2] == 0xFF
+                && data[3] == 0xED
+            )
             {
                 offset = 4; // Skip magic number
             }
 
             // Read CAP file minor version (1 byte)
             var capMinorVersion = data[offset++];
-            
-            // Read CAP file major version (1 byte) 
+
+            // Read CAP file major version (1 byte)
             var capMajorVersion = data[offset++];
 
             // Read flags (1 byte)
@@ -584,9 +642,13 @@ namespace Gp4Net.Domain.CapFile
 
             // Read package AID length
             var packageAidLength = data[offset++];
-            
+
             if (offset + packageAidLength > data.Length)
-                throw new InvalidDataException($"Invalid header component data: need {offset + packageAidLength} bytes for AID, have {data.Length}.");
+            {
+                throw new InvalidDataException(
+                    $"Invalid header component data: need {offset + packageAidLength} bytes for AID, have {data.Length}."
+                );
+            }
 
             var packageAid = new byte[packageAidLength];
             Array.Copy(data, offset, packageAid, 0, packageAidLength);
@@ -595,7 +657,7 @@ namespace Gp4Net.Domain.CapFile
             // Package version may not be present in all formats
             byte packageMajor = 1;
             byte packageMinor = 0;
-            
+
             if (offset + 1 < data.Length)
             {
                 packageMajor = data[offset++];
@@ -606,11 +668,12 @@ namespace Gp4Net.Domain.CapFile
             }
 
             return new HeaderComponent(
-                packageAid, 
+                packageAid,
                 new CapVersion(packageMajor, packageMinor),
                 capMinorVersion,
                 capMajorVersion,
-                flags);
+                flags
+            );
         }
     }
 
@@ -633,19 +696,25 @@ namespace Gp4Net.Domain.CapFile
 
             // Read count
             if (data.Length < 1)
+            {
                 return new AppletComponent(applets);
+            }
 
             var count = data[offset++];
 
             for (int i = 0; i < count; i++)
             {
                 if (offset >= data.Length)
+                {
                     break;
+                }
 
                 // Read AID length
                 var aidLength = data[offset++];
                 if (offset + aidLength + 2 > data.Length)
+                {
                     break;
+                }
 
                 // Read AID
                 var aid = new byte[aidLength];
@@ -714,14 +783,18 @@ namespace Gp4Net.Domain.CapFile
             string? creationTime = null,
             string? packageName = null,
             IList<ImportedPackage>? importedPackages = null,
-            bool? integerSupportRequired = null)
+            bool? integerSupportRequired = null
+        )
         {
             CapFileVersion = capFileVersion;
             ConverterVersion = converterVersion;
             ConverterProvider = converterProvider;
             CreationTime = creationTime;
             PackageName = packageName;
-            ImportedPackages = importedPackages != null ? new List<ImportedPackage>(importedPackages) : Array.Empty<ImportedPackage>();
+            ImportedPackages =
+                importedPackages != null
+                    ? new List<ImportedPackage>(importedPackages)
+                    : Array.Empty<ImportedPackage>();
             IntegerSupportRequired = integerSupportRequired;
         }
 
@@ -734,15 +807,21 @@ namespace Gp4Net.Domain.CapFile
         {
             var lines = manifestContent.Split('\n', StringSplitOptions.RemoveEmptyEntries);
             var properties = new Dictionary<string, string>();
-            
+
             string? currentKey = null;
             string? currentValue = null;
 
             foreach (var line in lines)
             {
                 var trimmedLine = line.Trim();
-                if (string.IsNullOrEmpty(trimmedLine) || trimmedLine.StartsWith("Manifest-Version") || trimmedLine.StartsWith("Name:"))
+                if (
+                    string.IsNullOrEmpty(trimmedLine)
+                    || trimmedLine.StartsWith("Manifest-Version")
+                    || trimmedLine.StartsWith("Name:")
+                )
+                {
                     continue;
+                }
 
                 if (trimmedLine.StartsWith(' ') && currentKey != null)
                 {
@@ -779,9 +858,11 @@ namespace Gp4Net.Domain.CapFile
             {
                 var aidKey = $"Java-Card-Imported-Package-{i}-AID";
                 var versionKey = $"Java-Card-Imported-Package-{i}-Version";
-                
-                if (properties.TryGetValue(aidKey, out var aidValue) && 
-                    properties.TryGetValue(versionKey, out var versionValue))
+
+                if (
+                    properties.TryGetValue(aidKey, out var aidValue)
+                    && properties.TryGetValue(versionKey, out var versionValue)
+                )
                 {
                     importedPackages.Add(new ImportedPackage(aidValue, versionValue));
                 }
@@ -794,7 +875,9 @@ namespace Gp4Net.Domain.CapFile
                 creationTime: properties.GetValueOrDefault("Java-Card-CAP-Creation-Time"),
                 packageName: properties.GetValueOrDefault("Java-Card-Package-Name"),
                 importedPackages: importedPackages,
-                integerSupportRequired: properties.GetValueOrDefault("Java-Card-Integer-Support-Required") == "TRUE"
+                integerSupportRequired: properties.GetValueOrDefault(
+                    "Java-Card-Integer-Support-Required"
+                ) == "TRUE"
             );
         }
     }

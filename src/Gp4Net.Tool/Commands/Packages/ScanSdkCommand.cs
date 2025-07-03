@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -23,22 +22,28 @@ namespace Gp4Net.Tool.Commands.Packages
         {
             if (!Directory.Exists(settings.SdkPath))
             {
-                AnsiConsole.MarkupLine($"[red]SDK path not found: {Markup.Escape(settings.SdkPath)}[/]");
+                AnsiConsole.MarkupLine(
+                    $"[red]SDK path not found: {Markup.Escape(settings.SdkPath)}[/]"
+                );
                 return 1;
             }
 
             try
             {
-                AnsiConsole.MarkupLine($"[cyan]Scanning Oracle Java Card SDKs at: {Markup.Escape(settings.SdkPath)}[/]");
-                
+                AnsiConsole.MarkupLine(
+                    $"[cyan]Scanning Oracle Java Card SDKs at: {Markup.Escape(settings.SdkPath)}[/]"
+                );
+
                 var mappings = await ScanForPackageMappingsAsync(settings.SdkPath);
-                
+
                 AnsiConsole.MarkupLine($"[green]Found {mappings.Count} package mappings[/]");
 
                 if (!string.IsNullOrEmpty(settings.OutputPath))
                 {
                     await WritePackageMappingsAsync(mappings, settings.OutputPath);
-                    AnsiConsole.MarkupLine($"[green]Package mappings written to: {Markup.Escape(settings.OutputPath)}[/]");
+                    AnsiConsole.MarkupLine(
+                        $"[green]Package mappings written to: {Markup.Escape(settings.OutputPath)}[/]"
+                    );
                 }
                 else
                 {
@@ -58,39 +63,53 @@ namespace Gp4Net.Tool.Commands.Packages
             }
         }
 
-        private static Task<Dictionary<string, PackageInfo>> ScanForPackageMappingsAsync(string sdkPath)
+        private static Task<Dictionary<string, PackageInfo>> ScanForPackageMappingsAsync(
+            string sdkPath
+        )
         {
             var mappings = new Dictionary<string, PackageInfo>();
-            
-            AnsiConsole.Status()
-                .Start("Scanning .exp files...", ctx =>
-                {
-                    var expFiles = Directory.GetFiles(sdkPath, "*.exp", SearchOption.AllDirectories);
-                    AnsiConsole.MarkupLine($"[dim]Found {expFiles.Length} .exp files[/]");
 
-                    foreach (var expFile in expFiles)
+            AnsiConsole
+                .Status()
+                .Start(
+                    "Scanning .exp files...",
+                    ctx =>
                     {
-                        ctx.Status($"Processing {Path.GetFileName(expFile)}...");
-                        
-                        try
+                        var expFiles = Directory.GetFiles(
+                            sdkPath,
+                            "*.exp",
+                            SearchOption.AllDirectories
+                        );
+                        AnsiConsole.MarkupLine($"[dim]Found {expFiles.Length} .exp files[/]");
+
+                        foreach (var expFile in expFiles)
                         {
-                            var packageInfo = ParseExpFile(expFile);
-                            if (packageInfo != null)
+                            _ = ctx.Status($"Processing {Path.GetFileName(expFile)}...");
+
+                            try
                             {
-                                var aidHex = Convert.ToHexString(packageInfo.Aid).ToUpper();
-                                if (!mappings.ContainsKey(aidHex))
+                                var packageInfo = ParseExpFile(expFile);
+                                if (packageInfo != null)
                                 {
-                                    mappings[aidHex] = packageInfo;
-                                    AnsiConsole.MarkupLine($"[dim]  Found: {packageInfo.Name} -> {aidHex}[/]");
+                                    var aidHex = Convert.ToHexString(packageInfo.Aid).ToUpper();
+                                    if (!mappings.ContainsKey(aidHex))
+                                    {
+                                        mappings[aidHex] = packageInfo;
+                                        AnsiConsole.MarkupLine(
+                                            $"[dim]  Found: {packageInfo.Name} -> {aidHex}[/]"
+                                        );
+                                    }
                                 }
                             }
-                        }
-                        catch (Exception ex)
-                        {
-                            AnsiConsole.MarkupLine($"[yellow]Warning: Failed to parse {Path.GetFileName(expFile)}: {ex.Message}[/]");
+                            catch (Exception ex)
+                            {
+                                AnsiConsole.MarkupLine(
+                                    $"[yellow]Warning: Failed to parse {Path.GetFileName(expFile)}: {ex.Message}[/]"
+                                );
+                            }
                         }
                     }
-                });
+                );
 
             return Task.FromResult(mappings);
         }
@@ -99,27 +118,35 @@ namespace Gp4Net.Tool.Commands.Packages
         {
             var fileBytes = File.ReadAllBytes(expFilePath);
             var relativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), expFilePath);
-            
+
             // Extract SDK version from path (e.g., jc221_kit -> jc221)
             var sdkVersion = ExtractSdkVersionFromPath(expFilePath);
-            
+
             // Look for package name pattern in the file
             var packageName = ExtractPackageNameFromPath(expFilePath);
             if (string.IsNullOrEmpty(packageName))
+            {
                 return null;
+            }
 
             // Find the last occurrence of the package name in the file
-            var packageNameBytes = System.Text.Encoding.UTF8.GetBytes(packageName.Replace('.', '/'));
+            var packageNameBytes = System.Text.Encoding.UTF8.GetBytes(
+                packageName.Replace('.', '/')
+            );
             var lastIndex = FindLastOccurrence(fileBytes, packageNameBytes);
-            
+
             if (lastIndex == -1)
+            {
                 return null;
+            }
 
             // Skip the package name and 4 bytes as per jcalgscan documentation
             var dataStart = lastIndex + packageNameBytes.Length + 4;
-            
+
             if (dataStart + 3 >= fileBytes.Length)
+            {
                 return null;
+            }
 
             try
             {
@@ -127,9 +154,11 @@ namespace Gp4Net.Tool.Commands.Packages
                 var minorVersion = fileBytes[dataStart];
                 var majorVersion = fileBytes[dataStart + 1];
                 var aidLength = fileBytes[dataStart + 2];
-                
+
                 if (dataStart + 3 + aidLength > fileBytes.Length)
+                {
                     return null;
+                }
 
                 var aid = new byte[aidLength];
                 Array.Copy(fileBytes, dataStart + 3, aid, 0, aidLength);
@@ -142,7 +171,7 @@ namespace Gp4Net.Tool.Commands.Packages
                     MinorVersion = minorVersion,
                     Version = $"{majorVersion}.{minorVersion}",
                     SourceFile = relativePath,
-                    SdkVersion = sdkVersion
+                    SdkVersion = sdkVersion,
                 };
             }
             catch
@@ -156,7 +185,7 @@ namespace Gp4Net.Tool.Commands.Packages
             // Extract SDK version from path like: external/oracle_javacard_sdks/jc221_kit/...
             // Returns: jc221 (removes _kit suffix)
             var parts = expFilePath.Replace('\\', '/').Split('/');
-            
+
             foreach (var part in parts)
             {
                 if (part.StartsWith("jc") && part.EndsWith("_kit"))
@@ -169,7 +198,7 @@ namespace Gp4Net.Tool.Commands.Packages
                     return part.Replace("_kit", "");
                 }
             }
-            
+
             return "unknown";
         }
 
@@ -178,7 +207,7 @@ namespace Gp4Net.Tool.Commands.Packages
             // Extract package name from path structure
             // e.g., javacard\framework\javacard\framework.exp -> javacard.framework
             var parts = expFilePath.Replace('\\', '/').Split('/');
-            
+
             // Look for patterns like: api_export_files/javacard/framework/javacard/framework.exp
             for (int i = 0; i < parts.Length - 1; i++)
             {
@@ -190,14 +219,16 @@ namespace Gp4Net.Tool.Commands.Packages
                     {
                         packageParts.Add(parts[j]);
                     }
-                    
+
                     // Determine the full package name with proper prefix
                     var packageName = string.Join('.', packageParts);
-                    
+
                     // Add proper prefixes based on the package structure
-                    if (!packageName.StartsWith("java.") && 
-                        !packageName.StartsWith("javacard.") && 
-                        !packageName.StartsWith("javacardx."))
+                    if (
+                        !packageName.StartsWith("java.")
+                        && !packageName.StartsWith("javacard.")
+                        && !packageName.StartsWith("javacardx.")
+                    )
                     {
                         // Map common packages to their full names
                         packageName = packageName switch
@@ -224,24 +255,24 @@ namespace Gp4Net.Tool.Commands.Packages
                             "security.derivation" => "javacardx.security.derivation",
                             "security.cert" => "javacardx.security.cert",
                             "framework.util.intx" => "javacardx.framework.util.intx",
-                            _ => packageName
+                            _ => packageName,
                         };
                     }
-                    
+
                     return packageName;
                 }
             }
 
             // Fallback: use filename without extension
             var filename = Path.GetFileNameWithoutExtension(expFilePath);
-            
+
             // Apply prefix mapping for fallback cases too
             return filename switch
             {
                 "framework" => "javacard.framework",
                 "security" => "javacard.security",
                 "crypto" => "javacardx.crypto",
-                _ => filename
+                _ => filename,
             };
         }
 
@@ -259,54 +290,71 @@ namespace Gp4Net.Tool.Commands.Packages
                     }
                 }
                 if (found)
+                {
                     return i;
+                }
             }
             return -1;
         }
 
-        private static async Task WritePackageMappingsAsync(Dictionary<string, PackageInfo> mappings, string outputPath)
+        private static async Task WritePackageMappingsAsync(
+            Dictionary<string, PackageInfo> mappings,
+            string outputPath
+        )
         {
             var options = new JsonSerializerOptions
             {
                 WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             };
 
             // Load existing data if file exists
             var existingData = new Dictionary<string, object>();
             var existingPackages = new Dictionary<string, object>();
-            
+
             if (File.Exists(outputPath))
             {
                 try
                 {
                     var existingJson = await File.ReadAllTextAsync(outputPath);
                     var existingDoc = JsonDocument.Parse(existingJson);
-                    
+
                     // Preserve existing non-package data
                     foreach (var element in existingDoc.RootElement.EnumerateObject())
                     {
                         if (element.Name != "packages")
                         {
-                            var deserializedValue = JsonSerializer.Deserialize<object>(element.Value.GetRawText(), options);
+                            var deserializedValue = JsonSerializer.Deserialize<object>(
+                                element.Value.GetRawText(),
+                                options
+                            );
                             if (deserializedValue != null)
+                            {
                                 existingData[element.Name] = deserializedValue;
+                            }
                         }
                         else
                         {
                             // Load existing packages
                             foreach (var pkg in element.Value.EnumerateObject())
                             {
-                                var deserializedPackage = JsonSerializer.Deserialize<object>(pkg.Value.GetRawText(), options);
+                                var deserializedPackage = JsonSerializer.Deserialize<object>(
+                                    pkg.Value.GetRawText(),
+                                    options
+                                );
                                 if (deserializedPackage != null)
+                                {
                                     existingPackages[pkg.Name] = deserializedPackage;
+                                }
                             }
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    AnsiConsole.MarkupLine($"[yellow]Warning: Could not parse existing JSON file: {ex.Message}[/]");
+                    AnsiConsole.MarkupLine(
+                        $"[yellow]Warning: Could not parse existing JSON file: {ex.Message}[/]"
+                    );
                     AnsiConsole.MarkupLine("[yellow]Creating new file...[/]");
                 }
             }
@@ -323,7 +371,7 @@ namespace Gp4Net.Tool.Commands.Packages
                     minorVersion = mapping.Value.MinorVersion,
                     sourceFile = mapping.Value.SourceFile,
                     sdkVersion = mapping.Value.SdkVersion,
-                    lastUpdated = DateTime.UtcNow
+                    lastUpdated = DateTime.UtcNow,
                 };
             }
 
@@ -332,15 +380,17 @@ namespace Gp4Net.Tool.Commands.Packages
             {
                 ["generatedAt"] = DateTime.UtcNow,
                 ["packageCount"] = allPackages.Count,
-                ["packages"] = allPackages
+                ["packages"] = allPackages,
             };
 
             var json = JsonSerializer.Serialize(jsonData, options);
             await File.WriteAllTextAsync(outputPath, json);
-            
+
             var newCount = mappings.Count;
             var totalCount = allPackages.Count;
-            AnsiConsole.MarkupLine($"[dim]Added {newCount} new mappings, total: {totalCount} packages[/]");
+            AnsiConsole.MarkupLine(
+                $"[dim]Added {newCount} new mappings, total: {totalCount} packages[/]"
+            );
         }
 
         private static void DisplayPackageMappings(Dictionary<string, PackageInfo> mappings)
@@ -352,9 +402,11 @@ namespace Gp4Net.Tool.Commands.Packages
                 .AddColumn("SDK Version")
                 .AddColumn("Source File");
 
-            foreach (var mapping in mappings.OrderBy(m => m.Value.SdkVersion).ThenBy(m => m.Value.Name))
+            foreach (
+                var mapping in mappings.OrderBy(m => m.Value.SdkVersion).ThenBy(m => m.Value.Name)
+            )
             {
-                table.AddRow(
+                _ = table.AddRow(
                     $"[dim]{mapping.Key}[/]",
                     mapping.Value.Name,
                     mapping.Value.Version,
@@ -363,9 +415,11 @@ namespace Gp4Net.Tool.Commands.Packages
                 );
             }
 
-            AnsiConsole.Write(new Panel(table)
-                .Header("[bold]Discovered Package Mappings[/]")
-                .BorderColor(Color.Green));
+            AnsiConsole.Write(
+                new Panel(table)
+                    .Header("[bold]Discovered Package Mappings[/]")
+                    .BorderColor(Color.Green)
+            );
         }
 
         /// <summary>

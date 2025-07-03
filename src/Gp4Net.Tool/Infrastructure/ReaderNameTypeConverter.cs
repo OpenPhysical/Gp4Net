@@ -23,18 +23,25 @@ namespace Gp4Net.Tool.Infrastructure
         }
 
         /// <inheritdoc />
-        public override object? ConvertFrom(ITypeDescriptorContext? context, CultureInfo? culture, object value)
+        public override object? ConvertFrom(
+            ITypeDescriptorContext? context,
+            CultureInfo? culture,
+            object value
+        )
         {
-            if (value is string stringValue)
+            if (value is string stringValue || value is null)
             {
                 // Get the card service from the context
                 var cardService = GetCardServiceFromContext(context);
                 if (cardService == null)
                 {
-                    throw new InvalidOperationException("CardService not available in conversion context");
+                    throw new InvalidOperationException(
+                        "CardService not available in conversion context"
+                    );
                 }
 
-                return ResolveReader(stringValue, cardService);
+                var inputValue = value as string ?? string.Empty;
+                return ResolveReader(inputValue, cardService);
             }
 
             return base.ConvertFrom(context, culture, value);
@@ -49,14 +56,18 @@ namespace Gp4Net.Tool.Infrastructure
         private static Reader ResolveReader(string input, ICardService cardService)
         {
             if (string.IsNullOrWhiteSpace(input))
+            {
                 input = "auto";
+            }
 
             // Get all available readers
             var allReaders = cardService.GetReaders();
-            
+
             if (allReaders.Count == 0)
             {
-                throw new ArgumentException("No card readers found. Please ensure a card reader is connected and drivers are installed.");
+                throw new ArgumentException(
+                    "No card readers found. Please ensure a card reader is connected and drivers are installed."
+                );
             }
 
             // Handle "auto" mode
@@ -66,9 +77,10 @@ namespace Gp4Net.Tool.Infrastructure
             }
 
             // Try exact match first (case-insensitive)
-            var exactMatch = allReaders.FirstOrDefault(r => 
-                string.Equals(r, input, StringComparison.OrdinalIgnoreCase));
-            
+            var exactMatch = allReaders.FirstOrDefault(r =>
+                string.Equals(r, input, StringComparison.OrdinalIgnoreCase)
+            );
+
             if (exactMatch != null)
             {
                 return new Reader(exactMatch);
@@ -82,7 +94,9 @@ namespace Gp4Net.Tool.Infrastructure
             if (partialMatches.Count == 1)
             {
                 var selectedReader = partialMatches[0];
-                AnsiConsole.MarkupLine($"[yellow]Using reader with partial match:[/] {selectedReader}");
+                AnsiConsole.MarkupLine(
+                    $"[yellow]Using reader with partial match:[/] {selectedReader}"
+                );
                 return new Reader(selectedReader, isPartialMatch: true);
             }
 
@@ -96,13 +110,15 @@ namespace Gp4Net.Tool.Infrastructure
             // No matches found
             AnsiConsole.MarkupLine($"[red]No reader found matching '{input}'.[/]");
             AnsiConsole.MarkupLine("[yellow]Available readers:[/]");
-            
+
             foreach (var reader in allReaders)
             {
                 AnsiConsole.MarkupLine($"  • {reader}");
             }
 
-            throw new ArgumentException($"Reader '{input}' not found. Use exact name, partial name, or 'auto' for automatic detection.");
+            throw new ArgumentException(
+                $"Reader '{input}' not found. Use exact name, partial name, or 'auto' for automatic detection."
+            );
         }
 
         /// <summary>

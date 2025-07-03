@@ -1,4 +1,3 @@
-using Gp4Net.Tests.TestBuilders;
 using Gp4Net.Tool.Services;
 using NUnit.Framework;
 
@@ -22,9 +21,7 @@ namespace Gp4Net.Tests.TestBuilders
         public void WithData_ByteArray_SetsData()
         {
             // Arrange & Act
-            var response = new CardResponseBuilder()
-                .WithData(0x6F, 0x10, 0x84, 0x08)
-                .Build();
+            var response = new CardResponseBuilder().WithData(0x6F, 0x10, 0x84, 0x08).Build();
 
             // Assert
             Assert.That(response.Data, Is.EqualTo(new byte[] { 0x6F, 0x10, 0x84, 0x08 }));
@@ -39,16 +36,33 @@ namespace Gp4Net.Tests.TestBuilders
                 .Build();
 
             // Assert
-            Assert.That(response.Data, Is.EqualTo(new byte[] { 0x6F, 0x10, 0x84, 0x08, 0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x00 }));
+            Assert.That(
+                response.Data,
+                Is.EqualTo(
+                    new byte[]
+                    {
+                        0x6F,
+                        0x10,
+                        0x84,
+                        0x08,
+                        0xA0,
+                        0x00,
+                        0x00,
+                        0x01,
+                        0x51,
+                        0x00,
+                        0x00,
+                        0x00,
+                    }
+                )
+            );
         }
 
         [Test]
         public void WithStatusWord_SetsStatusWord()
         {
             // Arrange & Act
-            var response = new CardResponseBuilder()
-                .WithStatusWord(0x6A82)
-                .Build();
+            var response = new CardResponseBuilder().WithStatusWord(0x6A82).Build();
 
             // Assert
             Assert.That(response.StatusWord, Is.EqualTo(0x6A82));
@@ -58,9 +72,7 @@ namespace Gp4Net.Tests.TestBuilders
         public void WithStatusBytes_SetsSW1AndSW2()
         {
             // Arrange & Act
-            var response = new CardResponseBuilder()
-                .WithStatusBytes(0x61, 0x10)
-                .Build();
+            var response = new CardResponseBuilder().WithStatusBytes(0x61, 0x10).Build();
 
             // Assert
             Assert.That(response.StatusWord, Is.EqualTo(0x6110));
@@ -70,9 +82,7 @@ namespace Gp4Net.Tests.TestBuilders
         public void WithSecurityNotSatisfied_SetsCorrectStatus()
         {
             // Arrange & Act
-            var response = new CardResponseBuilder()
-                .WithSecurityNotSatisfied()
-                .Build();
+            var response = new CardResponseBuilder().WithSecurityNotSatisfied().Build();
 
             // Assert
             Assert.That(response.StatusWord, Is.EqualTo(0x6982));
@@ -98,7 +108,7 @@ namespace Gp4Net.Tests.TestBuilders
             var response = new CardResponseBuilder()
                 .WithDataFromHex("6F 10")
                 .WithMoreDataAvailable(0x20)
-                .WithData(0xFF, 0xFE)  // This should override the previous data
+                .WithData(0xFF, 0xFE) // This should override the previous data
                 .Build();
 
             // Assert

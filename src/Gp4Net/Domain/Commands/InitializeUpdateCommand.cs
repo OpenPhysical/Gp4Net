@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Commands
@@ -12,7 +13,7 @@ namespace Gp4Net.Domain.Commands
     /// Represents the INITIALIZE UPDATE command for secure channel initiation.
     /// </summary>
     [PublicAPI]
-    public class InitializeUpdateCommand
+    public class InitializeUpdateCommand : IApduCommand
     {
         /// <summary>
         /// The command class byte.
@@ -40,6 +41,41 @@ namespace Gp4Net.Domain.Commands
         public byte[] HostChallenge { get; }
 
         /// <summary>
+        /// Gets the class byte.
+        /// </summary>
+        byte IApduCommand.Cla => Cla;
+
+        /// <summary>
+        /// Gets the instruction byte.
+        /// </summary>
+        byte IApduCommand.Ins => Ins;
+
+        /// <summary>
+        /// Gets the parameter 1 byte.
+        /// </summary>
+        public byte P1 => KeyVersion;
+
+        /// <summary>
+        /// Gets the parameter 2 byte.
+        /// </summary>
+        public byte P2 => KeyIdentifier;
+
+        /// <summary>
+        /// Gets the command data.
+        /// </summary>
+        public byte[]? Data => HostChallenge;
+
+        /// <summary>
+        /// Gets the expected response length (0 means maximum).
+        /// </summary>
+        public int? ExpectedResponseLength => 0;
+
+        /// <summary>
+        /// Gets whether this command uses extended length.
+        /// </summary>
+        public bool IsExtendedLength => false;
+
+        /// <summary>
         /// Initializes a new instance of the InitializeUpdateCommand class.
         /// </summary>
         /// <param name="keyVersion">The key version number (0 = first available key).</param>
@@ -48,7 +84,12 @@ namespace Gp4Net.Domain.Commands
         public InitializeUpdateCommand(byte keyVersion, byte keyIdentifier, byte[] hostChallenge)
         {
             if (hostChallenge?.Length != 8)
-                throw new ArgumentException("Host challenge must be 8 bytes.", nameof(hostChallenge));
+            {
+                throw new ArgumentException(
+                    "Host challenge must be 8 bytes.",
+                    nameof(hostChallenge)
+                );
+            }
 
             KeyVersion = keyVersion;
             KeyIdentifier = keyIdentifier;
@@ -61,13 +102,16 @@ namespace Gp4Net.Domain.Commands
         /// <returns>The APDU command bytes.</returns>
         public byte[] ToApdu()
         {
-            var apdu = new byte[5 + HostChallenge.Length];
+            var apdu = new byte[5 + HostChallenge.Length + 1]; // +1 for LE byte
             apdu[0] = Cla;
             apdu[1] = Ins;
             apdu[2] = KeyVersion;
             apdu[3] = KeyIdentifier;
             apdu[4] = (byte)HostChallenge.Length;
             Array.Copy(HostChallenge, 0, apdu, 5, HostChallenge.Length);
+
+            // Add LE byte (0x00 = maximum response length)
+            apdu[5 + HostChallenge.Length] = 0x00;
 
             return apdu;
         }
@@ -125,12 +169,13 @@ namespace Gp4Net.Domain.Commands
         /// <returns>The parsed response.</returns>
         public static InitializeUpdateResponse Parse(byte[] response)
         {
-            if (response == null)
-                throw new ArgumentNullException(nameof(response));
+            ArgumentNullException.ThrowIfNull(response);
 
-            // Minimum response length is 29 bytes (10 + 3 + 8 + 8)
-            if (response.Length < 29)
+            // SCP03 responses are 32 bytes, SCP02 are typically 28-30 bytes
+            if (response.Length < 28)
+            {
                 throw new ArgumentException("Response too short.", nameof(response));
+            }
 
             var offset = 0;
 
@@ -139,35 +184,88 @@ namespace Gp4Net.Domain.Commands
             Array.Copy(response, offset, keyDiversificationData, 0, 10);
             offset += 10;
 
-            // Key information (3 bytes)
-            var keyInformation = new byte[3];
-            Array.Copy(response, offset, keyInformation, 0, 3);
-            offset += 3;
-
-            // Card challenge (8 bytes)
-            var cardChallenge = new byte[8];
-            Array.Copy(response, offset, cardChallenge, 0, 8);
-            offset += 8;
-
-            // Card cryptogram (8 bytes)
-            var cardCryptogram = new byte[8];
-            Array.Copy(response, offset, cardCryptogram, 0, 8);
-            offset += 8;
-
-            // Sequence counter (3 bytes, only for SCP02)
+            // Key version (1 byte)
+            var keyVersion = response[offset++];
+            
+            // SCP identifier (1 byte)
+            var scpVersion = response[offset++];
+            
             byte[]? sequenceCounter = null;
-            if (response.Length >= 32)
+            byte[] cardChallenge;
+            byte[] cardCryptogram;
+            
+            if (scpVersion == 0x03 && response.Length >= 32) // SCP03 with 32-byte response
             {
-                sequenceCounter = new byte[3];
-                Array.Copy(response, offset, sequenceCounter, 0, 3);
-            }
+                // Implementation parameter (1 byte) 
+                var implementation = response[offset++];
+                
+                // Key information: KeyVersion + combined SCP ID (version | implementation)
+                var keyInformation = new byte[3];
+                keyInformation[0] = keyVersion;
+                keyInformation[1] = (byte)(scpVersion | implementation); // 0x03 | 0x70 = 0x73
+                keyInformation[2] = 0x00; // Padding
+                
+                // Card challenge (8 bytes)
+                cardChallenge = new byte[8];
+                Array.Copy(response, offset, cardChallenge, 0, 8);
+                offset += 8;
 
-            return new InitializeUpdateResponse(
-                keyDiversificationData,
-                keyInformation,
-                cardChallenge,
-                cardCryptogram,
-                sequenceCounter);
+                // Card cryptogram (8 bytes)
+                cardCryptogram = new byte[8];
+                Array.Copy(response, offset, cardCryptogram, 0, 8);
+                offset += 8;
+                
+                // Sequence counter (remaining bytes)
+                var remainingBytes = response.Length - offset;
+                if (remainingBytes > 0)
+                {
+                    sequenceCounter = new byte[remainingBytes];
+                    Array.Copy(response, offset, sequenceCounter, 0, remainingBytes);
+                }
+                
+                return new InitializeUpdateResponse(
+                    keyDiversificationData,
+                    keyInformation,
+                    cardChallenge,
+                    cardCryptogram,
+                    sequenceCounter
+                );
+            }
+            else // SCP02 or short SCP03 response
+            {
+                // Key information: KeyVersion + SCP ID + padding
+                var keyInformation = new byte[3];
+                keyInformation[0] = keyVersion;
+                keyInformation[1] = scpVersion;
+                keyInformation[2] = 0x00; // Padding
+
+                // Card challenge (8 bytes)
+                cardChallenge = new byte[8];
+                Array.Copy(response, offset, cardChallenge, 0, 8);
+                offset += 8;
+
+                // Card cryptogram (8 bytes)
+                cardCryptogram = new byte[8];
+                Array.Copy(response, offset, cardCryptogram, 0, 8);
+                offset += 8;
+                
+                // Extract sequence counter for SCP02
+                if (scpVersion == 0x02)
+                {
+                    sequenceCounter = new byte[3];
+                    sequenceCounter[0] = cardChallenge[0]; // First 2 bytes of challenge are sequence
+                    sequenceCounter[1] = cardChallenge[1];
+                    sequenceCounter[2] = 0x00; // Padding
+                }
+                
+                return new InitializeUpdateResponse(
+                    keyDiversificationData,
+                    keyInformation,
+                    cardChallenge,
+                    cardCryptogram,
+                    sequenceCounter
+                );
+            }
         }
 
         private InitializeUpdateResponse(
@@ -175,7 +273,8 @@ namespace Gp4Net.Domain.Commands
             byte[] keyInformation,
             byte[] cardChallenge,
             byte[] cardCryptogram,
-            byte[]? sequenceCounter)
+            byte[]? sequenceCounter
+        )
         {
             KeyDiversificationData = keyDiversificationData;
             KeyInformation = keyInformation;

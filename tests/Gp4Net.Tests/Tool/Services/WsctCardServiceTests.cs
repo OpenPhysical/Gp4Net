@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using Gp4Net.Domain.Protocol;
 using Gp4Net.Tool.Services;
 using Gp4Net.Tool.Services.CardCommunication;
+using Gp4Net.Transport;
 using Moq;
 using NUnit.Framework;
 using WSCT.Core.APDU;
@@ -16,6 +18,8 @@ namespace Gp4Net.Tests.Tool.Services
         private Mock<IWsctFactory> _mockFactory;
         private Mock<ICardContextWrapper> _mockContext;
         private Mock<ICardChannelWrapper> _mockChannel;
+        private Mock<ISecureChannelManager> _mockSecureChannelManager;
+        private Mock<IApduTransportFactory> _mockTransportFactory;
         private WsctCardService _service;
 
         [SetUp]
@@ -24,12 +28,14 @@ namespace Gp4Net.Tests.Tool.Services
             _mockFactory = new Mock<IWsctFactory>();
             _mockContext = new Mock<ICardContextWrapper>();
             _mockChannel = new Mock<ICardChannelWrapper>();
+            _mockSecureChannelManager = new Mock<ISecureChannelManager>();
+            _mockTransportFactory = new Mock<IApduTransportFactory>();
 
             // Setup factory to return mocked context
-            _mockFactory.Setup(f => f.CreateCardContext()).Returns(_mockContext.Object);
-            
+            _ = _mockFactory.Setup(f => f.CreateCardContext()).Returns(_mockContext.Object);
+
             // Setup context to establish successfully by default
-            _mockContext.Setup(c => c.Establish()).Returns(ErrorCode.Success);
+            _ = _mockContext.Setup(c => c.Establish()).Returns(ErrorCode.Success);
         }
 
         [TearDown]
@@ -44,7 +50,11 @@ namespace Gp4Net.Tests.Tool.Services
         public void Constructor_ValidFactory_EstablishesContext()
         {
             // Act
-            _service = new WsctCardService(_mockFactory.Object);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Assert
             _mockFactory.Verify(f => f.CreateCardContext(), Times.Once);
@@ -55,17 +65,31 @@ namespace Gp4Net.Tests.Tool.Services
         public void Constructor_NullFactory_ThrowsArgumentNullException()
         {
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => new WsctCardService(null!));
+            _ = Assert.Throws<ArgumentNullException>(
+                () =>
+                    new WsctCardService(
+                        null!,
+                        _mockSecureChannelManager.Object,
+                        _mockTransportFactory.Object
+                    )
+            );
         }
 
         [Test]
         public void Constructor_EstablishFails_ThrowsInvalidOperationException()
         {
             // Arrange
-            _mockContext.Setup(c => c.Establish()).Returns(ErrorCode.InternalError);
+            _ = _mockContext.Setup(c => c.Establish()).Returns(ErrorCode.InternalError);
 
             // Act & Assert
-            var ex = Assert.Throws<InvalidOperationException>(() => new WsctCardService(_mockFactory.Object));
+            var ex = Assert.Throws<InvalidOperationException>(
+                () =>
+                    new WsctCardService(
+                        _mockFactory.Object,
+                        _mockSecureChannelManager.Object,
+                        _mockTransportFactory.Object
+                    )
+            );
             Assert.That(ex.Message, Does.Contain("Failed to establish card context"));
         }
 
@@ -73,7 +97,13 @@ namespace Gp4Net.Tests.Tool.Services
         public void Constructor_DefaultConstructor_UsesDefaultFactory()
         {
             // Act & Assert - Should not throw
-            Assert.DoesNotThrow(() => new WsctCardService());
+            Assert.DoesNotThrow(
+                () =>
+                    new WsctCardService(
+                        _mockSecureChannelManager.Object,
+                        _mockTransportFactory.Object
+                    )
+            );
         }
 
         #endregion
@@ -85,9 +115,13 @@ namespace Gp4Net.Tests.Tool.Services
         {
             // Arrange
             var expectedReaders = new List<string> { "Reader1", "Reader2" };
-            _mockContext.Setup(c => c.ListReaders("")).Returns(ErrorCode.Success);
-            _mockContext.Setup(c => c.Readers).Returns(expectedReaders);
-            _service = new WsctCardService(_mockFactory.Object);
+            _ = _mockContext.Setup(c => c.ListReaders("")).Returns(ErrorCode.Success);
+            _ = _mockContext.Setup(c => c.Readers).Returns(expectedReaders);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act
             var readers = _service.GetReaders();
@@ -101,8 +135,12 @@ namespace Gp4Net.Tests.Tool.Services
         public void GetReaders_ListReadersFails_ReturnsEmptyList()
         {
             // Arrange
-            _mockContext.Setup(c => c.ListReaders("")).Returns(ErrorCode.NoReadersAvailable);
-            _service = new WsctCardService(_mockFactory.Object);
+            _ = _mockContext.Setup(c => c.ListReaders("")).Returns(ErrorCode.NoReadersAvailable);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act
             var readers = _service.GetReaders();
@@ -115,8 +153,12 @@ namespace Gp4Net.Tests.Tool.Services
         public void GetReaders_ExceptionThrown_ReturnsEmptyList()
         {
             // Arrange
-            _mockContext.Setup(c => c.ListReaders("")).Throws<Exception>();
-            _service = new WsctCardService(_mockFactory.Object);
+            _ = _mockContext.Setup(c => c.ListReaders("")).Throws<Exception>();
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act
             var readers = _service.GetReaders();
@@ -134,9 +176,17 @@ namespace Gp4Net.Tests.Tool.Services
         {
             // Arrange
             const string readerName = "TestReader";
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.Success);
-            _service = new WsctCardService(_mockFactory.Object);
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Returns(ErrorCode.Success);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act
             var result = _service.Connect(readerName);
@@ -144,27 +194,35 @@ namespace Gp4Net.Tests.Tool.Services
             // Assert
             Assert.That(result, Is.True);
             _mockContext.Verify(c => c.CreateCardChannel(readerName), Times.Once);
-            _mockChannel.Verify(ch => ch.Connect(ShareMode.Shared, Protocol.Any), Times.Once);
+            _mockChannel.Verify(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any), Times.Once);
         }
 
         [Test]
         public void Connect_NullReaderName_ThrowsArgumentException()
         {
             // Arrange
-            _service = new WsctCardService(_mockFactory.Object);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act & Assert
-            Assert.Throws<ArgumentException>(() => _service.Connect(null!));
+            _ = Assert.Throws<ArgumentException>(() => _service.Connect(null!));
         }
 
         [Test]
         public void Connect_EmptyReaderName_ThrowsArgumentException()
         {
             // Arrange
-            _service = new WsctCardService(_mockFactory.Object);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act & Assert
-            Assert.Throws<ArgumentException>(() => _service.Connect(string.Empty));
+            _ = Assert.Throws<ArgumentException>(() => _service.Connect(string.Empty));
         }
 
         [Test]
@@ -172,9 +230,17 @@ namespace Gp4Net.Tests.Tool.Services
         {
             // Arrange
             const string readerName = "TestReader";
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.CardUnsupported);
-            _service = new WsctCardService(_mockFactory.Object);
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Returns(ErrorCode.CardUnsupported);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act
             var result = _service.Connect(readerName);
@@ -189,13 +255,20 @@ namespace Gp4Net.Tests.Tool.Services
         {
             // Arrange
             const string readerName = "TestReader";
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.Success);
-            _mockChannel.Setup(ch => ch.GetStatus()).Returns(State.Specific);
-            _service = new WsctCardService(_mockFactory.Object);
-            
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Returns(ErrorCode.Success);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
+
             // First connection
-            _service.Connect(readerName);
+            _ = _service.Connect(readerName);
 
             // Act - Second connection
             var result = _service.Connect(readerName);
@@ -214,10 +287,18 @@ namespace Gp4Net.Tests.Tool.Services
         {
             // Arrange
             const string readerName = "TestReader";
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.Success);
-            _service = new WsctCardService(_mockFactory.Object);
-            _service.Connect(readerName);
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Returns(ErrorCode.Success);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
+            _ = _service.Connect(readerName);
 
             // Act
             _service.Disconnect();
@@ -231,7 +312,11 @@ namespace Gp4Net.Tests.Tool.Services
         public void Disconnect_NotConnected_DoesNothing()
         {
             // Arrange
-            _service = new WsctCardService(_mockFactory.Object);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act & Assert - Should not throw
             Assert.DoesNotThrow(() => _service.Disconnect());
@@ -242,11 +327,21 @@ namespace Gp4Net.Tests.Tool.Services
         {
             // Arrange
             const string readerName = "TestReader";
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.Success);
-            _mockChannel.Setup(ch => ch.Disconnect(It.IsAny<Disposition>())).Throws<Exception>();
-            _service = new WsctCardService(_mockFactory.Object);
-            _service.Connect(readerName);
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Returns(ErrorCode.Success);
+            _ = _mockChannel
+                .Setup(ch => ch.Disconnect(It.IsAny<Disposition>()))
+                .Throws<Exception>();
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
+            _ = _service.Connect(readerName);
 
             // Act
             _service.Disconnect();
@@ -264,11 +359,18 @@ namespace Gp4Net.Tests.Tool.Services
         {
             // Arrange
             const string readerName = "TestReader";
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.Success);
-            _mockChannel.Setup(ch => ch.GetStatus()).Returns(State.Specific);
-            _service = new WsctCardService(_mockFactory.Object);
-            _service.Connect(readerName);
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Returns(ErrorCode.Success);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
+            _ = _service.Connect(readerName);
 
             // Act
             var result = _service.IsConnected;
@@ -282,11 +384,18 @@ namespace Gp4Net.Tests.Tool.Services
         {
             // Arrange
             const string readerName = "TestReader";
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.Success);
-            _mockChannel.Setup(ch => ch.GetStatus()).Returns(State.Negotiable);
-            _service = new WsctCardService(_mockFactory.Object);
-            _service.Connect(readerName);
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Returns(ErrorCode.Success);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
+            _ = _service.Connect(readerName);
 
             // Act
             var result = _service.IsConnected;
@@ -300,11 +409,18 @@ namespace Gp4Net.Tests.Tool.Services
         {
             // Arrange
             const string readerName = "TestReader";
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.Success);
-            _mockChannel.Setup(ch => ch.GetStatus()).Returns(State.Powered);
-            _service = new WsctCardService(_mockFactory.Object);
-            _service.Connect(readerName);
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Returns(ErrorCode.Success);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
+            _ = _service.Connect(readerName);
 
             // Act
             var result = _service.IsConnected;
@@ -317,7 +433,11 @@ namespace Gp4Net.Tests.Tool.Services
         public void IsConnected_ChannelNull_ReturnsFalse()
         {
             // Arrange
-            _service = new WsctCardService(_mockFactory.Object);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act
             var result = _service.IsConnected;
@@ -327,21 +447,28 @@ namespace Gp4Net.Tests.Tool.Services
         }
 
         [Test]
-        public void IsConnected_GetStatusThrows_ReturnsFalse()
+        public void IsConnected_ChannelExists_ReturnsTrue()
         {
             // Arrange
             const string readerName = "TestReader";
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.Success);
-            _mockChannel.Setup(ch => ch.GetStatus()).Throws<Exception>();
-            _service = new WsctCardService(_mockFactory.Object);
-            _service.Connect(readerName);
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Returns(ErrorCode.Success);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
+            _ = _service.Connect(readerName);
 
             // Act
             var result = _service.IsConnected;
 
             // Assert
-            Assert.That(result, Is.False);
+            Assert.That(result, Is.True);
         }
 
         #endregion
@@ -354,21 +481,27 @@ namespace Gp4Net.Tests.Tool.Services
             // Arrange
             const string readerName = "TestReader";
             byte[] expectedAtr = { 0x3B, 0x65, 0x01, 0x02, 0x20, 0x56, 0x34, 0x47, 0x54 }; // Avoid zeros in middle
-            
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.Success);
-            _mockChannel.Setup(ch => ch.GetStatus()).Returns(State.Specific);
-            _mockChannel.Setup(ch => ch.GetAttrib(Attrib.AtrString, ref It.Ref<byte[]>.IsAny))
-                .Returns(ErrorCode.Success)
-                .Callback((Attrib attrib, ref byte[] buffer) => 
+
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Returns(ErrorCode.Success);
+            _ = _mockChannel
+                .Setup(ch => ch.GetAttrib(Attrib.AtrString, ref It.Ref<byte[]>.IsAny))
+                .Returns((Attrib attrib, ref byte[] buffer) =>
                 {
-                    // Create proper ATR buffer: ATR data followed by zeros
-                    Array.Copy(expectedAtr, buffer, expectedAtr.Length);
-                    // Ensure the rest of the buffer is zeros (already is by default)
+                    buffer = expectedAtr;
+                    return ErrorCode.Success;
                 });
-            
-            _service = new WsctCardService(_mockFactory.Object);
-            _service.Connect(readerName);
+
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
+            _ = _service.Connect(readerName);
 
             // Act
             var result = _service.GetAtr();
@@ -382,7 +515,11 @@ namespace Gp4Net.Tests.Tool.Services
         public void GetAtr_NotConnected_ReturnsNull()
         {
             // Arrange
-            _service = new WsctCardService(_mockFactory.Object);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act
             var result = _service.GetAtr();
@@ -396,14 +533,22 @@ namespace Gp4Net.Tests.Tool.Services
         {
             // Arrange
             const string readerName = "TestReader";
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.Success);
-            _mockChannel.Setup(ch => ch.GetStatus()).Returns(State.Specific);
-            _mockChannel.Setup(ch => ch.GetAttrib(Attrib.AtrString, ref It.Ref<byte[]>.IsAny))
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Returns(ErrorCode.Success);
+            _ = _mockChannel
+                .Setup(ch => ch.GetAttrib(Attrib.AtrString, ref It.Ref<byte[]>.IsAny))
                 .Returns(ErrorCode.InternalError);
-            
-            _service = new WsctCardService(_mockFactory.Object);
-            _service.Connect(readerName);
+
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
+            _ = _service.Connect(readerName);
 
             // Act
             var result = _service.GetAtr();
@@ -424,34 +569,44 @@ namespace Gp4Net.Tests.Tool.Services
             byte[] command = { 0x00, 0xA4, 0x04, 0x00 };
             byte[] expectedData = { 0x6F, 0x10 };
             ushort expectedSw = 0x9000;
-            
+
             var mockCommand = new Mock<ICardCommand>();
-            
+
             // Create a real ResponseAPDU with the expected data
             var realResponse = new ResponseAPDU();
-            
-            _mockFactory.Setup(f => f.CreateCommandApdu(command)).Returns(mockCommand.Object);
-            _mockFactory.Setup(f => f.CreateResponseApdu()).Returns(realResponse);
-            
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.Success);
-            _mockChannel.Setup(ch => ch.GetStatus()).Returns(State.Specific);
-            _mockChannel.Setup(ch => ch.Transmit(mockCommand.Object, realResponse))
+
+            _ = _mockFactory.Setup(f => f.CreateCommandApdu(command)).Returns(mockCommand.Object);
+            _ = _mockFactory.Setup(f => f.CreateResponseApdu()).Returns(realResponse);
+
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Returns(ErrorCode.Success);
+            _ = _mockChannel
+                .Setup(ch => ch.Transmit(mockCommand.Object, realResponse))
                 .Returns(ErrorCode.Success)
-                .Callback((ICardCommand cmd, ICardResponse resp) =>
-                {
-                    // Simulate the response data being set by the transmission
-                    var responseApdu = resp as ResponseAPDU;
-                    if (responseApdu != null)
+                .Callback(
+                    (ICardCommand cmd, ICardResponse resp) =>
                     {
-                        // We can't directly set Udr and StatusWord on ResponseAPDU since they're not settable
-                        // This test will verify the method doesn't crash and returns a response
-                        // The actual data validation will be done in integration tests
+                        // Simulate the response data being set by the transmission
+                        var responseApdu = resp as ResponseAPDU;
+                        if (responseApdu != null)
+                        {
+                            // We can't directly set Udr and StatusWord on ResponseAPDU since they're not settable
+                            // This test will verify the method doesn't crash and returns a response
+                            // The actual data validation will be done in integration tests
+                        }
                     }
-                });
-            
-            _service = new WsctCardService(_mockFactory.Object);
-            _service.Connect(readerName);
+                );
+
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
+            _ = _service.Connect(readerName);
 
             // Act
             var result = _service.SendCommand(command);
@@ -467,10 +622,14 @@ namespace Gp4Net.Tests.Tool.Services
         public void SendCommand_NullCommand_ThrowsArgumentNullException()
         {
             // Arrange
-            _service = new WsctCardService(_mockFactory.Object);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => _service.SendCommand(null!));
+            _ = Assert.Throws<ArgumentNullException>(() => _service.SendCommand((byte[])null!));
         }
 
         [Test]
@@ -478,7 +637,11 @@ namespace Gp4Net.Tests.Tool.Services
         {
             // Arrange
             byte[] command = { 0x00, 0xA4, 0x04, 0x00 };
-            _service = new WsctCardService(_mockFactory.Object);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act & Assert
             var ex = Assert.Throws<InvalidOperationException>(() => _service.SendCommand(command));
@@ -491,21 +654,29 @@ namespace Gp4Net.Tests.Tool.Services
             // Arrange
             const string readerName = "TestReader";
             byte[] command = { 0x00, 0xA4, 0x04, 0x00 };
-            
+
             var mockCommand = new Mock<ICardCommand>();
             var mockResponse = new Mock<ICardResponse>();
-            
-            _mockFactory.Setup(f => f.CreateCommandApdu(command)).Returns(mockCommand.Object);
-            _mockFactory.Setup(f => f.CreateResponseApdu()).Returns(mockResponse.Object);
-            
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.Success);
-            _mockChannel.Setup(ch => ch.GetStatus()).Returns(State.Specific);
-            _mockChannel.Setup(ch => ch.Transmit(mockCommand.Object, mockResponse.Object))
+
+            _ = _mockFactory.Setup(f => f.CreateCommandApdu(command)).Returns(mockCommand.Object);
+            _ = _mockFactory.Setup(f => f.CreateResponseApdu()).Returns(mockResponse.Object);
+
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Returns(ErrorCode.Success);
+            _ = _mockChannel
+                .Setup(ch => ch.Transmit(mockCommand.Object, mockResponse.Object))
                 .Returns(ErrorCode.CardUnsupported);
-            
-            _service = new WsctCardService(_mockFactory.Object);
-            _service.Connect(readerName);
+
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
+            _ = _service.Connect(readerName);
 
             // Act & Assert
             var ex = Assert.Throws<InvalidOperationException>(() => _service.SendCommand(command));
@@ -518,21 +689,29 @@ namespace Gp4Net.Tests.Tool.Services
             // Arrange
             const string readerName = "TestReader";
             byte[] command = { 0x00, 0xA4, 0x04, 0x00 };
-            
+
             var mockCommand = new Mock<ICardCommand>();
             var mockResponse = new Mock<ICardResponse>(); // Not a ResponseAPDU
-            
-            _mockFactory.Setup(f => f.CreateCommandApdu(command)).Returns(mockCommand.Object);
-            _mockFactory.Setup(f => f.CreateResponseApdu()).Returns(mockResponse.Object);
-            
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.Success);
-            _mockChannel.Setup(ch => ch.GetStatus()).Returns(State.Specific);
-            _mockChannel.Setup(ch => ch.Transmit(mockCommand.Object, mockResponse.Object))
+
+            _ = _mockFactory.Setup(f => f.CreateCommandApdu(command)).Returns(mockCommand.Object);
+            _ = _mockFactory.Setup(f => f.CreateResponseApdu()).Returns(mockResponse.Object);
+
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
                 .Returns(ErrorCode.Success);
-            
-            _service = new WsctCardService(_mockFactory.Object);
-            _service.Connect(readerName);
+            _ = _mockChannel
+                .Setup(ch => ch.Transmit(mockCommand.Object, mockResponse.Object))
+                .Returns(ErrorCode.Success);
+
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
+            _ = _service.Connect(readerName);
 
             // Act & Assert
             var ex = Assert.Throws<InvalidOperationException>(() => _service.SendCommand(command));
@@ -543,26 +722,16 @@ namespace Gp4Net.Tests.Tool.Services
 
         #region EstablishSecureChannel Tests
 
-        [Test]
-        public void EstablishSecureChannel_NotImplemented_ReturnsFalse()
-        {
-            // Arrange
-            byte[] keySet = { 0x40, 0x41, 0x42, 0x43 };
-            byte securityLevel = 0x03;
-            _service = new WsctCardService(_mockFactory.Object);
-
-            // Act
-            var result = _service.EstablishSecureChannel(keySet, securityLevel);
-
-            // Assert
-            Assert.That(result, Is.False);
-        }
 
         [Test]
         public void IsSecureChannelEstablished_Always_ReturnsFalse()
         {
             // Arrange
-            _service = new WsctCardService(_mockFactory.Object);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act
             var result = _service.IsSecureChannelEstablished;
@@ -580,10 +749,18 @@ namespace Gp4Net.Tests.Tool.Services
         {
             // Arrange
             const string readerName = "TestReader";
-            _mockContext.Setup(c => c.CreateCardChannel(readerName)).Returns(_mockChannel.Object);
-            _mockChannel.Setup(ch => ch.Connect(ShareMode.Shared, Protocol.Any)).Returns(ErrorCode.Success);
-            _service = new WsctCardService(_mockFactory.Object);
-            _service.Connect(readerName);
+            _ = _mockContext
+                .Setup(c => c.CreateCardChannel(readerName))
+                .Returns(_mockChannel.Object);
+            _ = _mockChannel
+                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Returns(ErrorCode.Success);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
+            _ = _service.Connect(readerName);
 
             // Act
             _service.Dispose();
@@ -598,7 +775,11 @@ namespace Gp4Net.Tests.Tool.Services
         public void Dispose_NotConnected_DisposesContext()
         {
             // Arrange
-            _service = new WsctCardService(_mockFactory.Object);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act
             _service.Dispose();
@@ -611,7 +792,11 @@ namespace Gp4Net.Tests.Tool.Services
         public void Dispose_CalledMultipleTimes_OnlyDisposesOnce()
         {
             // Arrange
-            _service = new WsctCardService(_mockFactory.Object);
+            _service = new WsctCardService(
+                _mockFactory.Object,
+                _mockSecureChannelManager.Object,
+                _mockTransportFactory.Object
+            );
 
             // Act
             _service.Dispose();

@@ -56,15 +56,20 @@ namespace Gp4Net.Domain.CapFile
                 string? errorMessage = null,
                 IList<object>? executedCommands = null,
                 byte[]? loadedPackageAid = null,
-                IList<byte[]>? installedAppletAids = null)
+                IList<byte[]>? installedAppletAids = null
+            )
             {
                 IsSuccessful = isSuccessful;
                 ErrorMessage = errorMessage;
-                ExecutedCommands = executedCommands != null ? new List<object>(executedCommands) : Array.Empty<object>();
+                ExecutedCommands =
+                    executedCommands != null
+                        ? new List<object>(executedCommands)
+                        : Array.Empty<object>();
                 LoadedPackageAid = loadedPackageAid?.Clone() as byte[];
-                InstalledAppletAids = installedAppletAids != null ? 
-                    new List<byte[]>(installedAppletAids.Select(aid => (byte[])aid.Clone())) : 
-                    Array.Empty<byte[]>();
+                InstalledAppletAids =
+                    installedAppletAids != null
+                        ? new List<byte[]>(installedAppletAids.Select(aid => (byte[])aid.Clone()))
+                        : Array.Empty<byte[]>();
             }
         }
 
@@ -82,10 +87,10 @@ namespace Gp4Net.Domain.CapFile
             byte[]? securityDomainAid = null,
             bool installApplets = true,
             bool makeSelectableAfterInstall = true,
-            int maxLoadBlockSize = 245)
+            int maxLoadBlockSize = 245
+        )
         {
-            if (capFileData == null)
-                throw new ArgumentNullException(nameof(capFileData));
+            ArgumentNullException.ThrowIfNull(capFileData);
 
             // Parse the CAP file to extract package and applet information
             var capFile = CapFileStructure.Parse(capFileData);
@@ -96,7 +101,8 @@ namespace Gp4Net.Domain.CapFile
                 // Step 1: INSTALL [for load]
                 var installForLoad = InstallCommand.CreateForLoad(
                     capFile.PackageAid,
-                    securityDomainAid);
+                    securityDomainAid
+                );
                 commands.Add(installForLoad);
 
                 // Step 2: LOAD commands (split CAP file into blocks)
@@ -110,14 +116,15 @@ namespace Gp4Net.Domain.CapFile
                 {
                     foreach (var applet in capFile.Applets)
                     {
-                        var installType = makeSelectableAfterInstall 
+                        var installType = makeSelectableAfterInstall
                             ? InstallCommand.InstallType.ForInstallAndMakeSelectable
                             : InstallCommand.InstallType.ForInstall;
 
                         var installForInstall = new InstallCommand(
                             installType,
                             capFile.PackageAid,
-                            applet.Aid);
+                            applet.Aid
+                        );
                         commands.Add(installForInstall);
                     }
                 }
@@ -126,7 +133,10 @@ namespace Gp4Net.Domain.CapFile
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException($"Failed to create loading commands: {ex.Message}", ex);
+                throw new InvalidOperationException(
+                    $"Failed to create loading commands: {ex.Message}",
+                    ex
+                );
             }
         }
 
@@ -138,43 +148,58 @@ namespace Gp4Net.Domain.CapFile
         public static CapFileValidationResult ValidateCapFile(byte[] capFileData)
         {
             if (capFileData == null)
+            {
                 return new CapFileValidationResult(false, "CAP file data is null");
+            }
 
             if (capFileData.Length == 0)
+            {
                 return new CapFileValidationResult(false, "CAP file data is empty");
+            }
 
             try
             {
                 var capFile = CapFileStructure.Parse(capFileData);
-                
+
                 var validationErrors = new List<string>();
 
                 // Validate package AID
                 if (capFile.PackageAid.Length < 5 || capFile.PackageAid.Length > 16)
+                {
                     validationErrors.Add("Package AID must be between 5 and 16 bytes");
+                }
 
                 // Validate components
                 if (capFile.Components.Count == 0)
+                {
                     validationErrors.Add("CAP file contains no components");
+                }
 
                 // Check for required components
-                var requiredComponents = new[] { 
+                var requiredComponents = new[]
+                {
                     CapFileStructure.ComponentTags.Header,
-                    CapFileStructure.ComponentTags.Directory 
+                    CapFileStructure.ComponentTags.Directory,
                 };
 
                 var presentTags = capFile.Components.Select(c => c.Tag).ToHashSet();
                 foreach (var requiredTag in requiredComponents)
                 {
                     if (!presentTags.Contains(requiredTag))
+                    {
                         validationErrors.Add($"Missing required component: {requiredTag:X2}");
+                    }
                 }
 
                 // Validate applets
                 foreach (var applet in capFile.Applets)
                 {
                     if (applet.Aid.Length < 5 || applet.Aid.Length > 16)
-                        validationErrors.Add($"Applet AID must be between 5 and 16 bytes: {Convert.ToHexString(applet.Aid)}");
+                    {
+                        validationErrors.Add(
+                            $"Applet AID must be between 5 and 16 bytes: {Convert.ToHexString(applet.Aid)}"
+                        );
+                    }
                 }
 
                 var isValid = validationErrors.Count == 0;
@@ -184,7 +209,10 @@ namespace Gp4Net.Domain.CapFile
             }
             catch (Exception ex)
             {
-                return new CapFileValidationResult(false, $"Failed to parse CAP file: {ex.Message}");
+                return new CapFileValidationResult(
+                    false,
+                    $"Failed to parse CAP file: {ex.Message}"
+                );
             }
         }
 
@@ -198,13 +226,13 @@ namespace Gp4Net.Domain.CapFile
         public static DeleteCommand CreateDeleteCommand(
             byte[] packageAid,
             IList<byte[]>? appletAids = null,
-            bool deleteRelated = true)
+            bool deleteRelated = true
+        )
         {
-            if (packageAid == null)
-                throw new ArgumentNullException(nameof(packageAid));
+            ArgumentNullException.ThrowIfNull(packageAid);
 
             var aidsToDelete = new List<byte[]> { packageAid };
-            
+
             if (appletAids != null)
             {
                 aidsToDelete.AddRange(appletAids);
@@ -213,7 +241,6 @@ namespace Gp4Net.Domain.CapFile
             return DeleteCommand.CreateForApplications(aidsToDelete, deleteRelated);
         }
 
-
         /// <summary>
         /// Estimates the memory requirements for loading a CAP file.
         /// </summary>
@@ -221,20 +248,23 @@ namespace Gp4Net.Domain.CapFile
         /// <returns>The estimated memory requirements in bytes.</returns>
         public static MemoryRequirements EstimateMemoryRequirements(byte[] capFileData)
         {
-            if (capFileData == null)
-                throw new ArgumentNullException(nameof(capFileData));
+            ArgumentNullException.ThrowIfNull(capFileData);
 
             var capFile = CapFileStructure.Parse(capFileData);
-            
+
             // Basic estimation - in practice this would be more sophisticated
-            var codeSize = capFile.Components
-                .Where(c => c.Tag == CapFileStructure.ComponentTags.Method || 
-                           c.Tag == CapFileStructure.ComponentTags.Class)
+            var codeSize = capFile
+                .Components.Where(c =>
+                    c.Tag == CapFileStructure.ComponentTags.Method
+                    || c.Tag == CapFileStructure.ComponentTags.Class
+                )
                 .Sum(c => c.Size);
 
-            var dataSize = capFile.Components
-                .Where(c => c.Tag == CapFileStructure.ComponentTags.StaticField ||
-                           c.Tag == CapFileStructure.ComponentTags.ConstantPool)
+            var dataSize = capFile
+                .Components.Where(c =>
+                    c.Tag == CapFileStructure.ComponentTags.StaticField
+                    || c.Tag == CapFileStructure.ComponentTags.ConstantPool
+                )
                 .Sum(c => c.Size);
 
             var totalSize = capFile.TotalSize;
@@ -270,7 +300,11 @@ namespace Gp4Net.Domain.CapFile
         /// <param name="isValid">Whether the CAP file is valid.</param>
         /// <param name="errorMessage">The error message (if invalid).</param>
         /// <param name="capFile">The parsed CAP file (if valid).</param>
-        public CapFileValidationResult(bool isValid, string? errorMessage = null, CapFileStructure? capFile = null)
+        public CapFileValidationResult(
+            bool isValid,
+            string? errorMessage = null,
+            CapFileStructure? capFile = null
+        )
         {
             IsValid = isValid;
             ErrorMessage = errorMessage;

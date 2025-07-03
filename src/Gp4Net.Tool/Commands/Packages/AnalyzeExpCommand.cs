@@ -6,7 +6,6 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -24,16 +23,20 @@ namespace Gp4Net.Tool.Commands.Packages
         {
             if (!File.Exists(settings.ExpFilePath))
             {
-                AnsiConsole.MarkupLine($"[red].exp file not found: {Markup.Escape(settings.ExpFilePath)}[/]");
+                AnsiConsole.MarkupLine(
+                    $"[red].exp file not found: {Markup.Escape(settings.ExpFilePath)}[/]"
+                );
                 return 1;
             }
 
             try
             {
-                AnsiConsole.MarkupLine($"[cyan]Analyzing .exp file: {Markup.Escape(settings.ExpFilePath)}[/]");
-                
+                AnsiConsole.MarkupLine(
+                    $"[cyan]Analyzing .exp file: {Markup.Escape(settings.ExpFilePath)}[/]"
+                );
+
                 var analysis = await AnalyzeExpFileAsync(settings.ExpFilePath, settings.SdkVersion);
-                
+
                 DisplayAnalysis(analysis, settings);
 
                 // Save to database if package was discovered and output path is specified
@@ -46,7 +49,9 @@ namespace Gp4Net.Tool.Commands.Packages
             }
             catch (Exception ex)
             {
-                AnsiConsole.MarkupLine($"[red]Error analyzing .exp file: {Markup.Escape(ex.Message)}[/]");
+                AnsiConsole.MarkupLine(
+                    $"[red]Error analyzing .exp file: {Markup.Escape(ex.Message)}[/]"
+                );
                 if (settings.Verbose)
                 {
                     AnsiConsole.WriteException(ex);
@@ -55,7 +60,10 @@ namespace Gp4Net.Tool.Commands.Packages
             }
         }
 
-        private static Task<ExpFileAnalysis> AnalyzeExpFileAsync(string expFilePath, string? sdkVersion = null)
+        private static Task<ExpFileAnalysis> AnalyzeExpFileAsync(
+            string expFilePath,
+            string? sdkVersion = null
+        )
         {
             var fileBytes = File.ReadAllBytes(expFilePath);
             var analysis = new ExpFileAnalysis
@@ -63,11 +71,10 @@ namespace Gp4Net.Tool.Commands.Packages
                 FilePath = expFilePath,
                 FileSize = fileBytes.Length,
                 FileName = Path.GetFileName(expFilePath),
-                SdkVersion = sdkVersion
+                SdkVersion = sdkVersion,
+                // Extract basic file info
+                RelativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), expFilePath)
             };
-
-            // Extract basic file info
-            analysis.RelativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), expFilePath);
 
             // Look for magic bytes and file format indicators
             AnalyzeFileFormat(fileBytes, analysis);
@@ -104,7 +111,12 @@ namespace Gp4Net.Tool.Commands.Packages
             }
 
             // Look for Java class file signature
-            if (fileBytes[0] == 0xCA && fileBytes[1] == 0xFE && fileBytes[2] == 0xBA && fileBytes[3] == 0xBE)
+            if (
+                fileBytes[0] == 0xCA
+                && fileBytes[1] == 0xFE
+                && fileBytes[2] == 0xBA
+                && fileBytes[3] == 0xBE
+            )
             {
                 analysis.FormatNotes.Add("Java class file format detected");
             }
@@ -120,15 +132,15 @@ namespace Gp4Net.Tool.Commands.Packages
         {
             var strings = new List<string>();
             var currentString = new StringBuilder();
-            
+
             for (int i = 0; i < fileBytes.Length; i++)
             {
                 var b = fileBytes[i];
-                
+
                 // Look for printable ASCII characters
                 if (b >= 32 && b <= 126)
                 {
-                    currentString.Append((char)b);
+                    _ = currentString.Append((char)b);
                 }
                 else
                 {
@@ -136,23 +148,25 @@ namespace Gp4Net.Tool.Commands.Packages
                     {
                         strings.Add(currentString.ToString());
                     }
-                    currentString.Clear();
+                    _ = currentString.Clear();
                 }
             }
-            
+
             // Don't forget the last string
             if (currentString.Length >= 4)
             {
                 strings.Add(currentString.ToString());
             }
 
-            analysis.ExtractedStrings = strings.Distinct().OrderBy(s => s).ToList();
+            analysis.ExtractedStrings = [.. strings.Distinct().OrderBy(s => s)];
 
             // Look for package-like strings
-            analysis.PossiblePackageNames = strings
-                .Where(s => s.Contains('.') && s.Length > 5)
-                .Where(s => s.All(c => char.IsLetterOrDigit(c) || c == '.' || c == '/'))
-                .ToList();
+            analysis.PossiblePackageNames =
+            [
+                .. strings
+                    .Where(s => s.Contains('.') && s.Length > 5)
+                    .Where(s => s.All(c => char.IsLetterOrDigit(c) || c == '.' || c == '/'))
+            ];
         }
 
         private static void ExtractPackageInfo(byte[] fileBytes, ExpFileAnalysis analysis)
@@ -162,9 +176,14 @@ namespace Gp4Net.Tool.Commands.Packages
             if (!string.IsNullOrEmpty(pathBasedPackageName))
             {
                 analysis.PathBasedPackageName = pathBasedPackageName;
-                
+
                 // Use jcalgscan method to find AID
-                var packageInfo = TryExtractAidMapping(fileBytes, pathBasedPackageName, analysis.SdkVersion, analysis.FilePath);
+                var packageInfo = TryExtractAidMapping(
+                    fileBytes,
+                    pathBasedPackageName,
+                    analysis.SdkVersion,
+                    analysis.FilePath
+                );
                 if (packageInfo != null)
                 {
                     analysis.PackageInfo = packageInfo;
@@ -174,7 +193,12 @@ namespace Gp4Net.Tool.Commands.Packages
             // Also try with detected package names from strings
             foreach (var possibleName in analysis.PossiblePackageNames.Take(5)) // Limit to first 5
             {
-                var packageInfo = TryExtractAidMapping(fileBytes, possibleName, analysis.SdkVersion, analysis.FilePath);
+                var packageInfo = TryExtractAidMapping(
+                    fileBytes,
+                    possibleName,
+                    analysis.SdkVersion,
+                    analysis.FilePath
+                );
                 if (packageInfo != null && analysis.PackageInfo == null)
                 {
                     analysis.PackageInfo = packageInfo;
@@ -199,10 +223,12 @@ namespace Gp4Net.Tool.Commands.Packages
         private static void ExtractVersionInfo(byte[] fileBytes, ExpFileAnalysis analysis)
         {
             // Look for version-like patterns in the strings
-            var versionPatterns = analysis.ExtractedStrings
-                .Where(s => System.Text.RegularExpressions.Regex.IsMatch(s, @"\d+\.\d+(\.\d+)?"))
+            var versionPatterns = analysis
+                .ExtractedStrings.Where(s =>
+                    System.Text.RegularExpressions.Regex.IsMatch(s, @"\d+\.\d+(\.\d+)?")
+                )
                 .ToList();
-            
+
             analysis.PossibleVersions = versionPatterns;
         }
 
@@ -218,9 +244,12 @@ namespace Gp4Net.Tool.Commands.Packages
                 if (length >= 5 && length <= 16 && i + length < fileBytes.Length)
                 {
                     var potentialAid = fileBytes.Skip(i + 1).Take(length).ToArray();
-                    
+
                     // Check if it looks like an AID (starts with A0 or similar)
-                    if (potentialAid.Length >= 5 && (potentialAid[0] == 0xA0 || potentialAid[0] == 0xA1))
+                    if (
+                        potentialAid.Length >= 5
+                        && (potentialAid[0] == 0xA0 || potentialAid[0] == 0xA1)
+                    )
                     {
                         var aidHex = Convert.ToHexString(potentialAid);
                         if (!aidPatterns.Contains(aidHex))
@@ -237,17 +266,28 @@ namespace Gp4Net.Tool.Commands.Packages
         private static void ExtractExportImportInfo(byte[] fileBytes, ExpFileAnalysis analysis)
         {
             // Look for export/import related strings
-            var exportImportKeywords = new[] { "export", "import", "Export", "Import", "EXPORT", "IMPORT" };
-            
-            analysis.ExportImportInfo = analysis.ExtractedStrings
-                .Where(s => exportImportKeywords.Any(keyword => s.Contains(keyword)))
-                .ToList();
+            var exportImportKeywords = new[]
+            {
+                "export",
+                "import",
+                "Export",
+                "Import",
+                "EXPORT",
+                "IMPORT",
+            };
+
+            analysis.ExportImportInfo =
+            [
+                .. analysis.ExtractedStrings.Where(s =>
+                    exportImportKeywords.Any(keyword => s.Contains(keyword))
+                )
+            ];
         }
 
         private static string? ExtractPackageNameFromPath(string expFilePath)
         {
             var parts = expFilePath.Replace('\\', '/').Split('/');
-            
+
             // Look for patterns like: api_export_files/javacard/framework/javacard/framework.exp
             for (int i = 0; i < parts.Length - 1; i++)
             {
@@ -270,7 +310,7 @@ namespace Gp4Net.Tool.Commands.Packages
             // Extract SDK version from path like: external/oracle_javacard_sdks/jc221_kit/...
             // Returns: jc221 (removes _kit suffix)
             var parts = expFilePath.Replace('\\', '/').Split('/');
-            
+
             foreach (var part in parts)
             {
                 if (part.StartsWith("jc") && part.EndsWith("_kit"))
@@ -283,31 +323,42 @@ namespace Gp4Net.Tool.Commands.Packages
                     return part.Replace("_kit", "");
                 }
             }
-            
+
             return "unknown";
         }
 
-        private static PackageInfo? TryExtractAidMapping(byte[] fileBytes, string packageName, string? sdkVersion, string expFilePath)
+        private static PackageInfo? TryExtractAidMapping(
+            byte[] fileBytes,
+            string packageName,
+            string? sdkVersion,
+            string expFilePath
+        )
         {
             var packageNameBytes = Encoding.UTF8.GetBytes(packageName.Replace('.', '/'));
             var lastIndex = FindLastOccurrence(fileBytes, packageNameBytes);
-            
+
             if (lastIndex == -1)
+            {
                 return null;
+            }
 
             var dataStart = lastIndex + packageNameBytes.Length + 4;
-            
+
             if (dataStart + 3 >= fileBytes.Length)
+            {
                 return null;
+            }
 
             try
             {
                 var minorVersion = fileBytes[dataStart];
                 var majorVersion = fileBytes[dataStart + 1];
                 var aidLength = fileBytes[dataStart + 2];
-                
+
                 if (dataStart + 3 + aidLength > fileBytes.Length)
+                {
                     return null;
+                }
 
                 var aid = new byte[aidLength];
                 Array.Copy(fileBytes, dataStart + 3, aid, 0, aidLength);
@@ -323,7 +374,7 @@ namespace Gp4Net.Tool.Commands.Packages
                     MinorVersion = minorVersion,
                     Version = $"{majorVersion}.{minorVersion}",
                     SdkVersion = finalSdkVersion,
-                    SourceFile = expFilePath
+                    SourceFile = expFilePath,
                 };
             }
             catch
@@ -346,7 +397,9 @@ namespace Gp4Net.Tool.Commands.Packages
                     }
                 }
                 if (found)
+                {
                     return i;
+                }
             }
             return -1;
         }
@@ -354,17 +407,17 @@ namespace Gp4Net.Tool.Commands.Packages
         private static void DisplayAnalysis(ExpFileAnalysis analysis, Settings settings)
         {
             // Basic file information
-            var basicTable = new Table()
-                .AddColumn("Property")
-                .AddColumn("Value");
+            var basicTable = new Table().AddColumn("Property").AddColumn("Value");
 
-            basicTable.AddRow("File Path", Markup.Escape(analysis.RelativePath));
-            basicTable.AddRow("File Size", $"{analysis.FileSize} bytes");
-            basicTable.AddRow("Header (hex)", $"[dim]{analysis.HeaderHex}[/]");
-            
-            AnsiConsole.Write(new Panel(basicTable)
-                .Header("[bold]Basic File Information[/]")
-                .BorderColor(Color.Blue));
+            _ = basicTable.AddRow("File Path", Markup.Escape(analysis.RelativePath));
+            _ = basicTable.AddRow("File Size", $"{analysis.FileSize} bytes");
+            _ = basicTable.AddRow("Header (hex)", $"[dim]{analysis.HeaderHex}[/]");
+
+            AnsiConsole.Write(
+                new Panel(basicTable)
+                    .Header("[bold]Basic File Information[/]")
+                    .BorderColor(Color.Blue)
+            );
 
             // Format analysis
             if (analysis.FormatNotes.Any())
@@ -381,29 +434,41 @@ namespace Gp4Net.Tool.Commands.Packages
             if (analysis.PackageInfo != null)
             {
                 AnsiConsole.WriteLine();
-                var packageTable = new Table()
-                    .AddColumn("Property")
-                    .AddColumn("Value");
+                var packageTable = new Table().AddColumn("Property").AddColumn("Value");
 
-                packageTable.AddRow("Package Name", analysis.PackageInfo.Name);
-                packageTable.AddRow("Package AID", $"[dim]{Convert.ToHexString(analysis.PackageInfo.Aid)}[/]");
-                packageTable.AddRow("Version", analysis.PackageInfo.Version);
-                packageTable.AddRow("Major Version", analysis.PackageInfo.MajorVersion.ToString());
-                packageTable.AddRow("Minor Version", analysis.PackageInfo.MinorVersion.ToString());
-                packageTable.AddRow("SDK Version", $"[yellow]{analysis.PackageInfo.SdkVersion}[/]");
+                _ = packageTable.AddRow("Package Name", analysis.PackageInfo.Name);
+                _ = packageTable.AddRow(
+                    "Package AID",
+                    $"[dim]{Convert.ToHexString(analysis.PackageInfo.Aid)}[/]"
+                );
+                _ = packageTable.AddRow("Version", analysis.PackageInfo.Version);
+                _ = packageTable.AddRow(
+                    "Major Version",
+                    analysis.PackageInfo.MajorVersion.ToString()
+                );
+                _ = packageTable.AddRow(
+                    "Minor Version",
+                    analysis.PackageInfo.MinorVersion.ToString()
+                );
+                _ = packageTable.AddRow(
+                    "SDK Version",
+                    $"[yellow]{analysis.PackageInfo.SdkVersion}[/]"
+                );
 
                 if (!string.IsNullOrEmpty(analysis.DetectedPackageName))
                 {
-                    packageTable.AddRow("Detection Method", "String analysis");
+                    _ = packageTable.AddRow("Detection Method", "String analysis");
                 }
                 else if (!string.IsNullOrEmpty(analysis.PathBasedPackageName))
                 {
-                    packageTable.AddRow("Detection Method", "Path analysis");
+                    _ = packageTable.AddRow("Detection Method", "Path analysis");
                 }
 
-                AnsiConsole.Write(new Panel(packageTable)
-                    .Header("[bold]Package Information[/]")
-                    .BorderColor(Color.Green));
+                AnsiConsole.Write(
+                    new Panel(packageTable)
+                        .Header("[bold]Package Information[/]")
+                        .BorderColor(Color.Green)
+                );
             }
 
             // Additional findings
@@ -476,44 +541,56 @@ namespace Gp4Net.Tool.Commands.Packages
             var options = new JsonSerializerOptions
             {
                 WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             };
 
             // Load existing data if file exists
             var existingData = new Dictionary<string, object>();
             var existingPackages = new Dictionary<string, object>();
-            
+
             if (File.Exists(databasePath))
             {
                 try
                 {
                     var existingJson = await File.ReadAllTextAsync(databasePath);
                     var existingDoc = JsonDocument.Parse(existingJson);
-                    
+
                     // Preserve existing non-package data
                     foreach (var element in existingDoc.RootElement.EnumerateObject())
                     {
                         if (element.Name != "packages")
                         {
-                            var deserializedValue = JsonSerializer.Deserialize<object>(element.Value.GetRawText(), options);
+                            var deserializedValue = JsonSerializer.Deserialize<object>(
+                                element.Value.GetRawText(),
+                                options
+                            );
                             if (deserializedValue != null)
+                            {
                                 existingData[element.Name] = deserializedValue;
+                            }
                         }
                         else
                         {
                             // Load existing packages
                             foreach (var pkg in element.Value.EnumerateObject())
                             {
-                                var deserializedPackage = JsonSerializer.Deserialize<object>(pkg.Value.GetRawText(), options);
+                                var deserializedPackage = JsonSerializer.Deserialize<object>(
+                                    pkg.Value.GetRawText(),
+                                    options
+                                );
                                 if (deserializedPackage != null)
+                                {
                                     existingPackages[pkg.Name] = deserializedPackage;
+                                }
                             }
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    AnsiConsole.MarkupLine($"[yellow]Warning: Could not parse existing JSON file: {ex.Message}[/]");
+                    AnsiConsole.MarkupLine(
+                        $"[yellow]Warning: Could not parse existing JSON file: {ex.Message}[/]"
+                    );
                     AnsiConsole.MarkupLine("[yellow]Creating new file...[/]");
                 }
             }
@@ -521,10 +598,10 @@ namespace Gp4Net.Tool.Commands.Packages
             // Convert AID to hex string and create compound key with version
             var aidHex = Convert.ToHexString(packageInfo.Aid).ToUpper();
             var packageKey = $"{aidHex}-v{packageInfo.Version}";
-            
+
             // Check for duplicate (same AID and version)
             var isDuplicate = existingPackages.ContainsKey(packageKey);
-            
+
             // Add or update the package
             existingPackages[packageKey] = new
             {
@@ -533,9 +610,12 @@ namespace Gp4Net.Tool.Commands.Packages
                 version = packageInfo.Version,
                 majorVersion = packageInfo.MajorVersion,
                 minorVersion = packageInfo.MinorVersion,
-                sourceFile = Path.GetRelativePath(Directory.GetCurrentDirectory(), packageInfo.SourceFile ?? ""),
+                sourceFile = Path.GetRelativePath(
+                    Directory.GetCurrentDirectory(),
+                    packageInfo.SourceFile ?? ""
+                ),
                 sdkVersion = packageInfo.SdkVersion,
-                lastUpdated = DateTime.UtcNow
+                lastUpdated = DateTime.UtcNow,
             };
 
             // Create final JSON structure
@@ -543,14 +623,16 @@ namespace Gp4Net.Tool.Commands.Packages
             {
                 ["generatedAt"] = DateTime.UtcNow,
                 ["packageCount"] = existingPackages.Count,
-                ["packages"] = existingPackages
+                ["packages"] = existingPackages,
             };
 
             var json = JsonSerializer.Serialize(jsonData, options);
             await File.WriteAllTextAsync(databasePath, json);
-            
+
             var action = isDuplicate ? "Updated" : "Added";
-            AnsiConsole.MarkupLine($"[green]{action} package {packageInfo.Name} v{packageInfo.Version} (AID: {aidHex}) to database[/]");
+            AnsiConsole.MarkupLine(
+                $"[green]{action} package {packageInfo.Name} v{packageInfo.Version} (AID: {aidHex}) to database[/]"
+            );
         }
 
         /// <summary>
@@ -612,12 +694,12 @@ namespace Gp4Net.Tool.Commands.Packages
             public string FileName { get; set; } = string.Empty;
             public long FileSize { get; set; }
             public string HeaderHex { get; set; } = string.Empty;
-            public List<string> FormatNotes { get; set; } = new();
-            public List<string> ExtractedStrings { get; set; } = new();
-            public List<string> PossiblePackageNames { get; set; } = new();
-            public List<string> PossibleAids { get; set; } = new();
-            public List<string> PossibleVersions { get; set; } = new();
-            public List<string> ExportImportInfo { get; set; } = new();
+            public List<string> FormatNotes { get; set; } = [];
+            public List<string> ExtractedStrings { get; set; } = [];
+            public List<string> PossiblePackageNames { get; set; } = [];
+            public List<string> PossibleAids { get; set; } = [];
+            public List<string> PossibleVersions { get; set; } = [];
+            public List<string> ExportImportInfo { get; set; } = [];
             public string? PathBasedPackageName { get; set; }
             public string? DetectedPackageName { get; set; }
             public string? SdkVersion { get; set; }

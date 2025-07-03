@@ -20,12 +20,15 @@ namespace Gp4Net.Utils
         /// <returns>The hexadecimal string representation.</returns>
         public static string ToHexString(this byte[] data)
         {
-            if (data == null) return string.Empty;
+            if (data == null)
+            {
+                return string.Empty;
+            }
 
             var sb = new StringBuilder(data.Length * 2);
             foreach (var b in data)
             {
-                sb.Append(b.ToString("X2"));
+                _ = sb.Append(b.ToString("X2"));
             }
             return sb.ToString();
         }
@@ -37,13 +40,20 @@ namespace Gp4Net.Utils
         /// <returns>The hexadecimal string representation with spaces.</returns>
         public static string ToHexStringWithSpaces(this byte[] data)
         {
-            if (data == null) return string.Empty;
+            if (data == null)
+            {
+                return string.Empty;
+            }
 
             var sb = new StringBuilder(data.Length * 3);
             for (int i = 0; i < data.Length; i++)
             {
-                if (i > 0) sb.Append(' ');
-                sb.Append(data[i].ToString("X2"));
+                if (i > 0)
+                {
+                    _ = sb.Append(' ');
+                }
+
+                _ = sb.Append(data[i].ToString("X2"));
             }
             return sb.ToString();
         }
@@ -57,9 +67,17 @@ namespace Gp4Net.Utils
         /// <returns>A new array containing the specified portion.</returns>
         public static byte[] Slice(this byte[] data, int offset, int length)
         {
-            if (data == null) throw new ArgumentNullException(nameof(data));
-            if (offset < 0 || offset > data.Length) throw new ArgumentOutOfRangeException(nameof(offset));
-            if (length < 0 || offset + length > data.Length) throw new ArgumentOutOfRangeException(nameof(length));
+            ArgumentNullException.ThrowIfNull(data);
+
+            if (offset < 0 || offset > data.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            }
+
+            if (length < 0 || offset + length > data.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(length));
+            }
 
             var result = new byte[length];
             Array.Copy(data, offset, result, 0, length);
@@ -73,13 +91,15 @@ namespace Gp4Net.Utils
         /// <returns>A new array containing all the input arrays.</returns>
         public static byte[] Concat(params byte[][] arrays)
         {
-            if (arrays == null) throw new ArgumentNullException(nameof(arrays));
+            ArgumentNullException.ThrowIfNull(arrays);
 
             var totalLength = 0;
             foreach (var array in arrays)
             {
                 if (array != null)
+                {
                     totalLength += array.Length;
+                }
             }
 
             var result = new byte[totalLength];
@@ -105,13 +125,27 @@ namespace Gp4Net.Utils
         /// <returns>True if the arrays are equal; otherwise, false.</returns>
         public static bool SequenceEqual(this byte[] a, byte[] b)
         {
-            if (ReferenceEquals(a, b)) return true;
-            if (a == null || b == null) return false;
-            if (a.Length != b.Length) return false;
+            if (ReferenceEquals(a, b))
+            {
+                return true;
+            }
+
+            if (a == null || b == null)
+            {
+                return false;
+            }
+
+            if (a.Length != b.Length)
+            {
+                return false;
+            }
 
             for (int i = 0; i < a.Length; i++)
             {
-                if (a[i] != b[i]) return false;
+                if (a[i] != b[i])
+                {
+                    return false;
+                }
             }
 
             return true;
@@ -125,9 +159,13 @@ namespace Gp4Net.Utils
         /// <returns>A new array containing the XOR result.</returns>
         public static byte[] Xor(this byte[] a, byte[] b)
         {
-            if (a == null) throw new ArgumentNullException(nameof(a));
-            if (b == null) throw new ArgumentNullException(nameof(b));
-            if (a.Length != b.Length) throw new ArgumentException("Arrays must have the same length.");
+            ArgumentNullException.ThrowIfNull(a);
+            ArgumentNullException.ThrowIfNull(b);
+
+            if (a.Length != b.Length)
+            {
+                throw new ArgumentException("Arrays must have the same length.");
+            }
 
             var result = new byte[a.Length];
             for (int i = 0; i < a.Length; i++)

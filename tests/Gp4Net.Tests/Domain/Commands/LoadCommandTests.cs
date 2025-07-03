@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 using Gp4Net.Domain.Commands;
-using Gp4Net.Utils;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.Commands
 {
@@ -17,7 +17,7 @@ namespace Gp4Net.Tests.Domain.Commands
         public void Constructor_ValidParameters_CreatesInstance()
         {
             // Arrange
-            var data = ConvertCompat.FromHexString("DEADBEEF");
+            var data = Convert.FromHexString("DEADBEEF");
 
             // Act
             var command = new LoadCommand(0, data, false, 100);
@@ -35,7 +35,7 @@ namespace Gp4Net.Tests.Domain.Commands
         public void Constructor_FinalBlock_SetsFinalType()
         {
             // Arrange
-            var data = ConvertCompat.FromHexString("DEADBEEF");
+            var data = Convert.FromHexString("DEADBEEF");
 
             // Act
             var command = new LoadCommand(1, data, true);
@@ -49,14 +49,16 @@ namespace Gp4Net.Tests.Domain.Commands
         public void Constructor_NullData_ThrowsArgumentNullException()
         {
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => new LoadCommand(0, null, false, 100));
+            _ = Assert.Throws<ArgumentNullException>(() => new LoadCommand(0, null, false, 100));
         }
 
         [Test]
         public void Constructor_EmptyData_ThrowsArgumentException()
         {
             // Act & Assert
-            var ex = Assert.Throws<ArgumentException>(() => new LoadCommand(0, Array.Empty<byte>(), false, 100));
+            var ex = Assert.Throws<ArgumentException>(
+                () => new LoadCommand(0, Array.Empty<byte>(), false, 100)
+            );
             Assert.That(ex.ParamName, Is.EqualTo("data"));
         }
 
@@ -64,7 +66,7 @@ namespace Gp4Net.Tests.Domain.Commands
         public void Constructor_FirstBlockWithoutTotalSize_ThrowsArgumentException()
         {
             // Arrange
-            var data = ConvertCompat.FromHexString("DEADBEEF");
+            var data = Convert.FromHexString("DEADBEEF");
 
             // Act & Assert
             var ex = Assert.Throws<ArgumentException>(() => new LoadCommand(0, data, false));
@@ -75,7 +77,7 @@ namespace Gp4Net.Tests.Domain.Commands
         public void Constructor_NonFirstBlockWithoutTotalSize_Succeeds()
         {
             // Arrange
-            var data = ConvertCompat.FromHexString("DEADBEEF");
+            var data = Convert.FromHexString("DEADBEEF");
 
             // Act
             var command = new LoadCommand(1, data, false);
@@ -92,7 +94,7 @@ namespace Gp4Net.Tests.Domain.Commands
         public void CreateFromCapFile_SmallCapFile_CreatesSingleCommand()
         {
             // Arrange
-            var capData = ConvertCompat.FromHexString("DEADBEEFCAFEBABE");
+            var capData = Convert.FromHexString("DEADBEEFCAFEBABE");
 
             // Act
             var commands = LoadCommand.CreateFromCapFile(capData, 255);
@@ -121,20 +123,20 @@ namespace Gp4Net.Tests.Domain.Commands
 
             // Assert
             Assert.That(commands.Count, Is.GreaterThan(1));
-            
+
             // Check first block
             Assert.That(commands[0].BlockNumber, Is.EqualTo(0));
             Assert.That(commands[0].IsFirstBlock, Is.True);
             Assert.That(commands[0].IsFinalBlock, Is.False);
             Assert.That(commands[0].TotalCapSize, Is.EqualTo(500));
-            
+
             // Check last block
             var lastCommand = commands[^1];
             Assert.That(lastCommand.BlockNumber, Is.EqualTo(commands.Count - 1));
             Assert.That(lastCommand.IsFirstBlock, Is.False);
             Assert.That(lastCommand.IsFinalBlock, Is.True);
             Assert.That(lastCommand.TotalCapSize, Is.Null);
-            
+
             // Check intermediate blocks
             for (int i = 1; i < commands.Count - 1; i++)
             {
@@ -184,14 +186,16 @@ namespace Gp4Net.Tests.Domain.Commands
         public void CreateFromCapFile_NullData_ThrowsArgumentNullException()
         {
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => LoadCommand.CreateFromCapFile(null));
+            _ = Assert.Throws<ArgumentNullException>(() => LoadCommand.CreateFromCapFile(null));
         }
 
         [Test]
         public void CreateFromCapFile_EmptyData_ThrowsArgumentException()
         {
             // Act & Assert
-            var ex = Assert.Throws<ArgumentException>(() => LoadCommand.CreateFromCapFile(Array.Empty<byte>()));
+            var ex = Assert.Throws<ArgumentException>(
+                () => LoadCommand.CreateFromCapFile(Array.Empty<byte>())
+            );
             Assert.That(ex.ParamName, Is.EqualTo("capFileData"));
         }
 
@@ -199,11 +203,11 @@ namespace Gp4Net.Tests.Domain.Commands
         public void CreateFromCapFile_InvalidBlockSize_ThrowsArgumentException()
         {
             // Arrange
-            var capData = ConvertCompat.FromHexString("DEADBEEF");
+            var capData = Convert.FromHexString("DEADBEEF");
 
             // Act & Assert
-            Assert.Throws<ArgumentException>(() => LoadCommand.CreateFromCapFile(capData, 0));
-            Assert.Throws<ArgumentException>(() => LoadCommand.CreateFromCapFile(capData, 256));
+            _ = Assert.Throws<ArgumentException>(() => LoadCommand.CreateFromCapFile(capData, 0));
+            _ = Assert.Throws<ArgumentException>(() => LoadCommand.CreateFromCapFile(capData, 256));
         }
 
         #endregion
@@ -214,7 +218,7 @@ namespace Gp4Net.Tests.Domain.Commands
         public void ToApdu_FirstBlock_IncludesTlvHeader()
         {
             // Arrange
-            var data = ConvertCompat.FromHexString("DEADBEEF");
+            var data = Convert.FromHexString("DEADBEEF");
             var command = new LoadCommand(0, data, false, 100);
 
             // Act
@@ -225,7 +229,7 @@ namespace Gp4Net.Tests.Domain.Commands
             Assert.That(apdu[1], Is.EqualTo(0xE8)); // INS
             Assert.That(apdu[2], Is.EqualTo(0x00)); // P1 (continuation)
             Assert.That(apdu[3], Is.EqualTo(0x00)); // P2 (block number)
-            
+
             // Data should include C4 tag and length
             var dataField = apdu.Skip(5).Take(apdu[4]).ToArray();
             Assert.That(dataField[0], Is.EqualTo(0xC4)); // TLV tag
@@ -237,7 +241,7 @@ namespace Gp4Net.Tests.Domain.Commands
         public void ToApdu_ContinuationBlock_DoesNotIncludeTlvHeader()
         {
             // Arrange
-            var data = ConvertCompat.FromHexString("DEADBEEF");
+            var data = Convert.FromHexString("DEADBEEF");
             var command = new LoadCommand(1, data, false);
 
             // Act
@@ -246,7 +250,7 @@ namespace Gp4Net.Tests.Domain.Commands
             // Assert
             Assert.That(apdu[2], Is.EqualTo(0x00)); // P1 (continuation)
             Assert.That(apdu[3], Is.EqualTo(0x01)); // P2 (block number)
-            
+
             // Data should be raw data without TLV header
             var dataField = apdu.Skip(5).Take(apdu[4]).ToArray();
             Assert.That(dataField, Is.EqualTo(data));
@@ -256,7 +260,7 @@ namespace Gp4Net.Tests.Domain.Commands
         public void ToApdu_FinalBlock_SetsFinalP1()
         {
             // Arrange
-            var data = ConvertCompat.FromHexString("DEADBEEF");
+            var data = Convert.FromHexString("DEADBEEF");
             var command = new LoadCommand(2, data, true);
 
             // Act
@@ -271,7 +275,7 @@ namespace Gp4Net.Tests.Domain.Commands
         public void ToApdu_LargeTotalSize_UsesMultiByteLengthEncoding()
         {
             // Arrange
-            var data = ConvertCompat.FromHexString("DEAD");
+            var data = Convert.FromHexString("DEAD");
             var command = new LoadCommand(0, data, false, 0x1234); // Large total size
 
             // Act
@@ -289,7 +293,7 @@ namespace Gp4Net.Tests.Domain.Commands
         public void ToApdu_IncludesLeField()
         {
             // Arrange
-            var data = ConvertCompat.FromHexString("DEADBEEF");
+            var data = Convert.FromHexString("DEADBEEF");
             var command = new LoadCommand(0, data, false, 100);
 
             // Act
@@ -307,7 +311,7 @@ namespace Gp4Net.Tests.Domain.Commands
         public void LoadResponse_Constructor_SetsProperties()
         {
             // Arrange
-            var data = ConvertCompat.FromHexString("DEADBEEF");
+            var data = Convert.FromHexString("DEADBEEF");
             const ushort statusWord = 0x9000;
 
             // Act
@@ -338,7 +342,7 @@ namespace Gp4Net.Tests.Domain.Commands
         public void LoadResponse_Parse_ReturnsCorrectResponse()
         {
             // Arrange
-            var data = ConvertCompat.FromHexString("DEADBEEF");
+            var data = Convert.FromHexString("DEADBEEF");
             const ushort statusWord = 0x9000;
 
             // Act
@@ -402,7 +406,9 @@ namespace Gp4Net.Tests.Domain.Commands
         public void GetErrorDescription_KnownErrorCode_ReturnsDescription()
         {
             // Act
-            var description = CapFileLoader.GetErrorDescription(CapFileLoader.ErrorCodes.IncorrectData);
+            var description = CapFileLoader.GetErrorDescription(
+                CapFileLoader.ErrorCodes.IncorrectData
+            );
 
             // Assert
             Assert.That(description, Is.Not.Null);

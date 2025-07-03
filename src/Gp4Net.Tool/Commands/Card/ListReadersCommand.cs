@@ -1,5 +1,5 @@
 using System.Threading.Tasks;
-using Gp4Net.Tool.Services;
+using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -10,47 +10,50 @@ namespace Gp4Net.Tool.Commands.Card
     /// Command to list available card readers.
     /// </summary>
     [PublicAPI]
-    public class ListReadersCommand : BaseCommand<ListReadersCommand.Settings>
+    [CommandHandler(Description = "List available card readers")]
+    public class ListReadersCommand : IPipelineCommand<ListReadersCommand.Settings>
     {
         /// <summary>
-        /// Initializes a new instance of the ListReadersCommand class.
+        /// Executes the list readers command to enumerate available smart card readers.
         /// </summary>
-        public ListReadersCommand(ICardService cardService, IGlobalPlatformService globalPlatformService)
-            : base(cardService, globalPlatformService)
+        public async Task<int> ExecuteAsync(ICommandContext context, Settings settings)
         {
-        }
-
-        /// <inheritdoc />
-        protected override Task<int> ExecuteCommandAsync(CommandContext context, Settings settings)
-        {
-            var readers = CardService.GetReaders();
-
-            if (readers.Count == 0)
+            try
             {
-                AnsiConsole.MarkupLine("[yellow]No card readers found[/]");
-                return Task.FromResult(0);
+                return await context
+                    .WithVerbose(settings.Verbose)
+                    .ExecuteAsync(ctx =>
+                    {
+                        var readers = ctx.CardService.GetReaders();
+
+                        if (readers.Count == 0)
+                        {
+                            ctx.Display.Warning("No card readers found");
+                            return 0;
+                        }
+
+                        ctx.Display.Success($"Found {readers.Count} card reader(s):");
+
+                        var table = new Table().AddColumn("Index").AddColumn("Reader Name");
+
+                        for (int i = 0; i < readers.Count; i++)
+                        {
+                            _ = table.AddRow(i.ToString(), readers[i]);
+                        }
+
+                        AnsiConsole.Write(table);
+                        return 0;
+                    });
             }
-
-            AnsiConsole.MarkupLine($"[green]Found {readers.Count} card reader(s):[/]");
-            
-            var table = new Table()
-                .AddColumn("Index")
-                .AddColumn("Reader Name");
-
-            for (int i = 0; i < readers.Count; i++)
+            catch (System.Exception)
             {
-                table.AddRow(i.ToString(), readers[i]);
+                return 1;
             }
-
-            AnsiConsole.Write(table);
-            return Task.FromResult(0);
         }
 
         /// <summary>
         /// Settings for the list readers command.
         /// </summary>
-        public class Settings : BaseCommandSettings
-        {
-        }
+        public class Settings : StandardCommandSettings { }
     }
 }

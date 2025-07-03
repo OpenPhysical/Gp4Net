@@ -1,0 +1,329 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+using Gp4Net.CardEmulator.Core;
+
+namespace Gp4Net.CardEmulator.Trace
+{
+    /// <summary>
+    /// Parser for gpshell APDU trace logs.
+    /// </summary>
+    public class GpShellTraceParser
+    {
+        // Regex patterns for different gpshell output formats
+        private static readonly Regex CommandPatterns = new Regex(
+            @"(?:"
+                + @"Command\s*(?:->|:)\s*([0-9A-Fa-f\s]+)|"
+                + // "Command -> XX XX XX"
+                @"send_APDU\s*(?:\(\))?\s*(?:->|:)?\s*([0-9A-Fa-f\s]+)|"
+                + // "send_APDU() -> XX XX XX"
+                @"=>\s*([0-9A-Fa-f\s]+)|"
+                + // "=> XX XX XX"
+                @"APDU:\s*([0-9A-Fa-f\s]+)|"
+                + // "APDU: XX XX XX"
+                @">>>\s*([0-9A-Fa-f\s]+)|"
+                + // ">>> XX XX XX"
+                @"C-APDU:\s*([0-9A-Fa-f\s]+)"
+                + // "C-APDU: XX XX XX"
+                @")",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled
+        );
+
+        private static readonly Regex ResponsePatterns = new Regex(
+            @"(?:"
+                + @"Response\s*(?:<-|:)\s*([0-9A-Fa-f\s]+)|"
+                + // "Response <- XX XX XX"
+                @"Received\s*(?:\(\))?\s*(?:<-|:)?\s*([0-9A-Fa-f\s]+)|"
+                + // "Received() <- XX XX XX"
+                @"<=\s*([0-9A-Fa-f\s]+)|"
+                + // "<= XX XX XX"
+                @"recv_APDU\s*(?:\(\))?\s*(?:<-|:)?\s*([0-9A-Fa-f\s]+)|"
+                + // "recv_APDU() <- XX XX XX"
+                @"<<<\s*([0-9A-Fa-f\s]+)|"
+                + // "<<< XX XX XX"
+                @"R-APDU:\s*([0-9A-Fa-f\s]+)|"
+                + // "R-APDU: XX XX XX"
+                @"SW(?:1SW2)?:\s*([0-9A-Fa-f]{4})"
+                + // "SW: 9000" or "SW1SW2: 9000"
+                @")",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled
+        );
+
+        private static readonly Regex AtrPattern = new Regex(
+            @"(?:ATR|Answer to Reset)[:=]\s*([0-9A-Fa-f\s]+)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled
+        );
+
+        private static readonly Regex ReaderPattern = new Regex(
+            @"(?:Reader|Terminal)[:=]\s*(.+?)(?:\s*\[|$)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled
+        );
+
+        /// <summary>
+        /// Parses a gpshell trace from a file.
+        /// </summary>
+        public ApduTrace ParseFile(string filePath)
+        {
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException($"Trace file not found: {filePath}");
+
+            var content = File.ReadAllText(filePath);
+            return ParseString(content);
+        }
+
+        /// <summary>
+        /// Parses a gpshell trace from a string.
+        /// </summary>
+        public ApduTrace ParseString(string traceContent)
+        {
+            if (string.IsNullOrWhiteSpace(traceContent))
+                throw new ArgumentException("Trace content cannot be empty", nameof(traceContent));
+
+            var trace = new ApduTrace { Metadata = { Source = "gpshell" } };
+
+            var lines = traceContent.Split(
+                new[] { '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries
+            );
+            var state = new ParserState();
+
+            foreach (var line in lines)
+            {
+                ProcessLine(line, trace, state);
+            }
+
+            // Handle any pending command
+            if (state.PendingCommand != null)
+            {
+                // Add command without response (might be last command in trace)
+                trace.AddExchange(new ApduExchange(state.PendingCommand, null));
+            }
+
+            return trace;
+        }
+
+        private void ProcessLine(string line, ApduTrace trace, ParserState state)
+        {
+            var trimmedLine = line.Trim();
+
+            // Skip empty lines and comments
+            if (
+                string.IsNullOrWhiteSpace(trimmedLine)
+                || trimmedLine.StartsWith("#")
+                || trimmedLine.StartsWith("//")
+            )
+            {
+                return;
+            }
+
+            // Check for ATR
+            var atrMatch = AtrPattern.Match(trimmedLine);
+            if (atrMatch.Success)
+            {
+                trace.Atr = ParseHexString(atrMatch.Groups[1].Value);
+                return;
+            }
+
+            // Check for reader name
+            var readerMatch = ReaderPattern.Match(trimmedLine);
+            if (readerMatch.Success)
+            {
+                trace.Metadata.ReaderName = readerMatch.Groups[1].Value.Trim();
+                return;
+            }
+
+            // Check for command
+            var commandMatch = CommandPatterns.Match(trimmedLine);
+            if (commandMatch.Success)
+            {
+                // Find first non-empty group (skip group 0 which is full match)
+                string hexData = null;
+                for (int i = 1; i < commandMatch.Groups.Count; i++)
+                {
+                    if (
+                        commandMatch.Groups[i].Success
+                        && !string.IsNullOrEmpty(commandMatch.Groups[i].Value)
+                    )
+                    {
+                        hexData = commandMatch.Groups[i].Value;
+                        break;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(hexData))
+                {
+                    // If we have a pending command, add it without response
+                    if (state.PendingCommand != null)
+                    {
+                        trace.AddExchange(new ApduExchange(state.PendingCommand, null));
+                    }
+
+                    state.PendingCommand = ParseHexString(hexData);
+                    state.LastLine = trimmedLine;
+                }
+                return;
+            }
+
+            // Check for response
+            var responseMatch = ResponsePatterns.Match(trimmedLine);
+            if (responseMatch.Success)
+            {
+                // Find first non-empty group
+                string hexData = null;
+                for (int i = 1; i < responseMatch.Groups.Count; i++)
+                {
+                    if (
+                        responseMatch.Groups[i].Success
+                        && !string.IsNullOrEmpty(responseMatch.Groups[i].Value)
+                    )
+                    {
+                        hexData = responseMatch.Groups[i].Value;
+                        break;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(hexData))
+                {
+                    ApduResponse response;
+
+                    // Check if this is just a status word
+                    if (hexData.Replace(" ", "").Length == 4)
+                    {
+                        // Just SW, no data
+                        var sw = Convert.ToUInt16(hexData.Replace(" ", ""), 16);
+                        response = new ApduResponse(Array.Empty<byte>(), sw);
+                    }
+                    else
+                    {
+                        // Full response with data
+                        var responseBytes = ParseHexString(hexData);
+                        response = ParseResponse(responseBytes);
+                    }
+
+                    // If we have a pending command, create exchange
+                    if (state.PendingCommand != null)
+                    {
+                        trace.AddExchange(new ApduExchange(state.PendingCommand, response));
+                        state.PendingCommand = null;
+                    }
+                    else if (state.PartialResponse != null)
+                    {
+                        // Handle multi-line responses
+                        var fullData = CombineArrays(state.PartialResponse, response.Data);
+                        response = new ApduResponse(fullData, response.StatusWord);
+
+                        if (state.LastExchange != null)
+                        {
+                            state.LastExchange.Response = response;
+                        }
+
+                        state.PartialResponse = null;
+                    }
+                }
+                return;
+            }
+
+            // Check if this might be continuation of previous data
+            if (IsHexLine(trimmedLine))
+            {
+                var hexData = ParseHexString(trimmedLine);
+
+                if (state.PendingCommand != null)
+                {
+                    // Continuation of command
+                    state.PendingCommand = CombineArrays(state.PendingCommand, hexData);
+                }
+                else if (state.LastExchange != null && state.LastExchange.Response == null)
+                {
+                    // This might be response data
+                    state.PartialResponse = hexData;
+                }
+            }
+        }
+
+        private byte[] ParseHexString(string hex)
+        {
+            // Remove all whitespace and common separators
+            hex = Regex.Replace(hex, @"[\s\-:,]", "");
+
+            // Ensure even length
+            if (hex.Length % 2 != 0)
+            {
+                throw new FormatException($"Hex string has odd length: {hex}");
+            }
+
+            var bytes = new byte[hex.Length / 2];
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
+        private ApduResponse ParseResponse(byte[] responseBytes)
+        {
+            if (responseBytes.Length < 2)
+            {
+                // Invalid response, assume error
+                return ApduResponse.Error(0x6F00);
+            }
+
+            // Extract SW from last 2 bytes
+            var sw = (ushort)(
+                (responseBytes[responseBytes.Length - 2] << 8)
+                | responseBytes[responseBytes.Length - 1]
+            );
+
+            // Extract data (everything except SW)
+            var data = new byte[responseBytes.Length - 2];
+            if (data.Length > 0)
+            {
+                Array.Copy(responseBytes, 0, data, 0, data.Length);
+            }
+
+            return new ApduResponse(data, sw);
+        }
+
+        private bool IsHexLine(string line)
+        {
+            // Check if line contains only hex characters, spaces, and common separators
+            var cleaned = Regex.Replace(line, @"[\s\-:,]", "");
+            return !string.IsNullOrEmpty(cleaned)
+                && cleaned.All(c => "0123456789ABCDEFabcdef".Contains(c));
+        }
+
+        private byte[] CombineArrays(byte[] first, byte[] second)
+        {
+            var result = new byte[first.Length + second.Length];
+            Array.Copy(first, 0, result, 0, first.Length);
+            Array.Copy(second, 0, result, first.Length, second.Length);
+            return result;
+        }
+
+        private class ParserState
+        {
+            public byte[] PendingCommand { get; set; }
+            public byte[] PartialResponse { get; set; }
+            public ApduExchange LastExchange { get; set; }
+            public string LastLine { get; set; }
+        }
+    }
+
+    /// <summary>
+    /// Options for parsing gpshell traces.
+    /// </summary>
+    public class GpShellParseOptions
+    {
+        /// <summary>
+        /// Gets or sets whether to be strict about format parsing.
+        /// </summary>
+        public bool StrictParsing { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether to combine multi-line hex data.
+        /// </summary>
+        public bool CombineMultiLineData { get; set; } = true;
+    }
+}

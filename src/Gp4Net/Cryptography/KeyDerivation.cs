@@ -23,11 +23,30 @@ namespace Gp4Net.Cryptography
         /// <param name="cardChallenge">The card challenge (8 bytes).</param>
         /// <param name="keyLength">The desired key length in bits.</param>
         /// <returns>The derived session keys.</returns>
-        public static SessionKeys DeriveScp03SessionKeys(Scp03KeySet keySet, byte[] hostChallenge, byte[] cardChallenge, int keyLength)
+        public static SessionKeys DeriveScp03SessionKeys(
+            Scp03KeySet keySet,
+            byte[] hostChallenge,
+            byte[] cardChallenge,
+            int keyLength
+        )
         {
-            if (keySet == null) throw new ArgumentNullException(nameof(keySet));
-            if (hostChallenge?.Length != 8) throw new ArgumentException("Host challenge must be 8 bytes.", nameof(hostChallenge));
-            if (cardChallenge?.Length != 8) throw new ArgumentException("Card challenge must be 8 bytes.", nameof(cardChallenge));
+            ArgumentNullException.ThrowIfNull(keySet);
+
+            if (hostChallenge?.Length != 8)
+            {
+                throw new ArgumentException(
+                    "Host challenge must be 8 bytes.",
+                    nameof(hostChallenge)
+                );
+            }
+
+            if (cardChallenge?.Length != 8)
+            {
+                throw new ArgumentException(
+                    "Card challenge must be 8 bytes.",
+                    nameof(cardChallenge)
+                );
+            }
 
             // Context is concatenation of host challenge and card challenge
             var context = new byte[16];
@@ -37,7 +56,12 @@ namespace Gp4Net.Cryptography
             // Derive session keys using SP 800-108 KDF
             var sEnc = DeriveScp03Key(keySet.EncKey, DerivationConstants.SEnc, context, keyLength);
             var sMac = DeriveScp03Key(keySet.MacKey, DerivationConstants.SMac, context, keyLength);
-            var sRMac = DeriveScp03Key(keySet.MacKey, DerivationConstants.SRMac, context, keyLength);
+            var sRMac = DeriveScp03Key(
+                keySet.MacKey,
+                DerivationConstants.SRMac,
+                context,
+                keyLength
+            );
 
             return new SessionKeys(sEnc, sMac, sRMac, keySet.DekKey);
         }
@@ -45,41 +69,40 @@ namespace Gp4Net.Cryptography
         /// <summary>
         /// Derives a single SCP03 key using SP 800-108 KDF.
         /// </summary>
-        private static byte[] DeriveScp03Key(byte[] kdk, byte derivationConstant, byte[] context, int keyLengthBits)
+        private static byte[] DeriveScp03Key(
+            byte[] kdk,
+            byte derivationConstant,
+            byte[] context,
+            int keyLengthBits
+        )
         {
-            // For SCP03, the KDF input structure is:
-            // Counter || Label || 0x00 || Derivation Constant || 0x00 || L || Context
+            // For SCP03, the KDF input structure per GlobalPlatform SCP03 specification is:
+            // Label (12 bytes: 11 bytes of 0x00 + derivation constant) || 0x00 || L (2 bytes) || Counter (1 byte) || Context (16 bytes)
             //
             // Where:
-            // - Counter (i) is 1 byte, managed by the KDF (not included in our fixed input)
-            // - Label is 11 bytes of 0x00
-            // - Derivation Constant is 1 byte (04 for S-ENC, 06 for S-MAC, 07 for S-RMAC)
+            // - Label is 11 bytes of 0x00 followed by derivation constant (04 for S-ENC, 06 for S-MAC, 07 for S-RMAC)
+            // - Separator is 0x00
             // - L is the output length in bits as 2 bytes big-endian
+            // - Counter (i) is 1 byte (01 or 02), managed by the KDF
             // - Context is the concatenation of host challenge and card challenge (16 bytes)
 
-            // Build fixed input (everything except the counter)
-            var fixedInput = new byte[11 + 1 + 1 + 1 + 2 + context.Length]; // Total: 32 bytes
+            // Build the "fixed input data" (everything that's constant for this derivation)
+            // This includes: Label + Separator + L + Context 
+            // The counter will be inserted by the KDF library between L and Context
+            var fixedInputBeforeCounter = new byte[11 + 1 + 1 + 2]; // Label + derivation + separator + L
             var offset = 0;
 
-            // Label (11 bytes of 0x00)
-            Array.Copy(DerivationConstants.Scp03Label, 0, fixedInput, offset, 11);
+            // Label (11 bytes of 0x00 followed by derivation constant)
+            Array.Copy(DerivationConstants.Scp03Label, 0, fixedInputBeforeCounter, offset, 11);
             offset += 11;
+            fixedInputBeforeCounter[offset++] = derivationConstant;
 
             // Separator
-            fixedInput[offset++] = 0x00;
-
-            // Derivation constant
-            fixedInput[offset++] = derivationConstant;
-
-            // Separator
-            fixedInput[offset++] = 0x00;
+            fixedInputBeforeCounter[offset++] = 0x00;
 
             // L (length in bits as 2-byte big-endian)
-            fixedInput[offset++] = (byte)(keyLengthBits >> 8);
-            fixedInput[offset++] = (byte)keyLengthBits;
-
-            // Context
-            Array.Copy(context, 0, fixedInput, offset, context.Length);
+            fixedInputBeforeCounter[offset++] = (byte)(keyLengthBits >> 8);
+            fixedInputBeforeCounter[offset++] = (byte)keyLengthBits;
 
             // Determine PRF type based on key length
             var prfType = kdk.Length switch
@@ -87,25 +110,27 @@ namespace Gp4Net.Cryptography
                 16 => PrfType.CmacAes128,
                 24 => PrfType.CmacAes192,
                 32 => PrfType.CmacAes256,
-                _ => throw new ArgumentException($"Unsupported key length: {kdk.Length} bytes")
+                _ => throw new ArgumentException($"Unsupported key length: {kdk.Length} bytes"),
             };
 
             // Configure KDF options for SCP03
+            // The counter comes after the fixed input (before context)
             var options = new KdfOptions(
                 prfType: prfType,
-                counterLengthBits: 8,              // SCP03 uses 8-bit counter
+                counterLengthBits: 8, // SCP03 uses 8-bit counter
                 useCounter: true,
-                counterLocation: CounterLocation.BeforeFixed  // Counter comes before fixed input
+                counterLocation: CounterLocation.MiddleFixed // Counter in the middle of fixed input
             );
 
             var kdf = new CounterModeKdf();
 
-            // Use DeriveWithSplitFixedInput with empty before array
-            // This puts the counter at the beginning, followed by our fixed input
+            // Use DeriveWithSplitFixedInput:
+            // - fixedInputBeforeCounter goes before the counter
+            // - context goes after the counter
             return kdf.DeriveWithSplitFixedInput(
                 kdk,
-                new byte[0],  // empty before array
-                fixedInput,   // all our fixed data goes in the after array
+                fixedInputBeforeCounter, // Label + derivation + separator + L
+                context, // Context (host + card challenges)
                 keyLengthBits,
                 options
             );
@@ -118,15 +143,32 @@ namespace Gp4Net.Cryptography
         /// <param name="sequenceCounter">The sequence counter (2 or 3 bytes).</param>
         /// <param name="implicitChannel">Whether to use implicit channel mode.</param>
         /// <returns>The derived session keys.</returns>
-        public static SessionKeys DeriveScp02SessionKeys(Scp02KeySet keySet, byte[] sequenceCounter, bool implicitChannel = false)
+        public static SessionKeys DeriveScp02SessionKeys(
+            Scp02KeySet keySet,
+            byte[] sequenceCounter,
+            bool implicitChannel = false
+        )
         {
-            if (keySet == null) throw new ArgumentNullException(nameof(keySet));
-            if (sequenceCounter == null || (sequenceCounter.Length != 2 && sequenceCounter.Length != 3))
-                throw new ArgumentException("Sequence counter must be 2 or 3 bytes.", nameof(sequenceCounter));
+            ArgumentNullException.ThrowIfNull(keySet);
+
+            if (
+                sequenceCounter == null
+                || (sequenceCounter.Length != 2 && sequenceCounter.Length != 3)
+            )
+            {
+                throw new ArgumentException(
+                    "Sequence counter must be 2 or 3 bytes.",
+                    nameof(sequenceCounter)
+                );
+            }
 
             // For SCP02, session keys are derived differently
             // This is a simplified version - full implementation would need more details
-            var sEnc = Derive3DesKey(keySet.EncKey, DerivationConstants.DataEncryption, sequenceCounter);
+            var sEnc = Derive3DesKey(
+                keySet.EncKey,
+                DerivationConstants.DataEncryption,
+                sequenceCounter
+            );
             var sMac = keySet.MacKey; // In basic SCP02, MAC key is not derived
             var sRMac = keySet.MacKey; // Same for R-MAC
 
@@ -143,16 +185,30 @@ namespace Gp4Net.Cryptography
         /// <returns>The derived 3DES key.</returns>
         /// <exception cref="ArgumentNullException">Thrown when baseKey or sequenceCounter is null.</exception>
         /// <exception cref="ArgumentException">Thrown when parameters have invalid lengths.</exception>
-        public static byte[] Derive3DesKey(byte[] baseKey, byte derivationConstant, byte[] sequenceCounter)
+        public static byte[] Derive3DesKey(
+            byte[] baseKey,
+            byte derivationConstant,
+            byte[] sequenceCounter
+        )
         {
-            if (baseKey == null)
-                throw new ArgumentNullException(nameof(baseKey));
-            if (sequenceCounter == null)
-                throw new ArgumentNullException(nameof(sequenceCounter));
+            ArgumentNullException.ThrowIfNull(baseKey);
+            ArgumentNullException.ThrowIfNull(sequenceCounter);
+
             if (baseKey.Length != 16 && baseKey.Length != 24)
-                throw new ArgumentException("Base key must be 16 or 24 bytes for 3DES.", nameof(baseKey));
+            {
+                throw new ArgumentException(
+                    "Base key must be 16 or 24 bytes for 3DES.",
+                    nameof(baseKey)
+                );
+            }
+
             if (sequenceCounter.Length != 2 && sequenceCounter.Length != 3)
-                throw new ArgumentException("Sequence counter must be 2 or 3 bytes.", nameof(sequenceCounter));
+            {
+                throw new ArgumentException(
+                    "Sequence counter must be 2 or 3 bytes.",
+                    nameof(sequenceCounter)
+                );
+            }
 
             // SCP02 key derivation data construction:
             // For 2-byte sequence counter: derivation_constant || sequence_counter || 0x00 || 0x00 || 0x00 || 0x00 || 0x00 || 0x00
@@ -172,7 +228,7 @@ namespace Gp4Net.Cryptography
 
             var output = new byte[cipher.GetOutputSize(derivationData.Length)];
             var len = cipher.ProcessBytes(derivationData, 0, derivationData.Length, output, 0);
-            cipher.DoFinal(output, len);
+            _ = cipher.DoFinal(output, len);
 
             // For 3DES, we need to return the appropriate key length
             // If the base key is 16 bytes, return 16 bytes
@@ -193,7 +249,7 @@ namespace Gp4Net.Cryptography
                 // Derive second block by incrementing the last byte of derivation data
                 derivationData[7] = 0x01;
                 len = cipher.ProcessBytes(derivationData, 0, derivationData.Length, output, 0);
-                cipher.DoFinal(output, len);
+                _ = cipher.DoFinal(output, len);
                 Array.Copy(output, 0, result, 8, 8);
 
                 // Third block is first block XORed with second block
@@ -223,7 +279,7 @@ namespace Gp4Net.Cryptography
                 cmac.BlockUpdate(data, 0, data.Length);
 
                 var fullMac = new byte[8];
-                cmac.DoFinal(fullMac, 0);
+                _ = cmac.DoFinal(fullMac, 0);
                 return fullMac;
             }
             else
@@ -235,7 +291,7 @@ namespace Gp4Net.Cryptography
                 mac.BlockUpdate(data, 0, data.Length);
 
                 var fullMac = new byte[8];
-                mac.DoFinal(fullMac, 0);
+                _ = mac.DoFinal(fullMac, 0);
                 return fullMac;
             }
         }

@@ -1,0 +1,213 @@
+{
+  "metadata": {
+    "source": {
+      "file": "docs/traces/install_uninstall.log",
+      "type": "gp_pro",
+      "generated": "2025-07-03T10:28:44Z",
+      "tool_version": "gp4net-1.0"
+    },
+    "card": {
+      "atr": "3BD518FF8191FE1FC38073C821100A",
+      "isd_aid": "A000000151000000",
+      "card_type": "UNKNOWN"
+    },
+    "sessions": [
+      {
+        "session_id": "session_1",
+        "scp_version": 3,
+        "scp_implementation": "i=70",
+        "key_version": 1,
+        "security_level": "C_MAC|R_MAC|C_ENC|R_ENC",
+        "key_diversification": "none",
+        "host_challenge": "E3EE2A55B971C507",
+        "card_challenge": "3E406498CA144CAD",
+        "sequence_counter": "000001",
+        "derivation_data": {
+          "kdd": "0370000000000000000001",
+          "host_challenge": "E3EE2A55B971C507",
+          "card_challenge": "3E406498CA144CAD",
+          "card_cryptogram": "B36F1520542C0000"
+        },
+        "operations": [
+          "secure_channel_establish",
+          "list",
+          "uninstall"
+        ]
+      }
+    ]
+  },
+  "operations": {
+    "info": {
+      "description": "Card information gathering",
+      "session_id": "session_1",
+      "start_exchange": 1,
+      "end_exchange": 1,
+      "commands": [
+        "SELECT"
+      ],
+      "expected_cli": "gp4net card info"
+    },
+    "secure_channel_establish": {
+      "description": "SCP authentication",
+      "session_id": "session_1",
+      "start_exchange": 2,
+      "end_exchange": 3,
+      "commands": [
+        "INITIALIZE UPDATE",
+        "EXTERNAL AUTHENTICATE"
+      ],
+      "expected_cli": "gp4net card test-sc -k gp_test_keys"
+    },
+    "list": {
+      "description": "List applications on card",
+      "session_id": "session_1",
+      "start_exchange": 4,
+      "end_exchange": 7,
+      "commands": [
+        "GET STATUS"
+      ],
+      "expected_cli": "gp4net applet list"
+    },
+    "uninstall": {
+      "description": "Remove application",
+      "session_id": "session_1",
+      "start_exchange": 8,
+      "end_exchange": 8,
+      "commands": [
+        "DELETE"
+      ],
+      "expected_cli": "gp4net applet delete {aid}"
+    }
+  },
+  "usage_examples": [
+    {
+      "description": "Card information gathering only",
+      "command": "gp4net card info -r \u0027lua:trace.lua?operations=info\u0027"
+    },
+    {
+      "description": "SCP authentication only",
+      "command": "gp4net card test-sc -k gp_test_keys -r \u0027lua:trace.lua?operations=secure_channel_establish\u0027"
+    },
+    {
+      "description": "List applications on card only",
+      "command": "gp4net applet list -r \u0027lua:trace.lua?operations=list\u0027"
+    },
+    {
+      "description": "Remove application only",
+      "command": "gp4net applet delete {aid} -r \u0027lua:trace.lua?operations=uninstall\u0027"
+    },
+    {
+      "description": "Install workflow",
+      "command": "gp4net applet install app.cap -r \u0027lua:trace.lua?operations=info,secure_channel_establish,uninstall\u0027"
+    },
+    {
+      "description": "Complete workflow",
+      "command": "gp4net script eval \u0027full_workflow()\u0027 -r \u0027lua:trace.lua?operations=info,secure_channel_establish,list,uninstall\u0027"
+    }
+  ],
+  "exchanges": [
+    {
+      "index": 1,
+      "operation": "info",
+      "session_id": "",
+      "step_in_operation": 1,
+      "command": "00A4040000",
+      "response": "6F108408A000000151000000A5049F6501FF9000",
+      "response_time_ms": 19,
+      "description": "SELECT",
+      "source_line": 5,
+      "secure_messaging": false
+    },
+    {
+      "index": 2,
+      "operation": "secure_channel_establish",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "8050000008E3EE2A55B971C50700",
+      "response": "0370000000000000000001037054FA3E406498CA144CADB36F1520542C0000149000",
+      "response_time_ms": 50,
+      "description": "INITIALIZE UPDATE",
+      "source_line": 7,
+      "secure_messaging": false,
+      "scp_data": {
+        "host_challenge": "E3EE2A55B971C507",
+        "card_challenge": "3E406498CA144CAD",
+        "card_cryptogram": "B36F1520542C0000",
+        "key_version": 1,
+        "scp_id": "03"
+      }
+    },
+    {
+      "index": 3,
+      "operation": "secure_channel_establish",
+      "session_id": "session_1",
+      "step_in_operation": 2,
+      "command": "8482010010A9A39F9910EDE5BC5677E1387BD3095D",
+      "response": "9000",
+      "response_time_ms": 18,
+      "description": "EXTERNAL AUTHENTICATE",
+      "source_line": 9,
+      "secure_messaging": true
+    },
+    {
+      "index": 4,
+      "operation": "list",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "84F280020A4F0097560176BA7BF48F00",
+      "response": "E3264F08A0000001510000009F700101C5039EFE80C407A0000001515350CC08A0000001510000009000",
+      "response_time_ms": 20,
+      "description": "GET STATUS",
+      "source_line": 11,
+      "secure_messaging": true
+    },
+    {
+      "index": 5,
+      "operation": "list",
+      "session_id": "session_1",
+      "step_in_operation": 2,
+      "command": "84F240020A4F007C5EF00767B5BF5100",
+      "response": "E32B4F0BA0000003080000100001009F700107C503000000C409A00000030800001000CC08A0000001510000009000",
+      "response_time_ms": 22,
+      "description": "GET STATUS",
+      "source_line": 13,
+      "secure_messaging": true
+    },
+    {
+      "index": 6,
+      "operation": "list",
+      "session_id": "session_1",
+      "step_in_operation": 3,
+      "command": "84F210020A4F00C98CE7A04BD8E14F00",
+      "response": "E3254F07A00000015153509F700101CE02FFFF8408A000000151535041CC08A000000151000000E3314F0DA00000016443446F634C6974659F700101CE020100840EA00000016443446F634C69746501CC08A000000151000000E31B4F07A00000006202049F700101CE020100CC08A000000151000000E31B4F07A00000006202029F700101CE020103CC08A000000151000000E32A4F09A000000308000010009F700101CE02010A840BA000000308000010000100CC08A0000001510000009000",
+      "response_time_ms": 51,
+      "description": "GET STATUS",
+      "source_line": 15,
+      "secure_messaging": true
+    },
+    {
+      "index": 7,
+      "operation": "list",
+      "session_id": "session_1",
+      "step_in_operation": 4,
+      "command": "84F220020A4F00FED5A70A4D989F5200",
+      "response": "E31B4F07A00000015153509F700101CE02FFFFCC08A000000151000000E3214F0DA00000016443446F634C6974659F700101CE020100CC08A000000151000000E31B4F07A00000006202049F700101CE020100CC08A000000151000000E31B4F07A00000006202029F700101CE020103CC08A000000151000000E31D4F09A000000308000010009F700101CE02010ACC08A0000001510000009000",
+      "response_time_ms": 45,
+      "description": "GET STATUS",
+      "source_line": 17,
+      "secure_messaging": true
+    },
+    {
+      "index": 8,
+      "operation": "uninstall",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "84E40080134F09A0000003080000100020EEDD243F094FAD",
+      "response": "009000",
+      "response_time_ms": 331,
+      "description": "DELETE",
+      "source_line": 19,
+      "secure_messaging": true
+    }
+  ]
+}

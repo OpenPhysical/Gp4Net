@@ -1,7 +1,7 @@
 using System;
 using Gp4Net.Constants;
 using Gp4Net.Cryptography;
-using Gp4Net.Utils;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Cryptography
 {
@@ -15,16 +15,24 @@ namespace Gp4Net.Tests.Cryptography
         #region Test Data
 
         // Test vectors for 16-byte base key with 2-byte sequence counter
-        private static readonly byte[] TestBaseKey16 = ConvertCompat.FromHexString("404142434445464748494A4B4C4D4E4F");
-        private static readonly byte[] TestSequenceCounter2 = ConvertCompat.FromHexString("0001");
-        private static readonly byte[] ExpectedDerived16_2Byte = ConvertCompat.FromHexString("750E2218F6257F3DFE9C1BAA806E2E0A750E2218F6257F3DFE9C1BAA806E2E0A");
+        private static readonly byte[] TestBaseKey16 = Convert.FromHexString(
+            "404142434445464748494A4B4C4D4E4F"
+        );
+        private static readonly byte[] TestSequenceCounter2 = Convert.FromHexString("0001");
+        private static readonly byte[] ExpectedDerived16_2Byte = Convert.FromHexString(
+            "750E2218F6257F3DFE9C1BAA806E2E0A750E2218F6257F3DFE9C1BAA806E2E0A"
+        );
 
         // Test vectors for 24-byte base key with 2-byte sequence counter
-        private static readonly byte[] TestBaseKey24 = ConvertCompat.FromHexString("404142434445464748494A4B4C4D4E4F5051525354555657");
-        private static readonly byte[] ExpectedDerived24_2Byte = ConvertCompat.FromHexString("750E2218F6257F3DFE9C1BAA806E2E0A8F1DDCC709AB80C220136245D7F191F5");
+        private static readonly byte[] TestBaseKey24 = Convert.FromHexString(
+            "404142434445464748494A4B4C4D4E4F5051525354555657"
+        );
+        private static readonly byte[] ExpectedDerived24_2Byte = Convert.FromHexString(
+            "750E2218F6257F3DFE9C1BAA806E2E0A8F1DDCC709AB80C220136245D7F191F5"
+        );
 
         // Test vectors for 3-byte sequence counter
-        private static readonly byte[] TestSequenceCounter3 = ConvertCompat.FromHexString("000001");
+        private static readonly byte[] TestSequenceCounter3 = Convert.FromHexString("000001");
 
         #endregion
 
@@ -34,7 +42,11 @@ namespace Gp4Net.Tests.Cryptography
         public void Derive3DesKey_ValidInputs16ByteKey2ByteCounter_ReturnsExpectedResult()
         {
             // Act
-            var result = KeyDerivation.Derive3DesKey(TestBaseKey16, DerivationConstants.DataEncryption, TestSequenceCounter2);
+            var result = KeyDerivation.Derive3DesKey(
+                TestBaseKey16,
+                DerivationConstants.DataEncryption,
+                TestSequenceCounter2
+            );
 
             // Assert
             Assert.That(result, Is.Not.Null);
@@ -47,7 +59,11 @@ namespace Gp4Net.Tests.Cryptography
         public void Derive3DesKey_ValidInputs24ByteKey2ByteCounter_ReturnsExpectedResult()
         {
             // Act
-            var result = KeyDerivation.Derive3DesKey(TestBaseKey24, DerivationConstants.DataEncryption, TestSequenceCounter2);
+            var result = KeyDerivation.Derive3DesKey(
+                TestBaseKey24,
+                DerivationConstants.DataEncryption,
+                TestSequenceCounter2
+            );
 
             // Assert
             Assert.That(result, Is.Not.Null);
@@ -58,7 +74,11 @@ namespace Gp4Net.Tests.Cryptography
         public void Derive3DesKey_ValidInputs16ByteKey3ByteCounter_ReturnsExpectedResult()
         {
             // Act
-            var result = KeyDerivation.Derive3DesKey(TestBaseKey16, DerivationConstants.DataEncryption, TestSequenceCounter3);
+            var result = KeyDerivation.Derive3DesKey(
+                TestBaseKey16,
+                DerivationConstants.DataEncryption,
+                TestSequenceCounter3
+            );
 
             // Assert
             Assert.That(result, Is.Not.Null);
@@ -69,7 +89,11 @@ namespace Gp4Net.Tests.Cryptography
         public void Derive3DesKey_ValidInputs24ByteKey3ByteCounter_ReturnsExpectedResult()
         {
             // Act
-            var result = KeyDerivation.Derive3DesKey(TestBaseKey24, DerivationConstants.DataEncryption, TestSequenceCounter3);
+            var result = KeyDerivation.Derive3DesKey(
+                TestBaseKey24,
+                DerivationConstants.DataEncryption,
+                TestSequenceCounter3
+            );
 
             // Assert
             Assert.That(result, Is.Not.Null);
@@ -80,8 +104,16 @@ namespace Gp4Net.Tests.Cryptography
         public void Derive3DesKey_DifferentDerivationConstants_ProduceDifferentResults()
         {
             // Act
-            var result1 = KeyDerivation.Derive3DesKey(TestBaseKey16, DerivationConstants.DataEncryption, TestSequenceCounter2);
-            var result2 = KeyDerivation.Derive3DesKey(TestBaseKey16, DerivationConstants.CardCryptogram, TestSequenceCounter2);
+            var result1 = KeyDerivation.Derive3DesKey(
+                TestBaseKey16,
+                DerivationConstants.DataEncryption,
+                TestSequenceCounter2
+            );
+            var result2 = KeyDerivation.Derive3DesKey(
+                TestBaseKey16,
+                DerivationConstants.CardCryptogram,
+                TestSequenceCounter2
+            );
 
             // Assert
             Assert.That(result1, Is.Not.EqualTo(result2));
@@ -91,12 +123,20 @@ namespace Gp4Net.Tests.Cryptography
         public void Derive3DesKey_DifferentSequenceCounters_ProduceDifferentResults()
         {
             // Arrange
-            var counter1 = ConvertCompat.FromHexString("0001");
-            var counter2 = ConvertCompat.FromHexString("0002");
+            var counter1 = Convert.FromHexString("0001");
+            var counter2 = Convert.FromHexString("0002");
 
             // Act
-            var result1 = KeyDerivation.Derive3DesKey(TestBaseKey16, DerivationConstants.DataEncryption, counter1);
-            var result2 = KeyDerivation.Derive3DesKey(TestBaseKey16, DerivationConstants.DataEncryption, counter2);
+            var result1 = KeyDerivation.Derive3DesKey(
+                TestBaseKey16,
+                DerivationConstants.DataEncryption,
+                counter1
+            );
+            var result2 = KeyDerivation.Derive3DesKey(
+                TestBaseKey16,
+                DerivationConstants.DataEncryption,
+                counter2
+            );
 
             // Assert
             Assert.That(result1, Is.Not.EqualTo(result2));
@@ -106,8 +146,16 @@ namespace Gp4Net.Tests.Cryptography
         public void Derive3DesKey_SameInputs_ProduceSameResults()
         {
             // Act
-            var result1 = KeyDerivation.Derive3DesKey(TestBaseKey16, DerivationConstants.DataEncryption, TestSequenceCounter2);
-            var result2 = KeyDerivation.Derive3DesKey(TestBaseKey16, DerivationConstants.DataEncryption, TestSequenceCounter2);
+            var result1 = KeyDerivation.Derive3DesKey(
+                TestBaseKey16,
+                DerivationConstants.DataEncryption,
+                TestSequenceCounter2
+            );
+            var result2 = KeyDerivation.Derive3DesKey(
+                TestBaseKey16,
+                DerivationConstants.DataEncryption,
+                TestSequenceCounter2
+            );
 
             // Assert
             Assert.That(result1, Is.EqualTo(result2));
@@ -134,7 +182,11 @@ namespace Gp4Net.Tests.Cryptography
         {
             // Arrange
             var maxKey = new byte[16];
-            for (int i = 0; i < maxKey.Length; i++) maxKey[i] = 0xFF;
+            for (int i = 0; i < maxKey.Length; i++)
+            {
+                maxKey[i] = 0xFF;
+            }
+
             var maxCounter = new byte[] { 0xFF, 0xFF };
 
             // Act
@@ -153,16 +205,28 @@ namespace Gp4Net.Tests.Cryptography
         public void Derive3DesKey_NullBaseKey_ThrowsArgumentNullException()
         {
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() =>
-                KeyDerivation.Derive3DesKey(null, DerivationConstants.DataEncryption, TestSequenceCounter2));
+            _ = Assert.Throws<ArgumentNullException>(
+                () =>
+                    KeyDerivation.Derive3DesKey(
+                        null,
+                        DerivationConstants.DataEncryption,
+                        TestSequenceCounter2
+                    )
+            );
         }
 
         [Test]
         public void Derive3DesKey_NullSequenceCounter_ThrowsArgumentNullException()
         {
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() =>
-                KeyDerivation.Derive3DesKey(TestBaseKey16, DerivationConstants.DataEncryption, null));
+            _ = Assert.Throws<ArgumentNullException>(
+                () =>
+                    KeyDerivation.Derive3DesKey(
+                        TestBaseKey16,
+                        DerivationConstants.DataEncryption,
+                        null
+                    )
+            );
         }
 
         [Test]
@@ -172,8 +236,14 @@ namespace Gp4Net.Tests.Cryptography
             var invalidKey = new byte[15]; // Invalid length
 
             // Act & Assert
-            var ex = Assert.Throws<ArgumentException>(() =>
-                KeyDerivation.Derive3DesKey(invalidKey, DerivationConstants.DataEncryption, TestSequenceCounter2));
+            var ex = Assert.Throws<ArgumentException>(
+                () =>
+                    KeyDerivation.Derive3DesKey(
+                        invalidKey,
+                        DerivationConstants.DataEncryption,
+                        TestSequenceCounter2
+                    )
+            );
             Assert.That(ex.ParamName, Is.EqualTo("baseKey"));
         }
 
@@ -184,8 +254,14 @@ namespace Gp4Net.Tests.Cryptography
             var emptyKey = new byte[0];
 
             // Act & Assert
-            var ex = Assert.Throws<ArgumentException>(() =>
-                KeyDerivation.Derive3DesKey(emptyKey, DerivationConstants.DataEncryption, TestSequenceCounter2));
+            var ex = Assert.Throws<ArgumentException>(
+                () =>
+                    KeyDerivation.Derive3DesKey(
+                        emptyKey,
+                        DerivationConstants.DataEncryption,
+                        TestSequenceCounter2
+                    )
+            );
             Assert.That(ex.ParamName, Is.EqualTo("baseKey"));
         }
 
@@ -196,8 +272,14 @@ namespace Gp4Net.Tests.Cryptography
             var invalidCounter = new byte[1]; // Invalid length
 
             // Act & Assert
-            var ex = Assert.Throws<ArgumentException>(() =>
-                KeyDerivation.Derive3DesKey(TestBaseKey16, DerivationConstants.DataEncryption, invalidCounter));
+            var ex = Assert.Throws<ArgumentException>(
+                () =>
+                    KeyDerivation.Derive3DesKey(
+                        TestBaseKey16,
+                        DerivationConstants.DataEncryption,
+                        invalidCounter
+                    )
+            );
             Assert.That(ex.ParamName, Is.EqualTo("sequenceCounter"));
         }
 
@@ -208,8 +290,14 @@ namespace Gp4Net.Tests.Cryptography
             var emptyCounter = new byte[0];
 
             // Act & Assert
-            var ex = Assert.Throws<ArgumentException>(() =>
-                KeyDerivation.Derive3DesKey(TestBaseKey16, DerivationConstants.DataEncryption, emptyCounter));
+            var ex = Assert.Throws<ArgumentException>(
+                () =>
+                    KeyDerivation.Derive3DesKey(
+                        TestBaseKey16,
+                        DerivationConstants.DataEncryption,
+                        emptyCounter
+                    )
+            );
             Assert.That(ex.ParamName, Is.EqualTo("sequenceCounter"));
         }
 
@@ -220,8 +308,14 @@ namespace Gp4Net.Tests.Cryptography
             var longCounter = new byte[4]; // Too long
 
             // Act & Assert
-            var ex = Assert.Throws<ArgumentException>(() =>
-                KeyDerivation.Derive3DesKey(TestBaseKey16, DerivationConstants.DataEncryption, longCounter));
+            var ex = Assert.Throws<ArgumentException>(
+                () =>
+                    KeyDerivation.Derive3DesKey(
+                        TestBaseKey16,
+                        DerivationConstants.DataEncryption,
+                        longCounter
+                    )
+            );
             Assert.That(ex.ParamName, Is.EqualTo("sequenceCounter"));
         }
 
@@ -233,7 +327,11 @@ namespace Gp4Net.Tests.Cryptography
         public void Derive3DesKey_16ByteKeyResult_FirstAndSecondHalfEqual()
         {
             // Act
-            var result = KeyDerivation.Derive3DesKey(TestBaseKey16, DerivationConstants.DataEncryption, TestSequenceCounter2);
+            var result = KeyDerivation.Derive3DesKey(
+                TestBaseKey16,
+                DerivationConstants.DataEncryption,
+                TestSequenceCounter2
+            );
 
             // Assert
             Assert.That(result.Length, Is.EqualTo(16));
@@ -251,7 +349,11 @@ namespace Gp4Net.Tests.Cryptography
         public void Derive3DesKey_24ByteKeyResult_ThirdBlockIsXorOfFirstTwo()
         {
             // Act
-            var result = KeyDerivation.Derive3DesKey(TestBaseKey24, DerivationConstants.DataEncryption, TestSequenceCounter2);
+            var result = KeyDerivation.Derive3DesKey(
+                TestBaseKey24,
+                DerivationConstants.DataEncryption,
+                TestSequenceCounter2
+            );
 
             // Assert
             Assert.That(result.Length, Is.EqualTo(24));
@@ -272,7 +374,11 @@ namespace Gp4Net.Tests.Cryptography
             var originalCounter = (byte[])TestSequenceCounter2.Clone();
 
             // Act
-            KeyDerivation.Derive3DesKey(TestBaseKey16, DerivationConstants.DataEncryption, TestSequenceCounter2);
+            _ = KeyDerivation.Derive3DesKey(
+                TestBaseKey16,
+                DerivationConstants.DataEncryption,
+                TestSequenceCounter2
+            );
 
             // Assert
             Assert.That(TestBaseKey16, Is.EqualTo(originalKey));

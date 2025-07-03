@@ -54,10 +54,14 @@ namespace Gp4Net.Domain.Commands
         public BeginRMacSessionCommand(byte cla, byte p1, byte[]? data = null, byte[]? mac = null)
         {
             if (cla != Cla80 && cla != ClaC0 && cla != ClaE0)
+            {
                 throw new ArgumentException("Invalid CLA byte.", nameof(cla));
+            }
 
             if (mac != null && mac.Length != 8)
+            {
                 throw new ArgumentException("MAC must be 8 bytes.", nameof(mac));
+            }
 
             Cla = cla;
             P1 = p1;
@@ -140,10 +144,14 @@ namespace Gp4Net.Domain.Commands
         public EndRMacSessionCommand(byte cla, byte p2, byte[]? mac = null)
         {
             if (cla != Cla80 && cla != ClaC0 && cla != ClaE0)
+            {
                 throw new ArgumentException("Invalid CLA byte.", nameof(cla));
+            }
 
             if (mac != null && mac.Length != 8)
+            {
                 throw new ArgumentException("MAC must be 8 bytes.", nameof(mac));
+            }
 
             Cla = cla;
             P2 = p2;
@@ -192,7 +200,9 @@ namespace Gp4Net.Domain.Commands
         public EndRMacSessionResponse(byte[] rMac)
         {
             if (rMac?.Length != 8)
+            {
                 throw new ArgumentException("R-MAC must be 8 bytes.", nameof(rMac));
+            }
 
             RMac = (byte[])rMac.Clone();
         }
@@ -205,7 +215,9 @@ namespace Gp4Net.Domain.Commands
         public static EndRMacSessionResponse Parse(byte[] response)
         {
             if (response == null || response.Length != 8)
+            {
                 throw new ArgumentException("Response must be 8 bytes.", nameof(response));
+            }
 
             return new EndRMacSessionResponse(response);
         }

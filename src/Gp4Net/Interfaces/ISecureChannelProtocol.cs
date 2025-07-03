@@ -34,7 +34,10 @@ namespace Gp4Net.Interfaces
         /// <param name="response">The INITIALIZE UPDATE response.</param>
         /// <param name="hostChallenge">The host challenge that was sent.</param>
         /// <returns>The established secure channel session.</returns>
-        SecureChannelSession ProcessInitializeUpdateResponse(InitializeUpdateResponse response, byte[] hostChallenge);
+        SecureChannelSession ProcessInitializeUpdateResponse(
+            InitializeUpdateResponse response,
+            byte[] hostChallenge
+        );
 
         /// <summary>
         /// Creates an EXTERNAL AUTHENTICATE command.
@@ -42,7 +45,10 @@ namespace Gp4Net.Interfaces
         /// <param name="session">The secure channel session.</param>
         /// <param name="securityLevel">The desired security level.</param>
         /// <returns>The EXTERNAL AUTHENTICATE command.</returns>
-        ExternalAuthenticateCommand CreateExternalAuthenticateCommand(SecureChannelSession session, SecurityLevel securityLevel);
+        ExternalAuthenticateCommand CreateExternalAuthenticateCommand(
+            SecureChannelSession session,
+            SecurityLevel securityLevel
+        );
 
         /// <summary>
         /// Verifies the card cryptogram.
@@ -51,7 +57,11 @@ namespace Gp4Net.Interfaces
         /// <param name="hostChallenge">The host challenge.</param>
         /// <param name="sessionKeys">The derived session keys.</param>
         /// <returns>True if the card cryptogram is valid; otherwise, false.</returns>
-        bool VerifyCardCryptogram(InitializeUpdateResponse response, byte[] hostChallenge, SessionKeys sessionKeys);
+        bool VerifyCardCryptogram(
+            InitializeUpdateResponse response,
+            byte[] hostChallenge,
+            SessionKeys sessionKeys
+        );
 
         /// <summary>
         /// Calculates the host cryptogram.
@@ -60,6 +70,10 @@ namespace Gp4Net.Interfaces
         /// <param name="hostChallenge">The host challenge.</param>
         /// <param name="sessionKeys">The derived session keys.</param>
         /// <returns>The host cryptogram.</returns>
-        byte[] CalculateHostCryptogram(InitializeUpdateResponse response, byte[] hostChallenge, SessionKeys sessionKeys);
+        byte[] CalculateHostCryptogram(
+            InitializeUpdateResponse response,
+            byte[] hostChallenge,
+            SessionKeys sessionKeys
+        );
     }
 }

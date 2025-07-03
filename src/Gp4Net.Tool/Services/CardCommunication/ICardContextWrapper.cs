@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using WSCT.Core;
 using WSCT.Wrapper;
 
 namespace Gp4Net.Tool.Services.CardCommunication

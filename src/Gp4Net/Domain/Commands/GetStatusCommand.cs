@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Commands
@@ -8,7 +9,7 @@ namespace Gp4Net.Domain.Commands
     /// Represents the GET STATUS command for querying card content status.
     /// </summary>
     [PublicAPI]
-    public class GetStatusCommand
+    public class GetStatusCommand : IApduCommand
     {
         /// <summary>
         /// The command class byte.
@@ -29,21 +30,21 @@ namespace Gp4Net.Domain.Commands
             /// Issuer Security Domain only.
             /// </summary>
             IssuerSecurityDomain = 0x80,
-            
+
             /// <summary>
             /// Applications and Supplementary Security Domains only.
             /// </summary>
             ApplicationsAndSupplementaryDomains = 0x40,
-            
+
             /// <summary>
             /// Executable Load Files only.
             /// </summary>
             ExecutableLoadFiles = 0x20,
-            
+
             /// <summary>
             /// Executable Load Files and their Executable Modules.
             /// </summary>
-            ExecutableLoadFilesAndModules = 0x10
+            ExecutableLoadFilesAndModules = 0x10,
         }
 
         /// <summary>
@@ -55,11 +56,11 @@ namespace Gp4Net.Domain.Commands
             /// No format specified.
             /// </summary>
             None = 0x00,
-            
+
             /// <summary>
             /// Return data in TLV format.
             /// </summary>
-            Tlv = 0x02
+            Tlv = 0x02,
         }
 
         /// <summary>
@@ -78,15 +79,59 @@ namespace Gp4Net.Domain.Commands
         public byte[]? SearchCriteria { get; }
 
         /// <summary>
+        /// Gets the class byte.
+        /// </summary>
+        byte IApduCommand.Cla => Cla;
+
+        /// <summary>
+        /// Gets the instruction byte.
+        /// </summary>
+        byte IApduCommand.Ins => Ins;
+
+        /// <summary>
+        /// Gets the parameter 1 byte.
+        /// </summary>
+        public byte P1 => (byte)Subset;
+
+        /// <summary>
+        /// Gets the parameter 2 byte.
+        /// </summary>
+        public byte P2 => (byte)Format;
+
+        /// <summary>
+        /// Gets the command data.
+        /// </summary>
+        public byte[]? Data => SearchCriteria;
+
+        /// <summary>
+        /// Gets the expected response length (0 means maximum).
+        /// </summary>
+        public int? ExpectedResponseLength => 0;
+
+        /// <summary>
+        /// Gets whether this command uses extended length.
+        /// </summary>
+        public bool IsExtendedLength => false;
+
+        /// <summary>
         /// Initializes a new instance of the GetStatusCommand class.
         /// </summary>
         /// <param name="subset">The status subset to query.</param>
         /// <param name="format">The response format.</param>
         /// <param name="searchCriteria">Optional search criteria (AID).</param>
-        public GetStatusCommand(StatusSubset subset, ResponseFormat format = ResponseFormat.None, byte[]? searchCriteria = null)
+        public GetStatusCommand(
+            StatusSubset subset,
+            ResponseFormat format = ResponseFormat.None,
+            byte[]? searchCriteria = null
+        )
         {
             if (searchCriteria != null && (searchCriteria.Length < 5 || searchCriteria.Length > 16))
-                throw new ArgumentException("Search criteria AID must be between 5 and 16 bytes.", nameof(searchCriteria));
+            {
+                throw new ArgumentException(
+                    "Search criteria AID must be between 5 and 16 bytes.",
+                    nameof(searchCriteria)
+                );
+            }
 
             Subset = subset;
             Format = format;
@@ -100,20 +145,25 @@ namespace Gp4Net.Domain.Commands
         public byte[] ToApdu()
         {
             var dataLength = SearchCriteria?.Length ?? 0;
-            var apdu = new byte[5 + dataLength];
 
-            apdu[0] = Cla;
-            apdu[1] = Ins;
-            apdu[2] = (byte)Subset;
-            apdu[3] = (byte)Format;
-            apdu[4] = (byte)dataLength;
-
-            if (SearchCriteria != null)
+            if (dataLength > 0)
             {
-                Array.Copy(SearchCriteria, 0, apdu, 5, SearchCriteria.Length);
+                // Case 4: Has data and expects response (CLA INS P1 P2 Lc Data Le)
+                var apdu = new byte[5 + dataLength + 1];
+                apdu[0] = Cla;
+                apdu[1] = Ins;
+                apdu[2] = (byte)Subset;
+                apdu[3] = (byte)Format;
+                apdu[4] = (byte)dataLength;
+                Array.Copy(SearchCriteria!, 0, apdu, 5, SearchCriteria!.Length);
+                apdu[5 + dataLength] = 0x00; // LE byte
+                return apdu;
             }
-
-            return apdu;
+            else
+            {
+                // Case 2: No data but expects response (CLA INS P1 P2 Le)
+                return new byte[] { Cla, Ins, (byte)Subset, (byte)Format, 0x00 };
+            }
         }
     }
 
@@ -132,26 +182,26 @@ namespace Gp4Net.Domain.Commands
             /// Application is installed.
             /// </summary>
             Installed = 0x03,
-            
+
             /// <summary>
             /// Application is selectable.
             /// </summary>
             Selectable = 0x07,
-            
+
             /// <summary>
             /// Application is personalized.
             /// </summary>
             Personalized = 0x0F,
-            
+
             /// <summary>
             /// Application is blocked.
             /// </summary>
             Blocked = 0x83,
-            
+
             /// <summary>
             /// Application is locked.
             /// </summary>
-            Locked = 0x87
+            Locked = 0x87,
         }
 
         /// <summary>
@@ -210,8 +260,7 @@ namespace Gp4Net.Domain.Commands
         /// <returns>The parsed response.</returns>
         public static GetStatusResponse Parse(byte[] response)
         {
-            if (response == null)
-                throw new ArgumentNullException(nameof(response));
+            ArgumentNullException.ThrowIfNull(response);
 
             var applications = new List<ApplicationStatusEntry>();
             var offset = 0;
@@ -220,12 +269,16 @@ namespace Gp4Net.Domain.Commands
             {
                 // Check if we have at least the minimum entry size
                 if (offset + 3 >= response.Length)
+                {
                     break;
+                }
 
                 // AID length
                 var aidLength = response[offset++];
                 if (aidLength == 0 || offset + aidLength >= response.Length)
+                {
                     break;
+                }
 
                 // AID
                 var aid = new byte[aidLength];
@@ -234,17 +287,26 @@ namespace Gp4Net.Domain.Commands
 
                 // Lifecycle state
                 if (offset >= response.Length)
+                {
                     break;
+                }
+
                 var state = (ApplicationStatusEntry.LifecycleState)response[offset++];
 
                 // Privileges length
                 if (offset >= response.Length)
+                {
                     break;
+                }
+
                 var privilegesLength = response[offset++];
 
                 // Privileges
                 if (offset + privilegesLength > response.Length)
+                {
                     break;
+                }
+
                 var privileges = new byte[privilegesLength];
                 if (privilegesLength > 0)
                 {

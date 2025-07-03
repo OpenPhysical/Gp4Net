@@ -1,0 +1,140 @@
+#!/usr/bin/env gpshell
+print Turning on debug.
+enable_trace
+
+mode_211
+enable_timer
+establish_context
+card_connect
+select -AID A000000151000000
+get_secure_channel_protocol_details
+
+print Opening Secure Channel...
+open_sc -security 3 -keyind 0 -keyver 0 -mac_key 404142434445464748494A4B4C4D4E4F -enc_key 404142434445464748494A4B4C4D4E4F -kek_key 404142434445464748494A4B4C4D4E4F
+
+print Installing Applet.
+install -file OpenFIPS201-v1_10_2-chainfix.cap
+
+print Selecting Piv Applet.
+select -AID A000000308000010000100
+
+print Opening Secure Channel...
+open_sc -security 3 -keyind 0 -keyver 0 -mac_key 404142434445464748494A4B4C4D4E4F -enc_key 404142434445464748494A4B4C4D4E4F -kek_key 404142434445464748494A4B4C4D4E4F
+
+print Configuring Applet.
+send_apdu -sc 1 -APDU 00DB3F005D685BA0248001FF8101008201008301008401068501088601068701058801008901048A01008B0100A1128001FF810100820108830106840105850100A203800100A303800100A415800100810100820100830100840100850100860100
+# 00 DB 3F 00 5D 
+#    68 5B
+#       A0 24       -- PIN Policy
+#          80 01 FF -- Enable local = true
+#          81 01 00 -- Enable global = false
+#          82 01 00 -- Prefer global = false
+#          83 01 00 -- permit contactless = true
+#          84 01 06 -- min length = 6
+#          85 01 08 -- max length = 8
+#          86 01 06 -- max retries contact = 6
+#          87 01 05 -- max retries contactless = 5
+#          88 01 00 -- charset = numeric
+#          89 01 04 -- history = 4
+#          8A 01 00 -- ruleSequence = no weak PIN check
+#          8B 01 00 -- ruleSequence = no weak PIN check
+#       A1 12       -- PUK policy
+#          80 01 FF -- enabled = true
+#          81 01 00 -- permitContactless = false
+#          82 01 08 -- length = 8
+#          83 01 06 -- retriesContact = 6
+#          84 01 05 -- retriesContactless = 5
+#          85 01 00 -- restrictUpdate = false
+#       A2 03       -- VCI policy
+#          80 01 00 -- disabled
+#       A3 03       -- OCC policy
+#          80 01 00 -- disabled
+#       A4 15       -- OPTIONS
+#          80 01 00 -- restrict contactless global = false
+#          81 01 00 -- restrict contactless admin = false
+#          82 01 00 -- restrict enumeration = false
+#          83 01 00 -- restrict single key = false
+#          84 01 00 -- ignore contactless acl = false
+#          85 01 00 -- read empty data object = false
+#          86 01 00 -- use RSA crt = false
+
+print Setting PIN.
+send_apdu -sc 1 -APDU 0024FF8008313233343536FFFF
+
+print Setting PUK.
+send_apdu -sc 1 -APDU 0024FF81083132333435363738
+
+print CREATE DATA OBJECT - 5FC107 - Card Capability Container
+send_apdu -sc 1 -APDU 00DB3F000D640B8B035FC1078C017F8D0100
+
+print CREATE DATA OBJECT - 5FC102 - Cardholder Unique Identifier
+send_apdu -sc 1 -APDU 00DB3F000D640B8B035FC1028C017F8D017F
+
+print CREATE DATA OBJECT - 5FC105 - X509 Certificate for PIV Authentication
+send_apdu -sc 1 -APDU 00DB3F000D640B8B035FC1058C017F8D0100
+
+print CREATE DATA OBJECT - 5FC101 - X509 Certificate for Card Authentication
+send_apdu -sc 1 -APDU 00DB3F000D640B8B035FC1018C017F8D017F
+
+print CREATE DATA OBJECT - 5FC103 - Cardholder Fingerprints
+send_apdu -sc 1 -APDU 00DB3F000D640B8B035FC1038C01018D0100
+
+print CREATE DATA OBJECT - 5FC108 - Cardholder Facial Image
+send_apdu -sc 1 -APDU 00DB3F000D640B8B035FC1088C01018D0100
+
+print CREATE DATA OBJECT - 5FC106 - Security Object
+send_apdu -sc 1 -APDU 00DB3F000D640B8B035FC1068C017F8D0100
+
+print CREATE DATA OBJECT - 5FC109 - Printed Information
+send_apdu -sc 1 -APDU 00DB3F000D640B8B035FC1098C01018D0100
+
+print CREATE DATA OBJECT - 5FC10A - X509 Certificate for Digital Signature
+send_apdu -sc 1 -APDU 00DB3F000D640B8B035FC10A8C017F8D0100
+
+print CREATE DATA OBJECT - 5FC10B - X509 Certificate for Key Management
+send_apdu -sc 1 -APDU 00DB3F000D640B8B035FC10B8C017F8D0100
+
+# print CREATE DATA OBJECT - 7E - Discovery Object
+# send_apdu -sc 1 -APDU 00DB3F000B64098B017E8C017F8D017F
+
+print CREATE KEY - 9B - Application Administration Key (AES128)
+send_apdu -sc 1 -APDU 00DB3F001466128B019B8C017F8D01008E01088F0101900111
+
+print INJECT KEY - 9B - Application Administration Key (AES128)
+send_apdu -sc 1 -APDU 0024039B1430128010000102030405060708090A0B0C0D0E0F
+
+# print CREATE KEY - 9A - PIV Authentication Key (RSA2048)
+# send_apdu -sc 1 -APDU 00DB3F001466128B019A8C01018D01008E01078F0104900110
+
+print CREATE KEY - 9C - Digital Signature Key (RSA2048)
+send_apdu -sc 1 -APDU 00DB3F001466128B019C8C01028D01008E01078F0104900110
+
+print CREATE KEY - 9D - Key Management Key (RSA2048)
+send_apdu -sc 1 -APDU 00DB3F001466128B019D8C01018D01008E01078F0102900110
+
+# print CREATE KEY - 9E - Card Authentication Key (RSA2048)
+# send_apdu -sc 1 -APDU 00DB3F001466128B019E8C017F8D017F8E01078F0104900110
+#                     00 DB 3F 00 14 
+#                        66 12
+#                           8B 01 9E -- slot 9E
+#                           8C 01 7F -- Contact Always
+#                           8D 01 7F -- Contactless Always
+#                           8E 01 07 -- Key Mechanism (RSA-2048)
+#                           8F 01 04 -- Key Role = Authenticate
+#                           90 01 10 -- Key Attribute = importable
+
+print CREATE KEY - 9A - PIV Authentication Key (ECC256)
+send_apdu -sc 1 -APDU 00DB3F001466128B019A8C01018D01008E01118F0104900110
+
+print CREATE KEY - 9E - Card Authentication Key (ECC256)
+send_apdu -sc 1 -APDU 00DB3F001466128B019E8C017F8D017F8E01118F0104900110
+
+# print GENERATE ASYMMETRIC KEYPAIR (9A)
+# send_apdu -sc 1 -APDU 0047009A05AC0380011100
+
+# print GENERATE ASYMMETRIC KEYPAIR (9E)
+# send_apdu -sc 1 -APDU 0047009E05AC0380011100
+
+
+card_disconnect
+release_context

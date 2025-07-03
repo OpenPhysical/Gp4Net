@@ -17,15 +17,28 @@ namespace Gp4Net.Tool.Commands.Applet
         /// <summary>
         /// Initializes a new instance of the StatusCommand class.
         /// </summary>
-        public StatusCommand(ICardService cardService, IGlobalPlatformService globalPlatformService)
-            : base(cardService, globalPlatformService)
-        {
-        }
+        public StatusCommand(
+            ICardService cardService,
+            IGlobalPlatformService globalPlatformService,
+            IKeysetResolver keysetResolver
+        )
+            : base(cardService, globalPlatformService, keysetResolver) { }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Executes the status command to display the status of applications on the card.
+        /// </summary>
+        /// <param name="context">The command context.</param>
+        /// <param name="settings">The command settings.</param>
+        /// <returns>0 if successful, 1 if failed.</returns>
         protected override Task<int> ExecuteCommandAsync(CommandContext context, Settings settings)
         {
             if (!EnsureCardConnection(settings))
+            {
+                return Task.FromResult(1);
+            }
+
+            // Optionally establish secure channel for better status information
+            if (settings.RequiresSecureChannel && !EnsureSecureChannel(settings))
             {
                 return Task.FromResult(1);
             }
@@ -53,31 +66,37 @@ namespace Gp4Net.Tool.Commands.Applet
                     .AddColumn("Lifecycle State")
                     .AddColumn("Privileges");
 
-                foreach (var app in applications.OrderBy(a => a.Type).ThenBy(a => System.Convert.ToHexString(a.Aid)))
+                foreach (
+                    var app in applications
+                        .OrderBy(a => a.Type)
+                        .ThenBy(a => System.Convert.ToHexString(a.Aid))
+                )
                 {
                     var typeColor = app.Type switch
                     {
-                        ApplicationType.IssuerSecurityDomain => "blue",
-                        ApplicationType.SupplementarySecurityDomain => "purple",
-                        ApplicationType.Applet => "green",
-                        ApplicationType.LoadFile => "yellow",
-                        _ => "white"
+                        "ISD" => "blue",
+                        "SSD" => "purple",
+                        "Application" => "green",
+                        "Package" => "yellow",
+                        _ => "white",
                     };
 
                     var stateColor = app.LifecycleState switch
                     {
-                        LifecycleState.Selectable => "green",
-                        LifecycleState.Personalized => "cyan",
-                        LifecycleState.Blocked => "red",
-                        LifecycleState.Locked => "red",
-                        _ => "yellow"
+                        "SELECTABLE" => "green",
+                        "PERSONALIZED" => "cyan",
+                        "BLOCKED" => "red",
+                        "LOCKED" => "red",
+                        "OP_READY" => "yellow",
+                        "INITIALIZED" => "yellow",
+                        _ => "yellow",
                     };
 
-                    table.AddRow(
+                    _ = table.AddRow(
                         $"[{typeColor}]{GetTypeDisplayName(app.Type)}[/]",
                         $"[dim]{System.Convert.ToHexString(app.Aid)}[/]",
                         $"[{stateColor}]{app.LifecycleState}[/]",
-                        $"0x{app.Privileges:X2}"
+                        app.Privileges.Count > 0 ? string.Join(", ", app.Privileges) : "None"
                     );
                 }
 
@@ -98,38 +117,42 @@ namespace Gp4Net.Tool.Commands.Applet
             }
         }
 
-        private static string GetTypeDisplayName(ApplicationType type)
+        private static string GetTypeDisplayName(string type)
         {
             return type switch
             {
-                ApplicationType.IssuerSecurityDomain => "ISD",
-                ApplicationType.SupplementarySecurityDomain => "SSD",
-                ApplicationType.Applet => "Applet",
-                ApplicationType.LoadFile => "Load File",
-                _ => "Unknown"
+                "ISD" => "ISD",
+                "SSD" => "SSD",
+                "Application" => "Applet",
+                "Package" => "Load File",
+                _ => "Unknown",
             };
         }
 
-        private static void DisplayDetailedInformation(System.Collections.Generic.IList<ApplicationInfo> applications)
+        private static void DisplayDetailedInformation(
+            System.Collections.Generic.IList<ApplicationInfo> applications
+        )
         {
             var groups = applications.GroupBy(a => a.Type);
 
             foreach (var group in groups)
             {
                 AnsiConsole.MarkupLine($"[bold]{group.Key}s:[/]");
-                
+
                 foreach (var app in group)
                 {
-                    var panel = new Panel($"[dim]AID:[/] {System.Convert.ToHexString(app.Aid)}\n" +
-                                         $"[dim]State:[/] {app.LifecycleState}\n" +
-                                         $"[dim]Privileges:[/] 0x{app.Privileges:X2}")
+                    var panel = new Panel(
+                        $"[dim]AID:[/] {System.Convert.ToHexString(app.Aid)}\n"
+                            + $"[dim]State:[/] {app.LifecycleState}\n"
+                            + $"[dim]Privileges:[/] {(app.Privileges.Count > 0 ? string.Join(", ", app.Privileges) : "None")}"
+                    )
                     {
-                        Header = new PanelHeader($"[bold]{GetTypeDisplayName(app.Type)}[/]")
+                        Header = new PanelHeader($"[bold]{GetTypeDisplayName(app.Type)}[/]"),
                     };
-                    
+
                     AnsiConsole.Write(panel);
                 }
-                
+
                 AnsiConsole.WriteLine();
             }
         }

@@ -7,6 +7,7 @@ using System;
 using Gp4Net.Constants;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain
 {
@@ -29,6 +30,12 @@ namespace Gp4Net.Tests.Domain
             _macChainingValue = new byte[16]; // Zero IV
         }
 
+        [TearDown]
+        public void TearDown()
+        {
+            _sessionKeys?.Dispose();
+        }
+
         [Test]
         public void Constructor_ValidParameters_CreatesSession()
         {
@@ -37,7 +44,8 @@ namespace Gp4Net.Tests.Domain
                 _sessionKeys,
                 SecurityLevel.CMac,
                 ProtocolIdentifiers.Scp03,
-                _macChainingValue);
+                _macChainingValue
+            );
 
             // Assert
             Assert.That(session, Is.Not.Null);
@@ -56,9 +64,24 @@ namespace Gp4Net.Tests.Domain
                 _sessionKeys,
                 SecurityLevel.CMac,
                 ProtocolIdentifiers.Scp03,
-                _macChainingValue);
+                _macChainingValue
+            );
 
-            var command = new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x07, 0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00 };
+            var command = new byte[]
+            {
+                0x00,
+                0xA4,
+                0x04,
+                0x00,
+                0x07,
+                0xA0,
+                0x00,
+                0x00,
+                0x00,
+                0x03,
+                0x00,
+                0x00,
+            };
 
             // Act
             var wrappedCommand = session.WrapCommand(command);
@@ -76,12 +99,13 @@ namespace Gp4Net.Tests.Domain
                 _sessionKeys,
                 SecurityLevel.CMac,
                 ProtocolIdentifiers.Scp03,
-                _macChainingValue);
+                _macChainingValue
+            );
 
             var invalidCommand = new byte[] { 0x00, 0xA4 }; // Too short
 
             // Act & Assert
-            Assert.Throws<ArgumentException>(() => session.WrapCommand(invalidCommand));
+            _ = Assert.Throws<ArgumentException>(() => session.WrapCommand(invalidCommand));
         }
 
         [Test]
@@ -92,12 +116,13 @@ namespace Gp4Net.Tests.Domain
                 _sessionKeys,
                 SecurityLevel.RMac,
                 ProtocolIdentifiers.Scp03,
-                _macChainingValue);
+                _macChainingValue
+            );
 
             var invalidResponse = new byte[] { 0x90 }; // Too short
 
             // Act & Assert
-            Assert.Throws<ArgumentException>(() => session.UnwrapResponse(invalidResponse));
+            _ = Assert.Throws<ArgumentException>(() => session.UnwrapResponse(invalidResponse));
         }
     }
 }

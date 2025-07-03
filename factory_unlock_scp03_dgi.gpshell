@@ -1,0 +1,80 @@
+#!/usr/bin/env gpshell
+# JCOP4 P71 - Set SCP03 i=70 as ONLY protocol using factory keys
+
+print Setting SCP03 i=70 as ONLY protocol using factory keys
+
+# Card connection and selection
+print Connecting to card...
+enable_trace
+mode_211
+establish_context
+card_connect
+select -AID A000000151000000
+
+# Step 1: Authenticate with factory diversified keys
+print Step 1: Opening Secure Channel with factory diversified keys...
+open_sc -security 3 -keyind 0 -keyver 0 -mac_key 86E6282CE0463C510FD4CB14D2A158EA -enc_key AC2AD8C8E2E874A4C6B514D7ECD5FBE5 -kek_key 7C290D97A5F4891F6C16ED7D2BB0A6E1
+
+# Step 2: Set SCP_ENABLE to ONLY SCP03 i=70
+print Step 2: Setting SCP_ENABLE to ONLY SCP03 i=70...
+# Config Module is available, use SET CONFIG ITEM format
+# DF2B (SET CONFIG tag) + 0D (length) + 1057 (SCP_ENABLE) + 0A (data length) + data
+# 0370 = SCP03 i=70 (ONLY protocol)
+# 0000000000000000 = Empty slots (4 slots x 2 bytes)
+send_apdu -sc 1 -APDU 80E2880010DF2B0D10570A0370000000000000000000
+
+# Note: Secure channel will be forcibly closed after changing SCP_ENABLE
+print Step 3: Secure channel should close now...
+
+# Step 4: Reconnect to verify the change
+print Step 4: Reconnecting to verify SCP_ENABLE change...
+card_disconnect
+card_connect
+select -AID A000000151000000
+
+# Step 5: Authenticate again with factory keys
+print Step 5: Re-authenticating with factory keys...
+open_sc -security 3 -keyind 0 -keyver 0 -mac_key 86E6282CE0463C510FD4CB14D2A158EA -enc_key AC2AD8C8E2E874A4C6B514D7ECD5FBE5 -kek_key 7C290D97A5F4891F6C16ED7D2BB0A6E1
+
+# Step 6: Check SCP_ENABLE configuration
+print Step 6: Checking SCP_ENABLE configuration...
+send_apdu -sc 1 -APDU 80CA00CF00
+
+# Step 7: Install GP test keys as KVN 1
+print Step 7: Installing GP test keys as KVN 1...
+put_sc_key -keyver 1 -newkeyver 1 -mac_key 404142434445464748494A4B4C4D4E4F -enc_key 404142434445464748494A4B4C4D4E4F -kek_key 404142434445464748494A4B4C4D4E4F
+
+# Step 8: Set default SCP key version to KVN 1
+print Step 8: Setting default SCP key version to 1...
+send_apdu -sc 1 -APDU 80E28800047F0D0101
+
+# Step 9: Power cycle the card
+print Step 9: Power cycling card to activate changes...
+card_disconnect
+
+print Waiting 2 seconds...
+# GPShell doesn't have a sleep command, so we'll just disconnect/reconnect
+card_connect
+card_disconnect
+card_connect
+select -AID A000000151000000
+
+# Step 10: Test connection with GP test keys and SCP03
+print Step 10: Testing SCP03 with GP test keys...
+open_sc -security 3 -keyind 0 -keyver 1 -scp 3 -scpimpl 70 -mac_key 404142434445464748494A4B4C4D4E4F -enc_key 404142434445464748494A4B4C4D4E4F -kek_key 404142434445464748494A4B4C4D4E4F
+
+# Step 11: Verify final configuration
+print Step 11: Verifying final configuration...
+send_apdu -sc 1 -APDU 80CA006600
+
+
+# Final cleanup
+card_disconnect
+release_context
+
+print
+print === COMPLETED ===
+print If successful:
+print - Card now ONLY supports SCP03 i=70
+print - GP test keys installed as KVN 1 (default)
+print - Card should work with standard GP tools using default keys

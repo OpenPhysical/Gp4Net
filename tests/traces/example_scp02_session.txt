@@ -1,0 +1,46 @@
+# Example gpshell trace - SCP02 session with GP Test Keys
+# This demonstrates a complete secure channel establishment and GET STATUS
+# Can be used with TraceReplayCardService for testing
+
+Reader: ACS ACR122U PICC Interface 00 00
+ATR: 3B 7D 94 00 00 80 31 80 65 B0 83 11 AC 83 00 90 00
+
+# SELECT ISD (empty AID selects ISD)
+Command -> 00 A4 04 00 00
+Response <- 6F 65 84 08 A0 00 00 00 03 00 00 00 A5 59 9F 65 01 FF 9F 6E 06 47 91 00 73 30 00 73 4A 06 07 2A 86 48 86 FC 6B 01 60 0C 06 0A 2A 86 48 86 FC 6B 02 02 01 01 63 09 06 07 2A 86 48 86 FC 6B 03 64 0B 06 09 2A 86 48 86 FC 6B 04 02 15 65 0B 06 09 2B 85 10 86 48 64 02 01 03 66 0C 06 0A 2B 06 01 04 01 2A 02 6E 01 02 90 00
+
+# INITIALIZE UPDATE
+# Key version: 00, Key ID: 00 (default)
+# Host challenge: 01 02 03 04 05 06 07 08
+Command -> 80 50 00 00 08 01 02 03 04 05 06 07 08 00
+Response <- 00 00 11 60 01 00 8A 79 0A F9 FF 02 00 12 A9 11 36 5D 71 00 A5 A5 EC 63 BB DC 74 E2 90 00
+
+# Card response breakdown:
+# 00 00 - Key diversification data
+# 11 60 01 00 8A 79 0A F9 - Key information
+# FF 02 - Key version (FF) and SCP version (02)
+# 00 12 - Sequence counter
+# A9 11 36 5D 71 00 A5 A5 - Card challenge  
+# EC 63 BB DC 74 E2 - Card cryptogram
+
+# EXTERNAL AUTHENTICATE
+# Security level: 01 (C-MAC only)
+# Host cryptogram: calculated using session keys
+Command -> 84 82 01 00 10 33 53 FD C0 CA A8 BC 73 FA 5E 63 0C 5A 24 92 B7 00
+Response <- 90 00
+
+# GET STATUS - Get ISD status
+# P1=80 (ISD only), P2=00, Data=4F00 (empty AID)
+# Note: Now using secure messaging (CLA=84)
+Command -> 84 F2 80 00 0A 4F 00 BC 36 7C 83 37 45 CE F1 00
+Response <- E3 18 4F 08 A0 00 00 00 03 00 00 00 9F 70 07 C5 01 41 9C 11 08 80 17 01 24 83 20 E4 D4 02 90 00
+
+# GET STATUS - Get all applications
+# P1=40 (Applications and SD), P2=00
+Command -> 84 F2 40 00 0A 4F 00 F4 CD 09 FB D2 0E 55 C9 00
+Response <- E3 18 4F 08 A0 00 00 00 03 00 00 00 9F 70 07 C5 01 41 9C 11 08 80 E3 10 4F 08 A0 00 00 01 51 00 00 00 9F 70 01 C1 08 18 4F 08 D2 76 00 01 24 01 01 01 9F 70 01 C1 2C 66 D9 24 C0 F2 E0 90 00
+
+# GET STATUS - Get executable load files  
+# P1=20 (Executable Load Files), P2=00
+Command -> 84 F2 20 00 0A 4F 00 8A 86 F2 0F 4B 01 2D 1C 00
+Response <- E3 0E 4F 08 A0 00 00 01 51 00 00 00 C9 02 01 E0 E3 0E 4F 08 D2 76 00 01 24 01 01 01 C9 02 C0 88 F2 8C 02 A8 C1 65 29 52 90 00

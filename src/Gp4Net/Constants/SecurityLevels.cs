@@ -51,7 +51,7 @@ namespace Gp4Net.Constants
         /// <summary>
         /// C-DECRYPTION, C-MAC, R-MAC and R-ENCRYPTION.
         /// </summary>
-        FullSecureMessaging = 0x33
+        FullSecureMessaging = 0x33,
     }
 
     /// <summary>
@@ -62,25 +62,25 @@ namespace Gp4Net.Constants
         /// <summary>
         /// Checks if C-MAC is enabled.
         /// </summary>
-        public static bool HasCMac(this SecurityLevel level)
-            => (level & SecurityLevel.CMac) == SecurityLevel.CMac;
+        public static bool HasCMac(this SecurityLevel level) =>
+            (level & SecurityLevel.CMac) == SecurityLevel.CMac;
 
         /// <summary>
         /// Checks if C-DECRYPTION is enabled.
         /// </summary>
-        public static bool HasCDecryption(this SecurityLevel level)
-            => (level & SecurityLevel.CMacAndCDecryption) == SecurityLevel.CMacAndCDecryption;
+        public static bool HasCDecryption(this SecurityLevel level) =>
+            (level & SecurityLevel.CMacAndCDecryption) == SecurityLevel.CMacAndCDecryption;
 
         /// <summary>
         /// Checks if R-MAC is enabled.
         /// </summary>
-        public static bool HasRMac(this SecurityLevel level)
-            => (level & SecurityLevel.RMac) == SecurityLevel.RMac;
+        public static bool HasRMac(this SecurityLevel level) =>
+            (level & SecurityLevel.RMac) == SecurityLevel.RMac;
 
         /// <summary>
         /// Checks if R-ENCRYPTION is enabled.
         /// </summary>
-        public static bool HasREncryption(this SecurityLevel level)
-            => (level & SecurityLevel.REncryption) == SecurityLevel.REncryption;
+        public static bool HasREncryption(this SecurityLevel level) =>
+            (level & SecurityLevel.REncryption) == SecurityLevel.REncryption;
     }
 }

@@ -1,4 +1,7 @@
 using System;
+using Gp4Net.Core.Tlv;
+using Gp4Net.Domain.CardInfo;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Commands
@@ -7,7 +10,7 @@ namespace Gp4Net.Domain.Commands
     /// Represents the GET DATA command for retrieving data objects from the card.
     /// </summary>
     [PublicAPI]
-    public class GetDataCommand
+    public class GetDataCommand : IApduCommand
     {
         /// <summary>
         /// The command class byte.
@@ -45,14 +48,19 @@ namespace Gp4Net.Domain.Commands
             public static readonly ushort KeyInformationTemplate = 0x00E0;
 
             /// <summary>
+            /// Card Capabilities (tag 0x0067).
+            /// </summary>
+            public static readonly ushort CardCapabilities = 0x0067;
+
+            /// <summary>
             /// Security Domain Manager AID (tag 0x004F).
             /// </summary>
             public static readonly ushort SecurityDomainManagerAid = 0x004F;
 
             /// <summary>
-            /// Card Production Life Cycle (tag 0x009F7F).
+            /// Card Production Life Cycle (tag 0x9F7F).
             /// </summary>
-            public static readonly uint CardProductionLifeCycle = 0x009F7F;
+            public static readonly ushort CardProductionLifeCycle = 0x9F7F;
 
             /// <summary>
             /// Sequence Counter of the default Key Version Number (tag 0x00C1).
@@ -83,6 +91,11 @@ namespace Gp4Net.Domain.Commands
             /// Key Derivation Data (tag 0x00D0).
             /// </summary>
             public static readonly ushort KeyDerivationData = 0x00D0;
+
+            /// <summary>
+            /// Security Domain Manager URL (tag 0x5F50).
+            /// </summary>
+            public static readonly ushort SecurityDomainManagerUrl = 0x5F50;
 
             /// <summary>
             /// Application Production Life Cycle Data (tag 0x009F70).
@@ -132,7 +145,12 @@ namespace Gp4Net.Domain.Commands
         public static GetDataCommand CreateFor3ByteIdentifier(uint dataObjectIdentifier)
         {
             if (dataObjectIdentifier > 0xFFFFFF)
-                throw new ArgumentException("Data object identifier must be 3 bytes or less.", nameof(dataObjectIdentifier));
+            {
+                throw new ArgumentException(
+                    "Data object identifier must be 3 bytes or less.",
+                    nameof(dataObjectIdentifier)
+                );
+            }
 
             // For 3-byte identifiers, we use the first two bytes as the identifier
             // This is a simplified approach - full implementation would handle 3-byte tags properly
@@ -151,9 +169,18 @@ namespace Gp4Net.Domain.Commands
                 Ins,
                 P1,
                 P2,
-                0x00 // Le (expecting response)
+                0x00, // Le (expecting response)
             };
         }
+
+        // IApduCommand implementation
+        byte IApduCommand.Cla => Cla;
+        byte IApduCommand.Ins => Ins;
+        byte IApduCommand.P1 => P1;
+        byte IApduCommand.P2 => P2;
+        byte[]? IApduCommand.Data => null;
+        int? IApduCommand.ExpectedResponseLength => 256;
+        bool IApduCommand.IsExtendedLength => false;
     }
 
     /// <summary>
@@ -173,33 +200,30 @@ namespace Gp4Net.Domain.Commands
         public byte[] Data { get; }
 
         /// <summary>
-        /// Gets the TLV tag if the response is in TLV format.
+        /// Gets the parsed TLV object if the response is in TLV format.
         /// </summary>
-        public byte[]? Tag { get; }
-
-        /// <summary>
-        /// Gets the TLV value if the response is in TLV format.
-        /// </summary>
-        public byte[]? Value { get; }
+        public TlvObject? TlvObject { get; }
 
         /// <summary>
         /// Gets a value indicating whether the response is in TLV format.
         /// </summary>
-        public bool IsTlvFormat => Tag != null && Value != null;
+        public bool IsTlvFormat => TlvObject != null;
 
         /// <summary>
         /// Initializes a new instance of the GetDataResponse class.
         /// </summary>
         /// <param name="dataObjectIdentifier">The data object identifier.</param>
         /// <param name="data">The retrieved data.</param>
-        /// <param name="tag">The TLV tag (optional).</param>
-        /// <param name="value">The TLV value (optional).</param>
-        public GetDataResponse(ushort dataObjectIdentifier, byte[] data, byte[]? tag = null, byte[]? value = null)
+        /// <param name="tlvObject">The parsed TLV object (optional).</param>
+        public GetDataResponse(
+            ushort dataObjectIdentifier,
+            byte[] data,
+            TlvObject? tlvObject = null
+        )
         {
             DataObjectIdentifier = dataObjectIdentifier;
             Data = (byte[])data.Clone();
-            Tag = tag != null ? (byte[])tag.Clone() : null;
-            Value = value != null ? (byte[])value.Clone() : null;
+            TlvObject = tlvObject;
         }
 
         /// <summary>
@@ -210,96 +234,153 @@ namespace Gp4Net.Domain.Commands
         /// <returns>The parsed response.</returns>
         public static GetDataResponse Parse(ushort dataObjectIdentifier, byte[] response)
         {
-            if (response == null)
-                throw new ArgumentNullException(nameof(response));
+            ArgumentNullException.ThrowIfNull(response);
 
-            // Try to parse as TLV if the response starts with a valid tag
-            var tlvResult = TryParseTlv(response);
-            if (tlvResult.HasValue)
-            {
-                return new GetDataResponse(
-                    dataObjectIdentifier,
-                    response,
-                    tlvResult.Value.Tag,
-                    tlvResult.Value.Value);
-            }
-
-            // Return as raw data if not TLV format
-            return new GetDataResponse(dataObjectIdentifier, response);
+            // Try to parse as TLV
+            var tlvObject = TlvParser.ParseSingle(response);
+            return new GetDataResponse(dataObjectIdentifier, response, tlvObject);
         }
 
         /// <summary>
-        /// Attempts to parse TLV data.
+        /// Parses the response as CPLC data.
         /// </summary>
-        /// <param name="data">The data to parse.</param>
-        /// <returns>The parsed TLV or null if not valid TLV.</returns>
-        private static (byte[] Tag, byte[] Value)? TryParseTlv(byte[] data)
+        /// <returns>Parsed CPLC data or null if not applicable.</returns>
+        public CplcData? ParseAsCplc()
         {
-            if (data == null || data.Length < 2)
+            if (DataObjectIdentifier != GetDataCommand.DataObjects.CardProductionLifeCycle)
+            {
                 return null;
+            }
+
+            // CPLC data can be in raw format or TLV format
+            var dataToparse = IsTlvFormat && TlvObject != null ? TlvObject.Value : Data;
+
+            if (dataToparse == null || dataToparse.Length < 42)
+            {
+                return null;
+            }
 
             try
             {
-                int offset = 0;
+                return CplcData.Parse(dataToparse);
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
-                // Parse tag
-                byte[] tag;
-                if ((data[0] & 0x1F) == 0x1F)
-                {
-                    // Multi-byte tag
-                    int tagLength = 1;
-                    while (offset + tagLength < data.Length && (data[offset + tagLength - 1] & 0x80) != 0)
-                        tagLength++;
-                    
-                    if (offset + tagLength >= data.Length)
-                        return null;
-                    
-                    tag = new byte[tagLength];
-                    Array.Copy(data, offset, tag, 0, tagLength);
-                    offset += tagLength;
-                }
-                else
-                {
-                    // Single-byte tag
-                    tag = new byte[] { data[0] };
-                    offset = 1;
-                }
+        /// <summary>
+        /// Parses the response as Card Data.
+        /// </summary>
+        /// <returns>Parsed card data or null if not applicable.</returns>
+        public CardDataInfo? ParseAsCardData()
+        {
+            if (DataObjectIdentifier != GetDataCommand.DataObjects.CardData)
+            {
+                return null;
+            }
 
-                if (offset >= data.Length)
-                    return null;
+            var dataToparse = IsTlvFormat && TlvObject != null ? TlvObject.Value : Data;
 
-                // Parse length
-                int valueLength;
-                if ((data[offset] & 0x80) == 0)
-                {
-                    // Short form
-                    valueLength = data[offset];
-                    offset++;
-                }
-                else
-                {
-                    // Long form
-                    int lengthBytes = data[offset] & 0x7F;
-                    if (lengthBytes == 0 || offset + lengthBytes >= data.Length)
-                        return null;
+            if (dataToparse == null || dataToparse.Length == 0)
+            {
+                return null;
+            }
 
-                    offset++;
-                    valueLength = 0;
-                    for (int i = 0; i < lengthBytes; i++)
-                    {
-                        valueLength = (valueLength << 8) | data[offset + i];
-                    }
-                    offset += lengthBytes;
-                }
+            try
+            {
+                return CardDataInfo.Parse(dataToparse);
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
-                if (offset + valueLength != data.Length)
-                    return null;
+        /// <summary>
+        /// Parses the response as Card Capabilities (tag 0x67 format).
+        /// </summary>
+        /// <returns>Parsed card capabilities or null if not applicable.</returns>
+        public CardCapabilities? ParseAsCardCapabilities()
+        {
+            if (DataObjectIdentifier != GetDataCommand.DataObjects.CardCapabilities)
+            {
+                return null;
+            }
 
-                // Parse value
-                var value = new byte[valueLength];
-                Array.Copy(data, offset, value, 0, valueLength);
+            var dataToparse = IsTlvFormat && TlvObject != null ? TlvObject.Value : Data;
 
-                return (tag, value);
+            if (dataToparse == null || dataToparse.Length == 0)
+            {
+                return null;
+            }
+
+            try
+            {
+                return CardCapabilities.Parse(dataToparse);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Gets the value as a hex string.
+        /// </summary>
+        /// <returns>The value formatted as a hex string.</returns>
+        public string GetValueAsHexString()
+        {
+            var dataToUse = IsTlvFormat && TlvObject != null ? TlvObject.Value : Data;
+            return dataToUse != null
+                ? BitConverter.ToString(dataToUse).Replace("-", "")
+                : string.Empty;
+        }
+
+        /// <summary>
+        /// Gets the value as a numeric value (for counters, etc).
+        /// </summary>
+        /// <returns>The numeric value or null if not applicable.</returns>
+        public uint? GetValueAsNumber()
+        {
+            var dataToUse = IsTlvFormat && TlvObject != null ? TlvObject.Value : Data;
+
+            if (dataToUse == null || dataToUse.Length == 0 || dataToUse.Length > 4)
+            {
+                return null;
+            }
+
+            uint result = 0;
+            for (int i = 0; i < dataToUse.Length; i++)
+            {
+                result = (result << 8) | dataToUse[i];
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Parses the response as Key Information Template.
+        /// </summary>
+        /// <returns>Parsed key information or null if not applicable.</returns>
+        public KeyInformationTemplate? ParseAsKeyInformation()
+        {
+            if (DataObjectIdentifier != GetDataCommand.DataObjects.KeyInformationTemplate)
+            {
+                return null;
+            }
+
+            var dataToparse = IsTlvFormat && TlvObject != null ? TlvObject.Value : Data;
+
+            if (dataToparse == null || dataToparse.Length == 0)
+            {
+                return null;
+            }
+
+            try
+            {
+                return KeyInformationTemplate.Parse(dataToparse);
             }
             catch
             {

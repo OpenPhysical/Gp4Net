@@ -1,4 +1,3 @@
-using System;
 using WSCT.Core;
 using WSCT.Core.APDU;
 using WSCT.Wrapper;
@@ -61,7 +60,7 @@ namespace Gp4Net.Tool.Services.CardCommunication
             {
                 try
                 {
-                    _channel.Disconnect(Disposition.UnpowerCard);
+                    _ = _channel.Disconnect(Disposition.UnpowerCard);
                 }
                 catch
                 {

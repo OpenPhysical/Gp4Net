@@ -18,15 +18,31 @@ namespace Gp4Net.Tool.Commands.Applet
         /// <summary>
         /// Initializes a new instance of the InstallCommand class.
         /// </summary>
-        public InstallCommand(ICardService cardService, IGlobalPlatformService globalPlatformService)
-            : base(cardService, globalPlatformService)
-        {
-        }
+        public InstallCommand(
+            ICardService cardService,
+            IGlobalPlatformService globalPlatformService,
+            IKeysetResolver keysetResolver
+        )
+            : base(cardService, globalPlatformService, keysetResolver) { }
 
-        /// <inheritdoc />
-        protected override async Task<int> ExecuteCommandAsync(CommandContext context, Settings settings)
+        /// <summary>
+        /// Executes the install command to load and install a CAP file on the card.
+        /// </summary>
+        /// <param name="context">The command context.</param>
+        /// <param name="settings">The command settings.</param>
+        /// <returns>0 if successful, 1 if failed.</returns>
+        protected override async Task<int> ExecuteCommandAsync(
+            CommandContext context,
+            Settings settings
+        )
         {
             if (!EnsureCardConnection(settings))
+            {
+                return 1;
+            }
+
+            // Establish secure channel for installation
+            if (!EnsureSecureChannel(settings))
             {
                 return 1;
             }
@@ -41,7 +57,7 @@ namespace Gp4Net.Tool.Commands.Applet
             {
                 AnsiConsole.MarkupLine($"[cyan]Reading CAP file: {settings.CapFile}[/]");
                 var capFileData = await File.ReadAllBytesAsync(settings.CapFile);
-                
+
                 AnsiConsole.MarkupLine($"[dim]CAP file size: {capFileData.Length} bytes[/]");
 
                 if (!settings.NoCardInfo)
@@ -50,8 +66,9 @@ namespace Gp4Net.Tool.Commands.Applet
                 }
 
                 AnsiConsole.WriteLine();
-                
-                await AnsiConsole.Progress()
+
+                _ = await AnsiConsole
+                    .Progress()
                     .StartAsync(async ctx =>
                     {
                         var task = ctx.AddTask("[green]Installing CAP file[/]");
@@ -62,33 +79,42 @@ namespace Gp4Net.Tool.Commands.Applet
                         await Task.Delay(100);
 
                         var result = GlobalPlatformService.InstallCapFile(
-                            capFileData, 
-                            settings.InstallApplets, 
-                            settings.MakeSelectable);
+                            capFileData,
+                            settings.InstallApplets,
+                            settings.MakeSelectable
+                        );
 
                         task.Value = 100;
 
                         if (result.IsSuccessful)
                         {
                             AnsiConsole.MarkupLine("[green]✓ CAP file installed successfully[/]");
-                            
+
                             if (result.PackageAid != null)
                             {
-                                AnsiConsole.MarkupLine($"[dim]Package AID: {Convert.ToHexString(result.PackageAid)}[/]");
+                                AnsiConsole.MarkupLine(
+                                    $"[dim]Package AID: {Convert.ToHexString(result.PackageAid)}[/]"
+                                );
                             }
 
                             if (result.InstalledApplets.Count > 0)
                             {
-                                AnsiConsole.MarkupLine($"[green]Installed {result.InstalledApplets.Count} applet(s):[/]");
+                                AnsiConsole.MarkupLine(
+                                    $"[green]Installed {result.InstalledApplets.Count} applet(s):[/]"
+                                );
                                 foreach (var appletAid in result.InstalledApplets)
                                 {
-                                    AnsiConsole.MarkupLine($"  [dim]• {Convert.ToHexString(appletAid)}[/]");
+                                    AnsiConsole.MarkupLine(
+                                        $"  [dim]• {Convert.ToHexString(appletAid)}[/]"
+                                    );
                                 }
                             }
                         }
                         else
                         {
-                            AnsiConsole.MarkupLine($"[red]✗ Installation failed: {result.ErrorMessage}[/]");
+                            AnsiConsole.MarkupLine(
+                                $"[red]✗ Installation failed: {result.ErrorMessage}[/]"
+                            );
                             return 1;
                         }
 
@@ -145,6 +171,12 @@ namespace Gp4Net.Tool.Commands.Applet
             public bool MakeSelectable => !NoMakeSelectable;
 
             /// <inheritdoc />
+            public override bool RequiresSecureChannel => true; // Installation always requires secure channel
+
+            /// <summary>
+            /// Validates the command settings.
+            /// </summary>
+            /// <returns>Success if valid, or an error message if validation fails.</returns>
             public override ValidationResult Validate()
             {
                 if (string.IsNullOrWhiteSpace(CapFile))

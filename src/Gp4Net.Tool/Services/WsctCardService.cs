@@ -1,6 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Gp4Net.Constants;
+using Gp4Net.Domain;
+using Gp4Net.Domain.Keys;
+using Gp4Net.Domain.Protocol;
 using Gp4Net.Tool.Services.CardCommunication;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 using log4net;
 using WSCT.ISO7816;
@@ -18,18 +25,33 @@ namespace Gp4Net.Tool.Services
 
         private readonly IWsctFactory _wsctFactory;
         private readonly ICardContextWrapper _context;
+        private readonly ISecureChannelManager _secureChannelManager;
+        private readonly IApduTransportFactory _transportFactory;
         private ICardChannelWrapper? _channel;
+        private SecureChannelSession? _secureChannelSession;
+        private IApduTransport? _transport;
         private bool _disposed;
 
         /// <summary>
         /// Initializes a new instance of the WsctCardService class.
         /// </summary>
         /// <param name="wsctFactory">Factory for creating WSCT objects.</param>
-        public WsctCardService(IWsctFactory wsctFactory)
+        /// <param name="secureChannelManager">The secure channel manager.</param>
+        /// <param name="transportFactory">The APDU transport factory.</param>
+        public WsctCardService(
+            IWsctFactory wsctFactory,
+            ISecureChannelManager secureChannelManager,
+            IApduTransportFactory transportFactory
+        )
         {
             _wsctFactory = wsctFactory ?? throw new ArgumentNullException(nameof(wsctFactory));
+            _secureChannelManager =
+                secureChannelManager
+                ?? throw new ArgumentNullException(nameof(secureChannelManager));
+            _transportFactory =
+                transportFactory ?? throw new ArgumentNullException(nameof(transportFactory));
             _context = _wsctFactory.CreateCardContext();
-            
+
             var result = _context.Establish();
             if (result != ErrorCode.Success)
             {
@@ -38,11 +60,13 @@ namespace Gp4Net.Tool.Services
         }
 
         /// <summary>
-        /// Initializes a new instance of the WsctCardService class with default factory.
+        /// Initializes a new instance of the WsctCardService class with default factories.
         /// </summary>
-        public WsctCardService() : this(new WsctFactory())
-        {
-        }
+        public WsctCardService(
+            ISecureChannelManager secureChannelManager,
+            IApduTransportFactory transportFactory
+        )
+            : this(new WsctFactory(), secureChannelManager, transportFactory) { }
 
         /// <inheritdoc />
         public IReadOnlyList<string> GetReaders()
@@ -55,7 +79,7 @@ namespace Gp4Net.Tool.Services
                     Logger.Warn($"Failed to list readers: {result}");
                     return Array.Empty<string>();
                 }
-                
+
                 var readers = _context.Readers;
                 Logger.Debug($"Found {readers.Count} card readers");
                 return readers;
@@ -71,14 +95,19 @@ namespace Gp4Net.Tool.Services
         public bool Connect(string readerName)
         {
             if (string.IsNullOrEmpty(readerName))
-                throw new ArgumentException("Reader name cannot be null or empty", nameof(readerName));
+            {
+                throw new ArgumentException(
+                    "Reader name cannot be null or empty",
+                    nameof(readerName)
+                );
+            }
 
             try
             {
                 Disconnect(); // Ensure clean state
 
                 _channel = _context.CreateCardChannel(readerName);
-                var result = _channel.Connect(ShareMode.Shared, Protocol.Any);
+                var result = _channel.Connect(ShareMode.Exclusive, Protocol.Any);
                 if (result != ErrorCode.Success)
                 {
                     _channel.Dispose();
@@ -87,6 +116,10 @@ namespace Gp4Net.Tool.Services
                     return false;
                 }
                 Logger.Info($"Connected to card in reader: {readerName}");
+
+                // Detect transport protocol based on ATR or default to T=0
+                _transport = _transportFactory.CreateTransport(TransportProtocol.T0);
+
                 return true;
             }
             catch (Exception ex)
@@ -103,7 +136,7 @@ namespace Gp4Net.Tool.Services
             {
                 try
                 {
-                    _channel.Disconnect(Disposition.UnpowerCard);
+                    _ = _channel.Disconnect(Disposition.UnpowerCard);
                     Logger.Debug("Disconnected from card");
                 }
                 catch (Exception ex)
@@ -114,6 +147,8 @@ namespace Gp4Net.Tool.Services
                 {
                     _channel.Dispose();
                     _channel = null;
+                    _secureChannelSession = null;
+                    _transport = null;
                 }
             }
         }
@@ -123,43 +158,26 @@ namespace Gp4Net.Tool.Services
         {
             get
             {
-                if (_channel == null)
-                    return false;
-                
-                try
-                {
-                    var state = _channel.GetStatus();
-                    return state == State.Specific || state == State.Negotiable || state == State.Powered;
-                }
-                catch
-                {
-                    return false;
-                }
+                // Simply check if channel exists - GetStatus() can hang
+                return _channel != null;
             }
         }
 
         /// <inheritdoc />
         public byte[]? GetAtr()
         {
-            if (!IsConnected)
+            if (!IsConnected || _channel == null)
+            {
                 return null;
+            }
 
             try
             {
-                var atrBuffer = new byte[256];
-                var result = _channel!.GetAttrib(Attrib.AtrString, ref atrBuffer);
-                if (result != ErrorCode.Success)
-                {
-                    throw new InvalidOperationException($"Failed to get ATR: {result}");
-                }
-                
-                // Extract actual ATR length from buffer
-                var atrLength = Array.IndexOf(atrBuffer, (byte)0);
-                if (atrLength == -1) atrLength = atrBuffer.Length;
-                var atr = new byte[atrLength];
-                Array.Copy(atrBuffer, atr, atrLength);
-                Logger.Debug($"Card ATR: {Convert.ToHexString(atr)}");
-                return atr;
+                Logger.Debug("Attempting to get ATR from card channel");
+
+                // Use GetAttrib with timeout as the primary method
+                // GetStatus method is not available in the wrapper interface
+                return GetAtrUsingGetAttrib();
             }
             catch (Exception ex)
             {
@@ -168,20 +186,64 @@ namespace Gp4Net.Tool.Services
             }
         }
 
+        private byte[]? GetAtrUsingGetAttrib()
+        {
+            try
+            {
+                Logger.Debug("Using GetAttrib for ATR retrieval");
+
+                // Direct call like in working implementation - no timeout needed
+                byte[]? atrBuffer = null;
+                var result = _channel?.GetAttrib(Attrib.AtrString, ref atrBuffer!) ?? ErrorCode.InternalError;
+
+                if (result != ErrorCode.Success)
+                {
+                    Logger.Warn($"GetAttrib failed with result: {result}");
+                    return null;
+                }
+
+                if (atrBuffer == null || atrBuffer.Length == 0)
+                {
+                    Logger.Warn("ATR buffer is null or empty");
+                    return null;
+                }
+
+                Logger.Debug($"Card ATR: {Convert.ToHexString(atrBuffer)}");
+                return atrBuffer;
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug($"GetAttrib failed: {ex.Message}");
+                return null;
+            }
+        }
+
         /// <inheritdoc />
         public CardResponse SendCommand(byte[] command)
         {
-            if (command == null)
-                throw new ArgumentNullException(nameof(command));
+            ArgumentNullException.ThrowIfNull(command);
 
             if (!IsConnected)
+            {
                 throw new InvalidOperationException("Card is not connected");
+            }
 
             try
             {
-                Logger.Debug($"Sending APDU: {Convert.ToHexString(command)}");
+                var commandToSend = command;
 
-                var apdu = _wsctFactory.CreateCommandApdu(command);
+                // Apply secure messaging if session is active
+                if (_secureChannelSession != null)
+                {
+                    commandToSend = _secureChannelSession.WrapCommand(command);
+                    Logger.Debug($"Sending wrapped APDU: {Convert.ToHexString(commandToSend)}");
+                }
+                else
+                {
+                    Logger.Debug($"Sending APDU: {Convert.ToHexString(commandToSend)}");
+                }
+
+                var apdu = _wsctFactory.CreateCommandApdu(commandToSend);
                 var response = _wsctFactory.CreateResponseApdu();
                 var result = _channel!.Transmit(apdu, response);
 
@@ -195,11 +257,41 @@ namespace Gp4Net.Tool.Services
                 {
                     throw new InvalidOperationException("Invalid response type received");
                 }
-                
+
                 var responseData = responseApdu.Udr ?? Array.Empty<byte>();
                 var statusWord = responseApdu.StatusWord;
 
-                Logger.Debug($"Received response: Data={Convert.ToHexString(responseData)}, SW={statusWord:X4}");
+                // Unwrap secure messaging if session is active
+                if (_secureChannelSession != null)
+                {
+                    // Combine data and SW for unwrapping
+                    var fullResponse = new byte[responseData.Length + 2];
+                    Array.Copy(responseData, 0, fullResponse, 0, responseData.Length);
+                    fullResponse[fullResponse.Length - 2] = (byte)(statusWord >> 8);
+                    fullResponse[fullResponse.Length - 1] = (byte)(statusWord & 0xFF);
+
+                    var unwrapped = _secureChannelSession.UnwrapResponse(fullResponse);
+
+                    // Extract unwrapped data and SW
+                    if (unwrapped.Length >= 2)
+                    {
+                        responseData = new byte[unwrapped.Length - 2];
+                        Array.Copy(unwrapped, 0, responseData, 0, responseData.Length);
+                        statusWord = (ushort)(
+                            (unwrapped[unwrapped.Length - 2] << 8) | unwrapped[unwrapped.Length - 1]
+                        );
+                    }
+
+                    Logger.Debug(
+                        $"Received unwrapped response: Data={Convert.ToHexString(responseData)}, SW={statusWord:X4}"
+                    );
+                }
+                else
+                {
+                    Logger.Debug(
+                        $"Received response: Data={Convert.ToHexString(responseData)}, SW={statusWord:X4}"
+                    );
+                }
 
                 return new CardResponse(responseData, statusWord);
             }
@@ -216,17 +308,123 @@ namespace Gp4Net.Tool.Services
         }
 
         /// <inheritdoc />
-        public bool EstablishSecureChannel(byte[] keySet, byte securityLevel)
+        public CardResponse SendCommand(IApduCommand command)
         {
-            // This is a placeholder implementation
-            // In a real implementation, this would use the GP4Net library
-            // to perform mutual authentication and establish a secure channel
-            Logger.Warn("Secure channel establishment not yet implemented");
-            return false;
+            ArgumentNullException.ThrowIfNull(command);
+
+            // Build APDU bytes from command
+            var apduBytes = new List<byte> { command.Cla, command.Ins, command.P1, command.P2 };
+
+            var hasData = command.Data != null && command.Data.Length > 0;
+            var hasExpectedLength = command.ExpectedResponseLength.HasValue;
+
+            if (hasData)
+            {
+                if (command.IsExtendedLength && command.Data!.Length > 255)
+                {
+                    apduBytes.Add(0x00);
+                    apduBytes.Add((byte)(command.Data.Length >> 8));
+                    apduBytes.Add((byte)(command.Data.Length & 0xFF));
+                }
+                else
+                {
+                    apduBytes.Add((byte)command.Data!.Length);
+                }
+                if (command.Data != null)
+                {
+                    apduBytes.AddRange(command.Data);
+                }
+            }
+
+            if (hasExpectedLength)
+            {
+                var expectedLength = command.ExpectedResponseLength!.Value;
+                if (command.IsExtendedLength && expectedLength > 255)
+                {
+                    if (!hasData)
+                    {
+                        apduBytes.Add(0x00); // Extended length prefix if no data
+                    }
+
+                    apduBytes.Add((byte)(expectedLength >> 8));
+                    apduBytes.Add((byte)(expectedLength & 0xFF));
+                }
+                else
+                {
+                    // For standard length, add LE byte
+                    // If expectedLength is 0 or 256, send 0x00 (meaning max response)
+                    apduBytes.Add(
+                        expectedLength == 0 || expectedLength == 256
+                            ? (byte)0x00
+                            : (byte)expectedLength
+                    );
+                }
+            }
+
+            return SendCommand([.. apduBytes]);
         }
 
         /// <inheritdoc />
-        public bool IsSecureChannelEstablished => false; // Placeholder
+        public bool EstablishSecureChannel(byte[] keySet, byte securityLevel)
+        {
+            ArgumentNullException.ThrowIfNull(keySet);
+
+            if (!IsConnected)
+            {
+                throw new InvalidOperationException("Card is not connected");
+            }
+
+            if (_transport == null)
+            {
+                throw new InvalidOperationException("Transport not initialized");
+            }
+
+            try
+            {
+                // For now, assume SCP02 with test keys
+                // In a real implementation, this would be configurable
+                var scp02KeySet = new Scp02KeySet(
+                    keySet, // ENC key
+                    keySet, // MAC key
+                    keySet, // DEK key
+                    0xFF
+                ); // Key version
+
+                var secLevel = (SecurityLevel)securityLevel;
+                var cardChannel = new CardServiceChannelAdapter(this, TransportProtocol.T0);
+
+                // Establish secure channel
+                // Use Task.Run to prevent deadlocks when calling async method from sync context
+                _secureChannelSession = Task.Run(
+                        async () =>
+                            await _secureChannelManager
+                                .EstablishAsync(
+                                    cardChannel,
+                                    _transport,
+                                    scp02KeySet,
+                                    secLevel,
+                                    CancellationToken.None
+                                )
+                                .ConfigureAwait(false)
+                    )
+                    .GetAwaiter()
+                    .GetResult();
+
+                Logger.Info(
+                    $"Successfully established secure channel with security level: {secLevel}"
+                );
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Failed to establish secure channel", ex);
+                _secureChannelSession = null;
+                return false;
+            }
+        }
+
+        /// <inheritdoc />
+        public bool IsSecureChannelEstablished => _secureChannelSession != null;
 
         /// <inheritdoc />
         public void Dispose()

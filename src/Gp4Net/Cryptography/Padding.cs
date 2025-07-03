@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using Gp4Net.Constants;
 
 namespace Gp4Net.Cryptography
 {
@@ -20,10 +21,12 @@ namespace Gp4Net.Cryptography
         /// <returns>The padded data.</returns>
         public static byte[] AddPadding(byte[] data, int blockSize)
         {
-            if (data == null)
-                throw new ArgumentNullException(nameof(data));
+            ArgumentNullException.ThrowIfNull(data);
+
             if (blockSize <= 0)
+            {
                 throw new ArgumentException("Block size must be positive.", nameof(blockSize));
+            }
 
             // Calculate the number of padding bytes needed
             int paddingLength = blockSize - (data.Length % blockSize);
@@ -33,7 +36,7 @@ namespace Gp4Net.Cryptography
             Array.Copy(data, 0, padded, 0, data.Length);
 
             // Add the padding: 0x80 followed by zeros
-            padded[data.Length] = 0x80;
+            padded[data.Length] = CryptographicConstants.ISO7816_PADDING_MARKER;
             // Remaining bytes are already zero (default value)
 
             return padded;
@@ -46,10 +49,12 @@ namespace Gp4Net.Cryptography
         /// <returns>The unpadded data.</returns>
         public static byte[] RemovePadding(byte[] data)
         {
-            if (data == null)
-                throw new ArgumentNullException(nameof(data));
+            ArgumentNullException.ThrowIfNull(data);
+
             if (data.Length == 0)
+            {
                 throw new ArgumentException("Data cannot be empty.", nameof(data));
+            }
 
             // Find the padding marker (0x80) from the end
             int i = data.Length - 1;
@@ -58,8 +63,10 @@ namespace Gp4Net.Cryptography
                 i--;
             }
 
-            if (i < 0 || data[i] != 0x80)
+            if (i < 0 || data[i] != CryptographicConstants.ISO7816_PADDING_MARKER)
+            {
                 throw new ArgumentException("Invalid padding.");
+            }
 
             // Create the unpadded array
             byte[] unpadded = new byte[i];
@@ -77,9 +84,14 @@ namespace Gp4Net.Cryptography
         public static int GetPaddedLength(int dataLength, int blockSize)
         {
             if (dataLength < 0)
+            {
                 throw new ArgumentException("Data length cannot be negative.", nameof(dataLength));
+            }
+
             if (blockSize <= 0)
+            {
                 throw new ArgumentException("Block size must be positive.", nameof(blockSize));
+            }
 
             int paddingLength = blockSize - (dataLength % blockSize);
             return dataLength + paddingLength;

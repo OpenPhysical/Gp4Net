@@ -4,13 +4,40 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using System.Security.Cryptography;
 
 namespace Gp4Net.Domain.Keys
 {
     /// <summary>
+    /// Interface for a set of GlobalPlatform static keys.
+    /// </summary>
+    public interface IKeySet : IDisposable
+    {
+        /// <summary>
+        /// Gets the key version number.
+        /// </summary>
+        byte KeyVersion { get; }
+
+        /// <summary>
+        /// Gets the encryption key (Key-ENC).
+        /// </summary>
+        byte[] EncKey { get; }
+
+        /// <summary>
+        /// Gets the MAC key (Key-MAC).
+        /// </summary>
+        byte[] MacKey { get; }
+
+        /// <summary>
+        /// Gets the data encryption key (Key-DEK).
+        /// </summary>
+        byte[] DekKey { get; }
+    }
+
+    /// <summary>
     /// Base class for a set of GlobalPlatform static keys.
     /// </summary>
-    public abstract class KeySet
+    public abstract class KeySet : IKeySet
     {
         /// <summary>
         /// Gets the key version number.
@@ -32,6 +59,8 @@ namespace Gp4Net.Domain.Keys
         /// </summary>
         public byte[] DekKey { get; }
 
+        private bool _disposed = false;
+
         /// <summary>
         /// Initializes a new instance of the KeySet class.
         /// </summary>
@@ -42,9 +71,34 @@ namespace Gp4Net.Domain.Keys
         protected KeySet(byte keyVersion, byte[] encKey, byte[] macKey, byte[] dekKey)
         {
             KeyVersion = keyVersion;
-            EncKey = encKey ?? throw new ArgumentNullException(nameof(encKey));
-            MacKey = macKey ?? throw new ArgumentNullException(nameof(macKey));
-            DekKey = dekKey ?? throw new ArgumentNullException(nameof(dekKey));
+            ArgumentNullException.ThrowIfNull(encKey);
+            ArgumentNullException.ThrowIfNull(macKey);
+            ArgumentNullException.ThrowIfNull(dekKey);
+            EncKey = encKey;
+            MacKey = macKey;
+            DekKey = dekKey;
+        }
+
+        /// <summary>
+        /// Clears all cryptographic keys from memory.
+        /// </summary>
+        public virtual void Clear()
+        {
+            CryptographicOperations.ZeroMemory(EncKey);
+            CryptographicOperations.ZeroMemory(MacKey);
+            CryptographicOperations.ZeroMemory(DekKey);
+        }
+
+        /// <summary>
+        /// Disposes of the key set, clearing sensitive data from memory.
+        /// </summary>
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                Clear();
+                _disposed = true;
+            }
         }
     }
 
@@ -71,7 +125,9 @@ namespace Gp4Net.Domain.Keys
         private static void ValidateKey(byte[] key, string paramName)
         {
             if (key.Length != 16 && key.Length != 24)
+            {
                 throw new ArgumentException("3DES key must be 16 or 24 bytes.", paramName);
+            }
         }
     }
 
@@ -96,13 +152,17 @@ namespace Gp4Net.Domain.Keys
 
             // All keys should have the same length
             if (encKey.Length != macKey.Length || macKey.Length != dekKey.Length)
+            {
                 throw new ArgumentException("All AES keys must have the same length.");
+            }
         }
 
         private static void ValidateKey(byte[] key, string paramName)
         {
             if (key.Length != 16 && key.Length != 24 && key.Length != 32)
+            {
                 throw new ArgumentException("AES key must be 16, 24, or 32 bytes.", paramName);
+            }
         }
     }
 }

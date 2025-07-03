@@ -21,8 +21,8 @@ namespace Gp4Net.Services
         /// </summary>
         public PackageRegistry()
         {
-            _packages = new Dictionary<string, PackageInfo>();
-            _aidLookup = new Dictionary<string, PackageInfo>();
+            _packages = [];
+            _aidLookup = [];
             LoadPackageDatabase();
         }
 
@@ -37,7 +37,7 @@ namespace Gp4Net.Services
         /// <param name="aid">The AID bytes.</param>
         /// <param name="packageInfo">The resolved package information, if found.</param>
         /// <returns>True if the AID was resolved, false otherwise.</returns>
-        public bool TryResolveAid(byte[] aid, out PackageInfo packageInfo)
+        public bool TryResolveAid(byte[] aid, out PackageInfo? packageInfo)
         {
             var aidHex = Convert.ToHexString(aid).ToUpper();
             return TryResolveAid(aidHex, out packageInfo);
@@ -49,7 +49,7 @@ namespace Gp4Net.Services
         /// <param name="aidHex">The AID as a hex string.</param>
         /// <param name="packageInfo">The resolved package information, if found.</param>
         /// <returns>True if the AID was resolved, false otherwise.</returns>
-        public bool TryResolveAid(string aidHex, out PackageInfo packageInfo)
+        public bool TryResolveAid(string aidHex, out PackageInfo? packageInfo)
         {
             return _aidLookup.TryGetValue(aidHex.ToUpper(), out packageInfo);
         }
@@ -79,19 +79,21 @@ namespace Gp4Net.Services
             {
                 var assembly = Assembly.GetExecutingAssembly();
                 var resourceName = "Gp4Net.Data.known-packages.json";
-                
+
                 using var stream = assembly.GetManifestResourceStream(resourceName);
                 if (stream == null)
                 {
-                    throw new InvalidOperationException($"Could not find embedded resource: {resourceName}");
+                    throw new InvalidOperationException(
+                        $"Could not find embedded resource: {resourceName}"
+                    );
                 }
 
                 using var reader = new StreamReader(stream);
                 var json = reader.ReadToEnd();
-                
+
                 var options = new JsonSerializerOptions
                 {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 };
 
                 var database = JsonSerializer.Deserialize<PackageDatabase>(json, options);
@@ -112,11 +114,11 @@ namespace Gp4Net.Services
                         MajorVersion = kvp.Value.MajorVersion,
                         MinorVersion = kvp.Value.MinorVersion,
                         SourceFile = kvp.Value.SourceFile ?? string.Empty,
-                        SdkVersion = kvp.Value.SdkVersion ?? string.Empty
+                        SdkVersion = kvp.Value.SdkVersion ?? string.Empty,
                     };
 
                     _packages[kvp.Key] = packageInfo;
-                    
+
                     // Also index by AID for quick lookup
                     if (!string.IsNullOrEmpty(packageInfo.Aid))
                     {

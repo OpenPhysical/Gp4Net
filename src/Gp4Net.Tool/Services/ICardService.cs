@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Tool.Services
@@ -43,6 +44,13 @@ namespace Gp4Net.Tool.Services
         /// <param name="command">The APDU command bytes.</param>
         /// <returns>The response from the card.</returns>
         CardResponse SendCommand(byte[] command);
+
+        /// <summary>
+        /// Sends an APDU command to the card.
+        /// </summary>
+        /// <param name="command">The APDU command.</param>
+        /// <returns>The response from the card.</returns>
+        CardResponse SendCommand(IApduCommand command);
 
         /// <summary>
         /// Establishes a secure channel with the card.

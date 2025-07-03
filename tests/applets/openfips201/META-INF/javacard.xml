@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<javacard-app xmlns="http://java.sun.com/xml/ns/javacard"
-       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-       xsi:schemaLocation="http://java.sun.com/xml/ns/javacard ../../../../docs/schemas/internal/applet-app_3_0.xsd"
-       version="3.0">
-</javacard-app>
+<javacard-app
+  xmlns="http://java.sun.com/xml/ns/javacard"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://java.sun.com/xml/ns/javacard ../../../../docs/schemas/internal/applet-app_3_0.xsd"
+  version="3.0"
+></javacard-app>

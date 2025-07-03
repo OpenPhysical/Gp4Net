@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using WSCT.Core;
 using WSCT.Wrapper;
 using WSCT.Wrapper.Desktop.Core;
 
@@ -24,7 +22,7 @@ namespace Gp4Net.Tool.Services.CardCommunication
         }
 
         /// <inheritdoc />
-        public IReadOnlyList<string> Readers => _context.Readers?.ToList() ?? new List<string>();
+        public IReadOnlyList<string> Readers => _context.Readers?.ToList() ?? [];
 
         /// <inheritdoc />
         public ErrorCode Establish()
@@ -57,7 +55,7 @@ namespace Gp4Net.Tool.Services.CardCommunication
             {
                 try
                 {
-                    _context.Release();
+                    _ = _context.Release();
                 }
                 catch
                 {

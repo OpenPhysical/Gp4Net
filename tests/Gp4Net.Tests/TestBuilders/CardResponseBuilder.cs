@@ -121,11 +121,13 @@ namespace Gp4Net.Tests.TestBuilders
         {
             // Remove spaces and convert to uppercase
             hex = hex.Replace(" ", "").Replace("-", "").ToUpperInvariant();
-            
+
             // Ensure even length
             if (hex.Length % 2 != 0)
+            {
                 throw new ArgumentException("Hex string must have even length");
-            
+            }
+
             var bytes = new byte[hex.Length / 2];
             for (int i = 0; i < bytes.Length; i++)
             {

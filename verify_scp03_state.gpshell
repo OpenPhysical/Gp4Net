@@ -1,0 +1,32 @@
+#!/usr/bin/env gpshell
+# Verify SCP03 state and test connections
+
+print Verifying SCP03 state on P71 card
+
+# Card connection and selection
+print Connecting to card...
+enable_trace
+mode_211
+establish_context
+card_connect
+select -AID A000000151000000
+
+# Check card state without authentication
+print Checking card data...
+send_apdu -sc 0 -APDU 80CA006600
+send_apdu -sc 0 -APDU 80CA00CF00
+
+# Try SCP03 authentication with factory keys
+print Testing SCP03 authentication with factory keys...
+open_sc -security 3 -keyind 0 -keyver 0 -scp 3 -scpimpl 70 -mac_key 86E6282CE0463C510FD4CB14D2A158EA -enc_key AC2AD8C8E2E874A4C6B514D7ECD5FBE5 -kek_key 7C290D97A5F4891F6C16ED7D2BB0A6E1
+
+# If that works, check key info
+print Checking key information...
+send_apdu -sc 1 -APDU 80CA00E000
+
+# Cleanup
+card_disconnect
+release_context
+
+print
+print === Verification Complete ===

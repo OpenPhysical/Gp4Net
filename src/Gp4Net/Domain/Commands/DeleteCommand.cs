@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Commands
@@ -9,7 +10,7 @@ namespace Gp4Net.Domain.Commands
     /// Represents the DELETE command for removing applications and load files from the card.
     /// </summary>
     [PublicAPI]
-    public class DeleteCommand
+    public class DeleteCommand : IApduCommand
     {
         /// <summary>
         /// The command class byte.
@@ -30,11 +31,11 @@ namespace Gp4Net.Domain.Commands
             /// Delete object and related objects.
             /// </summary>
             DeleteObjectAndRelated = 0x00,
-            
+
             /// <summary>
             /// Delete object only.
             /// </summary>
-            DeleteObjectOnly = 0x80
+            DeleteObjectOnly = 0x80,
         }
 
         /// <summary>
@@ -46,11 +47,11 @@ namespace Gp4Net.Domain.Commands
             /// Delete by object AID.
             /// </summary>
             ByAid = 0x00,
-            
+
             /// <summary>
-            /// Delete key or key component.
+            /// Delete with related objects.
             /// </summary>
-            Key = 0x80
+            WithRelated = 0x80,
         }
 
         /// <summary>
@@ -74,6 +75,106 @@ namespace Gp4Net.Domain.Commands
         public byte[]? DeletionToken { get; }
 
         /// <summary>
+        /// Optional Delete Token Key (for automatic token calculation).
+        /// </summary>
+        public byte[]? DeleteTokenKey { get; }
+
+        /// <summary>
+        /// Gets the class byte.
+        /// </summary>
+        byte IApduCommand.Cla => Cla;
+
+        /// <summary>
+        /// Gets the instruction byte.
+        /// </summary>
+        byte IApduCommand.Ins => Ins;
+
+        /// <summary>
+        /// Gets the parameter 1 byte.
+        /// </summary>
+        public byte P1 => (byte)Type;
+
+        /// <summary>
+        /// Gets the parameter 2 byte.
+        /// </summary>
+        public byte P2 => (byte)Target;
+
+        /// <summary>
+        /// Gets the command data.
+        /// </summary>
+        public byte[]? Data => GetDeleteData();
+
+        /// <summary>
+        /// Gets the expected response length.
+        /// </summary>
+        public int? ExpectedResponseLength => null;
+
+        /// <summary>
+        /// Gets whether this command uses extended length.
+        /// </summary>
+        public bool IsExtendedLength => false;
+
+        /// <summary>
+        /// Gets the delete data for the IApduCommand interface.
+        /// </summary>
+        private byte[] GetDeleteData()
+        {
+            var data = new List<byte>();
+
+            if (Target == DeleteTarget.ByAid || Target == DeleteTarget.WithRelated)
+            {
+                // For AID deletion, encode as TLV: 4F <len> <AIDs concatenated>
+                var totalAidLength = Aids.Sum(aid => aid.Length);
+                data.Add(0x4F); // Tag for AID
+                data.Add((byte)totalAidLength);
+                foreach (var aid in Aids)
+                {
+                    data.AddRange(aid);
+                }
+                // If DeletionTokenKey or DeletionToken is present, emit TLV (calculated as needed)
+                byte[]? token = DeletionToken;
+                if (token == null && DeleteTokenKey != null)
+                {
+                    // Compute token (simple heuristic: assume single AID, package removal)
+                    if (Aids.Count != 1)
+                        throw new InvalidOperationException("Delete token calculation requires exactly one AID.");
+                    // Compute token using the DeleteTokenCalculator
+                    token = Gp4Net.Cryptography.DeleteTokenCalculator.ComputeDeleteToken(
+                        DeleteTokenKey, 
+                        P1, 
+                        P2, 
+                        Aids[0], 
+                        null); // No optional TLV for now
+                }
+                if (token != null && token.Length > 0)
+                {
+                    data.Add(0x9E);
+                    if (token.Length <= 0x7F) data.Add((byte)token.Length);
+                    else { data.Add(0x81); data.Add((byte)token.Length); }
+                    data.AddRange(token);
+                }
+            }
+            else
+            {
+                // For key deletion, as TLV: D0 (keyId) + D2 (keyVer) per entry
+                foreach (var keyRef in Aids)
+                {
+                    if (keyRef.Length == 2)
+                    {
+                        data.Add(0xD0); data.Add(1); data.Add(keyRef[0]);
+                        data.Add(0xD2); data.Add(1); data.Add(keyRef[1]);
+                    }
+                    else if (keyRef.Length == 1)
+                    {
+                        data.Add(0xD0); data.Add(1); data.Add(keyRef[0]);
+                    }
+                }
+            }
+
+            return [.. data];
+        }
+
+        /// <summary>
         /// Initializes a new instance of the DeleteCommand class.
         /// </summary>
         /// <param name="type">The delete type.</param>
@@ -84,21 +185,28 @@ namespace Gp4Net.Domain.Commands
             DeleteType type,
             DeleteTarget target,
             IList<byte[]> aids,
-            byte[]? deletionToken = null)
+            byte[]? deletionToken = null,
+            byte[]? deleteTokenKey = null
+        )
         {
             if (aids == null || aids.Count == 0)
+            {
                 throw new ArgumentException("At least one AID must be provided.", nameof(aids));
+            }
 
             foreach (var aid in aids)
             {
                 if (aid == null || aid.Length == 0)
+                {
                     throw new ArgumentException("AIDs cannot be null or empty.", nameof(aids));
+                }
             }
 
             Type = type;
             Target = target;
             Aids = new List<byte[]>(aids.Select(aid => (byte[])aid.Clone()));
             DeletionToken = deletionToken?.Clone() as byte[];
+            DeleteTokenKey = deleteTokenKey?.Clone() as byte[];
         }
 
         /// <summary>
@@ -111,13 +219,18 @@ namespace Gp4Net.Domain.Commands
         public static DeleteCommand CreateForApplication(
             byte[] aid,
             bool deleteRelated = true,
-            byte[]? deletionToken = null)
+            byte[]? deletionToken = null
+        )
         {
-            if (aid == null)
-                throw new ArgumentNullException(nameof(aid));
+            ArgumentNullException.ThrowIfNull(aid);
 
-            var type = deleteRelated ? DeleteType.DeleteObjectAndRelated : DeleteType.DeleteObjectOnly;
-            return new DeleteCommand(type, DeleteTarget.ByAid, new[] { aid }, deletionToken);
+            var type = deleteRelated
+                ? DeleteType.DeleteObjectAndRelated
+                : DeleteType.DeleteObjectOnly;
+            var target = deleteRelated
+                ? DeleteTarget.WithRelated
+                : DeleteTarget.ByAid;
+            return new DeleteCommand(type, target, new[] { aid }, deletionToken);
         }
 
         /// <summary>
@@ -130,10 +243,16 @@ namespace Gp4Net.Domain.Commands
         public static DeleteCommand CreateForApplications(
             IList<byte[]> aids,
             bool deleteRelated = true,
-            byte[]? deletionToken = null)
+            byte[]? deletionToken = null
+        )
         {
-            var type = deleteRelated ? DeleteType.DeleteObjectAndRelated : DeleteType.DeleteObjectOnly;
-            return new DeleteCommand(type, DeleteTarget.ByAid, aids, deletionToken);
+            var type = deleteRelated
+                ? DeleteType.DeleteObjectAndRelated
+                : DeleteType.DeleteObjectOnly;
+            var target = deleteRelated
+                ? DeleteTarget.WithRelated
+                : DeleteTarget.ByAid;
+            return new DeleteCommand(type, target, aids, deletionToken);
         }
 
         /// <summary>
@@ -146,10 +265,16 @@ namespace Gp4Net.Domain.Commands
         public static DeleteCommand CreateForKey(
             byte keyIdentifier,
             byte keyVersion,
-            byte[]? deletionToken = null)
+            byte[]? deletionToken = null
+        )
         {
             var keyReference = new byte[] { keyIdentifier, keyVersion };
-            return new DeleteCommand(DeleteType.DeleteObjectOnly, DeleteTarget.Key, new[] { keyReference }, deletionToken);
+            return new DeleteCommand(
+                DeleteType.DeleteObjectOnly,
+                DeleteTarget.ByAid,
+                new[] { keyReference },
+                deletionToken
+            );
         }
 
         /// <summary>
@@ -160,15 +285,21 @@ namespace Gp4Net.Domain.Commands
         {
             var data = new List<byte>();
 
-            if (Target == DeleteTarget.ByAid)
+            if (Target == DeleteTarget.ByAid || Target == DeleteTarget.WithRelated)
             {
                 // For AID deletion, encode as:
-                // 4F <len> <AID1> [4F <len> <AID2>] ... [<token_len> <token>]
+                // 4F <total_len> <AID1><AID2>... [<token_len> <token>]
+                // Based on the trace: 4F09A000000308000010000
                 
+                // Calculate total length of all AIDs
+                var totalAidLength = Aids.Sum(aid => aid.Length);
+                
+                data.Add(0x4F); // AID tag
+                data.Add((byte)totalAidLength);
+                
+                // Add all AIDs concatenated
                 foreach (var aid in Aids)
                 {
-                    data.Add(0x4F); // AID tag
-                    data.Add((byte)aid.Length);
                     data.AddRange(aid);
                 }
             }
@@ -195,13 +326,13 @@ namespace Gp4Net.Domain.Commands
                 Ins,
                 (byte)Type,
                 (byte)Target,
-                (byte)data.Count // Lc
+                (byte)data.Count, // Lc
             };
 
             apdu.AddRange(data);
-            apdu.Add(0x00); // Le
+            // Note: DELETE command typically doesn't use Le byte
 
-            return apdu.ToArray();
+            return [.. apdu];
         }
     }
 
@@ -237,14 +368,19 @@ namespace Gp4Net.Domain.Commands
         /// <param name="data">The response data.</param>
         /// <param name="statusWord">The status word.</param>
         /// <param name="deletionReceipts">The deletion receipts.</param>
-        public DeleteResponse(byte[] data, ushort statusWord, IList<DeletionReceipt>? deletionReceipts = null)
+        public DeleteResponse(
+            byte[] data,
+            ushort statusWord,
+            IList<DeletionReceipt>? deletionReceipts = null
+        )
         {
             Data = data != null ? (byte[])data.Clone() : Array.Empty<byte>();
             StatusWord = statusWord;
             IsSuccessful = statusWord == 0x9000;
-            DeletionReceipts = deletionReceipts != null ? 
-                new List<DeletionReceipt>(deletionReceipts) : 
-                Array.Empty<DeletionReceipt>();
+            DeletionReceipts =
+                deletionReceipts != null
+                    ? new List<DeletionReceipt>(deletionReceipts)
+                    : Array.Empty<DeletionReceipt>();
         }
 
         /// <summary>
@@ -259,41 +395,63 @@ namespace Gp4Net.Domain.Commands
 
             if (response != null && response.Length > 0)
             {
-                // Parse deletion receipts if present
+                // According to GP spec Table 11-25, DELETE response has:
+                // - Length of delete confirmation (1-2 bytes): Mandatory
+                // - Delete confirmation (0-n bytes): Conditional
+                
                 var offset = 0;
-                while (offset < response.Length)
+                
+                // Read the length of delete confirmation
+                if (offset < response.Length)
                 {
-                    try
+                    var confirmationLength = response[offset];
+                    offset++;
+                    
+                    // Handle extended length encoding (81 80 - 81 FF)
+                    if (confirmationLength == 0x81 && offset < response.Length)
                     {
-                        // Simple parsing - in practice this would need more sophisticated TLV parsing
-                        if (offset + 2 < response.Length && response[offset] == 0x4F)
+                        confirmationLength = response[offset];
+                        offset++;
+                    }
+                    
+                    // Parse deletion confirmation if present
+                    if (confirmationLength > 0 && offset + confirmationLength <= response.Length)
+                    {
+                        // Parse the deletion confirmation data
+                        var confirmationEnd = offset + confirmationLength;
+                        while (offset < confirmationEnd)
                         {
-                            var aidLength = response[offset + 1];
-                            if (offset + 2 + aidLength <= response.Length)
+                            // Look for AID TLV (4F tag)
+                            if (offset + 2 < confirmationEnd && response[offset] == 0x4F)
                             {
-                                var aid = new byte[aidLength];
-                                Array.Copy(response, offset + 2, aid, 0, aidLength);
-                                deletionReceipts.Add(new DeletionReceipt(aid, true));
-                                offset += 2 + aidLength;
+                                var aidLength = response[offset + 1];
+                                if (offset + 2 + aidLength <= confirmationEnd)
+                                {
+                                    var aid = new byte[aidLength];
+                                    Array.Copy(response, offset + 2, aid, 0, aidLength);
+                                    deletionReceipts.Add(new DeletionReceipt(aid, true));
+                                    offset += 2 + aidLength;
+                                }
+                                else
+                                {
+                                    break;
+                                }
                             }
                             else
                             {
-                                break;
+                                // Skip unknown data
+                                offset++;
                             }
                         }
-                        else
-                        {
-                            break;
-                        }
-                    }
-                    catch
-                    {
-                        break;
                     }
                 }
             }
 
-            return new DeleteResponse(response ?? Array.Empty<byte>(), statusWord, deletionReceipts);
+            return new DeleteResponse(
+                response ?? Array.Empty<byte>(),
+                statusWord,
+                deletionReceipts
+            );
         }
 
         /// <summary>
@@ -310,7 +468,7 @@ namespace Gp4Net.Domain.Commands
                 0x6985 => "Conditions not satisfied (dependencies exist)",
                 0x6A88 => "Referenced data not found",
                 0x6F00 => "Generic failure during deletion",
-                _ => $"Unknown error: {StatusWord:X4}"
+                _ => $"Unknown error: {StatusWord:X4}",
             };
         }
     }

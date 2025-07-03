@@ -9,7 +9,8 @@ namespace Gp4Net.Tool.Infrastructure
     /// </summary>
     public sealed class TypeRegistrar : ITypeRegistrar
     {
-        private readonly IServiceCollection _builder;
+        private readonly IServiceCollection? _builder;
+        private readonly IServiceProvider? _provider;
 
         /// <summary>
         /// Initializes a new instance of the TypeRegistrar class.
@@ -20,28 +21,59 @@ namespace Gp4Net.Tool.Infrastructure
             _builder = builder;
         }
 
+        /// <summary>
+        /// Initializes a new instance of the TypeRegistrar class with a pre-built service provider.
+        /// </summary>
+        /// <param name="provider">The service provider.</param>
+        public TypeRegistrar(IServiceProvider provider)
+        {
+            _provider = provider;
+        }
+
         /// <inheritdoc />
         public ITypeResolver Build()
         {
-            return new TypeResolver(_builder.BuildServiceProvider());
+            if (_provider != null)
+            {
+                return new TypeResolver(_provider);
+            }
+
+            if (_builder != null)
+            {
+                return new TypeResolver(_builder.BuildServiceProvider());
+            }
+
+            throw new InvalidOperationException("No service collection or provider available");
         }
 
         /// <inheritdoc />
         public void Register(Type service, Type implementation)
         {
-            _builder.AddSingleton(service, implementation);
+            if (_builder == null)
+            {
+                throw new InvalidOperationException("Cannot register types with a pre-built service provider");
+            }
+            _ = _builder.AddSingleton(service, implementation);
         }
 
         /// <inheritdoc />
         public void RegisterInstance(Type service, object implementation)
         {
-            _builder.AddSingleton(service, implementation);
+            if (_builder == null)
+            {
+                throw new InvalidOperationException("Cannot register instances with a pre-built service provider");
+            }
+            _ = _builder.AddSingleton(service, implementation);
         }
 
         /// <inheritdoc />
         public void RegisterLazy(Type service, Func<object> factory)
         {
-            _builder.AddSingleton(service, _ => factory());
+            if (_builder == null)
+            {
+                throw new InvalidOperationException("Cannot register lazy factories with a pre-built service provider");
+            }
+            _ = _builder.AddSingleton(service, _ => factory());
         }
     }
 

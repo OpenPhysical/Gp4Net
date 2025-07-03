@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Commands
@@ -9,7 +10,7 @@ namespace Gp4Net.Domain.Commands
     /// Supports INSTALL [for load] and INSTALL [for install] operations.
     /// </summary>
     [PublicAPI]
-    public class InstallCommand
+    public class InstallCommand : IApduCommand
     {
         /// <summary>
         /// The command class byte.
@@ -30,21 +31,21 @@ namespace Gp4Net.Domain.Commands
             /// INSTALL [for load] - prepares card to receive a load file.
             /// </summary>
             ForLoad = 0x04,
-            
+
             /// <summary>
             /// INSTALL [for install] - instantiates an applet.
             /// </summary>
             ForInstall = 0x04,
-            
+
             /// <summary>
             /// INSTALL [for make selectable] - makes an applet selectable.
             /// </summary>
             ForMakeSelectable = 0x08,
-            
+
             /// <summary>
             /// INSTALL [for install and make selectable] - combines install and make selectable.
             /// </summary>
-            ForInstallAndMakeSelectable = 0x0C
+            ForInstallAndMakeSelectable = 0x0C,
         }
 
         /// <summary>
@@ -93,6 +94,137 @@ namespace Gp4Net.Domain.Commands
         public byte[]? InstallParameters { get; }
 
         /// <summary>
+        /// Gets the class byte.
+        /// </summary>
+        byte IApduCommand.Cla => Cla;
+
+        /// <summary>
+        /// Gets the instruction byte.
+        /// </summary>
+        byte IApduCommand.Ins => Ins;
+
+        /// <summary>
+        /// Gets the parameter 1 byte.
+        /// </summary>
+        public byte P1 => (byte)Type;
+
+        /// <summary>
+        /// Gets the parameter 2 byte.
+        /// </summary>
+        public byte P2 => 0x00;
+
+        /// <summary>
+        /// Gets the command data.
+        /// </summary>
+        public byte[]? Data => GetInstallData();
+
+        /// <summary>
+        /// Gets the expected response length.
+        /// </summary>
+        public int? ExpectedResponseLength => null;
+
+        /// <summary>
+        /// Gets whether this command uses extended length.
+        /// </summary>
+        public bool IsExtendedLength => false;
+
+        /// <summary>
+        /// Gets the install data for the IApduCommand interface.
+        /// </summary>
+        private byte[] GetInstallData()
+        {
+            var data = new List<byte>
+            {
+                // Add package AID
+                (byte)PackageAid.Length
+            };
+            data.AddRange(PackageAid);
+
+            // Add security domain AID (or zero length if null)
+            if (SecurityDomainAid != null)
+            {
+                data.Add((byte)SecurityDomainAid.Length);
+                data.AddRange(SecurityDomainAid);
+            }
+            else
+            {
+                data.Add(0x00);
+            }
+
+            // Add hash (or zero length if null)
+            if (Hash != null)
+            {
+                data.Add((byte)Hash.Length);
+                data.AddRange(Hash);
+            }
+            else
+            {
+                data.Add(0x00);
+            }
+
+            // Add install token (or zero length if null)
+            if (InstallToken != null)
+            {
+                data.Add((byte)InstallToken.Length);
+                data.AddRange(InstallToken);
+            }
+            else
+            {
+                data.Add(0x00);
+            }
+
+            // For install operations, add additional fields
+            if (Type == InstallType.ForInstall)
+            {
+                // Add module AID
+                if (ModuleAid != null)
+                {
+                    data.Add((byte)ModuleAid.Length);
+                    data.AddRange(ModuleAid);
+                }
+                else
+                {
+                    data.Add(0x00);
+                }
+
+                // Add applet AID
+                if (AppletAid != null)
+                {
+                    data.Add((byte)AppletAid.Length);
+                    data.AddRange(AppletAid);
+                }
+                else
+                {
+                    data.Add(0x00);
+                }
+
+                // Add privileges
+                if (Privileges != null)
+                {
+                    data.Add((byte)Privileges.Length);
+                    data.AddRange(Privileges);
+                }
+                else
+                {
+                    data.Add(0x00);
+                }
+
+                // Add install parameters
+                if (InstallParameters != null)
+                {
+                    data.Add((byte)InstallParameters.Length);
+                    data.AddRange(InstallParameters);
+                }
+                else
+                {
+                    data.Add(0x00);
+                }
+            }
+
+            return [.. data];
+        }
+
+        /// <summary>
         /// Initializes a new instance of the InstallCommand class for INSTALL [for load].
         /// </summary>
         /// <param name="packageAid">The package AID.</param>
@@ -103,12 +235,15 @@ namespace Gp4Net.Domain.Commands
             byte[] packageAid,
             byte[]? securityDomainAid = null,
             byte[]? hash = null,
-            byte[]? installToken = null)
+            byte[]? installToken = null
+        )
         {
-            if (packageAid == null)
-                throw new ArgumentNullException(nameof(packageAid));
+            ArgumentNullException.ThrowIfNull(packageAid);
+
             if (packageAid.Length == 0)
+            {
                 throw new ArgumentException("Package AID cannot be empty.", nameof(packageAid));
+            }
 
             Type = InstallType.ForLoad;
             PackageAid = (byte[])packageAid.Clone();
@@ -134,18 +269,30 @@ namespace Gp4Net.Domain.Commands
             byte[]? moduleAid = null,
             byte[]? privileges = null,
             byte[]? installParameters = null,
-            byte[]? installToken = null)
+            byte[]? installToken = null
+        )
         {
-            if (packageAid == null)
-                throw new ArgumentNullException(nameof(packageAid));
-            if (appletAid == null)
-                throw new ArgumentNullException(nameof(appletAid));
+            ArgumentNullException.ThrowIfNull(packageAid);
+
+            ArgumentNullException.ThrowIfNull(appletAid);
+
             if (packageAid.Length == 0)
+            {
                 throw new ArgumentException("Package AID cannot be empty.", nameof(packageAid));
+            }
+
             if (appletAid.Length == 0)
+            {
                 throw new ArgumentException("Applet AID cannot be empty.", nameof(appletAid));
+            }
+
             if (type == InstallType.ForLoad)
-                throw new ArgumentException("Use the other constructor for INSTALL [for load].", nameof(type));
+            {
+                throw new ArgumentException(
+                    "Use the other constructor for INSTALL [for load].",
+                    nameof(type)
+                );
+            }
 
             Type = type;
             PackageAid = (byte[])packageAid.Clone();
@@ -168,7 +315,8 @@ namespace Gp4Net.Domain.Commands
             byte[] packageAid,
             byte[]? securityDomainAid = null,
             byte[]? hash = null,
-            byte[]? installToken = null)
+            byte[]? installToken = null
+        )
         {
             return new InstallCommand(packageAid, securityDomainAid, hash, installToken);
         }
@@ -189,7 +337,8 @@ namespace Gp4Net.Domain.Commands
             byte[]? moduleAid = null,
             byte[]? privileges = null,
             byte[]? installParameters = null,
-            byte[]? installToken = null)
+            byte[]? installToken = null
+        )
         {
             return new InstallCommand(
                 InstallType.ForInstall,
@@ -198,7 +347,8 @@ namespace Gp4Net.Domain.Commands
                 moduleAid,
                 privileges ?? new byte[] { 0x00 }, // Default to no privileges
                 installParameters,
-                installToken);
+                installToken
+            );
         }
 
         /// <summary>
@@ -217,7 +367,8 @@ namespace Gp4Net.Domain.Commands
             byte[]? moduleAid = null,
             byte[]? privileges = null,
             byte[]? installParameters = null,
-            byte[]? installToken = null)
+            byte[]? installToken = null
+        )
         {
             return new InstallCommand(
                 InstallType.ForInstallAndMakeSelectable,
@@ -226,7 +377,8 @@ namespace Gp4Net.Domain.Commands
                 moduleAid,
                 privileges ?? new byte[] { 0x00 }, // Default to no privileges
                 installParameters,
-                installToken);
+                installToken
+            );
         }
 
         /// <summary>
@@ -353,13 +505,13 @@ namespace Gp4Net.Domain.Commands
                 Ins,
                 (byte)Type,
                 0x00, // P2
-                (byte)data.Count // Lc
+                (byte)data.Count, // Lc
             };
 
             apdu.AddRange(data);
             apdu.Add(0x00); // Le
 
-            return apdu.ToArray();
+            return [.. apdu];
         }
     }
 

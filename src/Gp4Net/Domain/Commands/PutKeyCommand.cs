@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Commands
@@ -9,7 +10,7 @@ namespace Gp4Net.Domain.Commands
     /// Represents the PUT KEY command for key establishment and replacement.
     /// </summary>
     [PublicAPI]
-    public class PutKeyCommand
+    public class PutKeyCommand : IApduCommand
     {
         /// <summary>
         /// The command class byte.
@@ -30,16 +31,16 @@ namespace Gp4Net.Domain.Commands
             /// Multiple keys.
             /// </summary>
             MultipleKeys = 0x00,
-            
+
             /// <summary>
             /// Single DES key.
             /// </summary>
             SingleDesKey = 0x01,
-            
+
             /// <summary>
             /// Single key (AES or RSA).
             /// </summary>
-            SingleKey = 0x81
+            SingleKey = 0x81,
         }
 
         /// <summary>
@@ -51,21 +52,21 @@ namespace Gp4Net.Domain.Commands
             /// No key encryption key (plain text).
             /// </summary>
             None = 0x00,
-            
+
             /// <summary>
             /// Key encrypted with KEK having key version number 1.
             /// </summary>
             KekVersion1 = 0x01,
-            
+
             /// <summary>
             /// Key encrypted with KEK having key version number 2.
             /// </summary>
             KekVersion2 = 0x02,
-            
+
             /// <summary>
             /// Key encrypted with current KEK.
             /// </summary>
-            CurrentKek = 0xFF
+            CurrentKek = 0xFF,
         }
 
         /// <summary>
@@ -84,6 +85,52 @@ namespace Gp4Net.Domain.Commands
         public IReadOnlyList<KeyDataBlock> KeyDataBlocks { get; }
 
         /// <summary>
+        /// Gets the class byte.
+        /// </summary>
+        byte IApduCommand.Cla => Cla;
+
+        /// <summary>
+        /// Gets the instruction byte.
+        /// </summary>
+        byte IApduCommand.Ins => Ins;
+
+        /// <summary>
+        /// Gets the parameter 1 byte.
+        /// </summary>
+        public byte P1 => (byte)UsageQualifier;
+
+        /// <summary>
+        /// Gets the parameter 2 byte.
+        /// </summary>
+        public byte P2 => (byte)KekIdentifier;
+
+        /// <summary>
+        /// Gets the command data.
+        /// </summary>
+        public byte[]? Data
+        {
+            get
+            {
+                var data = new List<byte>();
+                foreach (var block in KeyDataBlocks)
+                {
+                    data.AddRange(block.ToBytes());
+                }
+                return data.Count > 0 ? [.. data] : null;
+            }
+        }
+
+        /// <summary>
+        /// Gets the expected response length (null for PUT KEY as it's a case 3 command).
+        /// </summary>
+        public int? ExpectedResponseLength => null;
+
+        /// <summary>
+        /// Gets whether this command uses extended length.
+        /// </summary>
+        public bool IsExtendedLength => false;
+
+        /// <summary>
         /// Initializes a new instance of the PutKeyCommand class.
         /// </summary>
         /// <param name="usageQualifier">The key usage qualifier.</param>
@@ -92,10 +139,16 @@ namespace Gp4Net.Domain.Commands
         public PutKeyCommand(
             KeyUsageQualifier usageQualifier,
             KeyEncryptionKeyIdentifier kekIdentifier,
-            IList<KeyDataBlock> keyDataBlocks)
+            IList<KeyDataBlock> keyDataBlocks
+        )
         {
             if (keyDataBlocks == null || keyDataBlocks.Count == 0)
-                throw new ArgumentException("At least one key data block is required.", nameof(keyDataBlocks));
+            {
+                throw new ArgumentException(
+                    "At least one key data block is required.",
+                    nameof(keyDataBlocks)
+                );
+            }
 
             UsageQualifier = usageQualifier;
             KekIdentifier = kekIdentifier;
@@ -121,7 +174,7 @@ namespace Gp4Net.Domain.Commands
                 Ins,
                 (byte)UsageQualifier,
                 (byte)KekIdentifier,
-                (byte)dataLength
+                (byte)dataLength,
             };
 
             // Add key data blocks
@@ -130,7 +183,10 @@ namespace Gp4Net.Domain.Commands
                 apdu.AddRange(block.ToBytes());
             }
 
-            return apdu.ToArray();
+            // Note: PUT KEY is Case 3 APDU (no response data expected)
+            // Therefore, no LE byte should be added
+
+            return [.. apdu];
         }
     }
 
@@ -149,51 +205,51 @@ namespace Gp4Net.Domain.Commands
             /// DES key (single length).
             /// </summary>
             Des = 0x80,
-            
+
             /// <summary>
             /// 3DES key (double length).
             /// </summary>
             TripleDes2Key = 0x81,
-            
+
             /// <summary>
             /// 3DES key (triple length).
             /// </summary>
             TripleDes3Key = 0x82,
-            
+
             /// <summary>
             /// AES key (128 bits).
             /// </summary>
             Aes128 = 0x88,
-            
+
             /// <summary>
             /// AES key (192 bits).
             /// </summary>
             Aes192 = 0x89,
-            
+
             /// <summary>
             /// AES key (256 bits).
             /// </summary>
             Aes256 = 0x8A,
-            
+
             /// <summary>
             /// RSA public key.
             /// </summary>
             RsaPublic = 0xA0,
-            
+
             /// <summary>
             /// RSA private key.
             /// </summary>
             RsaPrivate = 0xA1,
-            
+
             /// <summary>
             /// ECC public key.
             /// </summary>
             EccPublic = 0xB0,
-            
+
             /// <summary>
             /// ECC private key.
             /// </summary>
-            EccPrivate = 0xB1
+            EccPrivate = 0xB1,
         }
 
         /// <summary>
@@ -224,10 +280,15 @@ namespace Gp4Net.Domain.Commands
         /// <param name="keyCheckValue">The key check value (optional, 3 bytes).</param>
         public KeyDataBlock(KeyType type, byte[] value, byte[]? keyCheckValue = null)
         {
-            if (value == null)
-                throw new ArgumentNullException(nameof(value));
+            ArgumentNullException.ThrowIfNull(value);
+
             if (keyCheckValue != null && keyCheckValue.Length != 3)
-                throw new ArgumentException("Key check value must be 3 bytes.", nameof(keyCheckValue));
+            {
+                throw new ArgumentException(
+                    "Key check value must be 3 bytes.",
+                    nameof(keyCheckValue)
+                );
+            }
 
             Type = type;
             Length = (byte)value.Length;
@@ -241,11 +302,7 @@ namespace Gp4Net.Domain.Commands
         /// <returns>The byte representation.</returns>
         public byte[] ToBytes()
         {
-            var result = new List<byte>
-            {
-                (byte)Type,
-                Length
-            };
+            var result = new List<byte> { (byte)Type, Length };
 
             result.AddRange(Value);
 
@@ -254,7 +311,7 @@ namespace Gp4Net.Domain.Commands
                 result.AddRange(KeyCheckValue);
             }
 
-            return result.ToArray();
+            return [.. result];
         }
 
         /// <summary>
@@ -266,7 +323,9 @@ namespace Gp4Net.Domain.Commands
         public static KeyDataBlock CreateDesKey(byte[] keyValue, byte[]? keyCheckValue = null)
         {
             if (keyValue?.Length != 8)
+            {
                 throw new ArgumentException("DES key must be 8 bytes.", nameof(keyValue));
+            }
 
             return new KeyDataBlock(KeyType.Des, keyValue, keyCheckValue);
         }
@@ -277,10 +336,18 @@ namespace Gp4Net.Domain.Commands
         /// <param name="keyValue">The 16-byte 3DES key value.</param>
         /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
         /// <returns>A new KeyDataBlock for 3DES (double length).</returns>
-        public static KeyDataBlock CreateTripleDes2Key(byte[] keyValue, byte[]? keyCheckValue = null)
+        public static KeyDataBlock CreateTripleDes2Key(
+            byte[] keyValue,
+            byte[]? keyCheckValue = null
+        )
         {
             if (keyValue?.Length != 16)
-                throw new ArgumentException("3DES double-length key must be 16 bytes.", nameof(keyValue));
+            {
+                throw new ArgumentException(
+                    "3DES double-length key must be 16 bytes.",
+                    nameof(keyValue)
+                );
+            }
 
             return new KeyDataBlock(KeyType.TripleDes2Key, keyValue, keyCheckValue);
         }
@@ -291,10 +358,18 @@ namespace Gp4Net.Domain.Commands
         /// <param name="keyValue">The 24-byte 3DES key value.</param>
         /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
         /// <returns>A new KeyDataBlock for 3DES (triple length).</returns>
-        public static KeyDataBlock CreateTripleDes3Key(byte[] keyValue, byte[]? keyCheckValue = null)
+        public static KeyDataBlock CreateTripleDes3Key(
+            byte[] keyValue,
+            byte[]? keyCheckValue = null
+        )
         {
             if (keyValue?.Length != 24)
-                throw new ArgumentException("3DES triple-length key must be 24 bytes.", nameof(keyValue));
+            {
+                throw new ArgumentException(
+                    "3DES triple-length key must be 24 bytes.",
+                    nameof(keyValue)
+                );
+            }
 
             return new KeyDataBlock(KeyType.TripleDes3Key, keyValue, keyCheckValue);
         }
@@ -308,7 +383,9 @@ namespace Gp4Net.Domain.Commands
         public static KeyDataBlock CreateAes128Key(byte[] keyValue, byte[]? keyCheckValue = null)
         {
             if (keyValue?.Length != 16)
+            {
                 throw new ArgumentException("AES-128 key must be 16 bytes.", nameof(keyValue));
+            }
 
             return new KeyDataBlock(KeyType.Aes128, keyValue, keyCheckValue);
         }
@@ -322,7 +399,9 @@ namespace Gp4Net.Domain.Commands
         public static KeyDataBlock CreateAes192Key(byte[] keyValue, byte[]? keyCheckValue = null)
         {
             if (keyValue?.Length != 24)
+            {
                 throw new ArgumentException("AES-192 key must be 24 bytes.", nameof(keyValue));
+            }
 
             return new KeyDataBlock(KeyType.Aes192, keyValue, keyCheckValue);
         }
@@ -336,7 +415,9 @@ namespace Gp4Net.Domain.Commands
         public static KeyDataBlock CreateAes256Key(byte[] keyValue, byte[]? keyCheckValue = null)
         {
             if (keyValue?.Length != 32)
+            {
                 throw new ArgumentException("AES-256 key must be 32 bytes.", nameof(keyValue));
+            }
 
             return new KeyDataBlock(KeyType.Aes256, keyValue, keyCheckValue);
         }
@@ -359,7 +440,9 @@ namespace Gp4Net.Domain.Commands
         /// <param name="keyCheckValues">The key check values.</param>
         public PutKeyResponse(IList<byte[]> keyCheckValues)
         {
-            KeyCheckValues = new List<byte[]>(keyCheckValues?.Select(kcv => (byte[])kcv.Clone()) ?? Array.Empty<byte[]>());
+            KeyCheckValues = new List<byte[]>(
+                keyCheckValues?.Select(kcv => (byte[])kcv.Clone()) ?? Array.Empty<byte[]>()
+            );
         }
 
         /// <summary>
@@ -369,11 +452,10 @@ namespace Gp4Net.Domain.Commands
         /// <returns>The parsed response.</returns>
         public static PutKeyResponse Parse(byte[] response)
         {
-            if (response == null)
-                throw new ArgumentNullException(nameof(response));
+            ArgumentNullException.ThrowIfNull(response);
 
             var keyCheckValues = new List<byte[]>();
-            
+
             // Each key check value is 3 bytes
             for (int i = 0; i + 2 < response.Length; i += 3)
             {

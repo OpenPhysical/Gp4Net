@@ -1,0 +1,30 @@
+#!/usr/bin/env gpshell
+# Check Config Module state on P71 card
+
+print Checking Config Module state on P71 card
+
+# Card connection and selection
+print Connecting to card...
+enable_trace
+mode_211
+establish_context
+card_connect
+select -AID A000000151000000
+
+# Send Identify Command to check Config Module state
+print Sending Identify Command...
+# Format: CLA=80, INS=CA, P1=00, P2=FE, Lc=02, Data=DF28
+send_apdu -sc 0 -APDU 80CA00FE02DF2800
+
+# The response should contain:
+# - Configuration ID at position 14, length 24
+# - Config Module State at position 120, length 2
+# State values: 00 = Deleted, 01/03 = Available
+
+card_disconnect
+release_context
+
+print
+print === Check Complete ===
+print Look for Config Module State in the response
+print State 00 = Deleted, 01/03 = Available

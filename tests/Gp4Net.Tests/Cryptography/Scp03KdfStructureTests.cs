@@ -7,6 +7,7 @@ using System;
 using System.Reflection;
 using Gp4Net.Constants;
 using Gp4Net.Cryptography;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Cryptography
 {
@@ -25,7 +26,8 @@ namespace Gp4Net.Tests.Cryptography
             // Use reflection to access the private DeriveScp03Key method for testing
             var method = typeof(KeyDerivation).GetMethod(
                 "DeriveScp03Key",
-                BindingFlags.NonPublic | BindingFlags.Static);
+                BindingFlags.NonPublic | BindingFlags.Static
+            );
 
             Assert.That(method, Is.Not.Null, "Could not find DeriveScp03Key method");
 
@@ -42,15 +44,33 @@ namespace Gp4Net.Tests.Cryptography
             var expectedLength = 11 + 1 + 1 + 1 + 2 + 16; // 32 bytes
 
             // Verify the constants
-            Assert.That(DerivationConstants.Scp03Label.Length, Is.EqualTo(11),
-                "SCP03 label should be 11 bytes");
-            Assert.That(DerivationConstants.Scp03Separator, Is.EqualTo(0x00),
-                "SCP03 separator should be 0x00");
+            Assert.That(
+                DerivationConstants.Scp03Label.Length,
+                Is.EqualTo(11),
+                "SCP03 label should be 11 bytes"
+            );
+            Assert.That(
+                DerivationConstants.Scp03Separator,
+                Is.EqualTo(0x00),
+                "SCP03 separator should be 0x00"
+            );
 
             // Test derivation constants
-            Assert.That(DerivationConstants.SEnc, Is.EqualTo(0x04), "S-ENC constant should be 0x04");
-            Assert.That(DerivationConstants.SMac, Is.EqualTo(0x06), "S-MAC constant should be 0x06");
-            Assert.That(DerivationConstants.SRMac, Is.EqualTo(0x07), "S-RMAC constant should be 0x07");
+            Assert.That(
+                DerivationConstants.SEnc,
+                Is.EqualTo(0x04),
+                "S-ENC constant should be 0x04"
+            );
+            Assert.That(
+                DerivationConstants.SMac,
+                Is.EqualTo(0x06),
+                "S-MAC constant should be 0x06"
+            );
+            Assert.That(
+                DerivationConstants.SRMac,
+                Is.EqualTo(0x07),
+                "S-RMAC constant should be 0x07"
+            );
         }
 
         [Test]
@@ -74,11 +94,7 @@ namespace Gp4Net.Tests.Cryptography
             var kdk = new byte[16];
             Array.Fill(kdk, (byte)0xFF);
 
-            var keySet = new Gp4Net.Domain.Keys.Scp03KeySet(
-                encKey: kdk,
-                macKey: kdk,
-                dekKey: kdk
-            );
+            var keySet = new Gp4Net.Domain.Keys.Scp03KeySet(encKey: kdk, macKey: kdk, dekKey: kdk);
 
             var hostChallenge = new byte[8];
             Array.Fill(hostChallenge, (byte)0xAA);
@@ -87,20 +103,29 @@ namespace Gp4Net.Tests.Cryptography
             Array.Fill(cardChallenge, (byte)0xBB);
 
             // Act
-            var sessionKeys = KeyDerivation.DeriveScp03SessionKeys(keySet, hostChallenge, cardChallenge, 128);
+            var sessionKeys = KeyDerivation.DeriveScp03SessionKeys(
+                keySet,
+                hostChallenge,
+                cardChallenge,
+                128
+            );
 
             // Assert - all three keys should be different due to different derivation constants
-            Assert.That(sessionKeys.SEnc, Is.Not.EqualTo(sessionKeys.SMac),
-                "S-ENC and S-MAC should be different");
-            Assert.That(sessionKeys.SMac, Is.Not.EqualTo(sessionKeys.SRMac),
-                "S-MAC and S-RMAC should be different");
-            Assert.That(sessionKeys.SEnc, Is.Not.EqualTo(sessionKeys.SRMac),
-                "S-ENC and S-RMAC should be different");
-
-            // Log for debugging
-            Console.WriteLine($"S-ENC:  {Convert.ToHexString(sessionKeys.SEnc)}");
-            Console.WriteLine($"S-MAC:  {Convert.ToHexString(sessionKeys.SMac)}");
-            Console.WriteLine($"S-RMAC: {Convert.ToHexString(sessionKeys.SRMac)}");
+            Assert.That(
+                sessionKeys.SEnc,
+                Is.Not.EqualTo(sessionKeys.SMac),
+                "S-ENC and S-MAC should be different"
+            );
+            Assert.That(
+                sessionKeys.SMac,
+                Is.Not.EqualTo(sessionKeys.SRMac),
+                "S-MAC and S-RMAC should be different"
+            );
+            Assert.That(
+                sessionKeys.SEnc,
+                Is.Not.EqualTo(sessionKeys.SRMac),
+                "S-ENC and S-RMAC should be different"
+            );
         }
 
         [Test]
@@ -117,16 +142,35 @@ namespace Gp4Net.Tests.Cryptography
             var cardChallenge = Convert.FromHexString("0807060504030201");
 
             // Act - derive keys twice
-            var sessionKeys1 = KeyDerivation.DeriveScp03SessionKeys(keySet, hostChallenge, cardChallenge, 128);
-            var sessionKeys2 = KeyDerivation.DeriveScp03SessionKeys(keySet, hostChallenge, cardChallenge, 128);
+            var sessionKeys1 = KeyDerivation.DeriveScp03SessionKeys(
+                keySet,
+                hostChallenge,
+                cardChallenge,
+                128
+            );
+            var sessionKeys2 = KeyDerivation.DeriveScp03SessionKeys(
+                keySet,
+                hostChallenge,
+                cardChallenge,
+                128
+            );
 
             // Assert - results should be identical
-            Assert.That(sessionKeys1.SEnc, Is.EqualTo(sessionKeys2.SEnc),
-                "S-ENC should be deterministic");
-            Assert.That(sessionKeys1.SMac, Is.EqualTo(sessionKeys2.SMac),
-                "S-MAC should be deterministic");
-            Assert.That(sessionKeys1.SRMac, Is.EqualTo(sessionKeys2.SRMac),
-                "S-RMAC should be deterministic");
+            Assert.That(
+                sessionKeys1.SEnc,
+                Is.EqualTo(sessionKeys2.SEnc),
+                "S-ENC should be deterministic"
+            );
+            Assert.That(
+                sessionKeys1.SMac,
+                Is.EqualTo(sessionKeys2.SMac),
+                "S-MAC should be deterministic"
+            );
+            Assert.That(
+                sessionKeys1.SRMac,
+                Is.EqualTo(sessionKeys2.SRMac),
+                "S-RMAC should be deterministic"
+            );
         }
     }
 }

@@ -27,7 +27,10 @@ namespace Gp4Net.Tool.Infrastructure
         /// <exception cref="InvalidOperationException">Thrown when no card service has been set.</exception>
         public static ICardService GetCardService()
         {
-            return _cardService ?? throw new InvalidOperationException("CardService has not been initialized. Call SetCardService first.");
+            return _cardService
+                ?? throw new InvalidOperationException(
+                    "CardService has not been initialized. Call SetCardService first."
+                );
         }
     }
 }

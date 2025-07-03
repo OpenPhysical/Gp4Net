@@ -1,4 +1,7 @@
 using System;
+using System.Linq;
+using Gp4Net.Core.Tlv;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Commands
@@ -7,17 +10,17 @@ namespace Gp4Net.Domain.Commands
     /// Represents the SELECT command for selecting applications or security domains.
     /// </summary>
     [PublicAPI]
-    public class SelectCommand
+    public class SelectCommand : BaseApduCommand
     {
         /// <summary>
         /// The command class byte.
         /// </summary>
-        public const byte Cla = 0x00;
+        public const byte ClassByte = 0x00;
 
         /// <summary>
         /// The command instruction byte.
         /// </summary>
-        public const byte Ins = 0xA4;
+        public const byte InstructionByte = 0xA4;
 
         /// <summary>
         /// Selection control values for P1.
@@ -27,7 +30,7 @@ namespace Gp4Net.Domain.Commands
             /// <summary>
             /// Select by name (AID).
             /// </summary>
-            SelectByName = 0x04
+            SelectByName = 0x04,
         }
 
         /// <summary>
@@ -39,21 +42,21 @@ namespace Gp4Net.Domain.Commands
             /// Return FCI template.
             /// </summary>
             ReturnFci = 0x00,
-            
+
             /// <summary>
             /// Return FCP template.
             /// </summary>
             ReturnFcp = 0x04,
-            
+
             /// <summary>
             /// Return FMD template.
             /// </summary>
             ReturnFmd = 0x08,
-            
+
             /// <summary>
             /// No response data.
             /// </summary>
-            NoResponseData = 0x0C
+            NoResponseData = 0x0C,
         }
 
         /// <summary>
@@ -74,15 +77,21 @@ namespace Gp4Net.Domain.Commands
         /// <summary>
         /// Initializes a new instance of the SelectCommand class.
         /// </summary>
-        /// <param name="aid">The application identifier to select (5-16 bytes).</param>
+        /// <param name="aid">The application identifier to select (0-16 bytes, empty for auto-detection).</param>
         /// <param name="control">The selection control method.</param>
         /// <param name="controlInfo">The file control information.</param>
-        public SelectCommand(byte[] aid, SelectionControl control = SelectionControl.SelectByName, FileControlInfo controlInfo = FileControlInfo.ReturnFci)
+        public SelectCommand(
+            byte[] aid,
+            SelectionControl control = SelectionControl.SelectByName,
+            FileControlInfo controlInfo = FileControlInfo.ReturnFci
+        )
         {
-            if (aid == null)
-                throw new ArgumentNullException(nameof(aid));
-            if (aid.Length < 5 || aid.Length > 16)
-                throw new ArgumentException("AID must be between 5 and 16 bytes.", nameof(aid));
+            ArgumentNullException.ThrowIfNull(aid);
+
+            if (aid.Length > 16)
+            {
+                throw new ArgumentException("AID must be 16 bytes or less.", nameof(aid));
+            }
 
             Aid = (byte[])aid.Clone();
             Control = control;
@@ -90,22 +99,49 @@ namespace Gp4Net.Domain.Commands
         }
 
         /// <summary>
+        /// Creates a SELECT command with empty AID for auto-detection.
+        /// </summary>
+        /// <param name="controlInfo">The file control information.</param>
+        /// <returns>A new SelectCommand instance with empty AID.</returns>
+        public static SelectCommand CreateEmptySelect(
+            FileControlInfo controlInfo = FileControlInfo.ReturnFci
+        )
+        {
+            return new SelectCommand(
+                Array.Empty<byte>(),
+                SelectionControl.SelectByName,
+                controlInfo
+            );
+        }
+
+        /// <inheritdoc />
+        public override byte Cla => ClassByte;
+
+        /// <inheritdoc />
+        public override byte Ins => InstructionByte;
+
+        /// <inheritdoc />
+        public override byte P1 => (byte)Control;
+
+        /// <inheritdoc />
+        public override byte P2 => (byte)ControlInfo;
+
+        /// <inheritdoc />
+        public override byte[]? Data => Aid;
+
+        /// <inheritdoc />
+        public override int? ExpectedResponseLength =>
+            ControlInfo == FileControlInfo.NoResponseData ? null : 256;
+
+        /// <summary>
         /// Converts this command to an APDU byte array.
+        /// This method is obsolete. Use IApduTransport.TransmitAsync instead.
         /// </summary>
         /// <returns>The APDU command bytes.</returns>
-        public byte[] ToApdu()
+        [Obsolete("Use IApduTransport.TransmitAsync instead of manual APDU building")]
+        public new byte[] ToApdu()
         {
-            var apdu = new byte[5 + Aid.Length];
-
-            apdu[0] = Cla;
-            apdu[1] = Ins;
-            apdu[2] = (byte)Control;
-            apdu[3] = (byte)ControlInfo;
-            apdu[4] = (byte)Aid.Length;
-
-            Array.Copy(Aid, 0, apdu, 5, Aid.Length);
-
-            return apdu;
+            return base.ToApdu();
         }
     }
 
@@ -181,17 +217,22 @@ namespace Gp4Net.Domain.Commands
             byte[]? issuerIdentificationNumber = null,
             byte[]? cardImageNumber = null,
             byte[]? cardData = null,
-            byte[]? discretionaryData = null)
+            byte[]? discretionaryData = null
+        )
         {
             ApplicationAid = applicationAid != null ? (byte[])applicationAid.Clone() : null;
             ApplicationLabel = applicationLabel;
             ApplicationPriorityIndicator = applicationPriorityIndicator;
             MaxCommandDataLength = maxCommandDataLength;
             MaxResponseDataLength = maxResponseDataLength;
-            IssuerIdentificationNumber = issuerIdentificationNumber != null ? (byte[])issuerIdentificationNumber.Clone() : null;
+            IssuerIdentificationNumber =
+                issuerIdentificationNumber != null
+                    ? (byte[])issuerIdentificationNumber.Clone()
+                    : null;
             CardImageNumber = cardImageNumber != null ? (byte[])cardImageNumber.Clone() : null;
             CardData = cardData != null ? (byte[])cardData.Clone() : null;
-            DiscretionaryData = discretionaryData != null ? (byte[])discretionaryData.Clone() : null;
+            DiscretionaryData =
+                discretionaryData != null ? (byte[])discretionaryData.Clone() : null;
         }
     }
 
@@ -229,12 +270,11 @@ namespace Gp4Net.Domain.Commands
         /// <returns>The parsed response.</returns>
         public static SelectResponse Parse(byte[] response)
         {
-            if (response == null)
-                throw new ArgumentNullException(nameof(response));
+            ArgumentNullException.ThrowIfNull(response);
 
-            // For now, return basic response without detailed FCI parsing
-            // Full TLV parsing would be more complex and requires additional TLV utilities
-            return new SelectResponse(response);
+            // Try to parse FCI data
+            var fci = ParseFciData(response);
+            return new SelectResponse(response, fci);
         }
 
         /// <summary>
@@ -244,8 +284,7 @@ namespace Gp4Net.Domain.Commands
         /// <returns>The parsed response with FCI details.</returns>
         public static SelectResponse ParseWithFci(byte[] response)
         {
-            if (response == null)
-                throw new ArgumentNullException(nameof(response));
+            ArgumentNullException.ThrowIfNull(response);
 
             var fci = ParseFciData(response);
             return new SelectResponse(response, fci);
@@ -253,56 +292,142 @@ namespace Gp4Net.Domain.Commands
 
         /// <summary>
         /// Parses FCI data from response.
-        /// This is a simplified parser that handles basic TLV structure.
         /// </summary>
         /// <param name="data">The FCI data.</param>
         /// <returns>The parsed FCI.</returns>
         private static FileControlInformation? ParseFciData(byte[] data)
         {
             if (data == null || data.Length == 0)
+            {
                 return null;
+            }
 
-            // This is a simplified FCI parser
-            // A full implementation would need complete TLV parsing
             try
             {
-                // Basic parsing for demonstration
-                // Real implementation would handle all TLV tags properly
-                
+                var tlvObjects = TlvParser.ParseAll(data);
+                var fciTemplate = tlvObjects.FirstOrDefault(t => t.TagNumber == 0x6F);
+
+                if (fciTemplate == null)
+                {
+                    return null;
+                }
+
                 byte[]? applicationAid = null;
                 string? applicationLabel = null;
-                
-                // Look for common tags (simplified approach)
-                for (int i = 0; i < data.Length - 1; i++)
+                byte? applicationPriorityIndicator = null;
+                ushort? maxCommandDataLength = null;
+                ushort? maxResponseDataLength = null;
+                byte[]? issuerIdentificationNumber = null;
+                byte[]? cardImageNumber = null;
+                byte[]? cardData = null;
+                byte[]? discretionaryData = null;
+
+                // Parse direct children of FCI template
+                var children = fciTemplate.ParseNestedTlv();
+                foreach (var tlv in children)
                 {
-                    byte tag = data[i];
-                    byte length = data[i + 1];
-                    
-                    if (i + 2 + length > data.Length)
-                        break;
-                    
-                    switch (tag)
+                    switch (tlv.TagNumber)
                     {
-                        case 0x4F: // Application AID
-                            applicationAid = new byte[length];
-                            Array.Copy(data, i + 2, applicationAid, 0, length);
+                        case 0x84: // DF Name (AID)
+                            applicationAid = tlv.Value;
                             break;
                         case 0x50: // Application Label
-                            applicationLabel = System.Text.Encoding.UTF8.GetString(data, i + 2, length);
+                            applicationLabel = System.Text.Encoding.UTF8.GetString(tlv.Value);
+                            break;
+                        case 0x87: // Application Priority Indicator
+                            if (tlv.Value.Length > 0)
+                            {
+                                applicationPriorityIndicator = tlv.Value[0];
+                            }
+
+                            break;
+                        case 0x9F38: // PDOL (Processing Options Data Object List)
+                            // Not currently used but could be parsed
+                            break;
+                        case 0xA5: // FCI Proprietary Template
+                            ParseProprietaryTemplate(
+                                tlv,
+                                ref maxCommandDataLength,
+                                ref maxResponseDataLength,
+                                ref issuerIdentificationNumber,
+                                ref cardImageNumber,
+                                ref cardData
+                            );
+                            break;
+                        case 0xBF0C: // FCI Issuer Discretionary Data
+                            discretionaryData = tlv.Value;
                             break;
                     }
-                    
-                    i += 1 + length;
                 }
-                
+
                 return new FileControlInformation(
                     applicationAid: applicationAid,
-                    applicationLabel: applicationLabel);
+                    applicationLabel: applicationLabel,
+                    applicationPriorityIndicator: applicationPriorityIndicator,
+                    maxCommandDataLength: maxCommandDataLength,
+                    maxResponseDataLength: maxResponseDataLength,
+                    issuerIdentificationNumber: issuerIdentificationNumber,
+                    cardImageNumber: cardImageNumber,
+                    cardData: cardData,
+                    discretionaryData: discretionaryData
+                );
             }
             catch
             {
                 // If parsing fails, return null
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Parses the proprietary template within FCI.
+        /// </summary>
+        private static void ParseProprietaryTemplate(
+            TlvObject proprietaryTemplate,
+            ref ushort? maxCommandDataLength,
+            ref ushort? maxResponseDataLength,
+            ref byte[]? issuerIdentificationNumber,
+            ref byte[]? cardImageNumber,
+            ref byte[]? cardData
+        )
+        {
+            var children = proprietaryTemplate.ParseNestedTlv();
+            foreach (var tlv in children)
+            {
+                switch (tlv.TagNumber)
+                {
+                    case 0x9F65: // Maximum length of data field in command message
+                        if (tlv.Value.Length == 1)
+                        {
+                            maxCommandDataLength = tlv.Value[0];
+                        }
+                        else if (tlv.Value.Length == 2)
+                        {
+                            maxCommandDataLength = (ushort)((tlv.Value[0] << 8) | tlv.Value[1]);
+                        }
+
+                        break;
+                    case 0x9F66: // Maximum length of data field in response message
+                        if (tlv.Value.Length == 1)
+                        {
+                            maxResponseDataLength = tlv.Value[0];
+                        }
+                        else if (tlv.Value.Length == 2)
+                        {
+                            maxResponseDataLength = (ushort)((tlv.Value[0] << 8) | tlv.Value[1]);
+                        }
+
+                        break;
+                    case 0x42: // Issuer Identification Number
+                        issuerIdentificationNumber = tlv.Value;
+                        break;
+                    case 0x45: // Card Image Number
+                        cardImageNumber = tlv.Value;
+                        break;
+                    case 0x66: // Card Data
+                        cardData = tlv.Value;
+                        break;
+                }
             }
         }
     }

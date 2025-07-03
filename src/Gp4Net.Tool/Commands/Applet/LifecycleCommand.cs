@@ -2,7 +2,6 @@ using System;
 using System.ComponentModel;
 using System.Threading.Tasks;
 using Gp4Net.Tool.Services;
-using Gp4Net.Utils;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -18,12 +17,19 @@ namespace Gp4Net.Tool.Commands.Applet
         /// <summary>
         /// Initializes a new instance of the LifecycleCommand class.
         /// </summary>
-        public LifecycleCommand(ICardService cardService, IGlobalPlatformService globalPlatformService)
-            : base(cardService, globalPlatformService)
-        {
-        }
+        public LifecycleCommand(
+            ICardService cardService,
+            IGlobalPlatformService globalPlatformService,
+            IKeysetResolver keysetResolver
+        )
+            : base(cardService, globalPlatformService, keysetResolver) { }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Executes the lifecycle command to change an application's lifecycle state.
+        /// </summary>
+        /// <param name="context">The command context.</param>
+        /// <param name="settings">The command settings.</param>
+        /// <returns>0 if successful, 1 if failed.</returns>
         protected override Task<int> ExecuteCommandAsync(CommandContext context, Settings settings)
         {
             if (!EnsureCardConnection(settings))
@@ -33,8 +39,8 @@ namespace Gp4Net.Tool.Commands.Applet
 
             try
             {
-                var aid = ConvertCompat.FromHexString(settings.Aid);
-                
+                var aid = Convert.FromHexString(settings.Aid);
+
                 AnsiConsole.MarkupLine($"[cyan]Setting lifecycle state for: {settings.Aid}[/]");
                 AnsiConsole.MarkupLine($"[cyan]New state: {settings.State}[/]");
 
@@ -45,7 +51,11 @@ namespace Gp4Net.Tool.Commands.Applet
 
                 if (!settings.Force)
                 {
-                    if (!AnsiConsole.Confirm($"Set lifecycle state of {settings.Aid} to {settings.State}?"))
+                    if (
+                        !AnsiConsole.Confirm(
+                            $"Set lifecycle state of {settings.Aid} to {settings.State}?"
+                        )
+                    )
                     {
                         AnsiConsole.MarkupLine("[yellow]Operation cancelled[/]");
                         return Task.FromResult(0);
@@ -103,7 +113,10 @@ namespace Gp4Net.Tool.Commands.Applet
             [Description("Force operation without confirmation")]
             public bool Force { get; set; }
 
-            /// <inheritdoc />
+            /// <summary>
+            /// Validates the command settings.
+            /// </summary>
+            /// <returns>Success if valid, or an error message if validation fails.</returns>
             public override ValidationResult Validate()
             {
                 if (string.IsNullOrWhiteSpace(Aid))
@@ -113,7 +126,7 @@ namespace Gp4Net.Tool.Commands.Applet
 
                 try
                 {
-                    ConvertCompat.FromHexString(Aid);
+                    _ = Convert.FromHexString(Aid);
                 }
                 catch
                 {

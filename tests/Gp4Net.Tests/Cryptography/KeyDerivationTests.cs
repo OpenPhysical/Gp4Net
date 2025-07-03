@@ -6,6 +6,7 @@
 using System;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Cryptography
 {
@@ -26,7 +27,12 @@ namespace Gp4Net.Tests.Cryptography
             var cardChallenge = Convert.FromHexString("0807060504030201");
 
             // Act
-            var sessionKeys = KeyDerivation.DeriveScp03SessionKeys(keySet, hostChallenge, cardChallenge, 128);
+            var sessionKeys = KeyDerivation.DeriveScp03SessionKeys(
+                keySet,
+                hostChallenge,
+                cardChallenge,
+                128
+            );
 
             // Assert
             Assert.That(sessionKeys, Is.Not.Null);
@@ -55,8 +61,18 @@ namespace Gp4Net.Tests.Cryptography
             var cardChallenge2 = Convert.FromHexString("1817161514131211");
 
             // Act
-            var sessionKeys1 = KeyDerivation.DeriveScp03SessionKeys(keySet, hostChallenge1, cardChallenge1, 128);
-            var sessionKeys2 = KeyDerivation.DeriveScp03SessionKeys(keySet, hostChallenge2, cardChallenge2, 128);
+            var sessionKeys1 = KeyDerivation.DeriveScp03SessionKeys(
+                keySet,
+                hostChallenge1,
+                cardChallenge1,
+                128
+            );
+            var sessionKeys2 = KeyDerivation.DeriveScp03SessionKeys(
+                keySet,
+                hostChallenge2,
+                cardChallenge2,
+                128
+            );
 
             // Assert
             Assert.That(sessionKeys1.SEnc, Is.Not.EqualTo(sessionKeys2.SEnc));
@@ -93,8 +109,15 @@ namespace Gp4Net.Tests.Cryptography
             var cardChallenge = Convert.FromHexString("0807060504030201");
 
             // Act & Assert
-            Assert.Throws<ArgumentException>(() =>
-                KeyDerivation.DeriveScp03SessionKeys(keySet, invalidHostChallenge, cardChallenge, 128));
+            _ = Assert.Throws<ArgumentException>(
+                () =>
+                    KeyDerivation.DeriveScp03SessionKeys(
+                        keySet,
+                        invalidHostChallenge,
+                        cardChallenge,
+                        128
+                    )
+            );
         }
     }
 }

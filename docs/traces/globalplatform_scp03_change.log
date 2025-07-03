@@ -1,0 +1,240 @@
+01/07 10:35:14 +OPGP_establish_context in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 56 : start
+01/07 10:35:14 +OPGP_release_context in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 108 : start
+01/07 10:35:14  -OPGP_release_context in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 132 : end status 0, error code(0x0): Success
+01/07 10:35:14 +DYN_LoadLibrary in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 60 : start
+01/07 10:35:14 DYN_LoadLibrary: Using library name "gppcscconnectionplugin" and version "".
+01/07 10:35:14  -DYN_LoadLibrary in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 107 : end status 0, error code(0x0): Success
+01/07 10:35:14 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:35:14  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:35:14 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:35:14  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:35:14 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:35:14  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:35:14 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:35:14  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:35:14 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:35:14  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:35:14 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:35:14  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:35:14 +OPGP_PL_establish_context in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 86 : start
+01/07 10:35:14  -OPGP_PL_establish_context in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 99 : end status 0, error code(0x0): Success
+01/07 10:35:14  -OPGP_establish_context in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 95 : end status 0, error code(0x0): Success
+01/07 10:35:14 +OPGP_list_readers in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 148 : start
+01/07 10:35:14 +OPGP_PL_list_readers in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 140 : start
+01/07 10:35:14  -OPGP_PL_list_readers in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 179 : end status 0, error code(0x0): Success
+01/07 10:35:14  -OPGP_list_readers in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 151 : end status 0, error code(0x0): Success
+01/07 10:35:14 +OPGP_card_connect in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 167 : start
+01/07 10:35:14 +OPGP_PL_card_connect in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 208 : start
+01/07 10:35:14  -OPGP_PL_card_connect in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 253 : end status 0, error code(0x0): Success
+01/07 10:35:14  -OPGP_card_connect in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 172 : end status 0, error code(0x0): Success
+01/07 10:35:14 +select_application in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/globalplatform.c at line 668 : start
+01/07 10:35:14 +OPGP_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 210 : start
+01/07 10:35:14 OPGP_send_APDU: Command --> 00A4040008A000000151000000
+01/07 10:35:14 +wrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1487 : start
+01/07 10:35:14  -wrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1717 : end status 0, error code(0x0): Success
+01/07 10:35:14 +OPGP_PL_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 309 : start
+01/07 10:35:14  -OPGP_PL_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 687 : end status 0, error code(0x80209000): 9000: Success. No error.
+01/07 10:35:14 OPGP_send_APDU: Response <-- 9000
+01/07 10:35:14 +GP211_check_R_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1955 : start
+01/07 10:35:14  -GP211_check_R_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 2005 : end status 0, error code(0x0): Success
+01/07 10:35:14  -unwrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1934 : end status 0, error code(0x0): Success
+01/07 10:35:14  -OPGP_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 276 : end status 0, error code(0x80209000): Success
+01/07 10:35:14  -select_application in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/globalplatform.c at line 699 : end status 0, error code(0x0): Success
+01/07 10:35:14 +mutual_authentication in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/globalplatform.c at line 4454 : start
+01/07 10:35:14 +get_random in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 2263 : start
+01/07 10:35:14  -get_random in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 2270 : end status 0, error code(0x0): Success
+01/07 10:35:14 mutual_authentication: Generated Host Challenge: D7EDC68D375D06AC
+01/07 10:35:14 +OPGP_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 210 : start
+01/07 10:35:14 OPGP_send_APDU: Command --> 8050010008D7EDC68D375D06AC00
+01/07 10:35:14 +wrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1487 : start
+01/07 10:35:14  -wrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1717 : end status 0, error code(0x0): Success
+01/07 10:35:14 +OPGP_PL_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 309 : start
+01/07 10:35:14  -OPGP_PL_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 687 : end status 0, error code(0x80209000): 9000: Success. No error.
+01/07 10:35:14 OPGP_send_APDU: Response <-- 000023455580832048390102000084657219BC6D656FA15D612FAB099000
+01/07 10:35:14 +GP211_check_R_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1955 : start
+01/07 10:35:14  -GP211_check_R_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 2005 : end status 0, error code(0x0): Success
+01/07 10:35:14  -unwrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1934 : end status 0, error code(0x0): Success
+01/07 10:35:14  -OPGP_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 276 : end status 0, error code(0x80209000): Success
+01/07 10:35:14 mutual_authentication: Secure Channel Protocol: 0x01
+01/07 10:35:14 mutual_authentication: Secure Channel Protocol Implementation: 0x05
+01/07 10:35:14 mutual_authentication: Key Diversification Data: 00002345558083204839
+01/07 10:35:14 mutual_authentication: Key Information Data: 0102
+01/07 10:35:14 mutual_authentication: Card Challenge: 000084657219BC6D
+01/07 10:35:14 mutual_authentication: Retrieved Card Cryptogram: 656FA15D612FAB09
+01/07 10:35:14 +create_session_key_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 764 : start
+01/07 10:35:14 +calculate_enc_ecb_two_key_triple_des in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 861 : start
+01/07 10:35:14  -calculate_enc_ecb_two_key_triple_des in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 903 : end status 0, error code(0x0): Success
+01/07 10:35:14  -create_session_key_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 777 : end status 0, error code(0x0): Success
+01/07 10:35:14 +create_session_key_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 764 : start
+01/07 10:35:14 +calculate_enc_ecb_two_key_triple_des in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 861 : start
+01/07 10:35:14  -calculate_enc_ecb_two_key_triple_des in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 903 : end status 0, error code(0x0): Success
+01/07 10:35:14  -create_session_key_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 777 : end status 0, error code(0x0): Success
+01/07 10:35:14 mutual_authentication: S-ENC Session Key: FE8568E7252DB180A7E72E14A5ACFB1F
+01/07 10:35:14 mutual_authentication: S-MAC Session Key: FE8568E7252DB180A7E72E14A5ACFB1F
+01/07 10:35:14 mutual_authentication: Data Encryption Key: 404142434445464748494A4B4C4D4E4F
+01/07 10:35:14 +calculate_card_cryptogram_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 556 : start
+01/07 10:35:14 +calculate_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 986 : start
+01/07 10:35:14  -calculate_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1023 : end status 0, error code(0x0): Success
+01/07 10:35:14  -calculate_card_cryptogram_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 566 : end status 0, error code(0x0): Success
+01/07 10:35:14 mutual_authentication: Card Cryptogram to compare: B1ECFF6286414308
+01/07 10:35:14  -mutual_authentication in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/globalplatform.c at line 4855 : end status 1, error code(0x80302000): The verification of the card cryptogram failed.
+01/07 10:35:45 +OPGP_establish_context in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 56 : start
+01/07 10:35:45 +OPGP_release_context in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 108 : start
+01/07 10:35:45  -OPGP_release_context in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 132 : end status 0, error code(0x0): Success
+01/07 10:35:45 +DYN_LoadLibrary in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 60 : start
+01/07 10:35:45 DYN_LoadLibrary: Using library name "gppcscconnectionplugin" and version "".
+01/07 10:35:45  -DYN_LoadLibrary in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 107 : end status 0, error code(0x0): Success
+01/07 10:35:45 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:35:45  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:35:45 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:35:45  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:35:45 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:35:45  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:35:45 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:35:45  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:35:45 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:35:45  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:35:45 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:35:45  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:35:45 +OPGP_PL_establish_context in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 86 : start
+01/07 10:35:45  -OPGP_PL_establish_context in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 99 : end status 0, error code(0x0): Success
+01/07 10:35:45  -OPGP_establish_context in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 95 : end status 0, error code(0x0): Success
+01/07 10:35:45 +OPGP_list_readers in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 148 : start
+01/07 10:35:45 +OPGP_PL_list_readers in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 140 : start
+01/07 10:35:45  -OPGP_PL_list_readers in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 179 : end status 0, error code(0x0): Success
+01/07 10:35:45  -OPGP_list_readers in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 151 : end status 0, error code(0x0): Success
+01/07 10:35:45 +OPGP_card_connect in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 167 : start
+01/07 10:35:45 +OPGP_PL_card_connect in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 208 : start
+01/07 10:35:45  -OPGP_PL_card_connect in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 253 : end status 0, error code(0x0): Success
+01/07 10:35:45  -OPGP_card_connect in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 172 : end status 0, error code(0x0): Success
+01/07 10:35:45 +select_application in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/globalplatform.c at line 668 : start
+01/07 10:35:45 +OPGP_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 210 : start
+01/07 10:35:45 OPGP_send_APDU: Command --> 00A4040008A000000151000000
+01/07 10:35:45 +wrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1487 : start
+01/07 10:35:45  -wrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1717 : end status 0, error code(0x0): Success
+01/07 10:35:45 +OPGP_PL_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 309 : start
+01/07 10:35:45  -OPGP_PL_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 687 : end status 0, error code(0x80209000): 9000: Success. No error.
+01/07 10:35:45 OPGP_send_APDU: Response <-- 9000
+01/07 10:35:45 +GP211_check_R_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1955 : start
+01/07 10:35:45  -GP211_check_R_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 2005 : end status 0, error code(0x0): Success
+01/07 10:35:45  -unwrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1934 : end status 0, error code(0x0): Success
+01/07 10:35:45  -OPGP_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 276 : end status 0, error code(0x80209000): Success
+01/07 10:35:45  -select_application in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/globalplatform.c at line 699 : end status 0, error code(0x0): Success
+01/07 10:35:45 +mutual_authentication in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/globalplatform.c at line 4454 : start
+01/07 10:35:45 +get_random in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 2263 : start
+01/07 10:35:45  -get_random in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 2270 : end status 0, error code(0x0): Success
+01/07 10:35:45 mutual_authentication: Generated Host Challenge: CFFF0C6B7E70825C
+01/07 10:35:45 +OPGP_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 210 : start
+01/07 10:35:45 OPGP_send_APDU: Command --> 8050010008CFFF0C6B7E70825C00
+01/07 10:35:45 +wrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1487 : start
+01/07 10:35:45  -wrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1717 : end status 0, error code(0x0): Success
+01/07 10:35:45 +OPGP_PL_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 309 : start
+01/07 10:35:45  -OPGP_PL_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 687 : end status 0, error code(0x80209000): 9000: Success. No error.
+01/07 10:35:45 OPGP_send_APDU: Response <-- 00002345558083204839010200008BA2FFCEA96CDD78E67D943B07449000
+01/07 10:35:45 +GP211_check_R_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1955 : start
+01/07 10:35:45  -GP211_check_R_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 2005 : end status 0, error code(0x0): Success
+01/07 10:35:45  -unwrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1934 : end status 0, error code(0x0): Success
+01/07 10:35:45  -OPGP_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 276 : end status 0, error code(0x80209000): Success
+01/07 10:35:45 mutual_authentication: Secure Channel Protocol: 0x01
+01/07 10:35:45 mutual_authentication: Secure Channel Protocol Implementation: 0x05
+01/07 10:35:45 mutual_authentication: Key Diversification Data: 00002345558083204839
+01/07 10:35:45 mutual_authentication: Key Information Data: 0102
+01/07 10:35:45 mutual_authentication: Card Challenge: 00008BA2FFCEA96C
+01/07 10:35:45 mutual_authentication: Retrieved Card Cryptogram: DD78E67D943B0744
+01/07 10:35:45 +create_session_key_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 764 : start
+01/07 10:35:45 +calculate_enc_ecb_two_key_triple_des in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 861 : start
+01/07 10:35:45  -calculate_enc_ecb_two_key_triple_des in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 903 : end status 0, error code(0x0): Success
+01/07 10:35:45  -create_session_key_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 777 : end status 0, error code(0x0): Success
+01/07 10:35:45 +create_session_key_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 764 : start
+01/07 10:35:45 +calculate_enc_ecb_two_key_triple_des in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 861 : start
+01/07 10:35:45  -calculate_enc_ecb_two_key_triple_des in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 903 : end status 0, error code(0x0): Success
+01/07 10:35:45  -create_session_key_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 777 : end status 0, error code(0x0): Success
+01/07 10:35:45 mutual_authentication: S-ENC Session Key: 6158E10833A60962C513E53BE419255C
+01/07 10:35:45 mutual_authentication: S-MAC Session Key: 6158E10833A60962C513E53BE419255C
+01/07 10:35:45 mutual_authentication: Data Encryption Key: 404142434445464748494A4B4C4D4E4F
+01/07 10:35:45 +calculate_card_cryptogram_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 556 : start
+01/07 10:35:45 +calculate_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 986 : start
+01/07 10:35:45  -calculate_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1023 : end status 0, error code(0x0): Success
+01/07 10:35:45  -calculate_card_cryptogram_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 566 : end status 0, error code(0x0): Success
+01/07 10:35:45 mutual_authentication: Card Cryptogram to compare: E186B14AEFCD1ACA
+01/07 10:35:45  -mutual_authentication in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/globalplatform.c at line 4855 : end status 1, error code(0x80302000): The verification of the card cryptogram failed.
+01/07 10:37:41 +OPGP_establish_context in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 56 : start
+01/07 10:37:41 +OPGP_release_context in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 108 : start
+01/07 10:37:41  -OPGP_release_context in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 132 : end status 0, error code(0x0): Success
+01/07 10:37:41 +DYN_LoadLibrary in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 60 : start
+01/07 10:37:41 DYN_LoadLibrary: Using library name "gppcscconnectionplugin" and version "".
+01/07 10:37:41  -DYN_LoadLibrary in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 107 : end status 0, error code(0x0): Success
+01/07 10:37:41 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:37:41  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:37:41 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:37:41  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:37:41 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:37:41  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:37:41 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:37:41  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:37:41 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:37:41  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:37:41 +DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 145 : start
+01/07 10:37:41  -DYN_GetAddress in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/dyn_unix.c at line 166 : end status 0, error code(0x0): Success
+01/07 10:37:41 +OPGP_PL_establish_context in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 86 : start
+01/07 10:37:41  -OPGP_PL_establish_context in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 99 : end status 0, error code(0x0): Success
+01/07 10:37:41  -OPGP_establish_context in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 95 : end status 0, error code(0x0): Success
+01/07 10:37:41 +OPGP_list_readers in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 148 : start
+01/07 10:37:41 +OPGP_PL_list_readers in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 140 : start
+01/07 10:37:41  -OPGP_PL_list_readers in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 179 : end status 0, error code(0x0): Success
+01/07 10:37:41  -OPGP_list_readers in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 151 : end status 0, error code(0x0): Success
+01/07 10:37:41 +OPGP_card_connect in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 167 : start
+01/07 10:37:41 +OPGP_PL_card_connect in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 208 : start
+01/07 10:37:41  -OPGP_PL_card_connect in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 253 : end status 0, error code(0x0): Success
+01/07 10:37:41  -OPGP_card_connect in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 172 : end status 0, error code(0x0): Success
+01/07 10:37:41 +select_application in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/globalplatform.c at line 668 : start
+01/07 10:37:41 +OPGP_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 210 : start
+01/07 10:37:41 OPGP_send_APDU: Command --> 00A4040008A000000151000000
+01/07 10:37:41 +wrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1487 : start
+01/07 10:37:41  -wrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1717 : end status 0, error code(0x0): Success
+01/07 10:37:41 +OPGP_PL_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 309 : start
+01/07 10:37:41  -OPGP_PL_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 687 : end status 0, error code(0x80209000): 9000: Success. No error.
+01/07 10:37:41 OPGP_send_APDU: Response <-- 9000
+01/07 10:37:41 +GP211_check_R_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1955 : start
+01/07 10:37:41  -GP211_check_R_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 2005 : end status 0, error code(0x0): Success
+01/07 10:37:41  -unwrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1934 : end status 0, error code(0x0): Success
+01/07 10:37:41  -OPGP_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 276 : end status 0, error code(0x80209000): Success
+01/07 10:37:41  -select_application in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/globalplatform.c at line 699 : end status 0, error code(0x0): Success
+01/07 10:37:41 +mutual_authentication in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/globalplatform.c at line 4454 : start
+01/07 10:37:41 +get_random in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 2263 : start
+01/07 10:37:41  -get_random in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 2270 : end status 0, error code(0x0): Success
+01/07 10:37:41 mutual_authentication: Generated Host Challenge: 70EC3DB0253C24D3
+01/07 10:37:41 +OPGP_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 210 : start
+01/07 10:37:41 OPGP_send_APDU: Command --> 805001000870EC3DB0253C24D300
+01/07 10:37:41 +wrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1487 : start
+01/07 10:37:41  -wrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1717 : end status 0, error code(0x0): Success
+01/07 10:37:41 +OPGP_PL_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 309 : start
+01/07 10:37:41  -OPGP_PL_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/gppcscconnectionplugin/src/gppcscconnectionplugin.c at line 687 : end status 0, error code(0x80209000): 9000: Success. No error.
+01/07 10:37:41 OPGP_send_APDU: Response <-- 00002345558083204839010200008BA2FFCEA96CB2D60296C51AC1D19000
+01/07 10:37:41 +GP211_check_R_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1955 : start
+01/07 10:37:41  -GP211_check_R_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 2005 : end status 0, error code(0x0): Success
+01/07 10:37:41  -unwrap_command in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1934 : end status 0, error code(0x0): Success
+01/07 10:37:41  -OPGP_send_APDU in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/connection.c at line 276 : end status 0, error code(0x80209000): Success
+01/07 10:37:41 mutual_authentication: Secure Channel Protocol: 0x01
+01/07 10:37:41 mutual_authentication: Secure Channel Protocol Implementation: 0x05
+01/07 10:37:41 mutual_authentication: Key Diversification Data: 00002345558083204839
+01/07 10:37:41 mutual_authentication: Key Information Data: 0102
+01/07 10:37:41 mutual_authentication: Card Challenge: 00008BA2FFCEA96C
+01/07 10:37:41 mutual_authentication: Retrieved Card Cryptogram: B2D60296C51AC1D1
+01/07 10:37:41 +create_session_key_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 764 : start
+01/07 10:37:41 +calculate_enc_ecb_two_key_triple_des in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 861 : start
+01/07 10:37:41  -calculate_enc_ecb_two_key_triple_des in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 903 : end status 0, error code(0x0): Success
+01/07 10:37:41  -create_session_key_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 777 : end status 0, error code(0x0): Success
+01/07 10:37:41 +create_session_key_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 764 : start
+01/07 10:37:41 +calculate_enc_ecb_two_key_triple_des in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 861 : start
+01/07 10:37:41  -calculate_enc_ecb_two_key_triple_des in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 903 : end status 0, error code(0x0): Success
+01/07 10:37:41  -create_session_key_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 777 : end status 0, error code(0x0): Success
+01/07 10:37:41 mutual_authentication: S-ENC Session Key: C908767A052701A8A5DE8A858AB1F4C8
+01/07 10:37:41 mutual_authentication: S-MAC Session Key: C908767A052701A8A5DE8A858AB1F4C8
+01/07 10:37:41 mutual_authentication: Data Encryption Key: 404142434445464748494A4B4C4D4E4F
+01/07 10:37:41 +calculate_card_cryptogram_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 556 : start
+01/07 10:37:41 +calculate_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 986 : start
+01/07 10:37:41  -calculate_MAC in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 1023 : end status 0, error code(0x0): Success
+01/07 10:37:41  -calculate_card_cryptogram_SCP01 in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/crypto.c at line 566 : end status 0, error code(0x0): Success
+01/07 10:37:41 mutual_authentication: Card Cryptogram to compare: 40246E005F924276
+01/07 10:37:41  -mutual_authentication in /tmp/globalplatform-20230327-12635-w2bez/globalplatform/src/globalplatform.c at line 4855 : end status 1, error code(0x80302000): The verification of the card cryptogram failed.

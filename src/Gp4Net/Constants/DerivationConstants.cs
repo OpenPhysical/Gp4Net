@@ -51,7 +51,20 @@ namespace Gp4Net.Constants
         /// <summary>
         /// Label for SCP03 key derivation.
         /// </summary>
-        public static readonly byte[] Scp03Label = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+        public static readonly byte[] Scp03Label = new byte[]
+        {
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+        };
 
         /// <summary>
         /// Separator for SCP03 key derivation.
