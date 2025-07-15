@@ -117,6 +117,36 @@ namespace Gp4Net.CardEmulator.Functional
         }
 
         /// <summary>
+        /// Creates a card with SCP02 protocol support.
+        /// </summary>
+        public static FunctionalVirtualCard Scp02Card()
+        {
+            var config = CardConfiguration.Generic() with
+            {
+                DefaultScpVersion = 0x02,
+                DefaultScpImplementation = 0x15
+            };
+            
+            var card = new FunctionalVirtualCard(config, new TestCryptographicService());
+            return card;
+        }
+
+        /// <summary>
+        /// Creates a card with SCP03 protocol support.
+        /// </summary>
+        public static FunctionalVirtualCard Scp03Card()
+        {
+            var config = CardConfiguration.Generic() with
+            {
+                DefaultScpVersion = 0x03,
+                DefaultScpImplementation = 0x70
+            };
+            
+            var card = new FunctionalVirtualCard(config, new TestCryptographicService());
+            return card;
+        }
+
+        /// <summary>
         /// Creates a card with custom ATR for testing.
         /// </summary>
         public static FunctionalVirtualCard WithCustomAtr(byte[] atr)

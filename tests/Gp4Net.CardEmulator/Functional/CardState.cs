@@ -74,14 +74,6 @@ namespace Gp4Net.CardEmulator.Functional
             CardChallenge = cardChallenge
         };
 
-        /// <summary>
-        /// Creates a new state with updated SCP configuration.
-        /// </summary>
-        public CardState WithScpConfiguration(byte version, byte implementation) => this with
-        {
-            ScpVersion = version,
-            ScpImplementation = implementation
-        };
 
         /// <summary>
         /// Creates a new state with updated current keys.

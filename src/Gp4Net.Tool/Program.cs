@@ -113,8 +113,6 @@ namespace Gp4Net.Tool
                                 .WithDescription("Test secure channel establishment");
                             _ = card.AddCommand<KeysChangeCommand>("change-keys")
                                 .WithDescription("Change cryptographic keys on the card (WARNING: This permanently modifies card keys)");
-                            _ = card.AddCommand<ConvertScpCommand>("convert-scp")
-                                .WithDescription("Convert card from SCP02 to SCP03");
                             _ = card.AddCommand<
                                 PipelineCommand<Commands.Card.GetIsdDataCommand.Settings>
                             >("get-data")

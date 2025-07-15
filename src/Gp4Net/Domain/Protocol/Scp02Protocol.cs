@@ -70,27 +70,25 @@ namespace Gp4Net.Domain.Protocol
         }
 
         /// <inheritdoc />
-        public SecureChannelContext ProcessInitializeUpdateResponse(
+        public Result<SecureChannelContext, SmartCardError> ProcessInitializeUpdateResponse(
             InitializeUpdateResponse response,
             byte[] hostChallenge
         )
         {
-            ArgumentNullException.ThrowIfNull(response);
+            if (response == null)
+            {
+                return SmartCardError.InvalidArgument("Response cannot be null");
+            }
 
             if (hostChallenge?.Length != 8)
             {
-                throw new ArgumentException(
-                    "Host challenge must be 8 bytes.",
-                    nameof(hostChallenge)
-                );
+                return SmartCardError.InvalidData("Host challenge must be 8 bytes");
             }
 
             // Verify the response is for SCP02
             if ((response.ScpId & ProtocolIdentifiers.ProtocolMask) != ProtocolIdentifiers.Scp02)
             {
-                throw new InvalidOperationException(
-                    $"Expected SCP02 but received SCP{response.ScpId:X2}"
-                );
+                return SmartCardError.InvalidResponse($"Expected SCP02 but received SCP{response.ScpId:X2}");
             }
 
             _logger.LogDebug(
@@ -101,9 +99,7 @@ namespace Gp4Net.Domain.Protocol
             // For SCP02, we need the sequence counter from the response
             if (response.SequenceCounter == null)
             {
-                throw new InvalidOperationException(
-                    "SCP02 requires sequence counter in INITIALIZE UPDATE response"
-                );
+                return SmartCardError.InvalidResponse("SCP02 requires sequence counter in INITIALIZE UPDATE response");
             }
 
             // Create key derivation context
@@ -121,18 +117,20 @@ namespace Gp4Net.Domain.Protocol
             // Verify card cryptogram
             if (!VerifyCardCryptogram(response, hostChallenge, sessionKeys))
             {
-                throw new InvalidOperationException("Card cryptogram verification failed.");
+                return SmartCardError.SecurityError("Card cryptogram verification failed");
             }
 
             _logger.LogDebug("Successfully processed SCP02 INITIALIZE UPDATE response");
 
-            return new SecureChannelContext(
+            var context = new SecureChannelContext(
                 hostChallenge,
                 response,
                 sessionKeys,
                 ProtocolVersion,
                 _keySet
             );
+
+            return Result<SecureChannelContext, SmartCardError>.Ok(context);
         }
 
         /// <inheritdoc />

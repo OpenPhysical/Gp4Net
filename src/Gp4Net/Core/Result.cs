@@ -4,6 +4,18 @@ using System.Threading.Tasks;
 namespace Gp4Net.Core
 {
     /// <summary>
+    /// Represents a unit value - the functional programming equivalent of void.
+    /// </summary>
+    public sealed record Unit
+    {
+        /// <summary>
+        /// The singleton instance of Unit.
+        /// </summary>
+        public static readonly Unit Value = new Unit();
+        
+        private Unit() { }
+    }
+    /// <summary>
     /// Represents the result of an operation that can either succeed with a value or fail with an error.
     /// This type enforces explicit error handling and eliminates null reference exceptions.
     /// </summary>
@@ -32,23 +44,27 @@ namespace Gp4Net.Core
         public bool IsFailure => this is Failure;
 
         /// <summary>
-        /// Gets the value if this is a success, otherwise throws an exception.
+        /// Attempts to get the value if this is a success.
+        /// Use Match() or TryGetValue() for safe access.
         /// </summary>
+        [Obsolete("Use Match() or TryGetValue() for safe access to values")]
         public TValue Value => this switch
         {
             Success s => s.SuccessValue,
-            Failure => throw new InvalidOperationException("Cannot access Value on a failed result"),
-            _ => throw new InvalidOperationException("Invalid result state")
+            Failure => default!,
+            _ => default!
         };
 
         /// <summary>
-        /// Gets the error if this is a failure, otherwise throws an exception.
+        /// Attempts to get the error if this is a failure.
+        /// Use Match() or TryGetError() for safe access.
         /// </summary>
+        [Obsolete("Use Match() or TryGetError() for safe access to errors")]
         public TError Error => this switch
         {
-            Success => throw new InvalidOperationException("Cannot access Error on a successful result"),
+            Success => default!,
             Failure f => f.FailureError,
-            _ => throw new InvalidOperationException("Invalid result state")
+            _ => default!
         };
 
         /// <summary>
@@ -63,9 +79,9 @@ namespace Gp4Net.Core
             Func<TError, TResult> failure) =>
             this switch
             {
-                Success s => success(s.Value),
-                Failure f => failure(f.Error),
-                _ => throw new InvalidOperationException("Invalid result state")
+                Success s => success(s.SuccessValue),
+                Failure f => failure(f.FailureError),
+                _ => default!
             };
 
         /// <summary>
@@ -76,9 +92,9 @@ namespace Gp4Net.Core
             Func<TError, Task<TResult>> failure) =>
             this switch
             {
-                Success s => success(s.Value),
-                Failure f => failure(f.Error),
-                _ => throw new InvalidOperationException("Invalid result state")
+                Success s => success(s.SuccessValue),
+                Failure f => failure(f.FailureError),
+                _ => Task.FromResult(default(TResult)!)
             };
 
         /// <summary>
@@ -88,9 +104,9 @@ namespace Gp4Net.Core
             Func<TValue, TNewValue> mapper) =>
             this switch
             {
-                Success s => Result<TNewValue, TError>.Ok(mapper(s.Value)),
-                Failure f => Result<TNewValue, TError>.Fail(f.Error),
-                _ => throw new InvalidOperationException("Invalid result state")
+                Success s => Result<TNewValue, TError>.Ok(mapper(s.SuccessValue)),
+                Failure f => Result<TNewValue, TError>.Fail(f.FailureError),
+                _ => Result<TNewValue, TError>.Fail(default(TError)!)
             };
 
         /// <summary>
@@ -100,9 +116,9 @@ namespace Gp4Net.Core
             Func<TError, TNewError> mapper) =>
             this switch
             {
-                Success s => Result<TValue, TNewError>.Ok(s.Value),
-                Failure f => Result<TValue, TNewError>.Fail(mapper(f.Error)),
-                _ => throw new InvalidOperationException("Invalid result state")
+                Success s => Result<TValue, TNewError>.Ok(s.SuccessValue),
+                Failure f => Result<TValue, TNewError>.Fail(mapper(f.FailureError)),
+                _ => Result<TValue, TNewError>.Fail(default(TNewError)!)
             };
 
         /// <summary>
@@ -112,9 +128,9 @@ namespace Gp4Net.Core
             Func<TValue, Result<TNewValue, TError>> binder) =>
             this switch
             {
-                Success s => binder(s.Value),
-                Failure f => Result<TNewValue, TError>.Fail(f.Error),
-                _ => throw new InvalidOperationException("Invalid result state")
+                Success s => binder(s.SuccessValue),
+                Failure f => Result<TNewValue, TError>.Fail(f.FailureError),
+                _ => Result<TNewValue, TError>.Fail(default(TError)!)
             };
 
         /// <summary>
@@ -124,9 +140,9 @@ namespace Gp4Net.Core
             Func<TValue, Task<Result<TNewValue, TError>>> binder) =>
             this switch
             {
-                Success s => binder(s.Value),
-                Failure f => Task.FromResult(Result<TNewValue, TError>.Fail(f.Error)),
-                _ => throw new InvalidOperationException("Invalid result state")
+                Success s => binder(s.SuccessValue),
+                Failure f => Task.FromResult(Result<TNewValue, TError>.Fail(f.FailureError)),
+                _ => Task.FromResult(Result<TNewValue, TError>.Fail(default(TError)!))
             };
 
         /// <summary>
@@ -135,9 +151,9 @@ namespace Gp4Net.Core
         public TValue GetOrDefault(TValue defaultValue) =>
             this switch
             {
-                Success s => s.Value,
+                Success s => s.SuccessValue,
                 Failure _ => defaultValue,
-                _ => throw new InvalidOperationException("Invalid result state")
+                _ => defaultValue
             };
 
         /// <summary>
@@ -146,9 +162,9 @@ namespace Gp4Net.Core
         public TValue GetOrElse(Func<TError, TValue> defaultProvider) =>
             this switch
             {
-                Success s => s.Value,
-                Failure f => defaultProvider(f.Error),
-                _ => throw new InvalidOperationException("Invalid result state")
+                Success s => s.SuccessValue,
+                Failure f => defaultProvider(f.FailureError),
+                _ => defaultProvider(default(TError)!)
             };
 
         /// <summary>
@@ -157,10 +173,48 @@ namespace Gp4Net.Core
         public TValue GetOrThrow(Func<TError, Exception> exceptionProvider) =>
             this switch
             {
-                Success s => s.Value,
-                Failure f => throw exceptionProvider(f.Error),
+                Success s => s.SuccessValue,
+                Failure f => throw exceptionProvider(f.FailureError),
                 _ => throw new InvalidOperationException("Invalid result state")
             };
+
+        /// <summary>
+        /// Safely tries to get the value if this is a success.
+        /// </summary>
+        public bool TryGetValue(out TValue value)
+        {
+            switch (this)
+            {
+                case Success s:
+                    value = s.SuccessValue;
+                    return true;
+                case Failure _:
+                    value = default!;
+                    return false;
+                default:
+                    value = default!;
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Safely tries to get the error if this is a failure.
+        /// </summary>
+        public bool TryGetError(out TError error)
+        {
+            switch (this)
+            {
+                case Success _:
+                    error = default!;
+                    return false;
+                case Failure f:
+                    error = f.FailureError;
+                    return true;
+                default:
+                    error = default!;
+                    return false;
+            }
+        }
 
         // Factory methods for easier creation
         public static Result<TValue, TError> Ok(TValue value) =>
@@ -190,6 +244,28 @@ namespace Gp4Net.Core
             value is not null
                 ? Result<T, string>.Ok(value)
                 : Result<T, string>.Fail(errorMessage);
+
+        /// <summary>
+        /// Converts an Option to a Result with a specified error for None.
+        /// </summary>
+        public static Result<T, TError> ToResult<T, TError>(this Option<T> option, TError error) =>
+            option switch
+            {
+                Option<T>.Some s => Result<T, TError>.Ok(s.SomeValue),
+                Option<T>.None => Result<T, TError>.Fail(error),
+                _ => Result<T, TError>.Fail(error)
+            };
+
+        /// <summary>
+        /// Converts an Option to a Result with a specified error function for None.
+        /// </summary>
+        public static Result<T, TError> ToResult<T, TError>(this Option<T> option, Func<TError> errorProvider) =>
+            option switch
+            {
+                Option<T>.Some s => Result<T, TError>.Ok(s.SomeValue),
+                Option<T>.None => Result<T, TError>.Fail(errorProvider()),
+                _ => Result<T, TError>.Fail(errorProvider())
+            };
 
         /// <summary>
         /// Tries to execute a function and returns a Result.
@@ -231,12 +307,12 @@ namespace Gp4Net.Core
             (result1, result2) switch
             {
                 (Result<T1, TError>.Success s1, Result<T2, TError>.Success s2) =>
-                    Result<(T1, T2), TError>.Ok((s1.Value, s2.Value)),
+                    Result<(T1, T2), TError>.Ok((s1.SuccessValue, s2.SuccessValue)),
                 (Result<T1, TError>.Failure f, _) =>
-                    Result<(T1, T2), TError>.Fail(f.Error),
+                    Result<(T1, T2), TError>.Fail(f.FailureError),
                 (_, Result<T2, TError>.Failure f) =>
-                    Result<(T1, T2), TError>.Fail(f.Error),
-                _ => throw new InvalidOperationException("Invalid result state")
+                    Result<(T1, T2), TError>.Fail(f.FailureError),
+                _ => Result<(T1, T2), TError>.Fail(default(TError)!)
             };
     }
 }

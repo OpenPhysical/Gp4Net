@@ -53,9 +53,9 @@ namespace Gp4Net.Pipeline
 
                 if (result.IsSuccess && _logger?.IsEnabled(LogLevel.Trace) == true)
                 {
-                    result.Match<Unit>(
-                        success => { _logger.LogTrace("Command succeeded with SW={SW:X4}", success.StatusWord); return Unit.Value; },
-                        failure => { _logger.LogTrace("Command failed: {Error}", failure.Message); return Unit.Value; });
+                    result.Match<Core.Unit>(
+                        success => { _logger.LogTrace("Command succeeded with SW={SW:X4}", success.StatusWord); return Core.Unit.Value; },
+                        failure => { _logger.LogTrace("Command failed: {Error}", failure.Message); return Core.Unit.Value; });
                 }
 
                 return result;

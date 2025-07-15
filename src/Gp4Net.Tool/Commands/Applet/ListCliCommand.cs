@@ -125,133 +125,25 @@ namespace Gp4Net.Tool.Commands.Applet
             string filter
         )
         {
-            return filter.ToLowerInvariant() switch
-            {
-                "isd" => applications.Where(a => a.Type == ApplicationType.IssuerSecurityDomain).ToList(),
-                "apps" or "applets" => applications.Where(a => a.Type == ApplicationType.Application).ToList(),
-                "packages" => applications.Where(a => a.Type == ApplicationType.LoadFile).ToList(),
-                "ssd" => applications.Where(a => a.Type == ApplicationType.SupplementarySecurityDomain).ToList(),
-                _ => applications,
-            };
+            return ApplicationDisplayService.FilterApplications(applications, filter);
         }
 
         private void DisplayTable(IReadOnlyList<ApplicationInfo> applications, bool extended)
         {
-            var table = new Table();
-
-            // Basic columns
-            _ = table.AddColumn("Type");
-            _ = table.AddColumn("AID");
-            _ = table.AddColumn("State");
-            _ = table.AddColumn("Privileges");
-
-            // Extended columns
-            if (extended)
-            {
-                _ = table.AddColumn("Version");
-                _ = table.AddColumn("Assoc. SD");
-            }
-
-            foreach (var app in applications)
-            {
-                var row = new List<string>
-                {
-                    GetTypeDisplay(app.Type),
-                    $"[cyan]{Convert.ToHexString(app.Aid)}[/]",
-                    GetStateDisplay(app.LifecycleState),
-                    GetPrivilegesDisplay(app.Privileges),
-                };
-
-                if (extended)
-                {
-                    row.Add(app.Version ?? "-");
-                    row.Add(
-                        app.AssociatedSecurityDomain != null
-                            ? Convert.ToHexString(app.AssociatedSecurityDomain)
-                            : "-"
-                    );
-                }
-
-                _ = table.AddRow(row.ToArray());
-            }
-
-            AnsiConsole.Write(table);
+            ApplicationDisplayService.DisplayApplicationTable(applications, extended);
         }
 
         private void DisplayJson(IReadOnlyList<ApplicationInfo> applications)
         {
-            var json = JsonSerializer.Serialize(
-                applications.Select(a => new
-                {
-                    type = a.Type.ToString(),
-                    aid = Convert.ToHexString(a.Aid),
-                    state = a.LifecycleState.ToString(),
-                    privileges = a.Privileges.Select(p => p.ToString()).ToArray(),
-                    version = a.Version,
-                    associatedSD = a.AssociatedSecurityDomain != null
-                        ? Convert.ToHexString(a.AssociatedSecurityDomain)
-                        : null,
-                }),
-                new JsonSerializerOptions { WriteIndented = true }
-            );
-
-            Console.WriteLine(json);
+            ApplicationDisplayService.DisplayApplicationsJson(applications);
         }
 
         private void DisplayCsv(IReadOnlyList<ApplicationInfo> applications)
         {
-            Console.WriteLine("Type,AID,State,Privileges,Version,AssociatedSD");
-
-            foreach (var app in applications)
-            {
-                Console.WriteLine(
-                    $"{app.Type},"
-                        + $"{Convert.ToHexString(app.Aid)},"
-                        + $"{app.LifecycleState},"
-                        + $"\"{string.Join(";", app.Privileges.Select(p => p.ToString()))}\","
-                        + $"{app.Version ?? ""},"
-                        + $"{(app.AssociatedSecurityDomain != null ? Convert.ToHexString(app.AssociatedSecurityDomain) : "")}"
-                );
-            }
+            ApplicationDisplayService.DisplayApplicationsCsv(applications);
         }
 
-        private string GetTypeDisplay(ApplicationType type)
-        {
-            return type switch
-            {
-                ApplicationType.IssuerSecurityDomain => "[red]ISD[/]",
-                ApplicationType.SupplementarySecurityDomain => "[yellow]SSD[/]",
-                ApplicationType.Application => "[green]App[/]",
-                ApplicationType.LoadFile => "[blue]Pkg[/]",
-                _ => type.ToString(),
-            };
-        }
-
-        private string GetStateDisplay(LifecycleState state)
-        {
-            return state switch
-            {
-                LifecycleState.Selectable => "[green]Selectable[/]",
-                LifecycleState.Personalized => "[blue]Personalized[/]",
-                LifecycleState.Locked => "[red]Locked[/]",
-                _ => state.ToString(),
-            };
-        }
-
-        private string GetPrivilegesDisplay(ImmutableList<Privilege> privileges)
-        {
-            if (privileges.Count == 0)
-            {
-                return "[dim]-[/]";
-            }
-
-            if (privileges.Count <= 3)
-            {
-                return string.Join(", ", privileges.Select(p => p.ToString()));
-            }
-
-            return $"{string.Join(", ", privileges.Take(2).Select(p => p.ToString()))}, [dim]+{privileges.Count - 2} more[/]";
-        }
+        // Display methods now delegate to ApplicationDisplayService
 
         /// <summary>
         /// Settings for the list command.

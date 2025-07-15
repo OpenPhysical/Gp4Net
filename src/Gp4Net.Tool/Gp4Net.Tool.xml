@@ -1,0 +1,3209 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Gp4Net.Tool</name>
+    </assembly>
+    <members>
+        <member name="T:Gp4Net.Tool.Commands.Applet.DeleteCommand">
+            <summary>
+            Command to delete applications or packages from a GlobalPlatform smart card using the functional pipeline pattern.
+            Supports deletion by AID, CAP file extraction, and interactive selection with comprehensive error handling.
+            
+            This command implements the GlobalPlatform DELETE instruction per Card Specification v2.3.1 with proper
+            cryptographic verification through secure channels. All operations follow the functional architecture
+            pattern using Result&lt;T,E&gt; monads for explicit error handling.
+            </summary>
+            <remarks>
+            <para><strong>Supported Operations:</strong></para>
+            <list type="bullet">
+            <item><description>Delete by specific AID with hex string input</description></item>
+            <item><description>Delete package AID extracted from CAP file</description></item>
+            <item><description>Interactive selection from applications on card</description></item>
+            <item><description>Dry-run mode for safe operation preview</description></item>
+            <item><description>Related object deletion (cascade delete for packages)</description></item>
+            </list>
+            
+            <para><strong>Security Requirements:</strong></para>
+            <list type="bullet">
+            <item><description>Requires established secure channel (SCP02/SCP03)</description></item>
+            <item><description>DELETE command uses authenticated encryption</description></item>
+            <item><description>Proper authentication with card management keys</description></item>
+            </list>
+            
+            <para><strong>Error Handling:</strong></para>
+            <para>All GlobalPlatform status words are mapped to human-readable error messages based on 
+            the official specification. Common errors include application not found (0x6A82), 
+            dependencies exist (0x6985), and security conditions not satisfied (0x6982).</para>
+            </remarks>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.DeleteCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings)">
+            <summary>
+            Executes the delete command to remove applications or packages from the GlobalPlatform smart card.
+            </summary>
+            <param name="context">The command execution context providing access to card services and configuration.</param>
+            <param name="settings">The command settings specifying what to delete and how to delete it.</param>
+            <returns>
+            A task representing the asynchronous operation. The result is:
+            <list type="bullet">
+            <item><description>0 if all deletions succeeded</description></item>
+            <item><description>1 if any deletion failed or validation error occurred</description></item>
+            </list>
+            </returns>
+            <remarks>
+            <para>This method implements the complete deletion workflow:</para>
+            <list type="number">
+            <item><description>Validates input parameters and determines target AIDs</description></item>
+            <item><description>Displays deletion plan with confirmation (unless forced)</description></item>
+            <item><description>Establishes card connection and secure channel</description></item>
+            <item><description>Executes DELETE commands with progress tracking</description></item>
+            <item><description>Provides detailed success/failure reporting</description></item>
+            </list>
+            
+            <para>In dry-run mode, the method stops after displaying the deletion plan without 
+            connecting to the card or executing any DELETE commands.</para>
+            
+            <para>All errors are logged and human-readable error messages are displayed to the user
+            based on GlobalPlatform specification status words.</para>
+            </remarks>
+            <exception cref="T:System.InvalidOperationException">Thrown when no deletion target is specified.</exception>
+            <exception cref="T:System.IO.FileNotFoundException">Thrown when a specified CAP file does not exist.</exception>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.DeleteCommand.DetermineAidsToDelete(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings)">
+            <summary>
+            Determines the list of AIDs to delete based on the command settings.
+            </summary>
+            <param name="context">The command execution context for card operations.</param>
+            <param name="settings">The command settings specifying the deletion source.</param>
+            <returns>
+            A task that returns a list of tuples containing:
+            <list type="bullet">
+            <item><description>Aid: The application identifier bytes</description></item>
+            <item><description>Description: Human-readable description for display</description></item>
+            <item><description>Source: The source of the AID (command line, CAP file, etc.)</description></item>
+            </list>
+            </returns>
+            <remarks>
+            <para>This method supports three modes of AID determination:</para>
+            <list type="bullet">
+            <item><description><strong>Direct AID:</strong> Uses the AID specified in settings.Aid</description></item>
+            <item><description><strong>CAP File:</strong> Extracts package AID from the specified CAP file</description></item>
+            <item><description><strong>Interactive:</strong> Prompts user to select from applications on card</description></item>
+            </list>
+            
+            <para>For CAP files, only the package AID is returned as deleting the package
+            will cascade to delete all related applets when deleteRelated is true.</para>
+            </remarks>
+            <exception cref="T:System.InvalidOperationException">Thrown when no deletion target is specified.</exception>
+            <exception cref="T:System.IO.FileNotFoundException">Thrown when a CAP file is specified but does not exist.</exception>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.DeleteCommand.GetHumanReadableError(Gp4Net.Core.SmartCardError)">
+            <summary>
+            Converts a SmartCardError to a human-readable error message based on GlobalPlatform specification status words.
+            </summary>
+            <param name="error">The smart card error containing the status word and message.</param>
+            <returns>
+            A descriptive error message suitable for display to users. If the status word is not recognized,
+            returns the original error message.
+            </returns>
+            <remarks>
+            <para>This method maps GlobalPlatform Card Specification v2.3.1 status words to user-friendly descriptions:</para>
+            <list type="table">
+            <listheader>
+            <term>Status Word</term>
+            <description>Meaning</description>
+            </listheader>
+            <item><term>0x6283</term><description>Application is locked (personalized state)</description></item>
+            <item><term>0x6581</term><description>Memory allocation problem</description></item>
+            <item><term>0x6982</term><description>Security status not satisfied</description></item>
+            <item><term>0x6985</term><description>Cannot delete - application has dependencies</description></item>
+            <item><term>0x6A80</term><description>Incorrect parameters in command data</description></item>
+            <item><term>0x6A82</term><description>Application or package not found</description></item>
+            <item><term>0x6A86</term><description>Incorrect P1/P2 parameters</description></item>
+            <item><term>0x6A88</term><description>Referenced data not found</description></item>
+            <item><term>0x6D00</term><description>Invalid instruction (DELETE not supported)</description></item>
+            <item><term>0x6E00</term><description>Invalid class</description></item>
+            <item><term>0x6F00</term><description>No precise diagnosis available</description></item>
+            </list>
+            </remarks>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings">
+            <summary>
+            Configuration settings for the DELETE command, supporting multiple deletion modes and security options.
+            Inherits card connection and authentication settings from CardCommandSettings.
+            </summary>
+            <remarks>
+            <para>The Settings class provides three mutually exclusive modes for specifying what to delete:</para>
+            <list type="bullet">
+            <item><description><strong>Direct AID Mode:</strong> Delete a specific application by providing its AID as a hex string</description></item>
+            <item><description><strong>CAP File Mode:</strong> Extract and delete the package AID from a CAP file</description></item>
+            <item><description><strong>Interactive Mode:</strong> Select applications to delete from a list retrieved from the card</description></item>
+            </list>
+            
+            <para><strong>Security Considerations:</strong></para>
+            <list type="bullet">
+            <item><description>All deletion operations require an established secure channel</description></item>
+            <item><description>Use Force mode carefully as it bypasses confirmation prompts</description></item>
+            <item><description>DryRun mode is recommended for testing deletion plans safely</description></item>
+            <item><description>DeleteRelated should be used with caution for package deletions</description></item>
+            </list>
+            
+            <para><strong>Best Practices:</strong></para>
+            <list type="bullet">
+            <item><description>Always use --dry-run first to preview deletion operations</description></item>
+            <item><description>Enable --debug for detailed operation logging</description></item>
+            <item><description>Use DeleteRelated=true for complete package removal</description></item>
+            <item><description>Verify card state after deletion operations</description></item>
+            </list>
+            </remarks>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings.Aid">
+            <summary>
+            Gets or sets the Application Identifier (AID) of the application to delete.
+            Must be provided as a hexadecimal string without spaces or separators.
+            </summary>
+            <value>
+            A hex string representing the AID (e.g., "A000000003000000"). 
+            Null if not specified (other deletion modes will be used).
+            </value>
+            <example>
+            <code>
+            // Delete specific application
+            settings.Aid = "A000000003000000";
+            
+            // Delete applet instance  
+            settings.Aid = "A000000003000001";
+            </code>
+            </example>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings.CapFile">
+            <summary>
+            Gets or sets the path to a CAP file from which to extract the package AID for deletion.
+            When specified, the command will parse the CAP file to determine the package AID and delete it.
+            </summary>
+            <value>
+            A file path to a valid CAP file. The file must exist and be a valid Java Card CAP archive.
+            Null if not specified (other deletion modes will be used).
+            </value>
+            <remarks>
+            <para>When using CAP file deletion:</para>
+            <list type="bullet">
+            <item><description>Only the package AID is extracted and deleted</description></item>
+            <item><description>Applets are deleted automatically if DeleteRelated is true</description></item>
+            <item><description>The CAP file is only read, not modified</description></item>
+            <item><description>File must be accessible and properly formatted</description></item>
+            </list>
+            </remarks>
+            <example>
+            <code>
+            // Delete package from CAP file
+            settings.CapFile = "/path/to/myapp.cap";
+            settings.DeleteRelated = true;  // Also delete related applets
+            </code>
+            </example>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings.Interactive">
+            <summary>
+            Gets or sets whether to use interactive mode.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings.DeleteRelated">
+            <summary>
+            Gets or sets whether to delete related objects when deleting a package.
+            When true, deleting a package will also delete all related applet instances.
+            </summary>
+            <value>
+            <c>true</c> to delete related objects (default); <c>false</c> to delete only the specific object.
+            </value>
+            <remarks>
+            <para>This setting corresponds to the P1 parameter of the GlobalPlatform DELETE command:</para>
+            <list type="bullet">
+            <item><description><c>true</c>: P1=0x00 (Delete object and related objects)</description></item>
+            <item><description><c>false</c>: P1=0x80 (Delete object only)</description></item>
+            </list>
+            
+            <para><strong>Warning:</strong> When deleting packages with DeleteRelated=false, 
+            related applets may become orphaned and unusable. This is typically not recommended
+            for package deletions unless you have specific requirements.</para>
+            </remarks>
+            <example>
+            <code>
+            // Complete package removal (recommended)
+            settings.DeleteRelated = true;   // Delete package and all applets
+            
+            // Package-only deletion (advanced use case)
+            settings.DeleteRelated = false;  // Leave applets orphaned
+            </code>
+            </example>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings.Force">
+            <summary>
+            Gets or sets whether to force deletion without confirmation.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings.DryRun">
+            <summary>
+            Gets or sets whether to perform a dry run.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings.NoCardInfo">
+            <summary>
+            Gets or sets whether to skip card info display.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings.Debug">
+            <summary>
+            Gets or sets debug mode.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.InstallCliCommand">
+            <summary>
+            CLI command to install a CAP file on the card.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.InstallCliCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Services.IKeysetResolver)">
+            <summary>
+            Initializes a new instance of the InstallCliCommand class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.InstallCliCommand.ExecuteCommandAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Applet.InstallCliCommand.Settings)">
+            <summary>
+            Executes the install command to load and install a CAP file on the card.
+            </summary>
+            <param name="context">The command context.</param>
+            <param name="settings">The command settings.</param>
+            <returns>0 if successful, 1 if failed.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.InstallCliCommand.Settings">
+            <summary>
+            Settings for the install command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.InstallCliCommand.Settings.CapFile">
+            <summary>
+            Gets or sets the CAP file path.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.InstallCliCommand.Settings.NoInstallApplets">
+            <summary>
+            Gets or sets a value indicating whether to install applets.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.InstallCliCommand.Settings.InstallApplets">
+            <summary>
+            Gets a value indicating whether to install applets.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.InstallCliCommand.Settings.NoMakeSelectable">
+            <summary>
+            Gets or sets a value indicating whether to make applets selectable.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.InstallCliCommand.Settings.MakeSelectable">
+            <summary>
+            Gets a value indicating whether to make applets selectable.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.InstallCliCommand.Settings.RequiresSecureChannel">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.InstallCliCommand.Settings.Validate">
+            <summary>
+            Validates the command settings.
+            </summary>
+            <returns>Success if valid, or an error message if validation fails.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.LifecycleCommand">
+            <summary>
+            Command to manage application lifecycle states.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.LifecycleCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Services.IKeysetResolver)">
+            <summary>
+            Initializes a new instance of the LifecycleCommand class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.LifecycleCommand.ExecuteCommandAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Applet.LifecycleCommand.Settings)">
+            <summary>
+            Executes the lifecycle command to change an application's lifecycle state.
+            </summary>
+            <param name="context">The command context.</param>
+            <param name="settings">The command settings.</param>
+            <returns>0 if successful, 1 if failed.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.LifecycleCommand.Settings">
+            <summary>
+            Settings for the lifecycle command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.LifecycleCommand.Settings.Aid">
+            <summary>
+            Gets or sets the AID of the application.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.LifecycleCommand.Settings.State">
+            <summary>
+            Gets or sets the new lifecycle state.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.LifecycleCommand.Settings.Force">
+            <summary>
+            Gets or sets a value indicating whether to force the operation without confirmation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.LifecycleCommand.Settings.Validate">
+            <summary>
+            Validates the command settings.
+            </summary>
+            <returns>Success if valid, or an error message if validation fails.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.ListCliCommand">
+            <summary>
+            Command to list applications on the card.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Services.IKeysetResolver)">
+            <summary>
+            Initializes a new instance of the ListCliCommand class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.ExecuteCommandAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings)">
+            <summary>
+            Executes the list command to enumerate applications on the card.
+            </summary>
+            <param name="context">The command context.</param>
+            <param name="settings">The command settings.</param>
+            <returns>0 if successful, 1 if failed.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings">
+            <summary>
+            Settings for the list command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.Filter">
+            <summary>
+            Gets or sets the filter type.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.Format">
+            <summary>
+            Gets or sets the output format.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.ShowExtended">
+            <summary>
+            Gets or sets whether to show extended information.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.NoSummary">
+            <summary>
+            Gets or sets whether to show summary.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.ShowSummary">
+            <summary>
+            Gets whether to show summary.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.UseSecureChannel">
+            <summary>
+            Gets or sets whether to use secure channel.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.RequiresSecureChannel">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.Validate">
+            <summary>
+            Validates the command settings.
+            </summary>
+            <returns>Success if valid, or an error message if validation fails.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.LoadCommand">
+            <summary>
+            Command to load a CAP file package onto the card without installing applets.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.LoadCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Services.IKeysetResolver)">
+            <summary>
+            Initializes a new instance of the LoadCommand class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.LoadCommand.ExecuteCommandAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Applet.LoadCommand.Settings)">
+            <summary>
+            Executes the load command to upload a CAP file package to the card.
+            </summary>
+            <param name="context">The command context.</param>
+            <param name="settings">The command settings.</param>
+            <returns>0 if successful, 1 if failed.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.LoadCommand.Settings">
+            <summary>
+            Settings for the load command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.LoadCommand.Settings.CapFile">
+            <summary>
+            Gets or sets the CAP file path.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.LoadCommand.Settings.PackageAid">
+            <summary>
+            Gets or sets the package AID override.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.LoadCommand.Settings.SecurityDomain">
+            <summary>
+            Gets or sets the security domain AID.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.LoadCommand.Settings.MaxBlockSize">
+            <summary>
+            Gets or sets the maximum block size.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.LoadCommand.Settings.ShowDetails">
+            <summary>
+            Gets or sets whether to show package details.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.LoadCommand.Settings.RequiresSecureChannel">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.LoadCommand.Settings.Validate">
+            <summary>
+            Validates the command settings.
+            </summary>
+            <returns>Success if valid, or an error message if validation fails.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.StatusCommand">
+            <summary>
+            Command to get the status of applets on the card.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.StatusCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Services.IKeysetResolver)">
+            <summary>
+            Initializes a new instance of the StatusCommand class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.StatusCommand.ExecuteCommandAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Applet.StatusCommand.Settings)">
+            <summary>
+            Executes the status command to display the status of applications on the card.
+            </summary>
+            <param name="context">The command context.</param>
+            <param name="settings">The command settings.</param>
+            <returns>0 if successful, 1 if failed.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.StatusCommand.Settings">
+            <summary>
+            Settings for the status command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.StatusCommand.Settings.Detailed">
+            <summary>
+            Gets or sets a value indicating whether to show detailed information.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.ValidateCommand">
+            <summary>
+            Command to validate a CAP file without installing it.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ValidateCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Services.PackageRegistry,Gp4Net.Tool.Services.IKeysetResolver)">
+            <summary>
+            Initializes a new instance of the ValidateCommand class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ValidateCommand.ExecuteCommandAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Applet.ValidateCommand.Settings)">
+            <summary>
+            Executes the validate command to check the integrity of a CAP file.
+            </summary>
+            <param name="context">The command context.</param>
+            <param name="settings">The command settings.</param>
+            <returns>0 if validation succeeds, 1 if failed.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.ValidateCommand.Settings">
+            <summary>
+            Settings for the validate command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.ValidateCommand.Settings.CapFile">
+            <summary>
+            Gets or sets the CAP file path.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.ValidateCommand.Settings.Detailed">
+            <summary>
+            Gets or sets a value indicating whether to show detailed information.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.ValidateCommand.Settings.EstimateMemory">
+            <summary>
+            Gets or sets a value indicating whether to estimate memory requirements.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ValidateCommand.Settings.Validate">
+            <summary>
+            Validates the command settings.
+            </summary>
+            <returns>Success if valid, or an error message if validation fails.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.BaseCommand`1">
+            <summary>
+            Base class for all GP4Net commands.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.BaseCommand`1.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Services.IKeysetResolver)">
+            <summary>
+            Initializes a new instance of the BaseCommand class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.BaseCommand`1.ExecuteAsync(Spectre.Console.Cli.CommandContext,`0)">
+            <summary>
+            Executes the command asynchronously with error handling and logging.
+            </summary>
+            <param name="context">The command context.</param>
+            <param name="settings">The command settings.</param>
+            <returns>0 if successful, 1 if failed.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.BaseCommand`1.ExecuteCommandAsync(Spectre.Console.Cli.CommandContext,`0)">
+            <summary>
+            Executes the specific command logic.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.BaseCommand`1.EnsureCardConnection(`0)">
+            <summary>
+            Ensures a card connection is established.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.BaseCommand`1.EnsureSecureChannel(`0)">
+            <summary>
+            Ensures a secure channel is established if required.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.BaseCommand`1.DisplayCardInfo">
+            <summary>
+            Displays card information.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.BaseCommandSettings">
+            <summary>
+            Base settings for all commands.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.Reader">
+            <summary>
+            Gets or sets the card reader.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.Verbose">
+            <summary>
+            Gets or sets a value indicating whether to use verbose output.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.NoCardInfo">
+            <summary>
+            Gets or sets a value indicating whether to suppress card info display.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.SecurityLevel">
+            <summary>
+            Gets or sets the security level for secure channel.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.Keyset">
+            <summary>
+            Gets or sets the keyset specification.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.KeysetParamArray">
+            <summary>
+            Gets or sets keyset parameters.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.KeysetParams">
+            <summary>
+            Gets the parsed keyset parameters.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.KeyEnc">
+            <summary>
+            Gets or sets the encryption key.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.KeyMac">
+            <summary>
+            Gets or sets the MAC key.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.KeyDek">
+            <summary>
+            Gets or sets the DEK key.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.KeyVersion">
+            <summary>
+            Gets or sets the key version.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.RequiresSecureChannel">
+            <summary>
+            Gets whether this command requires a secure channel.
+            Override in derived settings to change default behavior.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.ConnectCommand">
+            <summary>
+            Command to connect to a smart card.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ConnectCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.Card.ConnectCommand.Settings)">
+            <summary>
+            Executes the connect command to establish a connection to a smart card.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.ConnectCommand.Settings">
+            <summary>
+            Settings for the connect command.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.GetIsdDataCommand">
+            <summary>
+            Command to retrieve data from ISD using GET DATA operations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.GetIsdDataCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.Card.GetIsdDataCommand.Settings)">
+            <summary>
+            Executes the get-data command to retrieve data objects from the card.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.GetIsdDataCommand.Settings">
+            <summary>
+            Settings for the get-data command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Card.GetIsdDataCommand.Settings.DataObject">
+            <summary>
+            Gets or sets the data object to retrieve.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Card.GetIsdDataCommand.Settings.Format">
+            <summary>
+            Gets or sets the output format.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.GetIsdDataCommand.Settings.Validate">
+            <summary>
+            Validates the command settings.
+            </summary>
+            <returns>Success if valid, or an error message if validation fails.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.InfoCommand">
+            <summary>
+            Command to display detailed card information.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.Card.InfoCommand.Settings)">
+            <summary>
+            Executes the info command to display detailed card information.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.AddGetDataToTable(Gp4Net.Tool.Pipeline.ICommandContext,Spectre.Console.Table,System.String,System.UInt16)">
+            <summary>
+            Retrieves data using GET DATA command and adds it to the display table.
+            Provides special handling for different data object types.
+            </summary>
+            <param name="context">The command context for GP operations.</param>
+            <param name="table">The table to add the data to.</param>
+            <param name="name">The display name for this data.</param>
+            <param name="tag">The data object identifier tag.</param>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.InfoCommand.Settings">
+            <summary>
+            Settings for the info command.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.KeysChangeCommand">
+            <summary>
+            Command to change keys on a smart card.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.KeysChangeCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Services.IKeysetResolver)">
+            <summary>
+            Initializes a new instance of the KeysChangeCommand class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.KeysChangeCommand.ExecuteCommandAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Card.KeysChangeCommand.Settings)">
+            <summary>
+            Executes the keys change command to update the cryptographic keys on the card.
+            </summary>
+            <param name="context">The command context.</param>
+            <param name="settings">The command settings.</param>
+            <returns>0 if successful, 1 if failed.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.KeysChangeCommand.Settings">
+            <summary>
+            Settings for the keys change command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Card.KeysChangeCommand.Settings.NewKeyset">
+            <summary>
+            Gets or sets the new keyset specification.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Card.KeysChangeCommand.Settings.RequiresSecureChannel">
+            <summary>
+            This command requires a secure channel to authenticate with current keys.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.ListReadersCommand">
+            <summary>
+            Command to list available card readers.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ListReadersCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.Card.ListReadersCommand.Settings)">
+            <summary>
+            Executes the list readers command to enumerate available smart card readers.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.ListReadersCommand.Settings">
+            <summary>
+            Settings for the list readers command.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.PutIsdDataCommand">
+            <summary>
+            Command to write data to ISD using PUT DATA operations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.PutIsdDataCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.Card.PutIsdDataCommand.Settings)">
+            <summary>
+            Executes the put-data command to write data objects to the card.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.PutIsdDataCommand.Settings">
+            <summary>
+            Settings for the put-data command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Card.PutIsdDataCommand.Settings.KeyValuePairs">
+            <summary>
+            Gets or sets the key-value pairs to write.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Card.PutIsdDataCommand.Settings.ConfigFile">
+            <summary>
+            Gets or sets the configuration file path.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Card.PutIsdDataCommand.Settings.Interactive">
+            <summary>
+            Gets or sets whether to use interactive mode.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Card.PutIsdDataCommand.Settings.DryRun">
+            <summary>
+            Gets or sets whether to perform a dry run.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Card.PutIsdDataCommand.Settings.ContinueOnError">
+            <summary>
+            Gets or sets whether to continue on errors.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Card.PutIsdDataCommand.Settings.Force">
+            <summary>
+            Gets or sets whether to skip confirmation prompts.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.PutIsdDataCommand.Settings.Validate">
+            <summary>
+            Validates the command settings.
+            </summary>
+            <returns>Success if valid, or an error message if validation fails.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.TestSecureChannelCommand">
+            <summary>
+            Test command for establishing a secure channel with GP test keys.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.TestSecureChannelCommand.Settings">
+            <summary>
+            Command settings.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Card.TestSecureChannelCommand.Settings.UseScp03">
+            <summary>
+            Gets or sets whether to use SCP03.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.TestSecureChannelCommand.ExecuteAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Card.TestSecureChannelCommand.Settings)">
+            <summary>
+            Executes the test secure channel command to verify secure channel establishment.
+            </summary>
+            <param name="context">The command context.</param>
+            <param name="settings">The command settings.</param>
+            <returns>0 if successful, 1 if failed.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.ParseAsn1Command">
+            <summary>
+            CLI command to parse and display ASN.1 data in a human-readable format.
+            Helps with debugging and validation of ASN.1 structures.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.ParseTlvCommand">
+            <summary>
+            CLI command to parse and display TLV data in a human-readable format.
+            Helps with debugging and validation of GlobalPlatform TLV structures.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Packages.AnalyzeExpCommand">
+            <summary>
+            Command to analyze individual Oracle Java Card .exp files.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Packages.AnalyzeExpCommand.ExecuteAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Packages.AnalyzeExpCommand.Settings)">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Packages.AnalyzeExpCommand.Settings">
+            <summary>
+            Settings for the analyze-exp command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Packages.AnalyzeExpCommand.Settings.ExpFilePath">
+            <summary>
+            Gets or sets the .exp file path to analyze.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Packages.AnalyzeExpCommand.Settings.Detailed">
+            <summary>
+            Gets or sets a value indicating whether to show detailed analysis.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Packages.AnalyzeExpCommand.Settings.Verbose">
+            <summary>
+            Gets or sets a value indicating whether to show verbose output.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Packages.AnalyzeExpCommand.Settings.SdkVersion">
+            <summary>
+            Gets or sets the SDK version to use for the package.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Packages.AnalyzeExpCommand.Settings.DatabasePath">
+            <summary>
+            Gets or sets the database path to save discovered packages.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Packages.AnalyzeExpCommand.Settings.Validate">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Packages.ScanSdkCommand">
+            <summary>
+            Command to scan Oracle Java Card SDKs and extract package AID mappings.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Packages.ScanSdkCommand.ExecuteAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Packages.ScanSdkCommand.Settings)">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Packages.ScanSdkCommand.Settings">
+            <summary>
+            Settings for the scan-sdk command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Packages.ScanSdkCommand.Settings.SdkPath">
+            <summary>
+            Gets or sets the SDK path to scan.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Packages.ScanSdkCommand.Settings.OutputPath">
+            <summary>
+            Gets or sets the output file path for JSON mappings.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Packages.ScanSdkCommand.Settings.Verbose">
+            <summary>
+            Gets or sets a value indicating whether to show verbose output.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Packages.ScanSdkCommand.Settings.Validate">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Script.EvalCommand">
+            <summary>
+            Command to evaluate a Lua expression.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Script.EvalCommand.#ctor(Gp4Net.Tool.Scripting.ScriptManager)">
+            <summary>
+            Initializes a new instance of the EvalCommand class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Script.EvalCommand.ExecuteAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Script.EvalCommand.Settings)">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Script.EvalCommand.Settings">
+            <summary>
+            Settings for the eval command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Script.EvalCommand.Settings.Expression">
+            <summary>
+            Gets or sets the Lua expression to evaluate.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Script.EvalCommand.Settings.Verbose">
+            <summary>
+            Gets or sets whether to use verbose output.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Script.EvalCommand.Settings.Validate">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Script.ReplCommand">
+            <summary>
+            Command to start an interactive Lua REPL.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Script.ReplCommand.#ctor(Gp4Net.Tool.Scripting.ScriptManager)">
+            <summary>
+            Initializes a new instance of the ReplCommand class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Script.ReplCommand.ExecuteAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Script.ReplCommand.Settings)">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Script.ReplCommand.Settings">
+            <summary>
+            Settings for the REPL command.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Script.ScriptCommand">
+            <summary>
+            Command to execute a Lua script file.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Script.ScriptCommand.#ctor(Gp4Net.Tool.Scripting.ScriptManager)">
+            <summary>
+            Initializes a new instance of the ScriptCommand class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Script.ScriptCommand.ExecuteAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Script.ScriptCommand.Settings)">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Script.ScriptCommand.Settings">
+            <summary>
+            Settings for the script command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Script.ScriptCommand.Settings.ScriptFile">
+            <summary>
+            Gets or sets the script file to execute.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Script.ScriptCommand.Settings.Verbose">
+            <summary>
+            Gets or sets whether to use verbose output.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Script.ScriptCommand.Settings.Validate">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.StandardCommandSettings">
+            <summary>
+            Standard settings for commands that don't require card operations.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.StandardCommandSettings.Verbose">
+            <summary>
+            Gets or sets a value indicating whether to use verbose output.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.CardCommandSettings">
+            <summary>
+            Settings for commands that require card connection but not secure channel.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.CardCommandSettings.RequiresSecureChannel">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.SecureCommandSettings">
+            <summary>
+            Settings for commands that require both card connection and secure channel.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.SecureCommandSettings.RequiresSecureChannel">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.ConvertCommand">
+            <summary>
+            Command to convert trace files to structured JSON format with rich metadata.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.ConvertCommand.Settings">
+            <summary>
+            Settings for the convert command.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.TraceData">
+            <summary>
+            Main trace data structure for JSON output.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.TraceMetadata">
+            <summary>
+            Metadata about the trace file and card.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.SourceInfo">
+            <summary>
+            Information about the source trace file.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.CardInfo">
+            <summary>
+            Information about the card.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.CplcData">
+            <summary>
+            CPLC (Card Production Life Cycle) data.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.SessionMetadata">
+            <summary>
+            Session metadata for secure channel sessions.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.DerivationData">
+            <summary>
+            Key derivation data for secure channel.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.Operation">
+            <summary>
+            Operation within a trace.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.UsageExample">
+            <summary>
+            Usage example for trace replay.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.Exchange">
+            <summary>
+            Individual APDU exchange.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.ScpData">
+            <summary>
+            SCP-specific data extracted from exchanges.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.TraceConverter">
+            <summary>
+            Main trace converter class.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.ApduAnalyzer">
+            <summary>
+            Analyzes APDU commands to extract semantic information.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.OperationDetector">
+            <summary>
+            Detects and categorizes operations within traces.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.SessionAnalyzer">
+            <summary>
+            Analyzes traces to detect and characterize secure channel sessions.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.MetadataExtractor">
+            <summary>
+            Extracts metadata from parsed exchanges.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.UsageExampleGenerator">
+            <summary>
+            Generates usage examples for trace replay.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.SimpleTraceData">
+            <summary>
+            Simplified JSON trace format for virtual card testing.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.SimpleExchange">
+            <summary>
+            Simplified APDU exchange.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Trace.SimpleJsonConverter">
+            <summary>
+            Simplified trace converter that produces minimal JSON.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Infrastructure.ByteTypeConverter">
+            <summary>
+            Type converter for byte values that supports hex string input.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.ByteTypeConverter.CanConvertFrom(System.ComponentModel.ITypeDescriptorContext,System.Type)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.ByteTypeConverter.ConvertFrom(System.ComponentModel.ITypeDescriptorContext,System.Globalization.CultureInfo,System.Object)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.ByteTypeConverter.CanConvertTo(System.ComponentModel.ITypeDescriptorContext,System.Type)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.ByteTypeConverter.ConvertTo(System.ComponentModel.ITypeDescriptorContext,System.Globalization.CultureInfo,System.Object,System.Type)">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Infrastructure.CardServiceProvider">
+            <summary>
+            Static service provider for CardService access in TypeConverters.
+            This is a workaround for TypeConverters not supporting dependency injection.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.CardServiceProvider.SetCardService(Gp4Net.Tool.Services.ICardService)">
+            <summary>
+            Sets the card service instance.
+            </summary>
+            <param name="cardService">The card service instance.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.CardServiceProvider.GetCardService">
+            <summary>
+            Gets the current card service instance.
+            </summary>
+            <returns>The card service instance.</returns>
+            <exception cref="T:System.InvalidOperationException">Thrown when no card service has been set.</exception>
+        </member>
+        <member name="T:Gp4Net.Tool.Infrastructure.CliCommandAttribute">
+            <summary>
+            Attribute to mark CLI commands with metadata.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Infrastructure.CliCommandAttribute.Name">
+            <summary>
+            Gets the command name.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Infrastructure.CliCommandAttribute.Description">
+            <summary>
+            Gets the command description.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Infrastructure.CliCommandAttribute.Branch">
+            <summary>
+            Gets the parent branch name for nested commands.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Infrastructure.CliCommandAttribute.IsAlias">
+            <summary>
+            Gets whether this is an alias.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.CliCommandAttribute.#ctor(System.String,System.String,System.String,System.Boolean)">
+            <summary>
+            Initializes a new instance of the CliCommandAttribute class.
+            </summary>
+            <param name="name">The command name.</param>
+            <param name="description">The command description.</param>
+            <param name="branch">The parent branch name (e.g., "card", "applet", "script").</param>
+            <param name="isAlias">Whether this is an alias for another command.</param>
+        </member>
+        <member name="T:Gp4Net.Tool.Infrastructure.ICliCommand">
+            <summary>
+            Marker interface for CLI commands to enable Scrutor scanning.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Infrastructure.ICliCommand.Metadata">
+            <summary>
+            Gets the command metadata.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Infrastructure.CliCommandMetadata">
+            <summary>
+            Metadata for CLI commands.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.CliCommandMetadata.#ctor(System.String,System.String,System.String)">
+            <summary>
+            Metadata for CLI commands.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Infrastructure.CommandRegistrationExtensions">
+            <summary>
+            Extension methods for CLI command registration.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.CommandRegistrationExtensions.RegisterCliCommands(Spectre.Console.Cli.IConfigurator,Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            Automatically discovers and registers all CLI commands marked with CliCommandAttribute.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Infrastructure.HexStringTypeConverter">
+            <summary>
+            Type converter for hex string to byte array conversion.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.HexStringTypeConverter.CanConvertFrom(System.ComponentModel.ITypeDescriptorContext,System.Type)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.HexStringTypeConverter.ConvertFrom(System.ComponentModel.ITypeDescriptorContext,System.Globalization.CultureInfo,System.Object)">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Infrastructure.Reader">
+            <summary>
+            Represents a resolved smart card reader.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Infrastructure.Reader.Name">
+            <summary>
+            Gets the reader name.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Infrastructure.Reader.IsAutoDetected">
+            <summary>
+            Gets a value indicating whether this reader was auto-detected.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Infrastructure.Reader.IsPartialMatch">
+            <summary>
+            Gets a value indicating whether this reader was selected via partial match.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.Reader.#ctor(System.String,System.Boolean,System.Boolean)">
+            <summary>
+            Initializes a new instance of the Reader class.
+            </summary>
+            <param name="name">The reader name.</param>
+            <param name="isAutoDetected">Whether this reader was auto-detected.</param>
+            <param name="isPartialMatch">Whether this reader was selected via partial match.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.Reader.ToString">
+            <summary>
+            Returns the reader name.
+            </summary>
+            <returns>The reader name.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.Reader.op_Implicit(Gp4Net.Tool.Infrastructure.Reader)~System.String">
+            <summary>
+            Implicit conversion to string.
+            </summary>
+            <param name="reader">The reader.</param>
+        </member>
+        <member name="T:Gp4Net.Tool.Infrastructure.ReaderNameTypeConverter">
+            <summary>
+            Type converter for smart card reader names that supports:
+            - Partial name matching (case-insensitive)
+            - Auto-detection with user prompts
+            - Intelligent error handling
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.ReaderNameTypeConverter.CanConvertFrom(System.ComponentModel.ITypeDescriptorContext,System.Type)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.ReaderNameTypeConverter.ConvertFrom(System.ComponentModel.ITypeDescriptorContext,System.Globalization.CultureInfo,System.Object)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.ReaderNameTypeConverter.ResolveReader(System.String,Gp4Net.Tool.Services.ICardService)">
+            <summary>
+            Resolves a reader from the input string.
+            </summary>
+            <param name="input">The input reader specification.</param>
+            <param name="cardService">The card service for reader enumeration.</param>
+            <returns>The resolved reader.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.ReaderNameTypeConverter.HandleAutoDetection(System.Collections.Generic.IReadOnlyList{System.String})">
+            <summary>
+            Handles automatic reader detection.
+            </summary>
+            <param name="readers">List of available readers.</param>
+            <returns>The selected reader.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.ReaderNameTypeConverter.PromptUserToSelectReader(System.Collections.Generic.IReadOnlyList{System.String})">
+            <summary>
+            Prompts the user to select a reader from the available options.
+            </summary>
+            <param name="readers">List of available readers.</param>
+            <returns>The selected reader name.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.ReaderNameTypeConverter.GetCardServiceFromContext(System.ComponentModel.ITypeDescriptorContext)">
+            <summary>
+            Gets the card service from the conversion context.
+            </summary>
+            <param name="context">The type descriptor context.</param>
+            <returns>The card service if available.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Infrastructure.TypeRegistrar">
+            <summary>
+            Type registrar for integrating Microsoft.Extensions.DependencyInjection with Spectre.Console.Cli.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.TypeRegistrar.#ctor(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            Initializes a new instance of the TypeRegistrar class.
+            </summary>
+            <param name="builder">The service collection.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.TypeRegistrar.#ctor(System.IServiceProvider)">
+            <summary>
+            Initializes a new instance of the TypeRegistrar class with a pre-built service provider.
+            </summary>
+            <param name="provider">The service provider.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.TypeRegistrar.Build">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.TypeRegistrar.Register(System.Type,System.Type)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.TypeRegistrar.RegisterInstance(System.Type,System.Object)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.TypeRegistrar.RegisterLazy(System.Type,System.Func{System.Object})">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Infrastructure.TypeResolver">
+            <summary>
+            Type resolver for integrating Microsoft.Extensions.DependencyInjection with Spectre.Console.Cli.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.TypeResolver.#ctor(System.IServiceProvider)">
+            <summary>
+            Initializes a new instance of the TypeResolver class.
+            </summary>
+            <param name="provider">The service provider.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.TypeResolver.Resolve(System.Type)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.TypeResolver.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.CommandContext">
+            <summary>
+            Default implementation of ICommandContext.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.CommandContextExtensions">
+            <summary>
+            Extension methods for ICommandContext to provide fluent middleware pipeline capabilities.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.RequireCardConnection(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.BaseCommandSettings)">
+            <summary>
+            Ensures a card connection using settings from BaseCommandSettings.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.RequireSecureChannel(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.BaseCommandSettings)">
+            <summary>
+            Ensures a secure channel using settings from BaseCommandSettings.
+            Only establishes secure channel if required by the command settings.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.DisplayCardInfo(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.BaseCommandSettings)">
+            <summary>
+            Displays card information if not suppressed in settings.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.WithVerbose(Gp4Net.Tool.Pipeline.ICommandContext,System.Boolean)">
+            <summary>
+            Sets verbose mode on the display service.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ExecuteCardCommand(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.BaseCommandSettings,System.Func{Gp4Net.Tool.Pipeline.ICommandContext,System.Threading.Tasks.Task{System.Int32}})">
+            <summary>
+            Executes a command with common card operations setup.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ExecuteCardCommand(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.BaseCommandSettings,System.Func{Gp4Net.Tool.Pipeline.ICommandContext,System.Int32})">
+            <summary>
+            Executes a command with common card operations setup (synchronous version).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICommandContext},System.Func{Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Pipeline.ICommandContext})">
+            <summary>
+            Continues with a synchronous operation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICommandContext},System.Func{Gp4Net.Tool.Pipeline.ICommandContext,System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICommandContext}})">
+            <summary>
+            Continues with an asynchronous operation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICommandContext},System.Func{Gp4Net.Tool.Pipeline.ICommandContext,System.Threading.Tasks.Task{System.Int32}})">
+            <summary>
+            Continues with command execution.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICommandContext},System.Func{Gp4Net.Tool.Pipeline.ICommandContext,System.Int32})">
+            <summary>
+            Continues with synchronous command execution.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.CommandHandlerAttribute">
+            <summary>
+            Marks a class as a command handler for automatic registration.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.CommandHandlerAttribute.CommandName">
+            <summary>
+            Gets or sets the command name. If not specified, derives from the class name.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.CommandHandlerAttribute.Description">
+            <summary>
+            Gets or sets the command description.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.CommandRegistrationService">
+            <summary>
+            Service for automatically registering commands with the CommandHandler attribute.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CommandRegistrationService.RegisterCommandHandlers(Microsoft.Extensions.DependencyInjection.IServiceCollection,System.Reflection.Assembly)">
+            <summary>
+            Registers all commands marked with CommandHandler attribute from the specified assembly.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CommandRegistrationService.GetCommandHandlers(System.Reflection.Assembly)">
+            <summary>
+            Gets information about all command handlers in the assembly.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.CommandHandlerInfo">
+            <summary>
+            Information about a command handler.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.CommandHandlerInfo.CommandName">
+            <summary>
+            Gets or sets the command name.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.CommandHandlerInfo.Description">
+            <summary>
+            Gets or sets the command description.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.CommandHandlerInfo.CommandType">
+            <summary>
+            Gets or sets the command implementation type.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.CommandHandlerInfo.SettingsType">
+            <summary>
+            Gets or sets the settings type.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.CommandHandlerInfo.PipelineCommandType">
+            <summary>
+            Gets or sets the pipeline command adapter type.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.CommandTestExtensions">
+            <summary>
+            Extension methods for testing commands.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CommandTestExtensions.ExecuteWithMockContext``1(Gp4Net.Tool.Pipeline.IPipelineCommand{``0},``0,Gp4Net.Tool.Pipeline.MockCommandContext)">
+            <summary>
+            Executes a command with a mock context for testing.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CommandTestExtensions.CreateMockContext(System.Boolean,System.Boolean)">
+            <summary>
+            Creates a mock context with specific configuration.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.CommandTestResult">
+            <summary>
+            Result of a command test execution.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.CommandTestResult.ExitCode">
+            <summary>
+            Gets or sets the exit code returned by the command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.CommandTestResult.Context">
+            <summary>
+            Gets or sets the mock context used during execution.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.CommandTestResult.DisplayMessages">
+            <summary>
+            Gets or sets the display messages captured during execution.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.CommandTestResult.MethodCalls">
+            <summary>
+            Gets or sets the method calls made to the context during execution.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.CommandTestResult.Succeeded">
+            <summary>
+            Gets a value indicating whether the command succeeded.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.CommandTestResult.Failed">
+            <summary>
+            Gets a value indicating whether the command failed.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.DisplayService">
+            <summary>
+            Default implementation of IDisplayService using Spectre.Console.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.IPipelineCommand`1">
+            <summary>
+            Interface for commands using the new pipeline architecture.
+            </summary>
+            <typeparam name="TSettings">The settings type for the command.</typeparam>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.IPipelineCommand`1.ExecuteAsync(Gp4Net.Tool.Pipeline.ICommandContext,`0)">
+            <summary>
+            Executes the command with the provided context and settings.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.ICommandContext">
+            <summary>
+            Provides context and services for command execution.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.ICommandContext.Display">
+            <summary>
+            Gets the display service for console output.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.ICommandContext.CardService">
+            <summary>
+            Gets the card service for smart card operations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.ICommandContext.GetGlobalPlatformService">
+            <summary>
+            Gets the GlobalPlatform service for GP operations.
+            Creates the service on demand with proper pipeline context.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.ICommandContext.KeysetResolver">
+            <summary>
+            Gets the keyset resolver for key management.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.ICommandContext.RequireCardConnection(System.String)">
+            <summary>
+            Ensures a card connection is established with the specified reader.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.ICommandContext.RequireSecureChannel(System.Byte,System.String)">
+            <summary>
+            Ensures a secure channel is established with the specified security level.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.ICommandContext.ExecuteAsync(System.Func{Gp4Net.Tool.Pipeline.ICommandContext,System.Threading.Tasks.Task{System.Int32}})">
+            <summary>
+            Executes the command logic with the current context.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.ICommandContext.ExecuteAsync(System.Func{Gp4Net.Tool.Pipeline.ICommandContext,System.Int32})">
+            <summary>
+            Executes the command logic with the current context synchronously.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.IDisplayService">
+            <summary>
+            Service for displaying information to the user.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.IDisplayService.Success(System.String)">
+            <summary>
+            Displays a success message.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.IDisplayService.Error(System.String)">
+            <summary>
+            Displays an error message.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.IDisplayService.Warning(System.String)">
+            <summary>
+            Displays a warning message.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.IDisplayService.Info(System.String)">
+            <summary>
+            Displays an informational message.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.IDisplayService.Verbose(System.String)">
+            <summary>
+            Displays verbose information if verbose mode is enabled.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.IDisplayService.Exception(System.Exception)">
+            <summary>
+            Displays an exception with formatting.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.IDisplayService.CardInfo(System.Byte[])">
+            <summary>
+            Displays card information.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.IDisplayService.Markup(System.String)">
+            <summary>
+            Displays raw markup text.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.MockCommandContext">
+            <summary>
+            Mock implementation of ICommandContext for testing.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.MockCommandContext.MethodCalls">
+            <summary>
+            Gets the list of method calls made to this mock.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.MockCommandContext.ShouldConnectSucceed">
+            <summary>
+            Gets or sets whether card connection should succeed.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.MockCommandContext.ShouldSecureChannelSucceed">
+            <summary>
+            Gets or sets whether secure channel establishment should succeed.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.MockDisplayService">
+            <summary>
+            Mock implementation of IDisplayService for testing.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.MockCardService">
+            <summary>
+            Mock implementation of ICardService for testing.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.MockKeysetResolver">
+            <summary>
+            Mock implementation of IKeysetResolver for testing.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.MockKeySet">
+            <summary>
+            Mock implementation of IKeySet for testing.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.PipelineCommand`1">
+            <summary>
+            Adapter that bridges the new pipeline architecture with Spectre.Console.Cli.
+            </summary>
+            <typeparam name="TSettings">The settings type for the command.</typeparam>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.PipelineCommand`1.IsVerboseEnabled(`0)">
+            <summary>
+            Checks if verbose mode is enabled using reflection.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.VerboseLoggingHelper">
+            <summary>
+            Helper class to dynamically enable verbose console logging.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.VerboseLoggingHelper.EnableVerboseLogging(System.Boolean)">
+            <summary>
+            Enables or disables verbose console logging.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Program">
+            <summary>
+            Main program class for the GP4Net tool.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Program.Main(System.String[])">
+            <summary>
+            Main entry point for the application.
+            </summary>
+            <param name="args">Command line arguments.</param>
+            <returns>Exit code.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Program.ConfigureServices(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            Configures dependency injection services.
+            </summary>
+            <param name="services">The service collection.</param>
+        </member>
+        <member name="T:Gp4Net.Tool.Scripting.CryptoScriptModule">
+            <summary>
+            Provides cryptographic operations to Lua scripts.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.DesEcb(System.Byte[],System.Byte[])">
+            <summary>
+            DES ECB encryption.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.DesCbc(System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+            DES CBC encryption.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.Des3Ecb(System.Byte[],System.Byte[])">
+            <summary>
+            3DES ECB encryption.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.Des3Cbc(System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+            3DES CBC encryption.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.AesEcb(System.Byte[],System.Byte[])">
+            <summary>
+            AES ECB encryption.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.AesCbc(System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+            AES CBC encryption.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.CmacDes(System.Byte[],System.Byte[])">
+            <summary>
+            CMAC with DES.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.CmacAes(System.Byte[],System.Byte[])">
+            <summary>
+            CMAC with AES.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.Iso9797Mac(System.Byte[],System.Byte[])">
+            <summary>
+            ISO 9797-1 MAC Algorithm 3 (Retail MAC).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.Sha1(System.Byte[])">
+            <summary>
+            SHA-1 hash.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.Sha256(System.Byte[])">
+            <summary>
+            SHA-256 hash.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.Sha384(System.Byte[])">
+            <summary>
+            SHA-384 hash.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.Sha512(System.Byte[])">
+            <summary>
+            SHA-512 hash.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.RandomBytes(System.Int32)">
+            <summary>
+            Generate random bytes.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Scripting.GpScriptModule">
+            <summary>
+            Provides GlobalPlatform operations to Lua scripts.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Microsoft.Extensions.Logging.ILogger)">
+            <summary>
+            Initializes a new instance of the GpScriptModule class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.Connect(System.String)">
+            <summary>
+            Connects to a card reader.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.Disconnect(MoonSharp.Interpreter.Table)">
+            <summary>
+            Disconnects from the card.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.IsConnected(MoonSharp.Interpreter.Table)">
+            <summary>
+            Checks if connected to a card.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.EstablishSecureChannel(MoonSharp.Interpreter.Table,System.String,System.Byte)">
+            <summary>
+            Establishes a secure channel.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.CloseSecureChannel(MoonSharp.Interpreter.Table)">
+            <summary>
+            Closes the secure channel.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.Select(MoonSharp.Interpreter.Table,System.Byte[])">
+            <summary>
+            Selects an application.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.GetStatus(MoonSharp.Interpreter.Table,System.String)">
+            <summary>
+            Gets card status.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.GetCardInfo(MoonSharp.Interpreter.Table)">
+            <summary>
+            Gets card information.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.InstallCap(MoonSharp.Interpreter.Table,System.String,MoonSharp.Interpreter.Table)">
+            <summary>
+            Installs a CAP file.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.LoadCap(MoonSharp.Interpreter.Table,System.String,MoonSharp.Interpreter.Table)">
+            <summary>
+            Loads a CAP file (package only).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.InstallApplet(MoonSharp.Interpreter.Table,System.Byte[],System.Byte[],MoonSharp.Interpreter.Table)">
+            <summary>
+            Installs an applet from a loaded package.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.Delete(MoonSharp.Interpreter.Table,System.Byte[],MoonSharp.Interpreter.Table)">
+            <summary>
+            Deletes an application or package.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.SetLifecycleState(MoonSharp.Interpreter.Table,System.Byte[],System.String)">
+            <summary>
+            Sets the lifecycle state of an application.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.SendApdu(MoonSharp.Interpreter.Table,System.Byte[])">
+            <summary>
+            Sends a raw APDU command.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.Sleep(System.Int32)">
+            <summary>
+            Sleeps for specified milliseconds.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.ReadFile(System.String)">
+            <summary>
+            Reads a file.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.WriteFile(System.String,System.Byte[])">
+            <summary>
+            Writes a file.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.ListReaders">
+            <summary>
+            Lists available readers.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Scripting.GpShellScriptParser">
+            <summary>
+            Parser for GPShell script files.
+            Converts GPShell commands to Gp4Net Lua equivalents.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ParseFile(System.String)">
+            <summary>
+            Parses a GPShell script file and returns Lua script content.
+            </summary>
+            <param name="filePath">Path to the GPShell script file.</param>
+            <returns>Lua script content.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ParseLines(System.String[])">
+            <summary>
+            Parses GPShell script lines and returns Lua script content.
+            </summary>
+            <param name="lines">GPShell script lines.</param>
+            <returns>Lua script content.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ParseCommand(System.String)">
+            <summary>
+            Parses a single GPShell command and returns the Lua equivalent.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.SplitCommand(System.String)">
+            <summary>
+            Splits a command line into parts, respecting quotes.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ParseParameters(System.Collections.Generic.List{System.String})">
+            <summary>
+            Parses command parameters into a dictionary.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ConvertSelect(System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>
+            Converts a SELECT command.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ConvertOpenSecureChannel(System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>
+            Converts an OPEN_SC command.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ConvertSendApdu(System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>
+            Converts a SEND_APDU command.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ConvertPutKey(System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>
+            Converts a PUT_SC_KEY command.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.FormatParameters(System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>
+            Formats parameters for generic commands.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.EscapeString(System.String)">
+            <summary>
+            Escapes a string for Lua.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Scripting.IScriptManager">
+            <summary>
+            Interface for managing Lua script execution and module registration.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.IScriptManager.CreateScript">
+            <summary>
+            Creates a new Lua script with all modules loaded.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.IScriptManager.ExecuteScriptFileAsync(System.String)">
+            <summary>
+            Executes a script file.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.IScriptManager.ExecuteFunction(System.String,System.Collections.Generic.Dictionary{System.String,System.Object})">
+            <summary>
+            Executes a Lua function from a script.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.IScriptManager.ExecuteScriptFunction(System.String,System.String,System.String[],System.Collections.Generic.Dictionary{System.String,System.Object})">
+            <summary>
+            Executes a specific function in a script file with arguments.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.IScriptManager.ExecuteExpression(System.String)">
+            <summary>
+            Executes a Lua expression.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.IScriptManager.StartRepl">
+            <summary>
+            Creates a Lua REPL session.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Scripting.ScriptDirectoryResolver">
+            <summary>
+            Resolves script and configuration directories based on platform conventions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.ScriptDirectoryResolver.GetScriptSearchPaths">
+            <summary>
+            Gets the ordered list of directories to search for scripts.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.ScriptDirectoryResolver.GetConfigSearchPaths">
+            <summary>
+            Gets the ordered list of paths to search for configuration files.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.ScriptDirectoryResolver.FindScript(System.String)">
+            <summary>
+            Finds a script file in the search paths.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.ScriptDirectoryResolver.FindConfigFile">
+            <summary>
+            Finds the configuration file.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.ScriptDirectoryResolver.EnsureUserDirectories">
+            <summary>
+            Ensures the user directory structure exists.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Scripting.ScriptManager">
+            <summary>
+            Manages Lua script execution and module registration.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.ScriptManager.#ctor(Microsoft.Extensions.Logging.ILogger{Gp4Net.Tool.Scripting.ScriptManager},Gp4Net.Tool.Scripting.ScriptDirectoryResolver,Gp4Net.Tool.Services.ICardService,Gp4Net.Tool.Services.IDomainServiceFactory)">
+            <summary>
+            Initializes a new instance of the ScriptManager class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.ScriptManager.CreateScript">
+            <summary>
+            Creates a new Lua script with all modules loaded.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.ScriptManager.ExecuteScriptFileAsync(System.String)">
+            <summary>
+            Executes a script file.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.ScriptManager.ExecuteFunction(System.String,System.Collections.Generic.Dictionary{System.String,System.Object})">
+            <summary>
+            Executes a Lua function from a script.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.ScriptManager.ExecuteScriptFunction(System.String,System.String,System.String[],System.Collections.Generic.Dictionary{System.String,System.Object})">
+            <summary>
+            Executes a specific function in a script file with arguments.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.ScriptManager.ExecuteExpression(System.String)">
+            <summary>
+            Executes a Lua expression.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.ScriptManager.StartRepl">
+            <summary>
+            Creates a Lua REPL session.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Scripting.ScriptManager.CustomScriptLoader">
+            <summary>
+            Custom script loader that searches in our directories.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Scripting.UtilityScriptModule">
+            <summary>
+            Provides utility functions to Lua scripts.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.Hex(System.String)">
+            <summary>
+            Converts a hex string to bytes.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.Bytes(System.Object)">
+            <summary>
+            Creates a byte array from various inputs.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.Concat(System.Byte[][])">
+            <summary>
+            Concatenates byte arrays.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.Sub(System.Byte[],System.Int32,System.Int32)">
+            <summary>
+            Extracts a sub-array.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.Xor(System.Byte[],System.Byte[])">
+            <summary>
+            XORs two byte arrays.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.Pad80(System.Byte[],System.Int32)">
+            <summary>
+            Applies ISO 7816-4 padding (0x80 followed by zeros).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.HexString(System.Byte[])">
+            <summary>
+            Converts bytes to hex string.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.RandomBytes(System.Int32)">
+            <summary>
+            Generates random bytes.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.IntToBytes(System.Int32,System.Int32)">
+            <summary>
+            Converts integer to bytes (big-endian).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.BytesToInt(System.Byte[])">
+            <summary>
+            Converts bytes to integer (big-endian).
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.ApplicationDisplayService">
+            <summary>
+            Service for displaying application information consistently across commands.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ApplicationDisplayService.GetTypeDisplayName(Gp4Net.Domain.ApplicationType)">
+            <summary>
+            Gets the display name for an application type.
+            </summary>
+            <param name="type">The application type.</param>
+            <returns>The display name.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ApplicationDisplayService.GetTypeDisplay(Gp4Net.Domain.ApplicationType)">
+            <summary>
+            Gets the colored display string for an application type.
+            </summary>
+            <param name="type">The application type.</param>
+            <returns>The colored display string.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ApplicationDisplayService.GetTypeColor(Gp4Net.Domain.ApplicationType)">
+            <summary>
+            Gets the color for an application type.
+            </summary>
+            <param name="type">The application type.</param>
+            <returns>The color name.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ApplicationDisplayService.GetStateDisplay(Gp4Net.Domain.LifecycleState)">
+            <summary>
+            Gets the colored display string for a lifecycle state.
+            </summary>
+            <param name="state">The lifecycle state.</param>
+            <returns>The colored display string.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ApplicationDisplayService.GetStateColor(Gp4Net.Domain.LifecycleState)">
+            <summary>
+            Gets the color for a lifecycle state.
+            </summary>
+            <param name="state">The lifecycle state.</param>
+            <returns>The color name.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ApplicationDisplayService.GetPrivilegesDisplay(System.Collections.Immutable.ImmutableList{Gp4Net.Domain.Privilege},System.Int32)">
+            <summary>
+            Gets the display string for privileges.
+            </summary>
+            <param name="privileges">The privileges.</param>
+            <param name="maxDisplayCount">Maximum number of privileges to display before truncating.</param>
+            <returns>The display string.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ApplicationDisplayService.GetPrivilegesDisplaySimple(System.Collections.Immutable.ImmutableList{Gp4Net.Domain.Privilege})">
+            <summary>
+            Gets the simple privileges display string without markup.
+            </summary>
+            <param name="privileges">The privileges.</param>
+            <returns>The display string.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ApplicationDisplayService.CreateApplicationTable(System.Boolean)">
+            <summary>
+            Creates a table for displaying applications.
+            </summary>
+            <param name="extended">Whether to include extended columns.</param>
+            <returns>A configured table.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ApplicationDisplayService.AddApplicationRow(Spectre.Console.Table,Gp4Net.Domain.ApplicationInfo,System.Boolean)">
+            <summary>
+            Adds an application row to a table.
+            </summary>
+            <param name="table">The table to add to.</param>
+            <param name="app">The application info.</param>
+            <param name="extended">Whether to include extended columns.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ApplicationDisplayService.DisplayApplicationTable(System.Collections.Generic.IReadOnlyList{Gp4Net.Domain.ApplicationInfo},System.Boolean)">
+            <summary>
+            Displays applications in table format.
+            </summary>
+            <param name="applications">The applications to display.</param>
+            <param name="extended">Whether to show extended information.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ApplicationDisplayService.DisplayApplicationsJson(System.Collections.Generic.IReadOnlyList{Gp4Net.Domain.ApplicationInfo})">
+            <summary>
+            Displays applications in JSON format.
+            </summary>
+            <param name="applications">The applications to display.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ApplicationDisplayService.DisplayApplicationsCsv(System.Collections.Generic.IReadOnlyList{Gp4Net.Domain.ApplicationInfo})">
+            <summary>
+            Displays applications in CSV format.
+            </summary>
+            <param name="applications">The applications to display.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ApplicationDisplayService.DisplayDetailedInformation(System.Collections.Generic.IReadOnlyList{Gp4Net.Domain.ApplicationInfo})">
+            <summary>
+            Displays detailed information about applications.
+            </summary>
+            <param name="applications">The applications to display.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ApplicationDisplayService.FilterApplications(System.Collections.Generic.IReadOnlyList{Gp4Net.Domain.ApplicationInfo},System.String)">
+            <summary>
+            Filters applications by type.
+            </summary>
+            <param name="applications">The applications to filter.</param>
+            <param name="filter">The filter type.</param>
+            <returns>The filtered applications.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardCommunication.ICardChannelWrapper">
+            <summary>
+            Wrapper interface for WSCT CardChannel to enable unit testing.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.ICardChannelWrapper.Connect(WSCT.Wrapper.ShareMode,WSCT.Wrapper.Protocol)">
+            <summary>
+            Connects to the smart card.
+            </summary>
+            <param name="shareMode">The share mode for the connection.</param>
+            <param name="protocol">The preferred protocol.</param>
+            <returns>Error code indicating success or failure.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.ICardChannelWrapper.Disconnect(WSCT.Wrapper.Disposition)">
+            <summary>
+            Disconnects from the smart card.
+            </summary>
+            <param name="disposition">What to do with the card after disconnection.</param>
+            <returns>Error code indicating success or failure.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.ICardChannelWrapper.GetStatus">
+            <summary>
+            Gets the current status of the card channel.
+            </summary>
+            <returns>The current state of the channel.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.ICardChannelWrapper.GetAttrib(WSCT.Wrapper.Attrib,System.Byte[]@)">
+            <summary>
+            Gets an attribute from the card.
+            </summary>
+            <param name="attrib">The attribute to retrieve.</param>
+            <param name="buffer">Buffer to receive the attribute value.</param>
+            <returns>Error code indicating success or failure.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.ICardChannelWrapper.Transmit(WSCT.Core.APDU.ICardCommand,WSCT.Core.APDU.ICardResponse)">
+            <summary>
+            Transmits a command to the card and receives a response.
+            </summary>
+            <param name="command">The command to send.</param>
+            <param name="response">The response received.</param>
+            <returns>Error code indicating success or failure.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardCommunication.ICardContextWrapper">
+            <summary>
+            Wrapper interface for WSCT CardContext to enable unit testing.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardCommunication.ICardContextWrapper.Readers">
+            <summary>
+            Gets the list of available readers.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.ICardContextWrapper.Establish">
+            <summary>
+            Establishes the resource manager context.
+            </summary>
+            <returns>Error code indicating success or failure.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.ICardContextWrapper.ListReaders(System.String)">
+            <summary>
+            Lists all available card readers.
+            </summary>
+            <param name="groups">Reader groups to list (empty string for all).</param>
+            <returns>Error code indicating success or failure.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.ICardContextWrapper.CreateCardChannel(System.String)">
+            <summary>
+            Creates a new card channel for the specified reader.
+            </summary>
+            <param name="readerName">Name of the reader.</param>
+            <returns>A new card channel instance.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.ICardContextWrapper.Release">
+            <summary>
+            Releases the resource manager context.
+            </summary>
+            <returns>Error code indicating success or failure.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardCommunication.IResponseWrapper">
+            <summary>
+            Wrapper interface for APDU responses to enable unit testing.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardCommunication.IResponseWrapper.Data">
+            <summary>
+            Gets the response data.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardCommunication.IResponseWrapper.StatusWord">
+            <summary>
+            Gets the status word.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardCommunication.IWsctFactory">
+            <summary>
+            Factory interface for creating WSCT objects to enable unit testing.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.IWsctFactory.CreateCardContext">
+            <summary>
+            Creates a new card context wrapper.
+            </summary>
+            <returns>A new card context wrapper instance.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.IWsctFactory.CreateCommandApdu(System.Byte[])">
+            <summary>
+            Creates a new command APDU.
+            </summary>
+            <param name="command">The command bytes.</param>
+            <returns>A new command APDU instance.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.IWsctFactory.CreateResponseApdu">
+            <summary>
+            Creates a new response APDU.
+            </summary>
+            <returns>A new response APDU instance.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardChannelWrapper">
+            <summary>
+            Concrete implementation of ICardChannelWrapper using WSCT.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardChannelWrapper.#ctor(WSCT.Wrapper.Desktop.Core.CardContext,System.String,WSCT.Wrapper.ShareMode)">
+            <summary>
+            Initializes a new instance of the WsctCardChannelWrapper class.
+            </summary>
+            <param name="context">The WSCT card context.</param>
+            <param name="readerName">The reader name.</param>
+            <param name="shareMode">The share mode.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardChannelWrapper.Connect(WSCT.Wrapper.ShareMode,WSCT.Wrapper.Protocol)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardChannelWrapper.Disconnect(WSCT.Wrapper.Disposition)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardChannelWrapper.GetStatus">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardChannelWrapper.GetAttrib(WSCT.Wrapper.Attrib,System.Byte[]@)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardChannelWrapper.Transmit(WSCT.Core.APDU.ICardCommand,WSCT.Core.APDU.ICardResponse)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardChannelWrapper.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardContextWrapper">
+            <summary>
+            Concrete implementation of ICardContextWrapper using WSCT.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardContextWrapper.#ctor">
+            <summary>
+            Initializes a new instance of the WsctCardContextWrapper class.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardContextWrapper.Readers">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardContextWrapper.Establish">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardContextWrapper.ListReaders(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardContextWrapper.CreateCardChannel(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardContextWrapper.Release">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.Wsct.WsctCardContextWrapper.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardCommunication.WsctFactory">
+            <summary>
+            Concrete implementation of IWsctFactory.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.WsctFactory.CreateCardContext">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.WsctFactory.CreateCommandApdu(System.Byte[])">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCommunication.WsctFactory.CreateResponseApdu">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardCompatibilityService">
+            <summary>
+            Implementation of card compatibility service for safe real card testing.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardCompatibilityService.KnownCardTypes">
+            <summary>
+            Known card types and their characteristics.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardCompatibilityService.CplcManufacturers">
+            <summary>
+            CPLC manufacturer codes for identifying card vendors.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCompatibilityService.#ctor(Microsoft.Extensions.Logging.ILogger{Gp4Net.Tool.Services.CardCompatibilityService},Gp4Net.Tool.Services.IEnvironmentValidationService)">
+            <summary>
+            Initializes a new instance of CardCompatibilityService.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCompatibilityService.CheckCompatibilityAsync(Gp4Net.Tool.Services.CardOperation,Gp4Net.Domain.Keys.IKeySet,Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCompatibilityService.DetectCardTypeAsync(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCompatibilityService.GetAuthenticationAttemptCountAsync(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardServiceChannelAdapter">
+            <summary>
+            Adapter that implements ICardChannel using ICardService.
+            Bridges the tool's card service with the domain's transport abstraction.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardServiceChannelAdapter.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Transport.TransportProtocol)">
+            <summary>
+            Initializes a new instance of CardServiceChannelAdapter.
+            </summary>
+            <param name="cardService">The card service to adapt.</param>
+            <param name="protocol">The transport protocol (defaults to T=0).</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardServiceChannelAdapter.TransmitAsync(System.Byte[],System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardServiceChannelAdapter.Protocol">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardServiceChannelAdapter.IsOpen">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardServiceFactory">
+            <summary>
+            Factory that selects the appropriate card service based on reader name.
+            Supports both physical readers (via WSCT) and virtual readers (via Lua scripts).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.GetReaders">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.Connect(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.Disconnect">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardServiceFactory.IsConnected">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.GetAtr">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.SendCommand(System.Byte[])">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.SendCommand(Gp4Net.Transport.IApduCommand)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.EstablishSecureChannel(System.Byte[],System.Byte)">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardServiceFactory.IsSecureChannelEstablished">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Services.IDomainServiceFactory">
+            <summary>
+            Factory interface for creating domain services with proper pipeline context.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.IDomainServiceFactory.CreateSmartCardService(Gp4Net.Tool.Services.ICardService)">
+            <summary>
+            Creates a smart card service for the given card service.
+            </summary>
+            <param name="cardService">The card service to use for communication.</param>
+            <returns>A configured smart card service with proper pipeline context.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.IDomainServiceFactory.CreateGlobalPlatformService(Gp4Net.Tool.Services.ICardService)">
+            <summary>
+            Creates a GlobalPlatform service for the given card service.
+            </summary>
+            <param name="cardService">The card service to use for communication.</param>
+            <returns>A configured GlobalPlatform service with proper pipeline context.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.DomainServiceFactory">
+            <summary>
+            Factory implementation that creates domain services with proper functional context.
+            Ensures proper pipeline configuration and context flow.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.DomainServiceFactory.#ctor(Gp4Net.Pipeline.ICommandPipeline,Gp4Net.Transport.IApduTransportFactory,Gp4Net.Domain.Protocol.ISecureChannelManager,Microsoft.Extensions.Logging.ILogger{Gp4Net.Tool.Services.DomainServiceFactory})">
+            <summary>
+            Initializes a new instance of the DomainServiceFactory.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.DomainServiceFactory.CreateSmartCardService(Gp4Net.Tool.Services.ICardService)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.DomainServiceFactory.CreateGlobalPlatformService(Gp4Net.Tool.Services.ICardService)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.LoggerWrapper`1">
+            <summary>
+            Logger wrapper to adapt ILogger interfaces.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.EnvironmentValidationService">
+            <summary>
+            Implementation of environment validation service that prevents dangerous key/card combinations.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.EnvironmentValidationService.WellKnownTestKeys">
+            <summary>
+            Well-known test keys that should never be used on production cards.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.EnvironmentValidationService.ProductionCardIndicators">
+            <summary>
+            Production card indicators in CPLC data.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.EnvironmentValidationService.TestCardIndicators">
+            <summary>
+            Test card indicators in CPLC data.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.EnvironmentValidationService.#ctor(Microsoft.Extensions.Logging.ILogger{Gp4Net.Tool.Services.EnvironmentValidationService})">
+            <summary>
+            Initializes a new instance of EnvironmentValidationService.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.EnvironmentValidationService.ValidateEnvironmentAsync(Gp4Net.Domain.Keys.IKeySet,Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.EnvironmentValidationService.IsTestKeySet(Gp4Net.Domain.Keys.IKeySet)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.EnvironmentValidationService.DetectCardEnvironmentAsync(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Services.ICardCompatibilityService">
+            <summary>
+            Service for checking card compatibility with operations to prevent damage or lockout.
+            Provides comprehensive safety checks for real card testing.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ICardCompatibilityService.CheckCompatibilityAsync(Gp4Net.Tool.Services.CardOperation,Gp4Net.Domain.Keys.IKeySet,Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
+            <summary>
+            Checks if a card is compatible with a specific operation using the given keyset.
+            Prevents operations that could damage or lock the card.
+            </summary>
+            <param name="operation">The operation being attempted.</param>
+            <param name="keySet">The keyset to be used.</param>
+            <param name="channel">The card channel.</param>
+            <param name="transport">The transport layer.</param>
+            <param name="cancellationToken">The cancellation token.</param>
+            <returns>A result indicating compatibility and any warnings.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ICardCompatibilityService.DetectCardTypeAsync(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
+            <summary>
+            Detects the card type based on ATR and CPLC data.
+            </summary>
+            <param name="channel">The card channel.</param>
+            <param name="transport">The transport layer.</param>
+            <param name="cancellationToken">The cancellation token.</param>
+            <returns>A result containing the detected card type.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ICardCompatibilityService.GetAuthenticationAttemptCountAsync(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
+            <summary>
+            Gets the authentication attempt count for a card if available.
+            </summary>
+            <param name="channel">The card channel.</param>
+            <param name="transport">The transport layer.</param>
+            <param name="cancellationToken">The cancellation token.</param>
+            <returns>A result containing the current attempt count or null if unavailable.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardCompatibilityResult">
+            <summary>
+            Represents the result of card compatibility checking.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardCompatibilityResult.IsCompatible">
+            <summary>
+            Gets whether the operation is compatible and safe.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardCompatibilityResult.IsSafe">
+            <summary>
+            Gets whether the operation is safe (won't cause permanent damage).
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardCompatibilityResult.CardType">
+            <summary>
+            Gets the detected card type.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardCompatibilityResult.Message">
+            <summary>
+            Gets the compatibility message.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardCompatibilityResult.Warnings">
+            <summary>
+            Gets warnings about the operation.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardCompatibilityResult.Recommendations">
+            <summary>
+            Gets recommendations for safe operation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardCompatibilityResult.#ctor(System.Boolean,System.Boolean,Gp4Net.Tool.Services.CardTypeInfo,System.String,System.String[],System.String[])">
+            <summary>
+            Initializes a new instance of CardCompatibilityResult.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardTypeInfo">
+            <summary>
+            Represents detected card type information.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.Manufacturer">
+            <summary>
+            Gets the card manufacturer.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.Family">
+            <summary>
+            Gets the card family or series.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.Model">
+            <summary>
+            Gets the specific card model if detected.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.IsProduction">
+            <summary>
+            Gets whether this is a production card.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.MaxAuthenticationAttempts">
+            <summary>
+            Gets the maximum authentication attempts before lockout.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.SupportedProtocols">
+            <summary>
+            Gets supported secure channel protocols.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.KnownLimitations">
+            <summary>
+            Gets known limitations or risks for this card type.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardTypeInfo.#ctor(System.String,System.String,System.String,System.Boolean,System.Nullable{System.Int32},System.String[],System.String[])">
+            <summary>
+            Initializes a new instance of CardTypeInfo.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.DisplayName">
+            <summary>
+            Gets a descriptive name for this card type.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardOperation">
+            <summary>
+            Represents the type of operation being checked for compatibility.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardOperation.Authentication">
+            <summary>
+            Authentication operation (secure channel establishment).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardOperation.KeyInstallation">
+            <summary>
+            Key installation or replacement.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardOperation.ApplicationInstallation">
+            <summary>
+            Application installation.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardOperation.ApplicationDeletion">
+            <summary>
+            Application deletion.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardOperation.Personalization">
+            <summary>
+            Card personalization.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardOperation.ReadOnly">
+            <summary>
+            Read-only operations (safe).
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.ICardService">
+            <summary>
+            Interface for smart card communication services.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ICardService.GetReaders">
+            <summary>
+            Gets the available card readers.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ICardService.Connect(System.String)">
+            <summary>
+            Connects to a card in the specified reader.
+            </summary>
+            <param name="readerName">The reader name.</param>
+            <returns>True if connection was successful.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ICardService.Disconnect">
+            <summary>
+            Disconnects from the current card.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.ICardService.IsConnected">
+            <summary>
+            Gets a value indicating whether a card is connected.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ICardService.GetAtr">
+            <summary>
+            Gets the ATR of the connected card.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ICardService.SendCommand(System.Byte[])">
+            <summary>
+            Sends an APDU command to the card.
+            </summary>
+            <param name="command">The APDU command bytes.</param>
+            <returns>The response from the card.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ICardService.SendCommand(Gp4Net.Transport.IApduCommand)">
+            <summary>
+            Sends an APDU command to the card.
+            </summary>
+            <param name="command">The APDU command.</param>
+            <returns>The response from the card.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.ICardService.EstablishSecureChannel(System.Byte[],System.Byte)">
+            <summary>
+            Establishes a secure channel with the card.
+            </summary>
+            <param name="keySet">The key set to use for authentication.</param>
+            <param name="securityLevel">The security level to establish.</param>
+            <returns>True if secure channel was established successfully.</returns>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.ICardService.IsSecureChannelEstablished">
+            <summary>
+            Gets a value indicating whether a secure channel is established.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardResponse">
+            <summary>
+            Represents a response from a smart card.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardResponse.Data">
+            <summary>
+            Gets the response data.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardResponse.StatusWord">
+            <summary>
+            Gets the status word.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardResponse.IsSuccessful">
+            <summary>
+            Gets a value indicating whether the command was successful.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardResponse.#ctor(System.Byte[],System.UInt16)">
+            <summary>
+            Initializes a new instance of the CardResponse class.
+            </summary>
+            <param name="data">The response data.</param>
+            <param name="statusWord">The status word.</param>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.IEnvironmentValidationService">
+            <summary>
+            Service for validating environment safety before executing operations with real cards.
+            Prevents accidental use of test keys against production cards and vice versa.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.IEnvironmentValidationService.ValidateEnvironmentAsync(Gp4Net.Domain.Keys.IKeySet,Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
+            <summary>
+            Validates that the keyset is appropriate for the detected card environment.
+            Prevents using test keys on production cards or production keys on test cards.
+            </summary>
+            <param name="keySet">The keyset to validate.</param>
+            <param name="channel">The card channel to analyze.</param>
+            <param name="transport">The transport layer.</param>
+            <param name="cancellationToken">The cancellation token.</param>
+            <returns>A result indicating whether the environment is safe or contains validation errors.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.IEnvironmentValidationService.IsTestKeySet(Gp4Net.Domain.Keys.IKeySet)">
+            <summary>
+            Checks if a keyset contains only well-known test keys.
+            </summary>
+            <param name="keySet">The keyset to check.</param>
+            <returns>True if the keyset contains only test keys, false otherwise.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.IEnvironmentValidationService.DetectCardEnvironmentAsync(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
+            <summary>
+            Checks if a card appears to be a production card based on various indicators.
+            </summary>
+            <param name="channel">The card channel.</param>
+            <param name="transport">The transport layer.</param>
+            <param name="cancellationToken">The cancellation token.</param>
+            <returns>A result containing the card environment assessment.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.EnvironmentValidationResult">
+            <summary>
+            Represents the result of environment validation.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.EnvironmentValidationResult.IsSafe">
+            <summary>
+            Gets whether the environment combination is safe.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.EnvironmentValidationResult.CardEnvironment">
+            <summary>
+            Gets the detected card environment.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.EnvironmentValidationResult.IsTestKeySet">
+            <summary>
+            Gets whether the keyset appears to be for testing.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.EnvironmentValidationResult.Warnings">
+            <summary>
+            Gets warnings about the environment combination.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.EnvironmentValidationResult.Message">
+            <summary>
+            Gets the validation message.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.EnvironmentValidationResult.#ctor(System.Boolean,Gp4Net.Tool.Services.CardEnvironment,System.Boolean,System.String,System.String[])">
+            <summary>
+            Initializes a new instance of EnvironmentValidationResult.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardEnvironment">
+            <summary>
+            Represents the detected card environment type.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardEnvironment.Unknown">
+            <summary>
+            Environment could not be determined.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardEnvironment.Test">
+            <summary>
+            Appears to be a test/development card.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardEnvironment.Production">
+            <summary>
+            Appears to be a production card.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardEnvironment.Virtual">
+            <summary>
+            Virtual/emulated card for testing.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.IKeysetResolver">
+            <summary>
+            Interface for resolving keysets from script functions or explicit parameters.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.IKeysetResolver.ResolveKeyset(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Byte[],System.Byte[],System.Byte[],System.Byte,Gp4Net.Domain.Commands.InitializeUpdateResponse)">
+            <summary>
+            Resolves a keyset from various sources.
+            </summary>
+            <param name="keysetSpec">The keyset specification (e.g., 'gp_test_keys' or 'script:function').</param>
+            <param name="keysetParams">Parameters for the keyset function.</param>
+            <param name="encKey">Explicit encryption key (overrides keyset).</param>
+            <param name="macKey">Explicit MAC key (overrides keyset).</param>
+            <param name="dekKey">Explicit DEK key (overrides keyset).</param>
+            <param name="keyVersion">The key version.</param>
+            <param name="cardResponse">Optional card response for key diversification.</param>
+            <returns>The resolved keyset.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.JsonLuaCardService">
+            <summary>
+            Enhanced Lua card service that can load JSON trace data with rich metadata.
+            Supports operation filtering and session-aware replay.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.GetReaders">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.Connect(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.Disconnect">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.JsonLuaCardService.IsConnected">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.GetAtr">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.SendCommand(System.Byte[])">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.SendCommand(Gp4Net.Transport.IApduCommand)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.EstablishSecureChannel(System.Byte[],System.Byte)">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.JsonLuaCardService.IsSecureChannelEstablished">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Services.KeysetResolver">
+            <summary>
+            Resolves keysets from script functions or explicit parameters.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.KeysetResolver.#ctor(Microsoft.Extensions.Logging.ILogger{Gp4Net.Tool.Services.KeysetResolver},Gp4Net.Tool.Scripting.IScriptManager)">
+            <summary>
+            Initializes a new instance of the KeysetResolver class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.KeysetResolver.ResolveKeyset(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Byte[],System.Byte[],System.Byte[],System.Byte,Gp4Net.Domain.Commands.InitializeUpdateResponse)">
+            <summary>
+            Resolves a keyset from various sources.
+            </summary>
+        </member>
+        <!-- Badly formed XML comment ignored for member "T:Gp4Net.Tool.Services.LuaVirtualCardService" -->
+        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.GetReaders">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.Connect(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.Disconnect">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.LuaVirtualCardService.IsConnected">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.GetAtr">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.SendCommand(System.Byte[])">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.SendCommand(Gp4Net.Transport.IApduCommand)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.EstablishSecureChannel(System.Byte[],System.Byte)">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.LuaVirtualCardService.IsSecureChannelEstablished">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Services.SimpleCardServiceFactory">
+            <summary>
+            Simplified factory that selects between physical and virtual card services.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.GetReaders">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.Connect(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.Disconnect">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.SimpleCardServiceFactory.IsConnected">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.GetAtr">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.SendCommand(System.Byte[])">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.SendCommand(Gp4Net.Transport.IApduCommand)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.EstablishSecureChannel(System.Byte[],System.Byte)">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.SimpleCardServiceFactory.IsSecureChannelEstablished">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Services.SimpleTraceData">
+            <summary>
+            Simplified JSON trace format for virtual card testing.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.SimpleExchange">
+            <summary>
+            Simplified APDU exchange.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.SimpleJsonCardService">
+            <summary>
+            Simple JSON card service that uses minimal trace format.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleJsonCardService.GetReaders">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleJsonCardService.Connect(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleJsonCardService.Disconnect">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.SimpleJsonCardService.IsConnected">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleJsonCardService.GetAtr">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleJsonCardService.SendCommand(System.Byte[])">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleJsonCardService.SendCommand(Gp4Net.Transport.IApduCommand)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleJsonCardService.EstablishSecureChannel(System.Byte[],System.Byte)">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.SimpleJsonCardService.IsSecureChannelEstablished">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.SimpleJsonCardService.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Services.TraceBasedCardService">
+            <summary>
+            Card service that replays APDU exchanges from a JSON trace file.
+            Designed for deterministic testing and debugging.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.TraceBasedCardService.SetOperationFilter(System.String)">
+            <summary>
+            Sets the operation filter to limit which exchanges are replayed.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.TraceBasedCardService.GetNextExchange(System.Byte[])">
+            <summary>
+            Gets the next exchange in the trace that matches the provided command.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.TraceBasedCardService.TraceBasedCardChannel">
+            <summary>
+            Card channel implementation for trace-based testing.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.TraceBasedCardServiceExtensions">
+            <summary>
+            Extension methods for using trace-based card service in tests.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.TraceBasedCardServiceExtensions.CreateTraceReaderName(System.String,System.String)">
+            <summary>
+            Creates a reader name for trace-based testing.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.TraceBasedCardServiceExtensions.ParseTraceReaderName(System.String)">
+            <summary>
+            Parses a trace reader name to extract path and operations.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.WsctCardService">
+            <summary>
+            WSCT-based implementation of the card service.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.WsctCardService.#ctor(Gp4Net.Tool.Services.CardCommunication.IWsctFactory,Gp4Net.Domain.Protocol.ISecureChannelManager,Gp4Net.Transport.IApduTransportFactory)">
+            <summary>
+            Initializes a new instance of the WsctCardService class.
+            </summary>
+            <param name="wsctFactory">Factory for creating WSCT objects.</param>
+            <param name="secureChannelManager">The secure channel manager.</param>
+            <param name="transportFactory">The APDU transport factory.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.WsctCardService.#ctor(Gp4Net.Domain.Protocol.ISecureChannelManager,Gp4Net.Transport.IApduTransportFactory)">
+            <summary>
+            Initializes a new instance of the WsctCardService class with default factories.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.WsctCardService.GetReaders">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.WsctCardService.Connect(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.WsctCardService.Disconnect">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.WsctCardService.IsConnected">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.WsctCardService.GetAtr">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.WsctCardService.SendCommand(System.Byte[])">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.WsctCardService.SendCommand(Gp4Net.Transport.IApduCommand)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.WsctCardService.EstablishSecureChannel(System.Byte[],System.Byte)">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.WsctCardService.IsSecureChannelEstablished">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.WsctCardService.Dispose">
+            <inheritdoc />
+        </member>
+    </members>
+</doc>

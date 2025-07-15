@@ -283,7 +283,12 @@ namespace Gp4Net.Tool.Services
                 try
                 {
                     // Get wrapped command data and Le from secure channel
-                    var (wrappedData, expectedResponseLength) = _secureChannelSession.WrapCommand(command);
+                    var wrapResult = _secureChannelSession.WrapCommand(command);
+                    if (wrapResult.IsFailure)
+                    {
+                        throw new InvalidOperationException($"Failed to wrap command: {wrapResult.Error.Message}");
+                    }
+                    var (wrappedData, expectedResponseLength) = wrapResult.Value;
 
                     // Build final APDU with wrapped data and Le
                     var finalApdu = new List<byte>(wrappedData);
@@ -327,7 +332,12 @@ namespace Gp4Net.Tool.Services
                             Logger.Debug($"  Wrapped response: {Convert.ToHexString(fullResponse)}");
                         }
 
-                        var unwrapped = _secureChannelSession.UnwrapResponse(fullResponse);
+                        var unwrapResult = _secureChannelSession.UnwrapResponse(fullResponse);
+                        if (unwrapResult.IsFailure)
+                        {
+                            throw new InvalidOperationException($"Failed to unwrap response: {unwrapResult.Error.Message}");
+                        }
+                        var unwrapped = unwrapResult.Value;
 
                         // Extract unwrapped data and SW
                         byte[] unwrappedData = Array.Empty<byte>();
@@ -432,19 +442,19 @@ namespace Gp4Net.Tool.Services
             {
                 // For now, assume SCP02 with test keys
                 // In a real implementation, this would be configurable
-                var scp02KeySet = new Scp02KeySet(
+                var scp02KeySet = Scp02KeySet.Create(
                     keySet, // ENC key
                     keySet, // MAC key
                     keySet, // DEK key
                     0xFF
-                ); // Key version
+                ).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp02KeySet: {e.Message}")); // Key version
 
                 var secLevel = (SecurityLevel)securityLevel;
                 var cardChannel = new CardServiceChannelAdapter(this, TransportProtocol.T0);
 
                 // Establish secure channel
                 // Use Task.Run to prevent deadlocks when calling async method from sync context
-                _secureChannelSession = Task.Run(
+                var establishResult = Task.Run(
                         async () =>
                             await _secureChannelManager
                                 .EstablishAsync(
@@ -458,6 +468,15 @@ namespace Gp4Net.Tool.Services
                     )
                     .GetAwaiter()
                     .GetResult();
+
+                if (establishResult.IsFailure)
+                {
+                    Logger.Error($"Failed to establish secure channel: {establishResult.Error.Message}");
+                    _secureChannelSession = null;
+                    return false;
+                }
+
+                _secureChannelSession = establishResult.Value;
 
                 Logger.Info(
                     $"Successfully established secure channel with security level: {secLevel}"

@@ -98,13 +98,20 @@ namespace Gp4Net.Domain.Protocol
                 );
 
                 // Attempt authentication using the inner manager
-                var session = await _innerManager.EstablishAsync(
+                var sessionResult = await _innerManager.EstablishAsync(
                     channel,
                     transport,
                     keySet,
                     securityLevel,
                     cancellationToken
                 );
+
+                if (sessionResult.IsFailure)
+                {
+                    return sessionResult.Error;
+                }
+
+                var session = sessionResult.Value;
 
                 // Success - reset attempt counter
                 tracker.Reset();
@@ -202,7 +209,7 @@ namespace Gp4Net.Domain.Protocol
 
             try
             {
-                var session = await _innerManager.EstablishAutoDetectAsync(
+                var sessionResult = await _innerManager.EstablishAutoDetectAsync(
                     channel,
                     transport,
                     keySet,
@@ -210,6 +217,12 @@ namespace Gp4Net.Domain.Protocol
                     cancellationToken
                 );
 
+                if (sessionResult.IsFailure)
+                {
+                    return sessionResult.Error;
+                }
+
+                var session = sessionResult.Value;
                 tracker.Reset();
                 return Result<SecureChannelSession, SmartCardError>.Ok(session);
             }

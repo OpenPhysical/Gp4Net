@@ -10,7 +10,7 @@ using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Services;
-using Unit = Gp4Net.Services.Unit;
+using Unit = Gp4Net.Core.Unit;
 using DeleteCliCommand = Gp4Net.Tool.Commands.Applet.DeleteCommand;
 using Gp4Net.Tool.Commands;
 using Gp4Net.Tool.Pipeline;

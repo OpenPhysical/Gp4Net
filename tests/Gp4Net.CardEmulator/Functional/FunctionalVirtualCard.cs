@@ -27,8 +27,11 @@ namespace Gp4Net.CardEmulator.Functional
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _cryptoService = cryptoService ?? throw new ArgumentNullException(nameof(cryptoService));
-            _state = CardState.Initial
-                .WithScpConfiguration(_config.DefaultScpVersion, _config.DefaultScpImplementation);
+            _state = CardState.Initial with
+            {
+                ScpVersion = _config.DefaultScpVersion,
+                ScpImplementation = _config.DefaultScpImplementation
+            };
         }
 
         /// <inheritdoc />
@@ -200,11 +203,11 @@ namespace Gp4Net.CardEmulator.Functional
             var gpTestKey = new byte[] { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F };
             
             // Create new key set with the GP test keys
-            var newKeySet = new Gp4Net.Domain.Keys.Scp03KeySet(
+            var newKeySet = Gp4Net.Domain.Keys.Scp03KeySet.Create(
                 encKey: gpTestKey,
                 macKey: gpTestKey, 
                 dekKey: gpTestKey,
-                keyVersion: keyVersion);
+                keyVersion: keyVersion).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp03KeySet: {e.Message}"));
             
             // Update state with new key set
             var newState = state.WithInstalledKey(keyVersion, newKeySet);
@@ -256,40 +259,6 @@ namespace Gp4Net.CardEmulator.Functional
                         var configData = new byte[totalLength];
                         Array.Copy(data, 3, configData, 0, totalLength);
                         
-                        // Check for SCP_ENABLE (tag 1057)
-                        if (configData.Length >= 3 && configData[0] == 0x10 && configData[1] == 0x57)
-                        {
-                            var scpDataLength = configData[2];
-                            if (configData.Length >= 3 + scpDataLength)
-                            {
-                                var scpData = new byte[scpDataLength];
-                                Array.Copy(configData, 3, scpData, 0, scpDataLength);
-                                
-                                // Parse SCP implementations (2 bytes each: version + implementation)
-                                var implementations = new List<(byte version, byte implementation)>();
-                                for (int i = 0; i < scpDataLength && i + 1 < scpDataLength; i += 2)
-                                {
-                                    var version = scpData[i];
-                                    var impl = scpData[i + 1];
-                                    
-                                    // Skip padding bytes (0x00)
-                                    if (version != 0x00 && impl != 0x00)
-                                    {
-                                        implementations.Add((version, impl));
-                                    }
-                                }
-                                
-                                // Apply the first (primary) SCP configuration
-                                if (implementations.Count > 0)
-                                {
-                                    var primaryScp = implementations[0];
-                                    var newState = state.WithScpConfiguration(primaryScp.version, primaryScp.implementation);
-                                    
-                                    return new Result<(ApduResponse, CardState), SmartCardError>.Success(
-                                        (new ApduResponse(Array.Empty<byte>(), StatusWords.SUCCESS), newState));
-                                }
-                            }
-                        }
                     }
                 }
             }

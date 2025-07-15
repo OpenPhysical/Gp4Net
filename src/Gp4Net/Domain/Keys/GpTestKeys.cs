@@ -1,5 +1,6 @@
 using System;
 using JetBrains.Annotations;
+using Gp4Net.Core;
 
 namespace Gp4Net.Domain.Keys
 {
@@ -55,12 +56,12 @@ namespace Gp4Net.Domain.Keys
         /// <returns>The SCP02 test key set.</returns>
         public static Scp02KeySet CreateScp02TestKeySet(byte keyVersion = 0x00)
         {
-            return new Scp02KeySet(
+            return Scp02KeySet.Create(
                 encKey: (byte[])StandardTestKey.Clone(),
                 macKey: (byte[])StandardTestKey.Clone(),
                 dekKey: (byte[])StandardTestKey.Clone(),
                 keyVersion: keyVersion
-            );
+            ).GetOrThrow(error => new InvalidOperationException($"Failed to create SCP02 test key set: {error.Message}"));
         }
 
         /// <summary>
@@ -70,12 +71,12 @@ namespace Gp4Net.Domain.Keys
         /// <returns>The SCP03 test key set.</returns>
         public static Scp03KeySet CreateScp03TestKeySet(byte keyVersion = 0x00)
         {
-            return new Scp03KeySet(
+            return Scp03KeySet.Create(
                 encKey: (byte[])StandardTestKey.Clone(),
                 macKey: (byte[])StandardTestKey.Clone(),
                 dekKey: (byte[])StandardTestKey.Clone(),
                 keyVersion: keyVersion
-            );
+            ).GetOrThrow(error => new InvalidOperationException($"Failed to create SCP03 test key set: {error.Message}"));
         }
 
         /// <summary>
@@ -85,12 +86,12 @@ namespace Gp4Net.Domain.Keys
         /// <returns>The SCP02 zero key set.</returns>
         public static Scp02KeySet CreateScp02ZeroKeySet(byte keyVersion = 0x00)
         {
-            return new Scp02KeySet(
+            return Scp02KeySet.Create(
                 encKey: (byte[])ZeroTestKey.Clone(),
                 macKey: (byte[])ZeroTestKey.Clone(),
                 dekKey: (byte[])ZeroTestKey.Clone(),
                 keyVersion: keyVersion
-            );
+            ).GetOrThrow(error => new InvalidOperationException($"Failed to create SCP02 zero key set: {error.Message}"));
         }
 
         /// <summary>
@@ -100,12 +101,12 @@ namespace Gp4Net.Domain.Keys
         /// <returns>The SCP03 zero key set.</returns>
         public static Scp03KeySet CreateScp03ZeroKeySet(byte keyVersion = 0x00)
         {
-            return new Scp03KeySet(
+            return Scp03KeySet.Create(
                 encKey: (byte[])ZeroTestKey.Clone(),
                 macKey: (byte[])ZeroTestKey.Clone(),
                 dekKey: (byte[])ZeroTestKey.Clone(),
                 keyVersion: keyVersion
-            );
+            ).GetOrThrow(error => new InvalidOperationException($"Failed to create SCP03 zero key set: {error.Message}"));
         }
 
         /// <summary>
@@ -123,7 +124,8 @@ namespace Gp4Net.Domain.Keys
             byte keyVersion = 0x00
         )
         {
-            return new Scp02KeySet(encKey, macKey, dekKey, keyVersion);
+            return Scp02KeySet.Create(encKey, macKey, dekKey, keyVersion)
+                .GetOrThrow(error => new InvalidOperationException($"Failed to create SCP02 custom key set: {error.Message}"));
         }
 
         /// <summary>
@@ -141,7 +143,8 @@ namespace Gp4Net.Domain.Keys
             byte keyVersion = 0x00
         )
         {
-            return new Scp03KeySet(encKey, macKey, dekKey, keyVersion);
+            return Scp03KeySet.Create(encKey, macKey, dekKey, keyVersion)
+                .GetOrThrow(error => new InvalidOperationException($"Failed to create SCP03 custom key set: {error.Message}"));
         }
 
         /// <summary>
@@ -152,29 +155,30 @@ namespace Gp4Net.Domain.Keys
         /// <param name="protocolVersion">The protocol version (SCP02 or SCP03).</param>
         /// <param name="keyVersion">The key version (default: 0x00).</param>
         /// <returns>The key set.</returns>
-        public static IKeySet CreateFromHex(
+        public static Result<IKeySet, SmartCardError> CreateFromHex(
             string hexKey,
             byte protocolVersion,
             byte keyVersion = 0x00
         )
         {
             if (string.IsNullOrWhiteSpace(hexKey))
+                return SmartCardError.InvalidArgument("Hex key cannot be null or empty.");
+
+            try
             {
-                throw new ArgumentException("Hex key cannot be null or empty.", nameof(hexKey));
+                var key = Convert.FromHexString(hexKey);
+
+                return protocolVersion switch
+                {
+                    0x02 => Scp02KeySet.Create(key, key, key, keyVersion).Map(ks => (IKeySet)ks),
+                    0x03 => Scp03KeySet.Create(key, key, key, keyVersion).Map(ks => (IKeySet)ks),
+                    _ => SmartCardError.InvalidArgument($"Unsupported protocol version: {protocolVersion:X2}")
+                };
             }
-
-            var key = Convert.FromHexString(hexKey);
-
-            return protocolVersion switch
+            catch (FormatException ex)
             {
-                0x02 => CreateScp02CustomKeySet(key, key, key, keyVersion),
-                0x03 => CreateScp03CustomKeySet(key, key, key, keyVersion),
-                _
-                    => throw new ArgumentException(
-                        $"Unsupported protocol version: {protocolVersion:X2}",
-                        nameof(protocolVersion)
-                    ),
-            };
+                return SmartCardError.InvalidArgument($"Invalid hex string: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -184,17 +188,23 @@ namespace Gp4Net.Domain.Keys
         /// <param name="protocolVersion">The protocol version.</param>
         /// <param name="keyVersion">The key version (default: 0x00).</param>
         /// <returns>The test key set.</returns>
-        public static IKeySet GetTestKeySet(byte protocolVersion, byte keyVersion = 0x00)
+        public static Result<IKeySet, SmartCardError> GetTestKeySet(byte protocolVersion, byte keyVersion = 0x00)
         {
             return protocolVersion switch
             {
-                0x02 => CreateScp02TestKeySet(keyVersion),
-                0x03 => CreateScp03TestKeySet(keyVersion),
-                _
-                    => throw new ArgumentException(
-                        $"Unsupported protocol version: {protocolVersion:X2}",
-                        nameof(protocolVersion)
-                    ),
+                0x02 => Scp02KeySet.Create(
+                    (byte[])StandardTestKey.Clone(),
+                    (byte[])StandardTestKey.Clone(),
+                    (byte[])StandardTestKey.Clone(),
+                    keyVersion
+                ).Map(ks => (IKeySet)ks),
+                0x03 => Scp03KeySet.Create(
+                    (byte[])StandardTestKey.Clone(),
+                    (byte[])StandardTestKey.Clone(),
+                    (byte[])StandardTestKey.Clone(),
+                    keyVersion
+                ).Map(ks => (IKeySet)ks),
+                _ => SmartCardError.InvalidArgument($"Unsupported protocol version: {protocolVersion:X2}")
             };
         }
 

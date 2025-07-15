@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Domain.Commands;
@@ -350,7 +351,7 @@ namespace Gp4Net.Tool.Commands.Card
                             else if (tag == GetDataCommand.DataObjects.DiversificationData)
                             {
                                 // Extract and display SCP support from diversification data
-                                var scpSupport = DiversificationDataParser.ParseScpSupport(response);
+                                var scpSupport = DiversificationDataParser.ParseScpSupport(new Option<byte[]>.Some(response));
                                 _ = table.AddRow("SCP Support", scpSupport);
                             }
                             else if (tag == GetDataCommand.DataObjects.KeyInformationTemplate)

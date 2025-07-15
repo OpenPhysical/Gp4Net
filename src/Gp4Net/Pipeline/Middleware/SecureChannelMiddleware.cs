@@ -45,7 +45,13 @@ namespace Gp4Net.Pipeline.Middleware
             try
             {
                 // Wrap the command
-                var (wrappedData, expectedResponseLength) = session.WrapCommand(request.Command);
+                var wrapResult = session.WrapCommand(request.Command);
+                if (wrapResult.IsFailure)
+                {
+                    return Result<CommandResponse, SmartCardError>.Fail(wrapResult.Error);
+                }
+                
+                var (wrappedData, expectedResponseLength) = wrapResult.Value;
                 
                 // Create wrapped command - the wrappedData already includes the complete APDU
                 var wrappedCommand = new WrappedCommand(wrappedData, expectedResponseLength);
@@ -102,7 +108,13 @@ namespace Gp4Net.Pipeline.Middleware
                     fullResponse[^1] = (byte)(response.StatusWord & 0xFF);
 
                     // Unwrap response
-                    var unwrapped = session.UnwrapResponse(fullResponse);
+                    var unwrapResult = session.UnwrapResponse(fullResponse);
+                    if (unwrapResult.IsFailure)
+                    {
+                        return Task.FromResult(Result<CommandResponse, SmartCardError>.Fail(unwrapResult.Error));
+                    }
+                    
+                    var unwrapped = unwrapResult.Value;
                     
                     // Extract unwrapped data and SW
                     byte[] unwrappedData = Array.Empty<byte>();

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Gp4Net.Core;
 using Gp4Net.Core.Tlv;
 
 namespace Gp4Net.Domain.CardInfo
@@ -15,15 +16,12 @@ namespace Gp4Net.Domain.CardInfo
         /// </summary>
         /// <param name="data">The raw diversification data.</param>
         /// <returns>Hex string representation of the data.</returns>
-        public static string ParseAsHex(byte[] data)
+        public static string ParseAsHex(Option<byte[]> data)
         {
-            if (data == null || data.Length == 0)
-            {
-                return string.Empty;
-            }
-
-            // Show full diversification data without truncation
-            return Convert.ToHexString(data);
+            return data.Match(
+                some: bytes => bytes.Length == 0 ? string.Empty : Convert.ToHexString(bytes),
+                none: () => string.Empty
+            );
         }
 
         /// <summary>
@@ -33,15 +31,17 @@ namespace Gp4Net.Domain.CardInfo
         /// </summary>
         /// <param name="data">The diversification data containing SCP support info.</param>
         /// <returns>Formatted SCP support string.</returns>
-        public static string ParseScpSupport(byte[] data)
+        public static string ParseScpSupport(Option<byte[]> data)
         {
-            if (data == null || data.Length == 0)
-            {
-                return "[red]None[/]";
-            }
+            return data.Match(
+                some: bytes => ParseScpSupportFromBytes(bytes),
+                none: () => "[red]None[/]"
+            );
+        }
 
-            // Short data that can't contain a valid TLV structure
-            if (data.Length < 3) // Minimum: tag + length + some content
+        private static string ParseScpSupportFromBytes(byte[] data)
+        {
+            if (data.Length == 0 || data.Length < 3) // Minimum: tag + length + some content
             {
                 return "[red]None[/]";
             }

@@ -13,6 +13,8 @@ namespace Gp4Net.Tests.Integration
     /// <summary>
     /// Tests based on real card traces to verify secure channel auto-detection and KDF.
     /// </summary>
+    [TestFixture]
+    [Category("Integration")]
     public class TraceBasedSecureChannelTests
     {
         private readonly Mock<ILogger<KeysetResolver>> _loggerMock;

@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Gp4Net.Constants;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Transport;
@@ -42,7 +43,7 @@ namespace Gp4Net.Domain.Protocol
         }
 
         /// <inheritdoc />
-        public async Task<SecureChannelSession> EstablishAsync(
+        public async Task<Result<SecureChannelSession, SmartCardError>> EstablishAsync(
             ICardChannel channel,
             IApduTransport transport,
             IKeySet keySet,
@@ -64,21 +65,26 @@ namespace Gp4Net.Domain.Protocol
                 // Generate host challenge
                 var hostChallenge = _challengeGenerator.GenerateChallenge(8);
 
-                // Create INITIALIZE UPDATE command based on key set type
-                var protocolVersion = DetectProtocolFromKeySet(keySet);
+                // Detect protocol version from key set
+                var protocolVersionResult = DetectProtocolFromKeySet(keySet);
+                if (protocolVersionResult.IsFailure)
+                {
+                    _logger.LogError("Failed to detect protocol from key set");
+                    return protocolVersionResult.Error;
+                }
+
+                var protocolVersion = protocolVersionResult.Value;
                 var protocol = _protocolFactory.CreateProtocol(protocolVersion, keySet);
 
+                // Create INITIALIZE UPDATE command
                 var initUpdateCmdResult = protocol.CreateInitializeUpdateCommand(hostChallenge);
-                
                 if (initUpdateCmdResult.IsFailure)
                 {
-                    throw new InvalidOperationException(
-                        $"Failed to create INITIALIZE UPDATE command: {initUpdateCmdResult.Error.Message}"
-                    );
+                    _logger.LogError("Failed to create INITIALIZE UPDATE command: {Error}", initUpdateCmdResult.Error.Message);
+                    return initUpdateCmdResult.Error;
                 }
                 
                 var initUpdateCmd = initUpdateCmdResult.Value;
-
                 _logger.LogDebug("Sending INITIALIZE UPDATE command");
 
                 // Send INITIALIZE UPDATE
@@ -88,9 +94,11 @@ namespace Gp4Net.Domain.Protocol
 
                 if (!initUpdateResponse.IsSuccess)
                 {
-                    throw new InvalidOperationException(
+                    var error = SmartCardError.CommunicationError(
                         $"INITIALIZE UPDATE failed: SW={initUpdateResponse.StatusWord:X4}"
                     );
+                    _logger.LogError("INITIALIZE UPDATE failed: SW={StatusWord:X4}", initUpdateResponse.StatusWord);
+                    return error;
                 }
 
                 // Parse response
@@ -103,10 +111,18 @@ namespace Gp4Net.Domain.Protocol
 
                 // Process response with appropriate protocol
                 var actualProtocol = _protocolFactory.CreateProtocol(parsedResponse.ScpId, keySet);
-                var context = actualProtocol.ProcessInitializeUpdateResponse(
+                var contextResult = actualProtocol.ProcessInitializeUpdateResponse(
                     parsedResponse,
                     hostChallenge
                 );
+
+                if (contextResult.IsFailure)
+                {
+                    _logger.LogError("Failed to process INITIALIZE UPDATE response: {Error}", contextResult.Error.Message);
+                    return contextResult.Error;
+                }
+
+                var context = contextResult.Value;
 
                 // Create EXTERNAL AUTHENTICATE command
                 var extAuthCmdResult = actualProtocol.CreateExternalAuthenticateCommand(
@@ -116,13 +132,11 @@ namespace Gp4Net.Domain.Protocol
                 
                 if (extAuthCmdResult.IsFailure)
                 {
-                    throw new InvalidOperationException(
-                        $"Failed to create EXTERNAL AUTHENTICATE command: {extAuthCmdResult.Error.Message}"
-                    );
+                    _logger.LogError("Failed to create EXTERNAL AUTHENTICATE command: {Error}", extAuthCmdResult.Error.Message);
+                    return extAuthCmdResult.Error;
                 }
                 
                 var extAuthCmd = extAuthCmdResult.Value;
-
                 _logger.LogDebug("Sending EXTERNAL AUTHENTICATE command");
 
                 // Send EXTERNAL AUTHENTICATE
@@ -132,9 +146,11 @@ namespace Gp4Net.Domain.Protocol
 
                 if (!extAuthResponse.IsSuccess)
                 {
-                    throw new InvalidOperationException(
+                    var error = SmartCardError.CommunicationError(
                         $"EXTERNAL AUTHENTICATE failed: SW={extAuthResponse.StatusWord:X4}"
                     );
+                    _logger.LogError("EXTERNAL AUTHENTICATE failed: SW={StatusWord:X4}", extAuthResponse.StatusWord);
+                    return error;
                 }
 
                 // Create secure channel session
@@ -145,17 +161,17 @@ namespace Gp4Net.Domain.Protocol
                     parsedResponse.ScpId
                 );
 
-                return session;
+                return Result<SecureChannelSession, SmartCardError>.Ok(session);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to establish secure channel");
-                throw;
+                return SmartCardError.UnexpectedError($"Unexpected error during secure channel establishment: {ex.Message}", ex);
             }
         }
 
         /// <inheritdoc />
-        public async Task<SecureChannelSession> EstablishAutoDetectAsync(
+        public async Task<Result<SecureChannelSession, SmartCardError>> EstablishAutoDetectAsync(
             ICardChannel channel,
             IApduTransport transport,
             IKeySet keySet,
@@ -178,13 +194,11 @@ namespace Gp4Net.Domain.Protocol
                 var initUpdateCmdResult = InitializeUpdateCommand.Create(0x00, 0x00, hostChallenge);
                 if (initUpdateCmdResult.IsFailure)
                 {
-                    throw new InvalidOperationException(
-                        $"Failed to create INITIALIZE UPDATE command: {initUpdateCmdResult.Error.Message}"
-                    );
+                    _logger.LogError("Failed to create INITIALIZE UPDATE command: {Error}", initUpdateCmdResult.Error.Message);
+                    return initUpdateCmdResult.Error;
                 }
                 
                 var initUpdateCmd = initUpdateCmdResult.Value;
-
                 _logger.LogDebug("Sending INITIALIZE UPDATE for protocol detection");
 
                 // Send INITIALIZE UPDATE
@@ -200,9 +214,8 @@ namespace Gp4Net.Domain.Protocol
                     initUpdateCmdResult = InitializeUpdateCommand.Create(0xFF, 0x00, hostChallenge);
                     if (initUpdateCmdResult.IsFailure)
                     {
-                        throw new InvalidOperationException(
-                            $"Failed to create INITIALIZE UPDATE command: {initUpdateCmdResult.Error.Message}"
-                        );
+                        _logger.LogError("Failed to create INITIALIZE UPDATE command (retry): {Error}", initUpdateCmdResult.Error.Message);
+                        return initUpdateCmdResult.Error;
                     }
                     
                     initUpdateCmd = initUpdateCmdResult.Value;
@@ -212,9 +225,11 @@ namespace Gp4Net.Domain.Protocol
 
                     if (!initUpdateResponse.IsSuccess)
                     {
-                        throw new InvalidOperationException(
+                        var error = SmartCardError.CommunicationError(
                             $"INITIALIZE UPDATE failed: SW={initUpdateResponse.StatusWord:X4}"
                         );
+                        _logger.LogError("INITIALIZE UPDATE failed: SW={StatusWord:X4}", initUpdateResponse.StatusWord);
+                        return error;
                     }
                 }
 
@@ -228,23 +243,29 @@ namespace Gp4Net.Domain.Protocol
                 var protocol = _protocolFactory.CreateProtocol(detectedProtocol, keySet);
 
                 // Process response
-                var context = protocol.ProcessInitializeUpdateResponse(
+                var contextResult = protocol.ProcessInitializeUpdateResponse(
                     parsedResponse,
                     hostChallenge
                 );
+
+                if (contextResult.IsFailure)
+                {
+                    _logger.LogError("Failed to process INITIALIZE UPDATE response: {Error}", contextResult.Error.Message);
+                    return contextResult.Error;
+                }
+
+                var context = contextResult.Value;
 
                 // Create EXTERNAL AUTHENTICATE command
                 var extAuthCmdResult = protocol.CreateExternalAuthenticateCommand(context, securityLevel);
                 
                 if (extAuthCmdResult.IsFailure)
                 {
-                    throw new InvalidOperationException(
-                        $"Failed to create EXTERNAL AUTHENTICATE command: {extAuthCmdResult.Error.Message}"
-                    );
+                    _logger.LogError("Failed to create EXTERNAL AUTHENTICATE command: {Error}", extAuthCmdResult.Error.Message);
+                    return extAuthCmdResult.Error;
                 }
                 
                 var extAuthCmd = extAuthCmdResult.Value;
-
                 _logger.LogDebug("Sending EXTERNAL AUTHENTICATE command");
 
                 // Send EXTERNAL AUTHENTICATE
@@ -254,9 +275,11 @@ namespace Gp4Net.Domain.Protocol
 
                 if (!extAuthResponse.IsSuccess)
                 {
-                    throw new InvalidOperationException(
+                    var error = SmartCardError.CommunicationError(
                         $"EXTERNAL AUTHENTICATE failed: SW={extAuthResponse.StatusWord:X4}"
                     );
+                    _logger.LogError("EXTERNAL AUTHENTICATE failed: SW={StatusWord:X4}", extAuthResponse.StatusWord);
+                    return error;
                 }
 
                 // Create secure channel session
@@ -267,12 +290,12 @@ namespace Gp4Net.Domain.Protocol
                     detectedProtocol
                 );
 
-                return session;
+                return Result<SecureChannelSession, SmartCardError>.Ok(session);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to establish secure channel with auto-detection");
-                throw;
+                return SmartCardError.UnexpectedError($"Unexpected error during secure channel auto-detection: {ex.Message}", ex);
             }
         }
 
@@ -280,16 +303,13 @@ namespace Gp4Net.Domain.Protocol
         /// <summary>
         /// Detects the protocol version from the key set type.
         /// </summary>
-        private byte DetectProtocolFromKeySet(IKeySet keySet)
+        private Result<byte, SmartCardError> DetectProtocolFromKeySet(IKeySet keySet)
         {
             return keySet switch
             {
-                Scp02KeySet _ => ProtocolIdentifiers.Scp02,
-                Scp03KeySet _ => ProtocolIdentifiers.Scp03,
-                _
-                    => throw new NotSupportedException(
-                        $"Unknown key set type: {keySet.GetType().Name}"
-                    ),
+                Scp02KeySet _ => Result<byte, SmartCardError>.Ok(ProtocolIdentifiers.Scp02),
+                Scp03KeySet _ => Result<byte, SmartCardError>.Ok(ProtocolIdentifiers.Scp03),
+                _ => SmartCardError.InvalidData($"Unknown key set type: {keySet.GetType().Name}")
             };
         }
     }

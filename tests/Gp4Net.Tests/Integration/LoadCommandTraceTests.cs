@@ -12,6 +12,7 @@ namespace Gp4Net.Tests.Integration
     /// Tests LOAD command chunking using trace data.
     /// </summary>
     [TestFixture]
+    [Category("Integration")]
     public class LoadCommandTraceTests : TraceBasedTestBase
     {
         private readonly string _capFilePath;

@@ -172,17 +172,17 @@ namespace Gp4Net.Tool.Services
             if (encKey.Length == 16 && macKey.Length == 16 && dekKey.Length == 16)
             {
                 // 3DES keys - likely SCP02
-                return new Scp02KeySet(encKey, macKey, dekKey, version);
+                return Scp02KeySet.Create(encKey, macKey, dekKey, version).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp02KeySet: {e.Message}"));
             }
             else if (encKey.Length >= 16 && rmacKey != null)
             {
                 // AES keys with RMAC - SCP03
-                return new Scp03KeySet(encKey, macKey, dekKey, version);
+                return Scp03KeySet.Create(encKey, macKey, dekKey, version).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp03KeySet: {e.Message}"));
             }
             else
             {
                 // Default to SCP02
-                return new Scp02KeySet(encKey, macKey, dekKey, version);
+                return Scp02KeySet.Create(encKey, macKey, dekKey, version).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp02KeySet: {e.Message}"));
             }
         }
 
@@ -241,12 +241,12 @@ namespace Gp4Net.Tool.Services
             // Determine protocol based on key length
             if (encKey.Length == 16 && macKey.Length == 16 && dekKey.Length == 16)
             {
-                return new Scp02KeySet(encKey, macKey, dekKey, keyVersion);
+                return Scp02KeySet.Create(encKey, macKey, dekKey, keyVersion).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp02KeySet: {e.Message}"));
             }
             else
             {
                 // For SCP03, RMAC defaults to MAC
-                return new Scp03KeySet(encKey, macKey, dekKey, keyVersion);
+                return Scp03KeySet.Create(encKey, macKey, dekKey, keyVersion).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp03KeySet: {e.Message}"));
             }
         }
     }

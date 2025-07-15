@@ -96,27 +96,25 @@ namespace Gp4Net.Domain.Protocol
         /// <summary>
         /// Processes an INITIALIZE UPDATE response and establishes a session context.
         /// </summary>
-        public SecureChannelContext ProcessInitializeUpdateResponse(
+        public Result<SecureChannelContext, SmartCardError> ProcessInitializeUpdateResponse(
             InitializeUpdateResponse response,
             byte[] hostChallenge
         )
         {
-            ArgumentNullException.ThrowIfNull(response);
+            if (response == null)
+            {
+                return SmartCardError.InvalidArgument("Response cannot be null");
+            }
 
             if (hostChallenge?.Length != 8)
             {
-                throw new ArgumentException(
-                    "Host challenge must be 8 bytes.",
-                    nameof(hostChallenge)
-                );
+                return SmartCardError.InvalidData("Host challenge must be 8 bytes");
             }
 
             // Verify the response is for SCP03
             if ((response.ScpId & ProtocolIdentifiers.ProtocolMask) != ProtocolIdentifiers.Scp03)
             {
-                throw new InvalidOperationException(
-                    $"Expected SCP03 but received SCP{response.ScpId:X2}"
-                );
+                return SmartCardError.InvalidResponse($"Expected SCP03 but received SCP{response.ScpId:X2}");
             }
 
             // Extract implementation parameter from response
@@ -143,15 +141,19 @@ namespace Gp4Net.Domain.Protocol
 
             // Strict spec: verify card cryptogram
             if (!VerifyCardCryptogram(response, hostChallenge, sessionKeys))
-                throw new InvalidOperationException("Card cryptogram verification failed.");
+            {
+                return SmartCardError.SecurityError("Card cryptogram verification failed");
+            }
 
-            return new SecureChannelContext(
+            var context = new SecureChannelContext(
                 hostChallenge,
                 response,
                 sessionKeys,
                 ProtocolVersion,
                 _keySet
             );
+
+            return Result<SecureChannelContext, SmartCardError>.Ok(context);
         }
 
         private byte[]? _lastExternalAuthMac; // Store the full MAC for chaining value

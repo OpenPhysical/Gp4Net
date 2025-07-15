@@ -5,6 +5,7 @@
 
 using System;
 using System.Security.Cryptography;
+using Gp4Net.Core;
 
 namespace Gp4Net.Domain.Keys
 {
@@ -83,9 +84,6 @@ namespace Gp4Net.Domain.Keys
         {
             KeyVersion = keyVersion;
             KeyId = keyId;
-            ArgumentNullException.ThrowIfNull(encKey);
-            ArgumentNullException.ThrowIfNull(macKey);
-            ArgumentNullException.ThrowIfNull(dekKey);
             EncKey = encKey;
             MacKey = macKey;
             DekKey = dekKey;
@@ -120,27 +118,39 @@ namespace Gp4Net.Domain.Keys
     public class Scp02KeySet : KeySet
     {
         /// <summary>
-        /// Initializes a new instance of the Scp02KeySet class.
+        /// Private constructor for successful creation.
+        /// </summary>
+        private Scp02KeySet(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
+            : base(keyVersion, keyId, encKey, macKey, dekKey)
+        {
+        }
+
+        /// <summary>
+        /// Creates a new SCP02 key set with validation.
         /// </summary>
         /// <param name="encKey">The 3DES encryption key (16 or 24 bytes).</param>
         /// <param name="macKey">The 3DES MAC key (16 or 24 bytes).</param>
         /// <param name="dekKey">The 3DES data encryption key (16 or 24 bytes).</param>
         /// <param name="keyVersion">The key version number (default is 0).</param>
         /// <param name="keyId">The key identifier (default is 0).</param>
-        public Scp02KeySet(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
-            : base(keyVersion, keyId, encKey, macKey, dekKey)
+        /// <returns>A Result containing the KeySet or an error.</returns>
+        public static Result<Scp02KeySet, SmartCardError> Create(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
         {
-            ValidateKey(encKey, nameof(encKey));
-            ValidateKey(macKey, nameof(macKey));
-            ValidateKey(dekKey, nameof(dekKey));
+            return ValidateKey(encKey, nameof(encKey))
+                .Bind(_ => ValidateKey(macKey, nameof(macKey)))
+                .Bind(_ => ValidateKey(dekKey, nameof(dekKey)))
+                .Map(_ => new Scp02KeySet(encKey, macKey, dekKey, keyVersion, keyId));
         }
 
-        private static void ValidateKey(byte[] key, string paramName)
+        private static Result<Unit, SmartCardError> ValidateKey(byte[] key, string paramName)
         {
+            if (key is null)
+                return SmartCardError.InvalidArgument($"Key {paramName} cannot be null");
+            
             if (key.Length != 16 && key.Length != 24)
-            {
-                throw new ArgumentException("3DES key must be 16 or 24 bytes.", paramName);
-            }
+                return SmartCardError.InvalidArgument($"3DES key {paramName} must be 16 or 24 bytes, got {key.Length} bytes");
+            
+            return Unit.Value;
         }
     }
 
@@ -150,33 +160,48 @@ namespace Gp4Net.Domain.Keys
     public class Scp03KeySet : KeySet
     {
         /// <summary>
-        /// Initializes a new instance of the Scp03KeySet class.
+        /// Private constructor for successful creation.
+        /// </summary>
+        private Scp03KeySet(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
+            : base(keyVersion, keyId, encKey, macKey, dekKey)
+        {
+        }
+
+        /// <summary>
+        /// Creates a new SCP03 key set with validation.
         /// </summary>
         /// <param name="encKey">The AES encryption key (16, 24, or 32 bytes).</param>
         /// <param name="macKey">The AES MAC key (16, 24, or 32 bytes).</param>
         /// <param name="dekKey">The AES data encryption key (16, 24, or 32 bytes).</param>
         /// <param name="keyVersion">The key version number (default is 0).</param>
         /// <param name="keyId">The key identifier (default is 0).</param>
-        public Scp03KeySet(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
-            : base(keyVersion, keyId, encKey, macKey, dekKey)
+        /// <returns>A Result containing the KeySet or an error.</returns>
+        public static Result<Scp03KeySet, SmartCardError> Create(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
         {
-            ValidateKey(encKey, nameof(encKey));
-            ValidateKey(macKey, nameof(macKey));
-            ValidateKey(dekKey, nameof(dekKey));
-
-            // All keys should have the same length
-            if (encKey.Length != macKey.Length || macKey.Length != dekKey.Length)
-            {
-                throw new ArgumentException("All AES keys must have the same length.");
-            }
+            return ValidateKey(encKey, nameof(encKey))
+                .Bind(_ => ValidateKey(macKey, nameof(macKey)))
+                .Bind(_ => ValidateKey(dekKey, nameof(dekKey)))
+                .Bind(_ => ValidateKeyLengthsMatch(encKey, macKey, dekKey))
+                .Map(_ => new Scp03KeySet(encKey, macKey, dekKey, keyVersion, keyId));
         }
 
-        private static void ValidateKey(byte[] key, string paramName)
+        private static Result<Unit, SmartCardError> ValidateKey(byte[] key, string paramName)
         {
+            if (key is null)
+                return SmartCardError.InvalidArgument($"Key {paramName} cannot be null");
+            
             if (key.Length != 16 && key.Length != 24 && key.Length != 32)
-            {
-                throw new ArgumentException("AES key must be 16, 24, or 32 bytes.", paramName);
-            }
+                return SmartCardError.InvalidArgument($"AES key {paramName} must be 16, 24, or 32 bytes, got {key.Length} bytes");
+            
+            return Unit.Value;
+        }
+
+        private static Result<Unit, SmartCardError> ValidateKeyLengthsMatch(byte[] encKey, byte[] macKey, byte[] dekKey)
+        {
+            if (encKey.Length != macKey.Length || macKey.Length != dekKey.Length)
+                return SmartCardError.InvalidArgument($"All AES keys must have the same length. Got ENC: {encKey.Length}, MAC: {macKey.Length}, DEK: {dekKey.Length} bytes");
+            
+            return Unit.Value;
         }
     }
 }

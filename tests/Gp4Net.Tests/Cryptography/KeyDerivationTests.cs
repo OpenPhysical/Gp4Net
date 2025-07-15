@@ -35,13 +35,17 @@ namespace Gp4Net.Tests.Cryptography
             );
 
             // Assert
-            Assert.That(sessionKeys, Is.Not.Null);
-            Assert.That(sessionKeys.SEnc, Is.Not.Null);
-            Assert.That(sessionKeys.SMac, Is.Not.Null);
-            Assert.That(sessionKeys.SRMac, Is.Not.Null);
             Assert.That(sessionKeys.SEnc.Length, Is.EqualTo(16));
             Assert.That(sessionKeys.SMac.Length, Is.EqualTo(16));
             Assert.That(sessionKeys.SRMac.Length, Is.EqualTo(16));
+            // Verify keys are different from master keys
+            Assert.That(sessionKeys.SEnc, Is.Not.EqualTo(keySet.EncKey));
+            Assert.That(sessionKeys.SMac, Is.Not.EqualTo(keySet.MacKey));
+            Assert.That(sessionKeys.SRMac, Is.Not.EqualTo(keySet.MacKey));
+            // Verify keys are not all zeros
+            Assert.That(sessionKeys.SEnc, Is.Not.EqualTo(new byte[16]));
+            Assert.That(sessionKeys.SMac, Is.Not.EqualTo(new byte[16]));
+            Assert.That(sessionKeys.SRMac, Is.Not.EqualTo(new byte[16]));
         }
 
         [Test]
@@ -91,8 +95,12 @@ namespace Gp4Net.Tests.Cryptography
             var cryptogram = KeyDerivation.CalculateCryptogram(key, data, true);
 
             // Assert
-            Assert.That(cryptogram, Is.Not.Null);
             Assert.That(cryptogram.Length, Is.EqualTo(8));
+            // Verify cryptogram is not all zeros (would indicate a calculation error)
+            Assert.That(cryptogram, Is.Not.EqualTo(new byte[8]));
+            // Verify cryptogram is deterministic - same inputs should produce same output
+            var cryptogram2 = KeyDerivation.CalculateCryptogram(key, data, true);
+            Assert.That(cryptogram, Is.EqualTo(cryptogram2));
         }
 
         [Test]

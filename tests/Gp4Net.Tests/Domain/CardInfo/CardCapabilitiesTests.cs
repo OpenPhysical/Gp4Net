@@ -1,4 +1,5 @@
 using System.Linq;
+using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
 using NUnit.Framework;
 

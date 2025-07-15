@@ -1,6 +1,7 @@
 using System;
 using System.Security.Cryptography;
 using Gp4Net.Constants;
+using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Transport;
@@ -77,46 +78,61 @@ namespace Gp4Net.Domain
         /// Wraps an APDU command with secure messaging.
         /// </summary>
         /// <param name="command">The command to wrap.</param>
-        /// <returns>The wrapped command data (without Le) and the expected response length.</returns>
-        public (byte[] wrappedData, int? expectedResponseLength) WrapCommand(IApduCommand command)
+        /// <returns>A result containing the wrapped command data (without Le) and the expected response length, or an error.</returns>
+        public Result<(byte[] wrappedData, int? expectedResponseLength), SmartCardError> WrapCommand(IApduCommand command)
         {
-            ArgumentNullException.ThrowIfNull(command);
-
-            lock (_lock)
+            if (command == null)
             {
-                // Build command data without Le
-                var hasData = command.Data != null && command.Data.Length > 0;
-                var commandData = hasData 
-                    ? new byte[5 + command.Data!.Length]  // Header + Lc + Data
-                    : new byte[4];                        // Header only
-                
-                commandData[0] = command.Cla;
-                commandData[1] = command.Ins;
-                commandData[2] = command.P1;
-                commandData[3] = command.P2;
-                
-                if (hasData)
+                return SmartCardError.InvalidArgument("Command cannot be null");
+            }
+
+            try
+            {
+                lock (_lock)
                 {
-                    commandData[4] = (byte)command.Data!.Length;
-                    Array.Copy(command.Data, 0, commandData, 5, command.Data.Length);
+                    // Build command data without Le
+                    var hasData = command.Data != null && command.Data.Length > 0;
+                    var commandData = hasData 
+                        ? new byte[5 + command.Data!.Length]  // Header + Lc + Data
+                        : new byte[4];                        // Header only
+                    
+                    commandData[0] = command.Cla;
+                    commandData[1] = command.Ins;
+                    commandData[2] = command.P1;
+                    commandData[3] = command.P2;
+                    
+                    if (hasData)
+                    {
+                        commandData[4] = (byte)command.Data!.Length;
+                        Array.Copy(command.Data, 0, commandData, 5, command.Data.Length);
+                    }
+
+                    var wrappedCommand = commandData;
+
+                    // Apply encryption if required
+                    if (_securityLevel.HasCDecryption())
+                    {
+                        wrappedCommand = ApplyEncryption(wrappedCommand);
+                    }
+
+                    // Apply MAC if required
+                    if (_securityLevel.HasCMac())
+                    {
+                        wrappedCommand = ApplyMac(wrappedCommand);
+                    }
+
+                    // Return wrapped data and original Le
+                    return Result<(byte[] wrappedData, int? expectedResponseLength), SmartCardError>.Ok(
+                        (wrappedCommand, command.ExpectedResponseLength));
                 }
-
-                var wrappedCommand = commandData;
-
-                // Apply encryption if required
-                if (_securityLevel.HasCDecryption())
-                {
-                    wrappedCommand = ApplyEncryption(wrappedCommand);
-                }
-
-                // Apply MAC if required
-                if (_securityLevel.HasCMac())
-                {
-                    wrappedCommand = ApplyMac(wrappedCommand);
-                }
-
-                // Return wrapped data and original Le
-                return (wrappedCommand, command.ExpectedResponseLength);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return SmartCardError.SecurityError($"Failed to wrap command: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return SmartCardError.UnexpectedError($"Unexpected error wrapping command: {ex.Message}", ex);
             }
         }
 
@@ -125,32 +141,43 @@ namespace Gp4Net.Domain
         /// Unwraps an APDU response with secure messaging.
         /// </summary>
         /// <param name="response">The response APDU to unwrap.</param>
-        /// <returns>The unwrapped response APDU.</returns>
-        public byte[] UnwrapResponse(byte[] response)
+        /// <returns>A result containing the unwrapped response APDU or an error.</returns>
+        public Result<byte[], SmartCardError> UnwrapResponse(byte[] response)
         {
             if (response == null || response.Length < 2)
             {
-                throw new ArgumentException("Invalid response APDU.", nameof(response));
+                return SmartCardError.InvalidArgument("Invalid response APDU");
             }
 
-            lock (_lock)
+            try
             {
-                var unwrappedResponse = new byte[response.Length];
-                Array.Copy(response, unwrappedResponse, response.Length);
-
-                // Verify and remove R-MAC if required
-                if (_securityLevel.HasRMac())
+                lock (_lock)
                 {
-                    unwrappedResponse = VerifyAndRemoveRMac(unwrappedResponse);
-                }
+                    var unwrappedResponse = new byte[response.Length];
+                    Array.Copy(response, unwrappedResponse, response.Length);
 
-                // Decrypt if required
-                if (_securityLevel.HasREncryption())
-                {
-                    unwrappedResponse = DecryptResponse(unwrappedResponse);
-                }
+                    // Verify and remove R-MAC if required
+                    if (_securityLevel.HasRMac())
+                    {
+                        unwrappedResponse = VerifyAndRemoveRMac(unwrappedResponse);
+                    }
 
-                return unwrappedResponse;
+                    // Decrypt if required
+                    if (_securityLevel.HasREncryption())
+                    {
+                        unwrappedResponse = DecryptResponse(unwrappedResponse);
+                    }
+
+                    return Result<byte[], SmartCardError>.Ok(unwrappedResponse);
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                return SmartCardError.SecurityError($"Failed to unwrap response: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return SmartCardError.UnexpectedError($"Unexpected error unwrapping response: {ex.Message}", ex);
             }
         }
 

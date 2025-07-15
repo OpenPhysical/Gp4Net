@@ -124,28 +124,30 @@ namespace Gp4Net.Tests.Infrastructure
     /// </summary>
     public class TestSecureChannelManager : ISecureChannelManager
     {
-        public async Task<SecureChannelSession> EstablishAsync(
+        public async Task<Result<SecureChannelSession, SmartCardError>> EstablishAsync(
             ICardChannel channel,
             IApduTransport transport,
             IKeySet keySet,
             SecurityLevel securityLevel,
             CancellationToken cancellationToken = default)
         {
-            // For testing, throw NotImplementedException
+            // For testing, return failure
             // Real tests should use actual secure channel implementations or trace-based cards
-            throw new NotImplementedException("TestSecureChannelManager is a stub for interface compatibility only");
+            await Task.CompletedTask;
+            return SmartCardError.UnexpectedError("TestSecureChannelManager is a stub for interface compatibility only");
         }
 
-        public async Task<SecureChannelSession> EstablishAutoDetectAsync(
+        public async Task<Result<SecureChannelSession, SmartCardError>> EstablishAutoDetectAsync(
             ICardChannel channel,
             IApduTransport transport,
             IKeySet keySet,
             SecurityLevel securityLevel,
             CancellationToken cancellationToken = default)
         {
-            // For testing, throw NotImplementedException
+            // For testing, return failure
             // Real tests should use actual secure channel implementations or trace-based cards
-            throw new NotImplementedException("TestSecureChannelManager is a stub for interface compatibility only");
+            await Task.CompletedTask;
+            return SmartCardError.UnexpectedError("TestSecureChannelManager is a stub for interface compatibility only");
         }
     }
 

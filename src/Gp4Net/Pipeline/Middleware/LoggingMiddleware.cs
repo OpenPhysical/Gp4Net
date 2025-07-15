@@ -119,9 +119,9 @@ namespace Gp4Net.Pipeline.Middleware
 
         private void LogResponse(Result<CommandResponse, SmartCardError> result, TimeSpan elapsed, string requestId)
         {
-            result.Match<Unit>(
-                success => { LogSuccessResponse(success, elapsed, requestId); return Unit.Value; },
-                failure => { LogFailureResponse(failure, elapsed, requestId); return Unit.Value; });
+            result.Match<Core.Unit>(
+                success => { LogSuccessResponse(success, elapsed, requestId); return Core.Unit.Value; },
+                failure => { LogFailureResponse(failure, elapsed, requestId); return Core.Unit.Value; });
         }
 
         private void LogSuccessResponse(CommandResponse response, TimeSpan elapsed, string requestId)

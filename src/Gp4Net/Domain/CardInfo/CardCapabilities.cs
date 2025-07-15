@@ -63,64 +63,20 @@ namespace Gp4Net.Domain.CardInfo
 
         private CardCapabilities(byte[] rawData)
         {
-            ArgumentNullException.ThrowIfNull(rawData);
-            RawData = rawData;
+            RawData = rawData; // Validation done in TryParse
         }
 
         /// <summary>
         /// Parses card capabilities from tag 0x67 data.
         /// </summary>
+        /// <param name="data">The capabilities data bytes.</param>
+        /// <returns>The parsed capabilities.</returns>
+        /// <exception cref="ArgumentException">Thrown when data is null or empty.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when parsing fails.</exception>
+        /// <remarks>Consider using TryParse for functional error handling.</remarks>
         public static CardCapabilities Parse(byte[] data)
         {
-            if (data == null || data.Length == 0)
-            {
-                throw new ArgumentException(
-                    "Capabilities data cannot be null or empty",
-                    nameof(data)
-                );
-            }
-
-            var capabilities = new CardCapabilities(data);
-
-            // Parse DER structure
-            foreach (var element in SimpleTlvParser.Enumerate(data))
-            {
-                switch (element.Tag)
-                {
-                    case 0xA0: // SCP options
-                        capabilities.ParseScpOptions(element.Content);
-                        break;
-                    case 0x80: // Security Domain privileges
-                        capabilities.SdPrivileges = ParseSecurityDomainPrivileges(element.Content);
-                        break;
-                    case 0x81: // Application privileges
-                        capabilities.AppPrivileges = ParseApplicationPrivileges(element.Content);
-                        break;
-                    case 0x82: // Supported algorithms
-                        capabilities.Algorithms = ParseSupportedAlgorithms(element.Content);
-                        break;
-                    case 0x83: // LFDB hash algorithms
-                        capabilities.ParseCipherSuite(CipherUsage.LfdbHash, element.Content);
-                        break;
-                    case 0x84: // Token verification ciphers
-                        capabilities.ParseCipherSuite(CipherUsage.TokenVerification, element.Content);
-                        break;
-                    case 0x85: // Receipt generation ciphers
-                        capabilities.ParseCipherSuite(CipherUsage.ReceiptGeneration, element.Content);
-                        break;
-                    case 0x86: // DAP verification ciphers
-                        capabilities.ParseCipherSuite(CipherUsage.DapVerification, element.Content);
-                        break;
-                    case 0x87: // Mandated DAP verification ciphers
-                        capabilities.ParseCipherSuite(
-                            CipherUsage.MandatedDapVerification,
-                            element.Content
-                        );
-                        break;
-                }
-            }
-
-            return capabilities;
+            return TryParse(new Option<byte[]>.Some(data)).GetOrThrow(error => new InvalidOperationException(error.Message));
         }
 
         /// <summary>
@@ -128,23 +84,66 @@ namespace Gp4Net.Domain.CardInfo
         /// </summary>
         /// <param name="data">The capabilities data bytes.</param>
         /// <returns>A result containing the parsed capabilities or an error.</returns>
-        public static Result<CardCapabilities, SmartCardError> TryParse(byte[] data)
+        public static Result<CardCapabilities, SmartCardError> TryParse(Option<byte[]> data)
         {
-            if (data == null || data.Length == 0)
-            {
-                return Result<CardCapabilities, SmartCardError>.Fail(
-                    SmartCardError.InvalidData("Capabilities data cannot be null or empty"));
-            }
+            return data.Match(
+                some: bytes => bytes.Length == 0 
+                    ? SmartCardError.InvalidData("Capabilities data cannot be empty")
+                    : TryParseFromBytes(bytes),
+                none: () => SmartCardError.InvalidData("Capabilities data cannot be null")
+            );
+        }
+
+        private static Result<CardCapabilities, SmartCardError> TryParseFromBytes(byte[] data)
+        {
 
             try
             {
-                var capabilities = Parse(data);
-                return Result<CardCapabilities, SmartCardError>.Ok(capabilities);
+                var capabilities = new CardCapabilities(data);
+
+                // Parse DER structure
+                foreach (var element in SimpleTlvParser.Enumerate(data))
+                {
+                    switch (element.Tag)
+                    {
+                        case 0xA0: // SCP options
+                            capabilities.ParseScpOptions(element.Content);
+                            break;
+                        case 0x80: // Security Domain privileges
+                            capabilities.SdPrivileges = ParseSecurityDomainPrivileges(element.Content);
+                            break;
+                        case 0x81: // Application privileges
+                            capabilities.AppPrivileges = ParseApplicationPrivileges(element.Content);
+                            break;
+                        case 0x82: // Supported algorithms
+                            capabilities.Algorithms = ParseSupportedAlgorithms(element.Content);
+                            break;
+                        case 0x83: // LFDB hash algorithms
+                            capabilities.ParseCipherSuite(CipherUsage.LfdbHash, element.Content);
+                            break;
+                        case 0x84: // Token verification ciphers
+                            capabilities.ParseCipherSuite(CipherUsage.TokenVerification, element.Content);
+                            break;
+                        case 0x85: // Receipt generation ciphers
+                            capabilities.ParseCipherSuite(CipherUsage.ReceiptGeneration, element.Content);
+                            break;
+                        case 0x86: // DAP verification ciphers
+                            capabilities.ParseCipherSuite(CipherUsage.DapVerification, element.Content);
+                            break;
+                        case 0x87: // Mandated DAP verification ciphers
+                            capabilities.ParseCipherSuite(
+                                CipherUsage.MandatedDapVerification,
+                                element.Content
+                            );
+                            break;
+                    }
+                }
+
+                return capabilities;
             }
             catch (Exception ex)
             {
-                return Result<CardCapabilities, SmartCardError>.Fail(
-                    SmartCardError.InvalidData($"Failed to parse card capabilities: {ex.Message}"));
+                return SmartCardError.InvalidData($"Failed to parse card capabilities: {ex.Message}");
             }
         }
 
@@ -152,8 +151,8 @@ namespace Gp4Net.Domain.CardInfo
         {
             // Parse according to Table H-6: SCP Information
             byte scpType = 0;
-            byte[]? supportedOptions = null;
-            byte[]? supportedKeys = null;
+            Option<byte[]> supportedOptions = new Option<byte[]>.None();
+            Option<byte[]> supportedKeys = new Option<byte[]>.None();
 
             foreach (var element in SimpleTlvParser.Enumerate(data))
             {
@@ -167,129 +166,149 @@ namespace Gp4Net.Domain.CardInfo
 
                         break;
                     case 0x81: // List of supported options
-                        supportedOptions = element.Content;
+                        supportedOptions = new Option<byte[]>.Some(element.Content);
                         break;
                     case 0x82: // Supported keys for SCP03
-                        supportedKeys = element.Content;
+                        supportedKeys = new Option<byte[]>.Some(element.Content);
                         break;
                 }
             }
 
             // Parse supported options (i parameters)
-            if (supportedOptions != null && scpType > 0)
-            {
-                // Parse supported key lengths for SCP03
-                if (scpType == 0x03 && supportedKeys != null && supportedKeys.Length > 0)
-                {
-                    var keyLengthsBuilder = ImmutableList.CreateBuilder<int>();
-                    var keyByte = supportedKeys[0];
-                    if ((keyByte & 0x01) != 0)
+            supportedOptions.Match<object>(
+                some: options => {
+                    if (scpType > 0)
                     {
-                        keyLengthsBuilder.Add(128);
-                    }
-
-                    if ((keyByte & 0x02) != 0)
-                    {
-                        keyLengthsBuilder.Add(192);
-                    }
-
-                    if ((keyByte & 0x04) != 0)
-                    {
-                        keyLengthsBuilder.Add(256);
-                    }
-
-                    SupportedKeyLengths = SupportedKeyLengths.SetItem(scpType, keyLengthsBuilder.ToImmutable());
-                }
-
-                // Each byte in supportedOptions represents one supported implementation parameter
-                var scpOptionsBuilder = ScpOptions.ToBuilder();
-                foreach (var option in supportedOptions)
-                {
-                    scpOptionsBuilder.Add(
-                        new ScpOption
+                        // Parse supported key lengths for SCP03
+                        if (scpType == 0x03)
                         {
-                            ScpId = scpType,
-                            Implementation = option,
-                            KeyLength = DetermineKeyLength(scpType, supportedKeys)
+                            supportedKeys.Match<object>(
+                                some: keys => {
+                                    if (keys.Length > 0)
+                                    {
+                                        var keyLengthsBuilder = ImmutableList.CreateBuilder<int>();
+                                        var keyByte = keys[0];
+                                        if ((keyByte & 0x01) != 0)
+                                        {
+                                            keyLengthsBuilder.Add(128);
+                                        }
+
+                                        if ((keyByte & 0x02) != 0)
+                                        {
+                                            keyLengthsBuilder.Add(192);
+                                        }
+
+                                        if ((keyByte & 0x04) != 0)
+                                        {
+                                            keyLengthsBuilder.Add(256);
+                                        }
+
+                                        SupportedKeyLengths = SupportedKeyLengths.SetItem(scpType, keyLengthsBuilder.ToImmutable());
+                                    }
+                                    return new object();
+                                },
+                                none: () => new object()
+                            );
                         }
-                    );
-                }
-                ScpOptions = scpOptionsBuilder.ToImmutable();
-            }
+
+                        // Each byte in supportedOptions represents one supported implementation parameter
+                        var scpOptionsBuilder = ScpOptions.ToBuilder();
+                        foreach (var option in options)
+                        {
+                            scpOptionsBuilder.Add(
+                                new ScpOption(
+                                    scpType,
+                                    option,
+                                    DetermineKeyLength(scpType, supportedKeys)
+                                )
+                            );
+                        }
+                        ScpOptions = scpOptionsBuilder.ToImmutable();
+                    }
+                    return new object();
+                },
+                none: () => new object()
+            );
         }
 
-        private static int DetermineKeyLength(byte scpId, byte[]? supportedKeys)
+        private static int DetermineKeyLength(byte scpId, Option<byte[]> supportedKeys)
         {
             // For SCP03, parse supported keys according to Table H-7
-            if (scpId == 0x03 && supportedKeys != null && supportedKeys.Length > 0)
+            if (scpId == 0x03)
             {
-                var keyByte = supportedKeys[0];
-                // Multiple key lengths can be supported
-                if ((keyByte & 0x04) != 0)
-                {
-                    return 256; // Prefer highest
-                }
+                return supportedKeys.Match(
+                    some: keys => {
+                        if (keys.Length > 0)
+                        {
+                            var keyByte = keys[0];
+                            // Multiple key lengths can be supported
+                            if ((keyByte & 0x04) != 0)
+                            {
+                                return 256; // Prefer highest
+                            }
 
-                if ((keyByte & 0x02) != 0)
-                {
-                    return 192;
-                }
+                            if ((keyByte & 0x02) != 0)
+                            {
+                                return 192;
+                            }
 
-                if ((keyByte & 0x01) != 0)
-                {
-                    return 128;
-                }
+                            if ((keyByte & 0x01) != 0)
+                            {
+                                return 128;
+                            }
+                        }
+                        return 128; // Default
+                    },
+                    none: () => 128 // Default
+                );
             }
             return 128; // Default
         }
 
         private static SecurityDomainPrivileges ParseSecurityDomainPrivileges(byte[] data)
         {
-            if (data == null || data.Length < 3)
+            if (data.Length < 3)
             {
-                return new SecurityDomainPrivileges();
+                return new SecurityDomainPrivileges(0, 0, 0);
             }
 
-            return new SecurityDomainPrivileges
-            {
-                Byte1 = data[0],
-                Byte2 = data[1],
-                Byte3 = data.Length > 2 ? data[2] : (byte)0
-            };
+            return new SecurityDomainPrivileges(
+                data[0],
+                data[1],
+                data.Length > 2 ? data[2] : (byte)0
+            );
         }
 
         private static ApplicationPrivileges ParseApplicationPrivileges(byte[] data)
         {
-            if (data == null || data.Length < 3)
+            if (data.Length < 3)
             {
-                return new ApplicationPrivileges();
+                return new ApplicationPrivileges(0, 0, 0);
             }
 
-            return new ApplicationPrivileges
-            {
-                Byte1 = data[0],
-                Byte2 = data[1],
-                Byte3 = data.Length > 2 ? data[2] : (byte)0
-            };
+            return new ApplicationPrivileges(
+                data[0],
+                data[1],
+                data.Length > 2 ? data[2] : (byte)0
+            );
         }
 
         private static SupportedAlgorithms ParseSupportedAlgorithms(byte[] data)
         {
-            if (data == null || data.Length < 2)
+            if (data.Length < 2)
             {
-                return new SupportedAlgorithms();
+                return new SupportedAlgorithms(0, 0);
             }
 
-            return new SupportedAlgorithms
-            {
-                HashAlgorithms = data[0],
-                CipherAlgorithms = data.Length > 1 ? data[1] : (byte)0
-            };
+            return new SupportedAlgorithms(
+                data[0],
+                data.Length > 1 ? data[1] : (byte)0
+            );
         }
 
         private void ParseCipherSuite(CipherUsage usage, byte[] data)
         {
-            if (data == null || data.Length == 0)
+            if (data.Length == 0)
             {
                 return;
             }
@@ -406,22 +425,21 @@ namespace Gp4Net.Domain.CardInfo
     /// <summary>
     /// Represents an SCP option with implementation parameter.
     /// </summary>
-    public class ScpOption
-    {
-        public byte ScpId { get; set; }
-        public byte Implementation { get; set; }
-        public int KeyLength { get; set; }
-    }
+    public record ScpOption(
+        byte ScpId,
+        byte Implementation,
+        int KeyLength
+    );
 
     /// <summary>
     /// Security Domain privileges.
     /// </summary>
-    public class SecurityDomainPrivileges
+    public record SecurityDomainPrivileges(
+        byte Byte1,
+        byte Byte2,
+        byte Byte3
+    )
     {
-        public byte Byte1 { get; set; }
-        public byte Byte2 { get; set; }
-        public byte Byte3 { get; set; }
-
         public bool SecurityDomain => (Byte1 & 0x80) != 0;
         public bool DapVerification => (Byte1 & 0x40) != 0;
         public bool DelegatedManagement => (Byte1 & 0x20) != 0;
@@ -556,12 +574,12 @@ namespace Gp4Net.Domain.CardInfo
     /// <summary>
     /// Application privileges.
     /// </summary>
-    public class ApplicationPrivileges
+    public record ApplicationPrivileges(
+        byte Byte1,
+        byte Byte2,
+        byte Byte3
+    )
     {
-        public byte Byte1 { get; set; }
-        public byte Byte2 { get; set; }
-        public byte Byte3 { get; set; }
-
         // Note: Many privilege bits have same meaning as SecurityDomainPrivileges
         public bool CardLock => (Byte1 & 0x10) != 0;
         public bool CardTerminate => (Byte1 & 0x08) != 0;
@@ -612,11 +630,11 @@ namespace Gp4Net.Domain.CardInfo
     /// <summary>
     /// Supported algorithms.
     /// </summary>
-    public class SupportedAlgorithms
+    public record SupportedAlgorithms(
+        byte HashAlgorithms,
+        byte CipherAlgorithms
+    )
     {
-        public byte HashAlgorithms { get; set; }
-        public byte CipherAlgorithms { get; set; }
-
         public string GetHashAlgorithms()
         {
             var algs = new List<string>();

@@ -108,11 +108,8 @@ namespace Gp4Net.Tests.Integration
         /// </summary>
         protected void AssertCommandSucceeds(byte[] command, string description = "")
         {
-            Assert.That(CardService, Is.Not.Null);
+            var response = CardService!.SendCommand(command);
             
-            var response = CardService.SendCommand(command);
-            
-            Assert.That(response, Is.Not.Null);
             Assert.That(response.StatusWord, Is.EqualTo(0x9000), 
                 string.IsNullOrEmpty(description) ? "Command should succeed" : description);
         }
@@ -122,11 +119,8 @@ namespace Gp4Net.Tests.Integration
         /// </summary>
         protected void AssertCommandReturns(byte[] command, ushort expectedSw, string description = "")
         {
-            Assert.That(CardService, Is.Not.Null);
+            var response = CardService!.SendCommand(command);
             
-            var response = CardService.SendCommand(command);
-            
-            Assert.That(response, Is.Not.Null);
             Assert.That(response.StatusWord, Is.EqualTo(expectedSw),
                 string.IsNullOrEmpty(description) ? $"Command should return SW={expectedSw:X4}" : description);
         }
@@ -136,8 +130,7 @@ namespace Gp4Net.Tests.Integration
         /// </summary>
         protected CardResponse SendCommand(byte[] command)
         {
-            Assert.That(CardService, Is.Not.Null);
-            return CardService.SendCommand(command);
+            return CardService!.SendCommand(command);
         }
 
         /// <summary>
@@ -145,9 +138,7 @@ namespace Gp4Net.Tests.Integration
         /// </summary>
         protected async Task<T> ExecuteAsync<T>(Func<IGlobalPlatformService, Task<Result<T, SmartCardError>>> operation, string operationName = "")
         {
-            Assert.That(GlobalPlatformService, Is.Not.Null, "GlobalPlatformService must be initialized");
-            
-            var result = await operation(GlobalPlatformService);
+            var result = await operation(GlobalPlatformService!);
             
             return await result.MatchAsync(
                 async value => value,
@@ -168,9 +159,7 @@ namespace Gp4Net.Tests.Integration
             Func<IGlobalPlatformService, Task<Result<T, SmartCardError>>> operation, 
             string operationName = "")
         {
-            Assert.That(GlobalPlatformService, Is.Not.Null, "GlobalPlatformService must be initialized");
-            
-            var result = await operation(GlobalPlatformService);
+            var result = await operation(GlobalPlatformService!);
             
             return await result.MatchAsync(
                 async value => 

@@ -18,6 +18,7 @@ namespace Gp4Net.Tests.Integration
     /// Tests to debug SCP03 session establishment and command wrapping against GP Pro traces.
     /// </summary>
     [TestFixture]
+    [Category("Integration")]
     public class Scp03SessionDebuggingTests
     {
 

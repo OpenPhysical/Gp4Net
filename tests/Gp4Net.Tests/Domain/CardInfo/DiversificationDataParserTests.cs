@@ -1,4 +1,5 @@
 using System;
+using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
 using NUnit.Framework;
 
@@ -13,7 +14,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var data = Convert.FromHexString("CF0A0215031070060301060000");
 
             // Act
-            var result = DiversificationDataParser.ParseAsHex(data);
+            var result = DiversificationDataParser.ParseAsHex(new Option<byte[]>.Some(data));
 
             // Assert
             Assert.That(result, Is.EqualTo("CF0A0215031070060301060000"));
@@ -26,7 +27,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var data = Array.Empty<byte>();
 
             // Act
-            var result = DiversificationDataParser.ParseAsHex(data);
+            var result = DiversificationDataParser.ParseAsHex(new Option<byte[]>.Some(data));
 
             // Assert
             Assert.That(result, Is.EqualTo(string.Empty));
@@ -36,7 +37,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
         public void ParseAsHex_WithNullData_ReturnsEmptyString()
         {
             // Act
-            var result = DiversificationDataParser.ParseAsHex(null);
+            var result = DiversificationDataParser.ParseAsHex(new Option<byte[]>.None());
 
             // Assert
             Assert.That(result, Is.EqualTo(string.Empty));
@@ -49,7 +50,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var data = Convert.FromHexString("CF0A0215037000000000000000");
 
             // Act
-            var result = DiversificationDataParser.ParseScpSupport(data);
+            var result = DiversificationDataParser.ParseScpSupport(new Option<byte[]>.Some(data));
 
             // Assert
             Assert.That(result, Does.Contain("SCP02 (i=15)"));
@@ -63,7 +64,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var data = Convert.FromHexString("CF0A0215031060070301060000");
 
             // Act
-            var result = DiversificationDataParser.ParseScpSupport(data);
+            var result = DiversificationDataParser.ParseScpSupport(new Option<byte[]>.Some(data));
 
             // Assert
             Assert.That(result, Does.Contain("SCP02 (i=15)"));
@@ -80,7 +81,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var data = Convert.FromHexString("CF0A0215000003700000000000");
 
             // Act
-            var result = DiversificationDataParser.ParseScpSupport(data);
+            var result = DiversificationDataParser.ParseScpSupport(new Option<byte[]>.Some(data));
 
             // Assert
             Assert.That(result, Does.Contain("SCP02 (i=15)"));
@@ -95,7 +96,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var data = Convert.FromHexString("CF0A0000000000000000000000");
 
             // Act
-            var result = DiversificationDataParser.ParseScpSupport(data);
+            var result = DiversificationDataParser.ParseScpSupport(new Option<byte[]>.Some(data));
 
             // Assert
             Assert.That(result, Is.EqualTo("[red]None[/]"));
@@ -108,7 +109,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var data = Convert.FromHexString("CF0A0215");
 
             // Act
-            var result = DiversificationDataParser.ParseScpSupport(data);
+            var result = DiversificationDataParser.ParseScpSupport(new Option<byte[]>.Some(data));
 
             // Assert
             Assert.That(result, Is.EqualTo("[red]None[/]"));
@@ -121,7 +122,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var data = Convert.FromHexString("CF05021503700000");
 
             // Act
-            var result = DiversificationDataParser.ParseScpSupport(data);
+            var result = DiversificationDataParser.ParseScpSupport(new Option<byte[]>.Some(data));
 
             // Assert
             Assert.That(result, Is.EqualTo("[red]Parse error[/]"));
@@ -131,7 +132,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
         public void ParseScpSupport_WithNullData_ReturnsNone()
         {
             // Act
-            var result = DiversificationDataParser.ParseScpSupport(null);
+            var result = DiversificationDataParser.ParseScpSupport(new Option<byte[]>.None());
 
             // Assert
             Assert.That(result, Is.EqualTo("[red]None[/]"));
@@ -144,7 +145,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var data = Array.Empty<byte>();
 
             // Act
-            var result = DiversificationDataParser.ParseScpSupport(data);
+            var result = DiversificationDataParser.ParseScpSupport(new Option<byte[]>.Some(data));
 
             // Assert
             Assert.That(result, Is.EqualTo("[red]None[/]"));
@@ -157,7 +158,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var data = Convert.FromHexString("CF0A0215031060070000000000");
 
             // Act
-            var result = DiversificationDataParser.ParseScpSupport(data);
+            var result = DiversificationDataParser.ParseScpSupport(new Option<byte[]>.Some(data));
 
             // Assert
             Assert.That(result, Does.Contain(", "));
@@ -172,7 +173,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var data = Convert.FromHexString("CF0A0370021500000000000000");
 
             // Act
-            var result = DiversificationDataParser.ParseScpSupport(data);
+            var result = DiversificationDataParser.ParseScpSupport(new Option<byte[]>.Some(data));
 
             // Assert
             // Should appear in the order they are in the data

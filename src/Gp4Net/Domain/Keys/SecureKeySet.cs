@@ -6,6 +6,7 @@
 namespace Gp4Net.Domain.Keys
 {
     using System;
+    using Gp4Net.Core;
 
     /// <summary>
     /// Provides secure storage for a key set with automatic memory cleanup.
@@ -122,12 +123,12 @@ namespace Gp4Net.Domain.Keys
         public Scp02KeySet ToScp02KeySet()
         {
             this.ThrowIfDisposed();
-            return new Scp02KeySet(
+            return Scp02KeySet.Create(
                 this.encKey.GetKeyCopy(),
                 this.macKey.GetKeyCopy(),
                 this.dekKey.GetKeyCopy(),
                 this.KeyVersion
-            );
+            ).GetOrThrow(error => new InvalidOperationException(error.Message));
         }
 
         /// <summary>
@@ -137,12 +138,12 @@ namespace Gp4Net.Domain.Keys
         public Scp03KeySet ToScp03KeySet()
         {
             this.ThrowIfDisposed();
-            return new Scp03KeySet(
+            return Scp03KeySet.Create(
                 this.encKey.GetKeyCopy(),
                 this.macKey.GetKeyCopy(),
                 this.dekKey.GetKeyCopy(),
                 this.KeyVersion
-            );
+            ).GetOrThrow(error => new InvalidOperationException(error.Message));
         }
 
         /// <summary>

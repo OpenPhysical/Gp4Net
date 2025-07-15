@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
 
 namespace Gp4Net.Domain.Commands
@@ -61,30 +62,28 @@ namespace Gp4Net.Domain.Commands
                 return null;
             }
 
-            try
-            {
-                var capabilities = CardCapabilities.Parse(data);
-                // If the raw data has content but no capabilities were parsed, it's likely malformed
-                // Check if we have any meaningful capabilities or if this looks like malformed data
-                if (data.Length >= 3 && 
-                    capabilities.ScpOptions.Count == 0 && 
-                    capabilities.SdPrivileges == null && 
-                    capabilities.AppPrivileges == null && 
-                    capabilities.Algorithms == null &&
-                    capabilities.CipherSuites.Count == 0)
-                {
-                    // Additional check: if all bytes are the same (like 0xFF, 0xFF, 0xFF), it's likely malformed
-                    if (data.All(b => b == data[0]))
+            var result = CardCapabilities.TryParse(new Option<byte[]>.Some(data));
+            return result.Match(
+                success: capabilities => {
+                    // If the raw data has content but no capabilities were parsed, it's likely malformed
+                    // Check if we have any meaningful capabilities or if this looks like malformed data
+                    if (data.Length >= 3 && 
+                        capabilities.ScpOptions.Count == 0 && 
+                        capabilities.SdPrivileges == null && 
+                        capabilities.AppPrivileges == null && 
+                        capabilities.Algorithms == null &&
+                        capabilities.CipherSuites.Count == 0)
                     {
-                        return null;
+                        // Additional check: if all bytes are the same (like 0xFF, 0xFF, 0xFF), it's likely malformed
+                        if (data.All(b => b == data[0]))
+                        {
+                            return null;
+                        }
                     }
-                }
-                return capabilities;
-            }
-            catch
-            {
-                return null;
-            }
+                    return capabilities;
+                },
+                failure: error => null
+            );
         }
 
         /// <summary>

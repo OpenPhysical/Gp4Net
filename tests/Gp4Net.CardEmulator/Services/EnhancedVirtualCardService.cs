@@ -146,11 +146,11 @@ namespace Gp4Net.CardEmulator.Services
                 IKeySet keys;
                 if (HasScp03Capability(_currentCard))
                 {
-                    keys = new Scp03KeySet(keySet, keySet, keySet, 0xFF);
+                    keys = Scp03KeySet.Create(keySet, keySet, keySet, 0xFF).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp03KeySet: {e.Message}"));
                 }
                 else
                 {
-                    keys = new Scp02KeySet(keySet, keySet, keySet, 0xFF);
+                    keys = Scp02KeySet.Create(keySet, keySet, keySet, 0xFF).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp02KeySet: {e.Message}"));
                 }
 
                 // Note: Functional cards use immutable configuration,

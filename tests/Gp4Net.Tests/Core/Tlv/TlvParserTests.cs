@@ -19,7 +19,6 @@ namespace Gp4Net.Tests.Core.Tlv
             var tlv = TlvParser.ParseSingle(data);
 
             // Assert
-            Assert.That(tlv, Is.Not.Null);
             Assert.That(tlv.Tag, Is.EqualTo(new byte[] { 0x80 }));
             Assert.That(tlv.Length, Is.EqualTo(2));
             Assert.That(tlv.Value, Is.EqualTo(new byte[] { 0x01, 0x02 }));
@@ -35,7 +34,6 @@ namespace Gp4Net.Tests.Core.Tlv
             var tlv = TlvParser.ParseSingle(data);
 
             // Assert
-            Assert.That(tlv, Is.Not.Null);
             Assert.That(tlv.Tag, Is.EqualTo(new byte[] { 0x9F, 0x70 }));
             Assert.That(tlv.Length, Is.EqualTo(3));
             Assert.That(tlv.Value, Is.EqualTo(new byte[] { 0x01, 0x02, 0x03 }));
@@ -59,10 +57,14 @@ namespace Gp4Net.Tests.Core.Tlv
             var tlv = TlvParser.ParseSingle(data);
 
             // Assert
-            Assert.That(tlv, Is.Not.Null);
             Assert.That(tlv.Tag, Is.EqualTo(new byte[] { 0x80 }));
             Assert.That(tlv.Length, Is.EqualTo(128));
             Assert.That(tlv.Value.Length, Is.EqualTo(128));
+            // Verify actual pattern in value matches expected sequence
+            for (int i = 0; i < 128; i++)
+            {
+                Assert.That(tlv.Value[i], Is.EqualTo((byte)(i & 0xFF)), $"Value at index {i} should match expected pattern");
+            }
         }
 
         [Test]
@@ -75,7 +77,6 @@ namespace Gp4Net.Tests.Core.Tlv
             var tlv = TlvParser.ParseSingle(data);
 
             // Assert
-            Assert.That(tlv, Is.Not.Null);
             Assert.That(tlv.Tag, Is.EqualTo(new byte[] { 0x80 }));
             Assert.That(tlv.Length, Is.EqualTo(0));
             Assert.That(tlv.Value, Is.Empty);
@@ -177,7 +178,6 @@ namespace Gp4Net.Tests.Core.Tlv
             var found = TlvParser.FindByTag(data, 0x81);
 
             // Assert
-            Assert.That(found, Is.Not.Null);
             Assert.That(found.Tag, Is.EqualTo(new byte[] { 0x81 }));
             Assert.That(found.Value, Is.EqualTo(new byte[] { 0x03 }));
         }
@@ -207,7 +207,6 @@ namespace Gp4Net.Tests.Core.Tlv
             var found = TlvParser.FindByTag(data, (ushort)0x9F70);
 
             // Assert
-            Assert.That(found, Is.Not.Null);
             Assert.That(found.Tag, Is.EqualTo(new byte[] { 0x9F, 0x70 }));
             Assert.That(found.Value, Is.EqualTo(new byte[] { 0x03 }));
         }
@@ -222,7 +221,7 @@ namespace Gp4Net.Tests.Core.Tlv
             var number = tlv.GetValueAsNumber();
 
             // Assert
-            Assert.That(number, Is.Not.Null);
+            Assert.That(number, Is.Not.Null, "GetValueAsNumber should return a value for valid TLV data");
             Assert.That(number.Value, Is.EqualTo(0x012345u));
         }
 
@@ -276,7 +275,6 @@ namespace Gp4Net.Tests.Core.Tlv
             var tlv = TlvParser.ParseSingle(data, 3, out int consumed);
 
             // Assert
-            Assert.That(tlv, Is.Not.Null);
             Assert.That(tlv.Tag, Is.EqualTo(new byte[] { 0x80 }));
             Assert.That(tlv.Value, Is.EqualTo(new byte[] { 0x01, 0x02 }));
             Assert.That(consumed, Is.EqualTo(4)); // Tag(1) + Length(1) + Value(2)

@@ -71,39 +71,19 @@ namespace Gp4Net.Tool.Commands.Applet
 
             AnsiConsole.MarkupLine($"[green]Found {applications.Count} applet(s) on card:[/]");
 
-            var table = new Table()
-                .AddColumn("Type")
-                .AddColumn("AID")
-                .AddColumn("Lifecycle State")
-                .AddColumn("Privileges");
+            var table = ApplicationDisplayService.CreateApplicationTable(false);
+            table.Columns[2].Header("Lifecycle State");
 
             foreach (var app in applications
                 .OrderBy(a => a.Type)
                 .ThenBy(a => Convert.ToHexString(a.Aid)))
             {
-                var typeColor = app.Type switch
-                {
-                    ApplicationType.IssuerSecurityDomain => "blue",
-                    ApplicationType.SupplementarySecurityDomain => "purple",
-                    ApplicationType.Application => "green",
-                    ApplicationType.LoadFile => "yellow",
-                    _ => "white",
-                };
-
-                var stateColor = app.LifecycleState switch
-                {
-                    LifecycleState.Selectable => "green",
-                    LifecycleState.Personalized => "cyan",
-                    LifecycleState.Locked => "red",
-                    _ => "yellow",
-                };
-
-                var privilegesText = app.Privileges.Count > 0 
-                    ? string.Join(", ", app.Privileges.Select(p => p.ToString()))
-                    : "None";
+                var typeColor = ApplicationDisplayService.GetTypeColor(app.Type);
+                var stateColor = ApplicationDisplayService.GetStateColor(app.LifecycleState);
+                var privilegesText = ApplicationDisplayService.GetPrivilegesDisplaySimple(app.Privileges);
 
                 table.AddRow(
-                    $"[{typeColor}]{GetTypeDisplayName(app.Type)}[/]",
+                    $"[{typeColor}]{ApplicationDisplayService.GetTypeDisplayName(app.Type)}[/]",
                     $"[dim]{app.AidHex}[/]",
                     $"[{stateColor}]{app.LifecycleState}[/]",
                     privilegesText
@@ -115,7 +95,7 @@ namespace Gp4Net.Tool.Commands.Applet
             if (settings.Detailed)
             {
                 AnsiConsole.WriteLine();
-                DisplayDetailedInformation(applications);
+                ApplicationDisplayService.DisplayDetailedInformation(applications);
             }
 
             return Task.FromResult(0);
@@ -127,43 +107,7 @@ namespace Gp4Net.Tool.Commands.Applet
             return 1;
         }
 
-        private static string GetTypeDisplayName(ApplicationType type)
-        {
-            return type switch
-            {
-                ApplicationType.IssuerSecurityDomain => "ISD",
-                ApplicationType.SupplementarySecurityDomain => "SSD",
-                ApplicationType.Application => "Applet",
-                ApplicationType.LoadFile => "Load File",
-                _ => "Unknown",
-            };
-        }
-
-        private static void DisplayDetailedInformation(ImmutableList<ApplicationInfo> applications)
-        {
-            var groups = applications.GroupBy(a => a.Type);
-
-            foreach (var group in groups)
-            {
-                AnsiConsole.MarkupLine($"[bold]{group.Key}s:[/]");
-
-                foreach (var app in group)
-                {
-                    var panel = new Panel(
-                        $"[dim]AID:[/] {System.Convert.ToHexString(app.Aid)}\n"
-                            + $"[dim]State:[/] {app.LifecycleState}\n"
-                            + $"[dim]Privileges:[/] {(app.Privileges.Count > 0 ? string.Join(", ", app.Privileges) : "None")}"
-                    )
-                    {
-                        Header = new PanelHeader($"[bold]{GetTypeDisplayName(app.Type)}[/]"),
-                    };
-
-                    AnsiConsole.Write(panel);
-                }
-
-                AnsiConsole.WriteLine();
-            }
-        }
+        // Display methods now delegate to ApplicationDisplayService
 
         /// <summary>
         /// Settings for the status command.

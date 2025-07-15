@@ -15,6 +15,8 @@ namespace Gp4Net.Tests.Integration
     /// Integration tests for CAP file loading with secure channel wrapping.
     /// Tests the complete workflow from CAP file to wrapped APDUs without requiring a physical card.
     /// </summary>
+    [TestFixture]
+    [Category("Integration")]
     public class CapLoadingIntegrationTests
     {
         private readonly string _capFilePath;
@@ -37,7 +39,7 @@ namespace Gp4Net.Tests.Integration
             Assert.That(File.Exists(_capFilePath), Is.True, $"CAP file not found at: {_capFilePath}");
 
             var capFileData = File.ReadAllBytes(_capFilePath);
-            Assert.That(capFileData.Length > 0, Is.True, "CAP file should not be empty");
+            Assert.That(capFileData.Length, Is.GreaterThan(0), "CAP file should not be empty");
 
             // Parse and check structure
             var capFile = CapFileStructure.Parse(capFileData);
@@ -63,7 +65,7 @@ namespace Gp4Net.Tests.Integration
 
             // Assert - Verify we generated the expected number of commands
             Assert.That(
-                loadCommands.Count >= 2,
+                loadCommands.Count, Is.GreaterThanOrEqualTo(2),
                 "Should have at least 2 LOAD commands for OpenFIPS201"
             );
 
@@ -118,7 +120,7 @@ namespace Gp4Net.Tests.Integration
                 .ToList();
 
             // Assert - Verify wrapped APDUs have correct format
-            Assert.That(wrappedApdus.Count > 0, Is.True, "Should have generated wrapped APDUs");
+            Assert.That(wrappedApdus.Count, Is.GreaterThan(0), "Should have generated wrapped APDUs");
             foreach (var wrappedApdu in wrappedApdus)
             {
                 // Wrapped commands should have CLA = 0x84 (secure messaging)
@@ -126,10 +128,10 @@ namespace Gp4Net.Tests.Integration
 
                 // Should be longer than original due to MAC and padding
                 var originalIndex = wrappedApdus.IndexOf(wrappedApdu);
-                Assert.That(wrappedApdu.Length > plainApdus[originalIndex].Length, Is.True);
+                Assert.That(wrappedApdu.Length, Is.GreaterThan(plainApdus[originalIndex].Length));
 
                 // Should end with MAC (8 bytes)
-                Assert.That(wrappedApdu.Length >= 8, Is.True, "Wrapped APDU should include MAC");
+                Assert.That(wrappedApdu.Length, Is.GreaterThanOrEqualTo(8), "Wrapped APDU should include MAC");
             }
         }
 
@@ -180,13 +182,9 @@ namespace Gp4Net.Tests.Integration
 
             // Should start with TLV tag C4 (load file data block) - but actual might be different
             // The important thing is that we have valid load data structure
+            var validTlvTags = new byte[] { 0xC4, 0x50, 0x80, 0x81, 0x82, 0x83 };
             Assert.That(
-                loadData[0] == 0xC4
-                    || loadData[0] == 0x50
-                    || loadData[0] == 0x80
-                    || loadData[0] == 0x81
-                    || loadData[0] == 0x82
-                    || loadData[0] == 0x83,
+                validTlvTags, Does.Contain(loadData[0]),
                 $"Unexpected TLV tag: 0x{loadData[0]:X2}"
             );
 
@@ -208,7 +206,7 @@ namespace Gp4Net.Tests.Integration
             var capMagicPattern = new byte[] { 0xDE, 0xCA, 0xFF, 0xED };
             var capMagicIndex = ByteArrayHelpers.FindBytePattern([.. allLoadData], capMagicPattern);
             Assert.That(
-                capMagicIndex >= 0,
+                capMagicIndex, Is.GreaterThanOrEqualTo(0),
                 "Should contain CAP file magic number DECAFFED somewhere in the load data"
             );
         }
@@ -229,12 +227,17 @@ namespace Gp4Net.Tests.Integration
                 .GenerateLoadCommands(maxBlockSize: 245);
 
             // Assert - Verify the workflow produces expected results
-            Assert.That(result, Is.Not.Null);
-            Assert.That(result.LoadCommands.Count > 0, Is.True);
-            Assert.That(result.PlainApdus.Count > 0, Is.True);
-            Assert.That(result.WrappedApdus.Count > 0, Is.True);
+            Assert.That(result.LoadCommands.Count, Is.GreaterThan(0));
+            Assert.That(result.PlainApdus.Count, Is.GreaterThan(0));
+            Assert.That(result.WrappedApdus.Count, Is.GreaterThan(0));
             Assert.That(result.PlainApdus.Count, Is.EqualTo(result.LoadCommands.Count));
             Assert.That(result.WrappedApdus.Count, Is.EqualTo(result.LoadCommands.Count));
+            // Verify that wrapped APDUs are actually different from plain APDUs
+            for (int i = 0; i < result.PlainApdus.Count; i++)
+            {
+                Assert.That(result.WrappedApdus[i], Is.Not.EqualTo(result.PlainApdus[i]), 
+                    $"Wrapped APDU {i} should be different from plain APDU");
+            }
         }
     }
 

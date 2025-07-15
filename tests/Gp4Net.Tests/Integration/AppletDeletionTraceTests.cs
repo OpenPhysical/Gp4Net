@@ -18,6 +18,7 @@ namespace Gp4Net.Tests.Integration
     /// Tests based on GP Pro applet deletion trace to verify correct behavior.
     /// </summary>
     [TestFixture]
+    [Category("Integration")]
     public class AppletDeletionTraceTests
     {
         // From GP Pro trace

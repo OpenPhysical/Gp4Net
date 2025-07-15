@@ -10,6 +10,7 @@ namespace Gp4Net.Tests.Integration
     /// Tests DELETE command implementation using real trace data.
     /// </summary>
     [TestFixture]
+    [Category("Integration")]
     public class DeleteCommandTraceTests : TraceBasedTestBase
     {
         public DeleteCommandTraceTests() : base("install_uninstall.json", TraceOperations.Uninstall)

@@ -19,6 +19,8 @@ namespace Gp4Net.Tests.Integration
     /// Integration tests for SCP03 using exact GP Pro trace data.
     /// This ensures our implementation matches real card behavior.
     /// </summary>
+    [TestFixture]
+    [Category("Integration")]
     public class Scp03TraceBasedTests
     {
         // GP Test Keys from trace: "404142434445464748494A4B4C4D4E4F"

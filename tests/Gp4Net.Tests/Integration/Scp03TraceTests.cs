@@ -12,6 +12,7 @@ namespace Gp4Net.Tests.Integration
     /// Tests SCP03 implementation using real trace data.
     /// </summary>
     [TestFixture]
+    [Category("Integration")]
     public class Scp03TraceTests : TraceBasedTestBase
     {
         public Scp03TraceTests() : base(TraceFiles.GpShellInstallJson, TraceOperations.SecureChannelEstablish)

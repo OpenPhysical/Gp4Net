@@ -147,7 +147,7 @@ namespace Gp4Net.Services
         /// <summary>
         /// Deletes an application from the card.
         /// </summary>
-        public async Task<Result<Unit, SmartCardError>> DeleteApplicationAsync(
+        public async Task<Result<Core.Unit, SmartCardError>> DeleteApplicationAsync(
             byte[] aid,
             bool deleteRelated = false,
             CancellationToken cancellationToken = default)
@@ -158,14 +158,14 @@ namespace Gp4Net.Services
             return await createResult.BindAsync(async deleteCommand =>
             {
                 var result = await _cardService.ExecuteCommandAsync(deleteCommand, cancellationToken);
-                return result.Map(_ => Unit.Value);
+                return result.Map(_ => Core.Unit.Value);
             });
         }
 
         /// <summary>
         /// Performs a PUT KEY operation to change card keys.
         /// </summary>
-        public async Task<Result<Unit, SmartCardError>> PutKeysAsync(
+        public async Task<Result<Core.Unit, SmartCardError>> PutKeysAsync(
             KeySet keySet,
             byte keyVersion,
             CancellationToken cancellationToken = default)
@@ -215,7 +215,7 @@ namespace Gp4Net.Services
                 }
                 else
                 {
-                    return Result<Unit, SmartCardError>.Fail(
+                    return Result<Core.Unit, SmartCardError>.Fail(
                         SmartCardError.InvalidData($"Unsupported key set type: {keySet.GetType().Name}"));
                 }
 
@@ -229,12 +229,12 @@ namespace Gp4Net.Services
                 // Execute the command
                 var result = await _cardService.ExecuteCommandAsync(putKeyCommandResult.Value, cancellationToken);
                 
-                return result.Map(_ => Unit.Value);
+                return result.Map(_ => Core.Unit.Value);
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to perform PUT KEY operation");
-                return Result<Unit, SmartCardError>.Fail(
+                return Result<Core.Unit, SmartCardError>.Fail(
                     SmartCardError.CommunicationError("PUT KEY operation failed", ex));
             }
         }
@@ -309,7 +309,7 @@ namespace Gp4Net.Services
         /// <summary>
         /// Sets the lifecycle state of an application.
         /// </summary>
-        public Task<Result<Unit, SmartCardError>> SetLifecycleStateAsync(
+        public Task<Result<Core.Unit, SmartCardError>> SetLifecycleStateAsync(
             byte[] aid,
             LifecycleState state,
             CancellationToken cancellationToken = default)
@@ -318,7 +318,7 @@ namespace Gp4Net.Services
 
             // TODO: Implement SET STATUS command for lifecycle state change
             // For now, return a not implemented error
-            return Task.FromResult(Result<Unit, SmartCardError>.Fail(
+            return Task.FromResult(Result<Core.Unit, SmartCardError>.Fail(
                 SmartCardError.Unsupported("SetLifecycleState is not yet implemented - requires SET STATUS command implementation")));
         }
 
@@ -413,11 +413,18 @@ namespace Gp4Net.Services
                 }
 
                 // Use the secure channel manager to establish the session
-                var session = await _secureChannelManager.EstablishAsync(
+                var sessionResult = await _secureChannelManager.EstablishAsync(
                     channel, 
                     transport, 
                     keySet, 
                     securityLevel);
+
+                if (sessionResult.IsFailure)
+                {
+                    return sessionResult.Error;
+                }
+
+                var session = sessionResult.Value;
 
                 // Update service context with secure channel session
                 var newService = _cardService.WithContextValue(ContextKeys.SecureChannelSession, session);
@@ -985,17 +992,5 @@ namespace Gp4Net.Services
         /// Executable load files and their executable modules.
         /// </summary>
         ExecutableModules = 0x10
-    }
-
-
-    /// <summary>
-    /// Unit type for operations with no return value.
-    /// </summary>
-    public readonly struct Unit
-    {
-        /// <summary>
-        /// The single value of Unit type.
-        /// </summary>
-        public static Unit Value { get; } = new();
     }
 }

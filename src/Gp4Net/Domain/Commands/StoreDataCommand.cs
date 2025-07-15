@@ -164,65 +164,6 @@ namespace Gp4Net.Domain.Commands
             return new StoreDataCommand(structureFormat, block, data);
         }
 
-        /// <summary>
-        /// Creates a STORE DATA command for setting SCP_ENABLE configuration.
-        /// </summary>
-        /// <param name="implementations">List of SCP implementations.</param>
-        /// <returns>A Result containing either a new StoreDataCommand or an error.</returns>
-        public static Result<StoreDataCommand, SmartCardError> CreateScpEnableCommand(IList<ScpImplementation> implementations)
-        {
-            if (implementations == null)
-                return SmartCardError.InvalidArgument("SCP implementations list cannot be null.");
-
-            if (implementations.Count == 0)
-                return SmartCardError.InvalidArgument("At least one SCP implementation must be specified.");
-
-            if (implementations.Count > 5)
-                return SmartCardError.InvalidArgument("Cannot specify more than 5 SCP implementations.");
-
-            // Build SET CONFIG ITEM format
-            // DF2B (SET CONFIG tag) + length + 1057 (SCP_ENABLE) + data length + data
-            var data = new List<byte>
-            {
-                // SET CONFIG tag
-                0xDF,
-                0x2B
-            };
-
-            // Calculate data length for SCP_ENABLE: always 10 bytes (supports up to 5 implementations * 2 bytes each)
-            var scpDataLength = (byte)10; // Fixed 10 bytes for SCP implementations
-
-            // Total length inside SET CONFIG: SCP_ENABLE tag (2) + SCP data length (1) + SCP data (10) = 13
-            var totalLength = (byte)13; // 0x0D
-            data.Add(totalLength);
-
-            // SCP_ENABLE tag
-            data.Add(0x10);
-            data.Add(0x57);
-
-            // Data length
-            data.Add(scpDataLength);
-
-            // Add SCP implementations
-            foreach (var impl in implementations)
-            {
-                data.Add(impl.Version);
-                data.Add(impl.Implementation);
-            }
-
-            // Add padding to reach 10 bytes total
-            var paddingBytes = 10 - (implementations.Count * 2);
-            for (int i = 0; i < paddingBytes; i++)
-            {
-                data.Add(0x00);
-            }
-
-            return new StoreDataCommand(
-                DataStructureFormat.Dgi,
-                BlockFormat.FirstOrOnly,
-                [.. data]
-            );
-        }
 
         /// <summary>
         /// Creates a STORE DATA command for setting the default key version.

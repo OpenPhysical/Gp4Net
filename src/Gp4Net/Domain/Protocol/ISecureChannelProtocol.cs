@@ -32,8 +32,8 @@ namespace Gp4Net.Domain.Protocol
         /// </summary>
         /// <param name="response">The INITIALIZE UPDATE response.</param>
         /// <param name="hostChallenge">The host challenge used in the command.</param>
-        /// <returns>The secure channel context for authentication.</returns>
-        SecureChannelContext ProcessInitializeUpdateResponse(
+        /// <returns>A result containing the secure channel context or an error.</returns>
+        Result<SecureChannelContext, SmartCardError> ProcessInitializeUpdateResponse(
             InitializeUpdateResponse response,
             byte[] hostChallenge
         );
@@ -97,8 +97,8 @@ namespace Gp4Net.Domain.Protocol
         /// <param name="keySet">The key set to use for authentication.</param>
         /// <param name="securityLevel">The requested security level.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>The established secure channel session.</returns>
-        Task<SecureChannelSession> EstablishAsync(
+        /// <returns>A result containing the established secure channel session or an error.</returns>
+        Task<Result<SecureChannelSession, SmartCardError>> EstablishAsync(
             ICardChannel channel,
             IApduTransport transport,
             IKeySet keySet,
@@ -114,8 +114,8 @@ namespace Gp4Net.Domain.Protocol
         /// <param name="keySet">The key set to use for authentication.</param>
         /// <param name="securityLevel">The requested security level.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>The established secure channel session.</returns>
-        Task<SecureChannelSession> EstablishAutoDetectAsync(
+        /// <returns>A result containing the established secure channel session or an error.</returns>
+        Task<Result<SecureChannelSession, SmartCardError>> EstablishAutoDetectAsync(
             ICardChannel channel,
             IApduTransport transport,
             IKeySet keySet,

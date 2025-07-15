@@ -86,8 +86,8 @@ namespace Gp4Net.CardEmulator.Functional
             };
 
             return ImmutableDictionary.Create<byte, IKeySet>()
-                .Add(0x01, new Scp02KeySet(testKeys, testKeys, testKeys, 0x01))
-                .Add(0xFF, new Scp02KeySet(testKeys, testKeys, testKeys, 0xFF)); // Factory keys
+                .Add(0x01, Scp02KeySet.Create(testKeys, testKeys, testKeys, 0x01).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp02KeySet: {e.Message}")))
+                .Add(0xFF, Scp02KeySet.Create(testKeys, testKeys, testKeys, 0xFF).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp02KeySet: {e.Message}"))); // Factory keys
         }
 
         private static ImmutableDictionary<ushort, byte[]> CreateP71DataObjects()
@@ -133,7 +133,7 @@ namespace Gp4Net.CardEmulator.Functional
             };
 
             return ImmutableDictionary.Create<byte, IKeySet>()
-                .Add(0x01, new Scp02KeySet(defaultKeys, defaultKeys, defaultKeys, 0x01));
+                .Add(0x01, Scp02KeySet.Create(defaultKeys, defaultKeys, defaultKeys, 0x01).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp02KeySet: {e.Message}")));
         }
 
         private static ImmutableDictionary<ushort, byte[]> CreateGenericDataObjects()
