@@ -14,12 +14,12 @@ namespace Gp4Net.Core
         /// <summary>
         /// Represents a successful result containing a value.
         /// </summary>
-        public sealed record Success(TValue Value) : Result<TValue, TError>;
+        public sealed record Success(TValue SuccessValue) : Result<TValue, TError>;
 
         /// <summary>
         /// Represents a failed result containing an error.
         /// </summary>
-        public sealed record Failure(TError Error) : Result<TValue, TError>;
+        public sealed record Failure(TError FailureError) : Result<TValue, TError>;
 
         /// <summary>
         /// Gets a value indicating whether this result is successful.
@@ -36,7 +36,7 @@ namespace Gp4Net.Core
         /// </summary>
         public TValue Value => this switch
         {
-            Success s => s.Value,
+            Success s => s.SuccessValue,
             Failure => throw new InvalidOperationException("Cannot access Value on a failed result"),
             _ => throw new InvalidOperationException("Invalid result state")
         };
@@ -47,7 +47,7 @@ namespace Gp4Net.Core
         public TError Error => this switch
         {
             Success => throw new InvalidOperationException("Cannot access Error on a successful result"),
-            Failure f => f.Error,
+            Failure f => f.FailureError,
             _ => throw new InvalidOperationException("Invalid result state")
         };
 

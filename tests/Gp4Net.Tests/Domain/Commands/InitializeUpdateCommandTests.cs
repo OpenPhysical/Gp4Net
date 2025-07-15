@@ -1,156 +1,134 @@
 using System;
 using Gp4Net.Domain.Commands;
-using Xunit;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.Commands
 {
+    [TestFixture]
     public class InitializeUpdateCommandTests
     {
-        [Fact]
-        public void Constructor_WithValidParameters_CreatesCommand()
+        [Test]
+        public void Create_WithValidParameters_ReturnsSuccessResult()
         {
-            // Arrange
             byte keyVersion = 0x01;
             byte keyId = 0x00;
             var hostChallenge = Convert.FromHexString("0102030405060708");
 
-            // Act
-            var command = new InitializeUpdateCommand(keyVersion, keyId, hostChallenge);
+            var result = InitializeUpdateCommand.Create(keyVersion, keyId, hostChallenge);
 
-            // Assert
-            Assert.Equal(keyVersion, command.KeyVersion);
-            Assert.Equal(keyId, command.KeyIdentifier);
-            Assert.Equal(hostChallenge, command.HostChallenge);
+            Assert.That(result.IsSuccess, Is.True);
+            Assert.That(result.Value.KeyVersion, Is.EqualTo(keyVersion));
+            Assert.That(result.Value.KeyIdentifier, Is.EqualTo(keyId));
+            Assert.That(result.Value.HostChallenge, Is.EqualTo(hostChallenge));
         }
 
-        [Fact]
-        public void Constructor_WithNullHostChallenge_ThrowsArgumentNullException()
+        [Test]
+        [TestCase(0)]
+        [TestCase(7)]
+        [TestCase(9)]
+        [TestCase(16)]
+        public void Create_WithInvalidHostChallengeLength_ReturnsFailureResult(int length)
         {
-            // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => 
-                new InitializeUpdateCommand(0x01, 0x00, null!));
-        }
-
-        [Theory]
-        [InlineData(0)]
-        [InlineData(7)]
-        [InlineData(9)]
-        [InlineData(16)]
-        public void Constructor_WithInvalidHostChallengeLength_ThrowsArgumentException(int length)
-        {
-            // Arrange
             var hostChallenge = new byte[length];
 
-            // Act & Assert
-            var ex = Assert.Throws<ArgumentException>(() => 
-                new InitializeUpdateCommand(0x01, 0x00, hostChallenge));
-            Assert.Contains("Host challenge must be 8 bytes", ex.Message);
+            var result = InitializeUpdateCommand.Create(0x01, 0x00, hostChallenge);
+
+            Assert.That(result.IsFailure, Is.True);
+            Assert.That(result.Error.Message, Does.Contain("Host challenge must be 8 bytes"));
+            Assert.That(result.Error.Message, Does.Contain($"got {length}"));
         }
 
-        [Fact]
+        [Test]
         public void GetApdu_ReturnsCorrectApduStructure()
         {
-            // Arrange
             var keyVersion = (byte)0x01;
             var keyId = (byte)0x00;
             var hostChallenge = Convert.FromHexString("0102030405060708");
-            var command = new InitializeUpdateCommand(keyVersion, keyId, hostChallenge);
+            var result = InitializeUpdateCommand.Create(keyVersion, keyId, hostChallenge);
+            var command = result.Value;
 
-            // Act
             var apdu = command.GetApdu();
 
-            // Assert
-            Assert.Equal(0x80, apdu[0]); // CLA - GlobalPlatform
-            Assert.Equal(0x50, apdu[1]); // INS - INITIALIZE UPDATE
-            Assert.Equal(keyVersion, apdu[2]); // P1 - Key Version
-            Assert.Equal(keyId, apdu[3]); // P2 - Key Identifier
-            Assert.Equal(0x08, apdu[4]); // Lc - Data length
-            Assert.Equal(hostChallenge, apdu[5..13]); // Data - Host Challenge
-            Assert.Equal(0x00, apdu[13]); // Le - Expected response length
+            Assert.That(apdu[0], Is.EqualTo(0x80)); // CLA - GlobalPlatform
+            Assert.That(apdu[1], Is.EqualTo(0x50)); // INS - INITIALIZE UPDATE
+            Assert.That(apdu[2], Is.EqualTo(keyVersion)); // P1 - Key Version
+            Assert.That(apdu[3], Is.EqualTo(keyId)); // P2 - Key Identifier
+            Assert.That(apdu[4], Is.EqualTo(0x08)); // Lc - Data length
+            Assert.That(apdu[5..13], Is.EqualTo(hostChallenge)); // Data - Host Challenge
+            Assert.That(apdu[13], Is.EqualTo(28)); // Le - Expected response length
         }
 
-        [Fact]
+        [Test]
         public void GetApdu_WithDifferentKeyVersions_SetsP1Correctly()
         {
-            // Arrange
             var testCases = new byte[] { 0x00, 0x01, 0x7F, 0xFF };
             var hostChallenge = Convert.FromHexString("0102030405060708");
 
             foreach (var keyVersion in testCases)
             {
-                // Act
-                var command = new InitializeUpdateCommand(keyVersion, 0x00, hostChallenge);
+                var result = InitializeUpdateCommand.Create(keyVersion, 0x00, hostChallenge);
+                var command = result.Value;
                 var apdu = command.GetApdu();
 
-                // Assert
-                Assert.Equal(keyVersion, apdu[2]); // P1
+                Assert.That(apdu[2], Is.EqualTo(keyVersion)); // P1
             }
         }
 
-        [Fact]
+        [Test]
         public void GetApdu_WithDifferentKeyIds_SetsP2Correctly()
         {
-            // Arrange
             var testCases = new byte[] { 0x00, 0x01, 0x02, 0xFF };
             var hostChallenge = Convert.FromHexString("0102030405060708");
 
             foreach (var keyId in testCases)
             {
-                // Act
-                var command = new InitializeUpdateCommand(0x01, keyId, hostChallenge);
+                var result = InitializeUpdateCommand.Create(0x01, keyId, hostChallenge);
+                var command = result.Value;
                 var apdu = command.GetApdu();
 
-                // Assert
-                Assert.Equal(keyId, apdu[3]); // P2
+                Assert.That(apdu[3], Is.EqualTo(keyId)); // P2
             }
         }
 
-        [Fact]
+        [Test]
         public void GetApdu_ForScp03_UsesKeyId00()
         {
             // According to SCP03 spec, key identifier must be 0x00
-            // Arrange
             var hostChallenge = Convert.FromHexString("0102030405060708");
-            var command = new InitializeUpdateCommand(0x01, 0x00, hostChallenge);
+            var result = InitializeUpdateCommand.Create(0x01, 0x00, hostChallenge);
+            var command = result.Value;
 
-            // Act
             var apdu = command.GetApdu();
 
-            // Assert
-            Assert.Equal(0x00, apdu[3]); // P2 must be 0x00 for SCP03
+            Assert.That(apdu[3], Is.EqualTo(0x00)); // P2 must be 0x00 for SCP03
         }
 
-        [Fact]
+        [Test]
         public void GetApdu_AlwaysReturnsNewArray()
         {
-            // Arrange
-            var command = new InitializeUpdateCommand(0x01, 0x00, new byte[8]);
+            var result = InitializeUpdateCommand.Create(0x01, 0x00, new byte[8]);
+            var command = result.Value;
 
-            // Act
             var apdu1 = command.GetApdu();
             var apdu2 = command.GetApdu();
 
-            // Assert
-            Assert.NotSame(apdu1, apdu2); // Should be different array instances
-            Assert.Equal(apdu1, apdu2); // But with same content
+            Assert.That(apdu1, Is.Not.SameAs(apdu2)); // Should be different array instances
+            Assert.That(apdu2, Is.EqualTo(apdu1)); // But with same content
         }
 
-        [Fact]
+        [Test]
         public void ToString_ReturnsDescriptiveString()
         {
-            // Arrange
             var hostChallenge = Convert.FromHexString("0102030405060708");
-            var command = new InitializeUpdateCommand(0x01, 0x00, hostChallenge);
+            var result = InitializeUpdateCommand.Create(0x01, 0x00, hostChallenge);
+            var command = result.Value;
 
-            // Act
-            var result = command.ToString();
+            var resultString = command.ToString();
 
-            // Assert
-            Assert.Contains("INITIALIZE UPDATE", result);
-            Assert.Contains("0102030405060708", result); // Host challenge
+            Assert.That(resultString, Is.EqualTo("INITIALIZE UPDATE"));
         }
 
-        [Fact]
+        [Test]
         public void Command_FollowsGlobalPlatformSpecification()
         {
             // This test documents that the command follows GlobalPlatform Card Specification
@@ -161,16 +139,54 @@ namespace Gp4Net.Tests.Domain.Commands
             // P2: Key Identifier (0x00 for SCP03)
             // Lc: 0x08 (8 bytes of host challenge)
             // Data: 8-byte host challenge
-            // Le: 0x00 (receive all available bytes)
+            // Le: 0x1C (28 bytes expected response)
 
-            var command = new InitializeUpdateCommand(0x01, 0x00, new byte[8]);
+            var result = InitializeUpdateCommand.Create(0x01, 0x00, new byte[8]);
+            var command = result.Value;
             var apdu = command.GetApdu();
 
-            Assert.Equal(14, apdu.Length); // 5 header + 8 data + 1 Le
-            Assert.Equal(0x80, apdu[0]); // CLA
-            Assert.Equal(0x50, apdu[1]); // INS
-            Assert.Equal(0x08, apdu[4]); // Lc
-            Assert.Equal(0x00, apdu[13]); // Le
+            Assert.That(apdu.Length, Is.EqualTo(14)); // 5 header + 8 data + 1 Le
+            Assert.That(apdu[0], Is.EqualTo(0x80)); // CLA
+            Assert.That(apdu[1], Is.EqualTo(0x50)); // INS
+            Assert.That(apdu[4], Is.EqualTo(0x08)); // Lc
+            Assert.That(apdu[13], Is.EqualTo(28)); // Le (28 bytes expected)
+        }
+
+        [Test]
+        public void Properties_UseConstantsCorrectly()
+        {
+            var result = InitializeUpdateCommand.Create(0x01, 0x00, new byte[8]);
+            var command = result.Value;
+
+            Assert.That(command.Cla, Is.EqualTo(InitializeUpdateCommand.ClassByte));
+            Assert.That(command.Ins, Is.EqualTo(InitializeUpdateCommand.InstructionByte));
+            Assert.That(InitializeUpdateCommand.ClassByte, Is.EqualTo(0x80));
+            Assert.That(InitializeUpdateCommand.InstructionByte, Is.EqualTo(0x50));
+        }
+
+        [Test]
+        public void HostChallenge_NeverReturnsNull()
+        {
+            var originalChallenge = new byte[8];
+            var result = InitializeUpdateCommand.Create(0x01, 0x00, originalChallenge);
+            var command = result.Value;
+
+            Assert.That(command.HostChallenge, Is.Not.Null);
+            Assert.That(command.HostChallenge.Length, Is.EqualTo(8));
+        }
+
+        [Test]
+        public void HostChallenge_IsImmutable()
+        {
+            var originalChallenge = Convert.FromHexString("0102030405060708");
+            var result = InitializeUpdateCommand.Create(0x01, 0x00, originalChallenge);
+            var command = result.Value;
+
+            // Modify the original array
+            originalChallenge[0] = 0xFF;
+
+            // Command's host challenge should not be affected
+            Assert.That(command.HostChallenge[0], Is.EqualTo(0x01));
         }
     }
 }

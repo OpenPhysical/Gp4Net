@@ -415,11 +415,16 @@ namespace Gp4Net.Tool.Commands.Card
                 var tlvData = CreateTlvData(tag, data);
 
                 // Create STORE DATA command
-                var storeCommand = new StoreDataCommand(
+                var storeResult = StoreDataCommand.CreateWithFormat(
                     StoreDataCommand.DataStructureFormat.BerTlv,
                     StoreDataCommand.BlockFormat.FirstOrOnly,
                     tlvData
                 );
+                if (storeResult.IsFailure)
+                {
+                    throw new InvalidOperationException($"Failed to create STORE DATA command: {storeResult.Error.Message}");
+                }
+                var storeCommand = storeResult.Value;
 
                 // Send command
                 var response = context.CardService.SendCommand(storeCommand);
@@ -463,23 +468,22 @@ namespace Gp4Net.Tool.Commands.Card
             else
             {
                 // Try parsing as tag:data or tag=data format
-                try
+                var fullString = $"{key}:{value}";
+                var result = DataObjectParser.ParseRawDataObject(fullString);
+                if (result.IsSuccess)
                 {
-                    var fullString = $"{key}:{value}";
-                    return DataObjectParser.ParseRawDataObject(fullString);
+                    return result.Value;
                 }
-                catch
+
+                // Try with = separator
+                fullString = $"{key}={value}";
+                result = DataObjectParser.ParseRawDataObject(fullString);
+                if (result.IsSuccess)
                 {
-                    try
-                    {
-                        var fullString = $"{key}={value}";
-                        return DataObjectParser.ParseRawDataObject(fullString);
-                    }
-                    catch
-                    {
-                        throw new ArgumentException($"Invalid data object format: {key}. Expected formats: 0x9F70, 9F70:040102, or 9F70=040102");
-                    }
+                    return result.Value;
                 }
+
+                throw new ArgumentException($"Invalid data object format: {key}. Expected formats: 0x9F70, 9F70:040102, or 9F70=040102");
             }
         }
 

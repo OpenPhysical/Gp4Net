@@ -6,6 +6,7 @@
 using System;
 using System.Linq;
 using Gp4Net.Constants;
+using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
@@ -51,20 +52,13 @@ namespace Gp4Net.Domain.Protocol
             // Validate that this is an SCP03-compatible key set
             if (keySet is not Scp03KeySet)
             {
-                throw new ArgumentException(
-                    "SCP03 protocol requires SCP03 key set",
-                    nameof(keySet)
-                );
+                throw new ArgumentException("SCP03 protocol requires SCP03 key set");
             }
 
             // Validate implementation parameter
             if (!IsValidImplementation(implementation))
             {
-                throw new ArgumentException(
-                    $"Invalid SCP03 implementation parameter: 0x{implementation:X2}. "
-                        + "Valid values are 0x00, 0x10, 0x20, 0x60, 0x70.",
-                    nameof(implementation)
-                );
+                throw new ArgumentException("Invalid SCP03 implementation parameter");
             }
         }
 
@@ -87,18 +81,16 @@ namespace Gp4Net.Domain.Protocol
         /// <summary>
         /// Creates an INITIALIZE UPDATE command.
         /// </summary>
-        public InitializeUpdateCommand CreateInitializeUpdateCommand(byte[] hostChallenge)
+        public Result<InitializeUpdateCommand, SmartCardError> CreateInitializeUpdateCommand(byte[] hostChallenge)
         {
-            if (hostChallenge?.Length != 8)
+            if (hostChallenge.Length != 8)
             {
-                throw new ArgumentException(
-                    "Host challenge must be 8 bytes.",
-                    nameof(hostChallenge)
-                );
+                return Result<InitializeUpdateCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidData($"Host challenge must be 8 bytes, got {hostChallenge.Length}"));
             }
 
             // For SCP03, key identifier must be 0x00
-            return new InitializeUpdateCommand(_keySet.KeyVersion, 0x00, hostChallenge);
+            return InitializeUpdateCommand.Create(_keySet.KeyVersion, 0x00, hostChallenge);
         }
 
         /// <summary>
@@ -167,7 +159,7 @@ namespace Gp4Net.Domain.Protocol
         /// <summary>
         /// Creates an EXTERNAL AUTHENTICATE command.
         /// </summary>
-        public ExternalAuthenticateCommand CreateExternalAuthenticateCommand(
+        public Result<ExternalAuthenticateCommand, SmartCardError> CreateExternalAuthenticateCommand(
             SecureChannelContext context,
             SecurityLevel securityLevel
         )
@@ -182,7 +174,6 @@ namespace Gp4Net.Domain.Protocol
             );
 
             // For SCP03, if C-MAC is requested, we need to calculate MAC over the command
-            byte[]? mac = null;
             if (securityLevel.HasCMac())
             {
                 // Build the APDU for MAC calculation: CLA INS P1 P2 Lc Data
@@ -202,11 +193,13 @@ namespace Gp4Net.Domain.Protocol
                 _lastExternalAuthMac = fullMac;
                 
                 // Return only the truncated 8-byte MAC for the command
-                mac = new byte[8];
+                var mac = new byte[8];
                 Array.Copy(fullMac, 0, mac, 0, 8);
+                
+                return ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, mac);
             }
 
-            return new ExternalAuthenticateCommand(securityLevel, hostCryptogram, mac);
+            return ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
         }
 
         /// <summary>

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Gp4Net.Core.Tlv;
 
 namespace Gp4Net.Domain.CardInfo
 {
@@ -33,38 +35,58 @@ namespace Gp4Net.Domain.CardInfo
         /// <returns>Formatted SCP support string.</returns>
         public static string ParseScpSupport(byte[] data)
         {
-            if (data == null || data.Length < 12) // CF + 0A + 10 bytes
+            if (data == null || data.Length == 0)
             {
                 return "[red]None[/]";
             }
 
-            // Skip CF tag (1 byte) and length (1 byte) to get to actual content
-            var contentStart = 2;
-            var contentLength = data[1]; // Length byte after CF tag
-            
-            if (data.Length < contentStart + contentLength || contentLength < 10)
+            // Short data that can't contain a valid TLV structure
+            if (data.Length < 3) // Minimum: tag + length + some content
             {
-                return "[red]Parse error[/]";
+                return "[red]None[/]";
             }
 
-            var scpSupport = new List<string>();
-
-            // Parse 5 pairs of bytes (SCP version + i= parameter) from the content
-            for (int i = contentStart; i < contentStart + 10; i += 2)
+            try
             {
-                var scpVersion = data[i];
-                var iParameter = data[i + 1];
-
-                // Skip empty slots (00 00)
-                if (scpVersion == 0x00 && iParameter == 0x00)
+                // Use SimpleTlvParser to find CF tag (diversification data)
+                var cfElement = SimpleTlvParser.Enumerate(data).FirstOrDefault(e => e.Tag == 0xCF);
+                
+                // No CF tag found - treat as no data available
+                if (cfElement.Content == null)
                 {
-                    continue;
+                    return "[red]None[/]";
+                }
+                
+                // CF tag found but content too short for SCP data (needs 10 bytes for 5 pairs)
+                if (cfElement.Content.Length < 10)
+                {
+                    return "[red]Parse error[/]";
                 }
 
-                scpSupport.Add($"SCP{scpVersion:X2} (i={iParameter:X2})");
-            }
+                var scpSupport = new List<string>();
 
-            return scpSupport.Count > 0 ? string.Join(", ", scpSupport) : "[red]None[/]";
+                // Parse 5 pairs of bytes (SCP version + i= parameter) from the CF content
+                for (int i = 0; i < 10; i += 2)
+                {
+                    var scpVersion = cfElement.Content[i];
+                    var iParameter = cfElement.Content[i + 1];
+
+                    // Skip empty slots (00 00)
+                    if (scpVersion == 0x00 && iParameter == 0x00)
+                    {
+                        continue;
+                    }
+
+                    scpSupport.Add($"SCP{scpVersion:X2} (i={iParameter:X2})");
+                }
+
+                return scpSupport.Count > 0 ? string.Join(", ", scpSupport) : "[red]None[/]";
+            }
+            catch
+            {
+                // TLV parsing failed entirely
+                return "[red]None[/]";
+            }
         }
     }
 }

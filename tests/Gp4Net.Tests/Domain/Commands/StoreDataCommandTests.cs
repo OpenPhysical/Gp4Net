@@ -1,195 +1,235 @@
 using System;
+using System.Collections.Generic;
+using Gp4Net.Core;
+using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
-using Xunit;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.Commands
 {
     public class StoreDataCommandTests
     {
-        [Fact]
-        public void Constructor_WithValidParameters_CreatesCommand()
+        [Test]
+        public void Create_WithValidData_CreatesCommand()
         {
             // Arrange
-            var structureFormat = StoreDataCommand.DataStructureFormat.Dgi;
-            var block = StoreDataCommand.BlockFormat.FirstOrOnly;
             var data = new byte[] { 0x01, 0x02, 0x03 };
 
             // Act
-            var command = new StoreDataCommand(structureFormat, block, data);
+            var result = StoreDataCommand.Create(data);
 
             // Assert
-            Assert.Equal(structureFormat, command.StructureFormat);
-            Assert.Equal(block, command.Block);
-            Assert.Equal(data, command.StoreData);
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
+            Assert.That(command.StructureFormat, Is.EqualTo(StoreDataCommand.DataStructureFormat.Plain));
+            Assert.That(command.Block, Is.EqualTo(StoreDataCommand.BlockFormat.FirstOrOnly));
+            Assert.That(command.StoreData, Is.EqualTo(data));
         }
 
-        [Fact]
-        public void Constructor_WithNullData_ThrowsArgumentNullException()
+        [Test]
+        public void Create_WithNullData_ReturnsError()
         {
-            // Act & Assert
-            _ = Assert.Throws<ArgumentNullException>(
-                () =>
-                    new StoreDataCommand(
-                        StoreDataCommand.DataStructureFormat.Plain,
-                        StoreDataCommand.BlockFormat.FirstOrOnly,
-                        null!
-                    )
-            );
+            // Act
+            var result = StoreDataCommand.Create(null!);
+
+            // Assert
+            Assert.That(result.IsFailure, Is.True);
+            Assert.That(result.Error.Code, Is.EqualTo("INVALID_ARGUMENT"));
         }
 
-        [Fact]
+        [Test]
         public void ToApdu_WithPlainData_ReturnsCorrectApdu()
         {
             // Arrange
             var data = new byte[] { 0x01, 0x02, 0x03 };
-            var command = new StoreDataCommand(
-                StoreDataCommand.DataStructureFormat.Plain,
-                StoreDataCommand.BlockFormat.FirstOrOnly,
-                data
-            );
+            var result = StoreDataCommand.Create(data);
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
 
             // Act
             var apdu = command.ToApdu();
 
             // Assert
-            Assert.Equal(new byte[] { 0x80, 0xE2, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03 }, apdu);
+            Assert.That(apdu, Is.EqualTo(new byte[] { 0x80, 0xE2, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03 }));
         }
 
-        [Fact]
+        [Test]
         public void ToApdu_WithDgiFormat_ReturnsCorrectApdu()
         {
-            // Arrange
-            var data = new byte[] { 0xDF, 0x2B, 0x05, 0x01, 0x02, 0x03, 0x04, 0x05 };
-            var command = new StoreDataCommand(
-                StoreDataCommand.DataStructureFormat.Dgi,
-                StoreDataCommand.BlockFormat.FirstOrOnly,
-                data
-            );
+            // Arrange - Use CreateDefaultKeyVersionCommand which creates DGI format
+            var result = StoreDataCommand.CreateDefaultKeyVersionCommand(0x01);
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
 
             // Act
             var apdu = command.ToApdu();
 
             // Assert
-            Assert.Equal(0x80, apdu[0]); // CLA
-            Assert.Equal(0xE2, apdu[1]); // INS
-            Assert.Equal(0x80, apdu[2]); // P1 (DGI format)
-            Assert.Equal(0x00, apdu[3]); // P2 (First or only block)
-            Assert.Equal(0x08, apdu[4]); // LC
-            Assert.Equal(data, apdu[5..]); // Data
+            Assert.That(apdu[0], Is.EqualTo(0x80)); // CLA
+            Assert.That(apdu[1], Is.EqualTo(0xE2)); // INS
+            Assert.That(apdu[2], Is.EqualTo(0x80)); // P1 (DGI format)
+            Assert.That(apdu[3], Is.EqualTo(0x00)); // P2 (First or only block)
+            Assert.That(apdu[4], Is.EqualTo(0x04)); // LC
+            Assert.That(apdu[5..], Is.EqualTo(new byte[] { 0x7F, 0x0D, 0x01, 0x01 })); // Data
         }
 
-        [Fact]
+        [Test]
         public void CreateScpEnableCommand_WithSingleImplementation_CreatesCorrectCommand()
         {
             // Arrange
-            ushort scpImpl = 0x0370; // SCP03 i=70
+            var implementations = new List<ScpImplementation> { ScpImplementation.Scp03I70 };
 
             // Act
-            var command = StoreDataCommand.CreateScpEnableCommand(scpImpl);
+            var result = StoreDataCommand.CreateScpEnableCommand(implementations);
 
             // Assert
-            Assert.Equal(StoreDataCommand.DataStructureFormat.Dgi, command.StructureFormat);
-            Assert.Equal(StoreDataCommand.BlockFormat.FirstOrOnly, command.Block);
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
+            Assert.That(command.StructureFormat, Is.EqualTo(StoreDataCommand.DataStructureFormat.Dgi));
+            Assert.That(command.Block, Is.EqualTo(StoreDataCommand.BlockFormat.FirstOrOnly));
 
             var apdu = command.ToApdu();
-            Assert.Equal(0x80, apdu[0]); // CLA
-            Assert.Equal(0xE2, apdu[1]); // INS
-            Assert.Equal(0x80, apdu[2]); // P1 (DGI format)
-            Assert.Equal(0x00, apdu[3]); // P2
+            Assert.That(apdu[0], Is.EqualTo(0x80)); // CLA
+            Assert.That(apdu[1], Is.EqualTo(0xE2)); // INS
+            Assert.That(apdu[2], Is.EqualTo(0x80)); // P1 (DGI format)
+            Assert.That(apdu[3], Is.EqualTo(0x00)); // P2
 
             // Verify data structure
             var data = command.StoreData;
-            Assert.Equal(0xDF, data[0]); // SET CONFIG tag
-            Assert.Equal(0x2B, data[1]);
-            Assert.Equal(0x0D, data[2]); // Total length
-            Assert.Equal(0x10, data[3]); // SCP_ENABLE tag
-            Assert.Equal(0x57, data[4]);
-            Assert.Equal(0x0A, data[5]); // Data length
-            Assert.Equal(0x03, data[6]); // SCP03
-            Assert.Equal(0x70, data[7]); // i=70
+            Assert.That(data[0], Is.EqualTo(0xDF)); // SET CONFIG tag
+            Assert.That(data[1], Is.EqualTo(0x2B));
+            Assert.That(data[2], Is.EqualTo(0x0D)); // Total length
+            Assert.That(data[3], Is.EqualTo(0x10)); // SCP_ENABLE tag
+            Assert.That(data[4], Is.EqualTo(0x57));
+            Assert.That(data[5], Is.EqualTo(0x0A)); // Data length
+            Assert.That(data[6], Is.EqualTo(0x03)); // SCP03
+            Assert.That(data[7], Is.EqualTo(0x70)); // i=70
             // Rest should be zeros (empty slots)
             for (int i = 8; i < 14; i++)
             {
-                Assert.Equal(0x00, data[i]);
+                Assert.That(data[i], Is.EqualTo(0x00));
             }
         }
 
-        [Fact]
+        [Test]
         public void CreateScpEnableCommand_WithMultipleImplementations_CreatesCorrectCommand()
         {
             // Arrange
-            ushort[] scpImpls = { 0x0215, 0x0370 }; // SCP02 i=15, SCP03 i=70
+            var implementations = new List<ScpImplementation> 
+            { 
+                ScpImplementation.Scp02I15, 
+                ScpImplementation.Scp03I70 
+            };
 
             // Act
-            var command = StoreDataCommand.CreateScpEnableCommand(scpImpls);
+            var result = StoreDataCommand.CreateScpEnableCommand(implementations);
 
             // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
             var data = command.StoreData;
-            Assert.Equal(0xDF, data[0]); // SET CONFIG tag
-            Assert.Equal(0x2B, data[1]);
-            Assert.Equal(0x0D, data[2]); // Total length
-            Assert.Equal(0x10, data[3]); // SCP_ENABLE tag
-            Assert.Equal(0x57, data[4]);
-            Assert.Equal(0x0A, data[5]); // Data length
-            Assert.Equal(0x02, data[6]); // SCP02
-            Assert.Equal(0x15, data[7]); // i=15
-            Assert.Equal(0x03, data[8]); // SCP03
-            Assert.Equal(0x70, data[9]); // i=70
+            Assert.That(data[0], Is.EqualTo(0xDF)); // SET CONFIG tag
+            Assert.That(data[1], Is.EqualTo(0x2B));
+            Assert.That(data[2], Is.EqualTo(0x0D)); // Total length
+            Assert.That(data[3], Is.EqualTo(0x10)); // SCP_ENABLE tag
+            Assert.That(data[4], Is.EqualTo(0x57));
+            Assert.That(data[5], Is.EqualTo(0x0A)); // Data length
+            Assert.That(data[6], Is.EqualTo(0x02)); // SCP02
+            Assert.That(data[7], Is.EqualTo(0x15)); // i=15
+            Assert.That(data[8], Is.EqualTo(0x03)); // SCP03
+            Assert.That(data[9], Is.EqualTo(0x70)); // i=70
             // Rest should be zeros
             for (int i = 10; i < 14; i++)
             {
-                Assert.Equal(0x00, data[i]);
+                Assert.That(data[i], Is.EqualTo(0x00));
             }
         }
 
-        [Fact]
-        public void CreateScpEnableCommand_WithNoImplementations_ThrowsArgumentException()
+        [Test]
+        public void CreateScpEnableCommand_WithNoImplementations_ReturnsError()
         {
-            // Act & Assert
-            _ = Assert.Throws<ArgumentException>(() => StoreDataCommand.CreateScpEnableCommand());
+            // Arrange
+            var emptyList = new List<ScpImplementation>();
+
+            // Act
+            var result = StoreDataCommand.CreateScpEnableCommand(emptyList);
+
+            // Assert
+            Assert.That(result.IsFailure, Is.True);
+            Assert.That(result.Error.Code, Is.EqualTo("INVALID_ARGUMENT"));
         }
 
-        [Fact]
+        [Test]
+        public void CreateScpEnableCommand_WithNullImplementations_ReturnsError()
+        {
+            // Act
+            var result = StoreDataCommand.CreateScpEnableCommand(null!);
+
+            // Assert
+            Assert.That(result.IsFailure, Is.True);
+            Assert.That(result.Error.Code, Is.EqualTo("INVALID_ARGUMENT"));
+        }
+
+        [Test]
         public void CreateDefaultKeyVersionCommand_CreatesCorrectCommand()
         {
             // Arrange
             byte keyVersion = 0x01;
 
             // Act
-            var command = StoreDataCommand.CreateDefaultKeyVersionCommand(keyVersion);
+            var result = StoreDataCommand.CreateDefaultKeyVersionCommand(keyVersion);
 
             // Assert
-            Assert.Equal(StoreDataCommand.DataStructureFormat.Dgi, command.StructureFormat);
-            Assert.Equal(StoreDataCommand.BlockFormat.FirstOrOnly, command.Block);
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
+            Assert.That(command.StructureFormat, Is.EqualTo(StoreDataCommand.DataStructureFormat.Dgi));
+            Assert.That(command.Block, Is.EqualTo(StoreDataCommand.BlockFormat.FirstOrOnly));
 
             var data = command.StoreData;
-            Assert.Equal(new byte[] { 0x7F, 0x0D, 0x01, 0x01 }, data);
+            Assert.That(data, Is.EqualTo(new byte[] { 0x7F, 0x0D, 0x01, 0x01 }));
         }
 
-        [Fact]
+        [Test]
         public void IApduCommand_Properties_ReturnCorrectValues()
         {
             // Arrange
-            var command = new StoreDataCommand(
+            var result = StoreDataCommand.CreateWithFormat(
                 StoreDataCommand.DataStructureFormat.BerTlv,
                 StoreDataCommand.BlockFormat.MoreBlocks,
                 new byte[] { 0x01 }
             );
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
             var iapdu = (IApduCommand)command;
 
             // Assert
-            Assert.Equal(0x80, iapdu.Cla);
-            Assert.Equal(0xE2, iapdu.Ins);
-            Assert.Equal(0x60, iapdu.P1); // BER-TLV format
-            Assert.Equal(0x01, iapdu.P2); // More blocks
-            Assert.NotNull(iapdu.Data);
-            Assert.Equal(new byte[] { 0x01 }, iapdu.Data);
-            Assert.Null(iapdu.ExpectedResponseLength);
-            Assert.False(iapdu.IsExtendedLength);
+            Assert.That(iapdu.Cla, Is.EqualTo(0x80));
+            Assert.That(iapdu.Ins, Is.EqualTo(0xE2));
+            Assert.That(iapdu.P1, Is.EqualTo(0x60)); // BER-TLV format
+            Assert.That(iapdu.P2, Is.EqualTo(0x01)); // More blocks
+            Assert.That(iapdu.Data, Is.Not.Null);
+            Assert.That(iapdu.Data, Is.EqualTo(new byte[] { 0x01 }));
+            Assert.That(iapdu.ExpectedResponseLength, Is.Null);
+            Assert.That(iapdu.IsExtendedLength, Is.False);
         }
 
-        [Fact]
+        [Test]
+        public void ToString_ReturnsStoreData()
+        {
+            // Arrange
+            var result = StoreDataCommand.Create(new byte[] { 0x01 });
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
+
+            // Act
+            var str = command.ToString();
+
+            // Assert
+            Assert.That(str, Is.EqualTo("STORE DATA"));
+        }
+
+        [Test]
         public void StoreDataResponse_Parse_ReturnsSuccessfulResponse()
         {
             // Arrange
@@ -199,7 +239,7 @@ namespace Gp4Net.Tests.Domain.Commands
             var response = StoreDataResponse.Parse(responseData);
 
             // Assert
-            Assert.True(response.Success);
+            Assert.That(response.Success, Is.True);
         }
     }
 }

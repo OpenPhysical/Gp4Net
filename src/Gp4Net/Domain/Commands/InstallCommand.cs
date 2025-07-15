@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using Gp4Net.Core;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 
@@ -58,12 +59,27 @@ namespace Gp4Net.Domain.Commands
         /// <summary>
         /// Base constructor for InstallCommand.
         /// </summary>
-        protected InstallCommand(ImmutableArray<byte> packageAid)
+        private protected InstallCommand(ImmutableArray<byte> packageAid)
         {
-            if (packageAid.IsDefaultOrEmpty)
-                throw new ArgumentException("Package AID cannot be empty.", nameof(packageAid));
-
             PackageAid = packageAid;
+        }
+
+        /// <summary>
+        /// Validates that the provided package AID is not null or empty.
+        /// </summary>
+        /// <param name="packageAid">The package AID to validate.</param>
+        /// <returns>A Result indicating success or failure with a SmartCardError.</returns>
+        protected static Result<ImmutableArray<byte>, SmartCardError> ValidatePackageAid(byte[]? packageAid)
+        {
+            if (packageAid == null)
+                return Result<ImmutableArray<byte>, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument("Package AID cannot be null."));
+            
+            if (packageAid.Length == 0)
+                return Result<ImmutableArray<byte>, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument("Package AID cannot be empty."));
+            
+            return Result<ImmutableArray<byte>, SmartCardError>.Ok(packageAid.ToImmutableArray());
         }
 
         /// <summary>
@@ -97,7 +113,7 @@ namespace Gp4Net.Domain.Commands
             /// <summary>
             /// Initializes a new instance of InstallForLoadCommand.
             /// </summary>
-            public InstallForLoadCommand(
+            private InstallForLoadCommand(
                 ImmutableArray<byte> packageAid,
                 ImmutableArray<byte> securityDomainAid = default,
                 ImmutableArray<byte> hash = default,
@@ -109,6 +125,41 @@ namespace Gp4Net.Domain.Commands
                 Hash = hash;
                 LoadParameters = loadParameters;
                 InstallToken = installToken;
+            }
+
+            /// <summary>
+            /// Creates a new INSTALL [for load] command with validation.
+            /// </summary>
+            /// <param name="packageAid">The package AID.</param>
+            /// <param name="maxDataBlockSize">Optional maximum data block size parameter.</param>
+            /// <param name="securityDomainAid">Optional security domain AID.</param>
+            /// <param name="hash">Optional hash of the load file.</param>
+            /// <param name="installToken">Optional install token.</param>
+            /// <returns>A Result containing the command or an error.</returns>
+            public static Result<InstallForLoadCommand, SmartCardError> Create(
+                byte[] packageAid,
+                ushort? maxDataBlockSize = null,
+                byte[]? securityDomainAid = null,
+                byte[]? hash = null,
+                byte[]? installToken = null)
+            {
+                var packageAidResult = ValidatePackageAid(packageAid);
+                if (packageAidResult.IsFailure)
+                    return Result<InstallForLoadCommand, SmartCardError>.Fail(packageAidResult.Error);
+
+                // Convert maxDataBlockSize to load parameters if provided
+                var loadParameters = maxDataBlockSize.HasValue 
+                    ? new byte[] { 0xC9, 0x02, (byte)(maxDataBlockSize.Value >> 8), (byte)(maxDataBlockSize.Value & 0xFF) }
+                    : null;
+
+                var command = new InstallForLoadCommand(
+                    packageAidResult.Value,
+                    securityDomainAid?.ToImmutableArray() ?? default,
+                    hash?.ToImmutableArray() ?? default,
+                    loadParameters?.ToImmutableArray() ?? default,
+                    installToken?.ToImmutableArray() ?? default);
+
+                return Result<InstallForLoadCommand, SmartCardError>.Ok(command);
             }
 
             /// <inheritdoc/>
@@ -168,6 +219,33 @@ namespace Gp4Net.Domain.Commands
 
                 return builder.ToArray();
             }
+
+            /// <summary>
+            /// Converts this command to an APDU byte array (backward compatibility method).
+            /// </summary>
+            /// <returns>The APDU command bytes.</returns>
+            [Obsolete("Use IApduTransport.TransmitAsync instead of manual APDU building")]
+            public byte[] ToApdu()
+            {
+                var data = Data;
+                var apdu = new byte[5 + data.Length + 1]; // +1 for LE byte
+                apdu[0] = Cla;
+                apdu[1] = Ins;
+                apdu[2] = P1;
+                apdu[3] = P2;
+                apdu[4] = (byte)data.Length;
+                Array.Copy(data, 0, apdu, 5, data.Length);
+                
+                // Add LE byte (0x00 = maximum response length)
+                apdu[5 + data.Length] = 0x00;
+                
+                return apdu;
+            }
+
+            /// <summary>
+            /// Returns a string representation of this command.
+            /// </summary>
+            public override string ToString() => "INSTALL [for load]";
         }
 
         /// <summary>
@@ -206,7 +284,7 @@ namespace Gp4Net.Domain.Commands
             /// <summary>
             /// Initializes a new instance of InstallForInstallCommand.
             /// </summary>
-            public InstallForInstallCommand(
+            private InstallForInstallCommand(
                 InstallType type,
                 ImmutableArray<byte> packageAid,
                 ImmutableArray<byte> appletAid,
@@ -216,18 +294,104 @@ namespace Gp4Net.Domain.Commands
                 ImmutableArray<byte> installToken = default)
                 : base(packageAid)
             {
-                if (type == InstallType.ForLoad)
-                    throw new ArgumentException("Use InstallForLoadCommand for INSTALL [for load].", nameof(type));
-
-                if (appletAid.IsDefaultOrEmpty)
-                    throw new ArgumentException("Applet AID cannot be empty.", nameof(appletAid));
-
                 Type = type;
                 AppletAid = appletAid;
                 ModuleAid = moduleAid;
                 Privileges = privileges.IsDefaultOrEmpty ? ImmutableArray.Create<byte>(0x00) : privileges;
                 InstallParameters = installParameters;
                 InstallToken = installToken;
+            }
+
+            /// <summary>
+            /// Creates a new INSTALL [for install] command with validation.
+            /// </summary>
+            /// <param name="packageAid">The package AID.</param>
+            /// <param name="moduleAid">The module AID (can be same as packageAid).</param>
+            /// <param name="applicationAid">The application AID.</param>
+            /// <param name="privileges">The application privileges.</param>
+            /// <param name="installParameters">Optional install parameters.</param>
+            /// <param name="installToken">Optional install token.</param>
+            /// <returns>A Result containing the command or an error.</returns>
+            public static Result<InstallForInstallCommand, SmartCardError> Create(
+                byte[] packageAid,
+                byte[] moduleAid,
+                byte[] applicationAid,
+                byte[] privileges,
+                byte[]? installParameters = null,
+                byte[]? installToken = null)
+            {
+                var packageAidResult = ValidatePackageAid(packageAid);
+                if (packageAidResult.IsFailure)
+                    return Result<InstallForInstallCommand, SmartCardError>.Fail(packageAidResult.Error);
+
+                if (moduleAid == null || moduleAid.Length == 0)
+                    return Result<InstallForInstallCommand, SmartCardError>.Fail(
+                        SmartCardError.InvalidArgument("Module AID cannot be null or empty."));
+
+                if (applicationAid == null || applicationAid.Length == 0)
+                    return Result<InstallForInstallCommand, SmartCardError>.Fail(
+                        SmartCardError.InvalidArgument("Application AID cannot be null or empty."));
+
+                if (privileges == null)
+                    return Result<InstallForInstallCommand, SmartCardError>.Fail(
+                        SmartCardError.InvalidArgument("Privileges cannot be null."));
+
+                var command = new InstallForInstallCommand(
+                    InstallType.ForInstall,
+                    packageAidResult.Value,
+                    applicationAid.ToImmutableArray(),
+                    moduleAid.ToImmutableArray(),
+                    privileges.ToImmutableArray(),
+                    installParameters?.ToImmutableArray() ?? default,
+                    installToken?.ToImmutableArray() ?? default);
+
+                return Result<InstallForInstallCommand, SmartCardError>.Ok(command);
+            }
+
+            /// <summary>
+            /// Creates a new INSTALL [for install and make selectable] command with validation.
+            /// </summary>
+            /// <param name="packageAid">The package AID.</param>
+            /// <param name="moduleAid">The module AID (can be same as packageAid).</param>
+            /// <param name="applicationAid">The application AID.</param>
+            /// <param name="privileges">The application privileges.</param>
+            /// <param name="installParameters">Optional install parameters.</param>
+            /// <param name="installToken">Optional install token.</param>
+            /// <returns>A Result containing the command or an error.</returns>
+            public static Result<InstallForInstallCommand, SmartCardError> CreateAndMakeSelectable(
+                byte[] packageAid,
+                byte[] moduleAid,
+                byte[] applicationAid,
+                byte[] privileges,
+                byte[]? installParameters = null,
+                byte[]? installToken = null)
+            {
+                var packageAidResult = ValidatePackageAid(packageAid);
+                if (packageAidResult.IsFailure)
+                    return Result<InstallForInstallCommand, SmartCardError>.Fail(packageAidResult.Error);
+
+                if (moduleAid == null || moduleAid.Length == 0)
+                    return Result<InstallForInstallCommand, SmartCardError>.Fail(
+                        SmartCardError.InvalidArgument("Module AID cannot be null or empty."));
+
+                if (applicationAid == null || applicationAid.Length == 0)
+                    return Result<InstallForInstallCommand, SmartCardError>.Fail(
+                        SmartCardError.InvalidArgument("Application AID cannot be null or empty."));
+
+                if (privileges == null)
+                    return Result<InstallForInstallCommand, SmartCardError>.Fail(
+                        SmartCardError.InvalidArgument("Privileges cannot be null."));
+
+                var command = new InstallForInstallCommand(
+                    InstallType.ForInstallAndMakeSelectable,
+                    packageAidResult.Value,
+                    applicationAid.ToImmutableArray(),
+                    moduleAid.ToImmutableArray(),
+                    privileges.ToImmutableArray(),
+                    installParameters?.ToImmutableArray() ?? default,
+                    installToken?.ToImmutableArray() ?? default);
+
+                return Result<InstallForInstallCommand, SmartCardError>.Ok(command);
             }
 
             /// <inheritdoc/>
@@ -284,6 +448,11 @@ namespace Gp4Net.Domain.Commands
 
                 return builder.ToArray();
             }
+
+            /// <summary>
+            /// Returns a string representation of this command.
+            /// </summary>
+            public override string ToString() => "INSTALL [for install]";
         }
     }
 
@@ -314,7 +483,7 @@ namespace Gp4Net.Domain.Commands
     }
 
     /// <summary>
-    /// Builder for creating InstallCommand instances.
+    /// Builder for creating InstallCommand instances with functional error handling.
     /// </summary>
     [PublicAPI]
     public static class InstallCommandBuilder
@@ -322,25 +491,38 @@ namespace Gp4Net.Domain.Commands
         /// <summary>
         /// Creates an INSTALL [for load] command.
         /// </summary>
-        public static InstallCommand.InstallForLoadCommand CreateForLoad(
+        /// <param name="packageAid">The package AID.</param>
+        /// <param name="securityDomainAid">Optional security domain AID.</param>
+        /// <param name="hash">Optional hash of the load file.</param>
+        /// <param name="maxDataBlockSize">Optional maximum data block size.</param>
+        /// <param name="installToken">Optional install token.</param>
+        /// <returns>A Result containing the command or an error.</returns>
+        public static Result<InstallCommand.InstallForLoadCommand, SmartCardError> CreateForLoad(
             byte[] packageAid,
             byte[]? securityDomainAid = null,
             byte[]? hash = null,
-            byte[]? loadParameters = null,
+            ushort? maxDataBlockSize = null,
             byte[]? installToken = null)
         {
-            return new InstallCommand.InstallForLoadCommand(
-                packageAid.ToImmutableArray(),
-                securityDomainAid?.ToImmutableArray() ?? default,
-                hash?.ToImmutableArray() ?? default,
-                loadParameters?.ToImmutableArray() ?? default,
-                installToken?.ToImmutableArray() ?? default);
+            return InstallCommand.InstallForLoadCommand.Create(
+                packageAid,
+                maxDataBlockSize,
+                securityDomainAid,
+                hash,
+                installToken);
         }
 
         /// <summary>
         /// Creates an INSTALL [for install] command.
         /// </summary>
-        public static InstallCommand.InstallForInstallCommand CreateForInstall(
+        /// <param name="packageAid">The package AID.</param>
+        /// <param name="appletAid">The applet AID.</param>
+        /// <param name="moduleAid">The module AID (defaults to package AID if null).</param>
+        /// <param name="privileges">The privileges (defaults to 0x00 if null).</param>
+        /// <param name="installParameters">Optional install parameters.</param>
+        /// <param name="installToken">Optional install token.</param>
+        /// <returns>A Result containing the command or an error.</returns>
+        public static Result<InstallCommand.InstallForInstallCommand, SmartCardError> CreateForInstall(
             byte[] packageAid,
             byte[] appletAid,
             byte[]? moduleAid = null,
@@ -348,20 +530,26 @@ namespace Gp4Net.Domain.Commands
             byte[]? installParameters = null,
             byte[]? installToken = null)
         {
-            return new InstallCommand.InstallForInstallCommand(
-                InstallType.ForInstall,
-                packageAid.ToImmutableArray(),
-                appletAid.ToImmutableArray(),
-                moduleAid?.ToImmutableArray() ?? default,
-                privileges?.ToImmutableArray() ?? default,
-                installParameters?.ToImmutableArray() ?? default,
-                installToken?.ToImmutableArray() ?? default);
+            return InstallCommand.InstallForInstallCommand.Create(
+                packageAid,
+                moduleAid ?? packageAid, // Use package AID as module AID if not specified
+                appletAid,
+                privileges ?? new byte[] { 0x00 }, // Default to no privileges
+                installParameters,
+                installToken);
         }
 
         /// <summary>
         /// Creates an INSTALL [for install and make selectable] command.
         /// </summary>
-        public static InstallCommand.InstallForInstallCommand CreateForInstallAndMakeSelectable(
+        /// <param name="packageAid">The package AID.</param>
+        /// <param name="appletAid">The applet AID.</param>
+        /// <param name="moduleAid">The module AID (defaults to package AID if null).</param>
+        /// <param name="privileges">The privileges (defaults to 0x00 if null).</param>
+        /// <param name="installParameters">Optional install parameters.</param>
+        /// <param name="installToken">Optional install token.</param>
+        /// <returns>A Result containing the command or an error.</returns>
+        public static Result<InstallCommand.InstallForInstallCommand, SmartCardError> CreateForInstallAndMakeSelectable(
             byte[] packageAid,
             byte[] appletAid,
             byte[]? moduleAid = null,
@@ -369,14 +557,13 @@ namespace Gp4Net.Domain.Commands
             byte[]? installParameters = null,
             byte[]? installToken = null)
         {
-            return new InstallCommand.InstallForInstallCommand(
-                InstallType.ForInstallAndMakeSelectable,
-                packageAid.ToImmutableArray(),
-                appletAid.ToImmutableArray(),
-                moduleAid?.ToImmutableArray() ?? default,
-                privileges?.ToImmutableArray() ?? default,
-                installParameters?.ToImmutableArray() ?? default,
-                installToken?.ToImmutableArray() ?? default);
+            return InstallCommand.InstallForInstallCommand.CreateAndMakeSelectable(
+                packageAid,
+                moduleAid ?? packageAid, // Use package AID as module AID if not specified
+                appletAid,
+                privileges ?? new byte[] { 0x00 }, // Default to no privileges
+                installParameters,
+                installToken);
         }
     }
 

@@ -50,8 +50,7 @@ namespace Gp4Net.CardEmulator.Core
         /// <param name="rawBytes">The raw APDU command bytes.</param>
         public ApduCommand(byte[] rawBytes)
         {
-            if (rawBytes == null)
-                throw new ArgumentNullException(nameof(rawBytes));
+            ArgumentNullException.ThrowIfNull(rawBytes);
             if (rawBytes.Length < 4)
                 throw new ArgumentException("APDU must be at least 4 bytes long", nameof(rawBytes));
 

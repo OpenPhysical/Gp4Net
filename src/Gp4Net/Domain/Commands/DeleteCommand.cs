@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Gp4Net.Core;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 
@@ -102,10 +103,10 @@ namespace Gp4Net.Domain.Commands
         /// <summary>
         /// Gets the command data.
         /// </summary>
-        public byte[]? Data => GetDeleteData();
+        public byte[]? Data => GetDeleteData().GetOrDefault(null);
 
         /// <summary>
-        /// Gets the expected response length.
+        /// Gets the expected response length. DELETE commands do not use LE byte per GP traces.
         /// </summary>
         public int? ExpectedResponseLength => null;
 
@@ -117,7 +118,7 @@ namespace Gp4Net.Domain.Commands
         /// <summary>
         /// Gets the delete data for the IApduCommand interface.
         /// </summary>
-        private byte[] GetDeleteData()
+        private Result<byte[], SmartCardError> GetDeleteData()
         {
             var data = new List<byte>();
 
@@ -137,20 +138,26 @@ namespace Gp4Net.Domain.Commands
                 {
                     // Compute token (simple heuristic: assume single AID, package removal)
                     if (Aids.Count != 1)
-                        throw new InvalidOperationException("Delete token calculation requires exactly one AID.");
+                        return SmartCardError.InvalidArgument("Delete token calculation requires exactly one AID.");
                     // Compute token using the DeleteTokenCalculator
-                    token = Gp4Net.Cryptography.DeleteTokenCalculator.ComputeDeleteToken(
-                        DeleteTokenKey, 
-                        P1, 
-                        P2, 
-                        Aids[0], 
-                        null); // No optional TLV for now
+                    try
+                    {
+                        token = Gp4Net.Cryptography.DeleteTokenCalculator.ComputeDeleteToken(
+                            DeleteTokenKey, 
+                            P1, 
+                            P2, 
+                            Aids[0], 
+                            null); // No optional TLV for now
+                    }
+                    catch (Exception ex)
+                    {
+                        return SmartCardError.CryptographicError($"Failed to compute delete token: {ex.Message}");
+                    }
                 }
                 if (token != null && token.Length > 0)
                 {
-                    data.Add(0x9E);
-                    if (token.Length <= 0x7F) data.Add((byte)token.Length);
-                    else { data.Add(0x81); data.Add((byte)token.Length); }
+                    // Based on trace analysis, deletion token is appended directly
+                    // without TLV wrapping: just the raw token bytes
                     data.AddRange(token);
                 }
             }
@@ -171,7 +178,7 @@ namespace Gp4Net.Domain.Commands
                 }
             }
 
-            return [.. data];
+            return Result<byte[], SmartCardError>.Ok([.. data]);
         }
 
         /// <summary>
@@ -181,7 +188,7 @@ namespace Gp4Net.Domain.Commands
         /// <param name="target">The delete target.</param>
         /// <param name="aids">The list of AIDs to delete.</param>
         /// <param name="deletionToken">The deletion token (optional).</param>
-        public DeleteCommand(
+        private DeleteCommand(
             DeleteType type,
             DeleteTarget target,
             IList<byte[]> aids,
@@ -189,19 +196,6 @@ namespace Gp4Net.Domain.Commands
             byte[]? deleteTokenKey = null
         )
         {
-            if (aids == null || aids.Count == 0)
-            {
-                throw new ArgumentException("At least one AID must be provided.", nameof(aids));
-            }
-
-            foreach (var aid in aids)
-            {
-                if (aid == null || aid.Length == 0)
-                {
-                    throw new ArgumentException("AIDs cannot be null or empty.", nameof(aids));
-                }
-            }
-
             Type = type;
             Target = target;
             Aids = new List<byte[]>(aids.Select(aid => (byte[])aid.Clone()));
@@ -215,14 +209,74 @@ namespace Gp4Net.Domain.Commands
         /// <param name="aid">The AID to delete.</param>
         /// <param name="deleteRelated">Whether to delete related objects.</param>
         /// <param name="deletionToken">The deletion token (optional).</param>
-        /// <returns>A new DeleteCommand.</returns>
-        public static DeleteCommand CreateForApplication(
+        /// <returns>A Result containing either a new DeleteCommand or an error.</returns>
+        public static Result<DeleteCommand, SmartCardError> CreateForApplication(
             byte[] aid,
-            bool deleteRelated = true,
+            bool deleteRelated = false,
             byte[]? deletionToken = null
         )
         {
-            ArgumentNullException.ThrowIfNull(aid);
+            if (aid == null)
+                return SmartCardError.InvalidArgument("AID cannot be null.");
+            
+            if (aid.Length == 0)
+                return SmartCardError.InvalidArgument("AID cannot be empty.");
+
+            var type = deleteRelated
+                ? DeleteType.DeleteObjectAndRelated
+                : DeleteType.DeleteObjectOnly;
+            var target = deleteRelated
+                ? DeleteTarget.WithRelated
+                : DeleteTarget.ByAid;
+            return new DeleteCommand(type, target, new[] { aid }, deletionToken);
+        }
+
+        /// <summary>
+        /// Creates a DELETE command for deleting a package.
+        /// </summary>
+        /// <param name="aid">The package AID to delete.</param>
+        /// <param name="deleteRelated">Whether to delete related objects.</param>
+        /// <param name="deletionToken">The deletion token (optional).</param>
+        /// <returns>A Result containing either a new DeleteCommand or an error.</returns>
+        public static Result<DeleteCommand, SmartCardError> CreateForPackage(
+            byte[] aid,
+            bool deleteRelated = false,
+            byte[]? deletionToken = null
+        )
+        {
+            if (aid == null)
+                return SmartCardError.InvalidArgument("Package AID cannot be null.");
+            
+            if (aid.Length == 0)
+                return SmartCardError.InvalidArgument("Package AID cannot be empty.");
+
+            var type = deleteRelated
+                ? DeleteType.DeleteObjectAndRelated
+                : DeleteType.DeleteObjectOnly;
+            var target = deleteRelated
+                ? DeleteTarget.WithRelated
+                : DeleteTarget.ByAid;
+            return new DeleteCommand(type, target, new[] { aid }, deletionToken);
+        }
+
+        /// <summary>
+        /// Creates a DELETE command for deleting an executable load file.
+        /// </summary>
+        /// <param name="aid">The executable load file AID to delete.</param>
+        /// <param name="deleteRelated">Whether to delete related objects.</param>
+        /// <param name="deletionToken">The deletion token (optional).</param>
+        /// <returns>A Result containing either a new DeleteCommand or an error.</returns>
+        public static Result<DeleteCommand, SmartCardError> CreateForExecutableLoadFile(
+            byte[] aid,
+            bool deleteRelated = false,
+            byte[]? deletionToken = null
+        )
+        {
+            if (aid == null)
+                return SmartCardError.InvalidArgument("Executable load file AID cannot be null.");
+            
+            if (aid.Length == 0)
+                return SmartCardError.InvalidArgument("Executable load file AID cannot be empty.");
 
             var type = deleteRelated
                 ? DeleteType.DeleteObjectAndRelated
@@ -239,13 +293,28 @@ namespace Gp4Net.Domain.Commands
         /// <param name="aids">The AIDs to delete.</param>
         /// <param name="deleteRelated">Whether to delete related objects.</param>
         /// <param name="deletionToken">The deletion token (optional).</param>
-        /// <returns>A new DeleteCommand.</returns>
-        public static DeleteCommand CreateForApplications(
+        /// <returns>A Result containing either a new DeleteCommand or an error.</returns>
+        public static Result<DeleteCommand, SmartCardError> CreateForApplications(
             IList<byte[]> aids,
-            bool deleteRelated = true,
+            bool deleteRelated = false,
             byte[]? deletionToken = null
         )
         {
+            if (aids == null)
+                return SmartCardError.InvalidArgument("AIDs list cannot be null.");
+                
+            if (aids.Count == 0)
+                return SmartCardError.InvalidArgument("At least one AID must be provided.");
+
+            foreach (var aid in aids)
+            {
+                if (aid == null)
+                    return SmartCardError.InvalidArgument("AIDs cannot contain null values.");
+                    
+                if (aid.Length == 0)
+                    return SmartCardError.InvalidArgument("AIDs cannot be empty.");
+            }
+
             var type = deleteRelated
                 ? DeleteType.DeleteObjectAndRelated
                 : DeleteType.DeleteObjectOnly;
@@ -261,8 +330,8 @@ namespace Gp4Net.Domain.Commands
         /// <param name="keyIdentifier">The key identifier.</param>
         /// <param name="keyVersion">The key version.</param>
         /// <param name="deletionToken">The deletion token (optional).</param>
-        /// <returns>A new DeleteCommand.</returns>
-        public static DeleteCommand CreateForKey(
+        /// <returns>A Result containing either a new DeleteCommand or an error.</returns>
+        public static Result<DeleteCommand, SmartCardError> CreateForKey(
             byte keyIdentifier,
             byte keyVersion,
             byte[]? deletionToken = null
@@ -276,6 +345,12 @@ namespace Gp4Net.Domain.Commands
                 deletionToken
             );
         }
+
+        /// <summary>
+        /// Returns the string representation of this command.
+        /// </summary>
+        /// <returns>The string "DELETE".</returns>
+        public override string ToString() => "DELETE";
 
         /// <summary>
         /// Converts this command to an APDU byte array.
@@ -315,7 +390,8 @@ namespace Gp4Net.Domain.Commands
             // Add deletion token if present
             if (DeletionToken != null && DeletionToken.Length > 0)
             {
-                data.Add((byte)DeletionToken.Length);
+                // Based on trace analysis, deletion token is appended directly
+                // without length prefix: just the raw token bytes
                 data.AddRange(DeletionToken);
             }
 
@@ -330,7 +406,9 @@ namespace Gp4Net.Domain.Commands
             };
 
             apdu.AddRange(data);
-            // Note: DELETE command typically doesn't use Le byte
+            
+            // DELETE commands do NOT use LE byte per GP Pro traces
+            // Trace: 84E40080134F09A0000003080000100020EEDD243F094FAD (no LE)
 
             return [.. apdu];
         }

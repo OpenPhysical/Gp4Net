@@ -53,6 +53,15 @@ namespace Gp4Net.Core
             );
 
         /// <summary>
+        /// Creates an error for invalid arguments.
+        /// </summary>
+        public static SmartCardError InvalidArgument(string message) =>
+            new(
+                Code: "INVALID_ARGUMENT",
+                Message: message
+            );
+
+        /// <summary>
         /// Creates an error for unsupported operations.
         /// </summary>
         public static SmartCardError Unsupported(string message) =>
@@ -146,6 +155,44 @@ namespace Gp4Net.Core
                 Code: "FILE_NOT_FOUND",
                 Message: "File not found",
                 StatusWord: 0x6A82
+            );
+
+        /// <summary>
+        /// Creates an error for authentication failures.
+        /// </summary>
+        public static SmartCardError AuthenticationFailed(string message) =>
+            new(
+                Code: "AUTHENTICATION_FAILED",
+                Message: message,
+                StatusWord: 0x6300
+            );
+
+        /// <summary>
+        /// Creates an error for blocked authentication due to too many attempts.
+        /// </summary>
+        public static SmartCardError AuthenticationBlocked(string message) =>
+            new(
+                Code: "AUTHENTICATION_BLOCKED",
+                Message: message
+            );
+
+        /// <summary>
+        /// Creates an error for initialization failures.
+        /// </summary>
+        public static SmartCardError InitializationFailed(string message) =>
+            new(
+                Code: "INITIALIZATION_FAILED",
+                Message: message
+            );
+
+        /// <summary>
+        /// Creates an error for unexpected errors.
+        /// </summary>
+        public static SmartCardError UnexpectedError(string message, Exception? ex = null) =>
+            new(
+                Code: "UNEXPECTED_ERROR",
+                Message: message,
+                InnerException: ex
             );
 
         /// <summary>

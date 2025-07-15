@@ -94,7 +94,6 @@ namespace Gp4Net.Tool.Commands.Applet
                 {
                     LifecycleState.Selectable => "green",
                     LifecycleState.Personalized => "cyan",
-                    LifecycleState.Blocked => "red",
                     LifecycleState.Locked => "red",
                     _ => "yellow",
                 };

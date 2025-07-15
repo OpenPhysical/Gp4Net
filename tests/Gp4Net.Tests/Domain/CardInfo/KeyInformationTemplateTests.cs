@@ -1,12 +1,13 @@
 using System.Linq;
 using Gp4Net.Domain.CardInfo;
-using Xunit;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.CardInfo
 {
+    [TestFixture]
     public class KeyInformationTemplateTests
     {
-        [Fact]
+        [Test]
         public void Parse_WithSingleKey_ParsesCorrectly()
         {
             // Arrange - Single key with 3DES
@@ -24,19 +25,19 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var template = KeyInformationTemplate.Parse(data);
 
             // Assert
-            Assert.NotNull(template);
-            _ = Assert.Single(template.Keys);
+            Assert.That(template, Is.Not.Null);
+            Assert.That(template.Keys.Count, Is.EqualTo(1));
 
             var key = template.Keys.First();
-            Assert.Equal(1, key.KeyId);
-            Assert.Equal(1, key.KeyVersion);
-            Assert.Equal(2, key.KeyTypes.Count);
-            Assert.Equal(KeyType.TripleDes3Key, key.KeyTypes[0]);
-            Assert.Equal(KeyType.NotAvailable, key.KeyTypes[1]);
-            Assert.Equal(192, key.KeyLength);
+            Assert.That(key.KeyId, Is.EqualTo(1));
+            Assert.That(key.KeyVersion, Is.EqualTo(1));
+            Assert.That(key.KeyTypes.Count, Is.EqualTo(2));
+            Assert.That(key.KeyTypes[0], Is.EqualTo(KeyType.TripleDes3Key));
+            Assert.That(key.KeyTypes[1], Is.EqualTo(KeyType.NotAvailable));
+            Assert.That(key.KeyLength, Is.EqualTo(192));
         }
 
-        [Fact]
+        [Test]
         public void Parse_WithAesKey_ParsesCorrectly()
         {
             // Arrange - AES key
@@ -53,15 +54,15 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var template = KeyInformationTemplate.Parse(data);
 
             // Assert
-            Assert.NotNull(template);
+            Assert.That(template, Is.Not.Null);
             var key = template.Keys.First();
-            Assert.Equal(16, key.KeyId);
-            Assert.Equal(2, key.KeyVersion);
-            Assert.Equal(KeyType.Aes, key.PrimaryKeyType);
-            Assert.Equal(128, key.KeyLength); // Default AES length
+            Assert.That(key.KeyId, Is.EqualTo(16));
+            Assert.That(key.KeyVersion, Is.EqualTo(2));
+            Assert.That(key.PrimaryKeyType, Is.EqualTo(KeyType.Aes));
+            Assert.That(key.KeyLength, Is.EqualTo(128)); // Default AES length
         }
 
-        [Fact]
+        [Test]
         public void Parse_WithMultipleKeyTypes_ParsesAllTypes()
         {
             // Arrange - Key supporting multiple types
@@ -81,15 +82,15 @@ namespace Gp4Net.Tests.Domain.CardInfo
 
             // Assert
             var key = template.Keys.First();
-            Assert.Equal(3, key.KeyTypes.Count);
-            Assert.Contains(KeyType.Des, key.KeyTypes);
-            Assert.Contains(KeyType.TripleDes2Key, key.KeyTypes);
-            Assert.Contains(KeyType.TripleDes3Key, key.KeyTypes);
-            Assert.Equal(KeyType.Des, key.PrimaryKeyType); // First type
-            Assert.Equal(64, key.KeyLength); // DES length
+            Assert.That(key.KeyTypes.Count, Is.EqualTo(3));
+            Assert.That(key.KeyTypes, Does.Contain(KeyType.Des));
+            Assert.That(key.KeyTypes, Does.Contain(KeyType.TripleDes2Key));
+            Assert.That(key.KeyTypes, Does.Contain(KeyType.TripleDes3Key));
+            Assert.That(key.PrimaryKeyType, Is.EqualTo(KeyType.Des)); // First type
+            Assert.That(key.KeyLength, Is.EqualTo(64)); // DES length
         }
 
-        [Fact]
+        [Test]
         public void Parse_RealWorldExample_ParsesCorrectly()
         {
             // Arrange - Real world example from trace
@@ -127,27 +128,30 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var template = KeyInformationTemplate.Parse(data[2..]);
 
             // Assert
-            Assert.Equal(4, template.Keys.Count);
+            Assert.That(template.Keys.Count, Is.EqualTo(4));
 
             // First three keys have same ID but different versions
-            Assert.Equal(1, template.Keys[0].KeyId);
-            Assert.Equal(1, template.Keys[0].KeyVersion);
+            Assert.That(template.Keys[0].KeyId, Is.EqualTo(1));
+            Assert.That(template.Keys[0].KeyVersion, Is.EqualTo(1));
 
-            Assert.Equal(1, template.Keys[1].KeyId);
-            Assert.Equal(2, template.Keys[1].KeyVersion);
+            Assert.That(template.Keys[1].KeyId, Is.EqualTo(1));
+            Assert.That(template.Keys[1].KeyVersion, Is.EqualTo(2));
 
-            Assert.Equal(1, template.Keys[2].KeyId);
-            Assert.Equal(3, template.Keys[2].KeyVersion);
+            Assert.That(template.Keys[2].KeyId, Is.EqualTo(1));
+            Assert.That(template.Keys[2].KeyVersion, Is.EqualTo(3));
 
             // Fourth key has different ID
-            Assert.Equal(2, template.Keys[3].KeyId);
-            Assert.Equal(1, template.Keys[3].KeyVersion);
+            Assert.That(template.Keys[3].KeyId, Is.EqualTo(2));
+            Assert.That(template.Keys[3].KeyVersion, Is.EqualTo(1));
 
             // All are AES keys
-            Assert.All(template.Keys, k => Assert.Equal(KeyType.Aes, k.PrimaryKeyType));
+            foreach (var key in template.Keys)
+            {
+                Assert.That(key.PrimaryKeyType, Is.EqualTo(KeyType.Aes));
+            }
         }
 
-        [Fact]
+        [Test]
         public void KeyEntry_ToString_FormatsCorrectly()
         {
             // Arrange
@@ -165,13 +169,13 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var output = template.Keys.First().ToString();
 
             // Assert
-            Assert.Contains("Version: 2 (0x02)", output);
-            Assert.Contains("ID: 1 (0x01)", output);
-            Assert.Contains("type: AES", output);
-            Assert.Contains("length: 16", output); // 128 bits / 8
+            Assert.That(output, Does.Contain("Version: 2 (0x02)"));
+            Assert.That(output, Does.Contain("ID: 1 (0x01)"));
+            Assert.That(output, Does.Contain("type: AES"));
+            Assert.That(output, Does.Contain("length: 16")); // 128 bits / 8
         }
 
-        [Fact]
+        [Test]
         public void KeyInformationTemplate_ToString_FormatsCorrectly()
         {
             // Arrange
@@ -196,26 +200,26 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var output = template.ToString();
 
             // Assert
-            Assert.Contains("Key Information Template:", output);
-            Assert.Contains("Version: 1", output);
-            Assert.Contains("3DES", output);
-            Assert.Contains("AES", output);
+            Assert.That(output, Does.Contain("Key Information Template:"));
+            Assert.That(output, Does.Contain("Version: 1"));
+            Assert.That(output, Does.Contain("3DES"));
+            Assert.That(output, Does.Contain("AES"));
         }
 
-        [Fact]
+        [Test]
         public void KeyTypeExtensions_ToFriendlyString_ReturnsCorrectNames()
         {
             // Assert various key types format correctly
-            Assert.Equal("DES", KeyType.Des.ToFriendlyString());
-            Assert.Equal("3DES-2KEY", KeyType.TripleDes2Key.ToFriendlyString());
-            Assert.Equal("3DES-3KEY", KeyType.TripleDes3Key.ToFriendlyString());
-            Assert.Equal("3DES", KeyType.Des3.ToFriendlyString());
-            Assert.Equal("AES", KeyType.Aes.ToFriendlyString());
-            Assert.Equal("N/A", KeyType.NotAvailable.ToFriendlyString());
-            Assert.Equal("Unknown(0x00)", KeyType.Unknown.ToFriendlyString());
+            Assert.That(KeyType.Des.ToFriendlyString(), Is.EqualTo("DES"));
+            Assert.That(KeyType.TripleDes2Key.ToFriendlyString(), Is.EqualTo("3DES-2KEY"));
+            Assert.That(KeyType.TripleDes3Key.ToFriendlyString(), Is.EqualTo("3DES-3KEY"));
+            Assert.That(KeyType.Des3.ToFriendlyString(), Is.EqualTo("3DES"));
+            Assert.That(KeyType.Aes.ToFriendlyString(), Is.EqualTo("AES"));
+            Assert.That(KeyType.NotAvailable.ToFriendlyString(), Is.EqualTo("N/A"));
+            Assert.That(KeyType.Unknown.ToFriendlyString(), Is.EqualTo("Unknown(0x00)"));
         }
 
-        [Fact]
+        [Test]
         public void Parse_EmptyData_ThrowsException()
         {
             // Arrange
@@ -227,7 +231,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
             );
         }
 
-        [Fact]
+        [Test]
         public void Parse_ShortKeyData_HandlesGracefully()
         {
             // Arrange - Key data too short (less than 3 bytes)
@@ -243,7 +247,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var template = KeyInformationTemplate.Parse(data);
 
             // Assert
-            Assert.Empty(template.Keys); // Should not add incomplete key
+            Assert.That(template.Keys, Is.Empty); // Should not add incomplete key
         }
     }
 }

@@ -22,7 +22,9 @@ namespace Gp4Net.CardEmulator.Functional
         byte SecurityLevel,
         ImmutableDictionary<ushort, byte[]> DataObjects,
         ImmutableDictionary<string, InstalledApplication> Applications,
-        ImmutableList<LoadFile> LoadFiles
+        ImmutableList<LoadFile> LoadFiles,
+        ImmutableDictionary<byte, IKeySet> InstalledKeys,
+        byte DefaultKeyVersion
     )
     {
         /// <summary>
@@ -40,7 +42,9 @@ namespace Gp4Net.CardEmulator.Functional
             SecurityLevel: 0x00,
             DataObjects: ImmutableDictionary<ushort, byte[]>.Empty,
             Applications: ImmutableDictionary<string, InstalledApplication>.Empty,
-            LoadFiles: ImmutableList<LoadFile>.Empty
+            LoadFiles: ImmutableList<LoadFile>.Empty,
+            InstalledKeys: ImmutableDictionary<byte, IKeySet>.Empty,
+            DefaultKeyVersion: 0xFF
         );
 
         /// <summary>
@@ -109,13 +113,31 @@ namespace Gp4Net.CardEmulator.Functional
         };
 
         /// <summary>
+        /// Creates a new state with an installed key set.
+        /// </summary>
+        public CardState WithInstalledKey(byte keyVersion, IKeySet keySet) => this with
+        {
+            InstalledKeys = InstalledKeys.SetItem(keyVersion, keySet)
+        };
+
+        /// <summary>
+        /// Creates a new state with updated default key version.
+        /// </summary>
+        public CardState WithDefaultKeyVersion(byte keyVersion) => this with
+        {
+            DefaultKeyVersion = keyVersion
+        };
+
+        /// <summary>
         /// Resets the card state to initial conditions.
         /// </summary>
         public CardState Reset() => Initial with
         {
             ScpVersion = this.ScpVersion,
             ScpImplementation = this.ScpImplementation,
-            DataObjects = this.DataObjects
+            DataObjects = this.DataObjects,
+            InstalledKeys = this.InstalledKeys,
+            DefaultKeyVersion = this.DefaultKeyVersion
         };
     }
 

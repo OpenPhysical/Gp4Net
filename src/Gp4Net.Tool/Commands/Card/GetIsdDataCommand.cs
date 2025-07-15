@@ -84,7 +84,7 @@ namespace Gp4Net.Tool.Commands.Card
         {
             try
             {
-                var dataResult = await context.GlobalPlatformService.GetDataAsync(tag);
+                var dataResult = await context.GetGlobalPlatformService().GetDataAsync(tag);
                 return await dataResult.MatchAsync(
                     async response =>
                     {
@@ -128,7 +128,7 @@ namespace Gp4Net.Tool.Commands.Card
                     return 1;
                 }
 
-                var dataResult = await context.GlobalPlatformService.GetDataAsync(tag);
+                var dataResult = await context.GetGlobalPlatformService().GetDataAsync(tag);
                 return await dataResult.MatchAsync(
                     async response =>
                     {
@@ -158,13 +158,13 @@ namespace Gp4Net.Tool.Commands.Card
             try
             {
                 // Get all three required components
-                var iinResult = await context.GlobalPlatformService.GetDataAsync(
+                var iinResult = await context.GetGlobalPlatformService().GetDataAsync(
                     Domain.Commands.GetDataCommand.DataObjects.IssuerIdentificationNumber
                 );
-                var cinResult = await context.GlobalPlatformService.GetDataAsync(
+                var cinResult = await context.GetGlobalPlatformService().GetDataAsync(
                     Domain.Commands.GetDataCommand.DataObjects.CardImageNumber
                 );
-                var urlResult = await context.GlobalPlatformService.GetDataAsync(
+                var urlResult = await context.GetGlobalPlatformService().GetDataAsync(
                     Domain.Commands.GetDataCommand.DataObjects.SecurityDomainManagerUrl
                 );
 
@@ -258,7 +258,7 @@ namespace Gp4Net.Tool.Commands.Card
             {
                 try
                 {
-                    var dataResult = await context.GlobalPlatformService.GetDataAsync(tag);
+                    var dataResult = await context.GetGlobalPlatformService().GetDataAsync(tag);
                     await dataResult.MatchAsync(
                         async response =>
                         {

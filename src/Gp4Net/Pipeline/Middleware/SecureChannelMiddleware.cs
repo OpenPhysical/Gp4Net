@@ -84,7 +84,7 @@ namespace Gp4Net.Pipeline.Middleware
             };
         }
 
-        private async Task<Result<CommandResponse, SmartCardError>> ProcessSuccessResponse(
+        private Task<Result<CommandResponse, SmartCardError>> ProcessSuccessResponse(
             CommandResponse response,
             SecureChannelSession session)
         {
@@ -127,7 +127,7 @@ namespace Gp4Net.Pipeline.Middleware
                         .WithMetadata(ResponseMetadata.SecureChannelWrapped, true)
                         .WithMetadata("SecureChannelProtocol", $"SCP{session.ProtocolVersion:X2}");
 
-                    return Result<CommandResponse, SmartCardError>.Ok(unwrappedResponse);
+                    return Task.FromResult(Result<CommandResponse, SmartCardError>.Ok(unwrappedResponse));
                 }
 
                 // No unwrapping needed, just add metadata
@@ -135,14 +135,14 @@ namespace Gp4Net.Pipeline.Middleware
                     .WithMetadata(ResponseMetadata.SecureChannelWrapped, true)
                     .WithMetadata("SecureChannelProtocol", $"SCP{session.ProtocolVersion:X2}");
 
-                return Result<CommandResponse, SmartCardError>.Ok(updatedResponse);
+                return Task.FromResult(Result<CommandResponse, SmartCardError>.Ok(updatedResponse));
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to unwrap response with secure channel");
-                return Result<CommandResponse, SmartCardError>.Fail(
+                return Task.FromResult(Result<CommandResponse, SmartCardError>.Fail(
                     SmartCardError.SecurityError("Secure channel unwrapping failed", response.StatusWord)
-                        .WithContext("Exception", ex.Message));
+                        .WithContext("Exception", ex.Message)));
             }
         }
 

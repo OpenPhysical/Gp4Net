@@ -68,6 +68,11 @@ namespace Gp4Net.Domain
         /// <summary>
         /// Load file (package).
         /// </summary>
-        LoadFile = 0x01
+        LoadFile = 0x01,
+        
+        /// <summary>
+        /// Executable load file.
+        /// </summary>
+        ExecutableLoadFile = 0x02
     }
 }

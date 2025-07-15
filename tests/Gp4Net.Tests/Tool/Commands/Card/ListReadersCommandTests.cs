@@ -7,6 +7,7 @@ namespace Gp4Net.Tests.Tool.Commands.Card
 {
     using System.Collections.Generic;
     using System.Threading.Tasks;
+    using Gp4Net.Services;
     using Gp4Net.Tool.Commands.Card;
     using Gp4Net.Tool.Pipeline;
     using Gp4Net.Tool.Services;

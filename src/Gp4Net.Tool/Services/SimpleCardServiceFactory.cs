@@ -13,12 +13,12 @@ namespace Gp4Net.Tool.Services
     [PublicAPI]
     public class SimpleCardServiceFactory : ICardService
     {
-        private readonly EnhancedWsctCardService _wsctService;
+        private readonly WsctCardService _wsctService;
         private readonly SimpleJsonCardService _jsonService;
         private ICardService? _activeService;
         private TraceBasedCardService? _traceService;
 
-        public SimpleCardServiceFactory(EnhancedWsctCardService wsctService, SimpleJsonCardService jsonService)
+        public SimpleCardServiceFactory(WsctCardService wsctService, SimpleJsonCardService jsonService)
         {
             _wsctService = wsctService ?? throw new ArgumentNullException(nameof(wsctService));
             _jsonService = jsonService ?? throw new ArgumentNullException(nameof(jsonService));

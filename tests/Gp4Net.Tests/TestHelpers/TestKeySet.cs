@@ -12,15 +12,17 @@ namespace Gp4Net.Tests.TestHelpers
         private readonly byte[] _macKey;
         private readonly byte[] _dekKey;
 
-        public TestKeySet(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion)
+        public TestKeySet(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion, byte keyId = 0)
         {
             _encKey = (byte[])encKey.Clone();
             _macKey = (byte[])macKey.Clone();
             _dekKey = (byte[])dekKey.Clone();
             KeyVersion = keyVersion;
+            KeyId = keyId;
         }
 
         public byte KeyVersion { get; }
+        public byte KeyId { get; }
         public byte[] EncKey => (byte[])_encKey.Clone();
         public byte[] MacKey => (byte[])_macKey.Clone();
         public byte[] DekKey => (byte[])_dekKey.Clone();

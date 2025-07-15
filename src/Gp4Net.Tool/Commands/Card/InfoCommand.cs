@@ -64,7 +64,7 @@ namespace Gp4Net.Tool.Commands.Card
                 // Try to get ISD information (doesn't require secure channel)
                 try
                 {
-                    var selectResult = await ctx.GlobalPlatformService.SelectIsdAsync();
+                    var selectResult = await ctx.GetGlobalPlatformService().SelectIsdAsync();
                     await selectResult.MatchAsync(
                         async selectResponse =>
                         {
@@ -84,19 +84,27 @@ namespace Gp4Net.Tool.Commands.Card
                         });
 
                     // Add CPLC data to table (doesn't require secure channel)
-                    var cplcResult = await ctx.GlobalPlatformService.GetCplcAsync();
-                    await cplcResult.MatchAsync(
-                        async cplc =>
-                        {
-                            AddCplcToTable(table, cplc);
-                            return Task.CompletedTask;
-                        },
-                        async error =>
-                        {
-                            Logger.Debug($"Could not get CPLC data: {error.Message}");
-                            _ = table.AddRow("CPLC Data", "[red]Not available[/]");
-                            return Task.CompletedTask;
-                        });
+                    try
+                    {
+                        var cplcResult = await ctx.GetGlobalPlatformService().GetCplcAsync();
+                        await cplcResult.MatchAsync(
+                            async cplc =>
+                            {
+                                AddCplcToTable(table, cplc);
+                                return Task.CompletedTask;
+                            },
+                            async error =>
+                            {
+                                Logger.Debug($"Could not get CPLC data: {error.Message}");
+                                _ = table.AddRow("CPLC Data", "[red]Not available[/]");
+                                return Task.CompletedTask;
+                            });
+                    }
+                    catch (Exception cplcEx)
+                    {
+                        Logger.Debug($"Could not get CPLC data: {cplcEx.Message}");
+                        _ = table.AddRow("ISD Status", $"[red]✗ Error: {cplcEx.Message}[/]");
+                    }
 
                     // Add other GET DATA commands to table (these don't require secure channel)
                     await AddGetDataToTable(ctx, table, "Card Data", GetDataCommand.DataObjects.CardData);
@@ -124,7 +132,7 @@ namespace Gp4Net.Tool.Commands.Card
                     {
                         try
                         {
-                            var statusResult = await ctx.GlobalPlatformService.GetStatusAsync(StatusSubset.Applications);
+                            var statusResult = await ctx.GetGlobalPlatformService().GetStatusAsync(StatusSubset.Applications);
                             await statusResult.MatchAsync(
                                 async applications =>
                                 {
@@ -274,7 +282,7 @@ namespace Gp4Net.Tool.Commands.Card
         {
             try
             {
-                var dataResult = await context.GlobalPlatformService.GetDataAsync(tag);
+                var dataResult = await context.GetGlobalPlatformService().GetDataAsync(tag);
                 await dataResult.MatchAsync(
                     async response =>
                     {

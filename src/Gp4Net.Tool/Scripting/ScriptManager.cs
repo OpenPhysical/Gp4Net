@@ -18,8 +18,9 @@ namespace Gp4Net.Tool.Scripting
         private readonly ILogger<ScriptManager> _logger;
         private readonly ScriptDirectoryResolver _directoryResolver;
         private readonly ICardService _cardService;
-        private readonly Gp4Net.Services.IGlobalPlatformService _globalPlatformService;
+        private readonly IDomainServiceFactory _domainServiceFactory;
         private readonly Dictionary<string, Script> _scriptCache;
+        private Gp4Net.Services.IGlobalPlatformService? _cachedGlobalPlatformService;
 
         /// <summary>
         /// Initializes a new instance of the ScriptManager class.
@@ -28,16 +29,16 @@ namespace Gp4Net.Tool.Scripting
             ILogger<ScriptManager> logger,
             ScriptDirectoryResolver directoryResolver,
             ICardService cardService,
-            Gp4Net.Services.IGlobalPlatformService globalPlatformService
+            IDomainServiceFactory domainServiceFactory
         )
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _directoryResolver =
                 directoryResolver ?? throw new ArgumentNullException(nameof(directoryResolver));
             _cardService = cardService ?? throw new ArgumentNullException(nameof(cardService));
-            _globalPlatformService =
-                globalPlatformService
-                ?? throw new ArgumentNullException(nameof(globalPlatformService));
+            _domainServiceFactory =
+                domainServiceFactory
+                ?? throw new ArgumentNullException(nameof(domainServiceFactory));
             _scriptCache = [];
 
             // Register user data types
@@ -266,8 +267,16 @@ namespace Gp4Net.Tool.Scripting
 
         private void RegisterGpModule(Script script)
         {
-            var gpModule = new GpScriptModule(_cardService, _globalPlatformService, _logger);
+            var globalPlatformService = GetGlobalPlatformService();
+            var gpModule = new GpScriptModule(_cardService, globalPlatformService, _logger);
             script.Globals["gp"] = UserData.Create(gpModule);
+        }
+
+        private Gp4Net.Services.IGlobalPlatformService GetGlobalPlatformService()
+        {
+            // Create on demand with proper context, cache for reuse
+            return _cachedGlobalPlatformService ??= _domainServiceFactory
+                .CreateGlobalPlatformService(_cardService);
         }
 
         private void RegisterCryptoModule(Script script)

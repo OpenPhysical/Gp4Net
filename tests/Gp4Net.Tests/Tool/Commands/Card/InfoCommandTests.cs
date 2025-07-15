@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Threading;
 using System.Threading.Tasks;
+using Gp4Net.Domain;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Services;
 using Gp4Net.Tool.Commands.Card;
 using Gp4Net.Tool.Pipeline;
 using Gp4Net.Tool.Services;
@@ -106,8 +110,8 @@ namespace Gp4Net.Tests.Tool.Commands.Card
             // Arrange
             SetupConnectedCard();
             _ = _mockGlobalPlatformService
-                .Setup(s => s.SelectIsd())
-                .Throws(new Exception("ISD error"));
+                .Setup(s => s.SelectIsdAsync(It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new Exception("ISD error"));
 
             var settings = new InfoCommand.Settings();
 
@@ -126,8 +130,8 @@ namespace Gp4Net.Tests.Tool.Commands.Card
             SetupConnectedCard();
             SetupIsdSelection();
             _ = _mockGlobalPlatformService
-                .Setup(s => s.GetCplc())
-                .Throws(new Exception("CPLC error"));
+                .Setup(s => s.GetCplcAsync(It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new Exception("CPLC error"));
 
             var settings = new InfoCommand.Settings();
 
@@ -138,7 +142,7 @@ namespace Gp4Net.Tests.Tool.Commands.Card
             Assert.That(result, Is.EqualTo(0));
             // Should still try to get other data
             _mockGlobalPlatformService.Verify(
-                s => s.GetData(It.IsAny<ushort>()),
+                s => s.GetDataAsync(It.IsAny<ushort>(), It.IsAny<CancellationToken>()),
                 Times.AtLeastOnce
             );
         }
@@ -150,8 +154,8 @@ namespace Gp4Net.Tests.Tool.Commands.Card
             SetupConnectedCard();
             SetupIsdSelection();
             _ = _mockGlobalPlatformService
-                .Setup(s => s.GetApplications())
-                .Throws(new Exception("Apps error"));
+                .Setup(s => s.GetStatusAsync(It.IsAny<StatusSubset>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new Exception("Apps error"));
 
             var settings = new InfoCommand.Settings();
 
@@ -198,7 +202,7 @@ namespace Gp4Net.Tests.Tool.Commands.Card
 
             // Assert
             Assert.That(result, Is.EqualTo(0));
-            _mockGlobalPlatformService.Verify(s => s.GetCplc(), Times.Once);
+            _mockGlobalPlatformService.Verify(s => s.GetCplcAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Test]
@@ -213,11 +217,11 @@ namespace Gp4Net.Tests.Tool.Commands.Card
 
             var apps = new List<ApplicationInfo>
             {
-                new ApplicationInfo(new byte[] { 0xA0, 0x00 }, "SELECTABLE", [], "ISD"),
-                new ApplicationInfo(new byte[] { 0xA0, 0x01 }, "SELECTABLE", [], "Application"),
-                new ApplicationInfo(new byte[] { 0xA0, 0x02 }, "SELECTABLE", [], "Application")
+                new ApplicationInfo(new byte[] { 0xA0, 0x00 }, LifecycleState.Selectable, [], ApplicationType.IssuerSecurityDomain),
+                new ApplicationInfo(new byte[] { 0xA0, 0x01 }, LifecycleState.Selectable, [], ApplicationType.Application),
+                new ApplicationInfo(new byte[] { 0xA0, 0x02 }, LifecycleState.Selectable, [], ApplicationType.Application)
             };
-            _ = _mockGlobalPlatformService.Setup(s => s.GetApplications()).Returns(apps);
+            _ = _mockGlobalPlatformService.Setup(s => s.GetStatusAsync(It.IsAny<StatusSubset>(), It.IsAny<CancellationToken>())).ReturnsAsync(apps.ToImmutableList());
 
             var settings = new InfoCommand.Settings();
 
@@ -226,7 +230,7 @@ namespace Gp4Net.Tests.Tool.Commands.Card
 
             // Assert
             Assert.That(result, Is.EqualTo(0));
-            _mockGlobalPlatformService.Verify(s => s.GetApplications(), Times.Once);
+            _mockGlobalPlatformService.Verify(s => s.GetStatusAsync(It.IsAny<StatusSubset>(), It.IsAny<CancellationToken>()), Times.Once);
         }
 
         #endregion
@@ -242,7 +246,7 @@ namespace Gp4Net.Tests.Tool.Commands.Card
         private void SetupIsdSelection()
         {
             var selectResponse = new SelectResponse(new byte[] { 0x6F, 0x00 });
-            _ = _mockGlobalPlatformService.Setup(s => s.SelectIsd()).Returns(selectResponse);
+            _ = _mockGlobalPlatformService.Setup(s => s.SelectIsdAsync(It.IsAny<CancellationToken>())).ReturnsAsync(selectResponse);
         }
 
         private void SetupCplcData()
@@ -268,7 +272,7 @@ namespace Gp4Net.Tests.Tool.Commands.Card
                 IcPersonalizationDate = 0x1234,
                 IcPersonalizationEquipmentId = 0x56789ABC
             };
-            _ = _mockGlobalPlatformService.Setup(s => s.GetCplc()).Returns(cplc);
+            _ = _mockGlobalPlatformService.Setup(s => s.GetCplcAsync(It.IsAny<CancellationToken>())).ReturnsAsync(cplc);
         }
 
         #endregion

@@ -16,11 +16,14 @@ using Gp4Net.Tool.Pipeline;
 using Gp4Net.Tool.Scripting;
 using Gp4Net.Tool.Services;
 using Gp4Net.Tool.Services.CardCommunication;
+using Gp4Net.Core;
+using Gp4Net.Pipeline;
 using Gp4Net.Transport;
 using log4net;
 using log4net.Config;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Scrutor;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -217,6 +220,7 @@ namespace Gp4Net.Tool
 
             // Register WSCT dependencies
             _ = services.AddSingleton<IWsctFactory, WsctFactory>();
+            _ = services.AddSingleton<ICardContextWrapper>(provider => provider.GetRequiredService<IWsctFactory>().CreateCardContext());
 
             // Register cryptography services
             _ = services.AddSingleton<IKeyDerivationService, KeyDerivationService>();
@@ -241,31 +245,57 @@ namespace Gp4Net.Tool
             _ = services.AddSingleton<IScriptManager, ScriptManager>();
             _ = services.AddSingleton<IKeysetResolver, KeysetResolver>();
 
-            // Register card services with factory pattern for reader type selection
-            _ = services.AddSingleton<EnhancedWsctCardService>();
-            _ = services.AddSingleton<LuaVirtualCardService>();
-            _ = services.AddSingleton<JsonLuaCardService>();
-            _ = services.AddSingleton<SimpleJsonCardService>();
-            _ = services.AddSingleton<ICardService>(provider =>
-            {
-                // Create a factory that selects the appropriate service based on reader name
-                return new SimpleCardServiceFactory(
-                    provider.GetRequiredService<EnhancedWsctCardService>(),
-                    provider.GetRequiredService<SimpleJsonCardService>()
-                );
-            });
-            _ = services.AddSingleton<Gp4Net.Services.IGlobalPlatformService, Gp4Net.Services.FunctionalGlobalPlatformService>();
+            // Register card service  
+            _ = services.AddSingleton<ICardService, WsctCardService>();
+            
+            // Register domain service factory
+            _ = services.AddSingleton<IDomainServiceFactory, DomainServiceFactory>();
             _ = services.AddSingleton<PackageRegistry>();
 
             // Register pipeline services
             _ = services.AddSingleton<IDisplayService>(provider => new DisplayService(false));
-            _ = services.AddSingleton<ICommandContext, Pipeline.CommandContext>();
+            _ = services.AddScoped<Gp4Net.Tool.Pipeline.ICommandContext>(provider => 
+            {
+                var display = provider.GetRequiredService<IDisplayService>();
+                var cardService = provider.GetRequiredService<ICardService>();
+                var domainServiceFactory = provider.GetRequiredService<IDomainServiceFactory>();
+                var keysetResolver = provider.GetRequiredService<IKeysetResolver>();
+                
+                return new Pipeline.CommandContext(display, cardService, domainServiceFactory, keysetResolver);
+            });
+            
+            // Build the command pipeline
+            _ = services.AddSingleton<ICommandPipeline>(provider =>
+            {
+                var transportFactory = provider.GetRequiredService<IApduTransportFactory>();
+                var transport = transportFactory.CreateTransport(TransportProtocol.T0);
+                var transportLogger = provider.GetService<ILogger<Gp4Net.Pipeline.Middleware.TransportMiddleware>>();
+                var secureChannelLogger = provider.GetService<ILogger<Gp4Net.Pipeline.Middleware.SecureChannelMiddleware>>();
+                var loggingLogger = provider.GetService<ILogger<Gp4Net.Pipeline.Middleware.LoggingMiddleware>>();
+                
+                return new CommandPipelineBuilder()
+                    .Use(new Gp4Net.Pipeline.Middleware.TransportMiddleware(transport, transportLogger))
+                    .Use(new Gp4Net.Pipeline.Middleware.SecureChannelMiddleware(secureChannelLogger))
+                    .Use(new Gp4Net.Pipeline.Middleware.LoggingMiddleware(loggingLogger!))
+                    .Build();
+            });
 
             // Register new pipeline commands automatically
             services.RegisterCommandHandlers(Assembly.GetExecutingAssembly());
 
-            // TODO: Re-implement auto-registration with Scrutor package or manual registration
-            // For now, commands are registered through RegisterCommandHandlers above
+            // Use Scrutor for automatic service registration
+            _ = services.Scan(scan => scan
+                .FromAssemblyOf<Program>()
+                .FromAssemblyOf<Gp4Net.Core.ServiceLifetime.ISingletonService>()
+                .AddClasses(classes => classes.AssignableTo<Gp4Net.Core.ServiceLifetime.ISingletonService>())
+                    .AsImplementedInterfaces()
+                    .WithSingletonLifetime()
+                .AddClasses(classes => classes.AssignableTo<Gp4Net.Core.ServiceLifetime.IScopedService>())
+                    .AsImplementedInterfaces()
+                    .WithScopedLifetime()
+                .AddClasses(classes => classes.AssignableTo<Gp4Net.Core.ServiceLifetime.ITransientService>())
+                    .AsImplementedInterfaces()
+                    .WithTransientLifetime());
 
             Logger.Debug("Services configured");
         }

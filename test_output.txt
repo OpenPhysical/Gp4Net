@@ -1,0 +1,714 @@
+Test run for /Users/mistial/Projects/Gp4Net/tests/Gp4Net.Tests/bin/Debug/net8.0/Gp4Net.Tests.dll (.NETCoreApp,Version=v8.0)
+Test run for /Users/mistial/Projects/Gp4Net/tests/Gp4Net.Tests/bin/Debug/net9.0/Gp4Net.Tests.dll (.NETCoreApp,Version=v9.0)
+VSTest version 17.14.1 (arm64)
+VSTest version 17.14.1 (arm64)
+
+
+Starting test execution, please wait...Starting test execution, please wait...
+
+A total of 1 test files matched the specified pattern.
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:00.39]     Gp4Net.Tests.Integration.DeleteCommandTraceTests.DeleteCommand_GeneratesCorrectPlainApdu [FAIL]
+  Failed Gp4Net.Tests.Integration.DeleteCommandTraceTests.DeleteCommand_GeneratesCorrectPlainApdu [< 1 ms]
+  Error Message:
+   System.FormatException : The input is not a valid hex string as its length is not a multiple of 2.
+  Stack Trace:
+     at System.Convert.FromHexString(ReadOnlySpan`1 chars)
+   at System.Convert.FromHexString(String s)
+   at Gp4Net.Tests.Integration.DeleteCommandTraceTests.DeleteCommand_GeneratesCorrectPlainApdu() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandTraceTests.cs:line 151
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.40]     Gp4Net.Tests.Domain.Protocol.Scp03ProtocolTests.ProcessInitializeUpdateResponse_WithScp03Response_CreatesContext [FAIL]
+[xUnit.net 00:00:00.42]     Gp4Net.Tests.Integration.DeleteCommandTraceTests.DeleteCommand_WithSecureChannel_WorksCorrectly [FAIL]
+  Failed Gp4Net.Tests.Domain.Protocol.Scp03ProtocolTests.ProcessInitializeUpdateResponse_WithScp03Response_CreatesContext [< 1 ms]
+  Error Message:
+   System.InvalidOperationException : Card cryptogram verification failed.
+  Stack Trace:
+     at Gp4Net.Domain.Protocol.Scp03Protocol.ProcessInitializeUpdateResponse(InitializeUpdateResponse response, Byte[] hostChallenge) in /_/src/Gp4Net/Domain/Protocol/Scp03Protocol.cs:line 170
+   at Gp4Net.Tests.Domain.Protocol.Scp03ProtocolTests.ProcessInitializeUpdateResponse_WithScp03Response_CreatesContext() in /_/tests/Gp4Net.Tests/Domain/Protocol/Scp03ProtocolTests.cs:line 142
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed Gp4Net.Tests.Integration.DeleteCommandTraceTests.DeleteCommand_WithSecureChannel_WorksCorrectly [25 ms]
+  Error Message:
+   System.FormatException : The input is not a valid hex string as its length is not a multiple of 2.
+  Stack Trace:
+     at System.Convert.FromHexString(ReadOnlySpan`1 chars)
+   at System.Convert.FromHexString(String s)
+   at Gp4Net.Tests.Integration.DeleteCommandTraceTests.DeleteCommand_WithSecureChannel_WorksCorrectly() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandTraceTests.cs:line 132
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.49]     Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_WithWrapping_MatchesTraceFormat [FAIL]
+[xUnit.net 00:00:00.49]     Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_Chunking_GeneratesCorrectNumberOfBlocks [FAIL]
+[xUnit.net 00:00:00.49]     Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_FirstBlock_MatchesTrace [FAIL]
+  Failed Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_WithWrapping_MatchesTraceFormat [20 ms]
+  Error Message:
+   Assert.Empty() Failure: Collection was not empty
+Collection: [0]
+  Stack Trace:
+     at Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_WithWrapping_MatchesTraceFormat() in /_/tests/Gp4Net.Tests/Integration/LoadCommandTraceTests.cs:line 229
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_Chunking_GeneratesCorrectNumberOfBlocks [< 1 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: 256
+Actual:   0
+  Stack Trace:
+     at Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_Chunking_GeneratesCorrectNumberOfBlocks() in /_/tests/Gp4Net.Tests/Integration/LoadCommandTraceTests.cs:line 88
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_FirstBlock_MatchesTrace [< 1 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: 239
+Actual:   250
+  Stack Trace:
+     at Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_FirstBlock_MatchesTrace() in /_/tests/Gp4Net.Tests/Integration/LoadCommandTraceTests.cs:line 55
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed Delete_CapFileDryRun_ParsesWithoutConnection [55 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_CapFileDryRun_ParsesWithoutConnection() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 284
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_CapFileDryRun_ParsesWithoutConnection() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 284
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_CapFileDryRun_ParsesWithoutConnection()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m CardService not available in conversion context
+
+
+  Failed Delete_DryRun_NoChangesToCard [3 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_DryRun_NoChangesToCard() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 196
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_DryRun_NoChangesToCard() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 196
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_DryRun_NoChangesToCard()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_DryRunWithDebug_ShowsDetailedPlan [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_DryRunWithDebug_ShowsDetailedPlan() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 224
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_DryRunWithDebug_ShowsDetailedPlan() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 224
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_DryRunWithDebug_ShowsDetailedPlan()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_FromCapFile_ExtractsAndDeletes [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_FromCapFile_ExtractsAndDeletes() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 253
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_FromCapFile_ExtractsAndDeletes() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 253
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_FromCapFile_ExtractsAndDeletes()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_MultipleApplets_SimulatedCard_Success [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_MultipleApplets_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 109
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_MultipleApplets_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 109
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_MultipleApplets_SimulatedCard_Success()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_NoDeleteRelated_SimulatedCard_Success [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_NoDeleteRelated_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 165
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_NoDeleteRelated_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 165
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_NoDeleteRelated_SimulatedCard_Success()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_NonExistentApplet_ShowsError [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(1))
+  Expected: 1
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_NonExistentApplet_ShowsError() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 314
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_NonExistentApplet_ShowsError() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 314
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_NonExistentApplet_ShowsError()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_PartialFailure_ShowsPartialSuccess [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(1))
+  Expected: 1
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_PartialFailure_ShowsPartialSuccess() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 340
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_PartialFailure_ShowsPartialSuccess() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 340
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_PartialFailure_ShowsPartialSuccess()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_SingleApplet_SimulatedCard_Success [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_SingleApplet_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 83
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_SingleApplet_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 83
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_SingleApplet_SimulatedCard_Success()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_WithRelatedObjects_SimulatedCard_Success [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_WithRelatedObjects_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 139
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_WithRelatedObjects_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 139
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_WithRelatedObjects_SimulatedCard_Success()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed ExecuteAsync_CapFile_ExtractsAidsAndDeletes [155 ms]
+  Error Message:
+   Moq.MockException : 
+Expected invocation on the mock at least 2 times, but was 1 times: s => s.DeleteApplication(It.IsAny<byte[]>(), True)
+
+Performed invocations:
+
+   Mock<IGlobalPlatformService:11> (s):
+
+      IGlobalPlatformService.DeleteApplication([160, 0, 0, 3, 8, 0, 0, 16, 0], True)
+
+  Stack Trace:
+     at Moq.Mock.Verify(Mock mock, LambdaExpression expression, Times times, String failMessage) in /_/src/Moq/Mock.cs:line 332
+   at Moq.Mock`1.Verify[TResult](Expression`1 expression, Times times) in /_/src/Moq/Mock`1.cs:line 825
+   at Gp4Net.Tests.Tool.Commands.Applet.DeleteCommandTests.ExecuteAsync_CapFile_ExtractsAidsAndDeletes() in /_/tests/Gp4Net.Tests/Tool/Commands/Applet/DeleteCommandTests.cs:line 203
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+  Standard Output Messages:
+ [38;5;14mReading CAP file: [0m
+ [38;5;14m/Users/mistial/Projects/Gp4Net/tests/applets/OpenFIPS201-v1_10_2-chainfix.cap[0m
+                                  [38;5;7mDeletion Plan[0m                                  
+ ┌────────────────────┬────────────────────┬───────────────────┬────────────────┐
+ │ AID                │ Description        │ Source            │ Options        │
+ ├────────────────────┼────────────────────┼───────────────────┼────────────────┤
+ │ [38;5;11mA00000030800001000[0m │ Package            │ [2mOpenFIPS201-v1_10[0m │ Delete related │
+ │                    │ A00000030800001000 │ [2m_2-chainfix.cap[0m   │                │
+ └────────────────────┴────────────────────┴───────────────────┴────────────────┘
+ 
+ [2mNote: Only deleting the package AID. Applets will be deleted automatically with [0m
+ [2m'Delete related' option.[0m
+ [38;5;2mCard ATR:[0m 
+ [38;5;2m✓ Deleted Package A00000030800001000[0m
+ 
+ [38;5;2mSuccessfully deleted 1 object(s)[0m
+
+
+
+Failed!  - Failed:    17, Passed:   304, Skipped:     0, Total:   321, Duration: 914 ms - Gp4Net.Tests.dll (net9.0)
+[xUnit.net 00:00:01.34]     Gp4Net.Tests.Integration.DeleteCommandTraceTests.DeleteCommand_GeneratesCorrectPlainApdu [FAIL]
+[xUnit.net 00:00:01.34]     Gp4Net.Tests.Domain.Protocol.Scp03ProtocolTests.ProcessInitializeUpdateResponse_WithScp03Response_CreatesContext [FAIL]
+  Failed Gp4Net.Tests.Integration.DeleteCommandTraceTests.DeleteCommand_GeneratesCorrectPlainApdu [< 1 ms]
+  Error Message:
+   System.FormatException : The input is not a valid hex string as its length is not a multiple of 2.
+  Stack Trace:
+     at System.Convert.FromHexString(ReadOnlySpan`1 chars)
+   at System.Convert.FromHexString(String s)
+   at Gp4Net.Tests.Integration.DeleteCommandTraceTests.DeleteCommand_GeneratesCorrectPlainApdu() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandTraceTests.cs:line 151
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed Gp4Net.Tests.Domain.Protocol.Scp03ProtocolTests.ProcessInitializeUpdateResponse_WithScp03Response_CreatesContext [< 1 ms]
+  Error Message:
+   System.InvalidOperationException : Card cryptogram verification failed.
+  Stack Trace:
+     at Gp4Net.Domain.Protocol.Scp03Protocol.ProcessInitializeUpdateResponse(InitializeUpdateResponse response, Byte[] hostChallenge) in /_/src/Gp4Net/Domain/Protocol/Scp03Protocol.cs:line 170
+   at Gp4Net.Tests.Domain.Protocol.Scp03ProtocolTests.ProcessInitializeUpdateResponse_WithScp03Response_CreatesContext() in /_/tests/Gp4Net.Tests/Domain/Protocol/Scp03ProtocolTests.cs:line 142
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:01.36]     Gp4Net.Tests.Integration.DeleteCommandTraceTests.DeleteCommand_WithSecureChannel_WorksCorrectly [FAIL]
+[xUnit.net 00:00:01.36]     Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_WithWrapping_MatchesTraceFormat [FAIL]
+  Failed Gp4Net.Tests.Integration.DeleteCommandTraceTests.DeleteCommand_WithSecureChannel_WorksCorrectly [19 ms]
+  Error Message:
+   System.FormatException : The input is not a valid hex string as its length is not a multiple of 2.
+  Stack Trace:
+     at System.Convert.FromHexString(ReadOnlySpan`1 chars)
+   at System.Convert.FromHexString(String s)
+   at Gp4Net.Tests.Integration.DeleteCommandTraceTests.DeleteCommand_WithSecureChannel_WorksCorrectly() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandTraceTests.cs:line 132
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_WithWrapping_MatchesTraceFormat [151 ms]
+  Error Message:
+   Assert.Empty() Failure: Collection was not empty
+Collection: [0]
+  Stack Trace:
+     at Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_WithWrapping_MatchesTraceFormat() in /_/tests/Gp4Net.Tests/Integration/LoadCommandTraceTests.cs:line 229
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:01.36]     Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_Chunking_GeneratesCorrectNumberOfBlocks [FAIL]
+[xUnit.net 00:00:01.36]     Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_FirstBlock_MatchesTrace [FAIL]
+  Failed Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_Chunking_GeneratesCorrectNumberOfBlocks [< 1 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: 256
+Actual:   0
+  Stack Trace:
+     at Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_Chunking_GeneratesCorrectNumberOfBlocks() in /_/tests/Gp4Net.Tests/Integration/LoadCommandTraceTests.cs:line 88
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_FirstBlock_MatchesTrace [< 1 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: 239
+Actual:   250
+  Stack Trace:
+     at Gp4Net.Tests.Integration.LoadCommandTraceTests.LoadCommand_FirstBlock_MatchesTrace() in /_/tests/Gp4Net.Tests/Integration/LoadCommandTraceTests.cs:line 55
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  Failed Delete_CapFileDryRun_ParsesWithoutConnection [57 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_CapFileDryRun_ParsesWithoutConnection() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 284
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_CapFileDryRun_ParsesWithoutConnection() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 284
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_CapFileDryRun_ParsesWithoutConnection()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m CardService not available in conversion context
+
+
+  Failed Delete_DryRun_NoChangesToCard [3 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_DryRun_NoChangesToCard() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 196
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_DryRun_NoChangesToCard() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 196
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_DryRun_NoChangesToCard()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_DryRunWithDebug_ShowsDetailedPlan [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_DryRunWithDebug_ShowsDetailedPlan() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 224
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_DryRunWithDebug_ShowsDetailedPlan() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 224
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_DryRunWithDebug_ShowsDetailedPlan()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_FromCapFile_ExtractsAndDeletes [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_FromCapFile_ExtractsAndDeletes() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 253
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_FromCapFile_ExtractsAndDeletes() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 253
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_FromCapFile_ExtractsAndDeletes()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_MultipleApplets_SimulatedCard_Success [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_MultipleApplets_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 109
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_MultipleApplets_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 109
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_MultipleApplets_SimulatedCard_Success()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_NoDeleteRelated_SimulatedCard_Success [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_NoDeleteRelated_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 165
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_NoDeleteRelated_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 165
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_NoDeleteRelated_SimulatedCard_Success()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_NonExistentApplet_ShowsError [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(1))
+  Expected: 1
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_NonExistentApplet_ShowsError() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 314
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_NonExistentApplet_ShowsError() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 314
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_NonExistentApplet_ShowsError()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_PartialFailure_ShowsPartialSuccess [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(1))
+  Expected: 1
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_PartialFailure_ShowsPartialSuccess() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 340
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_PartialFailure_ShowsPartialSuccess() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 340
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_PartialFailure_ShowsPartialSuccess()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_SingleApplet_SimulatedCard_Success [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_SingleApplet_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 83
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_SingleApplet_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 83
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_SingleApplet_SimulatedCard_Success()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed Delete_WithRelatedObjects_SimulatedCard_Success [1 ms]
+  Error Message:
+     Assert.That(result, Is.EqualTo(0))
+  Expected: 0
+  But was:  -1
+
+  Stack Trace:
+     at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_WithRelatedObjects_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 139
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+1)    at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_WithRelatedObjects_SimulatedCard_Success() in /_/tests/Gp4Net.Tests/Integration/DeleteCommandIntegrationTests.cs:line 139
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at Gp4Net.Tests.Integration.DeleteCommandIntegrationTests.Delete_WithRelatedObjects_SimulatedCard_Success()
+
+
+  Standard Output Messages:
+ [38;5;9mError:[0m Failed to convert 'Simulated Reader' to Reader.
+
+
+  Failed ExecuteAsync_CapFile_ExtractsAidsAndDeletes [75 ms]
+  Error Message:
+   Moq.MockException : 
+Expected invocation on the mock at least 2 times, but was 1 times: s => s.DeleteApplication(It.IsAny<byte[]>(), True)
+
+Performed invocations:
+
+   Mock<IGlobalPlatformService:11> (s):
+
+      IGlobalPlatformService.DeleteApplication([160, 0, 0, 3, 8, 0, 0, 16, 0], True)
+
+  Stack Trace:
+     at Moq.Mock.Verify(Mock mock, LambdaExpression expression, Times times, String failMessage) in /_/src/Moq/Mock.cs:line 332
+   at Moq.Mock`1.Verify[TResult](Expression`1 expression, Times times) in /_/src/Moq/Mock`1.cs:line 825
+   at Gp4Net.Tests.Tool.Commands.Applet.DeleteCommandTests.ExecuteAsync_CapFile_ExtractsAidsAndDeletes() in /_/tests/Gp4Net.Tests/Tool/Commands/Applet/DeleteCommandTests.cs:line 203
+   at NUnit.Framework.Internal.TaskAwaitAdapter.GenericAdapter`1.GetResult()
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await[TResult](TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.AsyncToSyncAdapter.Await(TestExecutionContext context, Func`1 invoke)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.RunTestMethod(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.TestMethodCommand.Execute(TestExecutionContext context)
+   at NUnit.Framework.Internal.Commands.BeforeAndAfterTestCommand.<>c__DisplayClass1_0.<Execute>b__0()
+   at NUnit.Framework.Internal.Commands.DelegatingTestCommand.RunTestMethodInThreadAbortSafeZone(TestExecutionContext context, Action action)
+
+  Standard Output Messages:
+ [38;5;14mReading CAP file: [0m
+ [38;5;14m/Users/mistial/Projects/Gp4Net/tests/applets/OpenFIPS201-v1_10_2-chainfix.cap[0m
+                                  [38;5;7mDeletion Plan[0m                                  
+ ┌────────────────────┬────────────────────┬───────────────────┬────────────────┐
+ │ AID                │ Description        │ Source            │ Options        │
+ ├────────────────────┼────────────────────┼───────────────────┼────────────────┤
+ │ [38;5;11mA00000030800001000[0m │ Package            │ [2mOpenFIPS201-v1_10[0m │ Delete related │
+ │                    │ A00000030800001000 │ [2m_2-chainfix.cap[0m   │                │
+ └────────────────────┴────────────────────┴───────────────────┴────────────────┘
+ 
+ [2mNote: Only deleting the package AID. Applets will be deleted automatically with [0m
+ [2m'Delete related' option.[0m
+ [38;5;2mCard ATR:[0m 
+ [38;5;2m✓ Deleted Package A00000030800001000[0m
+ 
+ [38;5;2mSuccessfully deleted 1 object(s)[0m
+
+
+
+Failed!  - Failed:    17, Passed:   304, Skipped:     0, Total:   321, Duration: 620 ms - Gp4Net.Tests.dll (net8.0)

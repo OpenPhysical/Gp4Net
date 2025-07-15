@@ -1,15 +1,17 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Domain.Commands;
-using Xunit;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Integration
 {
     /// <summary>
     /// Tests LOAD command chunking using trace data.
     /// </summary>
+    [TestFixture]
     public class LoadCommandTraceTests : TraceBasedTestBase
     {
         private readonly string _capFilePath;
@@ -25,44 +27,94 @@ namespace Gp4Net.Tests.Integration
             );
         }
 
-        [Fact]
+        [Test]
         public void LoadCommand_FirstBlock_MatchesTrace()
         {
-            // From trace line 47: Command --> 80E80000EFC48268EE010013DECAFFED...
-            var expectedFirstBlockStart = "80E80000EFC48268EE010013DECAFFED";
-            
             // Arrange - Load CAP file
             var capFileData = File.ReadAllBytes(_capFilePath);
+            var maxBlockSize = 245;
             
             // Act - Generate LOAD commands
-            var loadCommands = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
+            var result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize);
+            Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
+            var loadCommands = result.Value;
             
             // Assert - First command structure
-            Assert.True(loadCommands.Count > 0);
+            Assert.That(loadCommands.Count > 0);
             var firstCommand = loadCommands[0];
             
-            Assert.True(firstCommand.IsFirstBlock);
-            Assert.False(firstCommand.IsFinalBlock);
-            Assert.Equal(0x00, firstCommand.P1); // Continuation
-            Assert.Equal(0x00, firstCommand.P2); // Block 0
+            Assert.That(firstCommand.IsFirstBlock);
+            Assert.That(firstCommand.IsFinalBlock, Is.False); // Large CAP file, not final block
+            Assert.That(firstCommand.P1, Is.EqualTo(0x00)); // Continuation
+            Assert.That(firstCommand.P2, Is.EqualTo(0x00)); // Block 0
             
             // The first block should include TLV header with total size
             var apdu = firstCommand.ToApdu();
-            Assert.Equal(0x80, apdu[0]); // CLA
-            Assert.Equal(0xE8, apdu[1]); // INS
-            Assert.Equal(0x00, apdu[2]); // P1
-            Assert.Equal(0x00, apdu[3]); // P2
-            Assert.Equal(0xEF, apdu[4]); // Lc (239 bytes)
+            Assert.That(apdu[0], Is.EqualTo(0x80)); // CLA
+            Assert.That(apdu[1], Is.EqualTo(0xE8)); // INS
+            Assert.That(apdu[2], Is.EqualTo(0x00)); // P1
+            Assert.That(apdu[3], Is.EqualTo(0x00)); // P2
             
             // Should start with C4 tag and length encoding
-            Assert.Equal(0xC4, apdu[5]); // CAP data tag
+            Assert.That(apdu[5], Is.EqualTo(0xC4)); // CAP data tag
+            
+            // Verify the total payload size respects maxBlockSize
+            var payloadSize = apdu[4]; // Lc field
+            Assert.That(payloadSize, Is.LessThanOrEqualTo(maxBlockSize), 
+                $"Payload size {payloadSize} should not exceed maxBlockSize {maxBlockSize}");
             
             // The length encoding should match the total CAP file size
             var totalSize = (uint)capFileData.Length;
-            Assert.Equal(totalSize, firstCommand.TotalCapSize);
+            Assert.That(firstCommand.TotalCapSize, Is.EqualTo(totalSize));
+            
+            // Verify TLV length encoding is correct for this file size
+            var expectedTlvHeader = CreateExpectedTlvHeader(totalSize);
+            for (int i = 0; i < expectedTlvHeader.Length; i++)
+            {
+                Assert.That(apdu[5 + i], Is.EqualTo(expectedTlvHeader[i]), 
+                    $"TLV header byte {i} should match expected encoding");
+            }
+        }
+        
+        private static byte[] CreateExpectedTlvHeader(uint totalSize)
+        {
+            var header = new List<byte> { 0xC4 }; // Tag
+            
+            if (totalSize <= 0x7F)
+            {
+                header.Add((byte)totalSize);
+            }
+            else if (totalSize <= 0xFF)
+            {
+                header.Add(0x81);
+                header.Add((byte)totalSize);
+            }
+            else if (totalSize <= 0xFFFF)
+            {
+                header.Add(0x82);
+                header.Add((byte)(totalSize >> 8));
+                header.Add((byte)(totalSize & 0xFF));
+            }
+            else if (totalSize <= 0xFFFFFF)
+            {
+                header.Add(0x83);
+                header.Add((byte)(totalSize >> 16));
+                header.Add((byte)((totalSize >> 8) & 0xFF));
+                header.Add((byte)(totalSize & 0xFF));
+            }
+            else
+            {
+                header.Add(0x84);
+                header.Add((byte)(totalSize >> 24));
+                header.Add((byte)((totalSize >> 16) & 0xFF));
+                header.Add((byte)((totalSize >> 8) & 0xFF));
+                header.Add((byte)(totalSize & 0xFF));
+            }
+            
+            return [.. header];
         }
 
-        [Fact]
+        [Test]
         public void LoadCommand_Chunking_GeneratesCorrectNumberOfBlocks()
         {
             // The trace shows 567 LOAD commands for OpenFIPS201
@@ -72,7 +124,9 @@ namespace Gp4Net.Tests.Integration
             var capFileSize = capFileData.Length;
             
             // Act
-            var loadCommands = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
+            var result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
+            Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
+            var loadCommands = result.Value;
             
             // Assert
             // With 245 byte blocks and considering TLV overhead:
@@ -80,21 +134,22 @@ namespace Gp4Net.Tests.Integration
             // Each block can carry up to 245 bytes of actual data
             
             // The trace shows many LOAD commands, let's verify we generate a reasonable number
-            Assert.True(loadCommands.Count > 100, $"Expected many LOAD commands, got {loadCommands.Count}");
+            Assert.That(loadCommands.Count > 100, Is.True, $"Expected many LOAD commands, got {loadCommands.Count}");
             
-            // Verify block numbering
+            // Verify block numbering (wraps at 256 due to byte limit)
             for (int i = 0; i < loadCommands.Count; i++)
             {
-                Assert.Equal(i, loadCommands[i].BlockNumber);
+                var expectedBlockNumber = (byte)(i % 256);
+                Assert.That(loadCommands[i].BlockNumber, Is.EqualTo(expectedBlockNumber));
             }
             
             // Last block should be marked as final
             var lastCommand = loadCommands.Last();
-            Assert.True(lastCommand.IsFinalBlock);
-            Assert.Equal(0x80, lastCommand.P1); // Final block
+            Assert.That(lastCommand.IsFinalBlock);
+            Assert.That(lastCommand.P1, Is.EqualTo(0x80)); // Final block
         }
 
-        [Fact]
+        [Test]
         public void LoadCommand_DataReassembly_ReconstructsOriginalCapFile()
         {
             // Verify that reassembling all LOAD command data reconstructs the original CAP file
@@ -103,7 +158,9 @@ namespace Gp4Net.Tests.Integration
             var originalCapData = File.ReadAllBytes(_capFilePath);
             
             // Act
-            var loadCommands = LoadCommand.CreateFromCapFile(originalCapData, maxBlockSize: 245);
+            var result = LoadCommand.CreateFromCapFile(originalCapData, maxBlockSize: 245);
+            Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
+            var loadCommands = result.Value;
             
             // Reassemble data from all commands
             var reassembledData = new System.Collections.Generic.List<byte>();
@@ -117,7 +174,7 @@ namespace Gp4Net.Tests.Integration
                 if (cmd.IsFirstBlock)
                 {
                     // Skip TLV header (C4 tag and length encoding)
-                    Assert.Equal(0xC4, commandData[0]);
+                    Assert.That(commandData[0], Is.EqualTo(0xC4));
                     
                     // Determine length encoding size
                     int headerSize = 1; // C4 tag
@@ -153,11 +210,11 @@ namespace Gp4Net.Tests.Integration
             
             // Assert
             var reassembled = reassembledData.ToArray();
-            Assert.Equal(originalCapData.Length, reassembled.Length);
-            Assert.Equal(originalCapData, reassembled);
+            Assert.That(reassembled.Length, Is.EqualTo(originalCapData.Length));
+            Assert.That(reassembled, Is.EqualTo(originalCapData));
         }
 
-        [Fact]
+        [Test]
         public void LoadCommand_CapFileStructure_IsValid()
         {
             // Verify the CAP file can be parsed
@@ -168,17 +225,17 @@ namespace Gp4Net.Tests.Integration
             // Act & Assert
             var capFile = CapFileStructure.Parse(capFileData);
             
-            Assert.NotNull(capFile);
-            Assert.Equal("A00000030800001000", Convert.ToHexString(capFile.PackageAid));
-            Assert.True(capFile.Components.Count > 0);
-            Assert.True(capFile.TotalSize > 0);
+            Assert.That(capFile, Is.Not.Null);
+            Assert.That(Convert.ToHexString(capFile.PackageAid), Is.EqualTo("A00000030800001000"));
+            Assert.That(capFile.Components.Count > 0);
+            Assert.That(capFile.TotalSize > 0);
             
             // The trace mentions OpenFIPS201-v1_10_2-chainfix.cap
             // This is a substantial applet with multiple components
-            Assert.True(capFile.Components.Count >= 5, $"Expected multiple components, got {capFile.Components.Count}");
+            Assert.That(capFile.Components.Count >= 5, Is.True, $"Expected multiple components, got {capFile.Components.Count}");
         }
 
-        [Fact]
+        [Test]
         public void LoadCommand_BlockSizeLimits_AreRespected()
         {
             // Verify that no LOAD command exceeds the maximum block size
@@ -188,7 +245,9 @@ namespace Gp4Net.Tests.Integration
             const int maxBlockSize = 245;
             
             // Act
-            var loadCommands = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize);
+            var result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize);
+            Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
+            var loadCommands = result.Value;
             
             // Assert
             foreach (var cmd in loadCommands)
@@ -198,22 +257,22 @@ namespace Gp4Net.Tests.Integration
                 
                 // The actual data length should not exceed maxBlockSize
                 // Note: First block has additional TLV overhead
-                Assert.True(lc <= 255, $"Lc byte {lc} exceeds maximum");
+                Assert.That(lc <= 255, Is.True, $"Lc byte {lc} exceeds maximum");
                 
                 // The data portion (excluding header and Le) should respect limits
                 var dataLength = apdu.Length - 6; // Minus CLA INS P1 P2 Lc Le
-                Assert.True(dataLength <= maxBlockSize + 10, $"Data length {dataLength} exceeds reasonable limits");
+                Assert.That(dataLength <= maxBlockSize + 10, Is.True, $"Data length {dataLength} exceeds reasonable limits");
             }
         }
 
-        [Fact]
+        [Test]
         public void LoadCommand_WithWrapping_MatchesTraceFormat()
         {
             // Compare wrapped commands with trace
             
             // Arrange
             ConnectToTrace("secure_channel_establish,install_applet");
-            Assert.NotNull(CardService);
+            Assert.That(CardService, Is.Not.Null);
             
             // From trace - first wrapped LOAD command (line 48)
             var expectedWrappedLoad = Convert.FromHexString(
@@ -224,9 +283,9 @@ namespace Gp4Net.Tests.Integration
             var response = CardService.SendCommand(expectedWrappedLoad);
             
             // Assert
-            Assert.NotNull(response);
-            Assert.Equal(0x9000, response.StatusWord);
-            Assert.Empty(response.Data); // LOAD commands typically return no data
+            Assert.That(response, Is.Not.Null);
+            Assert.That(response.StatusWord, Is.EqualTo(0x9000));
+            Assert.That(response.Data, Is.Empty); // LOAD commands typically return no data
         }
     }
 }

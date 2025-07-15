@@ -1,112 +1,120 @@
 using System;
 using Gp4Net.Domain.Commands;
-using Xunit;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.Commands
 {
+    [TestFixture]
     public class GetDataCommandTests
     {
-        [Theory]
-        [InlineData(GetDataCommand.DataObjects.IssuerIdentificationNumber)]
-        [InlineData(GetDataCommand.DataObjects.CardImageNumber)]
-        [InlineData(GetDataCommand.DataObjects.CardData)]
-        [InlineData(GetDataCommand.DataObjects.KeyInformationTemplate)]
-        [InlineData(GetDataCommand.DataObjects.SecurityDomainManagerUrl)]
-        public void Constructor_WithKnownDataObject_CreatesCommand(ushort dataObject)
+        [Test]
+        [TestCase((ushort)0x0042)] // IssuerIdentificationNumber
+        [TestCase((ushort)0x0045)] // CardImageNumber
+        [TestCase((ushort)0x0066)] // CardData
+        [TestCase((ushort)0x00E0)] // KeyInformationTemplate
+        [TestCase((ushort)0x5F50)] // SecurityDomainManagerUrl
+        public void Create_WithKnownDataObject_CreatesCommand(ushort dataObject)
         {
             // Act
-            var command = new GetDataCommand(dataObject);
+            var result = GetDataCommand.Create(dataObject);
 
             // Assert
-            Assert.Equal(dataObject, command.DataObject);
+            Assert.That(result.IsSuccess, Is.True);
+            Assert.That(result.Value.DataObjectIdentifier, Is.EqualTo(dataObject));
         }
 
-        [Fact]
+        [Test]
         public void GetApdu_ReturnsCorrectStructure()
         {
             // Arrange
             var dataObject = GetDataCommand.DataObjects.CardData;
-            var command = new GetDataCommand(dataObject);
+            var commandResult = GetDataCommand.Create(dataObject);
+            Assert.That(commandResult.IsSuccess, Is.True);
+            var command = commandResult.Value;
 
             // Act
-            var apdu = command.GetApdu();
+            var apdu = command.ToApdu();
 
             // Assert
-            Assert.Equal(0x80, apdu[0]); // CLA - GlobalPlatform
-            Assert.Equal(0xCA, apdu[1]); // INS - GET DATA
-            Assert.Equal((byte)(dataObject >> 8), apdu[2]); // P1 - High byte of tag
-            Assert.Equal((byte)(dataObject & 0xFF), apdu[3]); // P2 - Low byte of tag
-            Assert.Equal(0x00, apdu[4]); // Le - Receive all available
-            Assert.Equal(5, apdu.Length); // No command data for GET DATA
+            Assert.That(apdu[0], Is.EqualTo(0x80)); // CLA - GlobalPlatform
+            Assert.That(apdu[1], Is.EqualTo(0xCA)); // INS - GET DATA
+            Assert.That(apdu[2], Is.EqualTo((byte)(dataObject >> 8))); // P1 - High byte of tag
+            Assert.That(apdu[3], Is.EqualTo((byte)(dataObject & 0xFF))); // P2 - Low byte of tag
+            Assert.That(apdu[4], Is.EqualTo(0x00)); // Le - Receive all available
+            Assert.That(apdu.Length, Is.EqualTo(5)); // No command data for GET DATA
         }
 
-        [Theory]
-        [InlineData(0x0042, 0x00, 0x42)] // IIN
-        [InlineData(0x0045, 0x00, 0x45)] // CIN
-        [InlineData(0x0066, 0x00, 0x66)] // Card Data
-        [InlineData(0x00E0, 0x00, 0xE0)] // Key Information Template
-        [InlineData(0x5F50, 0x5F, 0x50)] // Manager URL
-        [InlineData(0x9F7F, 0x9F, 0x7F)] // CPLC
+        [Test]
+        [TestCase((ushort)0x0042, 0x00, 0x42)] // IIN
+        [TestCase((ushort)0x0045, 0x00, 0x45)] // CIN
+        [TestCase((ushort)0x0066, 0x00, 0x66)] // Card Data
+        [TestCase((ushort)0x00E0, 0x00, 0xE0)] // Key Information Template
+        [TestCase((ushort)0x5F50, 0x5F, 0x50)] // Manager URL
+        [TestCase((ushort)0x9F7F, 0x9F, 0x7F)] // CPLC
         public void GetApdu_SplitsTagCorrectly(ushort tag, byte expectedP1, byte expectedP2)
         {
             // Arrange
-            var command = new GetDataCommand(tag);
+            var commandResult = GetDataCommand.Create(tag);
+            Assert.That(commandResult.IsSuccess, Is.True);
+            var command = commandResult.Value;
 
             // Act
-            var apdu = command.GetApdu();
+            var apdu = command.ToApdu();
 
             // Assert
-            Assert.Equal(expectedP1, apdu[2]); // P1
-            Assert.Equal(expectedP2, apdu[3]); // P2
+            Assert.That(apdu[2], Is.EqualTo(expectedP1)); // P1
+            Assert.That(apdu[3], Is.EqualTo(expectedP2)); // P2
         }
 
-        [Fact]
+        [Test]
         public void GetApdu_AlwaysReturnsNewArray()
         {
             // Arrange
-            var command = new GetDataCommand(GetDataCommand.DataObjects.CardData);
+            var commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardData);
+            Assert.That(commandResult.IsSuccess, Is.True);
+            var command = commandResult.Value;
 
             // Act
-            var apdu1 = command.GetApdu();
-            var apdu2 = command.GetApdu();
+            var apdu1 = command.ToApdu();
+            var apdu2 = command.ToApdu();
 
             // Assert
-            Assert.NotSame(apdu1, apdu2); // Should be different array instances
-            Assert.Equal(apdu1, apdu2); // But with same content
+            Assert.That(apdu1, Is.Not.SameAs(apdu2)); // Should be different array instances
+            Assert.That(apdu2, Is.EqualTo(apdu1)); // But with same content
         }
 
-        [Fact]
+        [Test]
         public void ToString_ReturnsDescriptiveString()
         {
             // Arrange
-            var command = new GetDataCommand(GetDataCommand.DataObjects.CardData);
+            var commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardData);
+            Assert.That(commandResult.IsSuccess, Is.True);
+            var command = commandResult.Value;
 
             // Act
             var result = command.ToString();
 
             // Assert
-            Assert.Contains("GET DATA", result);
-            Assert.Contains("0066", result); // Tag in hex
+            Assert.That(result, Is.EqualTo("GET DATA"));
         }
 
-        [Fact]
+        [Test]
         public void DataObjects_DefinesCorrectTags()
         {
             // According to GlobalPlatform specification
-            Assert.Equal(0x0042, GetDataCommand.DataObjects.IssuerIdentificationNumber);
-            Assert.Equal(0x0045, GetDataCommand.DataObjects.CardImageNumber);
-            Assert.Equal(0x0066, GetDataCommand.DataObjects.CardData);
-            Assert.Equal(0x0067, GetDataCommand.DataObjects.CardCapabilities);
-            Assert.Equal(0x0068, GetDataCommand.DataObjects.StatusInformation);
-            Assert.Equal(0x00E0, GetDataCommand.DataObjects.KeyInformationTemplate);
-            Assert.Equal(0x00CF, GetDataCommand.DataObjects.DiversificationData);
-            Assert.Equal(0x9F7F, GetDataCommand.DataObjects.Cplc);
-            Assert.Equal(0x5F50, GetDataCommand.DataObjects.SecurityDomainManagerUrl);
-            Assert.Equal(0xDF28, GetDataCommand.DataObjects.ConfirmationCounter);
-            Assert.Equal(0xDF27, GetDataCommand.DataObjects.SequenceCounter);
+            Assert.That(GetDataCommand.DataObjects.IssuerIdentificationNumber, Is.EqualTo(0x0042));
+            Assert.That(GetDataCommand.DataObjects.CardImageNumber, Is.EqualTo(0x0045));
+            Assert.That(GetDataCommand.DataObjects.CardData, Is.EqualTo(0x0066));
+            Assert.That(GetDataCommand.DataObjects.CardCapabilities, Is.EqualTo(0x0067));
+            Assert.That(GetDataCommand.DataObjects.KeyInformationTemplate, Is.EqualTo(0x00E0));
+            Assert.That(GetDataCommand.DataObjects.DiversificationData, Is.EqualTo(0x00CF));
+            Assert.That(GetDataCommand.DataObjects.CardProductionLifeCycle, Is.EqualTo(0x9F7F)); // CPLC
+            Assert.That(GetDataCommand.DataObjects.SecurityDomainManagerUrl, Is.EqualTo(0x5F50));
+            Assert.That(GetDataCommand.DataObjects.ConfirmationCounter, Is.EqualTo(0x00C2));
+            Assert.That(GetDataCommand.DataObjects.SequenceCounterDefaultKeyVersion, Is.EqualTo(0x00C1));
         }
 
-        [Fact]
+        [Test]
         public void Command_FollowsGlobalPlatformSpecification()
         {
             // This test documents that the command follows GlobalPlatform Card Specification
@@ -117,44 +125,120 @@ namespace Gp4Net.Tests.Domain.Commands
             // Lc: Not present (no command data)
             // Le: 0x00 (receive all available bytes)
 
-            var command = new GetDataCommand(GetDataCommand.DataObjects.CardData);
-            var apdu = command.GetApdu();
+            var commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardData);
+            Assert.That(commandResult.IsSuccess, Is.True);
+            var command = commandResult.Value;
+            var apdu = command.ToApdu();
 
-            Assert.Equal(5, apdu.Length); // 5 header bytes only
-            Assert.Equal(0x80, apdu[0]); // CLA
-            Assert.Equal(0xCA, apdu[1]); // INS
-            Assert.Equal(0x00, apdu[4]); // Le
+            Assert.That(apdu.Length, Is.EqualTo(5)); // 5 header bytes only
+            Assert.That(apdu[0], Is.EqualTo(0x80)); // CLA
+            Assert.That(apdu[1], Is.EqualTo(0xCA)); // INS
+            Assert.That(apdu[4], Is.EqualTo(0x00)); // Le
         }
 
-        [Theory]
-        [InlineData(GetDataCommand.DataObjects.CardData, "Card Data")]
-        [InlineData(GetDataCommand.DataObjects.CardCapabilities, "Card Capabilities")]
-        [InlineData(GetDataCommand.DataObjects.KeyInformationTemplate, "Key Information Template")]
-        [InlineData(GetDataCommand.DataObjects.Cplc, "Card Production Life Cycle")]
+        [Test]
+        [TestCase((ushort)0x0066, "Card Data")]
+        [TestCase((ushort)0x0067, "Card Capabilities")]
+        [TestCase((ushort)0x00E0, "Key Information Template")]
+        [TestCase((ushort)0x9F7F, "Card Production Life Cycle")]
         public void GetDataCommand_ForCommonObjects_HasDescriptiveNames(ushort dataObject, string expectedDescription)
         {
             // This test documents common data objects and their purposes
-            var command = new GetDataCommand(dataObject);
+            var commandResult = GetDataCommand.Create(dataObject);
+            Assert.That(commandResult.IsSuccess, Is.True);
+            var command = commandResult.Value;
             
             // The command should be able to handle these common objects
-            Assert.NotNull(command);
+            Assert.That(command, Is.Not.Null);
             
             // Document the purpose (not testing string representation, just documenting)
             _ = expectedDescription;
         }
 
-        [Fact]
+        [Test]
         public void GetApdu_ForSecureMessaging_WouldUseClass00()
         {
             // Note: Some implementations might use CLA 0x00 instead of 0x80
             // for certain data objects or when used outside secure channel.
             // Our implementation uses 0x80 (GlobalPlatform class) consistently.
             
-            var command = new GetDataCommand(GetDataCommand.DataObjects.Cplc);
-            var apdu = command.GetApdu();
+            var commandResult = GetDataCommand.Create(0x9F7F); // CPLC
+            Assert.That(commandResult.IsSuccess, Is.True);
+            var command = commandResult.Value;
+            var apdu = command.ToApdu();
             
             // We use GP class
-            Assert.Equal(0x80, apdu[0]);
+            Assert.That(apdu[0], Is.EqualTo(0x80));
+        }
+
+        [Test]
+        public void CreateFor3ByteIdentifier_WithValidThreeBytes_CreatesCommand()
+        {
+            // Arrange
+            byte[] identifier = { 0x00, 0x9F, 0x70 };
+
+            // Act
+            var result = GetDataCommand.CreateFor3ByteIdentifier(identifier);
+
+            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            Assert.That(result.Value.DataObjectIdentifier, Is.EqualTo(0x009F));
+        }
+
+        [Test]
+        public void CreateFor3ByteIdentifier_WithNullIdentifier_ReturnsError()
+        {
+            // Act
+            var result = GetDataCommand.CreateFor3ByteIdentifier(null);
+
+            // Assert
+            Assert.That(result.IsFailure, Is.True);
+            Assert.That(result.Error.Code, Is.EqualTo("INVALID_ARGUMENT"));
+            Assert.That(result.Error.Message, Does.Contain("cannot be null"));
+        }
+
+        [Test]
+        [TestCase(new byte[] { })]
+        [TestCase(new byte[] { 0x00 })]
+        [TestCase(new byte[] { 0x00, 0x9F })]
+        [TestCase(new byte[] { 0x00, 0x9F, 0x70, 0x80 })]
+        public void CreateFor3ByteIdentifier_WithInvalidLength_ReturnsError(byte[] identifier)
+        {
+            // Act
+            var result = GetDataCommand.CreateFor3ByteIdentifier(identifier);
+
+            // Assert
+            Assert.That(result.IsFailure, Is.True);
+            Assert.That(result.Error.Code, Is.EqualTo("INVALID_ARGUMENT"));
+            Assert.That(result.Error.Message, Does.Contain("must be exactly 3 bytes"));
+        }
+
+        [Test]
+        public void Parse_WithValidResponse_ReturnsSuccess()
+        {
+            // Arrange
+            ushort tag = 0x0066;
+            byte[] responseData = { 0x01, 0x02, 0x03, 0x04 };
+
+            // Act
+            var result = GetDataResponse.Parse(tag, responseData);
+
+            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            Assert.That(result.Value.DataObjectIdentifier, Is.EqualTo(tag));
+            Assert.That(result.Value.Data, Is.EqualTo(responseData));
+        }
+
+        [Test]
+        public void Parse_WithNullResponse_ReturnsError()
+        {
+            // Act
+            var result = GetDataResponse.Parse(0x0066, null);
+
+            // Assert
+            Assert.That(result.IsFailure, Is.True);
+            Assert.That(result.Error.Code, Is.EqualTo("INVALID_ARGUMENT"));
+            Assert.That(result.Error.Message, Does.Contain("cannot be null"));
         }
     }
 }

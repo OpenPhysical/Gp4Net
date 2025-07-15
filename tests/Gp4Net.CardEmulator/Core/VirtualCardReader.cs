@@ -50,8 +50,7 @@ namespace Gp4Net.CardEmulator.Core
         /// <param name="card">The virtual card to insert.</param>
         public void InsertCard(IVirtualCard card)
         {
-            if (card == null)
-                throw new ArgumentNullException(nameof(card));
+            ArgumentNullException.ThrowIfNull(card);
 
             if (_insertedCard != null)
                 throw new InvalidOperationException("A card is already inserted");
@@ -142,8 +141,7 @@ namespace Gp4Net.CardEmulator.Core
         /// <param name="reader">The virtual reader to add.</param>
         public void AddReader(VirtualCardReader reader)
         {
-            if (reader == null)
-                throw new ArgumentNullException(nameof(reader));
+            ArgumentNullException.ThrowIfNull(reader);
 
             _readers[reader.ReaderName] = reader;
         }

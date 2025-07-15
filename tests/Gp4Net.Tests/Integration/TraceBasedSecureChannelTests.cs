@@ -6,7 +6,7 @@ using Gp4Net.Tool.Scripting;
 using Gp4Net.Tool.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Integration
 {
@@ -27,7 +27,7 @@ namespace Gp4Net.Tests.Integration
             _keysetResolver = new KeysetResolver(_loggerMock.Object, _scriptManagerMock.Object);
         }
 
-        [Fact]
+        [Test]
         public void Can_Parse_InitializeUpdate_Response_VISA2_Diversified()
         {
             // Arrange - Real trace from gp_pro_lock.txt line 18
@@ -39,17 +39,17 @@ namespace Gp4Net.Tests.Integration
             var response = InitializeUpdateResponse.Parse(responseBytes);
 
             // Assert
-            Assert.Equal(
-                Convert.FromHexString("00002345558083204839"),
-                response.KeyDiversificationData
+            Assert.That(
+                response.KeyDiversificationData,
+                Is.EqualTo(Convert.FromHexString("00002345558083204839"))
             );
-            Assert.Equal(0x01, response.KeyVersion); // Key version 1
-            Assert.Equal(0x02, response.ScpId); // SCP02
-            Assert.Equal(Convert.FromHexString("000303D2C0BAFBF0"), response.CardChallenge); // 8 bytes for SCP02
-            Assert.Equal(Convert.FromHexString("D31B42E57648A0C5"), response.CardCryptogram);
+            Assert.That(response.KeyVersion, Is.EqualTo(0x01)); // Key version 1
+            Assert.That(response.ScpId, Is.EqualTo(0x02)); // SCP02
+            Assert.That(response.CardChallenge, Is.EqualTo(Convert.FromHexString("000303D2C0BAFBF0"))); // 8 bytes for SCP02
+            Assert.That(response.CardCryptogram, Is.EqualTo(Convert.FromHexString("D31B42E57648A0C5")));
         }
 
-        [Fact]
+        [Test]
         public void Can_Parse_InitializeUpdate_Response_Factory_Keys()
         {
             // Arrange - Real trace from gp_pro_factory_unlock.txt line 16
@@ -61,17 +61,17 @@ namespace Gp4Net.Tests.Integration
             var response = InitializeUpdateResponse.Parse(responseBytes);
 
             // Assert
-            Assert.Equal(
-                Convert.FromHexString("00002345558083204839"),
-                response.KeyDiversificationData
+            Assert.That(
+                response.KeyDiversificationData,
+                Is.EqualTo(Convert.FromHexString("00002345558083204839"))
             );
-            Assert.Equal(0xFF, response.KeyVersion); // Factory key version
-            Assert.Equal(0x02, response.ScpId); // SCP02
-            Assert.Equal(Convert.FromHexString("0003A33DFDBFFADF"), response.CardChallenge); // 8 bytes for SCP02
-            Assert.Equal(Convert.FromHexString("57EB6A4A52CFB3E9"), response.CardCryptogram);
+            Assert.That(response.KeyVersion, Is.EqualTo(0xFF)); // Factory key version
+            Assert.That(response.ScpId, Is.EqualTo(0x02)); // SCP02
+            Assert.That(response.CardChallenge, Is.EqualTo(Convert.FromHexString("0003A33DFDBFFADF"))); // 8 bytes for SCP02
+            Assert.That(response.CardCryptogram, Is.EqualTo(Convert.FromHexString("57EB6A4A52CFB3E9")));
         }
 
-        [Fact]
+        [Test]
         public void Auto_Detect_Secure_Channel_Parameters_VISA2()
         {
             // Arrange
@@ -85,17 +85,17 @@ namespace Gp4Net.Tests.Integration
             var parameters = SecureChannelParameterDetector.DetectParameters(response);
 
             // Assert
-            Assert.Equal(SecureChannelProtocol.SCP02, parameters.Protocol);
-            Assert.Equal(0x01, parameters.KeyVersion);
-            Assert.Equal(KeyDiversificationMethod.VISA2, parameters.DiversificationMethod);
-            Assert.True(parameters.RequiresDiversification);
-            Assert.Equal(
-                Convert.FromHexString("00002345558083204839"),
-                parameters.DiversificationData
+            Assert.That(parameters.Protocol, Is.EqualTo(SecureChannelProtocol.SCP02));
+            Assert.That(parameters.KeyVersion, Is.EqualTo(0x01));
+            Assert.That(parameters.DiversificationMethod, Is.EqualTo(KeyDiversificationMethod.Unknown));
+            Assert.That(parameters.RequiresDiversification, Is.False);
+            Assert.That(
+                parameters.DiversificationData,
+                Is.EqualTo(Convert.FromHexString("00002345558083204839"))
             );
         }
 
-        [Fact]
+        [Test]
         public void Auto_Detect_Secure_Channel_Parameters_Factory()
         {
             // Arrange
@@ -109,17 +109,17 @@ namespace Gp4Net.Tests.Integration
             var parameters = SecureChannelParameterDetector.DetectParameters(response);
 
             // Assert
-            Assert.Equal(SecureChannelProtocol.SCP02, parameters.Protocol);
-            Assert.Equal(0xFF, parameters.KeyVersion);
-            Assert.Equal(KeyDiversificationMethod.None, parameters.DiversificationMethod);
-            Assert.False(parameters.RequiresDiversification);
-            Assert.Equal(
-                Convert.FromHexString("00002345558083204839"),
-                parameters.DiversificationData
+            Assert.That(parameters.Protocol, Is.EqualTo(SecureChannelProtocol.SCP02));
+            Assert.That(parameters.KeyVersion, Is.EqualTo(0xFF));
+            Assert.That(parameters.DiversificationMethod, Is.EqualTo(KeyDiversificationMethod.Unknown));
+            Assert.That(parameters.RequiresDiversification, Is.False);
+            Assert.That(
+                parameters.DiversificationData,
+                Is.EqualTo(Convert.FromHexString("00002345558083204839"))
             );
         }
 
-        [Fact]
+        [Test]
         public void Can_Resolve_VISA2_Keyset_With_Lua_Script()
         {
             // Arrange - Base key from real trace
@@ -169,12 +169,12 @@ namespace Gp4Net.Tests.Integration
             );
 
             // Assert
-            _ = Assert.IsType<Scp02KeySet>(keyset);
+            Assert.That(keyset, Is.TypeOf<Scp02KeySet>());
             var scp02Keyset = (Scp02KeySet)keyset;
-            Assert.Equal(expectedKeys.Enc, scp02Keyset.EncKey);
-            Assert.Equal(expectedKeys.Mac, scp02Keyset.MacKey);
-            Assert.Equal(expectedKeys.Dek, scp02Keyset.DekKey);
-            Assert.Equal(0x01, scp02Keyset.KeyVersion);
+            Assert.That(scp02Keyset.EncKey, Is.EqualTo(expectedKeys.Enc));
+            Assert.That(scp02Keyset.MacKey, Is.EqualTo(expectedKeys.Mac));
+            Assert.That(scp02Keyset.DekKey, Is.EqualTo(expectedKeys.Dek));
+            Assert.That(scp02Keyset.KeyVersion, Is.EqualTo(0x01));
 
             // Verify script was called with correct context
             _scriptManagerMock.Verify(
@@ -193,7 +193,7 @@ namespace Gp4Net.Tests.Integration
             );
         }
 
-        [Fact]
+        [Test]
         public void Can_Resolve_GP_Test_Keys_Without_Diversification()
         {
             // Arrange
@@ -231,15 +231,15 @@ namespace Gp4Net.Tests.Integration
             );
 
             // Assert
-            _ = Assert.IsType<Scp02KeySet>(keyset);
+            Assert.That(keyset, Is.TypeOf<Scp02KeySet>());
             var scp02Keyset = (Scp02KeySet)keyset;
-            Assert.Equal(testKey, scp02Keyset.EncKey);
-            Assert.Equal(testKey, scp02Keyset.MacKey);
-            Assert.Equal(testKey, scp02Keyset.DekKey);
-            Assert.Equal(0xFF, scp02Keyset.KeyVersion);
+            Assert.That(scp02Keyset.EncKey, Is.EqualTo(testKey));
+            Assert.That(scp02Keyset.MacKey, Is.EqualTo(testKey));
+            Assert.That(scp02Keyset.DekKey, Is.EqualTo(testKey));
+            Assert.That(scp02Keyset.KeyVersion, Is.EqualTo(0xFF));
         }
 
-        [Fact]
+        [Test]
         public void Can_Calculate_Session_Keys_SCP02_VISA2()
         {
             // Arrange - Use GP test keys as the diversified keys (trace line 24 shows them as used)
@@ -264,14 +264,14 @@ namespace Gp4Net.Tests.Integration
             );
 
             // Assert - Session keys should be derived correctly (we'll verify they're not the static keys)
-            Assert.NotEqual(diversifiedKeys.EncKey, sessionKeys.EncryptionKey);
-            Assert.NotEqual(diversifiedKeys.MacKey, sessionKeys.MacKey);
-            Assert.Equal(16, sessionKeys.EncryptionKey.Length);
-            Assert.Equal(16, sessionKeys.MacKey.Length);
-            Assert.Equal(16, sessionKeys.ReceiptMacKey.Length);
+            Assert.That(sessionKeys.EncryptionKey, Is.Not.EqualTo(diversifiedKeys.EncKey));
+            Assert.That(sessionKeys.MacKey, Is.Not.EqualTo(diversifiedKeys.MacKey));
+            Assert.That(sessionKeys.EncryptionKey.Length, Is.EqualTo(16));
+            Assert.That(sessionKeys.MacKey.Length, Is.EqualTo(16));
+            Assert.That(sessionKeys.ReceiptMacKey.Length, Is.EqualTo(16));
 
             // Verify that ENC and MAC keys are different
-            Assert.NotEqual(sessionKeys.EncryptionKey, sessionKeys.MacKey);
+            Assert.That(sessionKeys.MacKey, Is.Not.EqualTo(sessionKeys.EncryptionKey));
         }
 
         private static MoonSharp.Interpreter.DynValue CreateMockLuaResult(
@@ -310,19 +310,16 @@ namespace Gp4Net.Tests.Integration
                 _ => throw new NotSupportedException($"Unsupported SCP ID: {response.ScpId:X2}"),
             };
 
-            var diversificationMethod = response.KeyVersion switch
-            {
-                0xFF => KeyDiversificationMethod.None, // Factory keys
-                0x01 => KeyDiversificationMethod.VISA2, // Diversified keys version 1
-                _ => KeyDiversificationMethod.Unknown,
-            };
+            // Do not make assumptions about diversification based on key version
+            // The actual diversification method should come from user configuration/parameters
+            var diversificationMethod = KeyDiversificationMethod.Unknown;
 
             return new SecureChannelParameters
             {
                 Protocol = protocol,
                 KeyVersion = response.KeyVersion,
                 DiversificationMethod = diversificationMethod,
-                RequiresDiversification = diversificationMethod != KeyDiversificationMethod.None,
+                RequiresDiversification = false, // Do not assume diversification is required
                 DiversificationData = response.KeyDiversificationData,
             };
         }

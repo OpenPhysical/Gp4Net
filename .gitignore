@@ -4,3 +4,11 @@ obj/
 riderModule.iml
 /_ReSharper.Caches/
 .user/
+
+# Debug and development artifacts
+debug_*.py
+debug_*.cs
+functional_demo.cs
+test_kdf_debug.cs
+*.tmp
+*.bak

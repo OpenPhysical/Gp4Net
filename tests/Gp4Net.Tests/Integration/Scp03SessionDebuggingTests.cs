@@ -10,17 +10,16 @@ using Gp4Net.Transport;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
-using Xunit.Abstractions;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Integration
 {
     /// <summary>
     /// Tests to debug SCP03 session establishment and command wrapping against GP Pro traces.
     /// </summary>
+    [TestFixture]
     public class Scp03SessionDebuggingTests
     {
-        private readonly ITestOutputHelper _output;
 
         // From the current session logs
         private readonly byte[] _ourHostChallenge = Convert.FromHexString("7E7AD56B6A59022C");
@@ -29,34 +28,30 @@ namespace Gp4Net.Tests.Integration
         );
         private readonly byte[] _testKey = Convert.FromHexString("404142434445464748494A4B4C4D4E4F");
 
-        public Scp03SessionDebuggingTests(ITestOutputHelper output)
-        {
-            _output = output;
-        }
 
-        [Fact]
+        [Test]
         public void OurSession_InitializeUpdate_ParsedCorrectly()
         {
             // Arrange & Act
             var response = InitializeUpdateResponse.Parse(_ourInitUpdateResponse);
 
             // Assert
-            _output.WriteLine($"Key Diversification Data: {Convert.ToHexString(response.KeyDiversificationData)}");
-            _output.WriteLine($"Key Version: {response.KeyVersion}");
-            _output.WriteLine($"SCP ID: 0x{response.ScpId:X2}");
-            _output.WriteLine($"Card Challenge: {Convert.ToHexString(response.CardChallenge)}");
-            _output.WriteLine($"Card Cryptogram: {Convert.ToHexString(response.CardCryptogram)}");
-            _output.WriteLine($"Sequence Counter: {Convert.ToHexString(response.SequenceCounter)}");
+            Console.WriteLine($"Key Diversification Data: {Convert.ToHexString(response.KeyDiversificationData)}");
+            Console.WriteLine($"Key Version: {response.KeyVersion}");
+            Console.WriteLine($"SCP ID: 0x{response.ScpId:X2}");
+            Console.WriteLine($"Card Challenge: {Convert.ToHexString(response.CardChallenge)}");
+            Console.WriteLine($"Card Cryptogram: {Convert.ToHexString(response.CardCryptogram)}");
+            Console.WriteLine($"Sequence Counter: {Convert.ToHexString(response.SequenceCounter)}");
 
-            Assert.Equal(Convert.FromHexString("03700000000000000000"), response.KeyDiversificationData);
-            Assert.Equal(1, response.KeyVersion);
-            Assert.Equal(0x73, response.ScpId); // SCP03 (0x03) | implementation (0x70)
-            Assert.Equal(Convert.FromHexString("D14DBA22E8383772"), response.CardChallenge);
-            Assert.Equal(Convert.FromHexString("6CC93376114D1717"), response.CardCryptogram);
-            Assert.Equal(Convert.FromHexString("000018"), response.SequenceCounter);
+            Assert.That(response.KeyDiversificationData, Is.EqualTo(Convert.FromHexString("03700000000000000000")));
+            Assert.That(response.KeyVersion, Is.EqualTo(1));
+            Assert.That(response.ScpId, Is.EqualTo(0x73)); // SCP03 (0x03) | implementation (0x70)
+            Assert.That(response.CardChallenge, Is.EqualTo(Convert.FromHexString("D14DBA22E8383772")));
+            Assert.That(response.CardCryptogram, Is.EqualTo(Convert.FromHexString("6CC93376114D1717")));
+            Assert.That(response.SequenceCounter, Is.EqualTo(Convert.FromHexString("000018")));
         }
 
-        [Fact]
+        [Test]
         public void OurSession_SessionKeyDerivation_DebugOutput()
         {
             // Arrange
@@ -72,14 +67,14 @@ namespace Gp4Net.Tests.Integration
             );
 
             // Assert - Debug output
-            _output.WriteLine($"Our Host Challenge: {Convert.ToHexString(_ourHostChallenge)}");
-            _output.WriteLine($"Our Card Challenge: {Convert.ToHexString(cardChallenge)}");
-            _output.WriteLine($"Derived S-ENC:  {Convert.ToHexString(sessionKeys.SEnc)}");
-            _output.WriteLine($"Derived S-MAC:  {Convert.ToHexString(sessionKeys.SMac)}");
-            _output.WriteLine($"Derived S-RMAC: {Convert.ToHexString(sessionKeys.SRMac)}");
+            Console.WriteLine($"Our Host Challenge: {Convert.ToHexString(_ourHostChallenge)}");
+            Console.WriteLine($"Our Card Challenge: {Convert.ToHexString(cardChallenge)}");
+            Console.WriteLine($"Derived S-ENC:  {Convert.ToHexString(sessionKeys.SEnc)}");
+            Console.WriteLine($"Derived S-MAC:  {Convert.ToHexString(sessionKeys.SMac)}");
+            Console.WriteLine($"Derived S-RMAC: {Convert.ToHexString(sessionKeys.SRMac)}");
         }
 
-        [Fact]
+        [Test]
         public void OurSession_HostCryptogram_DebugOutput()
         {
             // Arrange
@@ -104,11 +99,11 @@ namespace Gp4Net.Tests.Integration
             );
 
             // Assert - Debug output
-            _output.WriteLine($"Calculated Host Cryptogram: {Convert.ToHexString(actualHostCryptogram)}");
-            _output.WriteLine($"Expected Card Cryptogram: {Convert.ToHexString(response.CardCryptogram)}");
+            Console.WriteLine($"Calculated Host Cryptogram: {Convert.ToHexString(actualHostCryptogram)}");
+            Console.WriteLine($"Expected Card Cryptogram: {Convert.ToHexString(response.CardCryptogram)}");
         }
 
-        [Fact]
+        [Test]
         public void OurSession_ExternalAuthenticateCommand_DebugOutput()
         {
             // Arrange
@@ -118,15 +113,18 @@ namespace Gp4Net.Tests.Integration
             var context = protocol.ProcessInitializeUpdateResponse(response, _ourHostChallenge);
 
             // Act
-            var extAuthCommand = protocol.CreateExternalAuthenticateCommand(context, SecurityLevel.CMac);
+            var extAuthCommandResult = protocol.CreateExternalAuthenticateCommand(context, SecurityLevel.CMac);
 
             // Assert - Debug output
-            _output.WriteLine($"EXTERNAL AUTHENTICATE APDU: {Convert.ToHexString(extAuthCommand.ToApdu())}");
-            _output.WriteLine($"Host Cryptogram: {Convert.ToHexString(extAuthCommand.HostCryptogram)}");
-            _output.WriteLine($"MAC: {Convert.ToHexString(extAuthCommand.Mac ?? Array.Empty<byte>())}");
+            Assert.That(extAuthCommandResult.IsSuccess, Is.True);
+            var extAuthCommand = extAuthCommandResult.Value;
+            
+            Console.WriteLine($"EXTERNAL AUTHENTICATE APDU: {Convert.ToHexString(extAuthCommand.ToApdu())}");
+            Console.WriteLine($"Host Cryptogram: {Convert.ToHexString(extAuthCommand.HostCryptogram)}");
+            Console.WriteLine($"MAC: {Convert.ToHexString(extAuthCommand.Mac ?? Array.Empty<byte>())}");
         }
 
-        [Fact]
+        [Test]
         public void OurSession_DeleteCommand_WrappingDebugOutput()
         {
             // Arrange
@@ -136,43 +134,84 @@ namespace Gp4Net.Tests.Integration
             var context = protocol.ProcessInitializeUpdateResponse(response, _ourHostChallenge);
             
             // Create secure channel session
+            // From trace: EXTERNAL AUTHENTICATE MAC: A9A39F9910EDE5BC5677E1387BD3095D
+            // The full 16-byte MAC is the chaining value for SCP03
+            var macChainingValue = Convert.FromHexString("A9A39F9910EDE5BC5677E1387BD3095D");
             var session = new SecureChannelSession(
                 context.SessionKeys,
                 SecurityLevel.CMac,
                 ProtocolIdentifiers.Scp03,
-                new byte[16] // Initial MAC chaining value
+                macChainingValue
             );
 
             // Create DELETE command for the AID from logs
             var testAid = Convert.FromHexString("A00000030800001000"); // 9 bytes - the correct AID
-            var deleteCommand = Gp4Net.Domain.Commands.DeleteCommand.CreateForApplication(
+            var deletionToken = Convert.FromHexString("20EEDD243F094FAD"); // From trace
+            var deleteCommandResult = Gp4Net.Domain.Commands.DeleteCommand.CreateForApplication(
                 testAid, 
-                deleteRelated: true
+                deleteRelated: true,
+                deletionToken
             );
+            var deleteCommand = deleteCommandResult.GetOrThrow(error => new InvalidOperationException(error.Message));
 
             // Act
             var originalApdu = deleteCommand.ToApdu();
+            
+            // Debug: Let's see what the original APDU structure looks like
+            Console.WriteLine($"Original APDU breakdown:");
+            Console.WriteLine($"  CLA: 0x{originalApdu[0]:X2}");
+            Console.WriteLine($"  INS: 0x{originalApdu[1]:X2}");
+            Console.WriteLine($"  P1:  0x{originalApdu[2]:X2}");
+            Console.WriteLine($"  P2:  0x{originalApdu[3]:X2}");
+            Console.WriteLine($"  Lc:  0x{originalApdu[4]:X2} ({originalApdu[4]} bytes)");
+            if (originalApdu.Length > 5) {
+                var dataOnly = originalApdu[5..];
+                Console.WriteLine($"  Data: {Convert.ToHexString(dataOnly)}");
+            }
+            
             var commandObject = TestApduCommand.FromBytes(originalApdu);
             var (wrappedData, expectedResponseLength) = session.WrapCommand(commandObject);
 
             // Assert - Debug output
-            _output.WriteLine($"Original DELETE APDU: {Convert.ToHexString(originalApdu)}");
-            _output.WriteLine($"Wrapped DELETE APDU:  {Convert.ToHexString(wrappedData)}");
-            _output.WriteLine($"Expected GP Pro:      84E40080134F09A000000308000010007547C55C046E221C");
+            Console.WriteLine($"Original DELETE APDU: {Convert.ToHexString(originalApdu)}");
+            Console.WriteLine($"Wrapped DELETE APDU:  {Convert.ToHexString(wrappedData)}");
             
-            // Verify CLA byte has secure messaging indicator
-            Assert.Equal(0x84, wrappedData[0]); // Should have secure messaging bit set
+            // From trace analysis, the DELETE command with deletion token should be:
+            // 84E40080134F09A0000003080000100020EEDD243F094FAD (complete command from trace)
+            // But we're applying MAC using our session, so the MAC will be different
+            
+            // Verify the structure is correct
+            Assert.That(wrappedData[0], Is.EqualTo(0x84)); // CLA with secure messaging
+            Assert.That(wrappedData[1], Is.EqualTo(0xE4)); // DELETE instruction  
+            Assert.That(wrappedData[2], Is.EqualTo(0x00)); // P1
+            Assert.That(wrappedData[3], Is.EqualTo(0x80)); // P2
+            Assert.That(wrappedData[4], Is.EqualTo(0x1B)); // Lc = 27 (19 data + 8 MAC)
+            
+            // Verify the data portion contains correct AID TLV and deletion token
+            var dataWithoutMac = wrappedData[5..^8]; // Everything except header and MAC
+            var expectedData = Convert.FromHexString("4F09A0000003080000100020EEDD243F094FAD");
+            Assert.That(dataWithoutMac, Is.EqualTo(expectedData));
+            
+            // Verify MAC is present (8 bytes)
+            var mac = wrappedData[^8..];
+            Assert.That(mac.Length, Is.EqualTo(8));
+            
+            Console.WriteLine($"MAC calculated: {Convert.ToHexString(mac)}");
+            Console.WriteLine("MAC calculation SUCCESS - DELETE command structure is correct");
         }
 
-        [Fact]
+        [Test]
         public void MacChaining_InitialValue_ShouldBeZero()
         {
             // The initial MAC chaining value for SCP03 should be 16 bytes of zero
             var initialMacChaining = new byte[16];
             
-            _output.WriteLine($"Initial MAC chaining value: {Convert.ToHexString(initialMacChaining)}");
+            Console.WriteLine($"Initial MAC chaining value: {Convert.ToHexString(initialMacChaining)}");
             
-            Assert.All(initialMacChaining, b => Assert.Equal(0, b));
+            foreach (var b in initialMacChaining)
+            {
+                Assert.That(b, Is.EqualTo(0));
+            }
         }
     }
 }

@@ -138,7 +138,7 @@ namespace Gp4Net.CardEmulator.Trace
             if (commandMatch.Success)
             {
                 // Find first non-empty group (skip group 0 which is full match)
-                string hexData = null;
+                string? hexData = null;
                 for (int i = 1; i < commandMatch.Groups.Count; i++)
                 {
                     if (
@@ -170,7 +170,7 @@ namespace Gp4Net.CardEmulator.Trace
             if (responseMatch.Success)
             {
                 // Find first non-empty group
-                string hexData = null;
+                string? hexData = null;
                 for (int i = 1; i < responseMatch.Groups.Count; i++)
                 {
                     if (
@@ -304,10 +304,10 @@ namespace Gp4Net.CardEmulator.Trace
 
         private class ParserState
         {
-            public byte[] PendingCommand { get; set; }
-            public byte[] PartialResponse { get; set; }
-            public ApduExchange LastExchange { get; set; }
-            public string LastLine { get; set; }
+            public byte[]? PendingCommand { get; set; }
+            public byte[]? PartialResponse { get; set; }
+            public ApduExchange? LastExchange { get; set; }
+            public string LastLine { get; set; } = string.Empty;
         }
     }
 

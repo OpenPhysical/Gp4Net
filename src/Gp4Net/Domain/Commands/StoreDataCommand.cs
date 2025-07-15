@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Gp4Net.Core;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 
@@ -125,28 +126,59 @@ namespace Gp4Net.Domain.Commands
         /// <param name="structureFormat">The data structure format.</param>
         /// <param name="block">The block format.</param>
         /// <param name="data">The data to store.</param>
-        public StoreDataCommand(DataStructureFormat structureFormat, BlockFormat block, byte[] data)
+        private StoreDataCommand(DataStructureFormat structureFormat, BlockFormat block, byte[] data)
         {
-            ArgumentNullException.ThrowIfNull(data);
             StructureFormat = structureFormat;
             Block = block;
             StoreData = data;
         }
 
         /// <summary>
+        /// Creates a STORE DATA command with plain data.
+        /// </summary>
+        /// <param name="data">The data to store.</param>
+        /// <returns>A Result containing either a new StoreDataCommand or an error.</returns>
+        public static Result<StoreDataCommand, SmartCardError> Create(byte[] data)
+        {
+            if (data == null)
+                return SmartCardError.InvalidArgument("Data cannot be null.");
+
+            return new StoreDataCommand(DataStructureFormat.Plain, BlockFormat.FirstOrOnly, data);
+        }
+
+        /// <summary>
+        /// Creates a STORE DATA command with specified format and block settings.
+        /// </summary>
+        /// <param name="structureFormat">The data structure format.</param>
+        /// <param name="block">The block format.</param>
+        /// <param name="data">The data to store.</param>
+        /// <returns>A Result containing either a new StoreDataCommand or an error.</returns>
+        public static Result<StoreDataCommand, SmartCardError> CreateWithFormat(
+            DataStructureFormat structureFormat,
+            BlockFormat block,
+            byte[] data)
+        {
+            if (data == null)
+                return SmartCardError.InvalidArgument("Data cannot be null.");
+
+            return new StoreDataCommand(structureFormat, block, data);
+        }
+
+        /// <summary>
         /// Creates a STORE DATA command for setting SCP_ENABLE configuration.
         /// </summary>
-        /// <param name="scpImplementations">Array of SCP implementation values (e.g., 0x0370 for SCP03 i=70).</param>
-        /// <returns>A new StoreDataCommand configured for SCP_ENABLE.</returns>
-        public static StoreDataCommand CreateScpEnableCommand(params ushort[] scpImplementations)
+        /// <param name="implementations">List of SCP implementations.</param>
+        /// <returns>A Result containing either a new StoreDataCommand or an error.</returns>
+        public static Result<StoreDataCommand, SmartCardError> CreateScpEnableCommand(IList<ScpImplementation> implementations)
         {
-            if (scpImplementations == null || scpImplementations.Length == 0)
-            {
-                throw new ArgumentException(
-                    "At least one SCP implementation must be specified.",
-                    nameof(scpImplementations)
-                );
-            }
+            if (implementations == null)
+                return SmartCardError.InvalidArgument("SCP implementations list cannot be null.");
+
+            if (implementations.Count == 0)
+                return SmartCardError.InvalidArgument("At least one SCP implementation must be specified.");
+
+            if (implementations.Count > 5)
+                return SmartCardError.InvalidArgument("Cannot specify more than 5 SCP implementations.");
 
             // Build SET CONFIG ITEM format
             // DF2B (SET CONFIG tag) + length + 1057 (SCP_ENABLE) + data length + data
@@ -172,14 +204,14 @@ namespace Gp4Net.Domain.Commands
             data.Add(scpDataLength);
 
             // Add SCP implementations
-            foreach (var impl in scpImplementations)
+            foreach (var impl in implementations)
             {
-                data.Add((byte)(impl >> 8));
-                data.Add((byte)(impl & 0xFF));
+                data.Add(impl.Version);
+                data.Add(impl.Implementation);
             }
 
             // Add padding to reach 10 bytes total
-            var paddingBytes = 10 - (scpImplementations.Length * 2);
+            var paddingBytes = 10 - (implementations.Count * 2);
             for (int i = 0; i < paddingBytes; i++)
             {
                 data.Add(0x00);
@@ -196,14 +228,20 @@ namespace Gp4Net.Domain.Commands
         /// Creates a STORE DATA command for setting the default key version.
         /// </summary>
         /// <param name="keyVersion">The default key version number.</param>
-        /// <returns>A new StoreDataCommand configured for default key version.</returns>
-        public static StoreDataCommand CreateDefaultKeyVersionCommand(byte keyVersion)
+        /// <returns>A Result containing either a new StoreDataCommand or an error.</returns>
+        public static Result<StoreDataCommand, SmartCardError> CreateDefaultKeyVersionCommand(byte keyVersion)
         {
             // Simple TLV format: 7F0D + length + key version
             var data = new byte[] { 0x7F, 0x0D, 0x01, keyVersion };
 
             return new StoreDataCommand(DataStructureFormat.Dgi, BlockFormat.FirstOrOnly, data);
         }
+
+        /// <summary>
+        /// Returns the string representation of this command.
+        /// </summary>
+        /// <returns>The string "STORE DATA".</returns>
+        public override string ToString() => "STORE DATA";
 
         /// <summary>
         /// Converts this command to an APDU byte array.

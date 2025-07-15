@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Gp4Net.Core;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 
@@ -104,9 +105,9 @@ namespace Gp4Net.Domain.Commands
         public byte[]? Data => SearchCriteria;
 
         /// <summary>
-        /// Gets the expected response length (0 means maximum).
+        /// Gets the expected response length (256 for maximum variable response data).
         /// </summary>
-        public int? ExpectedResponseLength => 0;
+        public int? ExpectedResponseLength => 256;
 
         /// <summary>
         /// Gets whether this command uses extended length.
@@ -119,23 +120,77 @@ namespace Gp4Net.Domain.Commands
         /// <param name="subset">The status subset to query.</param>
         /// <param name="format">The response format.</param>
         /// <param name="searchCriteria">Optional search criteria (AID).</param>
-        public GetStatusCommand(
+        private GetStatusCommand(
             StatusSubset subset,
             ResponseFormat format = ResponseFormat.None,
             byte[]? searchCriteria = null
         )
         {
-            if (searchCriteria != null && (searchCriteria.Length < 5 || searchCriteria.Length > 16))
-            {
-                throw new ArgumentException(
-                    "Search criteria AID must be between 5 and 16 bytes.",
-                    nameof(searchCriteria)
-                );
-            }
-
             Subset = subset;
             Format = format;
             SearchCriteria = searchCriteria != null ? (byte[])searchCriteria.Clone() : null;
+        }
+
+        /// <summary>
+        /// Creates a GET STATUS command with the specified parameters.
+        /// </summary>
+        /// <param name="subset">The status subset to query.</param>
+        /// <param name="format">The response format.</param>
+        /// <param name="searchCriteria">Optional search criteria (AID).</param>
+        /// <returns>A Result containing either a new GetStatusCommand or an error.</returns>
+        public static Result<GetStatusCommand, SmartCardError> Create(
+            StatusSubset subset,
+            ResponseFormat format = ResponseFormat.None,
+            byte[]? searchCriteria = null
+        )
+        {
+            // Validate StatusSubset enum
+            if (!IsValidStatusSubset(subset))
+                return SmartCardError.InvalidArgument($"Invalid status subset: {subset}");
+            
+            // Validate ResponseFormat enum
+            if (!IsValidResponseFormat(format))
+                return SmartCardError.InvalidArgument($"Invalid response format: {format}");
+            
+            // Validate search criteria if provided
+            if (searchCriteria != null && (searchCriteria.Length < 5 || searchCriteria.Length > 16))
+                return SmartCardError.InvalidArgument("Search criteria AID must be between 5 and 16 bytes.");
+
+            return new GetStatusCommand(subset, format, searchCriteria);
+        }
+
+        /// <summary>
+        /// Returns a string representation of this command.
+        /// </summary>
+        /// <returns>The command name.</returns>
+        public override string ToString() => "GET STATUS";
+
+        /// <summary>
+        /// Validates if the provided StatusSubset value is valid.
+        /// </summary>
+        private static bool IsValidStatusSubset(StatusSubset subset)
+        {
+            return subset switch
+            {
+                StatusSubset.IssuerSecurityDomain => true,
+                StatusSubset.ApplicationsAndSupplementaryDomains => true,
+                StatusSubset.ExecutableLoadFiles => true,
+                StatusSubset.ExecutableLoadFilesAndModules => true,
+                _ => false
+            };
+        }
+
+        /// <summary>
+        /// Validates if the provided ResponseFormat value is valid.
+        /// </summary>
+        private static bool IsValidResponseFormat(ResponseFormat format)
+        {
+            return format switch
+            {
+                ResponseFormat.None => true,
+                ResponseFormat.Tlv => true,
+                _ => false
+            };
         }
 
         /// <summary>
@@ -257,10 +312,11 @@ namespace Gp4Net.Domain.Commands
         /// Parses a GET STATUS response.
         /// </summary>
         /// <param name="response">The response data (excluding status word).</param>
-        /// <returns>The parsed response.</returns>
-        public static GetStatusResponse Parse(byte[] response)
+        /// <returns>A Result containing either the parsed response or an error.</returns>
+        public static Result<GetStatusResponse, SmartCardError> Parse(byte[] response)
         {
-            ArgumentNullException.ThrowIfNull(response);
+            if (response == null)
+                return SmartCardError.InvalidArgument("Response data cannot be null");
 
             var applications = new List<ApplicationStatusEntry>();
             var offset = 0;
@@ -291,7 +347,12 @@ namespace Gp4Net.Domain.Commands
                     break;
                 }
 
-                var state = (ApplicationStatusEntry.LifecycleState)response[offset++];
+                var stateValue = response[offset++];
+                if (!IsValidLifecycleState(stateValue))
+                {
+                    return SmartCardError.InvalidResponse($"Invalid lifecycle state: 0x{stateValue:X2}");
+                }
+                var state = (ApplicationStatusEntry.LifecycleState)stateValue;
 
                 // Privileges length
                 if (offset >= response.Length)
@@ -318,6 +379,22 @@ namespace Gp4Net.Domain.Commands
             }
 
             return new GetStatusResponse(applications);
+        }
+
+        /// <summary>
+        /// Validates if the provided lifecycle state value is valid.
+        /// </summary>
+        private static bool IsValidLifecycleState(byte state)
+        {
+            return state switch
+            {
+                0x03 => true, // Installed
+                0x07 => true, // Selectable
+                0x0F => true, // Personalized
+                0x83 => true, // Blocked
+                0x87 => true, // Locked
+                _ => false
+            };
         }
     }
 }

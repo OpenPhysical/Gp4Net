@@ -1,9 +1,10 @@
 using System;
-using FluentAssertions;
+using System.Linq;
+using AwesomeAssertions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
 using Gp4Net.Constants;
-using Xunit;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Functional
 {
@@ -11,9 +12,10 @@ namespace Gp4Net.Tests.Functional
     /// Demonstrates the testability of the functional virtual card architecture.
     /// These tests show how pure functions can be tested in isolation with predictable results.
     /// </summary>
+    [TestFixture]
     public class FunctionalVirtualCardTests
     {
-        [Fact]
+        [Test]
         public void P71Card_ShouldHaveCorrectAtr()
         {
             // Arrange
@@ -26,7 +28,7 @@ namespace Gp4Net.Tests.Functional
             atr.Should().Equal(Convert.FromHexString("3BD518FF8191FE1FC38073C821100A"));
         }
 
-        [Fact]
+        [Test]
         public void ProcessSelect_WithValidCommand_ShouldSelectCard()
         {
             // Arrange
@@ -42,7 +44,7 @@ namespace Gp4Net.Tests.Functional
             response.Data.Length.Should().BeGreaterThan(0); // Should return FCI
         }
 
-        [Fact]
+        [Test]
         public void ProcessSelect_WithUnsupportedInstruction_ShouldReturnError()
         {
             // Arrange
@@ -56,7 +58,7 @@ namespace Gp4Net.Tests.Functional
             response.StatusWord.Should().Be(StatusWords.INSTRUCTION_NOT_SUPPORTED);
         }
 
-        [Fact]
+        [Test]
         public void ProcessIdentify_OnP71Card_ShouldReturnP71Data()
         {
             // Arrange
@@ -74,7 +76,7 @@ namespace Gp4Net.Tests.Functional
             response.Data[1].Should().Be(0x28);
         }
 
-        [Fact]
+        [Test]
         public void ProcessInitializeUpdate_WithValidCommand_ShouldReturnCryptogram()
         {
             // Arrange
@@ -92,11 +94,11 @@ namespace Gp4Net.Tests.Functional
             
             // Assert
             response.StatusWord.Should().Be(StatusWords.SUCCESS);
-            response.Data.Length.Should().BeGreaterOrEqualTo(28); // Minimum INITIALIZE UPDATE response
+            response.Data.Length.Should().BeGreaterThanOrEqualTo(28); // Minimum INITIALIZE UPDATE response
             // Response should contain key version, SCP info, card challenge, and cryptogram
         }
 
-        [Fact]
+        [Test]
         public void ProcessCommand_WithFailingCrypto_ShouldHandleErrors()
         {
             // Arrange
@@ -116,7 +118,7 @@ namespace Gp4Net.Tests.Functional
             response.StatusWord.Should().NotBe(StatusWords.SUCCESS);
         }
 
-        [Fact]
+        [Test]
         public void CardState_ShouldBeImmutable()
         {
             // Arrange
@@ -135,7 +137,7 @@ namespace Gp4Net.Tests.Functional
             initialState.Should().NotBe(newState);
         }
 
-        [Fact]
+        [Test]
         public void ProcessCommandFunctionally_IsPureFunction()
         {
             // Arrange
@@ -160,7 +162,7 @@ namespace Gp4Net.Tests.Functional
             state1.Should().Be(state2); // Records have value equality
         }
 
-        [Fact]
+        [Test]
         public void Builder_ShouldCreateCustomConfigurations()
         {
             // Arrange & Act
@@ -176,7 +178,7 @@ namespace Gp4Net.Tests.Functional
             card.Configuration.DefaultScpImplementation.Should().Be(0x70);
         }
 
-        [Fact]
+        [Test]
         public void Reset_ShouldRestoreInitialState()
         {
             // Arrange

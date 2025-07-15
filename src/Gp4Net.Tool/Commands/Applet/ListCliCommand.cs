@@ -233,7 +233,6 @@ namespace Gp4Net.Tool.Commands.Applet
             {
                 LifecycleState.Selectable => "[green]Selectable[/]",
                 LifecycleState.Personalized => "[blue]Personalized[/]",
-                LifecycleState.Blocked => "[red]Blocked[/]",
                 LifecycleState.Locked => "[red]Locked[/]",
                 _ => state.ToString(),
             };

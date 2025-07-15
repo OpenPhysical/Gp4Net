@@ -336,7 +336,7 @@ namespace Gp4Net.Tool.Services
 
             foreach (var operationName in operations)
             {
-                if (_traceData.Operations.TryGetValue(operationName, out var opRange))
+                if (_traceData?.Operations?.TryGetValue(operationName, out var opRange) == true)
                 {
                     for (int i = opRange.StartIndex; i <= opRange.EndIndex; i++)
                     {

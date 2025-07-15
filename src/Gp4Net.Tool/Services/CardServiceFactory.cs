@@ -14,12 +14,12 @@ namespace Gp4Net.Tool.Services
     [PublicAPI]
     public class CardServiceFactory : ICardService
     {
-        private readonly EnhancedWsctCardService _wsctService;
+        private readonly WsctCardService _wsctService;
         private readonly LuaVirtualCardService _luaService;
         private readonly JsonLuaCardService _jsonLuaService;
         private ICardService? _activeService;
 
-        public CardServiceFactory(EnhancedWsctCardService wsctService, LuaVirtualCardService luaService, JsonLuaCardService jsonLuaService)
+        public CardServiceFactory(WsctCardService wsctService, LuaVirtualCardService luaService, JsonLuaCardService jsonLuaService)
         {
             _wsctService = wsctService ?? throw new ArgumentNullException(nameof(wsctService));
             _luaService = luaService ?? throw new ArgumentNullException(nameof(luaService));

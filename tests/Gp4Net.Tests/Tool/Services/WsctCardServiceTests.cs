@@ -180,7 +180,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.Success);
             _service = new WsctCardService(
                 _mockFactory.Object,
@@ -194,7 +194,7 @@ namespace Gp4Net.Tests.Tool.Services
             // Assert
             Assert.That(result, Is.True);
             _mockContext.Verify(c => c.CreateCardChannel(readerName), Times.Once);
-            _mockChannel.Verify(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any), Times.Once);
+            _mockChannel.Verify(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any), Times.Once);
         }
 
         [Test]
@@ -234,7 +234,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.CardUnsupported);
             _service = new WsctCardService(
                 _mockFactory.Object,
@@ -259,7 +259,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.Success);
             _service = new WsctCardService(
                 _mockFactory.Object,
@@ -291,7 +291,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.Success);
             _service = new WsctCardService(
                 _mockFactory.Object,
@@ -331,7 +331,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.Success);
             _ = _mockChannel
                 .Setup(ch => ch.Disconnect(It.IsAny<Disposition>()))
@@ -363,7 +363,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.Success);
             _service = new WsctCardService(
                 _mockFactory.Object,
@@ -388,7 +388,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.Success);
             _service = new WsctCardService(
                 _mockFactory.Object,
@@ -413,7 +413,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.Success);
             _service = new WsctCardService(
                 _mockFactory.Object,
@@ -455,7 +455,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.Success);
             _service = new WsctCardService(
                 _mockFactory.Object,
@@ -486,7 +486,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.Success);
             _ = _mockChannel
                 .Setup(ch => ch.GetAttrib(Attrib.AtrString, ref It.Ref<byte[]>.IsAny))
@@ -537,7 +537,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.Success);
             _ = _mockChannel
                 .Setup(ch => ch.GetAttrib(Attrib.AtrString, ref It.Ref<byte[]>.IsAny))
@@ -582,7 +582,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.Success);
             _ = _mockChannel
                 .Setup(ch => ch.Transmit(mockCommand.Object, realResponse))
@@ -665,7 +665,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.Success);
             _ = _mockChannel
                 .Setup(ch => ch.Transmit(mockCommand.Object, mockResponse.Object))
@@ -700,7 +700,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.Success);
             _ = _mockChannel
                 .Setup(ch => ch.Transmit(mockCommand.Object, mockResponse.Object))
@@ -753,7 +753,7 @@ namespace Gp4Net.Tests.Tool.Services
                 .Setup(c => c.CreateCardChannel(readerName))
                 .Returns(_mockChannel.Object);
             _ = _mockChannel
-                .Setup(ch => ch.Connect(ShareMode.Exclusive, Protocol.Any))
+                .Setup(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any))
                 .Returns(ErrorCode.Success);
             _service = new WsctCardService(
                 _mockFactory.Object,

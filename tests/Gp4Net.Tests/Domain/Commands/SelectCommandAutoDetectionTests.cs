@@ -1,65 +1,77 @@
 using System;
 using System.Linq;
+using Gp4Net.Core;
 using Gp4Net.Core.Tlv;
 using Gp4Net.Domain.Commands;
-using Xunit;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.Commands
 {
+    [TestFixture]
     public class SelectCommandAutoDetectionTests
     {
-        [Fact]
-        public void CreateEmptySelect_CreatesSelectWithEmptyAid()
+        [Test]
+        public void CreateForIssuerSecurityDomain_CreatesSelectWithEmptyAid()
         {
             // Act
-            var command = SelectCommand.CreateEmptySelect();
+            var result = SelectCommand.CreateForIssuerSecurityDomain();
 
             // Assert
-            Assert.NotNull(command);
-            Assert.Empty(command.Aid);
-            Assert.Equal(SelectCommand.SelectionControl.SelectByName, command.Control);
-            Assert.Equal(SelectCommand.FileControlInfo.ReturnFci, command.ControlInfo);
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
+            Assert.That(command, Is.Not.Null);
+            Assert.That(command.Aid, Is.Empty);
+            Assert.That(command.Control, Is.EqualTo(SelectCommand.SelectionControl.SelectByName));
+            Assert.That(command.ControlInfo, Is.EqualTo(SelectCommand.FileControlInfo.ReturnFci));
         }
 
-        [Fact]
+        [Test]
         public void EmptySelectCommand_GeneratesCorrectApdu()
         {
             // Arrange
-            var command = SelectCommand.CreateEmptySelect();
+            var result = SelectCommand.CreateForIssuerSecurityDomain();
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
 
             // Act
             var apdu = command.ToApdu();
 
             // Assert
-            Assert.Equal(new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 }, apdu);
+            Assert.That(apdu, Is.EqualTo(new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 }));
         }
 
-        [Fact]
+        [Test]
         public void SelectCommand_AllowsEmptyAid()
         {
-            // Act & Assert - Should not throw
-            var command = new SelectCommand(Array.Empty<byte>());
-            Assert.Empty(command.Aid);
+            // Act
+            var result = SelectCommand.Create(Array.Empty<byte>());
+            
+            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
+            Assert.That(command.Aid, Is.Empty);
         }
 
-        [Fact]
+        [Test]
         public void SelectResponse_ParsesFciWithAid()
         {
             // Arrange - FCI from the trace: 6F108408A000000151000000A5049F6501FF
             var fciData = Convert.FromHexString("6F108408A000000151000000A5049F6501FF");
 
             // Act
-            var response = SelectResponse.Parse(fciData);
+            var result = SelectResponse.Parse(fciData);
 
             // Assert
-            Assert.NotNull(response);
-            Assert.NotNull(response.Fci);
-            Assert.NotNull(response.Fci.ApplicationAid);
-            Assert.Equal("A000000151000000", Convert.ToHexString(response.Fci.ApplicationAid));
-            Assert.Equal((ushort?)255, response.Fci.MaxCommandDataLength);
+            Assert.That(result.IsSuccess, Is.True);
+            var response = result.Value;
+            Assert.That(response, Is.Not.Null);
+            Assert.That(response.Fci, Is.Not.Null);
+            Assert.That(response.Fci.ApplicationAid, Is.Not.Null);
+            Assert.That(Convert.ToHexString(response.Fci.ApplicationAid), Is.EqualTo("A000000151000000"));
+            Assert.That(response.Fci.MaxCommandDataLength, Is.EqualTo((ushort?)255));
         }
 
-        [Fact]
+        [Test]
         public void SelectResponse_ParsesComplexFci()
         {
             // Arrange - More complex FCI with multiple fields
@@ -84,45 +96,137 @@ namespace Gp4Net.Tests.Domain.Commands
             var fciData = tlvBuilder.Build();
 
             // Act
-            var response = SelectResponse.Parse(fciData);
+            var result = SelectResponse.Parse(fciData);
 
             // Assert
-            Assert.NotNull(response);
-            Assert.NotNull(response.Fci);
-            Assert.Equal("A0000000030000", Convert.ToHexString(response.Fci.ApplicationAid));
-            Assert.Equal("ISD", response.Fci.ApplicationLabel);
-            Assert.Equal((ushort?)255, response.Fci.MaxCommandDataLength);
-            Assert.Equal((ushort?)255, response.Fci.MaxResponseDataLength);
+            Assert.That(result.IsSuccess, Is.True);
+            var response = result.Value;
+            Assert.That(response, Is.Not.Null);
+            Assert.That(response.Fci, Is.Not.Null);
+            Assert.That(Convert.ToHexString(response.Fci.ApplicationAid), Is.EqualTo("A0000000030000"));
+            Assert.That(response.Fci.ApplicationLabel, Is.EqualTo("ISD"));
+            Assert.That(response.Fci.MaxCommandDataLength, Is.EqualTo((ushort?)255));
+            Assert.That(response.Fci.MaxResponseDataLength, Is.EqualTo((ushort?)255));
         }
 
-        [Fact]
+        [Test]
         public void SelectResponse_HandlesEmptyResponse()
         {
             // Arrange
             var emptyData = Array.Empty<byte>();
 
             // Act
-            var response = SelectResponse.Parse(emptyData);
+            var result = SelectResponse.Parse(emptyData);
 
             // Assert
-            Assert.NotNull(response);
-            Assert.Null(response.Fci);
-            Assert.Empty(response.RawData);
+            Assert.That(result.IsSuccess, Is.True);
+            var response = result.Value;
+            Assert.That(response, Is.Not.Null);
+            Assert.That(response.Fci, Is.Null);
+            Assert.That(response.RawData, Is.Empty);
         }
 
-        [Fact]
+        [Test]
         public void SelectResponse_HandlesNonFciResponse()
         {
             // Arrange - Some TLV data that's not FCI
             var nonFciData = Convert.FromHexString("9F7F2A47900000");
 
             // Act
-            var response = SelectResponse.Parse(nonFciData);
+            var result = SelectResponse.Parse(nonFciData);
 
             // Assert
-            Assert.NotNull(response);
-            Assert.Null(response.Fci); // Should not parse as FCI
-            Assert.Equal(nonFciData, response.RawData);
+            Assert.That(result.IsSuccess, Is.True);
+            var response = result.Value;
+            Assert.That(response, Is.Not.Null);
+            Assert.That(response.Fci, Is.Null); // Should not parse as FCI
+            Assert.That(response.RawData, Is.EqualTo(nonFciData));
+        }
+
+        [Test]
+        public void SelectCommand_Create_WithNullAid_ReturnsFailure()
+        {
+            // Act
+            var result = SelectCommand.Create(null);
+
+            // Assert
+            Assert.That(result.IsFailure, Is.True);
+            Assert.That(result.Error.Code, Is.EqualTo("INVALID_DATA"));
+            Assert.That(result.Error.Message, Does.Contain("AID cannot be null"));
+        }
+
+        [Test]
+        public void SelectCommand_Create_WithTooLongAid_ReturnsFailure()
+        {
+            // Arrange
+            var tooLongAid = new byte[17]; // 17 bytes is too long
+
+            // Act
+            var result = SelectCommand.Create(tooLongAid);
+
+            // Assert
+            Assert.That(result.IsFailure, Is.True);
+            Assert.That(result.Error.Code, Is.EqualTo("INVALID_DATA"));
+            Assert.That(result.Error.Message, Does.Contain("AID must be 16 bytes or less"));
+        }
+
+        [Test]
+        public void SelectCommand_Create_WithValidAid_ReturnsSuccess()
+        {
+            // Arrange
+            var aid = Convert.FromHexString("A000000151000000");
+
+            // Act
+            var result = SelectCommand.Create(aid);
+
+            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
+            Assert.That(command.Aid, Is.EqualTo(aid));
+            Assert.That(command.Control, Is.EqualTo(SelectCommand.SelectionControl.SelectByName));
+        }
+
+        [Test]
+        public void SelectCommand_Create_WithNextMode_SetsCorrectControlInfo()
+        {
+            // Arrange
+            var aid = Convert.FromHexString("A000000151000000");
+
+            // Act
+            var result = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
+
+            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
+            Assert.That(command.Aid, Is.EqualTo(aid));
+            Assert.That((byte)command.ControlInfo, Is.EqualTo(0x02)); // ReturnFci | Next
+        }
+
+        [Test]
+        public void SelectResponse_Parse_WithNullData_ReturnsFailure()
+        {
+            // Act
+            var result = SelectResponse.Parse(null);
+
+            // Assert
+            Assert.That(result.IsFailure, Is.True);
+            Assert.That(result.Error.Code, Is.EqualTo("INVALID_DATA"));
+            Assert.That(result.Error.Message, Does.Contain("Response data cannot be null"));
+        }
+
+        [Test]
+        public void SelectCommand_ToString_ReturnsSelect()
+        {
+            // Arrange
+            var result = SelectCommand.Create(Convert.FromHexString("A000000151000000"));
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
+
+            // Act
+            var str = command.ToString();
+
+            // Assert
+            Assert.That(str, Is.EqualTo("SELECT"));
         }
     }
 

@@ -29,7 +29,7 @@ namespace Gp4Net.Cryptography
         {
             if (macKey == null || (macKey.Length != 16 && macKey.Length != 24 && macKey.Length != 32))
                 throw new ArgumentException("Delete Token MAC key must be 16, 24, or 32 bytes for AES.");
-            if (aid == null) throw new ArgumentNullException(nameof(aid));
+            ArgumentNullException.ThrowIfNull(aid);
             if (aid.Length < 5 || aid.Length > 16) throw new ArgumentException("AID length must be 5-16 bytes per GP spec.");
 
             // Step 1: build TLV for object to delete (AID)

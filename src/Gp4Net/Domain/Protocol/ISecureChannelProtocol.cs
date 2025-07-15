@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Gp4Net.Constants;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Transport;
@@ -23,8 +24,8 @@ namespace Gp4Net.Domain.Protocol
         /// Creates an INITIALIZE UPDATE command for this protocol.
         /// </summary>
         /// <param name="hostChallenge">The host challenge (8 bytes).</param>
-        /// <returns>The INITIALIZE UPDATE command.</returns>
-        InitializeUpdateCommand CreateInitializeUpdateCommand(byte[] hostChallenge);
+        /// <returns>A result containing the INITIALIZE UPDATE command or an error.</returns>
+        Result<InitializeUpdateCommand, SmartCardError> CreateInitializeUpdateCommand(byte[] hostChallenge);
 
         /// <summary>
         /// Processes an INITIALIZE UPDATE response and creates an authentication context.
@@ -42,8 +43,8 @@ namespace Gp4Net.Domain.Protocol
         /// </summary>
         /// <param name="context">The secure channel context.</param>
         /// <param name="securityLevel">The requested security level.</param>
-        /// <returns>The EXTERNAL AUTHENTICATE command.</returns>
-        ExternalAuthenticateCommand CreateExternalAuthenticateCommand(
+        /// <returns>A result containing the EXTERNAL AUTHENTICATE command or an error.</returns>
+        Result<ExternalAuthenticateCommand, SmartCardError> CreateExternalAuthenticateCommand(
             SecureChannelContext context,
             SecurityLevel securityLevel
         );

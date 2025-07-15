@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Gp4Net.Constants;
+using Gp4Net.Core;
+using Gp4Net.Domain.CapFile;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 
@@ -168,28 +171,13 @@ namespace Gp4Net.Domain.Commands
         /// <param name="data">The data to load.</param>
         /// <param name="isFinalBlock">Whether this is the final block.</param>
         /// <param name="totalCapSize">The total CAP file size (required for first block).</param>
-        public LoadCommand(
+        private LoadCommand(
             byte blockNumber,
             byte[] data,
             bool isFinalBlock,
             uint? totalCapSize = null
         )
         {
-            ArgumentNullException.ThrowIfNull(data);
-
-            if (data.Length == 0)
-            {
-                throw new ArgumentException("Data cannot be empty.", nameof(data));
-            }
-
-            if (blockNumber == 0 && totalCapSize == null)
-            {
-                throw new ArgumentException(
-                    "Total CAP size must be provided for the first block.",
-                    nameof(totalCapSize)
-                );
-            }
-
             BlockNumber = blockNumber;
             Data = (byte[])data.Clone();
             Type = isFinalBlock ? LoadType.Final : LoadType.Continuation;
@@ -197,29 +185,63 @@ namespace Gp4Net.Domain.Commands
         }
 
         /// <summary>
+        /// Creates a single LOAD command with validation.
+        /// </summary>
+        /// <param name="blockNumber">The block number (0-based).</param>
+        /// <param name="data">The data to load.</param>
+        /// <param name="isLastBlock">Whether this is the last block.</param>
+        /// <returns>A Result containing the LoadCommand or an error.</returns>
+        public static Result<LoadCommand, SmartCardError> Create(
+            byte blockNumber,
+            byte[] data,
+            bool isLastBlock = false)
+        {
+            if (data == null)
+            {
+                return Result<LoadCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument("Data cannot be null."));
+            }
+
+            if (data.Length == 0)
+            {
+                return Result<LoadCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument("Data cannot be empty."));
+            }
+
+            uint? totalCapSize = blockNumber == 0 ? (uint)data.Length : null;
+            
+            var command = new LoadCommand(blockNumber, data, isLastBlock, totalCapSize);
+            return Result<LoadCommand, SmartCardError>.Ok(command);
+        }
+
+        /// <summary>
         /// Creates a sequence of LOAD commands from CAP file data.
         /// </summary>
         /// <param name="capFileData">The complete CAP file data.</param>
         /// <param name="maxBlockSize">Maximum block size (default optimized for smart cards).</param>
-        /// <returns>The sequence of LOAD commands.</returns>
-        public static IList<LoadCommand> CreateFromCapFile(
+        /// <returns>A Result containing the sequence of LOAD commands or an error.</returns>
+        public static Result<IList<LoadCommand>, SmartCardError> CreateFromCapFile(
             byte[] capFileData,
             int maxBlockSize = ApduConstants.DEFAULT_LOAD_BLOCK_SIZE
         )
         {
-            ArgumentNullException.ThrowIfNull(capFileData);
+            if (capFileData == null)
+            {
+                return Result<IList<LoadCommand>, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument("CAP file data cannot be null."));
+            }
 
             if (capFileData.Length == 0)
             {
-                throw new ArgumentException("CAP file data cannot be empty.", nameof(capFileData));
+                return Result<IList<LoadCommand>, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument("CAP file data cannot be empty."));
             }
 
             if (maxBlockSize < 1 || maxBlockSize > 255)
             {
-                throw new ArgumentException(
-                    "Block size must be between 1 and 255 bytes.",
-                    nameof(maxBlockSize)
-                );
+                return Result<IList<LoadCommand>, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument(
+                        "Block size must be between 1 and 255 bytes."));
             }
 
             var commands = new List<LoadCommand>();
@@ -230,7 +252,16 @@ namespace Gp4Net.Domain.Commands
             while (offset < capFileData.Length)
             {
                 var remainingBytes = capFileData.Length - offset;
-                var blockSize = Math.Min(remainingBytes, maxBlockSize);
+                var effectiveBlockSize = maxBlockSize;
+                
+                // For first block, account for TLV header overhead
+                if (blockNumber == 0)
+                {
+                    var tlvHeaderSize = CalculateTlvHeaderSize(totalSize);
+                    effectiveBlockSize = Math.Max(1, maxBlockSize - tlvHeaderSize);
+                }
+                
+                var blockSize = Math.Min(remainingBytes, effectiveBlockSize);
                 var blockData = new byte[blockSize];
 
                 Array.Copy(capFileData, offset, blockData, 0, blockSize);
@@ -244,7 +275,68 @@ namespace Gp4Net.Domain.Commands
                 blockNumber++;
             }
 
-            return commands;
+            return Result<IList<LoadCommand>, SmartCardError>.Ok(commands);
+        }
+
+        /// <summary>
+        /// Calculates the TLV header size for a given total CAP file size.
+        /// </summary>
+        /// <param name="totalSize">The total CAP file size.</param>
+        /// <returns>The number of bytes needed for the TLV header (tag + length).</returns>
+        private static int CalculateTlvHeaderSize(uint totalSize)
+        {
+            // C4 tag (1 byte) + length encoding
+            var tagSize = 1;
+            
+            if (totalSize <= 0x7F)
+            {
+                return tagSize + 1; // 1 byte length
+            }
+            else if (totalSize <= 0xFF)
+            {
+                return tagSize + 2; // 0x81 + 1 byte length
+            }
+            else if (totalSize <= 0xFFFF)
+            {
+                return tagSize + 3; // 0x82 + 2 bytes length
+            }
+            else if (totalSize <= 0xFFFFFF)
+            {
+                return tagSize + 4; // 0x83 + 3 bytes length
+            }
+            else
+            {
+                return tagSize + 5; // 0x84 + 4 bytes length
+            }
+        }
+
+        /// <summary>
+        /// Creates a sequence of LOAD commands from a CAP file structure.
+        /// </summary>
+        /// <param name="capFile">The CAP file structure.</param>
+        /// <param name="maxBlockSize">Maximum block size (default optimized for smart cards).</param>
+        /// <returns>A Result containing the sequence of LOAD commands or an error.</returns>
+        public static Result<IList<LoadCommand>, SmartCardError> CreateFromCapFile(
+            CapFileStructure capFile,
+            int maxBlockSize = ApduConstants.DEFAULT_LOAD_BLOCK_SIZE
+        )
+        {
+            if (capFile == null)
+            {
+                return Result<IList<LoadCommand>, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument("CAP file structure cannot be null."));
+            }
+
+            try
+            {
+                var binaryData = capFile.ToBinaryFormat();
+                return CreateFromCapFile(binaryData, maxBlockSize);
+            }
+            catch (Exception ex)
+            {
+                return Result<IList<LoadCommand>, SmartCardError>.Fail(
+                    SmartCardError.InvalidData($"Failed to convert CAP file to binary format: {ex.Message}"));
+            }
         }
 
         /// <summary>
@@ -312,6 +404,12 @@ namespace Gp4Net.Domain.Commands
 
             return [.. apdu];
         }
+
+        /// <summary>
+        /// Returns a string representation of this command.
+        /// </summary>
+        /// <returns>The string "LOAD".</returns>
+        public override string ToString() => "LOAD";
     }
 
     /// <summary>

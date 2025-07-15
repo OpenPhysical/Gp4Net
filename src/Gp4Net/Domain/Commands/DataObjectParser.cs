@@ -1,5 +1,6 @@
 using System;
 using System.Text.RegularExpressions;
+using Gp4Net.Core;
 
 namespace Gp4Net.Domain.Commands
 {
@@ -12,34 +13,66 @@ namespace Gp4Net.Domain.Commands
         /// Parses a raw data object in hex tag format (e.g., "9F70:040102" or "9F70=040102").
         /// </summary>
         /// <param name="dataObject">The data object string to parse.</param>
-        /// <returns>A tuple containing the tag and data bytes.</returns>
-        public static (ushort tag, byte[] data) ParseRawDataObject(string dataObject)
+        /// <returns>A Result containing the tag and data bytes, or an error.</returns>
+        public static Result<(ushort tag, byte[] data), SmartCardError> ParseRawDataObject(string dataObject)
         {
             if (string.IsNullOrWhiteSpace(dataObject))
             {
-                throw new ArgumentException("Data object cannot be null or empty");
+                return Result<(ushort tag, byte[] data), SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument("Data object cannot be null or empty"));
             }
 
-            // Support both ':' and '=' as separators
-            var match = Regex.Match(dataObject, @"^([0-9A-Fa-f]{4})[:=]([0-9A-Fa-f]+)$");
+            // Support both ':' and '=' as separators, 2-4 character tags, and allow any data
+            var match = Regex.Match(dataObject, @"^([0-9A-Fa-f]{2,4})[:=](.*)$");
             if (!match.Success)
             {
-                throw new ArgumentException($"Invalid data object format: {dataObject}. Expected format: 9F70:040102 or 9F70=040102");
+                return Result<(ushort tag, byte[] data), SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument("Invalid data object format"));
             }
 
             var tagHex = match.Groups[1].Value;
             var dataHex = match.Groups[2].Value;
 
-            // Ensure even number of hex characters for data
-            if (dataHex.Length % 2 != 0)
+            // Validate hex characters in data if not empty
+            if (!string.IsNullOrEmpty(dataHex))
             {
-                throw new ArgumentException($"Data must have even number of hex characters: {dataHex}");
+                if (!Regex.IsMatch(dataHex, @"^[0-9A-Fa-f]*$"))
+                {
+                    return Result<(ushort tag, byte[] data), SmartCardError>.Fail(
+                        SmartCardError.InvalidArgument("Data must contain only hex characters"));
+                }
+                
+                // Ensure even number of hex characters for data
+                if (dataHex.Length % 2 != 0)
+                {
+                    return Result<(ushort tag, byte[] data), SmartCardError>.Fail(
+                        SmartCardError.InvalidArgument("Data must have even number of hex characters"));
+                }
             }
 
-            var tag = Convert.ToUInt16(tagHex, 16);
-            var data = Convert.FromHexString(dataHex);
+            ushort tag;
+            try
+            {
+                tag = Convert.ToUInt16(tagHex, 16);
+            }
+            catch (Exception ex)
+            {
+                return Result<(ushort tag, byte[] data), SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument($"Invalid tag format: {ex.Message}"));
+            }
 
-            return (tag, data);
+            byte[] data;
+            try
+            {
+                data = string.IsNullOrEmpty(dataHex) ? Array.Empty<byte>() : Convert.FromHexString(dataHex);
+            }
+            catch (Exception ex)
+            {
+                return Result<(ushort tag, byte[] data), SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument($"Invalid data format: {ex.Message}"));
+            }
+
+            return Result<(ushort tag, byte[] data), SmartCardError>.Ok((tag, data));
         }
 
         /// <summary>

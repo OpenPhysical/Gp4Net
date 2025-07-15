@@ -1,12 +1,12 @@
 using System;
 using Gp4Net.Domain.CardInfo;
-using Xunit;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.CardInfo
 {
     public class DiversificationDataParserTests
     {
-        [Fact]
+        [Test]
         public void ParseAsHex_WithValidData_ReturnsHexString()
         {
             // Arrange
@@ -16,10 +16,10 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var result = DiversificationDataParser.ParseAsHex(data);
 
             // Assert
-            Assert.Equal("CF0A0215031070060301060000", result);
+            Assert.That(result, Is.EqualTo("CF0A0215031070060301060000"));
         }
 
-        [Fact]
+        [Test]
         public void ParseAsHex_WithEmptyData_ReturnsEmptyString()
         {
             // Arrange
@@ -29,20 +29,20 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var result = DiversificationDataParser.ParseAsHex(data);
 
             // Assert
-            Assert.Equal(string.Empty, result);
+            Assert.That(result, Is.EqualTo(string.Empty));
         }
 
-        [Fact]
+        [Test]
         public void ParseAsHex_WithNullData_ReturnsEmptyString()
         {
             // Act
             var result = DiversificationDataParser.ParseAsHex(null);
 
             // Assert
-            Assert.Equal(string.Empty, result);
+            Assert.That(result, Is.EqualTo(string.Empty));
         }
 
-        [Fact]
+        [Test]
         public void ParseScpSupport_WithValidCF0AFormat_ParsesScpVersions()
         {
             // Arrange - CF0A format with SCP02 (i=15) and SCP03 (i=70)
@@ -52,11 +52,11 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var result = DiversificationDataParser.ParseScpSupport(data);
 
             // Assert
-            Assert.Contains("SCP02 (i=15)", result);
-            Assert.Contains("SCP03 (i=70)", result);
+            Assert.That(result, Does.Contain("SCP02 (i=15)"));
+            Assert.That(result, Does.Contain("SCP03 (i=70)"));
         }
 
-        [Fact]
+        [Test]
         public void ParseScpSupport_WithMultipleScpVersions_ParsesAll()
         {
             // Arrange - CF0A format with multiple SCP versions
@@ -66,14 +66,14 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var result = DiversificationDataParser.ParseScpSupport(data);
 
             // Assert
-            Assert.Contains("SCP02 (i=15)", result);
-            Assert.Contains("SCP03 (i=10)", result);
-            Assert.Contains("SCP60 (i=07)", result);
-            Assert.Contains("SCP03 (i=01)", result);
-            Assert.Contains("SCP06 (i=00)", result);
+            Assert.That(result, Does.Contain("SCP02 (i=15)"));
+            Assert.That(result, Does.Contain("SCP03 (i=10)"));
+            Assert.That(result, Does.Contain("SCP60 (i=07)"));
+            Assert.That(result, Does.Contain("SCP03 (i=01)"));
+            Assert.That(result, Does.Contain("SCP06 (i=00)"));
         }
 
-        [Fact]
+        [Test]
         public void ParseScpSupport_WithEmptySlots_IgnoresZeroValues()
         {
             // Arrange - CF0A format with empty slots (00 00)
@@ -83,12 +83,12 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var result = DiversificationDataParser.ParseScpSupport(data);
 
             // Assert
-            Assert.Contains("SCP02 (i=15)", result);
-            Assert.Contains("SCP03 (i=70)", result);
-            Assert.DoesNotContain("SCP00", result);
+            Assert.That(result, Does.Contain("SCP02 (i=15)"));
+            Assert.That(result, Does.Contain("SCP03 (i=70)"));
+            Assert.That(result, Does.Not.Contain("SCP00"));
         }
 
-        [Fact]
+        [Test]
         public void ParseScpSupport_WithNoSupportedVersions_ReturnsNone()
         {
             // Arrange - CF0A format with all zeros
@@ -98,10 +98,10 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var result = DiversificationDataParser.ParseScpSupport(data);
 
             // Assert
-            Assert.Equal("[red]None[/]", result);
+            Assert.That(result, Is.EqualTo("[red]None[/]"));
         }
 
-        [Fact]
+        [Test]
         public void ParseScpSupport_WithShortData_ReturnsNone()
         {
             // Arrange - Data too short (less than 12 bytes)
@@ -111,10 +111,10 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var result = DiversificationDataParser.ParseScpSupport(data);
 
             // Assert
-            Assert.Equal("[red]None[/]", result);
+            Assert.That(result, Is.EqualTo("[red]None[/]"));
         }
 
-        [Fact]
+        [Test]
         public void ParseScpSupport_WithInvalidLength_ReturnsParseError()
         {
             // Arrange - CF tag with invalid length (less than 10)
@@ -124,20 +124,20 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var result = DiversificationDataParser.ParseScpSupport(data);
 
             // Assert
-            Assert.Equal("[red]Parse error[/]", result);
+            Assert.That(result, Is.EqualTo("[red]Parse error[/]"));
         }
 
-        [Fact]
+        [Test]
         public void ParseScpSupport_WithNullData_ReturnsNone()
         {
             // Act
             var result = DiversificationDataParser.ParseScpSupport(null);
 
             // Assert
-            Assert.Equal("[red]None[/]", result);
+            Assert.That(result, Is.EqualTo("[red]None[/]"));
         }
 
-        [Fact]
+        [Test]
         public void ParseScpSupport_WithEmptyData_ReturnsNone()
         {
             // Arrange
@@ -147,10 +147,10 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var result = DiversificationDataParser.ParseScpSupport(data);
 
             // Assert
-            Assert.Equal("[red]None[/]", result);
+            Assert.That(result, Is.EqualTo("[red]None[/]"));
         }
 
-        [Fact]
+        [Test]
         public void ParseScpSupport_FormatsMultipleVersionsWithCommas()
         {
             // Arrange - CF0A format with three SCP versions
@@ -160,12 +160,12 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var result = DiversificationDataParser.ParseScpSupport(data);
 
             // Assert
-            Assert.Contains(", ", result);
+            Assert.That(result, Does.Contain(", "));
             var versions = result.Split(", ");
-            Assert.Equal(3, versions.Length);
+            Assert.That(versions.Length, Is.EqualTo(3));
         }
 
-        [Fact]
+        [Test]
         public void ParseScpSupport_PreservesParameterOrder()
         {
             // Arrange - CF0A format with specific order
@@ -179,7 +179,7 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var firstCommaIndex = result.IndexOf(',');
             var scp03Index = result.IndexOf("SCP03");
             var scp02Index = result.IndexOf("SCP02");
-            Assert.True(scp03Index < scp02Index);
+            Assert.That(scp03Index, Is.LessThan(scp02Index));
         }
     }
 }

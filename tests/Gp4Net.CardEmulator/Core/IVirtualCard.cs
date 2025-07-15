@@ -74,7 +74,7 @@ namespace Gp4Net.CardEmulator.Core
         /// </summary>
         /// <param name="data">The response data.</param>
         /// <returns>A successful APDU response.</returns>
-        public static ApduResponse Success(byte[] data = null)
+        public static ApduResponse Success(byte[]? data = null)
         {
             return new ApduResponse(data ?? Array.Empty<byte>(), 0x9000);
         }

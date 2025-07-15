@@ -45,8 +45,45 @@ namespace Gp4Net.Domain.CardInfo
 
             var template = new KeyInformationTemplate(data);
 
-            // Parse DER structure
-            foreach (var element in SimpleTlvParser.Enumerate(data))
+            // Check if data starts with E0 tag and extract the content
+            byte[] contentToParse = data;
+            if (data.Length >= 2 && data[0] == 0xE0)
+            {
+                // This is an E0 tag, extract its content
+                int offset = 1;
+                int length = 0;
+                
+                if ((data[1] & 0x80) == 0)
+                {
+                    // Short form length
+                    length = data[1];
+                    offset = 2;
+                }
+                else
+                {
+                    // Long form length
+                    int lenLength = data[1] & 0x7F;
+                    if (lenLength > 0 && lenLength <= 4 && 2 + lenLength <= data.Length)
+                    {
+                        offset = 2;
+                        for (int i = 0; i < lenLength; i++)
+                        {
+                            length = (length << 8) | data[offset++];
+                        }
+                    }
+                }
+                
+                if (length > 0 && offset + length <= data.Length)
+                {
+                    contentToParse = new byte[length];
+                    Array.Copy(data, offset, contentToParse, 0, length);
+                }
+            }
+
+            // Parse the content for C0 tags
+            var elements = SimpleTlvParser.Enumerate(contentToParse).ToList();
+            
+            foreach (var element in elements)
             {
                 if (element.Tag == 0xC0) // Key Information Data
                 {
@@ -67,9 +104,14 @@ namespace Gp4Net.Domain.CardInfo
             var keyEntry = new KeyEntry { KeyId = data[0], KeyVersion = data[1] };
 
             // Parse key types starting from byte 2
+            // The format is: ID, Version, KeyType1, KeyType2, KeyType3, ...
             for (int i = 2; i < data.Length; i++)
             {
-                keyEntry.KeyTypes.Add(ParseKeyType(data[i]));
+                var keyType = ParseKeyType(data[i]);
+                if (keyType != KeyType.Unknown)
+                {
+                    keyEntry.KeyTypes.Add(keyType);
+                }
             }
 
             Keys.Add(keyEntry);

@@ -27,7 +27,7 @@ namespace Gp4Net.Tool.Commands.Card
                     // Try to select ISD and get basic card information
                     try
                     {
-                        var selectResult = await ctx.GlobalPlatformService.SelectIsdAsync();
+                        var selectResult = await ctx.GetGlobalPlatformService().SelectIsdAsync();
                         
                         await selectResult.MatchAsync<object>(
                             selectResponse =>

@@ -16,7 +16,7 @@ namespace Gp4Net.Tool.Pipeline
     {
         public IDisplayService Display { get; }
         public ICardService CardService { get; }
-        public Gp4Net.Services.IGlobalPlatformService GlobalPlatformService { get; }
+        private readonly Gp4Net.Services.IGlobalPlatformService _globalPlatformService;
         public IKeysetResolver KeysetResolver { get; }
 
         /// <summary>
@@ -43,8 +43,14 @@ namespace Gp4Net.Tool.Pipeline
         {
             Display = display ?? new MockDisplayService();
             CardService = cardService ?? new MockCardService();
-            GlobalPlatformService = globalPlatformService ?? throw new ArgumentNullException(nameof(globalPlatformService), "Must provide functional IGlobalPlatformService");
+            _globalPlatformService = globalPlatformService ?? throw new ArgumentNullException(nameof(globalPlatformService), "Must provide functional IGlobalPlatformService");
             KeysetResolver = keysetResolver ?? new MockKeysetResolver();
+        }
+
+        public Gp4Net.Services.IGlobalPlatformService GetGlobalPlatformService()
+        {
+            MethodCalls.Add("GetGlobalPlatformService()");
+            return _globalPlatformService;
         }
 
         public async Task<ICommandContext> RequireCardConnection(string? readerName = null)

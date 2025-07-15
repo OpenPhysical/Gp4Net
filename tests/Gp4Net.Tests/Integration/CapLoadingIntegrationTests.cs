@@ -7,7 +7,7 @@ using Gp4Net.Domain;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
-using Xunit;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Integration
 {
@@ -30,20 +30,20 @@ namespace Gp4Net.Tests.Integration
             );
         }
 
-        [Fact]
+        [Test]
         public void CapFile_Exists_CanBeRead()
         {
             // Verify the CAP file exists and can be read
-            Assert.True(File.Exists(_capFilePath), $"CAP file not found at: {_capFilePath}");
+            Assert.That(File.Exists(_capFilePath), Is.True, $"CAP file not found at: {_capFilePath}");
 
             var capFileData = File.ReadAllBytes(_capFilePath);
-            Assert.True(capFileData.Length > 0, "CAP file should not be empty");
+            Assert.That(capFileData.Length > 0, Is.True, "CAP file should not be empty");
 
             // Parse and check structure
             var capFile = CapFileStructure.Parse(capFileData);
         }
 
-        [Fact]
+        [Test]
         public void CapFileLoading_EndToEndWorkflow_GeneratesCorrectWrappedCommands()
         {
             // Arrange - Load the CAP file used in the real trace
@@ -54,38 +54,40 @@ namespace Gp4Net.Tests.Integration
 
             // Verify we have the expected package from the trace (OpenFIPS201 package)
             var expectedPackageAid = Convert.FromHexString("A00000030800001000");
-            Assert.Equal(expectedPackageAid, capFile.PackageAid);
+            Assert.That(capFile.PackageAid, Is.EqualTo(expectedPackageAid));
 
             // Act - Generate LOAD commands from CAP file
-            var loadCommands = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
+            var result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
+            Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
+            var loadCommands = result.Value;
 
             // Assert - Verify we generated the expected number of commands
-            Assert.True(
+            Assert.That(
                 loadCommands.Count >= 2,
                 "Should have at least 2 LOAD commands for OpenFIPS201"
             );
 
             // Verify first command structure matches trace expectations
             var firstCommand = loadCommands[0];
-            Assert.True(firstCommand.IsFirstBlock, "First command should be marked as first block");
-            Assert.False(firstCommand.IsFinalBlock, "First command should not be final block");
+            Assert.That(firstCommand.IsFirstBlock, Is.True, "First command should be marked as first block");
+            Assert.That(firstCommand.IsFinalBlock, Is.False, "First command should not be final block");
 
             // Verify final command structure
             var lastCommand = loadCommands.Last();
-            Assert.True(lastCommand.IsFinalBlock, "Last command should be marked as final block");
+            Assert.That(lastCommand.IsFinalBlock, Is.True, "Last command should be marked as final block");
 
             // Convert to APDUs for secure channel wrapping
             var plainApdus = loadCommands.Select(cmd => cmd.ToApdu()).ToList();
 
             // Verify APDU structure matches trace format
             var firstApdu = plainApdus[0];
-            Assert.Equal(0x80, firstApdu[0]); // CLA
-            Assert.Equal(0xE8, firstApdu[1]); // INS (LOAD)
-            Assert.Equal(0x00, firstApdu[2]); // P1 (first block)
-            Assert.Equal(0x00, firstApdu[3]); // P2
+            Assert.That(firstApdu[0], Is.EqualTo(0x80)); // CLA
+            Assert.That(firstApdu[1], Is.EqualTo(0xE8)); // INS (LOAD)
+            Assert.That(firstApdu[2], Is.EqualTo(0x00)); // P1 (first block)
+            Assert.That(firstApdu[3], Is.EqualTo(0x00)); // P2
         }
 
-        [Fact]
+        [Test]
         public void SecureChannelWrapping_WithScp02_MatchesTraceFormat()
         {
             // Arrange - For now, test the CAP loading + basic APDU generation workflow
@@ -93,7 +95,9 @@ namespace Gp4Net.Tests.Integration
 
             // Load CAP file and generate LOAD commands
             var capFileData = File.ReadAllBytes(_capFilePath);
-            var loadCommands = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
+            var result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
+            Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
+            var loadCommands = result.Value;
             var plainApdus = loadCommands.Select(cmd => cmd.ToApdu()).ToList();
 
             // Simulate what wrapped APDUs would look like (for demonstration)
@@ -114,22 +118,22 @@ namespace Gp4Net.Tests.Integration
                 .ToList();
 
             // Assert - Verify wrapped APDUs have correct format
-            Assert.True(wrappedApdus.Count > 0, "Should have generated wrapped APDUs");
+            Assert.That(wrappedApdus.Count > 0, Is.True, "Should have generated wrapped APDUs");
             foreach (var wrappedApdu in wrappedApdus)
             {
                 // Wrapped commands should have CLA = 0x84 (secure messaging)
-                Assert.Equal(0x84, wrappedApdu[0]);
+                Assert.That(wrappedApdu[0], Is.EqualTo(0x84));
 
                 // Should be longer than original due to MAC and padding
                 var originalIndex = wrappedApdus.IndexOf(wrappedApdu);
-                Assert.True(wrappedApdu.Length > plainApdus[originalIndex].Length);
+                Assert.That(wrappedApdu.Length > plainApdus[originalIndex].Length, Is.True);
 
                 // Should end with MAC (8 bytes)
-                Assert.True(wrappedApdu.Length >= 8, "Wrapped APDU should include MAC");
+                Assert.That(wrappedApdu.Length >= 8, Is.True, "Wrapped APDU should include MAC");
             }
         }
 
-        [Fact]
+        [Test]
         public void TraceComparison_LoadCommands_MatchExpectedStructure()
         {
             // Arrange - Expected values from configure_gpshell_log.txt trace
@@ -146,33 +150,37 @@ namespace Gp4Net.Tests.Integration
             var capFile = CapFileStructure.Parse(capFileData);
 
             // Generate INSTALL [for load] command
-            var installForLoadCmd = InstallCommandBuilder.CreateForLoad(
+            var installForLoadResult = InstallCommandBuilder.CreateForLoad(
                 packageAid: capFile.PackageAid,
                 securityDomainAid: Convert.FromHexString("A000000151000000") // Card Manager AID from trace
             );
-
+            
+            Assert.That(installForLoadResult.IsSuccess, Is.True, "CreateForLoad should succeed");
+            var installForLoadCmd = installForLoadResult.Value;
             var installForLoadApdu = installForLoadCmd.ToApdu();
 
             // Generate LOAD commands
-            var loadCommands = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
+            var result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
+            Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
+            var loadCommands = result.Value;
             var firstLoadApdu = loadCommands[0].ToApdu();
 
             // Assert - Verify structure matches trace expectations
-            Assert.Equal(0x80, installForLoadApdu[0]); // CLA
-            Assert.Equal(0xE6, installForLoadApdu[1]); // INS (INSTALL)
-            Assert.Equal(0x04, installForLoadApdu[2]); // P1 (for load = 0x04, not 0x02)
+            Assert.That(installForLoadApdu[0], Is.EqualTo(0x80)); // CLA
+            Assert.That(installForLoadApdu[1], Is.EqualTo(0xE6)); // INS (INSTALL)
+            Assert.That(installForLoadApdu[2], Is.EqualTo(0x02)); // P1 (for load = 0x02, as per trace)
 
-            Assert.Equal(0x80, firstLoadApdu[0]); // CLA
-            Assert.Equal(0xE8, firstLoadApdu[1]); // INS (LOAD)
-            Assert.Equal(0x00, firstLoadApdu[2]); // P1 (first block)
+            Assert.That(firstLoadApdu[0], Is.EqualTo(0x80)); // CLA
+            Assert.That(firstLoadApdu[1], Is.EqualTo(0xE8)); // INS (LOAD)
+            Assert.That(firstLoadApdu[2], Is.EqualTo(0x00)); // P1 (first block)
 
             // Verify the LOAD command contains the CAP file header
             var loadData = loadCommands[0].Data;
-            Assert.NotNull(loadData);
+            Assert.That(loadData, Is.Not.Null);
 
             // Should start with TLV tag C4 (load file data block) - but actual might be different
             // The important thing is that we have valid load data structure
-            Assert.True(
+            Assert.That(
                 loadData[0] == 0xC4
                     || loadData[0] == 0x50
                     || loadData[0] == 0x80
@@ -184,8 +192,8 @@ namespace Gp4Net.Tests.Integration
 
             // CAP files are ZIP files, so they start with ZIP magic "PK" (0x504B), not CAP magic
             // The first LOAD command should contain the ZIP header
-            Assert.Equal(0x50, loadData[0]); // 'P' from "PK"
-            Assert.Equal(0x4B, loadData[1]); // 'K' from "PK"
+            Assert.That(loadData[0], Is.EqualTo(0x50)); // 'P' from "PK"
+            Assert.That(loadData[1], Is.EqualTo(0x4B)); // 'K' from "PK"
 
             // Look for CAP magic "DECAFFED" across all LOAD commands
             var allLoadData = new List<byte>();
@@ -199,13 +207,13 @@ namespace Gp4Net.Tests.Integration
 
             var capMagicPattern = new byte[] { 0xDE, 0xCA, 0xFF, 0xED };
             var capMagicIndex = ByteArrayHelpers.FindBytePattern([.. allLoadData], capMagicPattern);
-            Assert.True(
+            Assert.That(
                 capMagicIndex >= 0,
                 "Should contain CAP file magic number DECAFFED somewhere in the load data"
             );
         }
 
-        [Fact]
+        [Test]
         public void FluentInterface_SecureChannelWorkflow_DemonstratesUsability()
         {
             // Arrange - Demonstrate the fluent interface for secure channel operations
@@ -216,17 +224,17 @@ namespace Gp4Net.Tests.Integration
             var result = SecureChannelWorkflow
                 .WithCapFile(capFileData)
                 .UsingGpTestKeys() // Use proper key derivation
-                .WithSecurityLevel(SecurityLevel.CMacAndCDecryption)
+                .WithSecurityLevel(SecurityLevel.CDecryption)
                 .WithProtocol(TestSecureChannelProtocol.SCP02)
                 .GenerateLoadCommands(maxBlockSize: 245);
 
             // Assert - Verify the workflow produces expected results
-            Assert.NotNull(result);
-            Assert.True(result.LoadCommands.Count > 0);
-            Assert.True(result.PlainApdus.Count > 0);
-            Assert.True(result.WrappedApdus.Count > 0);
-            Assert.Equal(result.LoadCommands.Count, result.PlainApdus.Count);
-            Assert.Equal(result.LoadCommands.Count, result.WrappedApdus.Count);
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.LoadCommands.Count > 0, Is.True);
+            Assert.That(result.PlainApdus.Count > 0, Is.True);
+            Assert.That(result.WrappedApdus.Count > 0, Is.True);
+            Assert.That(result.PlainApdus.Count, Is.EqualTo(result.LoadCommands.Count));
+            Assert.That(result.WrappedApdus.Count, Is.EqualTo(result.LoadCommands.Count));
         }
     }
 
@@ -279,7 +287,12 @@ namespace Gp4Net.Tests.Integration
         public SecureChannelResult GenerateLoadCommands(int maxBlockSize = 245)
         {
             // Generate LOAD commands from CAP file
-            var loadCommands = LoadCommand.CreateFromCapFile(_capFileData, maxBlockSize);
+            var result = LoadCommand.CreateFromCapFile(_capFileData, maxBlockSize);
+            if (result.IsFailure)
+            {
+                throw new InvalidOperationException($"Failed to create LOAD commands: {result.Error.Message}");
+            }
+            var loadCommands = result.Value;
             var plainApdus = loadCommands.Select(cmd => cmd.ToApdu()).ToList();
 
             // Create proper session keys using existing key derivation

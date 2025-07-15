@@ -32,8 +32,7 @@ namespace Gp4Net.CardEmulator.Trace
         /// </summary>
         public void AddExchange(ApduExchange exchange)
         {
-            if (exchange == null)
-                throw new ArgumentNullException(nameof(exchange));
+            ArgumentNullException.ThrowIfNull(exchange);
 
             _exchanges.Add(exchange);
         }

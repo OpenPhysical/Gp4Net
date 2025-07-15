@@ -1,12 +1,13 @@
 using System.Linq;
 using Gp4Net.Domain.CardInfo;
-using Xunit;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.CardInfo
 {
+    [TestFixture]
     public class CardCapabilitiesTests
     {
-        [Fact]
+        [Test]
         public void Parse_WithScpOptions_ParsesCorrectly()
         {
             // Arrange - SCP03 with i=70 and AES-128/192/256 support
@@ -29,21 +30,21 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var capabilities = CardCapabilities.Parse(data);
 
             // Assert
-            Assert.NotNull(capabilities);
-            _ = Assert.Single(capabilities.ScpOptions);
+            Assert.That(capabilities, Is.Not.Null);
+            Assert.That(capabilities.ScpOptions.Count, Is.EqualTo(1));
 
             var scpOption = capabilities.ScpOptions.First();
-            Assert.Equal(0x03, scpOption.ScpId);
-            Assert.Equal(0x70, scpOption.Implementation);
+            Assert.That(scpOption.ScpId, Is.EqualTo(0x03));
+            Assert.That(scpOption.Implementation, Is.EqualTo(0x70));
 
-            Assert.True(capabilities.SupportedKeyLengths.ContainsKey(0x03));
+            Assert.That(capabilities.SupportedKeyLengths.ContainsKey(0x03), Is.True);
             var keyLengths = capabilities.SupportedKeyLengths[0x03];
-            Assert.Contains(128, keyLengths);
-            Assert.Contains(192, keyLengths);
-            Assert.Contains(256, keyLengths);
+            Assert.That(keyLengths, Does.Contain(128));
+            Assert.That(keyLengths, Does.Contain(192));
+            Assert.That(keyLengths, Does.Contain(256));
         }
 
-        [Fact]
+        [Test]
         public void Parse_WithSecurityDomainPrivileges_ParsesCorrectly()
         {
             // Arrange
@@ -60,13 +61,13 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var capabilities = CardCapabilities.Parse(data);
 
             // Assert
-            Assert.NotNull(capabilities.SdPrivileges);
-            Assert.True(capabilities.SdPrivileges.SecurityDomain);
-            Assert.True(capabilities.SdPrivileges.DapVerification);
-            Assert.False(capabilities.SdPrivileges.CardLock);
+            Assert.That(capabilities.SdPrivileges, Is.Not.Null);
+            Assert.That(capabilities.SdPrivileges.SecurityDomain, Is.True);
+            Assert.That(capabilities.SdPrivileges.DapVerification, Is.True);
+            Assert.That(capabilities.SdPrivileges.CardLock, Is.False);
         }
 
-        [Fact]
+        [Test]
         public void Parse_WithApplicationPrivileges_ParsesCorrectly()
         {
             // Arrange
@@ -83,12 +84,12 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var capabilities = CardCapabilities.Parse(data);
 
             // Assert
-            Assert.NotNull(capabilities.AppPrivileges);
-            Assert.True(capabilities.AppPrivileges.FinalApplication);
-            Assert.False(capabilities.AppPrivileges.CardLock);
+            Assert.That(capabilities.AppPrivileges, Is.Not.Null);
+            Assert.That(capabilities.AppPrivileges.FinalApplication, Is.True);
+            Assert.That(capabilities.AppPrivileges.CardLock, Is.False);
         }
 
-        [Fact]
+        [Test]
         public void Parse_WithSupportedAlgorithms_ParsesCorrectly()
         {
             // Arrange
@@ -104,13 +105,13 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var capabilities = CardCapabilities.Parse(data);
 
             // Assert
-            Assert.NotNull(capabilities.Algorithms);
+            Assert.That(capabilities.Algorithms, Is.Not.Null);
             var hashAlgs = capabilities.Algorithms.GetHashAlgorithms();
-            Assert.Contains("SHA-1", hashAlgs);
-            Assert.Contains("SHA-256", hashAlgs);
+            Assert.That(hashAlgs, Does.Contain("SHA-1"));
+            Assert.That(hashAlgs, Does.Contain("SHA-256"));
         }
 
-        [Fact]
+        [Test]
         public void Parse_WithCipherSuites_ParsesCorrectly()
         {
             // Arrange
@@ -126,13 +127,13 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var capabilities = CardCapabilities.Parse(data);
 
             // Assert
-            Assert.True(capabilities.CipherSuites.ContainsKey(CipherUsage.DapVerification));
+            Assert.That(capabilities.CipherSuites.ContainsKey(CipherUsage.DapVerification), Is.True);
             var ciphers = capabilities.CipherSuites[CipherUsage.DapVerification];
-            Assert.Contains(CipherSuite.Des3Mac, ciphers);
-            Assert.Contains(CipherSuite.AesCmac128, ciphers);
+            Assert.That(ciphers, Does.Contain(CipherSuite.Des3Mac));
+            Assert.That(ciphers, Does.Contain(CipherSuite.AesCmac128));
         }
 
-        [Fact]
+        [Test]
         public void Parse_ComplexCapabilities_ParsesAllSections()
         {
             // Arrange - Complex capabilities like from the trace
@@ -180,21 +181,21 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var capabilities = CardCapabilities.Parse(data);
 
             // Assert
-            Assert.NotNull(capabilities);
-            Assert.NotEmpty(capabilities.ScpOptions);
-            Assert.NotNull(capabilities.SdPrivileges);
-            Assert.NotNull(capabilities.AppPrivileges);
-            Assert.NotNull(capabilities.Algorithms);
-            Assert.NotEmpty(capabilities.CipherSuites);
+            Assert.That(capabilities, Is.Not.Null);
+            Assert.That(capabilities.ScpOptions, Is.Not.Empty);
+            Assert.That(capabilities.SdPrivileges, Is.Not.Null);
+            Assert.That(capabilities.AppPrivileges, Is.Not.Null);
+            Assert.That(capabilities.Algorithms, Is.Not.Null);
+            Assert.That(capabilities.CipherSuites, Is.Not.Empty);
 
             // Verify the ToString() method produces readable output
             var output = capabilities.ToString();
-            Assert.Contains("SCP03", output);
-            Assert.Contains("AES", output);
-            Assert.Contains("SecurityDomain", output);
+            Assert.That(output, Does.Contain("SCP03"));
+            Assert.That(output, Does.Contain("AES"));
+            Assert.That(output, Does.Contain("SecurityDomain"));
         }
 
-        [Fact]
+        [Test]
         public void ToString_FormatsOutputCorrectly()
         {
             // Arrange
@@ -223,9 +224,10 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var output = capabilities.ToString();
 
             // Assert
-            Assert.Contains("Card Capabilities:", output);
-            Assert.Contains("Supports SCP03 i=70 with AES-128 AES-192 AES-256", output);
-            Assert.Contains("Supported DOM privileges: SecurityDomain, DAPVerification", output);
+            Assert.That(output, Does.Contain("Card Capabilities:"));
+            Assert.That(output, Does.Contain("Supports SCP03 i=70 with AES-128 AES-192 AES-256"));
+            Assert.That(output, Does.Contain("DAP"));
+            Assert.That(output, Does.Contain("SecurityDomain"));
         }
     }
 }

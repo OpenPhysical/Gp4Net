@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using NUnit.Framework;
 
@@ -11,78 +12,79 @@ namespace Gp4Net.Tests.Domain.Commands
     [TestFixture]
     public class LoadCommandTests
     {
-        #region Constructor Tests
+        #region Create Tests
 
         [Test]
-        public void Constructor_ValidParameters_CreatesInstance()
+        public void Create_ValidParameters_CreatesInstance()
         {
-            // Arrange
             var data = Convert.FromHexString("DEADBEEF");
 
-            // Act
-            var command = new LoadCommand(0, data, false, 100);
+            var result = LoadCommand.Create(0, data, false);
 
-            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
             Assert.That(command.BlockNumber, Is.EqualTo(0));
             Assert.That(command.Data, Is.EqualTo(data));
             Assert.That(command.Type, Is.EqualTo(LoadCommand.LoadType.Continuation));
-            Assert.That(command.TotalCapSize, Is.EqualTo(100));
+            Assert.That(command.TotalCapSize, Is.EqualTo(4)); // Length of data
             Assert.That(command.IsFirstBlock, Is.True);
             Assert.That(command.IsFinalBlock, Is.False);
         }
 
         [Test]
-        public void Constructor_FinalBlock_SetsFinalType()
+        public void Create_FinalBlock_SetsFinalType()
         {
-            // Arrange
             var data = Convert.FromHexString("DEADBEEF");
 
-            // Act
-            var command = new LoadCommand(1, data, true);
+            var result = LoadCommand.Create(1, data, true);
 
-            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
             Assert.That(command.Type, Is.EqualTo(LoadCommand.LoadType.Final));
             Assert.That(command.IsFinalBlock, Is.True);
         }
 
         [Test]
-        public void Constructor_NullData_ThrowsArgumentNullException()
+        public void Create_NullData_ReturnsFailure()
         {
-            // Act & Assert
-            _ = Assert.Throws<ArgumentNullException>(() => new LoadCommand(0, null, false, 100));
+            var result = LoadCommand.Create(0, null, false);
+
+            Assert.That(result.IsFailure, Is.True);
+            Assert.That(result.Error.Code, Is.EqualTo("INVALID_ARGUMENT"));
+            Assert.That(result.Error.Message, Does.Contain("null"));
         }
 
         [Test]
-        public void Constructor_EmptyData_ThrowsArgumentException()
+        public void Create_EmptyData_ReturnsFailure()
         {
-            // Act & Assert
-            var ex = Assert.Throws<ArgumentException>(
-                () => new LoadCommand(0, Array.Empty<byte>(), false, 100)
-            );
-            Assert.That(ex.ParamName, Is.EqualTo("data"));
+            var result = LoadCommand.Create(0, Array.Empty<byte>(), false);
+
+            Assert.That(result.IsFailure, Is.True);
+            Assert.That(result.Error.Code, Is.EqualTo("INVALID_ARGUMENT"));
+            Assert.That(result.Error.Message, Does.Contain("empty"));
         }
 
         [Test]
-        public void Constructor_FirstBlockWithoutTotalSize_ThrowsArgumentException()
+        public void Create_FirstBlock_IncludesTotalCapSize()
         {
-            // Arrange
             var data = Convert.FromHexString("DEADBEEF");
 
-            // Act & Assert
-            var ex = Assert.Throws<ArgumentException>(() => new LoadCommand(0, data, false));
-            Assert.That(ex.ParamName, Is.EqualTo("totalCapSize"));
+            var result = LoadCommand.Create(0, data, false);
+
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
+            Assert.That(command.TotalCapSize, Is.EqualTo(4));
         }
 
         [Test]
-        public void Constructor_NonFirstBlockWithoutTotalSize_Succeeds()
+        public void Create_NonFirstBlock_NoTotalCapSize()
         {
-            // Arrange
             var data = Convert.FromHexString("DEADBEEF");
 
-            // Act
-            var command = new LoadCommand(1, data, false);
+            var result = LoadCommand.Create(1, data, false);
 
-            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            var command = result.Value;
             Assert.That(command.TotalCapSize, Is.Null);
         }
 
@@ -93,13 +95,12 @@ namespace Gp4Net.Tests.Domain.Commands
         [Test]
         public void CreateFromCapFile_SmallCapFile_CreatesSingleCommand()
         {
-            // Arrange
             var capData = Convert.FromHexString("DEADBEEFCAFEBABE");
 
-            // Act
-            var commands = LoadCommand.CreateFromCapFile(capData, 255);
+            var result = LoadCommand.CreateFromCapFile(capData, 255);
 
-            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            var commands = result.Value;
             Assert.That(commands.Count, Is.EqualTo(1));
             Assert.That(commands[0].BlockNumber, Is.EqualTo(0));
             Assert.That(commands[0].IsFirstBlock, Is.True);
@@ -111,17 +112,16 @@ namespace Gp4Net.Tests.Domain.Commands
         [Test]
         public void CreateFromCapFile_LargeCapFile_CreatesMultipleCommands()
         {
-            // Arrange
             var capData = new byte[500]; // Large enough to require multiple blocks
             for (int i = 0; i < capData.Length; i++)
             {
                 capData[i] = (byte)(i % 256);
             }
 
-            // Act
-            var commands = LoadCommand.CreateFromCapFile(capData, 200);
+            var result = LoadCommand.CreateFromCapFile(capData, 200);
 
-            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            var commands = result.Value;
             Assert.That(commands.Count, Is.GreaterThan(1));
 
             // Check first block
@@ -150,14 +150,13 @@ namespace Gp4Net.Tests.Domain.Commands
         [Test]
         public void CreateFromCapFile_RespectsMaxBlockSize()
         {
-            // Arrange
             var capData = new byte[100];
             var maxBlockSize = 30;
 
-            // Act
-            var commands = LoadCommand.CreateFromCapFile(capData, maxBlockSize);
+            var result = LoadCommand.CreateFromCapFile(capData, maxBlockSize);
 
-            // Assert
+            Assert.That(result.IsSuccess, Is.True);
+            var commands = result.Value;
             foreach (var command in commands)
             {
                 Assert.That(command.Data.Length, Is.LessThanOrEqualTo(maxBlockSize));
@@ -167,47 +166,52 @@ namespace Gp4Net.Tests.Domain.Commands
         [Test]
         public void CreateFromCapFile_ReconstructedDataMatchesOriginal()
         {
-            // Arrange
             var capData = new byte[123]; // Odd size to test edge cases
             for (int i = 0; i < capData.Length; i++)
             {
                 capData[i] = (byte)(i % 256);
             }
 
-            // Act
-            var commands = LoadCommand.CreateFromCapFile(capData, 50);
+            var result = LoadCommand.CreateFromCapFile(capData, 50);
+            
+            Assert.That(result.IsSuccess, Is.True);
+            var commands = result.Value;
             var reconstructed = commands.SelectMany(c => c.Data).ToArray();
-
-            // Assert
             Assert.That(reconstructed, Is.EqualTo(capData));
         }
 
         [Test]
-        public void CreateFromCapFile_NullData_ThrowsArgumentNullException()
+        public void CreateFromCapFile_NullData_ReturnsFailure()
         {
-            // Act & Assert
-            _ = Assert.Throws<ArgumentNullException>(() => LoadCommand.CreateFromCapFile(null));
+            var result = LoadCommand.CreateFromCapFile((byte[])null);
+
+            Assert.That(result.IsFailure, Is.True);
+            Assert.That(result.Error.Code, Is.EqualTo("INVALID_ARGUMENT"));
+            Assert.That(result.Error.Message, Does.Contain("null"));
         }
 
         [Test]
-        public void CreateFromCapFile_EmptyData_ThrowsArgumentException()
+        public void CreateFromCapFile_EmptyData_ReturnsFailure()
         {
-            // Act & Assert
-            var ex = Assert.Throws<ArgumentException>(
-                () => LoadCommand.CreateFromCapFile(Array.Empty<byte>())
-            );
-            Assert.That(ex.ParamName, Is.EqualTo("capFileData"));
+            var result = LoadCommand.CreateFromCapFile(Array.Empty<byte>());
+
+            Assert.That(result.IsFailure, Is.True);
+            Assert.That(result.Error.Code, Is.EqualTo("INVALID_ARGUMENT"));
+            Assert.That(result.Error.Message, Does.Contain("empty"));
         }
 
         [Test]
-        public void CreateFromCapFile_InvalidBlockSize_ThrowsArgumentException()
+        public void CreateFromCapFile_InvalidBlockSize_ReturnsFailure()
         {
-            // Arrange
             var capData = Convert.FromHexString("DEADBEEF");
 
-            // Act & Assert
-            _ = Assert.Throws<ArgumentException>(() => LoadCommand.CreateFromCapFile(capData, 0));
-            _ = Assert.Throws<ArgumentException>(() => LoadCommand.CreateFromCapFile(capData, 256));
+            var result1 = LoadCommand.CreateFromCapFile(capData, 0);
+            var result2 = LoadCommand.CreateFromCapFile(capData, 256);
+
+            Assert.That(result1.IsFailure, Is.True);
+            Assert.That(result1.Error.Code, Is.EqualTo("INVALID_ARGUMENT"));
+            Assert.That(result2.IsFailure, Is.True);
+            Assert.That(result2.Error.Code, Is.EqualTo("INVALID_ARGUMENT"));
         }
 
         #endregion
@@ -217,14 +221,12 @@ namespace Gp4Net.Tests.Domain.Commands
         [Test]
         public void ToApdu_FirstBlock_IncludesTlvHeader()
         {
-            // Arrange
             var data = Convert.FromHexString("DEADBEEF");
-            var command = new LoadCommand(0, data, false, 100);
+            var result = LoadCommand.Create(0, data, false);
+            var command = result.Value;
 
-            // Act
             var apdu = command.ToApdu();
 
-            // Assert
             Assert.That(apdu[0], Is.EqualTo(0x80)); // CLA
             Assert.That(apdu[1], Is.EqualTo(0xE8)); // INS
             Assert.That(apdu[2], Is.EqualTo(0x00)); // P1 (continuation)
@@ -233,21 +235,19 @@ namespace Gp4Net.Tests.Domain.Commands
             // Data should include C4 tag and length
             var dataField = apdu.Skip(5).Take(apdu[4]).ToArray();
             Assert.That(dataField[0], Is.EqualTo(0xC4)); // TLV tag
-            Assert.That(dataField[1], Is.EqualTo(100)); // Total length (short form)
+            Assert.That(dataField[1], Is.EqualTo(4)); // Total length (actual data length)
             Assert.That(dataField.Skip(2).ToArray(), Is.EqualTo(data)); // Actual data
         }
 
         [Test]
         public void ToApdu_ContinuationBlock_DoesNotIncludeTlvHeader()
         {
-            // Arrange
             var data = Convert.FromHexString("DEADBEEF");
-            var command = new LoadCommand(1, data, false);
+            var result = LoadCommand.Create(1, data, false);
+            var command = result.Value;
 
-            // Act
             var apdu = command.ToApdu();
 
-            // Assert
             Assert.That(apdu[2], Is.EqualTo(0x00)); // P1 (continuation)
             Assert.That(apdu[3], Is.EqualTo(0x01)); // P2 (block number)
 
@@ -259,14 +259,12 @@ namespace Gp4Net.Tests.Domain.Commands
         [Test]
         public void ToApdu_FinalBlock_SetsFinalP1()
         {
-            // Arrange
             var data = Convert.FromHexString("DEADBEEF");
-            var command = new LoadCommand(2, data, true);
+            var result = LoadCommand.Create(2, data, true);
+            var command = result.Value;
 
-            // Act
             var apdu = command.ToApdu();
 
-            // Assert
             Assert.That(apdu[2], Is.EqualTo(0x80)); // P1 (final)
             Assert.That(apdu[3], Is.EqualTo(0x02)); // P2 (block number)
         }
@@ -274,14 +272,18 @@ namespace Gp4Net.Tests.Domain.Commands
         [Test]
         public void ToApdu_LargeTotalSize_UsesMultiByteLengthEncoding()
         {
-            // Arrange
-            var data = Convert.FromHexString("DEAD");
-            var command = new LoadCommand(0, data, false, 0x1234); // Large total size
+            // Create a large data set to trigger multi-byte length encoding
+            var largeCapData = new byte[0x1234];
+            for (int i = 0; i < largeCapData.Length; i++)
+            {
+                largeCapData[i] = (byte)(i % 256);
+            }
+            var result = LoadCommand.CreateFromCapFile(largeCapData, 50);
+            var commands = result.Value;
+            var firstCommand = commands[0]; // First block will have the TLV header
 
-            // Act
-            var apdu = command.ToApdu();
+            var apdu = firstCommand.ToApdu();
 
-            // Assert
             var dataField = apdu.Skip(5).Take(apdu[4]).ToArray();
             Assert.That(dataField[0], Is.EqualTo(0xC4)); // TLV tag
             Assert.That(dataField[1], Is.EqualTo(0x82)); // Length form (2 bytes follow)
@@ -292,14 +294,12 @@ namespace Gp4Net.Tests.Domain.Commands
         [Test]
         public void ToApdu_IncludesLeField()
         {
-            // Arrange
             var data = Convert.FromHexString("DEADBEEF");
-            var command = new LoadCommand(0, data, false, 100);
+            var result = LoadCommand.Create(0, data, false);
+            var command = result.Value;
 
-            // Act
             var apdu = command.ToApdu();
 
-            // Assert
             Assert.That(apdu[^1], Is.EqualTo(0x00)); // Le field
         }
 
@@ -363,6 +363,18 @@ namespace Gp4Net.Tests.Domain.Commands
             // Assert
             Assert.That(response.Data, Is.Not.Null);
             Assert.That(response.Data.Length, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ToString_ReturnsLoad()
+        {
+            var data = Convert.FromHexString("DEADBEEF");
+            var result = LoadCommand.Create(0, data, false);
+            var command = result.Value;
+
+            var str = command.ToString();
+
+            Assert.That(str, Is.EqualTo("LOAD"));
         }
 
         #endregion

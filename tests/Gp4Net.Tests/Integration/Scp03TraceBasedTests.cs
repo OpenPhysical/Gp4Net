@@ -11,7 +11,7 @@ using Gp4Net.Transport;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Xunit;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Integration
 {
@@ -40,7 +40,7 @@ namespace Gp4Net.Tests.Integration
         // From GP Pro trace line 95: Expected EXTERNAL AUTHENTICATE command
         private readonly byte[] _expectedExtAuthCommand = Convert.FromHexString("84820100107B54E3B21E27DA5FFCA958062C7CA0C5");
 
-        [Fact]
+        [Test]
         public void Scp03Protocol_WithRealTraceData_ProducesCorrectSessionKeys()
         {
             // Arrange
@@ -52,12 +52,12 @@ namespace Gp4Net.Tests.Integration
             var context = protocol.ProcessInitializeUpdateResponse(response, _hostChallenge);
 
             // Assert - Verify session keys match GP Pro exactly
-            Assert.Equal(_expectedEncKey, context.SessionKeys.SEnc);
-            Assert.Equal(_expectedMacKey, context.SessionKeys.SMac);
-            Assert.Equal(_expectedRMacKey, context.SessionKeys.SRMac);
+            Assert.That(context.SessionKeys.SEnc, Is.EqualTo(_expectedEncKey));
+            Assert.That(context.SessionKeys.SMac, Is.EqualTo(_expectedMacKey));
+            Assert.That(context.SessionKeys.SRMac, Is.EqualTo(_expectedRMacKey));
         }
 
-        [Fact]
+        [Test]
         public void Scp03Protocol_WithRealTraceData_CreatesCorrectExternalAuthCommand()
         {
             // Arrange
@@ -68,17 +68,20 @@ namespace Gp4Net.Tests.Integration
             var context = protocol.ProcessInitializeUpdateResponse(response, _hostChallenge);
 
             // Act - Create EXTERNAL AUTHENTICATE command
-            var extAuthCommand = protocol.CreateExternalAuthenticateCommand(context, SecurityLevel.CMac);
+            var extAuthCommandResult = protocol.CreateExternalAuthenticateCommand(context, SecurityLevel.CMac);
 
             // Assert - Verify the command matches GP Pro trace exactly
+            Assert.That(extAuthCommandResult.IsSuccess, Is.True);
+            var extAuthCommand = extAuthCommandResult.Value;
+            
             var expectedHostCryptogram = Convert.FromHexString("7B54E3B21E27DA5F");
             var expectedMac = Convert.FromHexString("FCA958062C7CA0C5");
             
-            Assert.Equal(expectedHostCryptogram, extAuthCommand.HostCryptogram);
-            Assert.Equal(expectedMac, extAuthCommand.Mac);
+            Assert.That(extAuthCommand.HostCryptogram, Is.EqualTo(expectedHostCryptogram));
+            Assert.That(extAuthCommand.Mac, Is.EqualTo(expectedMac));
         }
 
-        [Fact]
+        [Test]
         public async Task SecureChannelManager_WithRealTrace_EstablishesChannelSuccessfully()
         {
             // Arrange
@@ -133,9 +136,9 @@ namespace Gp4Net.Tests.Integration
             );
 
             // Assert
-            Assert.NotNull(session);
-            Assert.Equal(SecurityLevel.CMac, session.SecurityLevel);
-            Assert.Equal(ProtocolIdentifiers.Scp03, session.ProtocolVersion);
+            Assert.That(session, Is.Not.Null);
+            Assert.That(session.SecurityLevel, Is.EqualTo(SecurityLevel.CMac));
+            Assert.That(session.ProtocolVersion, Is.EqualTo(ProtocolIdentifiers.Scp03));
             
             // Verify the exact commands were sent with the expected host challenge
             mockTransport.Verify(t => t.TransmitAsync(
@@ -155,22 +158,22 @@ namespace Gp4Net.Tests.Integration
             mockChallengeGenerator.Verify(g => g.GenerateChallenge(8), Times.Once);
         }
 
-        [Fact]
+        [Test]
         public void InitializeUpdateResponse_ParseRealTrace_ExtractsCorrectData()
         {
             // Act
             var response = InitializeUpdateResponse.Parse(_initUpdateResponse);
 
             // Assert - Verify all fields match the GP Pro trace analysis
-            Assert.Equal(Convert.FromHexString("03700000000000000000"), response.KeyDiversificationData);
-            Assert.Equal(1, response.KeyVersion); // From trace line 90
-            Assert.Equal(0x73, response.ScpId); // 0x03 | 0x70 (SCP03 with i=70)
-            Assert.Equal(Convert.FromHexString("83FA042C5C10F778"), response.CardChallenge); // From trace line 89
-            Assert.Equal(Convert.FromHexString("148C0CAF84B0E110"), response.CardCryptogram);
-            Assert.Equal(Convert.FromHexString("000002"), response.SequenceCounter); // From trace line 87
+            Assert.That(response.KeyDiversificationData, Is.EqualTo(Convert.FromHexString("03700000000000000000")));
+            Assert.That(response.KeyVersion, Is.EqualTo(1)); // From trace line 90
+            Assert.That(response.ScpId, Is.EqualTo(0x73)); // 0x03 | 0x70 (SCP03 with i=70)
+            Assert.That(response.CardChallenge, Is.EqualTo(Convert.FromHexString("83FA042C5C10F778"))); // From trace line 89
+            Assert.That(response.CardCryptogram, Is.EqualTo(Convert.FromHexString("148C0CAF84B0E110")));
+            Assert.That(response.SequenceCounter, Is.EqualTo(Convert.FromHexString("000002"))); // From trace line 87
         }
 
-        [Fact]
+        [Test]
         public void Scp03KeyDerivation_WithRealKDD_MatchesGpProKeys()
         {
             // Arrange - Use the exact KDD from trace
@@ -188,9 +191,9 @@ namespace Gp4Net.Tests.Integration
             
             // Act - The key set should handle diversification internally
             // Assert - For this specific trace, diversified keys equal base keys
-            Assert.Equal(baseKey, keySet.EncKey);
-            Assert.Equal(baseKey, keySet.MacKey);
-            Assert.Equal(baseKey, keySet.DekKey);
+            Assert.That(keySet.EncKey, Is.EqualTo(baseKey));
+            Assert.That(keySet.MacKey, Is.EqualTo(baseKey));
+            Assert.That(keySet.DekKey, Is.EqualTo(baseKey));
         }
     }
 }

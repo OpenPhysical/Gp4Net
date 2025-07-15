@@ -14,13 +14,13 @@ namespace Gp4Net.CardEmulator.Services
     public class TraceReplayCardService : VirtualCardService
     {
         private readonly GpShellTraceParser _parser;
-        private TraceReplayCard _currentCard;
+        private TraceReplayCard? _currentCard;
         private string _readerName = "Trace Replay Reader";
 
         /// <summary>
         /// Gets the current trace replay card if loaded.
         /// </summary>
-        public TraceReplayCard CurrentCard => _currentCard;
+        public TraceReplayCard? CurrentCard => _currentCard;
 
         /// <summary>
         /// Gets or sets options for trace replay.
@@ -39,7 +39,7 @@ namespace Gp4Net.CardEmulator.Services
         /// <summary>
         /// Loads a trace from a file and creates a virtual card.
         /// </summary>
-        public void LoadTraceFromFile(string filePath, string readerName = null)
+        public void LoadTraceFromFile(string filePath, string? readerName = null)
         {
             if (!File.Exists(filePath))
                 throw new FileNotFoundException($"Trace file not found: {filePath}", filePath);
@@ -51,7 +51,7 @@ namespace Gp4Net.CardEmulator.Services
         /// <summary>
         /// Loads a trace from a string and creates a virtual card.
         /// </summary>
-        public void LoadTraceFromString(string traceContent, string readerName = null)
+        public void LoadTraceFromString(string traceContent, string? readerName = null)
         {
             if (string.IsNullOrWhiteSpace(traceContent))
                 throw new ArgumentException("Trace content cannot be empty", nameof(traceContent));
@@ -63,10 +63,9 @@ namespace Gp4Net.CardEmulator.Services
         /// <summary>
         /// Loads a pre-parsed trace and creates a virtual card.
         /// </summary>
-        public void LoadTrace(ApduTrace trace, string readerName = null)
+        public void LoadTrace(ApduTrace trace, string? readerName = null)
         {
-            if (trace == null)
-                throw new ArgumentNullException(nameof(trace));
+            ArgumentNullException.ThrowIfNull(trace);
 
             // Remove any existing trace replay readers
             RemoveTraceReplayReaders();
@@ -239,21 +238,21 @@ namespace Gp4Net.CardEmulator.Services
         /// <summary>
         /// Gets or sets the command that caused the mismatch.
         /// </summary>
-        public string Command { get; set; }
+        public string Command { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the description of the issue.
         /// </summary>
-        public string Issue { get; set; }
+        public string Issue { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the expected response if applicable.
         /// </summary>
-        public string ExpectedResponse { get; set; }
+        public string ExpectedResponse { get; set; } = string.Empty;
 
         /// <summary>
         /// Gets or sets the actual response if applicable.
         /// </summary>
-        public string ActualResponse { get; set; }
+        public string ActualResponse { get; set; } = string.Empty;
     }
 }

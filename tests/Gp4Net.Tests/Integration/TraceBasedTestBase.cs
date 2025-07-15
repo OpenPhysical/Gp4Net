@@ -1,19 +1,27 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
+using Gp4Net.Core;
+using Gp4Net.Services;
 using Gp4Net.Tool.Services;
-using Xunit;
+using Gp4Net.Tests.Infrastructure;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Integration
 {
     /// <summary>
     /// Base class for trace-based integration tests.
-    /// Provides common functionality for testing with trace files.
+    /// Provides common functionality for testing with trace files using functional architecture.
     /// </summary>
+    [TestFixture]
     public abstract class TraceBasedTestBase : IDisposable
     {
         protected ICardService? CardService { get; private set; }
+        protected IGlobalPlatformService? GlobalPlatformService { get; private set; }
+        protected IDomainServiceFactory? ServiceFactory { get; private set; }
         protected string TracePath { get; }
         protected string ReaderName { get; private set; } = string.Empty;
+        private bool _disposed;
 
         protected TraceBasedTestBase(string traceFileName, string? operations = null)
         {
@@ -25,9 +33,9 @@ namespace Gp4Net.Tests.Integration
         }
 
         /// <summary>
-        /// Connects to the trace-based card service.
+        /// Connects to the trace-based card service and sets up functional services.
         /// </summary>
-        protected void ConnectToTrace(string? operations = null)
+        protected async Task ConnectToTraceAsync(string? operations = null)
         {
             if (!string.IsNullOrEmpty(operations))
             {
@@ -41,7 +49,32 @@ namespace Gp4Net.Tests.Integration
             CardService = traceService;
             
             var connected = CardService.Connect(ReaderName);
-            Assert.True(connected, "Failed to connect to trace-based card service");
+            Assert.That(connected, Is.True, "Failed to connect to trace-based card service");
+
+            // Create functional services using the factory pattern
+            ServiceFactory = CreateTestServiceFactory();
+            GlobalPlatformService = ServiceFactory.CreateGlobalPlatformService(CardService);
+        }
+
+        /// <summary>
+        /// Synchronous wrapper for backward compatibility.
+        /// </summary>
+        protected void ConnectToTrace(string? operations = null)
+        {
+            ConnectToTraceAsync(operations).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Creates a test service factory for functional testing.
+        /// </summary>
+        protected virtual IDomainServiceFactory CreateTestServiceFactory()
+        {
+            // Create minimal functional dependencies for testing
+            var pipeline = new TestCommandPipeline();
+            var transportFactory = new TestApduTransportFactory();
+            var secureChannelManager = new TestSecureChannelManager();
+            
+            return new DomainServiceFactory(pipeline, transportFactory, secureChannelManager);
         }
 
         /// <summary>
@@ -75,17 +108,13 @@ namespace Gp4Net.Tests.Integration
         /// </summary>
         protected void AssertCommandSucceeds(byte[] command, string description = "")
         {
-            Assert.NotNull(CardService);
+            Assert.That(CardService, Is.Not.Null);
             
             var response = CardService.SendCommand(command);
             
-            Assert.NotNull(response);
-            Assert.Equal(0x9000, response.StatusWord);
-            
-            if (!string.IsNullOrEmpty(description))
-            {
-                // Command succeeded
-            }
+            Assert.That(response, Is.Not.Null);
+            Assert.That(response.StatusWord, Is.EqualTo(0x9000), 
+                string.IsNullOrEmpty(description) ? "Command should succeed" : description);
         }
 
         /// <summary>
@@ -93,17 +122,13 @@ namespace Gp4Net.Tests.Integration
         /// </summary>
         protected void AssertCommandReturns(byte[] command, ushort expectedSw, string description = "")
         {
-            Assert.NotNull(CardService);
+            Assert.That(CardService, Is.Not.Null);
             
             var response = CardService.SendCommand(command);
             
-            Assert.NotNull(response);
-            Assert.Equal(expectedSw, response.StatusWord);
-            
-            if (!string.IsNullOrEmpty(description))
-            {
-                // Command returned expected SW
-            }
+            Assert.That(response, Is.Not.Null);
+            Assert.That(response.StatusWord, Is.EqualTo(expectedSw),
+                string.IsNullOrEmpty(description) ? $"Command should return SW={expectedSw:X4}" : description);
         }
 
         /// <summary>
@@ -111,15 +136,78 @@ namespace Gp4Net.Tests.Integration
         /// </summary>
         protected CardResponse SendCommand(byte[] command)
         {
-            Assert.NotNull(CardService);
+            Assert.That(CardService, Is.Not.Null);
             return CardService.SendCommand(command);
         }
 
-        public virtual void Dispose()
+        /// <summary>
+        /// Executes a functional operation with proper Result handling.
+        /// </summary>
+        protected async Task<T> ExecuteAsync<T>(Func<IGlobalPlatformService, Task<Result<T, SmartCardError>>> operation, string operationName = "")
         {
-            CardService?.Disconnect();
-            CardService?.Dispose();
-            CardService = null;
+            Assert.That(GlobalPlatformService, Is.Not.Null, "GlobalPlatformService must be initialized");
+            
+            var result = await operation(GlobalPlatformService);
+            
+            return await result.MatchAsync(
+                async value => value,
+                async error => 
+                {
+                    var message = string.IsNullOrEmpty(operationName) 
+                        ? $"Operation failed: {error.Message}" 
+                        : $"{operationName} failed: {error.Message}";
+                    Assert.Fail(message);
+                    return default(T)!; // This will never be reached
+                });
+        }
+
+        /// <summary>
+        /// Executes a functional operation and expects it to fail with a specific error.
+        /// </summary>
+        protected async Task<SmartCardError> ExecuteExpectingErrorAsync<T>(
+            Func<IGlobalPlatformService, Task<Result<T, SmartCardError>>> operation, 
+            string operationName = "")
+        {
+            Assert.That(GlobalPlatformService, Is.Not.Null, "GlobalPlatformService must be initialized");
+            
+            var result = await operation(GlobalPlatformService);
+            
+            return await result.MatchAsync(
+                async value => 
+                {
+                    var message = string.IsNullOrEmpty(operationName) 
+                        ? "Operation should have failed" 
+                        : $"{operationName} should have failed";
+                    Assert.Fail(message);
+                    return default(SmartCardError)!; // This will never be reached
+                },
+                async error => error);
+        }
+
+        [TearDown]
+        public virtual void TearDown()
+        {
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    CardService?.Disconnect();
+                    CardService?.Dispose();
+                    CardService = null;
+                }
+                _disposed = true;
+            }
         }
     }
 

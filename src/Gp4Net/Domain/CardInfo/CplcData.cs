@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using Gp4Net.Core;
 
 namespace Gp4Net.Domain.CardInfo
 {
@@ -146,6 +147,37 @@ namespace Gp4Net.Domain.CardInfo
             cplc.IcPersonalizationEquipmentId = ReadUInt32(data, ref offset);
 
             return cplc;
+        }
+
+        /// <summary>
+        /// Attempts to parse CPLC data using functional error handling.
+        /// </summary>
+        /// <param name="data">The CPLC data bytes (must be at least 42 bytes).</param>
+        /// <returns>A result containing the parsed CPLC data or an error.</returns>
+        public static Result<CplcData, SmartCardError> TryParse(byte[] data)
+        {
+            if (data == null)
+            {
+                return Result<CplcData, SmartCardError>.Fail(
+                    SmartCardError.InvalidData("CPLC data cannot be null"));
+            }
+
+            if (data.Length < 42)
+            {
+                return Result<CplcData, SmartCardError>.Fail(
+                    SmartCardError.InvalidData($"CPLC data must be at least 42 bytes, got {data.Length}"));
+            }
+
+            try
+            {
+                var cplc = Parse(data);
+                return Result<CplcData, SmartCardError>.Ok(cplc);
+            }
+            catch (Exception ex)
+            {
+                return Result<CplcData, SmartCardError>.Fail(
+                    SmartCardError.InvalidData($"Failed to parse CPLC data: {ex.Message}"));
+            }
         }
 
         private static ushort ReadUInt16(byte[] data, ref int offset)

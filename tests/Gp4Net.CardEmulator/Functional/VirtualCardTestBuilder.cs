@@ -103,11 +103,17 @@ namespace Gp4Net.CardEmulator.Functional
         /// </summary>
         public static FunctionalVirtualCard MinimalCard()
         {
-            var config = CardConfiguration.Generic()
-                .WithInstruction(0xA4)  // SELECT only
-                .WithInstruction(0xCA); // GET DATA only
+            // Create a truly minimal configuration with only SELECT and GET DATA
+            var baseConfig = CardConfiguration.Generic();
+            var minimalConfig = baseConfig with
+            {
+                SupportedInstructions = System.Collections.Immutable.ImmutableList.Create<byte>(
+                    0xA4, // SELECT only
+                    0xCA  // GET DATA only
+                )
+            };
 
-            return new FunctionalVirtualCard(config, new TestCryptographicService());
+            return new FunctionalVirtualCard(minimalConfig, new TestCryptographicService());
         }
 
         /// <summary>

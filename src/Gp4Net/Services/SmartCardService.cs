@@ -9,24 +9,24 @@ using Microsoft.Extensions.Logging;
 namespace Gp4Net.Services
 {
     /// <summary>
-    /// Functional implementation of smart card service using pipeline architecture.
+    /// Smart card service implementation using pipeline architecture.
     /// </summary>
-    public class FunctionalSmartCardService : ISmartCardService
+    public class SmartCardService : ISmartCardService
     {
         private readonly ICommandPipeline _pipeline;
         private readonly ICommandContext _context;
         private readonly IApduTransport _transport;
-        private readonly ILogger<FunctionalSmartCardService>? _logger;
+        private readonly ILogger<SmartCardService>? _logger;
         private bool _disposed;
 
         /// <summary>
-        /// Initializes a new instance of FunctionalSmartCardService.
+        /// Initializes a new instance of SmartCardService.
         /// </summary>
-        public FunctionalSmartCardService(
+        public SmartCardService(
             ICommandPipeline pipeline,
             ICommandContext context,
             IApduTransport transport,
-            ILogger<FunctionalSmartCardService>? logger = null)
+            ILogger<SmartCardService>? logger = null)
         {
             _pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
             _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -90,7 +90,7 @@ namespace Gp4Net.Services
         public ISmartCardService WithContext(ICommandContext context)
         {
             ArgumentNullException.ThrowIfNull(context);
-            return new FunctionalSmartCardService(_pipeline, context, _transport, _logger);
+            return new SmartCardService(_pipeline, context, _transport, _logger);
         }
 
         /// <inheritdoc/>
@@ -169,8 +169,8 @@ namespace Gp4Net.Services
                 var context = options.InitialContext ?? new ImmutableCommandContext();
 
                 // Create service
-                var logger = _loggerFactory?.CreateLogger<FunctionalSmartCardService>();
-                var service = new FunctionalSmartCardService(pipeline, context, transport, logger);
+                var logger = _loggerFactory?.CreateLogger<SmartCardService>();
+                var service = new SmartCardService(pipeline, context, transport, logger);
 
                 return Result<ISmartCardService, SmartCardError>.Ok(service);
             }
@@ -215,23 +215,30 @@ namespace Gp4Net.Services
             string readerName,
             CardProtocol requestedProtocol)
         {
-            return await Task.Run(() =>
+            // Execute synchronous operation on thread pool to avoid blocking
+            // This is acceptable as we're bridging legacy synchronous API
+            return await Task.Run(() => ConnectToCardSync(context, readerName, requestedProtocol));
+        }
+
+        private Result<(ICardChannel, CardProtocol), SmartCardError> ConnectToCardSync(
+            ICardContext context,
+            string readerName,
+            CardProtocol requestedProtocol)
+        {
+            try
             {
-                try
-                {
-                    var legacyChannel = context.Connect(readerName, ConvertProtocol(requestedProtocol));
-                    // TODO: Create proper adapter between ILegacyCardChannel and ICardChannel
-                    // For now, this is a placeholder that needs architectural fix
-                    var channel = CreateChannelAdapter(legacyChannel);
-                    var actualProtocol = DetectProtocol(legacyChannel);
-                    return Result<(ICardChannel, CardProtocol), SmartCardError>.Ok((channel, actualProtocol));
-                }
-                catch (Exception ex)
-                {
-                    return Result<(ICardChannel, CardProtocol), SmartCardError>.Fail(
-                        SmartCardError.CommunicationError($"Failed to connect to card: {ex.Message}", ex));
-                }
-            });
+                var legacyChannel = context.Connect(readerName, ConvertProtocol(requestedProtocol));
+                // TODO: Create proper adapter between ILegacyCardChannel and ICardChannel
+                // For now, this is a placeholder that needs architectural fix
+                var channel = CreateChannelAdapter(legacyChannel);
+                var actualProtocol = DetectProtocol(legacyChannel);
+                return Result<(ICardChannel, CardProtocol), SmartCardError>.Ok((channel, actualProtocol));
+            }
+            catch (Exception ex)
+            {
+                return Result<(ICardChannel, CardProtocol), SmartCardError>.Fail(
+                    SmartCardError.CommunicationError($"Failed to connect to card: {ex.Message}", ex));
+            }
         }
 
         private ICardChannel CreateChannelAdapter(ILegacyCardChannel legacyChannel)

@@ -77,8 +77,7 @@ namespace Gp4Net.CardEmulator.Services
         /// <inheritdoc />
         public CardResponse SendCommand(byte[] command)
         {
-            if (command == null)
-                throw new ArgumentNullException(nameof(command));
+            ArgumentNullException.ThrowIfNull(command);
 
             if (!IsConnected || _connectedReader == null)
                 throw new InvalidOperationException("Card is not connected");
@@ -90,8 +89,7 @@ namespace Gp4Net.CardEmulator.Services
         /// <inheritdoc />
         public CardResponse SendCommand(IApduCommand command)
         {
-            if (command == null)
-                throw new ArgumentNullException(nameof(command));
+            ArgumentNullException.ThrowIfNull(command);
 
             // Convert IApduCommand to byte array
             var apduBytes = new List<byte> { command.Cla, command.Ins, command.P1, command.P2 };
@@ -137,8 +135,7 @@ namespace Gp4Net.CardEmulator.Services
         /// <inheritdoc />
         public bool EstablishSecureChannel(byte[] keySet, byte securityLevel)
         {
-            if (keySet == null)
-                throw new ArgumentNullException(nameof(keySet));
+            ArgumentNullException.ThrowIfNull(keySet);
 
             if (!IsConnected || _currentCard == null)
                 throw new InvalidOperationException("Card is not connected");

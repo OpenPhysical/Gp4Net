@@ -97,8 +97,7 @@ namespace Gp4Net.CardEmulator.Services
         /// <returns>The response from the virtual card.</returns>
         public CardResponse SendCommand(byte[] command)
         {
-            if (command == null)
-                throw new ArgumentNullException(nameof(command));
+            ArgumentNullException.ThrowIfNull(command);
 
             if (!IsConnected)
                 throw new InvalidOperationException("Card is not connected");
@@ -205,7 +204,8 @@ namespace Gp4Net.CardEmulator.Services
         /// <param name="statusWord">The status word.</param>
         public CardResponse(byte[] data, ushort statusWord)
         {
-            Data = data ?? throw new ArgumentNullException(nameof(data));
+            ArgumentNullException.ThrowIfNull(data);
+            Data = data;
             StatusWord = statusWord;
         }
     }

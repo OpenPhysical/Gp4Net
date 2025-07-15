@@ -234,6 +234,20 @@ namespace Gp4Net.Tool.Services
                     ? fullResponse.Substring(0, fullResponse.Length - 4) 
                     : "";
 
+                // Handle command-specific response parsing for "009000" responses
+                if (data == "00" && fullResponse.Length == 6 && commandApdu.Length >= 2)
+                {
+                    var instruction = commandApdu[1]; // INS byte
+                    
+                    // LOAD commands (INS = 0xE8) typically return no data, so "009000" should be empty + 9000
+                    if (instruction == 0xE8)
+                    {
+                        data = "";
+                    }
+                    // DELETE commands (INS = 0xE6) return length field, so "009000" should be "00" + 9000
+                    // Keep data = "00" for DELETE commands and other commands
+                }
+
                 var responseData = string.IsNullOrEmpty(data) 
                     ? Array.Empty<byte>() 
                     : Convert.FromHexString(data);

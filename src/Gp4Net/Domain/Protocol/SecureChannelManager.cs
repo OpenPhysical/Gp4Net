@@ -68,7 +68,16 @@ namespace Gp4Net.Domain.Protocol
                 var protocolVersion = DetectProtocolFromKeySet(keySet);
                 var protocol = _protocolFactory.CreateProtocol(protocolVersion, keySet);
 
-                var initUpdateCmd = protocol.CreateInitializeUpdateCommand(hostChallenge);
+                var initUpdateCmdResult = protocol.CreateInitializeUpdateCommand(hostChallenge);
+                
+                if (initUpdateCmdResult.IsFailure)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to create INITIALIZE UPDATE command: {initUpdateCmdResult.Error.Message}"
+                    );
+                }
+                
+                var initUpdateCmd = initUpdateCmdResult.Value;
 
                 _logger.LogDebug("Sending INITIALIZE UPDATE command");
 
@@ -100,10 +109,19 @@ namespace Gp4Net.Domain.Protocol
                 );
 
                 // Create EXTERNAL AUTHENTICATE command
-                var extAuthCmd = actualProtocol.CreateExternalAuthenticateCommand(
+                var extAuthCmdResult = actualProtocol.CreateExternalAuthenticateCommand(
                     context,
                     securityLevel
                 );
+                
+                if (extAuthCmdResult.IsFailure)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to create EXTERNAL AUTHENTICATE command: {extAuthCmdResult.Error.Message}"
+                    );
+                }
+                
+                var extAuthCmd = extAuthCmdResult.Value;
 
                 _logger.LogDebug("Sending EXTERNAL AUTHENTICATE command");
 
@@ -157,7 +175,15 @@ namespace Gp4Net.Domain.Protocol
                 var hostChallenge = _challengeGenerator.GenerateChallenge(8);
 
                 // Try with key version 0x00 first, using a generic INITIALIZE UPDATE
-                var initUpdateCmd = new InitializeUpdateCommand(0x00, 0x00, hostChallenge);
+                var initUpdateCmdResult = InitializeUpdateCommand.Create(0x00, 0x00, hostChallenge);
+                if (initUpdateCmdResult.IsFailure)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to create INITIALIZE UPDATE command: {initUpdateCmdResult.Error.Message}"
+                    );
+                }
+                
+                var initUpdateCmd = initUpdateCmdResult.Value;
 
                 _logger.LogDebug("Sending INITIALIZE UPDATE for protocol detection");
 
@@ -171,7 +197,15 @@ namespace Gp4Net.Domain.Protocol
                     // Try with key version 0xFF
                     _logger.LogDebug("Retrying with key version 0xFF");
 
-                    initUpdateCmd = new InitializeUpdateCommand(0xFF, 0x00, hostChallenge);
+                    initUpdateCmdResult = InitializeUpdateCommand.Create(0xFF, 0x00, hostChallenge);
+                    if (initUpdateCmdResult.IsFailure)
+                    {
+                        throw new InvalidOperationException(
+                            $"Failed to create INITIALIZE UPDATE command: {initUpdateCmdResult.Error.Message}"
+                        );
+                    }
+                    
+                    initUpdateCmd = initUpdateCmdResult.Value;
                     initUpdateResponse = await transport
                         .TransmitAsync(initUpdateCmd, channel, cancellationToken)
                         .ConfigureAwait(false);
@@ -200,7 +234,16 @@ namespace Gp4Net.Domain.Protocol
                 );
 
                 // Create EXTERNAL AUTHENTICATE command
-                var extAuthCmd = protocol.CreateExternalAuthenticateCommand(context, securityLevel);
+                var extAuthCmdResult = protocol.CreateExternalAuthenticateCommand(context, securityLevel);
+                
+                if (extAuthCmdResult.IsFailure)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to create EXTERNAL AUTHENTICATE command: {extAuthCmdResult.Error.Message}"
+                    );
+                }
+                
+                var extAuthCmd = extAuthCmdResult.Value;
 
                 _logger.LogDebug("Sending EXTERNAL AUTHENTICATE command");
 

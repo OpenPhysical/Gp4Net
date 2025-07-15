@@ -141,7 +141,13 @@ namespace Gp4Net.Tool.Scripting
         [MoonSharpVisible(true)]
         public Table Select(Table card, byte[] aid)
         {
-            var selectCommand = new SelectCommand(aid);
+            var selectResult = SelectCommand.Create(aid);
+            if (selectResult.IsFailure)
+            {
+                throw new InvalidOperationException($"Failed to create SELECT command: {selectResult.Error.Message}");
+            }
+            
+            var selectCommand = selectResult.Value;
             var response = _cardService.SendCommand(selectCommand);
 
             var script = new Script();
@@ -265,13 +271,14 @@ namespace Gp4Net.Tool.Scripting
                 cascade = (bool)parameters["cascade"];
             }
 
-            // Use async method with synchronous wait for Lua compatibility
+            // Note: Lua script execution requires synchronous operation
+            // This is the only acceptable use of .GetAwaiter().GetResult() due to Lua interop constraints
             var result = _globalPlatformService.DeleteApplicationAsync(aid, cascade).GetAwaiter().GetResult();
 
             var script = new Script();
             var resultTable = new Table(script);
 
-            result.Match<object>(
+            result.Match<object?>(
                 success =>
                 {
                     resultTable["success"] = true;
@@ -301,13 +308,14 @@ namespace Gp4Net.Tool.Scripting
                 throw new ArgumentException($"Invalid lifecycle state: {state}");
             }
 
-            // Use async method with synchronous wait for Lua compatibility
+            // Note: Lua script execution requires synchronous operation
+            // This is the only acceptable use of .GetAwaiter().GetResult() due to Lua interop constraints
             var result = _globalPlatformService.SetLifecycleStateAsync(aid, lifecycleState).GetAwaiter().GetResult();
 
             var script = new Script();
             var resultTable = new Table(script);
 
-            result.Match<object>(
+            result.Match<object?>(
                 success =>
                 {
                     resultTable["success"] = true;

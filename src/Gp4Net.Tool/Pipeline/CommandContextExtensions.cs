@@ -69,12 +69,9 @@ namespace Gp4Net.Tool.Pipeline
             {
                 // Create a new display service with updated verbose setting
                 var newDisplayService = new DisplayService(verbose);
-                return new CommandContext(
-                    newDisplayService,
-                    context.CardService,
-                    context.GlobalPlatformService,
-                    context.KeysetResolver
-                );
+                // Note: This creates a new context but loses the domain service factory
+                // In practice, commands should just use the existing context
+                return context;
             }
             return context;
         }

@@ -1,24 +1,19 @@
 using System;
 using Gp4Net.Constants;
 using Gp4Net.Cryptography;
+using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
-using Xunit;
-using Xunit.Abstractions;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Integration
 {
+    [TestFixture]
     public class DebugScp03KeyDerivation
     {
-        private readonly ITestOutputHelper _output;
 
-        public DebugScp03KeyDerivation(ITestOutputHelper output)
-        {
-            _output = output;
-        }
-
-        [Fact]
+        [Test]
         public void Debug_Scp03_KeyDerivation_WithGpProTrace()
         {
             // Exact data from GP Pro trace
@@ -35,11 +30,11 @@ namespace Gp4Net.Tests.Integration
             var expectedHostCryptogram = Convert.FromHexString("7B54E3B21E27DA5F");
             var expectedCardCryptogram = Convert.FromHexString("148C0CAF84B0E110");
             
-            _output.WriteLine("=== SCP03 Key Derivation Debug ===");
-            _output.WriteLine($"Static keys: {Convert.ToHexString(staticKeys)}");
-            _output.WriteLine($"Host challenge: {Convert.ToHexString(hostChallenge)}");
-            _output.WriteLine($"Card challenge: {Convert.ToHexString(cardChallenge)}");
-            _output.WriteLine("");
+            Console.WriteLine("=== SCP03 Key Derivation Debug ===");
+            Console.WriteLine($"Static keys: {Convert.ToHexString(staticKeys)}");
+            Console.WriteLine($"Host challenge: {Convert.ToHexString(hostChallenge)}");
+            Console.WriteLine($"Card challenge: {Convert.ToHexString(cardChallenge)}");
+            Console.WriteLine("");
             
             // Create SCP03 key set
             var keySet = new Scp03KeySet(staticKeys, staticKeys, staticKeys, 1);
@@ -47,23 +42,23 @@ namespace Gp4Net.Tests.Integration
             // Derive session keys using our implementation
             var sessionKeys = KeyDerivation.DeriveScp03SessionKeys(keySet, hostChallenge, cardChallenge, 128);
             
-            _output.WriteLine("Expected:");
-            _output.WriteLine($"S-ENC:  {Convert.ToHexString(expectedSEnc)}");
-            _output.WriteLine($"S-MAC:  {Convert.ToHexString(expectedSMac)}");
-            _output.WriteLine($"S-RMAC: {Convert.ToHexString(expectedSRMac)}");
-            _output.WriteLine("");
+            Console.WriteLine("Expected:");
+            Console.WriteLine($"S-ENC:  {Convert.ToHexString(expectedSEnc)}");
+            Console.WriteLine($"S-MAC:  {Convert.ToHexString(expectedSMac)}");
+            Console.WriteLine($"S-RMAC: {Convert.ToHexString(expectedSRMac)}");
+            Console.WriteLine("");
             
-            _output.WriteLine("Actual:");
-            _output.WriteLine($"S-ENC:  {Convert.ToHexString(sessionKeys.SEnc)}");
-            _output.WriteLine($"S-MAC:  {Convert.ToHexString(sessionKeys.SMac)}");
-            _output.WriteLine($"S-RMAC: {Convert.ToHexString(sessionKeys.SRMac)}");
-            _output.WriteLine("");
+            Console.WriteLine("Actual:");
+            Console.WriteLine($"S-ENC:  {Convert.ToHexString(sessionKeys.SEnc)}");
+            Console.WriteLine($"S-MAC:  {Convert.ToHexString(sessionKeys.SMac)}");
+            Console.WriteLine($"S-RMAC: {Convert.ToHexString(sessionKeys.SRMac)}");
+            Console.WriteLine("");
             
-            _output.WriteLine("Match:");
-            _output.WriteLine($"S-ENC:  {Convert.ToHexString(sessionKeys.SEnc) == Convert.ToHexString(expectedSEnc)}");
-            _output.WriteLine($"S-MAC:  {Convert.ToHexString(sessionKeys.SMac) == Convert.ToHexString(expectedSMac)}");
-            _output.WriteLine($"S-RMAC: {Convert.ToHexString(sessionKeys.SRMac) == Convert.ToHexString(expectedSRMac)}");
-            _output.WriteLine("");
+            Console.WriteLine("Match:");
+            Console.WriteLine($"S-ENC:  {Convert.ToHexString(sessionKeys.SEnc) == Convert.ToHexString(expectedSEnc)}");
+            Console.WriteLine($"S-MAC:  {Convert.ToHexString(sessionKeys.SMac) == Convert.ToHexString(expectedSMac)}");
+            Console.WriteLine($"S-RMAC: {Convert.ToHexString(sessionKeys.SRMac) == Convert.ToHexString(expectedSRMac)}");
+            Console.WriteLine("");
             
             // Test cryptogram calculation
             var protocol = new Scp03Protocol(keySet, 0x70);
@@ -73,17 +68,17 @@ namespace Gp4Net.Tests.Integration
             var actualHostCryptogram = protocol.CalculateHostCryptogram(response, hostChallenge, sessionKeys);
             var cardCryptogramValid = protocol.VerifyCardCryptogram(response, hostChallenge, sessionKeys);
             
-            _output.WriteLine("Host cryptogram:");
-            _output.WriteLine($"Expected: {Convert.ToHexString(expectedHostCryptogram)}");
-            _output.WriteLine($"Actual:   {Convert.ToHexString(actualHostCryptogram)}");
-            _output.WriteLine($"Match: {Convert.ToHexString(actualHostCryptogram) == Convert.ToHexString(expectedHostCryptogram)}");
-            _output.WriteLine("");
+            Console.WriteLine("Host cryptogram:");
+            Console.WriteLine($"Expected: {Convert.ToHexString(expectedHostCryptogram)}");
+            Console.WriteLine($"Actual:   {Convert.ToHexString(actualHostCryptogram)}");
+            Console.WriteLine($"Match: {Convert.ToHexString(actualHostCryptogram) == Convert.ToHexString(expectedHostCryptogram)}");
+            Console.WriteLine("");
             
-            _output.WriteLine("Card cryptogram:");
-            _output.WriteLine($"Expected: {Convert.ToHexString(expectedCardCryptogram)}");
-            _output.WriteLine($"From card: {Convert.ToHexString(response.CardCryptogram)}");
-            _output.WriteLine($"Valid: {cardCryptogramValid}");
-            _output.WriteLine("");
+            Console.WriteLine("Card cryptogram:");
+            Console.WriteLine($"Expected: {Convert.ToHexString(expectedCardCryptogram)}");
+            Console.WriteLine($"From card: {Convert.ToHexString(response.CardCryptogram)}");
+            Console.WriteLine($"Valid: {cardCryptogramValid}");
+            Console.WriteLine("");
             
             // Test EXTERNAL AUTHENTICATE command creation
             var context = new SecureChannelContext(
@@ -93,23 +88,25 @@ namespace Gp4Net.Tests.Integration
                 0x03,
                 keySet
             );
-            var extAuthCommand = protocol.CreateExternalAuthenticateCommand(context, SecurityLevel.CMac);
+            var extAuthCommandResult = protocol.CreateExternalAuthenticateCommand(context, SecurityLevel.CMac);
+            Assert.That(extAuthCommandResult.IsSuccess, Is.True);
+            var extAuthCommand = extAuthCommandResult.Value;
             var expectedMac = Convert.FromHexString("FCA958062C7CA0C5");
             
-            _output.WriteLine("EXTERNAL AUTHENTICATE MAC:");
-            _output.WriteLine($"Expected: {Convert.ToHexString(expectedMac)}");
-            _output.WriteLine($"Actual:   {Convert.ToHexString(extAuthCommand.Mac ?? new byte[0])}");
-            _output.WriteLine($"Match: {Convert.ToHexString(extAuthCommand.Mac ?? new byte[0]) == Convert.ToHexString(expectedMac)}");
+            Console.WriteLine("EXTERNAL AUTHENTICATE MAC:");
+            Console.WriteLine($"Expected: {Convert.ToHexString(expectedMac)}");
+            Console.WriteLine($"Actual:   {Convert.ToHexString(extAuthCommand.Mac ?? new byte[0])}");
+            Console.WriteLine($"Match: {Convert.ToHexString(extAuthCommand.Mac ?? new byte[0]) == Convert.ToHexString(expectedMac)}");
             
             // Context analysis
             var contextBytes = new byte[16];
             Array.Copy(hostChallenge, 0, contextBytes, 0, 8);
             Array.Copy(cardChallenge, 0, contextBytes, 8, 8);
-            _output.WriteLine("");
-            _output.WriteLine($"Context: {Convert.ToHexString(contextBytes)}");
+            Console.WriteLine("");
+            Console.WriteLine($"Context: {Convert.ToHexString(contextBytes)}");
             
             // This test will fail - we're just using it for debugging
-            // Assert.Equal(expectedSEnc, sessionKeys.SEnc);
+            // Assert.That(sessionKeys.SEnc, Is.EqualTo(expectedSEnc));
         }
     }
 }

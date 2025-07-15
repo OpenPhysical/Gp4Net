@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Gp4Net.Services;
 using Gp4Net.Tool.Pipeline;
 using Gp4Net.Tool.Services;
 using Moq;
@@ -17,6 +18,7 @@ namespace Gp4Net.Tests.Tool.Commands
         private Mock<IDisplayService> _mockDisplayService;
         private Mock<ICardService> _mockCardService;
         private Mock<IGlobalPlatformService> _mockGlobalPlatformService;
+        private Mock<IDomainServiceFactory> _mockDomainServiceFactory;
         private Mock<IKeysetResolver> _mockKeysetResolver;
         private CommandContext _commandContext;
         private TestConsole _console;
@@ -27,13 +29,19 @@ namespace Gp4Net.Tests.Tool.Commands
             _mockDisplayService = new Mock<IDisplayService>();
             _mockCardService = new Mock<ICardService>();
             _mockGlobalPlatformService = new Mock<IGlobalPlatformService>();
+            _mockDomainServiceFactory = new Mock<IDomainServiceFactory>();
             _mockKeysetResolver = new Mock<IKeysetResolver>();
             _console = new TestConsole();
+
+            // Setup the factory to return our mock service
+            _mockDomainServiceFactory
+                .Setup(f => f.CreateGlobalPlatformService(It.IsAny<ICardService>()))
+                .Returns(_mockGlobalPlatformService.Object);
 
             _commandContext = new CommandContext(
                 _mockDisplayService.Object,
                 _mockCardService.Object,
-                _mockGlobalPlatformService.Object,
+                _mockDomainServiceFactory.Object,
                 _mockKeysetResolver.Object
             );
         }

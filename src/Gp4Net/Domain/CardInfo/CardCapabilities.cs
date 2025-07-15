@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using Gp4Net.Core;
 using Gp4Net.Core.Tlv;
 using JetBrains.Annotations;
 
@@ -22,12 +24,12 @@ namespace Gp4Net.Domain.CardInfo
         /// <summary>
         /// Gets the supported SCP options.
         /// </summary>
-        public List<ScpOption> ScpOptions { get; } = [];
+        public ImmutableList<ScpOption> ScpOptions { get; private set; } = ImmutableList<ScpOption>.Empty;
 
         /// <summary>
         /// Gets the supported key lengths for each SCP.
         /// </summary>
-        public Dictionary<byte, List<int>> SupportedKeyLengths { get; } = [];
+        public ImmutableDictionary<byte, ImmutableList<int>> SupportedKeyLengths { get; private set; } = ImmutableDictionary<byte, ImmutableList<int>>.Empty;
 
         /// <summary>
         /// Gets the supported Security Domain privileges.
@@ -47,7 +49,7 @@ namespace Gp4Net.Domain.CardInfo
         /// <summary>
         /// Gets the supported cipher suites for various operations.
         /// </summary>
-        public Dictionary<CipherUsage, List<CipherSuite>> CipherSuites { get; } = [];
+        public ImmutableDictionary<CipherUsage, ImmutableList<CipherSuite>> CipherSuites { get; private set; } = ImmutableDictionary<CipherUsage, ImmutableList<CipherSuite>>.Empty;
 
         /// <summary>
         /// Gets a value indicating whether SCP02 is supported.
@@ -121,6 +123,31 @@ namespace Gp4Net.Domain.CardInfo
             return capabilities;
         }
 
+        /// <summary>
+        /// Attempts to parse card capabilities data using functional error handling.
+        /// </summary>
+        /// <param name="data">The capabilities data bytes.</param>
+        /// <returns>A result containing the parsed capabilities or an error.</returns>
+        public static Result<CardCapabilities, SmartCardError> TryParse(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+            {
+                return Result<CardCapabilities, SmartCardError>.Fail(
+                    SmartCardError.InvalidData("Capabilities data cannot be null or empty"));
+            }
+
+            try
+            {
+                var capabilities = Parse(data);
+                return Result<CardCapabilities, SmartCardError>.Ok(capabilities);
+            }
+            catch (Exception ex)
+            {
+                return Result<CardCapabilities, SmartCardError>.Fail(
+                    SmartCardError.InvalidData($"Failed to parse card capabilities: {ex.Message}"));
+            }
+        }
+
         internal void ParseScpOptions(byte[] data)
         {
             // Parse according to Table H-6: SCP Information
@@ -154,30 +181,31 @@ namespace Gp4Net.Domain.CardInfo
                 // Parse supported key lengths for SCP03
                 if (scpType == 0x03 && supportedKeys != null && supportedKeys.Length > 0)
                 {
-                    var keyLengths = new List<int>();
+                    var keyLengthsBuilder = ImmutableList.CreateBuilder<int>();
                     var keyByte = supportedKeys[0];
                     if ((keyByte & 0x01) != 0)
                     {
-                        keyLengths.Add(128);
+                        keyLengthsBuilder.Add(128);
                     }
 
                     if ((keyByte & 0x02) != 0)
                     {
-                        keyLengths.Add(192);
+                        keyLengthsBuilder.Add(192);
                     }
 
                     if ((keyByte & 0x04) != 0)
                     {
-                        keyLengths.Add(256);
+                        keyLengthsBuilder.Add(256);
                     }
 
-                    SupportedKeyLengths[scpType] = keyLengths;
+                    SupportedKeyLengths = SupportedKeyLengths.SetItem(scpType, keyLengthsBuilder.ToImmutable());
                 }
 
                 // Each byte in supportedOptions represents one supported implementation parameter
+                var scpOptionsBuilder = ScpOptions.ToBuilder();
                 foreach (var option in supportedOptions)
                 {
-                    ScpOptions.Add(
+                    scpOptionsBuilder.Add(
                         new ScpOption
                         {
                             ScpId = scpType,
@@ -186,6 +214,7 @@ namespace Gp4Net.Domain.CardInfo
                         }
                     );
                 }
+                ScpOptions = scpOptionsBuilder.ToImmutable();
             }
         }
 
@@ -265,20 +294,20 @@ namespace Gp4Net.Domain.CardInfo
                 return;
             }
 
-            var suites = new List<CipherSuite>();
+            var suitesBuilder = ImmutableList.CreateBuilder<CipherSuite>();
 
             for (int i = 0; i < data.Length; i++)
             {
                 var suite = ParseCipherSuiteByte(data[i]);
                 if (suite != CipherSuite.Unknown)
                 {
-                    suites.Add(suite);
+                    suitesBuilder.Add(suite);
                 }
             }
 
-            if (suites.Count > 0)
+            if (suitesBuilder.Count > 0)
             {
-                CipherSuites[usage] = suites;
+                CipherSuites = CipherSuites.SetItem(usage, suitesBuilder.ToImmutable());
             }
         }
 

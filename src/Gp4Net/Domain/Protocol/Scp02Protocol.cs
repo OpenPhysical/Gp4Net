@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Gp4Net.Constants;
+using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Cryptography.Implementation;
 using Gp4Net.Domain.Commands;
@@ -54,20 +55,18 @@ namespace Gp4Net.Domain.Protocol
         }
 
         /// <inheritdoc />
-        public InitializeUpdateCommand CreateInitializeUpdateCommand(byte[] hostChallenge)
+        public Result<InitializeUpdateCommand, SmartCardError> CreateInitializeUpdateCommand(byte[] hostChallenge)
         {
-            if (hostChallenge?.Length != 8)
+            if (hostChallenge.Length != 8)
             {
-                throw new ArgumentException(
-                    "Host challenge must be 8 bytes.",
-                    nameof(hostChallenge)
-                );
+                return Result<InitializeUpdateCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidData($"Host challenge must be 8 bytes, got {hostChallenge.Length}"));
             }
 
             _logger.LogDebug("Creating SCP02 INITIALIZE UPDATE command");
 
             // For SCP02, key identifier can vary (0x00 is common)
-            return new InitializeUpdateCommand(_keySet.KeyVersion, 0x00, hostChallenge);
+            return InitializeUpdateCommand.Create(_keySet.KeyVersion, 0x00, hostChallenge);
         }
 
         /// <inheritdoc />
@@ -137,7 +136,7 @@ namespace Gp4Net.Domain.Protocol
         }
 
         /// <inheritdoc />
-        public ExternalAuthenticateCommand CreateExternalAuthenticateCommand(
+        public Result<ExternalAuthenticateCommand, SmartCardError> CreateExternalAuthenticateCommand(
             SecureChannelContext context,
             SecurityLevel securityLevel
         )
@@ -153,18 +152,25 @@ namespace Gp4Net.Domain.Protocol
             var hostCryptogram = CalculateHostCryptogram(context);
 
             // For SCP02, if C-MAC is requested, we need to calculate MAC over the command
-            byte[]? mac = null;
             if (securityLevel.HasCMac())
             {
-                // Create the command without MAC first
-                var tempCommand = new ExternalAuthenticateCommand(securityLevel, hostCryptogram);
+                // Create the command without MAC first to get the APDU structure
+                var tempCommandResult = ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
+                if (tempCommandResult.IsFailure)
+                {
+                    return tempCommandResult;
+                }
+                
+                var tempCommand = tempCommandResult.Value;
                 var commandApdu = new byte[] { tempCommand.Cla, tempCommand.Ins, tempCommand.P1, tempCommand.P2, (byte)tempCommand.Data!.Length }.Concat(tempCommand.Data!).ToArray();
 
                 // Calculate MAC over the command
-                mac = CalculateCMacForCommand(commandApdu, context.SessionKeys.SMac);
+                var mac = CalculateCMacForCommand(commandApdu, context.SessionKeys.SMac);
+                
+                return ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, mac);
             }
 
-            return new ExternalAuthenticateCommand(securityLevel, hostCryptogram, mac);
+            return ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
         }
 
         /// <inheritdoc />

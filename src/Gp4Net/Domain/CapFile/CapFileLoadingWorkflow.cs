@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.CapFile
@@ -82,7 +84,7 @@ namespace Gp4Net.Domain.CapFile
         /// <param name="makeSelectableAfterInstall">Whether to make applets selectable after installation.</param>
         /// <param name="maxLoadBlockSize">Maximum size for LOAD command blocks.</param>
         /// <returns>The sequence of commands to execute.</returns>
-        public static IList<object> CreateLoadingCommands(
+        public static Result<IList<IApduCommand>, SmartCardError> CreateLoadingCommands(
             byte[] capFileData,
             byte[]? securityDomainAid = null,
             bool installApplets = true,
@@ -94,7 +96,7 @@ namespace Gp4Net.Domain.CapFile
 
             // Parse the CAP file to extract package and applet information
             var capFile = CapFileStructure.Parse(capFileData);
-            var commands = new List<object>();
+            var commands = new List<IApduCommand>();
 
             try
             {
@@ -105,44 +107,55 @@ namespace Gp4Net.Domain.CapFile
                 // - The Load File Data Block is encrypted
                 // Since we don't use tokens or DAP blocks, we'll omit the hash to avoid verification errors
                 
-                var installForLoad = InstallCommandBuilder.CreateForLoad(
+                var installForLoadResult = InstallCommandBuilder.CreateForLoad(
                     capFile.PackageAid,
                     securityDomainAid,
                     hash: null,  // Omit hash as it's optional and may cause verification issues
-                    loadParameters: null  // No load parameters (matches GP Pro and GP Shell)
+                    maxDataBlockSize: (ushort)maxLoadBlockSize  // Pass max block size for load parameters
                 );
-                commands.Add(installForLoad);
+                
+                if (installForLoadResult.IsFailure)
+                {
+                    return Result<IList<IApduCommand>, SmartCardError>.Fail(installForLoadResult.Error);
+                }
+                commands.Add(installForLoadResult.Value);
 
                 // Step 2: LOAD commands (split CAP file into blocks)
-                // Convert ZIP format to binary format for loading
-                var binaryCapData = capFile.ToBinaryFormat();
-                var loadCommands = LoadCommand.CreateFromCapFile(binaryCapData, maxLoadBlockSize);
-                commands.AddRange(loadCommands);
+                // Use the CAP file structure directly to avoid double conversion
+                var loadCommandsResult = LoadCommand.CreateFromCapFile(capFile, maxLoadBlockSize);
+                if (loadCommandsResult.IsFailure)
+                {
+                    return Result<IList<IApduCommand>, SmartCardError>.Fail(loadCommandsResult.Error);
+                }
+                commands.AddRange(loadCommandsResult.Value);
 
                 // Step 3: INSTALL [for install] commands for each applet (if requested)
                 if (installApplets && capFile.Applets.Count > 0)
                 {
                     foreach (var applet in capFile.Applets)
                     {
-                        var installForInstall = makeSelectableAfterInstall
+                        var installForInstallResult = makeSelectableAfterInstall
                             ? InstallCommandBuilder.CreateForInstallAndMakeSelectable(
                                 capFile.PackageAid,
                                 applet.Aid)
                             : InstallCommandBuilder.CreateForInstall(
                                 capFile.PackageAid,
                                 applet.Aid);
-                        commands.Add(installForInstall);
+                        
+                        if (installForInstallResult.IsFailure)
+                        {
+                            return Result<IList<IApduCommand>, SmartCardError>.Fail(installForInstallResult.Error);
+                        }
+                        commands.Add(installForInstallResult.Value);
                     }
                 }
 
-                return commands;
+                return Result<IList<IApduCommand>, SmartCardError>.Ok(commands);
             }
             catch (Exception ex)
             {
-                throw new InvalidOperationException(
-                    $"Failed to create loading commands: {ex.Message}",
-                    ex
-                );
+                return Result<IList<IApduCommand>, SmartCardError>.Fail(
+                    SmartCardError.InvalidData($"Failed to create loading commands: {ex.Message}"));
             }
         }
 
@@ -228,14 +241,18 @@ namespace Gp4Net.Domain.CapFile
         /// <param name="packageAid">The package AID to delete.</param>
         /// <param name="appletAids">The applet AIDs to delete (optional).</param>
         /// <param name="deleteRelated">Whether to delete related objects.</param>
-        /// <returns>The DELETE command.</returns>
-        public static DeleteCommand CreateDeleteCommand(
+        /// <returns>A Result containing either the DELETE command or an error.</returns>
+        public static Result<DeleteCommand, SmartCardError> CreateDeleteCommand(
             byte[] packageAid,
             IList<byte[]>? appletAids = null,
             bool deleteRelated = true
         )
         {
-            ArgumentNullException.ThrowIfNull(packageAid);
+            if (packageAid == null)
+                return SmartCardError.InvalidArgument("Package AID cannot be null.");
+
+            if (packageAid.Length == 0)
+                return SmartCardError.InvalidArgument("Package AID cannot be empty.");
 
             var aidsToDelete = new List<byte[]> { packageAid };
 

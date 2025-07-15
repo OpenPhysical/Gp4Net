@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Gp4Net.Core;
 using Gp4Net.Core.Tlv;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
@@ -80,22 +81,77 @@ namespace Gp4Net.Domain.Commands
         /// <param name="aid">The application identifier to select (0-16 bytes, empty for auto-detection).</param>
         /// <param name="control">The selection control method.</param>
         /// <param name="controlInfo">The file control information.</param>
-        public SelectCommand(
+        private SelectCommand(
             byte[] aid,
             SelectionControl control = SelectionControl.SelectByName,
             FileControlInfo controlInfo = FileControlInfo.ReturnFci
         )
         {
-            ArgumentNullException.ThrowIfNull(aid);
-
-            if (aid.Length > 16)
-            {
-                throw new ArgumentException("AID must be 16 bytes or less.", nameof(aid));
-            }
-
             Aid = (byte[])aid.Clone();
             Control = control;
             ControlInfo = controlInfo;
+        }
+
+        /// <summary>
+        /// Select mode for the SELECT command.
+        /// </summary>
+        public enum SelectMode : byte
+        {
+            /// <summary>
+            /// Select the first or only occurrence.
+            /// </summary>
+            First = 0x00,
+
+            /// <summary>
+            /// Select the next occurrence.
+            /// </summary>
+            Next = 0x02,
+        }
+
+        /// <summary>
+        /// Creates a SELECT command with the specified AID.
+        /// </summary>
+        /// <param name="aid">The application identifier to select (0-16 bytes).</param>
+        /// <param name="mode">The select mode.</param>
+        /// <returns>A Result containing the SelectCommand or an error.</returns>
+        public static Result<SelectCommand, SmartCardError> Create(
+            byte[] aid,
+            SelectMode mode = SelectMode.First
+        )
+        {
+            if (aid == null)
+            {
+                return Result<SelectCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidData("AID cannot be null")
+                );
+            }
+
+            if (aid.Length > 16)
+            {
+                return Result<SelectCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidData("AID must be 16 bytes or less")
+                );
+            }
+
+            var control = mode == SelectMode.First
+                ? SelectionControl.SelectByName
+                : SelectionControl.SelectByName; // Note: mode affects P2, not P1
+            var controlInfo = mode == SelectMode.First
+                ? FileControlInfo.ReturnFci
+                : (FileControlInfo)((byte)FileControlInfo.ReturnFci | (byte)mode);
+
+            return Result<SelectCommand, SmartCardError>.Ok(
+                new SelectCommand(aid, control, controlInfo)
+            );
+        }
+
+        /// <summary>
+        /// Creates a SELECT command for the Issuer Security Domain.
+        /// </summary>
+        /// <returns>A Result containing the SelectCommand or an error.</returns>
+        public static Result<SelectCommand, SmartCardError> CreateForIssuerSecurityDomain()
+        {
+            return Create(Array.Empty<byte>(), SelectMode.First);
         }
 
         /// <summary>
@@ -103,6 +159,7 @@ namespace Gp4Net.Domain.Commands
         /// </summary>
         /// <param name="controlInfo">The file control information.</param>
         /// <returns>A new SelectCommand instance with empty AID.</returns>
+        [Obsolete("Use CreateForIssuerSecurityDomain() instead")]
         public static SelectCommand CreateEmptySelect(
             FileControlInfo controlInfo = FileControlInfo.ReturnFci
         )
@@ -143,6 +200,12 @@ namespace Gp4Net.Domain.Commands
         {
             return base.ToApdu();
         }
+
+        /// <summary>
+        /// Returns a string representation of this command.
+        /// </summary>
+        /// <returns>The string "SELECT".</returns>
+        public override string ToString() => "SELECT";
     }
 
     /// <summary>
@@ -267,27 +330,40 @@ namespace Gp4Net.Domain.Commands
         /// Parses a SELECT response.
         /// </summary>
         /// <param name="response">The response data (excluding status word).</param>
-        /// <returns>The parsed response.</returns>
-        public static SelectResponse Parse(byte[] response)
+        /// <returns>A Result containing the parsed response or an error.</returns>
+        public static Result<SelectResponse, SmartCardError> Parse(byte[] response)
         {
-            ArgumentNullException.ThrowIfNull(response);
+            if (response == null)
+            {
+                return Result<SelectResponse, SmartCardError>.Fail(
+                    SmartCardError.InvalidData("Response data cannot be null")
+                );
+            }
 
-            // Try to parse FCI data
-            var fci = ParseFciData(response);
-            return new SelectResponse(response, fci);
+            try
+            {
+                // Try to parse FCI data
+                var fci = ParseFciData(response);
+                return Result<SelectResponse, SmartCardError>.Ok(
+                    new SelectResponse(response, fci)
+                );
+            }
+            catch (Exception ex)
+            {
+                return Result<SelectResponse, SmartCardError>.Fail(
+                    SmartCardError.InvalidResponse($"Failed to parse SELECT response: {ex.Message}")
+                );
+            }
         }
 
         /// <summary>
         /// Parses a SELECT response with detailed FCI parsing.
         /// </summary>
         /// <param name="response">The response data (excluding status word).</param>
-        /// <returns>The parsed response with FCI details.</returns>
-        public static SelectResponse ParseWithFci(byte[] response)
+        /// <returns>A Result containing the parsed response with FCI details or an error.</returns>
+        public static Result<SelectResponse, SmartCardError> ParseWithFci(byte[] response)
         {
-            ArgumentNullException.ThrowIfNull(response);
-
-            var fci = ParseFciData(response);
-            return new SelectResponse(response, fci);
+            return Parse(response);
         }
 
         /// <summary>

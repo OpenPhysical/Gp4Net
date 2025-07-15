@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using Gp4Net.Core;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 
@@ -13,17 +14,17 @@ namespace Gp4Net.Domain.Commands
     /// Represents the INITIALIZE UPDATE command for secure channel initiation.
     /// </summary>
     [PublicAPI]
-    public class InitializeUpdateCommand : IApduCommand
+    public class InitializeUpdateCommand : BaseApduCommand
     {
         /// <summary>
         /// The command class byte.
         /// </summary>
-        public const byte Cla = 0x80;
+        public const byte ClassByte = 0x80;
 
         /// <summary>
         /// The command instruction byte.
         /// </summary>
-        public const byte Ins = 0x50;
+        public const byte InstructionByte = 0x50;
 
         /// <summary>
         /// Gets the key version number.
@@ -41,39 +42,27 @@ namespace Gp4Net.Domain.Commands
         public byte[] HostChallenge { get; }
 
         /// <summary>
-        /// Gets the class byte.
+        /// Gets whether to use maximum response length (256) for trace compatibility.
         /// </summary>
-        byte IApduCommand.Cla => Cla;
+        private readonly bool _useMaxResponseLength;
 
-        /// <summary>
-        /// Gets the instruction byte.
-        /// </summary>
-        byte IApduCommand.Ins => Ins;
+        /// <inheritdoc />
+        public override byte Cla => ClassByte;
 
-        /// <summary>
-        /// Gets the parameter 1 byte.
-        /// </summary>
-        public byte P1 => KeyVersion;
+        /// <inheritdoc />
+        public override byte Ins => InstructionByte;
 
-        /// <summary>
-        /// Gets the parameter 2 byte.
-        /// </summary>
-        public byte P2 => KeyIdentifier;
+        /// <inheritdoc />
+        public override byte P1 => KeyVersion;
 
-        /// <summary>
-        /// Gets the command data.
-        /// </summary>
-        public byte[]? Data => HostChallenge;
+        /// <inheritdoc />
+        public override byte P2 => KeyIdentifier;
 
-        /// <summary>
-        /// Gets the expected response length (0 means maximum).
-        /// </summary>
-        public int? ExpectedResponseLength => 0;
+        /// <inheritdoc />
+        public override byte[]? Data => HostChallenge;
 
-        /// <summary>
-        /// Gets whether this command uses extended length.
-        /// </summary>
-        public bool IsExtendedLength => false;
+        /// <inheritdoc />
+        public override int? ExpectedResponseLength => _useMaxResponseLength ? 256 : 28;
 
         /// <summary>
         /// Initializes a new instance of the InitializeUpdateCommand class.
@@ -81,39 +70,88 @@ namespace Gp4Net.Domain.Commands
         /// <param name="keyVersion">The key version number (0 = first available key).</param>
         /// <param name="keyIdentifier">The key identifier (must be 0x00 for SCP03).</param>
         /// <param name="hostChallenge">The host challenge (8 bytes).</param>
-        public InitializeUpdateCommand(byte keyVersion, byte keyIdentifier, byte[] hostChallenge)
+        /// <param name="useMaxResponseLength">Whether to use maximum response length for trace compatibility.</param>
+        private InitializeUpdateCommand(byte keyVersion, byte keyIdentifier, byte[] hostChallenge, bool useMaxResponseLength = false)
         {
-            if (hostChallenge?.Length != 8)
-            {
-                throw new ArgumentException(
-                    "Host challenge must be 8 bytes.",
-                    nameof(hostChallenge)
-                );
-            }
-
             KeyVersion = keyVersion;
             KeyIdentifier = keyIdentifier;
             HostChallenge = (byte[])hostChallenge.Clone();
+            _useMaxResponseLength = useMaxResponseLength;
+        }
+
+        /// <summary>
+        /// Creates a new InitializeUpdateCommand instance.
+        /// </summary>
+        /// <param name="keyVersion">The key version number (0 = first available key).</param>
+        /// <param name="keyIdentifier">The key identifier (must be 0x00 for SCP03).</param>
+        /// <param name="hostChallenge">The host challenge (8 bytes).</param>
+        /// <returns>A result containing the command or an error.</returns>
+        public static Result<InitializeUpdateCommand, SmartCardError> Create(
+            byte keyVersion,
+            byte keyIdentifier,
+            byte[] hostChallenge)
+        {
+            if (hostChallenge.Length != 8)
+            {
+                return Result<InitializeUpdateCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidData($"Host challenge must be 8 bytes, got {hostChallenge.Length}"));
+            }
+
+            return Result<InitializeUpdateCommand, SmartCardError>.Ok(
+                new InitializeUpdateCommand(keyVersion, keyIdentifier, hostChallenge));
+        }
+
+        /// <summary>
+        /// Creates a new InitializeUpdateCommand instance with trace compatibility.
+        /// </summary>
+        /// <param name="keyVersion">The key version number (0 = first available key).</param>
+        /// <param name="keyIdentifier">The key identifier (must be 0x00 for SCP03).</param>
+        /// <param name="hostChallenge">The host challenge (8 bytes).</param>
+        /// <param name="useMaxResponseLength">Whether to use maximum response length for trace compatibility.</param>
+        /// <returns>A result containing the command or an error.</returns>
+        public static Result<InitializeUpdateCommand, SmartCardError> CreateWithOptions(
+            byte keyVersion,
+            byte keyIdentifier,
+            byte[] hostChallenge,
+            bool useMaxResponseLength)
+        {
+            if (hostChallenge.Length != 8)
+            {
+                return Result<InitializeUpdateCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidData($"Host challenge must be 8 bytes, got {hostChallenge.Length}"));
+            }
+
+            return Result<InitializeUpdateCommand, SmartCardError>.Ok(
+                new InitializeUpdateCommand(keyVersion, keyIdentifier, hostChallenge, useMaxResponseLength));
         }
 
         /// <summary>
         /// Converts this command to an APDU byte array.
+        /// This method is obsolete. Use IApduTransport.TransmitAsync instead.
         /// </summary>
         /// <returns>The APDU command bytes.</returns>
-        public byte[] ToApdu()
+        [Obsolete("Use IApduTransport.TransmitAsync instead of manual APDU building")]
+        public new byte[] ToApdu()
         {
-            var apdu = new byte[5 + HostChallenge.Length + 1]; // +1 for LE byte
-            apdu[0] = Cla;
-            apdu[1] = Ins;
-            apdu[2] = KeyVersion;
-            apdu[3] = KeyIdentifier;
-            apdu[4] = (byte)HostChallenge.Length;
-            Array.Copy(HostChallenge, 0, apdu, 5, HostChallenge.Length);
+            return base.ToApdu();
+        }
 
-            // Add LE byte (0x00 = maximum response length)
-            apdu[5 + HostChallenge.Length] = 0x00;
+        /// <summary>
+        /// Gets the APDU byte array for this command (backward compatibility alias for ToApdu).
+        /// </summary>
+        /// <returns>The APDU command bytes.</returns>
+        [Obsolete("Use IApduTransport.TransmitAsync instead of manual APDU building")]
+        public byte[] GetApdu()
+        {
+            return ToApdu();
+        }
 
-            return apdu;
+        /// <summary>
+        /// Returns a string representation of this command.
+        /// </summary>
+        public override string ToString()
+        {
+            return "INITIALIZE UPDATE";
         }
     }
 

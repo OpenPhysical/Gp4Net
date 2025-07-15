@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Gp4Net.Core;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 
@@ -121,9 +122,9 @@ namespace Gp4Net.Domain.Commands
         }
 
         /// <summary>
-        /// Gets the expected response length (null for PUT KEY as it's a case 3 command).
+        /// Gets the expected response length (key check values, typically 3 bytes per key).
         /// </summary>
-        public int? ExpectedResponseLength => null;
+        public int? ExpectedResponseLength => KeyDataBlocks.Count * 3;
 
         /// <summary>
         /// Gets whether this command uses extended length.
@@ -136,24 +137,53 @@ namespace Gp4Net.Domain.Commands
         /// <param name="usageQualifier">The key usage qualifier.</param>
         /// <param name="kekIdentifier">The key encryption key identifier.</param>
         /// <param name="keyDataBlocks">The key data blocks.</param>
-        public PutKeyCommand(
+        private PutKeyCommand(
             KeyUsageQualifier usageQualifier,
             KeyEncryptionKeyIdentifier kekIdentifier,
             IList<KeyDataBlock> keyDataBlocks
         )
         {
-            if (keyDataBlocks == null || keyDataBlocks.Count == 0)
-            {
-                throw new ArgumentException(
-                    "At least one key data block is required.",
-                    nameof(keyDataBlocks)
-                );
-            }
-
             UsageQualifier = usageQualifier;
             KekIdentifier = kekIdentifier;
             KeyDataBlocks = new List<KeyDataBlock>(keyDataBlocks);
         }
+
+        /// <summary>
+        /// Creates a new PUT KEY command with the specified parameters.
+        /// </summary>
+        /// <param name="keyVersion">The key version number.</param>
+        /// <param name="keyDataBlocks">The key data blocks.</param>
+        /// <returns>A Result containing the PutKeyCommand or an error.</returns>
+        public static Result<PutKeyCommand, SmartCardError> Create(
+            byte keyVersion,
+            IList<KeyDataBlock> keyDataBlocks)
+        {
+            if (keyDataBlocks == null)
+            {
+                return SmartCardError.InvalidArgument("Key data blocks cannot be null.");
+            }
+
+            if (keyDataBlocks.Count == 0)
+            {
+                return SmartCardError.InvalidArgument("At least one key data block is required.");
+            }
+
+            // Determine usage qualifier based on number of keys
+            var usageQualifier = keyDataBlocks.Count == 1 ? 
+                KeyUsageQualifier.SingleKey : 
+                KeyUsageQualifier.MultipleKeys;
+
+            // For now, we always use plain text (no key encryption)
+            var kekIdentifier = KeyEncryptionKeyIdentifier.None;
+
+            return new PutKeyCommand(usageQualifier, kekIdentifier, keyDataBlocks);
+        }
+
+        /// <summary>
+        /// Returns a string representation of this command.
+        /// </summary>
+        /// <returns>The command name.</returns>
+        public override string ToString() => "PUT KEY";
 
         /// <summary>
         /// Converts this command to an APDU byte array.
@@ -183,8 +213,8 @@ namespace Gp4Net.Domain.Commands
                 apdu.AddRange(block.ToBytes());
             }
 
-            // Note: PUT KEY is Case 3 APDU (no response data expected)
-            // Therefore, no LE byte should be added
+            // Add LE byte for key check values (3 bytes per key)
+            apdu.Add((byte)(KeyDataBlocks.Count * 3));
 
             return [.. apdu];
         }
@@ -278,18 +308,8 @@ namespace Gp4Net.Domain.Commands
         /// <param name="type">The key type.</param>
         /// <param name="value">The key value.</param>
         /// <param name="keyCheckValue">The key check value (optional, 3 bytes).</param>
-        public KeyDataBlock(KeyType type, byte[] value, byte[]? keyCheckValue = null)
+        private KeyDataBlock(KeyType type, byte[] value, byte[]? keyCheckValue = null)
         {
-            ArgumentNullException.ThrowIfNull(value);
-
-            if (keyCheckValue != null && keyCheckValue.Length != 3)
-            {
-                throw new ArgumentException(
-                    "Key check value must be 3 bytes.",
-                    nameof(keyCheckValue)
-                );
-            }
-
             Type = type;
             Length = (byte)value.Length;
             Value = (byte[])value.Clone();
@@ -319,12 +339,22 @@ namespace Gp4Net.Domain.Commands
         /// </summary>
         /// <param name="keyValue">The 8-byte DES key value.</param>
         /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
-        /// <returns>A new KeyDataBlock for DES.</returns>
-        public static KeyDataBlock CreateDesKey(byte[] keyValue, byte[]? keyCheckValue = null)
+        /// <returns>A Result containing the KeyDataBlock for DES or an error.</returns>
+        public static Result<KeyDataBlock, SmartCardError> CreateDesKey(byte[] keyValue, byte[]? keyCheckValue = null)
         {
-            if (keyValue?.Length != 8)
+            if (keyValue == null)
             {
-                throw new ArgumentException("DES key must be 8 bytes.", nameof(keyValue));
+                return SmartCardError.InvalidArgument("DES key value cannot be null.");
+            }
+
+            if (keyValue.Length != 8)
+            {
+                return SmartCardError.InvalidArgument($"DES key must be 8 bytes, got {keyValue.Length} bytes.");
+            }
+
+            if (keyCheckValue != null && keyCheckValue.Length != 3)
+            {
+                return SmartCardError.InvalidArgument($"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes.");
             }
 
             return new KeyDataBlock(KeyType.Des, keyValue, keyCheckValue);
@@ -335,18 +365,25 @@ namespace Gp4Net.Domain.Commands
         /// </summary>
         /// <param name="keyValue">The 16-byte 3DES key value.</param>
         /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
-        /// <returns>A new KeyDataBlock for 3DES (double length).</returns>
-        public static KeyDataBlock CreateTripleDes2Key(
+        /// <returns>A Result containing the KeyDataBlock for 3DES (double length) or an error.</returns>
+        public static Result<KeyDataBlock, SmartCardError> CreateTripleDes2Key(
             byte[] keyValue,
             byte[]? keyCheckValue = null
         )
         {
-            if (keyValue?.Length != 16)
+            if (keyValue == null)
             {
-                throw new ArgumentException(
-                    "3DES double-length key must be 16 bytes.",
-                    nameof(keyValue)
-                );
+                return SmartCardError.InvalidArgument("3DES double-length key value cannot be null.");
+            }
+
+            if (keyValue.Length != 16)
+            {
+                return SmartCardError.InvalidArgument($"3DES double-length key must be 16 bytes, got {keyValue.Length} bytes.");
+            }
+
+            if (keyCheckValue != null && keyCheckValue.Length != 3)
+            {
+                return SmartCardError.InvalidArgument($"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes.");
             }
 
             return new KeyDataBlock(KeyType.TripleDes2Key, keyValue, keyCheckValue);
@@ -357,18 +394,25 @@ namespace Gp4Net.Domain.Commands
         /// </summary>
         /// <param name="keyValue">The 24-byte 3DES key value.</param>
         /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
-        /// <returns>A new KeyDataBlock for 3DES (triple length).</returns>
-        public static KeyDataBlock CreateTripleDes3Key(
+        /// <returns>A Result containing the KeyDataBlock for 3DES (triple length) or an error.</returns>
+        public static Result<KeyDataBlock, SmartCardError> CreateTripleDes3Key(
             byte[] keyValue,
             byte[]? keyCheckValue = null
         )
         {
-            if (keyValue?.Length != 24)
+            if (keyValue == null)
             {
-                throw new ArgumentException(
-                    "3DES triple-length key must be 24 bytes.",
-                    nameof(keyValue)
-                );
+                return SmartCardError.InvalidArgument("3DES triple-length key value cannot be null.");
+            }
+
+            if (keyValue.Length != 24)
+            {
+                return SmartCardError.InvalidArgument($"3DES triple-length key must be 24 bytes, got {keyValue.Length} bytes.");
+            }
+
+            if (keyCheckValue != null && keyCheckValue.Length != 3)
+            {
+                return SmartCardError.InvalidArgument($"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes.");
             }
 
             return new KeyDataBlock(KeyType.TripleDes3Key, keyValue, keyCheckValue);
@@ -379,12 +423,22 @@ namespace Gp4Net.Domain.Commands
         /// </summary>
         /// <param name="keyValue">The 16-byte AES key value.</param>
         /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
-        /// <returns>A new KeyDataBlock for AES-128.</returns>
-        public static KeyDataBlock CreateAes128Key(byte[] keyValue, byte[]? keyCheckValue = null)
+        /// <returns>A Result containing the KeyDataBlock for AES-128 or an error.</returns>
+        public static Result<KeyDataBlock, SmartCardError> CreateAes128Key(byte[] keyValue, byte[]? keyCheckValue = null)
         {
-            if (keyValue?.Length != 16)
+            if (keyValue == null)
             {
-                throw new ArgumentException("AES-128 key must be 16 bytes.", nameof(keyValue));
+                return SmartCardError.InvalidArgument("AES-128 key value cannot be null.");
+            }
+
+            if (keyValue.Length != 16)
+            {
+                return SmartCardError.InvalidArgument($"AES-128 key must be 16 bytes, got {keyValue.Length} bytes.");
+            }
+
+            if (keyCheckValue != null && keyCheckValue.Length != 3)
+            {
+                return SmartCardError.InvalidArgument($"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes.");
             }
 
             return new KeyDataBlock(KeyType.Aes128, keyValue, keyCheckValue);
@@ -395,12 +449,22 @@ namespace Gp4Net.Domain.Commands
         /// </summary>
         /// <param name="keyValue">The 24-byte AES key value.</param>
         /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
-        /// <returns>A new KeyDataBlock for AES-192.</returns>
-        public static KeyDataBlock CreateAes192Key(byte[] keyValue, byte[]? keyCheckValue = null)
+        /// <returns>A Result containing the KeyDataBlock for AES-192 or an error.</returns>
+        public static Result<KeyDataBlock, SmartCardError> CreateAes192Key(byte[] keyValue, byte[]? keyCheckValue = null)
         {
-            if (keyValue?.Length != 24)
+            if (keyValue == null)
             {
-                throw new ArgumentException("AES-192 key must be 24 bytes.", nameof(keyValue));
+                return SmartCardError.InvalidArgument("AES-192 key value cannot be null.");
+            }
+
+            if (keyValue.Length != 24)
+            {
+                return SmartCardError.InvalidArgument($"AES-192 key must be 24 bytes, got {keyValue.Length} bytes.");
+            }
+
+            if (keyCheckValue != null && keyCheckValue.Length != 3)
+            {
+                return SmartCardError.InvalidArgument($"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes.");
             }
 
             return new KeyDataBlock(KeyType.Aes192, keyValue, keyCheckValue);
@@ -411,12 +475,22 @@ namespace Gp4Net.Domain.Commands
         /// </summary>
         /// <param name="keyValue">The 32-byte AES key value.</param>
         /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
-        /// <returns>A new KeyDataBlock for AES-256.</returns>
-        public static KeyDataBlock CreateAes256Key(byte[] keyValue, byte[]? keyCheckValue = null)
+        /// <returns>A Result containing the KeyDataBlock for AES-256 or an error.</returns>
+        public static Result<KeyDataBlock, SmartCardError> CreateAes256Key(byte[] keyValue, byte[]? keyCheckValue = null)
         {
-            if (keyValue?.Length != 32)
+            if (keyValue == null)
             {
-                throw new ArgumentException("AES-256 key must be 32 bytes.", nameof(keyValue));
+                return SmartCardError.InvalidArgument("AES-256 key value cannot be null.");
+            }
+
+            if (keyValue.Length != 32)
+            {
+                return SmartCardError.InvalidArgument($"AES-256 key must be 32 bytes, got {keyValue.Length} bytes.");
+            }
+
+            if (keyCheckValue != null && keyCheckValue.Length != 3)
+            {
+                return SmartCardError.InvalidArgument($"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes.");
             }
 
             return new KeyDataBlock(KeyType.Aes256, keyValue, keyCheckValue);
@@ -449,10 +523,18 @@ namespace Gp4Net.Domain.Commands
         /// Parses a PUT KEY response.
         /// </summary>
         /// <param name="response">The response data (excluding status word).</param>
-        /// <returns>The parsed response.</returns>
-        public static PutKeyResponse Parse(byte[] response)
+        /// <returns>A Result containing the parsed response or an error.</returns>
+        public static Result<PutKeyResponse, SmartCardError> Parse(byte[] response)
         {
-            ArgumentNullException.ThrowIfNull(response);
+            if (response == null)
+            {
+                return SmartCardError.InvalidArgument("Response data cannot be null.");
+            }
+
+            if (response.Length % 3 != 0)
+            {
+                return SmartCardError.InvalidResponse($"Invalid response length {response.Length}, expected multiple of 3 bytes for key check values.");
+            }
 
             var keyCheckValues = new List<byte[]>();
 

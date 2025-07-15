@@ -17,23 +17,31 @@ namespace Gp4Net.Tool.Pipeline
 
         public IDisplayService Display { get; }
         public ICardService CardService { get; }
-        public Gp4Net.Services.IGlobalPlatformService GlobalPlatformService { get; }
+        private readonly IDomainServiceFactory _domainServiceFactory;
+        private Gp4Net.Services.IGlobalPlatformService? _cachedGlobalPlatformService;
         public IKeysetResolver KeysetResolver { get; }
 
         public CommandContext(
             IDisplayService display,
             ICardService cardService,
-            Gp4Net.Services.IGlobalPlatformService globalPlatformService,
+            IDomainServiceFactory domainServiceFactory,
             IKeysetResolver keysetResolver
         )
         {
             Display = display ?? throw new ArgumentNullException(nameof(display));
             CardService = cardService ?? throw new ArgumentNullException(nameof(cardService));
-            GlobalPlatformService =
-                globalPlatformService
-                ?? throw new ArgumentNullException(nameof(globalPlatformService));
+            _domainServiceFactory =
+                domainServiceFactory
+                ?? throw new ArgumentNullException(nameof(domainServiceFactory));
             KeysetResolver =
                 keysetResolver ?? throw new ArgumentNullException(nameof(keysetResolver));
+        }
+
+        public Gp4Net.Services.IGlobalPlatformService GetGlobalPlatformService()
+        {
+            // Create on demand with proper context, cache for reuse within same command
+            return _cachedGlobalPlatformService ??= _domainServiceFactory
+                .CreateGlobalPlatformService(CardService);
         }
 
         public Task<ICommandContext> RequireCardConnection(string? readerName = null)

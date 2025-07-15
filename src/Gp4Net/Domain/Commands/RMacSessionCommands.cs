@@ -4,6 +4,8 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using Gp4Net.Core;
+using Gp4Net.Domain;
 
 namespace Gp4Net.Domain.Commands
 {
@@ -51,18 +53,8 @@ namespace Gp4Net.Domain.Commands
         /// <param name="p1">The P1 parameter (0x10 for R-MAC, 0x30 for R-ENCRYPTION and R-MAC).</param>
         /// <param name="data">Optional data field.</param>
         /// <param name="mac">Optional MAC value (8 bytes).</param>
-        public BeginRMacSessionCommand(byte cla, byte p1, byte[]? data = null, byte[]? mac = null)
+        private BeginRMacSessionCommand(byte cla, byte p1, byte[]? data = null, byte[]? mac = null)
         {
-            if (cla != Cla80 && cla != ClaC0 && cla != ClaE0)
-            {
-                throw new ArgumentException("Invalid CLA byte.", nameof(cla));
-            }
-
-            if (mac != null && mac.Length != 8)
-            {
-                throw new ArgumentException("MAC must be 8 bytes.", nameof(mac));
-            }
-
             Cla = cla;
             P1 = p1;
             Data = data != null ? (byte[])data.Clone() : null;
@@ -101,6 +93,58 @@ namespace Gp4Net.Domain.Commands
 
             return apdu;
         }
+
+        /// <summary>
+        /// Creates a BEGIN R-MAC SESSION command with the specified security level.
+        /// </summary>
+        /// <param name="securityLevel">The security level for the R-MAC session.</param>
+        /// <param name="cla">The command class byte (default: 0x80).</param>
+        /// <param name="data">Optional data field.</param>
+        /// <param name="mac">Optional MAC value (must be 8 bytes if provided).</param>
+        /// <returns>A Result containing the BeginRMacSessionCommand or an error.</returns>
+        public static Result<BeginRMacSessionCommand, SmartCardError> Create(
+            SecurityLevel securityLevel,
+            byte cla = Cla80,
+            byte[]? data = null,
+            byte[]? mac = null)
+        {
+            // Validate security level
+            if (!System.Enum.IsDefined(typeof(SecurityLevel), securityLevel))
+            {
+                return Result<BeginRMacSessionCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument($"Invalid security level: {securityLevel}")
+                );
+            }
+
+            // Validate CLA byte
+            if (cla != Cla80 && cla != ClaC0 && cla != ClaE0)
+            {
+                return Result<BeginRMacSessionCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument($"Invalid CLA byte: 0x{cla:X2}. Must be 0x80, 0xC0, or 0xE0")
+                );
+            }
+
+            // Validate MAC length
+            if (mac != null && mac.Length != 8)
+            {
+                return Result<BeginRMacSessionCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument("MAC must be exactly 8 bytes")
+                );
+            }
+
+            // Convert security level to P1 parameter
+            byte p1 = (byte)securityLevel;
+
+            return Result<BeginRMacSessionCommand, SmartCardError>.Ok(
+                new BeginRMacSessionCommand(cla, p1, data, mac)
+            );
+        }
+
+        /// <summary>
+        /// Returns a string representation of this command.
+        /// </summary>
+        /// <returns>A string describing this command.</returns>
+        public override string ToString() => "BEGIN R-MAC SESSION";
     }
 
     /// <summary>
@@ -141,18 +185,8 @@ namespace Gp4Net.Domain.Commands
         /// <param name="cla">The command class byte.</param>
         /// <param name="p2">The P2 parameter (0x03 to end session and return R-MAC).</param>
         /// <param name="mac">Optional C-MAC value (8 bytes).</param>
-        public EndRMacSessionCommand(byte cla, byte p2, byte[]? mac = null)
+        private EndRMacSessionCommand(byte cla, byte p2, byte[]? mac = null)
         {
-            if (cla != Cla80 && cla != ClaC0 && cla != ClaE0)
-            {
-                throw new ArgumentException("Invalid CLA byte.", nameof(cla));
-            }
-
-            if (mac != null && mac.Length != 8)
-            {
-                throw new ArgumentException("MAC must be 8 bytes.", nameof(mac));
-            }
-
             Cla = cla;
             P2 = p2;
             Mac = mac != null ? (byte[])mac.Clone() : null;
@@ -181,6 +215,56 @@ namespace Gp4Net.Domain.Commands
 
             return apdu;
         }
+
+        /// <summary>
+        /// Creates an END R-MAC SESSION command with the specified security level.
+        /// </summary>
+        /// <param name="securityLevel">The security level for the R-MAC session.</param>
+        /// <param name="cla">The command class byte (default: 0x80).</param>
+        /// <param name="mac">Optional C-MAC value (must be 8 bytes if provided).</param>
+        /// <returns>A Result containing the EndRMacSessionCommand or an error.</returns>
+        public static Result<EndRMacSessionCommand, SmartCardError> Create(
+            SecurityLevel securityLevel,
+            byte cla = Cla80,
+            byte[]? mac = null)
+        {
+            // Validate security level
+            if (!System.Enum.IsDefined(typeof(SecurityLevel), securityLevel))
+            {
+                return Result<EndRMacSessionCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument($"Invalid security level: {securityLevel}")
+                );
+            }
+
+            // Validate CLA byte
+            if (cla != Cla80 && cla != ClaC0 && cla != ClaE0)
+            {
+                return Result<EndRMacSessionCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument($"Invalid CLA byte: 0x{cla:X2}. Must be 0x80, 0xC0, or 0xE0")
+                );
+            }
+
+            // Validate MAC length
+            if (mac != null && mac.Length != 8)
+            {
+                return Result<EndRMacSessionCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument("MAC must be exactly 8 bytes")
+                );
+            }
+
+            // P2 parameter is typically 0x03 to end session and return R-MAC
+            byte p2 = 0x03;
+
+            return Result<EndRMacSessionCommand, SmartCardError>.Ok(
+                new EndRMacSessionCommand(cla, p2, mac)
+            );
+        }
+
+        /// <summary>
+        /// Returns a string representation of this command.
+        /// </summary>
+        /// <returns>A string describing this command.</returns>
+        public override string ToString() => "END R-MAC SESSION";
     }
 
     /// <summary>
@@ -197,29 +281,41 @@ namespace Gp4Net.Domain.Commands
         /// Initializes a new instance of the EndRMacSessionResponse class.
         /// </summary>
         /// <param name="rMac">The R-MAC value (8 bytes).</param>
-        public EndRMacSessionResponse(byte[] rMac)
+        private EndRMacSessionResponse(byte[] rMac)
         {
-            if (rMac?.Length != 8)
-            {
-                throw new ArgumentException("R-MAC must be 8 bytes.", nameof(rMac));
-            }
-
             RMac = (byte[])rMac.Clone();
         }
 
         /// <summary>
         /// Parses an END R-MAC SESSION response.
         /// </summary>
-        /// <param name="response">The response data (excluding status word).</param>
-        /// <returns>The parsed response.</returns>
-        public static EndRMacSessionResponse Parse(byte[] response)
+        /// <param name="responseData">The response data (excluding status word).</param>
+        /// <returns>A Result containing the parsed response or an error.</returns>
+        public static Result<EndRMacSessionResponse, SmartCardError> Parse(byte[] responseData)
         {
-            if (response == null || response.Length != 8)
+            if (responseData == null)
             {
-                throw new ArgumentException("Response must be 8 bytes.", nameof(response));
+                return Result<EndRMacSessionResponse, SmartCardError>.Fail(
+                    SmartCardError.InvalidData("Response data cannot be null")
+                );
             }
 
-            return new EndRMacSessionResponse(response);
+            if (responseData.Length != 8)
+            {
+                return Result<EndRMacSessionResponse, SmartCardError>.Fail(
+                    SmartCardError.InvalidData($"Response must be exactly 8 bytes, but got {responseData.Length} bytes")
+                );
+            }
+
+            return Result<EndRMacSessionResponse, SmartCardError>.Ok(
+                new EndRMacSessionResponse(responseData)
+            );
         }
+
+        /// <summary>
+        /// Returns a string representation of this response.
+        /// </summary>
+        /// <returns>A string describing this response.</returns>
+        public override string ToString() => $"END R-MAC SESSION RESPONSE (R-MAC: {Convert.ToHexString(RMac)})";
     }
 }

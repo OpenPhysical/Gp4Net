@@ -1,12 +1,13 @@
 using System.Linq;
 using Gp4Net.Domain.CardInfo;
-using Xunit;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.CardInfo
 {
+    [TestFixture]
     public class CardDataInfoOidTests
     {
-        [Fact]
+        [Test]
         public void Parse_WithOids_ExtractsCorrectly()
         {
             // Arrange - Real card data with OIDs
@@ -97,17 +98,17 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var cardData = CardDataInfo.Parse(data);
 
             // Assert
-            Assert.NotNull(cardData);
-            Assert.Equal(6, cardData.Oids.Count);
-            Assert.Contains("1.2.840.114283.1", cardData.Oids);
-            Assert.Contains("1.2.840.114283.2.2.3", cardData.Oids);
-            Assert.Contains("1.2.840.114283.3", cardData.Oids);
-            Assert.Contains("1.2.840.114283.4.3.112", cardData.Oids);
-            Assert.Contains("1.2.840.114283.5.7.2.0.0", cardData.Oids);
-            Assert.Contains("1.3.6.1.4.1.42.2.110.1.3", cardData.Oids);
+            Assert.That(cardData, Is.Not.Null);
+            Assert.That(cardData.Oids.Count, Is.EqualTo(6));
+            Assert.That(cardData.Oids[0], Is.EqualTo("1.2.840.114283.1"));
+            Assert.That(cardData.Oids[1], Is.EqualTo("1.2.840.114283.2.2.3"));
+            Assert.That(cardData.Oids[2], Is.EqualTo("1.2.840.114283.3"));
+            Assert.That(cardData.Oids[3], Is.EqualTo("1.2.840.114283.4.3.112"));
+            Assert.That(cardData.Oids[4], Is.EqualTo("1.2.840.114283.5.7.2.0.0"));
+            Assert.That(cardData.Oids[5], Is.EqualTo("1.3.6.1.4.1.42.2.110.1.3"));
         }
 
-        [Fact]
+        [Test]
         public void Parse_ExtractsGlobalPlatformVersionFromOid()
         {
             // Arrange - Data with GP version OID
@@ -130,10 +131,10 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var cardData = CardDataInfo.Parse(data);
 
             // Assert
-            Assert.Equal("2.2.3", cardData.GlobalPlatformVersionFromOid);
+            Assert.That(cardData.GlobalPlatformVersionFromOid, Is.EqualTo("2.2.3"));
         }
 
-        [Fact]
+        [Test]
         public void ToString_IncludesOidDescriptions()
         {
             // Arrange
@@ -161,14 +162,14 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var output = cardData.ToString();
 
             // Assert
-            Assert.Contains("Parsed OIDs:", output);
-            Assert.Contains("1.2.840.114283.2.2.3", output);
-            Assert.Contains("GlobalPlatform", output);
-            Assert.Contains("-> GP Version: 2.2.3", output);
-            Assert.Contains("Secure Channel Protocol Info:", output);
+            Assert.That(output, Does.Contain("Parsed OIDs:"));
+            Assert.That(output, Does.Contain("1.2.840.114283.2.2.3"));
+            Assert.That(output, Does.Contain("GlobalPlatform"));
+            Assert.That(output, Does.Contain("-> GP Version: 2.2.3"));
+            Assert.That(output, Does.Contain("Secure Channel Protocol Info:"));
         }
 
-        [Fact]
+        [Test]
         public void Parse_HandlesDataWithoutOids()
         {
             // Arrange - Data without OIDs
@@ -184,13 +185,13 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var cardData = CardDataInfo.Parse(data);
 
             // Assert
-            Assert.Empty(cardData.Oids);
-            Assert.Null(cardData.GlobalPlatformVersionFromOid);
-            Assert.NotNull(cardData.GlobalPlatformVersion);
-            Assert.Equal(new System.Version(2, 3), cardData.GlobalPlatformVersion);
+            Assert.That(cardData.Oids, Is.Empty);
+            Assert.That(cardData.GlobalPlatformVersionFromOid, Is.Null);
+            Assert.That(cardData.GlobalPlatformVersion, Is.Not.Null);
+            Assert.That(cardData.GlobalPlatformVersion, Is.EqualTo(new System.Version(2, 3)));
         }
 
-        [Fact]
+        [Test]
         public void Parse_PreservesExistingTagParsing()
         {
             // Arrange
@@ -221,14 +222,14 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var cardData = CardDataInfo.Parse(data);
 
             // Assert
-            Assert.Equal(4, cardData.Tags.Count);
-            Assert.Equal(new System.Version(2, 2, 3), cardData.GlobalPlatformVersion);
-            Assert.Equal(new byte[] { 0x03, 0x70 }, cardData.SecureChannelProtocolInfo);
-            Assert.Equal(new byte[] { 0x01, 0x02, 0x03, 0x04 }, cardData.CardConfigurationDetails);
-            Assert.Equal(new byte[] { 0xFF, 0xEE }, cardData.CardChipDetails);
+            Assert.That(cardData.Tags.Count, Is.EqualTo(4));
+            Assert.That(cardData.GlobalPlatformVersion, Is.EqualTo(new System.Version(2, 2, 3)));
+            Assert.That(cardData.SecureChannelProtocolInfo, Is.EqualTo(new byte[] { 0x03, 0x70 }));
+            Assert.That(cardData.CardConfigurationDetails, Is.EqualTo(new byte[] { 0x01, 0x02, 0x03, 0x04 }));
+            Assert.That(cardData.CardChipDetails, Is.EqualTo(new byte[] { 0xFF, 0xEE }));
         }
 
-        [Fact]
+        [Test]
         public void Parse_WithMixedOidsAndTags_ParsesBoth()
         {
             // Arrange - Mix of OIDs and regular tags
@@ -259,14 +260,14 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var cardData = CardDataInfo.Parse(data);
 
             // Assert
-            Assert.Equal(3, cardData.Tags.Count); // Tags 73, 06, and 64
-            _ = Assert.Single(cardData.Oids);
-            Assert.Contains("1.2.840.114283.2.2.3", cardData.Oids);
-            Assert.Equal("2.2.3", cardData.GlobalPlatformVersionFromOid);
-            Assert.Equal(new System.Version(2, 2, 1), cardData.GlobalPlatformVersion); // From tag 73
+            Assert.That(cardData.Tags.Count, Is.EqualTo(3)); // Tags 73, 06, and 64
+            Assert.That(cardData.Oids.Count, Is.EqualTo(1));
+            Assert.That(cardData.Oids[0], Is.EqualTo("1.2.840.114283.2.2.3"));
+            Assert.That(cardData.GlobalPlatformVersionFromOid, Is.EqualTo("2.2.3"));
+            Assert.That(cardData.GlobalPlatformVersion, Is.EqualTo(new System.Version(2, 2, 1))); // From tag 73
         }
 
-        [Fact]
+        [Test]
         public void Parse_NonGlobalPlatformOid_ParsedButNoVersionExtracted()
         {
             // Arrange - NIST OID
@@ -290,9 +291,9 @@ namespace Gp4Net.Tests.Domain.CardInfo
             var cardData = CardDataInfo.Parse(data);
 
             // Assert
-            _ = Assert.Single(cardData.Oids);
-            Assert.Contains("1.3.6.1.4.1.42.2.110.1.3", cardData.Oids);
-            Assert.Null(cardData.GlobalPlatformVersionFromOid); // Not a GP version OID
+            Assert.That(cardData.Oids.Count, Is.EqualTo(1));
+            Assert.That(cardData.Oids[0], Is.EqualTo("1.3.6.1.4.1.42.2.110.1.3"));
+            Assert.That(cardData.GlobalPlatformVersionFromOid, Is.Null); // Not a GP version OID
         }
     }
 }

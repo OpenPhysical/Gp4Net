@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Gp4Net.Tool.Pipeline;
 using Spectre.Console.Cli;
 
 namespace Gp4Net.Tool.Infrastructure
@@ -51,7 +52,7 @@ namespace Gp4Net.Tool.Infrastructure
             // Register root commands
             foreach (var (type, attr) in rootCommands)
             {
-                RegisterCommand(config, type, attr);
+                RegisterCommand(config, services, type, attr);
             }
 
             // Register branches with their commands
@@ -64,14 +65,35 @@ namespace Gp4Net.Tool.Infrastructure
                     
                     foreach (var (type, attr) in commands)
                     {
-                        RegisterCommand(branch, type, attr);
+                        RegisterCommand(branch, services, type, attr);
                     }
                 });
             }
         }
 
-        private static void RegisterCommand(object config, Type commandType, CliCommandAttribute attr)
+        private static void RegisterCommand(object config, IServiceCollection services, Type commandType, CliCommandAttribute attr)
         {
+            // Check if the command implements IPipelineCommand<TSettings>
+            var pipelineInterface = commandType.GetInterfaces()
+                .FirstOrDefault(i => i.IsGenericType && 
+                                   i.GetGenericTypeDefinition() == typeof(IPipelineCommand<>));
+
+            Type registrationType;
+            if (pipelineInterface != null)
+            {
+                // This is a pipeline command, wrap it with PipelineCommand<TSettings>
+                var settingsType = pipelineInterface.GetGenericArguments()[0];
+                registrationType = typeof(PipelineCommand<>).MakeGenericType(settingsType);
+                
+                // Register the original command implementation for DI
+                services.AddTransient(pipelineInterface, commandType);
+            }
+            else
+            {
+                // This is a regular Spectre.Console.Cli command
+                registrationType = commandType;
+            }
+
             // Get the generic AddCommand method
             var addCommandMethod = config.GetType()
                 .GetMethods()
@@ -81,7 +103,7 @@ namespace Gp4Net.Tool.Infrastructure
 
             if (addCommandMethod != null)
             {
-                var genericMethod = addCommandMethod.MakeGenericMethod(commandType);
+                var genericMethod = addCommandMethod.MakeGenericMethod(registrationType);
                 var commandConfig = genericMethod.Invoke(config, new object[] { attr.Name });
                 
                 // Set description

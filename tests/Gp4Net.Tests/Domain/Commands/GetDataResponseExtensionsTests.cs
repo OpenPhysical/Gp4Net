@@ -1,12 +1,12 @@
 using System;
 using Gp4Net.Domain.Commands;
-using Xunit;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.Commands
 {
     public class GetDataResponseExtensionsTests
     {
-        [Fact]
+        [Test]
         public void ParseAsCardData_WithValidData_ReturnsCardDataInfo()
         {
             // Arrange - Sample card data with OID
@@ -16,11 +16,11 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsCardData();
 
             // Assert
-            Assert.NotNull(result);
+            Assert.That(result, Is.Not.Null);
             // Further assertions would require knowing the expected CardDataInfo structure
         }
 
-        [Fact]
+        [Test]
         public void ParseAsCardData_WithInvalidData_ReturnsNull()
         {
             // Arrange
@@ -30,10 +30,10 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsCardData();
 
             // Assert
-            Assert.Null(result);
+            Assert.That(result, Is.Null);
         }
 
-        [Fact]
+        [Test]
         public void ParseAsCardData_WithEmptyData_ReturnsNull()
         {
             // Arrange
@@ -43,10 +43,10 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsCardData();
 
             // Assert
-            Assert.Null(result);
+            Assert.That(result, Is.Null);
         }
 
-        [Fact]
+        [Test]
         public void ParseAsCardData_WithNullData_ReturnsNull()
         {
             // Arrange
@@ -56,10 +56,10 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsCardData();
 
             // Assert
-            Assert.Null(result);
+            Assert.That(result, Is.Null);
         }
 
-        [Fact]
+        [Test]
         public void ParseAsCardCapabilities_WithValidData_ReturnsCardCapabilities()
         {
             // Arrange - Sample capabilities data
@@ -69,11 +69,11 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsCardCapabilities();
 
             // Assert
-            Assert.NotNull(result);
+            Assert.That(result, Is.Not.Null);
             // Further assertions would require knowing the expected CardCapabilities structure
         }
 
-        [Fact]
+        [Test]
         public void ParseAsCardCapabilities_WithInvalidData_ReturnsNull()
         {
             // Arrange
@@ -83,10 +83,10 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsCardCapabilities();
 
             // Assert
-            Assert.Null(result);
+            Assert.That(result, Is.Null);
         }
 
-        [Fact]
+        [Test]
         public void ParseAsCardCapabilities_WithEmptyData_ReturnsNull()
         {
             // Arrange
@@ -96,10 +96,10 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsCardCapabilities();
 
             // Assert
-            Assert.Null(result);
+            Assert.That(result, Is.Null);
         }
 
-        [Fact]
+        [Test]
         public void ParseAsCardCapabilities_WithNullData_ReturnsNull()
         {
             // Arrange
@@ -109,10 +109,10 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsCardCapabilities();
 
             // Assert
-            Assert.Null(result);
+            Assert.That(result, Is.Null);
         }
 
-        [Fact]
+        [Test]
         public void ParseAsKeyInformation_WithValidData_ReturnsKeyInformationTemplate()
         {
             // Arrange - Sample key information template data (tag E0)
@@ -122,11 +122,11 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsKeyInformation();
 
             // Assert
-            Assert.NotNull(result);
-            Assert.NotEmpty(result.Keys);
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.Keys, Is.Not.Empty);
         }
 
-        [Fact]
+        [Test]
         public void ParseAsKeyInformation_WithInvalidData_ReturnsNull()
         {
             // Arrange
@@ -136,10 +136,10 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsKeyInformation();
 
             // Assert
-            Assert.Null(result);
+            Assert.That(result, Is.Null);
         }
 
-        [Fact]
+        [Test]
         public void ParseAsKeyInformation_WithEmptyData_ReturnsNull()
         {
             // Arrange
@@ -149,10 +149,10 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsKeyInformation();
 
             // Assert
-            Assert.Null(result);
+            Assert.That(result, Is.Null);
         }
 
-        [Fact]
+        [Test]
         public void ParseAsKeyInformation_WithNullData_ReturnsNull()
         {
             // Arrange
@@ -162,10 +162,10 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsKeyInformation();
 
             // Assert
-            Assert.Null(result);
+            Assert.That(result, Is.Null);
         }
 
-        [Fact]
+        [Test]
         public void ParseAsCplc_WithValidData_ReturnsCplcData()
         {
             // Arrange - CPLC data is always 42 bytes
@@ -179,11 +179,11 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsCplc();
 
             // Assert
-            Assert.NotNull(result);
-            Assert.Equal(0x1234, result.IcFabricator);
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.IcFabricator, Is.EqualTo(0x1234));
         }
 
-        [Fact]
+        [Test]
         public void ParseAsCplc_WithWrongLength_ReturnsNull()
         {
             // Arrange - CPLC must be exactly 42 bytes
@@ -193,10 +193,10 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsCplc();
 
             // Assert
-            Assert.Null(result);
+            Assert.That(result, Is.Null);
         }
 
-        [Fact]
+        [Test]
         public void ParseAsCplc_WithEmptyData_ReturnsNull()
         {
             // Arrange
@@ -206,10 +206,10 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsCplc();
 
             // Assert
-            Assert.Null(result);
+            Assert.That(result, Is.Null);
         }
 
-        [Fact]
+        [Test]
         public void ParseAsCplc_WithNullData_ReturnsNull()
         {
             // Arrange
@@ -219,20 +219,20 @@ namespace Gp4Net.Tests.Domain.Commands
             var result = data.ParseAsCplc();
 
             // Assert
-            Assert.Null(result);
+            Assert.That(result, Is.Null);
         }
 
-        [Fact]
+        [Test]
         public void AllParseMethods_HandleExceptionsGracefully()
         {
             // Arrange - Data that might cause parsing exceptions
             var malformedData = new byte[] { 0xFF, 0xFF, 0xFF };
 
             // Act & Assert - None should throw, all should return null
-            Assert.Null(malformedData.ParseAsCardData());
-            Assert.Null(malformedData.ParseAsCardCapabilities());
-            Assert.Null(malformedData.ParseAsKeyInformation());
-            Assert.Null(malformedData.ParseAsCplc());
+            Assert.That(malformedData.ParseAsCardData(), Is.Null);
+            Assert.That(malformedData.ParseAsCardCapabilities(), Is.Null);
+            Assert.That(malformedData.ParseAsKeyInformation(), Is.Null);
+            Assert.That(malformedData.ParseAsCplc(), Is.Null);
         }
     }
 }

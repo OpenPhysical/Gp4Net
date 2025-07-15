@@ -38,7 +38,7 @@ namespace Gp4Net.Pipeline.Middleware
                 failure => Task.FromResult(Result<CommandResponse, SmartCardError>.Fail(failure)));
         }
 
-        private async Task<Result<CommandResponse, SmartCardError>> CaptureStateFromResponse(
+        private Task<Result<CommandResponse, SmartCardError>> CaptureStateFromResponse(
             CommandRequest request,
             CommandResponse response)
         {
@@ -62,17 +62,17 @@ namespace Gp4Net.Pipeline.Middleware
                     _logger?.LogDebug("State captured from {CommandType} response", 
                         request.Command.GetType().Name);
                     
-                    return Result<CommandResponse, SmartCardError>.Ok(
-                        response.WithContext(updatedContext));
+                    return Task.FromResult(Result<CommandResponse, SmartCardError>.Ok(
+                        response.WithContext(updatedContext)));
                 }
 
-                return Result<CommandResponse, SmartCardError>.Ok(response);
+                return Task.FromResult(Result<CommandResponse, SmartCardError>.Ok(response));
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to capture state from response");
                 // Don't fail the command, just return the original response
-                return Result<CommandResponse, SmartCardError>.Ok(response);
+                return Task.FromResult(Result<CommandResponse, SmartCardError>.Ok(response));
             }
         }
 

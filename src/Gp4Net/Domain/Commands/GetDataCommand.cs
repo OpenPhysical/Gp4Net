@@ -1,4 +1,5 @@
 using System;
+using Gp4Net.Core;
 using Gp4Net.Core.Tlv;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Transport;
@@ -132,29 +133,48 @@ namespace Gp4Net.Domain.Commands
         /// Initializes a new instance of the GetDataCommand class.
         /// </summary>
         /// <param name="dataObjectIdentifier">The data object identifier (2 bytes).</param>
-        public GetDataCommand(ushort dataObjectIdentifier)
+        private GetDataCommand(ushort dataObjectIdentifier)
         {
             DataObjectIdentifier = dataObjectIdentifier;
         }
 
         /// <summary>
+        /// Creates a GET DATA command for a 2-byte data object identifier.
+        /// </summary>
+        /// <param name="dataObject">The data object identifier (2 bytes).</param>
+        /// <returns>A Result containing the command or an error.</returns>
+        public static Result<GetDataCommand, SmartCardError> Create(ushort dataObject)
+        {
+            return Result<GetDataCommand, SmartCardError>.Ok(new GetDataCommand(dataObject));
+        }
+
+        /// <summary>
         /// Creates a GET DATA command for a 3-byte data object identifier.
         /// </summary>
-        /// <param name="dataObjectIdentifier">The 3-byte data object identifier.</param>
-        /// <returns>A new GetDataCommand instance.</returns>
-        public static GetDataCommand CreateFor3ByteIdentifier(uint dataObjectIdentifier)
+        /// <param name="identifier">The 3-byte data object identifier.</param>
+        /// <returns>A Result containing the command or an error.</returns>
+        public static Result<GetDataCommand, SmartCardError> CreateFor3ByteIdentifier(byte[] identifier)
         {
-            if (dataObjectIdentifier > 0xFFFFFF)
+            if (identifier == null)
             {
-                throw new ArgumentException(
-                    "Data object identifier must be 3 bytes or less.",
-                    nameof(dataObjectIdentifier)
+                return Result<GetDataCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument("Identifier cannot be null")
+                );
+            }
+
+            if (identifier.Length != 3)
+            {
+                return Result<GetDataCommand, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument(
+                        $"Identifier must be exactly 3 bytes, but was {identifier.Length} bytes"
+                    )
                 );
             }
 
             // For 3-byte identifiers, we use the first two bytes as the identifier
             // This is a simplified approach - full implementation would handle 3-byte tags properly
-            return new GetDataCommand((ushort)(dataObjectIdentifier >> 8));
+            var twoByteIdentifier = (ushort)((identifier[0] << 8) | identifier[1]);
+            return Result<GetDataCommand, SmartCardError>.Ok(new GetDataCommand(twoByteIdentifier));
         }
 
         /// <summary>
@@ -181,6 +201,12 @@ namespace Gp4Net.Domain.Commands
         byte[]? IApduCommand.Data => null;
         int? IApduCommand.ExpectedResponseLength => 256;
         bool IApduCommand.IsExtendedLength => false;
+
+        /// <summary>
+        /// Returns a string representation of the command.
+        /// </summary>
+        /// <returns>"GET DATA"</returns>
+        public override string ToString() => "GET DATA";
     }
 
     /// <summary>
@@ -231,14 +257,29 @@ namespace Gp4Net.Domain.Commands
         /// </summary>
         /// <param name="dataObjectIdentifier">The data object identifier that was requested.</param>
         /// <param name="response">The response data (excluding status word).</param>
-        /// <returns>The parsed response.</returns>
-        public static GetDataResponse Parse(ushort dataObjectIdentifier, byte[] response)
+        /// <returns>A Result containing the parsed response or an error.</returns>
+        public static Result<GetDataResponse, SmartCardError> Parse(ushort dataObjectIdentifier, byte[] response)
         {
-            ArgumentNullException.ThrowIfNull(response);
+            if (response == null)
+            {
+                return Result<GetDataResponse, SmartCardError>.Fail(
+                    SmartCardError.InvalidArgument("Response data cannot be null")
+                );
+            }
 
-            // Try to parse as TLV
-            var tlvObject = TlvParser.ParseSingle(response);
-            return new GetDataResponse(dataObjectIdentifier, response, tlvObject);
+            try
+            {
+                // Try to parse as TLV
+                var tlvObject = TlvParser.ParseSingle(response);
+                var parsedResponse = new GetDataResponse(dataObjectIdentifier, response, tlvObject);
+                return Result<GetDataResponse, SmartCardError>.Ok(parsedResponse);
+            }
+            catch (Exception ex)
+            {
+                return Result<GetDataResponse, SmartCardError>.Fail(
+                    SmartCardError.InvalidResponse($"Failed to parse GET DATA response: {ex.Message}")
+                );
+            }
         }
 
         /// <summary>

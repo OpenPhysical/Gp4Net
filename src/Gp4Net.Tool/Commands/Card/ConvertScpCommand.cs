@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Tool.Infrastructure;
@@ -85,8 +87,14 @@ namespace Gp4Net.Tool.Commands.Card
                 // Step 2: Set SCP_ENABLE to SCP03 only
                 AnsiConsole.MarkupLine("[yellow]Step 2: Setting SCP_ENABLE to SCP03 i=70...[/]");
 
-                var storeDataCommand = StoreDataCommand.CreateScpEnableCommand(0x0370);
-                var response = CardService.SendCommand(storeDataCommand);
+                var implementations = new List<ScpImplementation> { ScpImplementation.Scp03I70 };
+                var storeDataResult = StoreDataCommand.CreateScpEnableCommand(implementations);
+                if (storeDataResult.IsFailure)
+                {
+                    AnsiConsole.MarkupLine($"[red]Failed to create STORE DATA command: {storeDataResult.Error.Message}[/]");
+                    return 1;
+                }
+                var response = CardService.SendCommand(storeDataResult.Value);
 
                 if (!response.IsSuccessful)
                 {
@@ -119,8 +127,14 @@ namespace Gp4Net.Tool.Commands.Card
                 // Step 4: Check SCP_ENABLE configuration
                 AnsiConsole.MarkupLine("[yellow]Step 3: Checking SCP_ENABLE configuration...[/]");
 
-                var getDataCommand = new GetDataCommand(0x00CF);
-                response = CardService.SendCommand(getDataCommand);
+                var commandResult = GetDataCommand.Create(0x00CF);
+                if (commandResult.IsFailure)
+                {
+                    AnsiConsole.MarkupLine($"[red]✗ Failed to create GET DATA command: {commandResult.Error.Message}[/]");
+                    return 1;
+                }
+                
+                response = CardService.SendCommand(commandResult.Value);
 
                 if (response.IsSuccessful && response.Data.Length > 0)
                 {
@@ -139,18 +153,26 @@ namespace Gp4Net.Tool.Commands.Card
                     var testKey = settings.NewKey ?? GpTestKeys.StandardTestKey;
 
                     // Create PUT KEY command for 3 AES keys
-                    var keyDataBlocks = new[]
+                    var keyDataBlocks = new List<KeyDataBlock>();
+                    
+                    for (int i = 0; i < 3; i++) // ENC, MAC, DEK keys
                     {
-                        KeyDataBlock.CreateAes128Key(testKey),
-                        KeyDataBlock.CreateAes128Key(testKey),
-                        KeyDataBlock.CreateAes128Key(testKey)
-                    };
+                        var keyResult = KeyDataBlock.CreateAes128Key(testKey);
+                        if (keyResult.IsFailure)
+                        {
+                            AnsiConsole.MarkupLine($"[red]Failed to create key data block: {keyResult.Error.Message}[/]");
+                            return 1;
+                        }
+                        keyDataBlocks.Add(keyResult.Value);
+                    }
 
-                    var putKeyCommand = new PutKeyCommand(
-                        PutKeyCommand.KeyUsageQualifier.MultipleKeys,
-                        PutKeyCommand.KeyEncryptionKeyIdentifier.None,
-                        keyDataBlocks
-                    );
+                    var putKeyCommandResult = PutKeyCommand.Create(0x01, keyDataBlocks); // KVN 1
+                    if (putKeyCommandResult.IsFailure)
+                    {
+                        AnsiConsole.MarkupLine($"[red]Failed to create PUT KEY command: {putKeyCommandResult.Error.Message}[/]");
+                        return 1;
+                    }
+                    var putKeyCommand = putKeyCommandResult.Value;
 
                     // Add key version byte at the beginning of data
                     var putKeyData = new byte[] { 0x01 }; // KVN 1
@@ -177,8 +199,13 @@ namespace Gp4Net.Tool.Commands.Card
                         "[yellow]Step 5: Setting default key version to 1...[/]"
                     );
 
-                    storeDataCommand = StoreDataCommand.CreateDefaultKeyVersionCommand(0x01);
-                    response = CardService.SendCommand(storeDataCommand);
+                    storeDataResult = StoreDataCommand.CreateDefaultKeyVersionCommand(0x01);
+                    if (storeDataResult.IsFailure)
+                    {
+                        AnsiConsole.MarkupLine($"[red]Failed to create default key version command: {storeDataResult.Error.Message}[/]");
+                        return 1;
+                    }
+                    response = CardService.SendCommand(storeDataResult.Value);
 
                     if (!response.IsSuccessful)
                     {
@@ -229,8 +256,14 @@ namespace Gp4Net.Tool.Commands.Card
                     );
 
                     // Final verification
-                    var cardDataCommand = new GetDataCommand(0x0066);
-                    response = CardService.SendCommand(cardDataCommand);
+                    var cardDataResult = GetDataCommand.Create(0x0066);
+                    if (cardDataResult.IsFailure)
+                    {
+                        AnsiConsole.MarkupLine($"[red]✗ Failed to create card data command: {cardDataResult.Error.Message}[/]");
+                        return 1;
+                    }
+                    
+                    response = CardService.SendCommand(cardDataResult.Value);
 
                     if (response.IsSuccessful)
                     {
