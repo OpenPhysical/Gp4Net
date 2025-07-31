@@ -85,7 +85,7 @@ namespace Gp4Net.Tool.Commands.Applet
         /// </remarks>
         /// <exception cref="InvalidOperationException">Thrown when no deletion target is specified.</exception>
         /// <exception cref="FileNotFoundException">Thrown when a specified CAP file does not exist.</exception>
-        public async Task<int> ExecuteAsync(ICommandContext context, Settings settings)
+        public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
         {
             try
             {
@@ -169,7 +169,7 @@ namespace Gp4Net.Tool.Commands.Applet
         /// <exception cref="InvalidOperationException">Thrown when no deletion target is specified.</exception>
         /// <exception cref="FileNotFoundException">Thrown when a CAP file is specified but does not exist.</exception>
         private async Task<List<(byte[] Aid, string Description, string Source)>> DetermineAidsToDelete(
-            ICommandContext context,
+            ICliExecutionContext context,
             Settings settings)
         {
             var aidsToDelete = new List<(byte[] Aid, string Description, string Source)>();
@@ -224,7 +224,7 @@ namespace Gp4Net.Tool.Commands.Applet
         }
 
         private async Task<List<(byte[] Aid, string Description, string Source)>> GetInteractiveAids(
-            ICommandContext context,
+            ICliExecutionContext context,
             Settings settings)
         {
             // Need to establish secure channel first for GET STATUS
@@ -233,13 +233,16 @@ namespace Gp4Net.Tool.Commands.Applet
 
             var statusResult = await ctx.GetGlobalPlatformService().GetStatusAsync(Gp4Net.Services.StatusSubset.Applications);
             
-            var applications = await statusResult.MatchAsync(
-                apps => Task.FromResult(apps),
-                error => 
-                {
-                    AnsiConsole.MarkupLine($"[red]Error getting applications: {error.Message}[/]");
-                    return Task.FromResult(ImmutableList<ApplicationInfo>.Empty);
-                });
+            ImmutableList<ApplicationInfo> applications;
+            if (statusResult.IsSuccess)
+            {
+                applications = statusResult.Value;
+            }
+            else
+            {
+                AnsiConsole.MarkupLine($"[red]Error getting applications: {statusResult.Error.Message}[/]");
+                applications = ImmutableList<ApplicationInfo>.Empty;
+            }
 
             if (applications.Count == 0)
             {
@@ -330,7 +333,7 @@ namespace Gp4Net.Tool.Commands.Applet
         }
 
         private async Task<int> PerformDeletions(
-            ICommandContext context,
+            ICliExecutionContext context,
             List<(byte[] Aid, string Description, string Source)> aidsToDelete,
             Settings settings)
         {
@@ -355,25 +358,22 @@ namespace Gp4Net.Tool.Commands.Applet
                         var result = await context.GetGlobalPlatformService()
                             .DeleteApplicationAsync(aid, settings.DeleteRelated);
 
-                        await result.MatchAsync<object>(
-                            async unit =>
+                        if (result.IsSuccess)
+                        {
+                            successCount++;
+                            AnsiConsole.MarkupLine($"[green]✓ Deleted {description}[/]");
+                        }
+                        else
+                        {
+                            failureCount++;
+                            var errorMessage = GetHumanReadableError(result.Error);
+                            AnsiConsole.MarkupLine($"[red]✗ Failed to delete {description}: {errorMessage}[/]");
+                            
+                            if (settings.Debug && result.Error.InnerException != null)
                             {
-                                successCount++;
-                                AnsiConsole.MarkupLine($"[green]✓ Deleted {description}[/]");
-                                return new object();
-                            },
-                            async error =>
-                            {
-                                failureCount++;
-                                var errorMessage = GetHumanReadableError(error);
-                                AnsiConsole.MarkupLine($"[red]✗ Failed to delete {description}: {errorMessage}[/]");
-                                
-                                if (settings.Debug && error.InnerException != null)
-                                {
-                                    AnsiConsole.WriteException(error.InnerException);
-                                }
-                                return new object();
-                            });
+                                AnsiConsole.WriteException(result.Error.InnerException);
+                            }
+                        }
 
                         task.Increment(1);
                     }
@@ -441,18 +441,16 @@ namespace Gp4Net.Tool.Commands.Applet
             };
         }
 
-        private async Task DisplayCardInfo(ICommandContext context)
+        private async Task DisplayCardInfo(ICliExecutionContext context)
         {
             try
             {
                 var selectResult = await context.GetGlobalPlatformService().SelectIsdAsync();
-                await selectResult.MatchAsync<object>(
-                    async response =>
-                    {
-                        AnsiConsole.MarkupLine($"[dim]ISD AID: {Convert.ToHexString(response.Fci?.ApplicationAid ?? [])}[/]");
-                        return new object();
-                    },
-                    async _ => new object());
+                if (selectResult.IsSuccess)
+                {
+                    var response = selectResult.Value;
+                    AnsiConsole.MarkupLine($"[dim]ISD AID: {Convert.ToHexString(response.Fci?.ApplicationAid ?? [])}[/]");
+                }
             }
             catch
             {

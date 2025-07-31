@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
@@ -161,7 +162,7 @@ namespace Gp4Net.Domain.Protocol
                     parsedResponse.ScpId
                 );
 
-                return Result<SecureChannelSession, SmartCardError>.Ok(session);
+                return Result.Success<SecureChannelSession, SmartCardError>(session);
             }
             catch (Exception ex)
             {
@@ -290,7 +291,7 @@ namespace Gp4Net.Domain.Protocol
                     detectedProtocol
                 );
 
-                return Result<SecureChannelSession, SmartCardError>.Ok(session);
+                return Result.Success<SecureChannelSession, SmartCardError>(session);
             }
             catch (Exception ex)
             {
@@ -307,8 +308,8 @@ namespace Gp4Net.Domain.Protocol
         {
             return keySet switch
             {
-                Scp02KeySet _ => Result<byte, SmartCardError>.Ok(ProtocolIdentifiers.Scp02),
-                Scp03KeySet _ => Result<byte, SmartCardError>.Ok(ProtocolIdentifiers.Scp03),
+                Scp02KeySet _ => Result.Success<byte, SmartCardError>(ProtocolIdentifiers.Scp02),
+                Scp03KeySet _ => Result.Success<byte, SmartCardError>(ProtocolIdentifiers.Scp03),
                 _ => SmartCardError.InvalidData($"Unknown key set type: {keySet.GetType().Name}")
             };
         }

@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Functional
@@ -24,7 +23,8 @@ namespace Gp4Net.CardEmulator.Functional
         ImmutableDictionary<string, InstalledApplication> Applications,
         ImmutableList<LoadFile> LoadFiles,
         ImmutableDictionary<byte, IKeySet> InstalledKeys,
-        byte DefaultKeyVersion
+        byte DefaultKeyVersion,
+        ImmutableDictionary<byte, byte[]> SequenceCounters
     )
     {
         /// <summary>
@@ -44,7 +44,8 @@ namespace Gp4Net.CardEmulator.Functional
             Applications: ImmutableDictionary<string, InstalledApplication>.Empty,
             LoadFiles: ImmutableList<LoadFile>.Empty,
             InstalledKeys: ImmutableDictionary<byte, IKeySet>.Empty,
-            DefaultKeyVersion: 0xFF
+            DefaultKeyVersion: 0xFF,
+            SequenceCounters: ImmutableDictionary<byte, byte[]>.Empty
         );
 
         /// <summary>
@@ -119,6 +120,56 @@ namespace Gp4Net.CardEmulator.Functional
         {
             DefaultKeyVersion = keyVersion
         };
+
+        /// <summary>
+        /// Gets the sequence counter for a specific key version.
+        /// Returns a 3-byte counter starting at 000001 if not found.
+        /// </summary>
+        public byte[] GetSequenceCounter(byte keyVersion)
+        {
+            return SequenceCounters.TryGetValue(keyVersion, out var counter) 
+                ? counter 
+                : new byte[] { 0x00, 0x00, 0x01 }; // Default starting counter
+        }
+
+        /// <summary>
+        /// Creates a new state with an incremented sequence counter for the specified key version.
+        /// </summary>
+        public CardState WithIncrementedSequenceCounter(byte keyVersion)
+        {
+            var currentCounter = GetSequenceCounter(keyVersion);
+            var newCounter = IncrementCounter(currentCounter);
+            return this with { SequenceCounters = SequenceCounters.SetItem(keyVersion, newCounter) };
+        }
+
+        /// <summary>
+        /// Creates a new state with a reset sequence counter for the specified key version.
+        /// This should be called when a keyset is created or replaced.
+        /// </summary>
+        public CardState WithResetSequenceCounter(byte keyVersion)
+        {
+            var resetCounter = new byte[] { 0x00, 0x00, 0x01 };
+            return this with { SequenceCounters = SequenceCounters.SetItem(keyVersion, resetCounter) };
+        }
+
+        /// <summary>
+        /// Increments a 3-byte counter in big-endian format.
+        /// </summary>
+        private static byte[] IncrementCounter(byte[] counter)
+        {
+            var newCounter = new byte[3];
+            System.Array.Copy(counter, newCounter, 3);
+            
+            // Increment in big-endian format
+            var value = (newCounter[0] << 16) | (newCounter[1] << 8) | newCounter[2];
+            value++;
+            
+            newCounter[0] = (byte)(value >> 16);
+            newCounter[1] = (byte)(value >> 8);
+            newCounter[2] = (byte)value;
+            
+            return newCounter;
+        }
 
         /// <summary>
         /// Resets the card state to initial conditions.

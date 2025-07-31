@@ -1,4 +1,5 @@
 using System;
+using CSharpFunctionalExtensions;
 using JetBrains.Annotations;
 using Gp4Net.Core;
 
@@ -61,7 +62,9 @@ namespace Gp4Net.Domain.Keys
                 macKey: (byte[])StandardTestKey.Clone(),
                 dekKey: (byte[])StandardTestKey.Clone(),
                 keyVersion: keyVersion
-            ).GetOrThrow(error => new InvalidOperationException($"Failed to create SCP02 test key set: {error.Message}"));
+            ).Match(
+                onSuccess: keySet => keySet,
+                onFailure: error => throw new InvalidOperationException($"Failed to create SCP02 test key set: {error.Message}"));
         }
 
         /// <summary>
@@ -76,7 +79,9 @@ namespace Gp4Net.Domain.Keys
                 macKey: (byte[])StandardTestKey.Clone(),
                 dekKey: (byte[])StandardTestKey.Clone(),
                 keyVersion: keyVersion
-            ).GetOrThrow(error => new InvalidOperationException($"Failed to create SCP03 test key set: {error.Message}"));
+            ).Match(
+                onSuccess: keySet => keySet,
+                onFailure: error => throw new InvalidOperationException($"Failed to create SCP03 test key set: {error.Message}"));
         }
 
         /// <summary>
@@ -91,7 +96,9 @@ namespace Gp4Net.Domain.Keys
                 macKey: (byte[])ZeroTestKey.Clone(),
                 dekKey: (byte[])ZeroTestKey.Clone(),
                 keyVersion: keyVersion
-            ).GetOrThrow(error => new InvalidOperationException($"Failed to create SCP02 zero key set: {error.Message}"));
+            ).Match(
+                onSuccess: keySet => keySet,
+                onFailure: error => throw new InvalidOperationException($"Failed to create SCP02 zero key set: {error.Message}"));
         }
 
         /// <summary>
@@ -106,7 +113,9 @@ namespace Gp4Net.Domain.Keys
                 macKey: (byte[])ZeroTestKey.Clone(),
                 dekKey: (byte[])ZeroTestKey.Clone(),
                 keyVersion: keyVersion
-            ).GetOrThrow(error => new InvalidOperationException($"Failed to create SCP03 zero key set: {error.Message}"));
+            ).Match(
+                onSuccess: keySet => keySet,
+                onFailure: error => throw new InvalidOperationException($"Failed to create SCP03 zero key set: {error.Message}"));
         }
 
         /// <summary>
@@ -125,7 +134,9 @@ namespace Gp4Net.Domain.Keys
         )
         {
             return Scp02KeySet.Create(encKey, macKey, dekKey, keyVersion)
-                .GetOrThrow(error => new InvalidOperationException($"Failed to create SCP02 custom key set: {error.Message}"));
+                .Match(
+                    onSuccess: keySet => keySet,
+                    onFailure: error => throw new InvalidOperationException($"Failed to create SCP02 custom key set: {error.Message}"));
         }
 
         /// <summary>
@@ -144,7 +155,9 @@ namespace Gp4Net.Domain.Keys
         )
         {
             return Scp03KeySet.Create(encKey, macKey, dekKey, keyVersion)
-                .GetOrThrow(error => new InvalidOperationException($"Failed to create SCP03 custom key set: {error.Message}"));
+                .Match(
+                    onSuccess: keySet => keySet,
+                    onFailure: error => throw new InvalidOperationException($"Failed to create SCP03 custom key set: {error.Message}"));
         }
 
         /// <summary>

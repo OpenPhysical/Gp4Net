@@ -1,5 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 
 namespace Gp4Net.Pipeline
@@ -45,7 +46,7 @@ namespace Gp4Net.Pipeline
         /// </summary>
         protected static Result<CommandResponse, SmartCardError> UpdateContext(
             Result<CommandResponse, SmartCardError> result,
-            ICommandContext newContext) =>
+            IPipelineContext newContext) =>
             result.Map(response => response.WithContext(newContext));
 
         /// <summary>

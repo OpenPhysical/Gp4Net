@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Pipeline;
 using Gp4Net.Transport;
@@ -14,7 +15,7 @@ namespace Gp4Net.Services
     public class SmartCardService : ISmartCardService
     {
         private readonly ICommandPipeline _pipeline;
-        private readonly ICommandContext _context;
+        private readonly IPipelineContext _context;
         private readonly IApduTransport _transport;
         private readonly ILogger<SmartCardService>? _logger;
         private bool _disposed;
@@ -24,7 +25,7 @@ namespace Gp4Net.Services
         /// </summary>
         public SmartCardService(
             ICommandPipeline pipeline,
-            ICommandContext context,
+            IPipelineContext context,
             IApduTransport transport,
             ILogger<SmartCardService>? logger = null)
         {
@@ -35,7 +36,7 @@ namespace Gp4Net.Services
         }
 
         /// <inheritdoc/>
-        public ICommandContext Context => _context;
+        public IPipelineContext Context => _context;
 
         /// <inheritdoc/>
         public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
@@ -81,20 +82,20 @@ namespace Gp4Net.Services
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger?.LogError(ex, "Unexpected error executing command");
-                return Result<CommandResponse, SmartCardError>.Fail(
+                return Result.Failure<CommandResponse, SmartCardError>(
                     SmartCardError.CommunicationError("Unexpected error executing command", ex));
             }
         }
 
         /// <inheritdoc/>
-        public ISmartCardService WithContext(ICommandContext context)
+        public ISmartCardService WithContext(IPipelineContext context)
         {
             ArgumentNullException.ThrowIfNull(context);
             return new SmartCardService(_pipeline, context, _transport, _logger);
         }
 
         /// <inheritdoc/>
-        public ISmartCardService WithContextValue<T>(string key, T value) where T : class
+        public ISmartCardService WithContextValue<T>(string key, T value)
         {
             var newContext = _context.With(key, value);
             return WithContext(newContext);
@@ -145,7 +146,7 @@ namespace Gp4Net.Services
                 // Create card context
                 var contextResult = await CreateCardContextAsync();
                 if (contextResult.IsFailure)
-                    return Result<ISmartCardService, SmartCardError>.Fail(contextResult.Error);
+                    return Result.Failure<ISmartCardService, SmartCardError>(contextResult.Error);
 
                 var cardContext = contextResult.Value;
 
@@ -154,7 +155,7 @@ namespace Gp4Net.Services
                 if (connectResult.IsFailure)
                 {
                     cardContext.Dispose();
-                    return Result<ISmartCardService, SmartCardError>.Fail(connectResult.Error);
+                    return Result.Failure<ISmartCardService, SmartCardError>(connectResult.Error);
                 }
 
                 var (cardChannel, protocol) = connectResult.Value;
@@ -166,17 +167,17 @@ namespace Gp4Net.Services
                 var pipeline = BuildPipeline(transport, options);
 
                 // Create initial context
-                var context = options.InitialContext ?? new ImmutableCommandContext();
+                var context = options.InitialContext ?? new ImmutablePipelineContext();
 
                 // Create service
                 var logger = _loggerFactory?.CreateLogger<SmartCardService>();
                 var service = new SmartCardService(pipeline, context, transport, logger);
 
-                return Result<ISmartCardService, SmartCardError>.Ok(service);
+                return Result.Success<ISmartCardService, SmartCardError>(service);
             }
             catch (Exception ex)
             {
-                return Result<ISmartCardService, SmartCardError>.Fail(
+                return Result.Failure<ISmartCardService, SmartCardError>(
                     SmartCardError.CommunicationError($"Failed to create smart card service: {ex.Message}", ex));
             }
         }
@@ -188,16 +189,16 @@ namespace Gp4Net.Services
             {
                 var contextResult = await CreateCardContextAsync();
                 if (contextResult.IsFailure)
-                    return Result<string[], SmartCardError>.Fail(contextResult.Error);
+                    return Result.Failure<string[], SmartCardError>(contextResult.Error);
 
                 using var cardContext = contextResult.Value;
                 var readers = cardContext.GetReaders();
                 
-                return Result<string[], SmartCardError>.Ok(readers);
+                return Result.Success<string[], SmartCardError>(readers);
             }
             catch (Exception ex)
             {
-                return Result<string[], SmartCardError>.Fail(
+                return Result.Failure<string[], SmartCardError>(
                     SmartCardError.CommunicationError($"Failed to list readers: {ex.Message}", ex));
             }
         }
@@ -206,7 +207,7 @@ namespace Gp4Net.Services
         {
             // The card context should be provided by the tool layer through dependency injection
             // This service should not know about specific implementations like WSCT
-            return await Task.FromResult(Result<ICardContext, SmartCardError>.Fail(
+            return await Task.FromResult(Result.Failure<ICardContext, SmartCardError>(
                 SmartCardError.CommunicationError("Card context must be injected from tool layer")));
         }
 
@@ -232,11 +233,11 @@ namespace Gp4Net.Services
                 // For now, this is a placeholder that needs architectural fix
                 var channel = CreateChannelAdapter(legacyChannel);
                 var actualProtocol = DetectProtocol(legacyChannel);
-                return Result<(ICardChannel, CardProtocol), SmartCardError>.Ok((channel, actualProtocol));
+                return Result.Success<(ICardChannel, CardProtocol), SmartCardError>((channel, actualProtocol));
             }
             catch (Exception ex)
             {
-                return Result<(ICardChannel, CardProtocol), SmartCardError>.Fail(
+                return Result.Failure<(ICardChannel, CardProtocol), SmartCardError>(
                     SmartCardError.CommunicationError($"Failed to connect to card: {ex.Message}", ex));
             }
         }
@@ -352,7 +353,7 @@ namespace Gp4Net.Services
                 var result = await currentService.ExecuteCommandAsync(commands[i], cancellationToken);
                 
                 if (result.IsFailure)
-                    return Result<CommandResponse[], SmartCardError>.Fail(result.Error);
+                    return Result.Failure<CommandResponse[], SmartCardError>(result.Error);
 
                 var response = result.Value;
                 responses[i] = response;
@@ -364,7 +365,7 @@ namespace Gp4Net.Services
                 }
             }
 
-            return Result<CommandResponse[], SmartCardError>.Ok(responses);
+            return Result.Success<CommandResponse[], SmartCardError>(responses);
         }
 
         /// <summary>

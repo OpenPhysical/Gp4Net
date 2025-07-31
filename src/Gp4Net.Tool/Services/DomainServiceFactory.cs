@@ -75,7 +75,7 @@ namespace Gp4Net.Tool.Services
             var transport = _transportFactory.CreateTransport(TransportProtocol.T0);
             
             // Build immutable domain context with all required dependencies
-            var context = new Gp4Net.Pipeline.ImmutableCommandContext()
+            var context = new Gp4Net.Pipeline.ImmutablePipelineContext()
                 .With("CardChannel", channel)
                 .With("ApduTransport", transport)
                 .With("TransportProtocol", TransportProtocol.T0);

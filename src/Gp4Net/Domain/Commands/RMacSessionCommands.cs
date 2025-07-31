@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 
@@ -111,7 +112,7 @@ namespace Gp4Net.Domain.Commands
             // Validate security level
             if (!System.Enum.IsDefined(typeof(SecurityLevel), securityLevel))
             {
-                return Result<BeginRMacSessionCommand, SmartCardError>.Fail(
+                return Result.Failure<BeginRMacSessionCommand, SmartCardError>(
                     SmartCardError.InvalidArgument($"Invalid security level: {securityLevel}")
                 );
             }
@@ -119,7 +120,7 @@ namespace Gp4Net.Domain.Commands
             // Validate CLA byte
             if (cla != Cla80 && cla != ClaC0 && cla != ClaE0)
             {
-                return Result<BeginRMacSessionCommand, SmartCardError>.Fail(
+                return Result.Failure<BeginRMacSessionCommand, SmartCardError>(
                     SmartCardError.InvalidArgument($"Invalid CLA byte: 0x{cla:X2}. Must be 0x80, 0xC0, or 0xE0")
                 );
             }
@@ -127,7 +128,7 @@ namespace Gp4Net.Domain.Commands
             // Validate MAC length
             if (mac != null && mac.Length != 8)
             {
-                return Result<BeginRMacSessionCommand, SmartCardError>.Fail(
+                return Result.Failure<BeginRMacSessionCommand, SmartCardError>(
                     SmartCardError.InvalidArgument("MAC must be exactly 8 bytes")
                 );
             }
@@ -135,7 +136,7 @@ namespace Gp4Net.Domain.Commands
             // Convert security level to P1 parameter
             byte p1 = (byte)securityLevel;
 
-            return Result<BeginRMacSessionCommand, SmartCardError>.Ok(
+            return Result.Success<BeginRMacSessionCommand, SmartCardError>(
                 new BeginRMacSessionCommand(cla, p1, data, mac)
             );
         }
@@ -231,7 +232,7 @@ namespace Gp4Net.Domain.Commands
             // Validate security level
             if (!System.Enum.IsDefined(typeof(SecurityLevel), securityLevel))
             {
-                return Result<EndRMacSessionCommand, SmartCardError>.Fail(
+                return Result.Failure<EndRMacSessionCommand, SmartCardError>(
                     SmartCardError.InvalidArgument($"Invalid security level: {securityLevel}")
                 );
             }
@@ -239,7 +240,7 @@ namespace Gp4Net.Domain.Commands
             // Validate CLA byte
             if (cla != Cla80 && cla != ClaC0 && cla != ClaE0)
             {
-                return Result<EndRMacSessionCommand, SmartCardError>.Fail(
+                return Result.Failure<EndRMacSessionCommand, SmartCardError>(
                     SmartCardError.InvalidArgument($"Invalid CLA byte: 0x{cla:X2}. Must be 0x80, 0xC0, or 0xE0")
                 );
             }
@@ -247,7 +248,7 @@ namespace Gp4Net.Domain.Commands
             // Validate MAC length
             if (mac != null && mac.Length != 8)
             {
-                return Result<EndRMacSessionCommand, SmartCardError>.Fail(
+                return Result.Failure<EndRMacSessionCommand, SmartCardError>(
                     SmartCardError.InvalidArgument("MAC must be exactly 8 bytes")
                 );
             }
@@ -255,7 +256,7 @@ namespace Gp4Net.Domain.Commands
             // P2 parameter is typically 0x03 to end session and return R-MAC
             byte p2 = 0x03;
 
-            return Result<EndRMacSessionCommand, SmartCardError>.Ok(
+            return Result.Success<EndRMacSessionCommand, SmartCardError>(
                 new EndRMacSessionCommand(cla, p2, mac)
             );
         }
@@ -295,19 +296,19 @@ namespace Gp4Net.Domain.Commands
         {
             if (responseData == null)
             {
-                return Result<EndRMacSessionResponse, SmartCardError>.Fail(
+                return Result.Failure<EndRMacSessionResponse, SmartCardError>(
                     SmartCardError.InvalidData("Response data cannot be null")
                 );
             }
 
             if (responseData.Length != 8)
             {
-                return Result<EndRMacSessionResponse, SmartCardError>.Fail(
+                return Result.Failure<EndRMacSessionResponse, SmartCardError>(
                     SmartCardError.InvalidData($"Response must be exactly 8 bytes, but got {responseData.Length} bytes")
                 );
             }
 
-            return Result<EndRMacSessionResponse, SmartCardError>.Ok(
+            return Result.Success<EndRMacSessionResponse, SmartCardError>(
                 new EndRMacSessionResponse(responseData)
             );
         }

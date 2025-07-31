@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
 using Gp4Net.Domain.Keys;
@@ -146,11 +147,15 @@ namespace Gp4Net.CardEmulator.Services
                 IKeySet keys;
                 if (HasScp03Capability(_currentCard))
                 {
-                    keys = Scp03KeySet.Create(keySet, keySet, keySet, 0xFF).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp03KeySet: {e.Message}"));
+                    keys = Scp03KeySet.Create(keySet, keySet, keySet, 0xFF).Match(
+                        onSuccess: k => k,
+                        onFailure: error => throw new InvalidOperationException($"Failed to create Scp03KeySet: {error.Message}"));
                 }
                 else
                 {
-                    keys = Scp02KeySet.Create(keySet, keySet, keySet, 0xFF).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp02KeySet: {e.Message}"));
+                    keys = Scp02KeySet.Create(keySet, keySet, keySet, 0xFF).Match(
+                        onSuccess: k => k,
+                        onFailure: error => throw new InvalidOperationException($"Failed to create Scp02KeySet: {error.Message}"));
                 }
 
                 // Note: Functional cards use immutable configuration,

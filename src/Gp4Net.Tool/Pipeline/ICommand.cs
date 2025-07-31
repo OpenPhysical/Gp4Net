@@ -13,6 +13,6 @@ namespace Gp4Net.Tool.Pipeline
         /// <summary>
         /// Executes the command with the provided context and settings.
         /// </summary>
-        Task<int> ExecuteAsync(ICommandContext context, TSettings settings);
+        Task<int> ExecuteAsync(ICliExecutionContext context, TSettings settings);
     }
 }

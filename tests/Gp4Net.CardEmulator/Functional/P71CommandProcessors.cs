@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Constants;
 using Gp4Net.CardEmulator.Core;
@@ -42,7 +42,7 @@ namespace Gp4Net.CardEmulator.Functional
             return ParseGetDataCommand(command)
                 .Bind(tag => ValidateP71DataAccess(tag, state))
                 .Bind(tag => RetrieveP71DataObject(tag, config))
-                .Map(data => (new ApduResponse(data, StatusWords.SUCCESS), state));
+                .Map(data => (new ApduResponse(data, StatusWords.Success), state));
         }
 
         /// <summary>
@@ -63,25 +63,25 @@ namespace Gp4Net.CardEmulator.Functional
         {
             // IDENTIFY command: 80 CA 00 FE 02 DF28 00
             if (command.Length < 7)
-                return new Result<IdentifyRequest, SmartCardError>.Failure(SmartCardError.WrongLength());
+                return Result.Failure<IdentifyRequest, SmartCardError>(SmartCardError.WrongLength());
 
             if (command[0] != 0x80 || command[1] != 0xCA || 
                 command[2] != 0x00 || command[3] != 0xFE)
-                return new Result<IdentifyRequest, SmartCardError>.Failure(SmartCardError.InstructionNotSupported());
+                return Result.Failure<IdentifyRequest, SmartCardError>(SmartCardError.InstructionNotSupported());
 
             if (command[4] != 0x02)
-                return new Result<IdentifyRequest, SmartCardError>.Failure(SmartCardError.WrongLength());
+                return Result.Failure<IdentifyRequest, SmartCardError>(SmartCardError.WrongLength());
 
             if (command[5] != 0xDF || command[6] != 0x28)
-                return new Result<IdentifyRequest, SmartCardError>.Failure(SmartCardError.IncorrectData());
+                return Result.Failure<IdentifyRequest, SmartCardError>(SmartCardError.IncorrectData());
 
-            return new Result<IdentifyRequest, SmartCardError>.Success(new IdentifyRequest());
+            return Result.Success<IdentifyRequest, SmartCardError>(new IdentifyRequest());
         }
 
         private static Result<IdentifyRequest, SmartCardError> ValidateIdentifyAccess(CardState state)
         {
             // IDENTIFY can be called without secure channel or selection
-            return new Result<IdentifyRequest, SmartCardError>.Success(new IdentifyRequest());
+            return Result.Success<IdentifyRequest, SmartCardError>(new IdentifyRequest());
         }
 
         private static ApduResponse CreateP71IdentifyResponse(CardConfiguration config)
@@ -106,19 +106,19 @@ namespace Gp4Net.CardEmulator.Functional
             // FIPS Mode (Tag 05) - from FIPS 140-2 document
             data.AddRange([0x05, 0x01, 0x01]); // 01 = FIPS mode active
 
-            return new ApduResponse(data.ToArray(), StatusWords.SUCCESS);
+            return new ApduResponse(data.ToArray(), StatusWords.Success);
         }
 
         private static Result<ushort, SmartCardError> ParseGetDataCommand(byte[] command)
         {
             if (command.Length < 4)
-                return new Result<ushort, SmartCardError>.Failure(SmartCardError.WrongLength());
+                return Result.Failure<ushort, SmartCardError>(SmartCardError.WrongLength());
 
             if (command[0] != 0x80 || command[1] != 0xCA)
-                return new Result<ushort, SmartCardError>.Failure(SmartCardError.InstructionNotSupported());
+                return Result.Failure<ushort, SmartCardError>(SmartCardError.InstructionNotSupported());
 
             var tag = (ushort)((command[2] << 8) | command[3]);
-            return new Result<ushort, SmartCardError>.Success(tag);
+            return Result.Success<ushort, SmartCardError>(tag);
         }
 
         private static Result<ushort, SmartCardError> ValidateP71DataAccess(ushort tag, CardState state)
@@ -128,8 +128,8 @@ namespace Gp4Net.CardEmulator.Functional
             return tag switch
             {
                 0x00E0 when !state.IsSecureChannelEstablished => // Key info requires auth
-                    new Result<ushort, SmartCardError>.Failure(SmartCardError.SecurityStatusNotSatisfied()),
-                _ => new Result<ushort, SmartCardError>.Success(tag)
+                    Result.Failure<ushort, SmartCardError>(SmartCardError.SecurityStatusNotSatisfied()),
+                _ => Result.Success<ushort, SmartCardError>(tag)
             };
         }
 
@@ -139,7 +139,7 @@ namespace Gp4Net.CardEmulator.Functional
         {
             // Try to get from configuration first
             if (config.DefaultDataObjects.TryGetValue(tag, out var data))
-                return new Result<byte[], SmartCardError>.Success(data);
+                return Result.Success<byte[], SmartCardError>(data);
 
             // Handle P71-specific dynamic data objects
             return tag switch
@@ -147,14 +147,14 @@ namespace Gp4Net.CardEmulator.Functional
                 0x9F7F => CreateP71CplcData(), // Enhanced CPLC
                 0x0067 => CreateP71Capabilities(), // Enhanced capabilities
                 0x0066 => CreateP71CardData(), // Enhanced card data
-                _ => new Result<byte[], SmartCardError>.Failure(SmartCardError.ReferencedDataNotFound())
+                _ => Result.Failure<byte[], SmartCardError>(SmartCardError.ReferencedDataNotFound())
             };
         }
 
         private static Result<byte[], SmartCardError> ValidateCplcAccess(CardState state)
         {
             // CPLC data is usually publicly readable
-            return new Result<byte[], SmartCardError>.Success(Array.Empty<byte>());
+            return Result.Success<byte[], SmartCardError>(Array.Empty<byte>());
         }
 
         private static ApduResponse CreateP71CplcResponse(CardConfiguration config)
@@ -163,7 +163,7 @@ namespace Gp4Net.CardEmulator.Functional
             var cplcData = Convert.FromHexString(
                 "4790D3214700000000002345558919204839000000000000000018649535383931390000000000000000");
             
-            return new ApduResponse(cplcData, StatusWords.SUCCESS);
+            return new ApduResponse(cplcData, StatusWords.Success);
         }
 
         private static Result<byte[], SmartCardError> CreateP71CplcData()
@@ -208,7 +208,7 @@ namespace Gp4Net.CardEmulator.Functional
             // IC Personalization Equipment ID: 00000000
             cplcData.AddRange([0x00, 0x00, 0x00, 0x00]);
 
-            return new Result<byte[], SmartCardError>.Success(cplcData.ToArray());
+            return Result.Success<byte[], SmartCardError>(cplcData.ToArray());
         }
 
         private static Result<byte[], SmartCardError> CreateP71Capabilities()
@@ -216,7 +216,7 @@ namespace Gp4Net.CardEmulator.Functional
             // P71 capabilities from trace data
             var capabilities = Convert.FromHexString(
                 "6728A00D800103810500102060708201078103E5BEC082031E030083010284010285017B86010C87017B");
-            return new Result<byte[], SmartCardError>.Success(capabilities);
+            return Result.Success<byte[], SmartCardError>(capabilities);
         }
 
         private static Result<byte[], SmartCardError> CreateP71CardData()
@@ -224,7 +224,7 @@ namespace Gp4Net.CardEmulator.Functional
             // P71 card data from trace data showing GP and JavaCard support
             var cardData = Convert.FromHexString(
                 "664D734B06072A864886FC6B01600B06092A864886FC6B020203630906072A864886FC6B03640B06092A864886FC6B040370650D060B2A864886FC6B0507020000660C060A2B060104012A026E0103");
-            return new Result<byte[], SmartCardError>.Success(cardData);
+            return Result.Success<byte[], SmartCardError>(cardData);
         }
 
         private record IdentifyRequest();

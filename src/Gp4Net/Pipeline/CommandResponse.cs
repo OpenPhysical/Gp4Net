@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 
 namespace Gp4Net.Pipeline
@@ -10,7 +11,7 @@ namespace Gp4Net.Pipeline
     public record CommandResponse(
         byte[] Data,
         ushort StatusWord,
-        ICommandContext UpdatedContext,
+        IPipelineContext UpdatedContext,
         IReadOnlyDictionary<string, object>? Metadata = null)
     {
         /// <summary>
@@ -23,12 +24,12 @@ namespace Gp4Net.Pipeline
         /// </summary>
         public static CommandResponse Success(
             byte[]? data = null,
-            ICommandContext? context = null,
+            IPipelineContext? context = null,
             IReadOnlyDictionary<string, object>? metadata = null) =>
             new(
                 data ?? Array.Empty<byte>(),
                 0x9000,
-                context ?? ImmutableCommandContext.Empty,
+                context ?? ImmutablePipelineContext.Empty,
                 metadata);
 
         /// <summary>
@@ -36,12 +37,12 @@ namespace Gp4Net.Pipeline
         /// </summary>
         public static CommandResponse Failure(
             ushort statusWord,
-            ICommandContext? context = null,
+            IPipelineContext? context = null,
             IReadOnlyDictionary<string, object>? metadata = null) =>
             new(
                 Array.Empty<byte>(),
                 statusWord,
-                context ?? ImmutableCommandContext.Empty,
+                context ?? ImmutablePipelineContext.Empty,
                 metadata);
 
         /// <summary>
@@ -49,8 +50,8 @@ namespace Gp4Net.Pipeline
         /// </summary>
         public Result<CommandResponse, SmartCardError> ToResult() =>
             IsSuccess
-                ? Result<CommandResponse, SmartCardError>.Ok(this)
-                : Result<CommandResponse, SmartCardError>.Fail(
+                ? Result.Success<CommandResponse, SmartCardError>(this)
+                : Result.Failure<CommandResponse, SmartCardError>(
                     SmartCardError.FromStatusWord(StatusWord));
 
         /// <summary>
@@ -68,7 +69,7 @@ namespace Gp4Net.Pipeline
         /// <summary>
         /// Creates a new response with updated context.
         /// </summary>
-        public CommandResponse WithContext(ICommandContext context) =>
+        public CommandResponse WithContext(IPipelineContext context) =>
             this with { UpdatedContext = context };
 
         /// <summary>

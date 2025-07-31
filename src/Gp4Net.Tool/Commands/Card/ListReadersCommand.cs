@@ -16,7 +16,7 @@ namespace Gp4Net.Tool.Commands.Card
         /// <summary>
         /// Executes the list readers command to enumerate available smart card readers.
         /// </summary>
-        public async Task<int> ExecuteAsync(ICommandContext context, Settings settings)
+        public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
         {
             try
             {

@@ -32,7 +32,7 @@ namespace Gp4Net.Tool.Commands.Debug
             public bool ShowOffsets { get; set; } = true;
         }
 
-        public Task<int> ExecuteAsync(ICommandContext context, Settings settings)
+        public Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
         {
             try
             {
@@ -68,7 +68,7 @@ namespace Gp4Net.Tool.Commands.Debug
             }
         }
 
-        private void DisplayAsn1Object(ICommandContext context, Asn1Object obj, int depth, int offset, Settings settings)
+        private void DisplayAsn1Object(ICliExecutionContext context, Asn1Object obj, int depth, int offset, Settings settings)
         {
             var indent = new string(' ', depth * 2);
             var typeInfo = GetAsn1TypeInfo(obj);

@@ -64,9 +64,14 @@ namespace Gp4Net.Tool.Commands.Applet
             var statusResult = await GlobalPlatformService.GetStatusAsync(
                 StatusSubset.Applications);
 
-            return await statusResult.MatchAsync(
-                async applications => await ProcessApplications(applications, settings),
-                error => Task.FromResult(HandleError(error, settings)));
+            if (statusResult.IsSuccess)
+            {
+                return await ProcessApplications(statusResult.Value, settings);
+            }
+            else
+            {
+                return HandleError(statusResult.Error, settings);
+            }
         }
 
         private Task<int> ProcessApplications(IReadOnlyList<ApplicationInfo> applications, Settings settings)

@@ -1,16 +1,19 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Pipeline;
 using Gp4Net.Services;
 using Gp4Net.Tests.Infrastructure;
 using Gp4Net.Tests.TestHelpers;
 using Gp4Net.Tool.Services;
+using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Transport;
 using NUnit.Framework;
-using ToolICommandContext = Gp4Net.Tool.Pipeline.ICommandContext;
 
 namespace Gp4Net.Tests.Services
 {
@@ -22,7 +25,7 @@ namespace Gp4Net.Tests.Services
     {
         private MockTransport _mockTransport;
         private ICommandPipeline _pipeline;
-        private ICommandContext _context;
+        private IPipelineContext _context;
         private SmartCardService _service;
 
         [SetUp]
@@ -144,12 +147,12 @@ namespace Gp4Net.Tests.Services
         {
             public Task<Result<CommandResponse, SmartCardError>> ExecuteAsync(
                 IApduCommand command,
-                ToolICommandContext context,
+                IPipelineContext context,
                 CancellationToken cancellationToken = default)
             {
                 // Simple pass-through implementation for testing
                 var response = new CommandResponse(new byte[] { 0x90, 0x00 }, null);
-                return Task.FromResult(Result<CommandResponse, SmartCardError>.Ok(response));
+                return Task.FromResult(Result.Success<CommandResponse, SmartCardError>(response));
             }
 
             public Task<Result<CommandResponse, SmartCardError>> ExecuteAsync(
@@ -158,32 +161,62 @@ namespace Gp4Net.Tests.Services
             {
                 // Simple pass-through implementation for testing
                 var response = new CommandResponse(new byte[] { 0x90, 0x00 }, null);
-                return Task.FromResult(Result<CommandResponse, SmartCardError>.Ok(response));
+                return Task.FromResult(Result.Success<CommandResponse, SmartCardError>(response));
             }
         }
 
         /// <summary>
         /// Simple test command context implementation for testing.
         /// </summary>
-        private class TestCommandContext : ToolICommandContext
+        private class TestCommandContext : IPipelineContext
         {
-            public IDisplayService Display { get; } = null!;
-            public ICardService CardService { get; } = null!;
-            public IKeysetResolver KeysetResolver { get; } = null!;
+            private readonly ImmutableDictionary<string, object> _values;
 
-            public Gp4Net.Services.IGlobalPlatformService GetGlobalPlatformService() => null!;
+            public TestCommandContext() : this(ImmutableDictionary<string, object>.Empty)
+            {
+            }
 
-            public Task<ToolICommandContext> RequireCardConnection(string? readerName = null) =>
-                Task.FromResult<ToolICommandContext>(this);
+            private TestCommandContext(ImmutableDictionary<string, object> values)
+            {
+                _values = values;
+            }
 
-            public Task<ToolICommandContext> RequireSecureChannel(byte securityLevel = 1, string? keyset = null) =>
-                Task.FromResult<ToolICommandContext>(this);
+            public Maybe<T> Get<T>(string key)
+            {
+                if (_values.TryGetValue(key, out var value) && value is T typedValue)
+                {
+                    return Maybe<T>.From(typedValue);
+                }
+                return Maybe<T>.None;
+            }
 
-            public Task<int> ExecuteAsync(Func<ToolICommandContext, Task<int>> commandLogic) =>
-                Task.FromResult(0);
+            public IPipelineContext With<T>(string key, T value)
+            {
+                var newValues = value != null ? _values.SetItem(key, value) : _values;
+                return new TestCommandContext(newValues);
+            }
 
-            public Task<int> ExecuteAsync(Func<ToolICommandContext, int> commandLogic) =>
-                Task.FromResult(0);
+            public IPipelineContext Without(string key)
+            {
+                return new TestCommandContext(_values.Remove(key));
+            }
+
+            public ImmutableArray<string> Keys => _values.Keys.ToImmutableArray();
+
+            public IPipelineContext WithMany(ImmutableDictionary<string, object> values)
+            {
+                var newValues = _values;
+                foreach (var kvp in values)
+                {
+                    newValues = newValues.SetItem(kvp.Key, kvp.Value);
+                }
+                return new TestCommandContext(newValues);
+            }
+
+            public ImmutableDictionary<string, object> ToImmutableDictionary()
+            {
+                return _values;
+            }
         }
     }
 }

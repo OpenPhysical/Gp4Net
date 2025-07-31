@@ -1,5 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
 
@@ -19,7 +20,7 @@ namespace Gp4Net.Pipeline
         /// <returns>The result of the command execution.</returns>
         Task<Result<CommandResponse, SmartCardError>> ExecuteAsync(
             IApduCommand command,
-            ICommandContext context,
+            IPipelineContext context,
             CancellationToken cancellationToken = default);
 
         /// <summary>

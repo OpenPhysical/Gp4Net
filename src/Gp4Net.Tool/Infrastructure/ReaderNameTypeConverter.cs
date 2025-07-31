@@ -12,6 +12,7 @@ namespace Gp4Net.Tool.Infrastructure
     /// Type converter for smart card reader names that supports:
     /// - Partial name matching (case-insensitive)
     /// - Auto-detection with user prompts
+    /// - Virtual card emulator support
     /// - Intelligent error handling
     /// </summary>
     public class ReaderNameTypeConverter : TypeConverter
@@ -55,6 +56,37 @@ namespace Gp4Net.Tool.Infrastructure
         /// <returns>The resolved reader.</returns>
         private static Reader ResolveReader(string input, ICardService cardService)
         {
+            // Check for virtual card emulator keywords
+            if (!string.IsNullOrWhiteSpace(input))
+            {
+                var normalizedInput = input.Trim().ToLowerInvariant();
+                
+                // Handle different emulator types - be explicit with virtual- prefix
+                switch (normalizedInput)
+                {
+                    case "virtual" or "virtual-emulator":
+                        return new Reader("Virtual Card Emulator", isVirtual: true);
+                    
+                    case "virtual-p71":
+                        return new Reader("Virtual P71 Reader 00 00", isVirtual: true);
+                    
+                    case "virtual-dual" or "virtual-dual-protocol":
+                        return new Reader("Virtual Dual Protocol Reader 01 00", isVirtual: true);
+                    
+                    case "virtual-scp03":
+                        return new Reader("Virtual SCP03 Reader 02 00", isVirtual: true);
+                    
+                    case "virtual-generic":
+                        return new Reader("Virtual Generic Reader 03 00", isVirtual: true);
+                    
+                    case "virtual-scp02":
+                        return new Reader("Virtual SCP02 Reader 04 00", isVirtual: true);
+                }
+                
+                // No partial matching - be explicit
+                // User must use exact virtual-* names
+            }
+
             if (string.IsNullOrWhiteSpace(input))
             {
                 input = "auto";

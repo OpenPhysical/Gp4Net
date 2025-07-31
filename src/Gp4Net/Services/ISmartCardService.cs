@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Pipeline;
 using Gp4Net.Transport;
@@ -37,14 +38,14 @@ namespace Gp4Net.Services
         /// <summary>
         /// Gets the current command context containing state information.
         /// </summary>
-        ICommandContext Context { get; }
+        IPipelineContext Context { get; }
 
         /// <summary>
         /// Creates a new service instance with an updated context.
         /// </summary>
         /// <param name="context">The new context.</param>
         /// <returns>A new service instance with the updated context.</returns>
-        ISmartCardService WithContext(ICommandContext context);
+        ISmartCardService WithContext(IPipelineContext context);
 
         /// <summary>
         /// Creates a new service instance with a context value added.
@@ -53,7 +54,7 @@ namespace Gp4Net.Services
         /// <param name="key">The context key.</param>
         /// <param name="value">The context value.</param>
         /// <returns>A new service instance with the updated context.</returns>
-        ISmartCardService WithContextValue<T>(string key, T value) where T : class;
+        ISmartCardService WithContextValue<T>(string key, T value);
     }
 
     /// <summary>
@@ -106,7 +107,7 @@ namespace Gp4Net.Services
         /// <summary>
         /// Initial context values.
         /// </summary>
-        public ICommandContext? InitialContext { get; init; }
+        public IPipelineContext? InitialContext { get; init; }
     }
 
     /// <summary>

@@ -25,7 +25,7 @@ namespace Gp4Net.Tool.Commands.Card
         /// <summary>
         /// Executes the put-data command to write data objects to the card.
         /// </summary>
-        public async Task<int> ExecuteAsync(ICommandContext context, Settings settings)
+        public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
         {
             var ctx = await context.WithVerbose(settings.Verbose).RequireCardConnection(settings);
 
@@ -34,7 +34,7 @@ namespace Gp4Net.Tool.Commands.Card
             return PutDataObjects(ctx, settings);
         }
 
-        private static int PutDataObjects(ICommandContext context, Settings settings)
+        private static int PutDataObjects(ICliExecutionContext context, Settings settings)
         {
             try
             {
@@ -120,7 +120,7 @@ namespace Gp4Net.Tool.Commands.Card
         private static bool LoadDataFromFile(
             string filePath,
             Dictionary<string, string> dataToWrite,
-            ICommandContext context
+            ICliExecutionContext context
         )
         {
             try
@@ -189,7 +189,7 @@ namespace Gp4Net.Tool.Commands.Card
 
         private static bool LoadDataInteractively(
             Dictionary<string, string> dataToWrite,
-            ICommandContext context
+            ICliExecutionContext context
         )
         {
             context.Display.Info("Interactive data entry mode. Press Enter to skip a field.");
@@ -220,7 +220,7 @@ namespace Gp4Net.Tool.Commands.Card
         private static bool ParseKeyValuePairs(
             string[] keyValuePairs,
             Dictionary<string, string> dataToWrite,
-            ICommandContext context
+            ICliExecutionContext context
         )
         {
             foreach (var pair in keyValuePairs)
@@ -249,7 +249,7 @@ namespace Gp4Net.Tool.Commands.Card
 
         private static bool ValidateNoConflicts(
             Dictionary<string, string> dataToWrite,
-            ICommandContext context
+            ICliExecutionContext context
         )
         {
             var hasOpid = dataToWrite.ContainsKey("opid");
@@ -272,7 +272,7 @@ namespace Gp4Net.Tool.Commands.Card
 
         private static bool ExpandOpid(
             Dictionary<string, string> dataToWrite,
-            ICommandContext context
+            ICliExecutionContext context
         )
         {
             var opidString = dataToWrite["opid"];
@@ -300,7 +300,7 @@ namespace Gp4Net.Tool.Commands.Card
 
         private static void ShowPreview(
             Dictionary<string, string> dataToWrite,
-            ICommandContext context
+            ICliExecutionContext context
         )
         {
             var table = new Table()
@@ -326,7 +326,7 @@ namespace Gp4Net.Tool.Commands.Card
 
         private static int WriteDataToCard(
             Dictionary<string, string> dataToWrite,
-            ICommandContext context,
+            ICliExecutionContext context,
             Settings settings
         )
         {
@@ -386,7 +386,7 @@ namespace Gp4Net.Tool.Commands.Card
             return errors > 0 ? 1 : 0;
         }
 
-        private static bool WriteDataObject(string key, string value, ICommandContext context)
+        private static bool WriteDataObject(string key, string value, ICliExecutionContext context)
         {
             try
             {

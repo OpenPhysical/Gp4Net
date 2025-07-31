@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
@@ -38,12 +39,13 @@ namespace Gp4Net.Pipeline.Middleware
             try
             {
                 // Get card channel from context
-                var channel = request.Context.Get<ICardChannel>("CardChannel");
-                if (channel == null)
+                var channelMaybe = request.Context.Get<ICardChannel>("CardChannel");
+                if (!channelMaybe.HasValue)
                 {
-                    return Result<CommandResponse, SmartCardError>.Fail(
+                    return Result.Failure<CommandResponse, SmartCardError>(
                         SmartCardError.CommunicationError("No card channel available in context"));
                 }
+                var channel = channelMaybe.Value;
 
                 // Get command bytes for logging
                 byte[] commandBytes = GetCommandBytes(request.Command);
@@ -73,20 +75,20 @@ namespace Gp4Net.Pipeline.Middleware
                 // Check for errors
                 if (!IsSuccessStatusWord(statusWord))
                 {
-                    return Result<CommandResponse, SmartCardError>.Fail(
+                    return Result.Failure<CommandResponse, SmartCardError>(
                         SmartCardError.FromStatusWord(statusWord)
                             .WithContext("Command", request.Command.GetType().Name)
                             .WithContext("Response", response));
                 }
 
-                return Result<CommandResponse, SmartCardError>.Ok(response);
+                return Result.Success<CommandResponse, SmartCardError>(response);
             }
             catch (Exception ex)
             {
                 stopwatch.Stop();
                 _logger?.LogError(ex, "Failed to execute command");
                 
-                return Result<CommandResponse, SmartCardError>.Fail(
+                return Result.Failure<CommandResponse, SmartCardError>(
                     SmartCardError.CommunicationError("Failed to execute command", ex));
             }
         }

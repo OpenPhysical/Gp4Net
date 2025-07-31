@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.CardInfo;
@@ -64,7 +65,7 @@ namespace Gp4Net.Services
         /// <param name="deleteRelated">Whether to delete related objects.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Success or failure result.</returns>
-        Task<Result<Core.Unit, SmartCardError>> DeleteApplicationAsync(
+        Task<Result<bool, SmartCardError>> DeleteApplicationAsync(
             byte[] aid,
             bool deleteRelated = false,
             CancellationToken cancellationToken = default);
@@ -76,7 +77,7 @@ namespace Gp4Net.Services
         /// <param name="keyVersion">The key version number.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Success or failure result.</returns>
-        Task<Result<Core.Unit, SmartCardError>> PutKeysAsync(
+        Task<Result<bool, SmartCardError>> PutKeysAsync(
             KeySet keySet,
             byte keyVersion,
             CancellationToken cancellationToken = default);
@@ -106,7 +107,7 @@ namespace Gp4Net.Services
         /// <param name="state">The lifecycle state to set.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Success or failure result.</returns>
-        Task<Result<Core.Unit, SmartCardError>> SetLifecycleStateAsync(
+        Task<Result<bool, SmartCardError>> SetLifecycleStateAsync(
             byte[] aid,
             LifecycleState state,
             CancellationToken cancellationToken = default);

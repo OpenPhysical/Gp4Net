@@ -94,17 +94,16 @@ namespace Gp4Net.Tool.Commands.Card
                     newKeySet.KeyVersion
                 );
 
-                return await putKeyResult.MatchAsync(
-                    unit =>
-                    {
-                        AnsiConsole.MarkupLine("[green]✓ Keys changed successfully[/]");
-                        return Task.FromResult(0);
-                    },
-                    error =>
-                    {
-                        AnsiConsole.MarkupLine($"[red]✗ Failed to change keys: {error.Message}[/]");
-                        return Task.FromResult(1);
-                    });
+                if (putKeyResult.IsSuccess)
+                {
+                    AnsiConsole.MarkupLine("[green]✓ Keys changed successfully[/]");
+                    return 0;
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]✗ Failed to change keys: {putKeyResult.Error.Message}[/]");
+                    return 1;
+                }
             }
             catch (Exception ex)
             {

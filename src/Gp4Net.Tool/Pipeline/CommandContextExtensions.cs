@@ -6,7 +6,7 @@ using JetBrains.Annotations;
 namespace Gp4Net.Tool.Pipeline
 {
     /// <summary>
-    /// Extension methods for ICommandContext to provide fluent middleware pipeline capabilities.
+    /// Extension methods for ICliExecutionContext to provide fluent middleware pipeline capabilities.
     /// </summary>
     [PublicAPI]
     public static class CommandContextExtensions
@@ -14,8 +14,8 @@ namespace Gp4Net.Tool.Pipeline
         /// <summary>
         /// Ensures a card connection using settings from BaseCommandSettings.
         /// </summary>
-        public static async Task<ICommandContext> RequireCardConnection(
-            this ICommandContext context,
+        public static async Task<ICliExecutionContext> RequireCardConnection(
+            this ICliExecutionContext context,
             BaseCommandSettings settings
         )
         {
@@ -27,8 +27,8 @@ namespace Gp4Net.Tool.Pipeline
         /// Ensures a secure channel using settings from BaseCommandSettings.
         /// Only establishes secure channel if required by the command settings.
         /// </summary>
-        public static async Task<ICommandContext> RequireSecureChannel(
-            this ICommandContext context,
+        public static async Task<ICliExecutionContext> RequireSecureChannel(
+            this ICliExecutionContext context,
             BaseCommandSettings settings
         )
         {
@@ -44,8 +44,8 @@ namespace Gp4Net.Tool.Pipeline
         /// <summary>
         /// Displays card information if not suppressed in settings.
         /// </summary>
-        public static ICommandContext DisplayCardInfo(
-            this ICommandContext context,
+        public static ICliExecutionContext DisplayCardInfo(
+            this ICliExecutionContext context,
             BaseCommandSettings settings
         )
         {
@@ -63,7 +63,7 @@ namespace Gp4Net.Tool.Pipeline
         /// <summary>
         /// Sets verbose mode on the display service.
         /// </summary>
-        public static ICommandContext WithVerbose(this ICommandContext context, bool verbose)
+        public static ICliExecutionContext WithVerbose(this ICliExecutionContext context, bool verbose)
         {
             if (context.Display is DisplayService displayService)
             {
@@ -80,9 +80,9 @@ namespace Gp4Net.Tool.Pipeline
         /// Executes a command with common card operations setup.
         /// </summary>
         public static async Task<int> ExecuteCardCommand(
-            this ICommandContext context,
+            this ICliExecutionContext context,
             BaseCommandSettings settings,
-            Func<ICommandContext, Task<int>> commandLogic
+            Func<ICliExecutionContext, Task<int>> commandLogic
         )
         {
             return await context
@@ -97,9 +97,9 @@ namespace Gp4Net.Tool.Pipeline
         /// Executes a command with common card operations setup (synchronous version).
         /// </summary>
         public static async Task<int> ExecuteCardCommand(
-            this ICommandContext context,
+            this ICliExecutionContext context,
             BaseCommandSettings settings,
-            Func<ICommandContext, int> commandLogic
+            Func<ICliExecutionContext, int> commandLogic
         )
         {
             return await context
@@ -113,9 +113,9 @@ namespace Gp4Net.Tool.Pipeline
         /// <summary>
         /// Continues with a synchronous operation.
         /// </summary>
-        private static async Task<ICommandContext> ContinueWith(
-            this Task<ICommandContext> contextTask,
-            Func<ICommandContext, ICommandContext> operation
+        private static async Task<ICliExecutionContext> ContinueWith(
+            this Task<ICliExecutionContext> contextTask,
+            Func<ICliExecutionContext, ICliExecutionContext> operation
         )
         {
             var context = await contextTask;
@@ -125,9 +125,9 @@ namespace Gp4Net.Tool.Pipeline
         /// <summary>
         /// Continues with an asynchronous operation.
         /// </summary>
-        private static async Task<ICommandContext> ContinueWith(
-            this Task<ICommandContext> contextTask,
-            Func<ICommandContext, Task<ICommandContext>> operation
+        private static async Task<ICliExecutionContext> ContinueWith(
+            this Task<ICliExecutionContext> contextTask,
+            Func<ICliExecutionContext, Task<ICliExecutionContext>> operation
         )
         {
             var context = await contextTask;
@@ -138,8 +138,8 @@ namespace Gp4Net.Tool.Pipeline
         /// Continues with command execution.
         /// </summary>
         private static async Task<int> ContinueWith(
-            this Task<ICommandContext> contextTask,
-            Func<ICommandContext, Task<int>> operation
+            this Task<ICliExecutionContext> contextTask,
+            Func<ICliExecutionContext, Task<int>> operation
         )
         {
             var context = await contextTask;
@@ -150,8 +150,8 @@ namespace Gp4Net.Tool.Pipeline
         /// Continues with synchronous command execution.
         /// </summary>
         private static async Task<int> ContinueWith(
-            this Task<ICommandContext> contextTask,
-            Func<ICommandContext, int> operation
+            this Task<ICliExecutionContext> contextTask,
+            Func<ICliExecutionContext, int> operation
         )
         {
             var context = await contextTask;

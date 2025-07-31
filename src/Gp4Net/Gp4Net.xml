@@ -509,276 +509,6 @@
             </summary>
             <returns>A read-only collection of all known OIDs.</returns>
         </member>
-        <member name="T:Gp4Net.Core.Option`1">
-            <summary>
-            Represents an optional value that can either be some value or none.
-            This type eliminates null reference exceptions and makes optional values explicit.
-            </summary>
-            <typeparam name="T">The type of the optional value.</typeparam>
-        </member>
-        <member name="T:Gp4Net.Core.Option`1.Some">
-            <summary>
-            Represents a value that is present.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Option`1.Some.#ctor(`0)">
-            <summary>
-            Represents a value that is present.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Core.Option`1.None">
-            <summary>
-            Represents an absent value.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Core.Option`1.HasValue">
-            <summary>
-            Gets a value indicating whether this option has a value.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Core.Option`1.IsEmpty">
-            <summary>
-            Gets a value indicating whether this option is empty.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Option`1.TryGetValue(`0@)">
-            <summary>
-            Safely tries to get the value if present.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Option`1.Match``1(System.Func{`0,``0},System.Func{``0})">
-            <summary>
-            Pattern matches on the option, executing the appropriate function.
-            </summary>
-            <typeparam name="TResult">The type of the result.</typeparam>
-            <param name="some">Function to execute if the option has a value.</param>
-            <param name="none">Function to execute if the option is empty.</param>
-            <returns>The result of the executed function.</returns>
-        </member>
-        <member name="M:Gp4Net.Core.Option`1.MatchAsync``1(System.Func{`0,System.Threading.Tasks.Task{``0}},System.Func{System.Threading.Tasks.Task{``0}})">
-            <summary>
-            Async pattern matching on the option.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Option`1.Map``1(System.Func{`0,``0})">
-            <summary>
-            Maps the value to a new type if present, preserving None.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Option`1.Bind``1(System.Func{`0,Gp4Net.Core.Option{``0}})">
-            <summary>
-            Flat maps the value, allowing for chaining of operations that return Options.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Option`1.Filter(System.Func{`0,System.Boolean})">
-            <summary>
-            Filters the option based on a predicate.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Option`1.GetOrDefault(`0)">
-            <summary>
-            Provides a default value if the option is empty.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Option`1.GetOrElse(System.Func{`0})">
-            <summary>
-            Provides a default value from a function if the option is empty.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Option`1.ToResult``1(``0)">
-            <summary>
-            Converts the option to a Result with a specified error for None.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Option`1.ToResult``1(System.Func{``0})">
-            <summary>
-            Converts the option to a Result with a specified error function for None.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Core.OptionExtensions">
-            <summary>
-            Extension methods for working with Options.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.OptionExtensions.ToOption``1(``0)">
-            <summary>
-            Converts a nullable value to an Option.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.OptionExtensions.ToOption``1(System.Nullable{``0})">
-            <summary>
-            Converts a nullable value type to an Option.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.OptionExtensions.Combine``2(Gp4Net.Core.Option{``0},Gp4Net.Core.Option{``1})">
-            <summary>
-            Combines two options into a tuple option.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.OptionExtensions.ToOption``2(Gp4Net.Core.Result{``0,``1})">
-            <summary>
-            Converts a Result to an Option, discarding the error.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.OptionExtensions.Flatten``1(Gp4Net.Core.Option{Gp4Net.Core.Option{``0}})">
-            <summary>
-            Flattens a nested Option.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Core.Unit">
-            <summary>
-            Represents a unit value - the functional programming equivalent of void.
-            </summary>
-        </member>
-        <member name="F:Gp4Net.Core.Unit.Value">
-            <summary>
-            The singleton instance of Unit.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Core.Result`2">
-            <summary>
-            Represents the result of an operation that can either succeed with a value or fail with an error.
-            This type enforces explicit error handling and eliminates null reference exceptions.
-            </summary>
-            <typeparam name="TValue">The type of the success value.</typeparam>
-            <typeparam name="TError">The type of the error.</typeparam>
-        </member>
-        <member name="T:Gp4Net.Core.Result`2.Success">
-            <summary>
-            Represents a successful result containing a value.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Result`2.Success.#ctor(`0)">
-            <summary>
-            Represents a successful result containing a value.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Core.Result`2.Failure">
-            <summary>
-            Represents a failed result containing an error.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Result`2.Failure.#ctor(`1)">
-            <summary>
-            Represents a failed result containing an error.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Core.Result`2.IsSuccess">
-            <summary>
-            Gets a value indicating whether this result is successful.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Core.Result`2.IsFailure">
-            <summary>
-            Gets a value indicating whether this result is a failure.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Core.Result`2.Value">
-            <summary>
-            Attempts to get the value if this is a success.
-            Use Match() or TryGetValue() for safe access.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Core.Result`2.Error">
-            <summary>
-            Attempts to get the error if this is a failure.
-            Use Match() or TryGetError() for safe access.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Result`2.Match``1(System.Func{`0,``0},System.Func{`1,``0})">
-            <summary>
-            Pattern matches on the result, executing the appropriate function based on success or failure.
-            </summary>
-            <typeparam name="TResult">The type of the result.</typeparam>
-            <param name="success">Function to execute if the result is successful.</param>
-            <param name="failure">Function to execute if the result is a failure.</param>
-            <returns>The result of the executed function.</returns>
-        </member>
-        <member name="M:Gp4Net.Core.Result`2.MatchAsync``1(System.Func{`0,System.Threading.Tasks.Task{``0}},System.Func{`1,System.Threading.Tasks.Task{``0}})">
-            <summary>
-            Pattern matches on the result with async functions.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Result`2.Map``1(System.Func{`0,``0})">
-            <summary>
-            Maps the success value to a new type, preserving failures.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Result`2.MapError``1(System.Func{`1,``0})">
-            <summary>
-            Maps the error to a new type, preserving successes.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Result`2.Bind``1(System.Func{`0,Gp4Net.Core.Result{``0,`1}})">
-            <summary>
-            Flat maps the success value, allowing for chaining of operations that return Results.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Result`2.BindAsync``1(System.Func{`0,System.Threading.Tasks.Task{Gp4Net.Core.Result{``0,`1}}})">
-            <summary>
-            Async version of Bind.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Result`2.GetOrDefault(`0)">
-            <summary>
-            Provides a default value if the result is a failure.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Result`2.GetOrElse(System.Func{`1,`0})">
-            <summary>
-            Provides a default value from a function if the result is a failure.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Result`2.GetOrThrow(System.Func{`1,System.Exception})">
-            <summary>
-            Throws an exception if the result is a failure.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Result`2.TryGetValue(`0@)">
-            <summary>
-            Safely tries to get the value if this is a success.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.Result`2.TryGetError(`1@)">
-            <summary>
-            Safely tries to get the error if this is a failure.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Core.ResultExtensions">
-            <summary>
-            Extension methods for working with Results.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.ResultExtensions.ToResult``1(``0,System.String)">
-            <summary>
-            Converts a nullable value to a Result.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.ResultExtensions.ToResult``2(Gp4Net.Core.Option{``0},``1)">
-            <summary>
-            Converts an Option to a Result with a specified error for None.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.ResultExtensions.ToResult``2(Gp4Net.Core.Option{``0},System.Func{``1})">
-            <summary>
-            Converts an Option to a Result with a specified error function for None.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.ResultExtensions.Try``1(System.Func{``0})">
-            <summary>
-            Tries to execute a function and returns a Result.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.ResultExtensions.TryAsync``1(System.Func{System.Threading.Tasks.Task{``0}})">
-            <summary>
-            Async version of Try.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Core.ResultExtensions.Combine``3(Gp4Net.Core.Result{``0,``2},Gp4Net.Core.Result{``1,``2})">
-            <summary>
-            Combines multiple results into a single result containing a tuple.
-            </summary>
-        </member>
         <member name="T:Gp4Net.Core.ServiceLifetime.IScopedService">
             <summary>
             Marker interface for services that should be registered as scoped.
@@ -2523,7 +2253,7 @@
             <exception cref="T:System.InvalidOperationException">Thrown when parsing fails.</exception>
             <remarks>Consider using TryParse for functional error handling.</remarks>
         </member>
-        <member name="M:Gp4Net.Domain.CardInfo.CardCapabilities.TryParse(Gp4Net.Core.Option{System.Byte[]})">
+        <member name="M:Gp4Net.Domain.CardInfo.CardCapabilities.TryParse(CSharpFunctionalExtensions.Maybe{System.Byte[]})">
             <summary>
             Attempts to parse card capabilities data using functional error handling.
             </summary>
@@ -2893,14 +2623,14 @@
             Parses diversification data and SCP support information.
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.CardInfo.DiversificationDataParser.ParseAsHex(Gp4Net.Core.Option{System.Byte[]})">
+        <member name="M:Gp4Net.Domain.CardInfo.DiversificationDataParser.ParseAsHex(CSharpFunctionalExtensions.Maybe{System.Byte[]})">
             <summary>
             Parses diversification data as a hex string.
             </summary>
             <param name="data">The raw diversification data.</param>
             <returns>Hex string representation of the data.</returns>
         </member>
-        <member name="M:Gp4Net.Domain.CardInfo.DiversificationDataParser.ParseScpSupport(Gp4Net.Core.Option{System.Byte[]})">
+        <member name="M:Gp4Net.Domain.CardInfo.DiversificationDataParser.ParseScpSupport(CSharpFunctionalExtensions.Maybe{System.Byte[]})">
             <summary>
             Parses SCP support information from diversification data (CF0A format).
             The CF tag contains the actual diversification data, which starts with length 0A (10 bytes).
@@ -5973,6 +5703,152 @@
             Constants used throughout the GlobalPlatform implementation.
             </summary>
         </member>
+        <member name="T:Gp4Net.Domain.ImmutableSecureChannelSession">
+            <summary>
+            Immutable secure channel session that maintains thread safety through immutability.
+            Each operation returns a new session state rather than mutating existing state.
+            This ensures thread safety without locks and follows functional programming principles.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ImmutableSecureChannelSession.SessionId">
+            <summary>
+            Gets the session identifier.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ImmutableSecureChannelSession.SecurityLevel">
+            <summary>
+            Gets the security level for this session.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ImmutableSecureChannelSession.ProtocolVersion">
+            <summary>
+            Gets the protocol version (SCP02 or SCP03).
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ImmutableSecureChannelSession.IsScp03">
+            <summary>
+            Gets whether this is an SCP03 session.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ImmutableSecureChannelSession.MacChainingValue">
+            <summary>
+            Gets the current MAC chaining value (immutable copy).
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ImmutableSecureChannelSession.EncryptionCounter">
+            <summary>
+            Gets the current encryption counter.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ImmutableSecureChannelSession.#ctor(Gp4Net.Domain.Keys.SessionKeys,Gp4Net.Domain.SecurityLevel,System.Byte,System.Byte[],System.Byte[],System.UInt32)">
+            <summary>
+            Initializes a new instance of the ImmutableSecureChannelSession class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ImmutableSecureChannelSession.With(System.Byte[],System.Nullable{System.UInt32})">
+            <summary>
+            Creates a new session with updated state.
+            Private helper for immutable updates.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ImmutableSecureChannelSession.WrapCommand(Gp4Net.Transport.IApduCommand)">
+            <summary>
+            Wraps an APDU command with secure messaging.
+            Returns both the wrapped command and the new session state.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ImmutableSecureChannelSession.UnwrapResponse(System.Byte[])">
+            <summary>
+            Unwraps an APDU response with secure messaging.
+            Returns both the unwrapped response and the new session state.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ImmutableSecureChannelSession.ApplyEncryption(System.Byte[])">
+            <summary>
+            Applies encryption to the command data.
+            Returns encrypted command and new encryption counter.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ImmutableSecureChannelSession.ApplyMac(System.Byte[])">
+            <summary>
+            Applies MAC to the command.
+            Returns MAC'd command and new chaining value.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ImmutableSecureChannelSession.CreateScp03MacInput(System.Byte[])">
+            <summary>
+            Creates the modified APDU input for SCP03 MAC calculation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ImmutableSecureChannelSession.CreateScp02MacInput(System.Byte[])">
+            <summary>
+            Creates the modified APDU input for SCP02 MAC calculation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ImmutableSecureChannelSession.CalculateCMac(System.Byte[])">
+            <summary>
+            Calculates C-MAC for a command.
+            Returns MAC and new chaining value.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.FunctionalKeyDerivationService">
+            <summary>
+            Functional key derivation service that implements secure key management patterns.
+            All operations are pure functions that return new instances rather than mutating state.
+            Keys are handled securely with automatic cleanup and minimal exposure.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.FunctionalKeyDerivationService.DeriveSessionKeys(Gp4Net.Domain.Keys.IKeySet,System.Byte[],System.Byte[],System.Byte[],Gp4Net.Domain.Keys.FunctionalKeyDerivationService.DiversificationMode)">
+            <summary>
+            Derives session keys from a master key set using the specified diversification data.
+            This is a pure function that doesn't modify any state.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.FunctionalKeyDerivationService.CreateSecureKeySet(System.Byte[],System.Byte[],System.Byte[],System.Byte,System.Boolean)">
+            <summary>
+            Creates a secure key set with proper key management.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.FunctionalKeyDerivationService.KeyDerivationContext">
+            <summary>
+            Key derivation context with all necessary parameters.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.FunctionalKeyDerivationService.KeyDerivationContext.#ctor(System.Byte[],System.Byte[],System.Byte[],Gp4Net.Domain.Keys.FunctionalKeyDerivationService.DiversificationMode)">
+            <summary>
+            Key derivation context with all necessary parameters.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.FunctionalKeyDerivationService.DiversificationMode">
+            <summary>
+            Key diversification modes.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.FunctionalSecureKeySet">
+            <summary>
+            Secure key set that automatically clears keys when disposed.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.DerivedKeys">
+            <summary>
+            Container for derived session keys.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.DerivedKeys.#ctor(System.Byte[],System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+            Container for derived session keys.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.DerivedKeys.ToSessionKeys">
+            <summary>
+            Creates session keys from the derived keys.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.DerivedKeys.Clear">
+            <summary>
+            Clears all key material.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Domain.Keys.GpTestKeys">
             <summary>
             Provides GlobalPlatform test keys for development and testing purposes.
@@ -6112,6 +5988,163 @@
         <member name="F:Gp4Net.Domain.Keys.GpTestKeys.TestAids.OpenFips201PackageAid">
             <summary>
             OpenFIPS201 package AID.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.KeyManagementConfiguration">
+            <summary>
+            Immutable configuration for secure key management.
+            Enforces security policies and best practices for key handling.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Keys.KeyManagementConfiguration.Default">
+            <summary>
+            Default secure configuration with recommended settings.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Keys.KeyManagementConfiguration.RequireKeyRotation">
+            <summary>
+            Gets whether key rotation is required.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Keys.KeyManagementConfiguration.KeyRotationIntervalDays">
+            <summary>
+            Gets the key rotation interval in days.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Keys.KeyManagementConfiguration.MaxKeyUsageCount">
+            <summary>
+            Gets the maximum number of times a key can be used.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Keys.KeyManagementConfiguration.RequireSecureStorage">
+            <summary>
+            Gets whether secure storage is required for keys.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Keys.KeyManagementConfiguration.AllowKeyExport">
+            <summary>
+            Gets whether keys can be exported from the system.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Keys.KeyManagementConfiguration.MinimumKeyLength">
+            <summary>
+            Gets the minimum key length in bytes.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Keys.KeyManagementConfiguration.RequireKeyDerivation">
+            <summary>
+            Gets whether key derivation is required for session keys.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Keys.KeyManagementConfiguration.ClearKeysAfterUse">
+            <summary>
+            Gets whether keys should be cleared from memory after use.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Keys.KeyManagementConfiguration.KeyLifetimeMinutes">
+            <summary>
+            Gets the maximum lifetime of a key in memory (minutes).
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Keys.KeyManagementConfiguration.EnableKeyAuditing">
+            <summary>
+            Gets whether key usage should be audited.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.KeyManagementConfiguration.ValidateKey(System.Byte[],System.String)">
+            <summary>
+            Validates a key against the configuration policies.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Keys.KeyManagementConfiguration.Development">
+            <summary>
+            Creates a development configuration with relaxed security.
+            Should only be used for testing and development.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.KeyLifecycleManager">
+            <summary>
+            Manages key lifecycle with security policies.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.KeyLifecycleManager.Create(Gp4Net.Domain.Keys.KeyManagementConfiguration)">
+            <summary>
+            Creates a new key lifecycle manager.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.KeyLifecycleManager.RegisterKey(System.String,System.Byte[],Gp4Net.Domain.Keys.KeyPurpose)">
+            <summary>
+            Registers a new key with lifecycle management.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.KeyLifecycleManager.UseKey``1(System.String,System.Func{System.Byte[],CSharpFunctionalExtensions.Result{``0,Gp4Net.Core.SmartCardError}})">
+            <summary>
+            Uses a key with lifecycle tracking.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.KeyLifecycleManager.IsKeyValid(System.String)">
+            <summary>
+            Checks if a key exists and is valid.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.KeyLifecycleManager.GetKeyAuditInfo(System.String)">
+            <summary>
+            Gets audit information for a key.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.KeyLifecycleManager.KeyMetadata">
+            <summary>
+            Key metadata for lifecycle tracking.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.KeyLifecycleManager.KeyMetadata.#ctor(System.String,Gp4Net.Domain.Keys.KeyPurpose,System.DateTime,System.Int32,System.DateTime)">
+            <summary>
+            Key metadata for lifecycle tracking.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.KeyPurpose">
+            <summary>
+            Defines the purpose of a cryptographic key.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Keys.KeyPurpose.Master">
+            <summary>
+            Master key for key derivation.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Keys.KeyPurpose.Session">
+            <summary>
+            Session key for secure channel.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Keys.KeyPurpose.KeyEncryption">
+            <summary>
+            Key encryption key.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Keys.KeyPurpose.DataEncryption">
+            <summary>
+            Data encryption key.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Keys.KeyPurpose.Authentication">
+            <summary>
+            Message authentication key.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Keys.KeyPurpose.Storage">
+            <summary>
+            Key for secure storage.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.KeyAuditInfo">
+            <summary>
+            Audit information for a key.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.KeyAuditInfo.#ctor(System.String,Gp4Net.Domain.Keys.KeyPurpose,System.DateTime,System.DateTime,System.Int32,System.Boolean)">
+            <summary>
+            Audit information for a key.
             </summary>
         </member>
         <member name="T:Gp4Net.Domain.Keys.IKeySet">
@@ -6438,6 +6471,80 @@
         <member name="M:Gp4Net.Domain.Keys.SecureSessionKeys.Dispose">
             <summary>
             Disposes of the session keys, clearing sensitive data from memory.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.SecureKeyStore">
+            <summary>
+            Immutable, thread-safe secure key store that manages cryptographic keys
+            using functional programming patterns. Keys are encrypted in memory
+            and can only be accessed through secure operations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.SecureKeyStore.#ctor(System.Collections.Immutable.ImmutableDictionary{System.String,Gp4Net.Domain.Keys.SecureKeyStore.EncryptedKey},System.Byte[],System.Byte[])">
+            <summary>
+            Initializes a new secure key store.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.SecureKeyStore.Create">
+            <summary>
+            Creates a new empty secure key store with a randomly generated master key.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.SecureKeyStore.AddKey(System.String,System.Byte[])">
+            <summary>
+            Adds a key to the store, returning a new immutable store instance.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.SecureKeyStore.GetKey(System.String)">
+            <summary>
+            Retrieves a key from the store securely.
+            The returned key should be used immediately and then cleared.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.SecureKeyStore.RemoveKey(System.String)">
+            <summary>
+            Removes a key from the store, returning a new immutable store instance.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.SecureKeyStore.ListKeyIds">
+            <summary>
+            Lists all key IDs in the store.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.SecureKeyStore.UseKey``1(System.String,System.Func{System.Byte[],CSharpFunctionalExtensions.Result{``0,Gp4Net.Core.SmartCardError}})">
+            <summary>
+            Performs a secure operation with a key, ensuring the key is cleared after use.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.SecureKeyStore.CreateKeySet(System.String,System.String,System.String,System.Byte,System.Boolean)">
+            <summary>
+            Creates a key set from stored keys for GlobalPlatform operations.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.SecureKeyStore.EncryptedKey">
+            <summary>
+            Encrypted key data with initialization vector.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.SecureKeyStore.EncryptedKey.#ctor(System.Byte[],System.Byte[])">
+            <summary>
+            Encrypted key data with initialization vector.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.SecureKey">
+            <summary>
+            Represents a decrypted key that automatically clears itself when disposed.
+            Ensures keys are not left in memory after use.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.SecureKey.Use``1(System.Func{System.Byte[],CSharpFunctionalExtensions.Result{``0,Gp4Net.Core.SmartCardError}})">
+            <summary>
+            Uses the key in a secure operation, ensuring it's not exposed.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.SecureKey.GetCopy">
+            <summary>
+            Gets a copy of the key data. The caller is responsible for clearing it.
             </summary>
         </member>
         <member name="T:Gp4Net.Domain.Keys.SessionKeys">
@@ -7313,6 +7420,31 @@
             Calculates C-MAC for a command.
             </summary>
         </member>
+        <member name="M:Gp4Net.Domain.SecureChannelSession.GetSessionKeys">
+            <summary>
+            Gets the session keys (for internal use).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.SecureChannelSession.GetMacChainingValue">
+            <summary>
+            Gets the current MAC chaining value (for internal use).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.SecureChannelSession.GetEncryptionCounter">
+            <summary>
+            Gets the current encryption counter (for internal use).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.SecureChannelSession.Dispose">
+            <summary>
+            Disposes of any resources used by the session.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.SecureChannelSession.Dispose(System.Boolean)">
+            <summary>
+            Disposes of resources used by the session.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Domain.SecurityLevel">
             <summary>
             Security level flags for secure channel protocols.
@@ -7388,6 +7520,53 @@
             Gets a human-readable description of the security level.
             </summary>
         </member>
+        <member name="T:Gp4Net.Domain.ThreadSafeSecureChannelSession">
+            <summary>
+            Thread-safe secure channel session wrapper that manages immutable session state.
+            Uses lock-free atomic operations to ensure thread safety with high performance.
+            This wrapper provides the same interface as SecureChannelSession but with guaranteed thread safety.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ThreadSafeSecureChannelSession.#ctor(Gp4Net.Domain.Keys.SessionKeys,Gp4Net.Domain.SecurityLevel,System.Byte,System.Byte[])">
+            <summary>
+            Initializes a new instance of the ThreadSafeSecureChannelSession class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ThreadSafeSecureChannelSession.WrapCommand(Gp4Net.Transport.IApduCommand)">
+            <summary>
+            Wraps an APDU command with secure messaging in a thread-safe manner.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ThreadSafeSecureChannelSession.UnwrapResponse(System.Byte[])">
+            <summary>
+            Unwraps an APDU response with secure messaging in a thread-safe manner.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ThreadSafeSecureChannelSession.GetCurrentState">
+            <summary>
+            Gets the current session state in a thread-safe manner.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ThreadSafeSecureChannelSession.Dispose(System.Boolean)">
+            <summary>
+            Disposes of the lock resources.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.SecureChannelSessionExtensions">
+            <summary>
+            Extension methods for creating thread-safe secure channel sessions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.SecureChannelSessionExtensions.MakeThreadSafe(Gp4Net.Domain.Keys.SessionKeys,Gp4Net.Domain.SecurityLevel,System.Byte,System.Byte[])">
+            <summary>
+            Creates a thread-safe version of a secure channel session.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.SecureChannelSessionExtensions.ToImmutable(Gp4Net.Domain.SecureChannelSession)">
+            <summary>
+            Converts an existing session to use immutable patterns.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Interfaces.ISecureChannelProtocol">
             <summary>
             Defines the interface for a secure channel protocol implementation.
@@ -7449,7 +7628,7 @@
             Initializes a new instance of CommandPipeline.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandPipeline.ExecuteAsync(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.ICommandContext,System.Threading.CancellationToken)">
+        <member name="M:Gp4Net.Pipeline.CommandPipeline.ExecuteAsync(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.IPipelineContext,System.Threading.CancellationToken)">
             <inheritdoc/>
         </member>
         <member name="M:Gp4Net.Pipeline.CommandPipeline.ExecuteAsync(Gp4Net.Pipeline.CommandRequest,System.Threading.CancellationToken)">
@@ -7492,7 +7671,7 @@
             Adds a conditional middleware to the pipeline.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.PipelineBuilderExtensions.Use(Gp4Net.Pipeline.ICommandPipelineBuilder,System.Func{Gp4Net.Pipeline.CommandRequest,Gp4Net.Pipeline.CommandDelegate,System.Threading.CancellationToken,System.Threading.Tasks.Task{Gp4Net.Core.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}})">
+        <member name="M:Gp4Net.Pipeline.PipelineBuilderExtensions.Use(Gp4Net.Pipeline.ICommandPipelineBuilder,System.Func{Gp4Net.Pipeline.CommandRequest,Gp4Net.Pipeline.CommandDelegate,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}})">
             <summary>
             Adds an inline middleware using a lambda.
             </summary>
@@ -7507,7 +7686,7 @@
             Represents a request to execute a command through the pipeline.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandRequest.#ctor(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.ICommandContext,Gp4Net.Pipeline.CommandOptions)">
+        <member name="M:Gp4Net.Pipeline.CommandRequest.#ctor(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.IPipelineContext,Gp4Net.Pipeline.CommandOptions)">
             <summary>
             Represents a request to execute a command through the pipeline.
             </summary>
@@ -7517,12 +7696,12 @@
             Creates a simple request with just a command.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandRequest.Create(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.ICommandContext)">
+        <member name="M:Gp4Net.Pipeline.CommandRequest.Create(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.IPipelineContext)">
             <summary>
             Creates a request with a command and context.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandRequest.WithContext(Gp4Net.Pipeline.ICommandContext)">
+        <member name="M:Gp4Net.Pipeline.CommandRequest.WithContext(Gp4Net.Pipeline.IPipelineContext)">
             <summary>
             Creates a new request with updated context.
             </summary>
@@ -7567,7 +7746,7 @@
             Represents the response from executing a command through the pipeline.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandResponse.#ctor(System.Byte[],System.UInt16,Gp4Net.Pipeline.ICommandContext,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
+        <member name="M:Gp4Net.Pipeline.CommandResponse.#ctor(System.Byte[],System.UInt16,Gp4Net.Pipeline.IPipelineContext,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
             <summary>
             Represents the response from executing a command through the pipeline.
             </summary>
@@ -7577,12 +7756,12 @@
             Gets a value indicating whether the command was successful (SW=9000).
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandResponse.Success(System.Byte[],Gp4Net.Pipeline.ICommandContext,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
+        <member name="M:Gp4Net.Pipeline.CommandResponse.Success(System.Byte[],Gp4Net.Pipeline.IPipelineContext,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
             <summary>
             Creates a successful response.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandResponse.Failure(System.UInt16,Gp4Net.Pipeline.ICommandContext,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
+        <member name="M:Gp4Net.Pipeline.CommandResponse.Failure(System.UInt16,Gp4Net.Pipeline.IPipelineContext,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
             <summary>
             Creates a failed response.
             </summary>
@@ -7597,7 +7776,7 @@
             Creates a new response with additional metadata.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandResponse.WithContext(Gp4Net.Pipeline.ICommandContext)">
+        <member name="M:Gp4Net.Pipeline.CommandResponse.WithContext(Gp4Net.Pipeline.IPipelineContext)">
             <summary>
             Creates a new response with updated context.
             </summary>
@@ -7727,56 +7906,6 @@
             The selected AID (alias for SelectedApplicationAid).
             </summary>
         </member>
-        <member name="T:Gp4Net.Pipeline.ICommandContext">
-            <summary>
-            Represents an immutable context that flows through the command pipeline.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Pipeline.ICommandContext.Get``1(System.String)">
-            <summary>
-            Gets a value from the context.
-            </summary>
-            <typeparam name="T">The type of the value.</typeparam>
-            <param name="key">The key to look up.</param>
-            <returns>The value if found, otherwise null.</returns>
-        </member>
-        <member name="M:Gp4Net.Pipeline.ICommandContext.TryGet``1(System.String,``0@)">
-            <summary>
-            Tries to get a value from the context.
-            </summary>
-            <typeparam name="T">The type of the value.</typeparam>
-            <param name="key">The key to look up.</param>
-            <param name="value">The value if found.</param>
-            <returns>True if the value was found, otherwise false.</returns>
-        </member>
-        <member name="M:Gp4Net.Pipeline.ICommandContext.With``1(System.String,``0)">
-            <summary>
-            Creates a new context with an additional value.
-            </summary>
-            <typeparam name="T">The type of the value.</typeparam>
-            <param name="key">The key to store the value under.</param>
-            <param name="value">The value to store.</param>
-            <returns>A new context containing the additional value.</returns>
-        </member>
-        <member name="M:Gp4Net.Pipeline.ICommandContext.Without(System.String)">
-            <summary>
-            Creates a new context without the specified key.
-            </summary>
-            <param name="key">The key to remove.</param>
-            <returns>A new context without the specified key.</returns>
-        </member>
-        <member name="P:Gp4Net.Pipeline.ICommandContext.Keys">
-            <summary>
-            Gets all keys in the context.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Pipeline.ICommandContext.WithMany(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
-            <summary>
-            Creates a new context with multiple values.
-            </summary>
-            <param name="values">The values to add.</param>
-            <returns>A new context containing the additional values.</returns>
-        </member>
         <member name="T:Gp4Net.Pipeline.ICommandMiddleware">
             <summary>
             Represents a middleware component in the command pipeline.
@@ -7804,12 +7933,12 @@
         <member name="M:Gp4Net.Pipeline.CommandMiddlewareBase.InvokeAsync(Gp4Net.Pipeline.CommandRequest,Gp4Net.Pipeline.CommandDelegate,System.Threading.CancellationToken)">
             <inheritdoc/>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandMiddlewareBase.UpdateContext(Gp4Net.Core.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError},Gp4Net.Pipeline.ICommandContext)">
+        <member name="M:Gp4Net.Pipeline.CommandMiddlewareBase.UpdateContext(CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError},Gp4Net.Pipeline.IPipelineContext)">
             <summary>
             Helper method to update the context in a response.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandMiddlewareBase.AddMetadata(Gp4Net.Core.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError},System.String,System.Object)">
+        <member name="M:Gp4Net.Pipeline.CommandMiddlewareBase.AddMetadata(CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError},System.String,System.Object)">
             <summary>
             Helper method to add metadata to a response.
             </summary>
@@ -7819,7 +7948,7 @@
             Represents a pipeline for executing APDU commands with middleware processing.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.ICommandPipeline.ExecuteAsync(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.ICommandContext,System.Threading.CancellationToken)">
+        <member name="M:Gp4Net.Pipeline.ICommandPipeline.ExecuteAsync(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.IPipelineContext,System.Threading.CancellationToken)">
             <summary>
             Executes a command through the pipeline.
             </summary>
@@ -7873,82 +8002,130 @@
             Delegate for inline middleware definitions.
             </summary>
         </member>
-        <member name="T:Gp4Net.Pipeline.ImmutableCommandContext">
+        <member name="T:Gp4Net.Pipeline.ImmutablePipelineContext">
             <summary>
-            An immutable implementation of ICommandContext using persistent data structures.
+            An immutable implementation of IPipelineContext using CSharpFunctionalExtensions and persistent data structures.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.ImmutableCommandContext.#ctor">
+        <member name="M:Gp4Net.Pipeline.ImmutablePipelineContext.#ctor">
             <summary>
-            Initializes a new instance of ImmutableCommandContext.
+            Initializes a new instance of ImmutablePipelineContext.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.ImmutableCommandContext.#ctor(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
+        <member name="M:Gp4Net.Pipeline.ImmutablePipelineContext.#ctor(System.Collections.Immutable.ImmutableDictionary{System.String,System.Object})">
             <summary>
-            Initializes a new instance of ImmutableCommandContext with initial values.
+            Initializes a new instance of ImmutablePipelineContext with initial values.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.ImmutableCommandContext.Get``1(System.String)">
+        <member name="M:Gp4Net.Pipeline.ImmutablePipelineContext.Get``1(System.String)">
             <inheritdoc/>
         </member>
-        <member name="M:Gp4Net.Pipeline.ImmutableCommandContext.TryGet``1(System.String,``0@)">
+        <member name="M:Gp4Net.Pipeline.ImmutablePipelineContext.With``1(System.String,``0)">
             <inheritdoc/>
         </member>
-        <member name="M:Gp4Net.Pipeline.ImmutableCommandContext.With``1(System.String,``0)">
+        <member name="M:Gp4Net.Pipeline.ImmutablePipelineContext.Without(System.String)">
             <inheritdoc/>
         </member>
-        <member name="M:Gp4Net.Pipeline.ImmutableCommandContext.Without(System.String)">
+        <member name="P:Gp4Net.Pipeline.ImmutablePipelineContext.Keys">
             <inheritdoc/>
         </member>
-        <member name="P:Gp4Net.Pipeline.ImmutableCommandContext.Keys">
+        <member name="M:Gp4Net.Pipeline.ImmutablePipelineContext.WithMany(System.Collections.Immutable.ImmutableDictionary{System.String,System.Object})">
             <inheritdoc/>
         </member>
-        <member name="M:Gp4Net.Pipeline.ImmutableCommandContext.WithMany(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
+        <member name="M:Gp4Net.Pipeline.ImmutablePipelineContext.ToImmutableDictionary">
             <inheritdoc/>
         </member>
-        <member name="P:Gp4Net.Pipeline.ImmutableCommandContext.Empty">
+        <member name="P:Gp4Net.Pipeline.ImmutablePipelineContext.Empty">
             <summary>
             Creates an empty context.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.ImmutableCommandContext.Create``1(System.String,``0)">
+        <member name="M:Gp4Net.Pipeline.ImmutablePipelineContext.Create``1(System.String,``0)">
             <summary>
             Creates a context with a single value.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.ImmutableCommandContext.Create(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Object})">
+        <member name="M:Gp4Net.Pipeline.ImmutablePipelineContext.Create(System.Collections.Immutable.ImmutableDictionary{System.String,System.Object})">
             <summary>
             Creates a context from a dictionary of values.
             </summary>
         </member>
-        <member name="T:Gp4Net.Pipeline.CommandContextExtensions">
+        <member name="T:Gp4Net.Pipeline.PipelineContextExtensions">
             <summary>
-            Extension methods for working with command contexts.
+            Extension methods for working with pipeline contexts.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandContextExtensions.GetRequired``1(Gp4Net.Pipeline.ICommandContext,System.String)">
+        <member name="M:Gp4Net.Pipeline.PipelineContextExtensions.GetRequired``1(Gp4Net.Pipeline.IPipelineContext,System.String)">
             <summary>
             Gets a required value from the context, throwing if not found.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandContextExtensions.GetOrDefault``1(Gp4Net.Pipeline.ICommandContext,System.String,``0)">
+        <member name="M:Gp4Net.Pipeline.PipelineContextExtensions.GetOrDefault``1(Gp4Net.Pipeline.IPipelineContext,System.String,``0)">
             <summary>
             Gets a value from the context or a default if not found.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandContextExtensions.GetOrAdd``1(Gp4Net.Pipeline.ICommandContext,System.String,System.Func{``0})">
+        <member name="M:Gp4Net.Pipeline.PipelineContextExtensions.GetOrAdd``1(Gp4Net.Pipeline.IPipelineContext,System.String,System.Func{``0})">
             <summary>
             Gets a value from the context or computes it if not found.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandContextExtensions.Contains(Gp4Net.Pipeline.ICommandContext,System.String)">
+        <member name="M:Gp4Net.Pipeline.PipelineContextExtensions.Contains(Gp4Net.Pipeline.IPipelineContext,System.String)">
             <summary>
             Checks if a key exists in the context.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandContextExtensions.Merge(Gp4Net.Pipeline.ICommandContext,Gp4Net.Pipeline.ICommandContext)">
+        <member name="M:Gp4Net.Pipeline.PipelineContextExtensions.Merge(Gp4Net.Pipeline.IPipelineContext,Gp4Net.Pipeline.IPipelineContext)">
             <summary>
             Creates a new context by merging with another context.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Pipeline.IPipelineContext">
+            <summary>
+            Represents an immutable context that flows through the command pipeline.
+            Uses CSharpFunctionalExtensions types for proper functional programming.
+            Acts as a typed immutable dictionary for pipeline data flow.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.IPipelineContext.Get``1(System.String)">
+            <summary>
+            Gets a value from the context.
+            </summary>
+            <typeparam name="T">The type of the value.</typeparam>
+            <param name="key">The key to look up.</param>
+            <returns>Maybe containing the value if found, None otherwise.</returns>
+        </member>
+        <member name="M:Gp4Net.Pipeline.IPipelineContext.With``1(System.String,``0)">
+            <summary>
+            Creates a new context with an additional value.
+            </summary>
+            <typeparam name="T">The type of the value.</typeparam>
+            <param name="key">The key to store the value under.</param>
+            <param name="value">The value to store.</param>
+            <returns>A new context containing the additional value.</returns>
+        </member>
+        <member name="M:Gp4Net.Pipeline.IPipelineContext.Without(System.String)">
+            <summary>
+            Creates a new context without the specified key.
+            </summary>
+            <param name="key">The key to remove.</param>
+            <returns>A new context without the specified key.</returns>
+        </member>
+        <member name="P:Gp4Net.Pipeline.IPipelineContext.Keys">
+            <summary>
+            Gets all keys in the context as an immutable sequence.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.IPipelineContext.WithMany(System.Collections.Immutable.ImmutableDictionary{System.String,System.Object})">
+            <summary>
+            Creates a new context with multiple values.
+            </summary>
+            <param name="values">The values to add.</param>
+            <returns>A new context containing the additional values.</returns>
+        </member>
+        <member name="M:Gp4Net.Pipeline.IPipelineContext.ToImmutableDictionary">
+            <summary>
+            Gets the underlying dictionary for functional operations.
             </summary>
         </member>
         <member name="T:Gp4Net.Pipeline.Middleware.LoggingMiddleware">
@@ -8057,6 +8234,44 @@
             </summary>
         </member>
         <member name="M:Gp4Net.Pipeline.Middleware.TransportMiddleware.InvokeAsync(Gp4Net.Pipeline.CommandRequest,Gp4Net.Pipeline.CommandDelegate,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Gp4Net.Services.FunctionalGlobalPlatformService">
+            <summary>
+            Functional implementation of IGlobalPlatformService using pure functions.
+            Built alongside the existing service for gradual migration.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Services.FunctionalGlobalPlatformService.#ctor(Gp4Net.Services.ISmartCardService,Gp4Net.Domain.Protocol.ISecureChannelManager,Microsoft.Extensions.Logging.ILogger{Gp4Net.Services.FunctionalGlobalPlatformService})">
+            <summary>
+            Initializes a new instance of the FunctionalGlobalPlatformService class.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Services.FunctionalGlobalPlatformService.SelectIsdAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gp4Net.Services.FunctionalGlobalPlatformService.EstablishSecureChannelAsync(Gp4Net.Domain.Keys.KeySet,Gp4Net.Domain.SecurityLevel,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gp4Net.Services.FunctionalGlobalPlatformService.GetStatusAsync(Gp4Net.Services.StatusSubset,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gp4Net.Services.FunctionalGlobalPlatformService.InstallCapFileAsync(System.Byte[],Gp4Net.Services.InstallOptions,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gp4Net.Services.FunctionalGlobalPlatformService.DeleteApplicationAsync(System.Byte[],System.Boolean,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gp4Net.Services.FunctionalGlobalPlatformService.PutKeysAsync(Gp4Net.Domain.Keys.KeySet,System.Byte,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gp4Net.Services.FunctionalGlobalPlatformService.GetCplcAsync(System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gp4Net.Services.FunctionalGlobalPlatformService.GetDataAsync(System.UInt16,System.Threading.CancellationToken)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gp4Net.Services.FunctionalGlobalPlatformService.SetLifecycleStateAsync(System.Byte[],Gp4Net.Domain.LifecycleState,System.Threading.CancellationToken)">
             <inheritdoc/>
         </member>
         <member name="T:Gp4Net.Services.GlobalPlatformService">
@@ -8353,7 +8568,7 @@
             Gets the current command context containing state information.
             </summary>
         </member>
-        <member name="M:Gp4Net.Services.ISmartCardService.WithContext(Gp4Net.Pipeline.ICommandContext)">
+        <member name="M:Gp4Net.Services.ISmartCardService.WithContext(Gp4Net.Pipeline.IPipelineContext)">
             <summary>
             Creates a new service instance with an updated context.
             </summary>
@@ -8537,12 +8752,107 @@
             Gets the display name for the package.
             </summary>
         </member>
+        <member name="T:Gp4Net.Services.ServiceFactory">
+            <summary>
+            Functional service factory that composes services using pure functions
+            and dependency composition rather than complex dependency injection.
+            Demonstrates the functional architecture approach with explicit dependencies.
+            
+            Example usage:
+            <code>
+            var transport = new T0ApduTransport();
+            var secureChannelManager = new SecureChannelManager();
+            
+            var configResult = ServiceFactory.CreateServiceConfiguration(transport, secureChannelManager);
+            
+            configResult.Match(
+                config => {
+                    var context = config.CreateServiceContext();
+                    // Use services through context...
+                },
+                error => Console.WriteLine($"Configuration failed: {error}")
+            );
+            </code>
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Services.ServiceFactory.CreateGlobalPlatformService(Gp4Net.Services.ISmartCardService,Gp4Net.Domain.Protocol.ISecureChannelManager)">
+            <summary>
+            Creates a functional GlobalPlatform service with all required dependencies.
+            Uses functional composition to wire up the service graph.
+            </summary>
+            <param name="cardService">The card service for smart card communication.</param>
+            <param name="secureChannelManager">The secure channel manager for cryptographic operations.</param>
+            <returns>A fully configured functional GlobalPlatform service.</returns>
+        </member>
+        <member name="M:Gp4Net.Services.ServiceFactory.CreateSmartCardService(Gp4Net.Transport.IApduTransport)">
+            <summary>
+            Creates a smart card service with functional pipeline composition.
+            Demonstrates how to build services with explicit dependency management.
+            </summary>
+            <param name="transport">The APDU transport for card communication.</param>
+            <returns>A configured smart card service with functional pipeline.</returns>
+        </member>
+        <member name="M:Gp4Net.Services.ServiceFactory.CreateCommandPipeline(Gp4Net.Transport.IApduTransport)">
+            <summary>
+            Creates a command pipeline with functional middleware composition.
+            Uses builder pattern but with functional error handling.
+            </summary>
+            <param name="transport">The APDU transport for the terminal middleware.</param>
+            <returns>A configured command pipeline or configuration error.</returns>
+        </member>
+        <member name="M:Gp4Net.Services.ServiceFactory.CreatePipelineContext">
+            <summary>
+            Creates an immutable pipeline context for command execution.
+            Demonstrates functional context creation with proper immutability.
+            </summary>
+            <returns>An immutable pipeline context.</returns>
+        </member>
+        <member name="M:Gp4Net.Services.ServiceFactory.CreateServiceConfiguration(Gp4Net.Transport.IApduTransport,Gp4Net.Domain.Protocol.ISecureChannelManager)">
+            <summary>
+            Creates a complete service graph for GlobalPlatform operations.
+            This is the main factory method that demonstrates functional composition
+            of the entire service dependency graph.
+            </summary>
+            <param name="transport">The APDU transport for card communication.</param>
+            <param name="secureChannelManager">The secure channel manager for cryptographic operations.</param>
+            <returns>A complete service configuration or error.</returns>
+        </member>
+        <member name="T:Gp4Net.Services.ServiceConfiguration">
+            <summary>
+            Immutable configuration containing all required services.
+            Demonstrates functional service composition with explicit dependencies.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Services.ServiceConfiguration.#ctor(Gp4Net.Services.ISmartCardService,Gp4Net.Services.IGlobalPlatformService)">
+            <summary>
+            Immutable configuration containing all required services.
+            Demonstrates functional service composition with explicit dependencies.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Services.ServiceConfiguration.CreateServiceContext">
+            <summary>
+            Creates a service context for command execution with all required services.
+            </summary>
+            <returns>A pipeline context populated with service dependencies.</returns>
+        </member>
+        <member name="T:Gp4Net.Services.ServiceConfigurationError">
+            <summary>
+            Represents errors that can occur during service configuration.
+            Uses functional error handling instead of exceptions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Services.ServiceConfigurationError.#ctor(System.String,System.String)">
+            <summary>
+            Represents errors that can occur during service configuration.
+            Uses functional error handling instead of exceptions.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Services.SmartCardService">
             <summary>
             Smart card service implementation using pipeline architecture.
             </summary>
         </member>
-        <member name="M:Gp4Net.Services.SmartCardService.#ctor(Gp4Net.Pipeline.ICommandPipeline,Gp4Net.Pipeline.ICommandContext,Gp4Net.Transport.IApduTransport,Microsoft.Extensions.Logging.ILogger{Gp4Net.Services.SmartCardService})">
+        <member name="M:Gp4Net.Services.SmartCardService.#ctor(Gp4Net.Pipeline.ICommandPipeline,Gp4Net.Pipeline.IPipelineContext,Gp4Net.Transport.IApduTransport,Microsoft.Extensions.Logging.ILogger{Gp4Net.Services.SmartCardService})">
             <summary>
             Initializes a new instance of SmartCardService.
             </summary>
@@ -8556,7 +8866,7 @@
         <member name="M:Gp4Net.Services.SmartCardService.ExecuteCommandAsync(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.CommandOptions,System.Threading.CancellationToken)">
             <inheritdoc/>
         </member>
-        <member name="M:Gp4Net.Services.SmartCardService.WithContext(Gp4Net.Pipeline.ICommandContext)">
+        <member name="M:Gp4Net.Services.SmartCardService.WithContext(Gp4Net.Pipeline.IPipelineContext)">
             <inheritdoc/>
         </member>
         <member name="M:Gp4Net.Services.SmartCardService.WithContextValue``1(System.String,``0)">

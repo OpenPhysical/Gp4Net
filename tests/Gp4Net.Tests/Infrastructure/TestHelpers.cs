@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
@@ -19,25 +20,26 @@ namespace Gp4Net.Tests.Infrastructure
     {
         public async Task<Result<CommandResponse, SmartCardError>> ExecuteAsync(
             IApduCommand command,
-            ICommandContext context,
+            IPipelineContext context,
             CancellationToken cancellationToken = default)
         {
             // Basic test implementation - just execute the command
-            try
+            var transportMaybe = context.Get<IApduTransport>("ApduTransport");
+            var channelMaybe = context.Get<ICardChannel>("CardChannel");
+            
+            if (transportMaybe.HasNoValue || channelMaybe.HasNoValue)
             {
-                var transport = context.GetRequired<IApduTransport>("ApduTransport");
-                var channel = context.GetRequired<ICardChannel>("CardChannel");
-                
-                var response = await transport.TransmitAsync(command, channel, cancellationToken);
-                
-                return Result<CommandResponse, SmartCardError>.Ok(
-                    new CommandResponse(response.Data, response.StatusWord, context));
+                return Result.Failure<CommandResponse, SmartCardError>(
+                    SmartCardError.CommunicationError("Transport or channel not available in context"));
             }
-            catch (Exception ex)
-            {
-                return Result<CommandResponse, SmartCardError>.Fail(
-                    SmartCardError.CommunicationError($"Pipeline execution failed: {ex.Message}"));
-            }
+            
+            var transport = transportMaybe.Value;
+            var channel = channelMaybe.Value;
+            
+            var response = await transport.TransmitAsync(command, channel, cancellationToken);
+            
+            return Result.Success<CommandResponse, SmartCardError>(
+                new CommandResponse(response.Data, response.StatusWord, context));
         }
 
         public async Task<Result<CommandResponse, SmartCardError>> ExecuteAsync(
@@ -45,21 +47,22 @@ namespace Gp4Net.Tests.Infrastructure
             CancellationToken cancellationToken = default)
         {
             // Basic test implementation - execute the command from the request
-            try
+            var transportMaybe = request.Context.Get<IApduTransport>("ApduTransport");
+            var channelMaybe = request.Context.Get<ICardChannel>("CardChannel");
+            
+            if (transportMaybe.HasNoValue || channelMaybe.HasNoValue)
             {
-                var transport = request.Context.GetRequired<IApduTransport>("ApduTransport");
-                var channel = request.Context.GetRequired<ICardChannel>("CardChannel");
-                
-                var response = await transport.TransmitAsync(request.Command, channel, cancellationToken);
-                
-                return Result<CommandResponse, SmartCardError>.Ok(
-                    new CommandResponse(response.Data, response.StatusWord, request.Context));
+                return Result.Failure<CommandResponse, SmartCardError>(
+                    SmartCardError.CommunicationError("Transport or channel not available in context"));
             }
-            catch (Exception ex)
-            {
-                return Result<CommandResponse, SmartCardError>.Fail(
-                    SmartCardError.CommunicationError($"Pipeline execution failed: {ex.Message}"));
-            }
+            
+            var transport = transportMaybe.Value;
+            var channel = channelMaybe.Value;
+            
+            var response = await transport.TransmitAsync(request.Command, channel, cancellationToken);
+            
+            return Result.Success<CommandResponse, SmartCardError>(
+                new CommandResponse(response.Data, response.StatusWord, request.Context));
         }
     }
 
@@ -134,7 +137,8 @@ namespace Gp4Net.Tests.Infrastructure
             // For testing, return failure
             // Real tests should use actual secure channel implementations or trace-based cards
             await Task.CompletedTask;
-            return SmartCardError.UnexpectedError("TestSecureChannelManager is a stub for interface compatibility only");
+            return Result.Failure<SecureChannelSession, SmartCardError>(
+                SmartCardError.UnexpectedError("TestSecureChannelManager is a stub for interface compatibility only"));
         }
 
         public async Task<Result<SecureChannelSession, SmartCardError>> EstablishAutoDetectAsync(
@@ -147,7 +151,8 @@ namespace Gp4Net.Tests.Infrastructure
             // For testing, return failure
             // Real tests should use actual secure channel implementations or trace-based cards
             await Task.CompletedTask;
-            return SmartCardError.UnexpectedError("TestSecureChannelManager is a stub for interface compatibility only");
+            return Result.Failure<SecureChannelSession, SmartCardError>(
+                SmartCardError.UnexpectedError("TestSecureChannelManager is a stub for interface compatibility only"));
         }
     }
 

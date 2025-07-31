@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Pipeline;
 using Gp4Net.Services;
@@ -102,15 +103,15 @@ namespace Gp4Net.Pipeline.Middleware
             {
                 // Log relevant context values
                 var secureChannel = request.Context.Get<Domain.SecureChannelSession>(ContextKeys.SecureChannelSession);
-                if (secureChannel != null)
+                if (secureChannel.HasValue)
                 {
-                    logBuilder.AppendLine($"  Secure Channel: SCP{secureChannel.ProtocolVersion:X2}");
+                    logBuilder.AppendLine($"  Secure Channel: SCP{secureChannel.Value.ProtocolVersion:X2}");
                 }
 
                 var selectedAid = request.Context.Get<byte[]>(ContextKeys.SelectedAid);
-                if (selectedAid != null)
+                if (selectedAid.HasValue)
                 {
-                    logBuilder.AppendLine($"  Selected AID: {Convert.ToHexString(selectedAid)}");
+                    logBuilder.AppendLine($"  Selected AID: {Convert.ToHexString(selectedAid.Value)}");
                 }
             }
 
@@ -119,9 +120,14 @@ namespace Gp4Net.Pipeline.Middleware
 
         private void LogResponse(Result<CommandResponse, SmartCardError> result, TimeSpan elapsed, string requestId)
         {
-            result.Match<Core.Unit>(
-                success => { LogSuccessResponse(success, elapsed, requestId); return Core.Unit.Value; },
-                failure => { LogFailureResponse(failure, elapsed, requestId); return Core.Unit.Value; });
+            if (result.IsSuccess)
+            {
+                LogSuccessResponse(result.Value, elapsed, requestId);
+            }
+            else
+            {
+                LogFailureResponse(result.Error, elapsed, requestId);
+            }
         }
 
         private void LogSuccessResponse(CommandResponse response, TimeSpan elapsed, string requestId)

@@ -8,10 +8,10 @@ using log4net;
 namespace Gp4Net.Tool.Pipeline
 {
     /// <summary>
-    /// Default implementation of ICommandContext.
+    /// Default implementation of ICliExecutionContext.
     /// </summary>
     [PublicAPI]
-    public class CommandContext : ICommandContext
+    public class CommandContext : ICliExecutionContext
     {
         private static readonly ILog Logger = LogManager.GetLogger(typeof(CommandContext));
 
@@ -44,11 +44,11 @@ namespace Gp4Net.Tool.Pipeline
                 .CreateGlobalPlatformService(CardService);
         }
 
-        public Task<ICommandContext> RequireCardConnection(string? readerName = null)
+        public Task<ICliExecutionContext> RequireCardConnection(string? readerName = null)
         {
             if (CardService.IsConnected)
             {
-                return Task.FromResult<ICommandContext>(this);
+                return Task.FromResult<ICliExecutionContext>(this);
             }
 
             try
@@ -76,7 +76,7 @@ namespace Gp4Net.Tool.Pipeline
                 }
 
                 Display.Success($"Connected to reader: {readerName}");
-                return Task.FromResult<ICommandContext>(this);
+                return Task.FromResult<ICliExecutionContext>(this);
             }
             catch (Exception ex)
             {
@@ -86,14 +86,14 @@ namespace Gp4Net.Tool.Pipeline
             }
         }
 
-        public Task<ICommandContext> RequireSecureChannel(
+        public Task<ICliExecutionContext> RequireSecureChannel(
             byte securityLevel = 1,
             string? keyset = null
         )
         {
             if (CardService.IsSecureChannelEstablished)
             {
-                return Task.FromResult<ICommandContext>(this);
+                return Task.FromResult<ICliExecutionContext>(this);
             }
 
             try
@@ -106,7 +106,7 @@ namespace Gp4Net.Tool.Pipeline
                 if (CardService.EstablishSecureChannel(keyBytes, securityLevel))
                 {
                     Display.Success("✓ Secure channel established");
-                    return Task.FromResult<ICommandContext>(this);
+                    return Task.FromResult<ICliExecutionContext>(this);
                 }
                 else
                 {
@@ -122,7 +122,7 @@ namespace Gp4Net.Tool.Pipeline
             }
         }
 
-        public async Task<int> ExecuteAsync(Func<ICommandContext, Task<int>> commandLogic)
+        public async Task<int> ExecuteAsync(Func<ICliExecutionContext, Task<int>> commandLogic)
         {
             try
             {
@@ -136,7 +136,7 @@ namespace Gp4Net.Tool.Pipeline
             }
         }
 
-        public async Task<int> ExecuteAsync(Func<ICommandContext, int> commandLogic)
+        public async Task<int> ExecuteAsync(Func<ICliExecutionContext, int> commandLogic)
         {
             try
             {

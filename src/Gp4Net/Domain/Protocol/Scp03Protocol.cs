@@ -4,15 +4,18 @@
 // -----------------------------------------------------------------------------
 
 using System;
-using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
+using Gp4Net.Utils;
 using JetBrains.Annotations;
 using Kdf108.Domain.Kdf;
 using Kdf108.Domain.Kdf.Modes;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Parameters;
@@ -23,15 +26,14 @@ namespace Gp4Net.Domain.Protocol
     /// Implements the SCP03 secure channel protocol.
     /// </summary>
     [PublicAPI]
-    public class Scp03Protocol : ISecureChannelProtocol
+    public class Scp03Protocol : SecureChannelProtocolBase
     {
-        private readonly IKeySet _keySet;
         private readonly byte _implementation;
 
         /// <summary>
         /// Gets the protocol version identifier.
         /// </summary>
-        public byte ProtocolVersion => ProtocolIdentifiers.Scp03;
+        public override byte ProtocolVersion => ProtocolIdentifiers.Scp03;
 
         /// <summary>
         /// Gets the SCP03 implementation parameter.
@@ -42,11 +44,23 @@ namespace Gp4Net.Domain.Protocol
         /// Initializes a new instance of the Scp03Protocol class.
         /// </summary>
         /// <param name="keySet">The static key set.</param>
+        /// <param name="keyDerivationService">The key derivation service.</param>
         /// <param name="implementation">The SCP03 implementation parameter (default is 0x70).</param>
-        public Scp03Protocol(IKeySet keySet, byte implementation = 0x70)
+        public Scp03Protocol(IKeySet keySet, IKeyDerivationService keyDerivationService, byte implementation = 0x70)
+            : this(keySet, keyDerivationService, NullLogger<Scp03Protocol>.Instance, implementation)
         {
-            ArgumentNullException.ThrowIfNull(keySet);
-            _keySet = keySet;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the Scp03Protocol class with logging.
+        /// </summary>
+        /// <param name="keySet">The static key set.</param>
+        /// <param name="keyDerivationService">The key derivation service.</param>
+        /// <param name="logger">The logger instance.</param>
+        /// <param name="implementation">The SCP03 implementation parameter (default is 0x70).</param>
+        public Scp03Protocol(IKeySet keySet, IKeyDerivationService keyDerivationService, ILogger<Scp03Protocol> logger, byte implementation = 0x70)
+            : base(keySet, keyDerivationService, logger)
+        {
             _implementation = implementation;
 
             // Validate that this is an SCP03-compatible key set
@@ -60,6 +74,9 @@ namespace Gp4Net.Domain.Protocol
             {
                 throw new ArgumentException("Invalid SCP03 implementation parameter");
             }
+
+            _logger.LogDebug("Initialized SCP03 protocol with implementation parameter: {Implementation:X2}", implementation);
+            _logger.LogDebug("Key set version: {KeyVersion:X2}", keySet.KeyVersion);
         }
 
         /// <summary>
@@ -78,72 +95,95 @@ namespace Gp4Net.Domain.Protocol
                 implementation == 0x70; // R-MAC and R-ENC with pseudo-random card challenge
         }
 
-        /// <summary>
-        /// Creates an INITIALIZE UPDATE command.
-        /// </summary>
-        public Result<InitializeUpdateCommand, SmartCardError> CreateInitializeUpdateCommand(byte[] hostChallenge)
+        /// <inheritdoc />
+        protected override Result<InitializeUpdateCommand, SmartCardError> CreateInitializeUpdateCommandImpl(byte[] hostChallenge)
         {
-            if (hostChallenge.Length != 8)
-            {
-                return Result<InitializeUpdateCommand, SmartCardError>.Fail(
-                    SmartCardError.InvalidData($"Host challenge must be 8 bytes, got {hostChallenge.Length}"));
-            }
+            _logger.LogDebug("Creating SCP03 INITIALIZE UPDATE command");
+            _logger.LogDebug("Host challenge: {Challenge}", hostChallenge.ToHexString());
 
             // For SCP03, key identifier must be 0x00
-            return InitializeUpdateCommand.Create(_keySet.KeyVersion, 0x00, hostChallenge);
+            return InitializeUpdateCommand.Create(_keySet.KeyVersion, 0x00, hostChallenge)
+                .Tap(cmd => _logger.LogDebug("Created INITIALIZE UPDATE: KeyVersion={KeyVersion:X2}, KeyId={KeyId:X2}", 
+                    cmd.P1, cmd.P2));
         }
 
-        /// <summary>
-        /// Processes an INITIALIZE UPDATE response and establishes a session context.
-        /// </summary>
-        public Result<SecureChannelContext, SmartCardError> ProcessInitializeUpdateResponse(
+        /// <inheritdoc />
+        protected override Result<SecureChannelContext, SmartCardError> ProcessInitializeUpdateResponseImpl(
             InitializeUpdateResponse response,
-            byte[] hostChallenge
-        )
+            byte[] hostChallenge)
         {
+            _logger.LogDebug("Processing INITIALIZE UPDATE response");
+            
             if (response == null)
             {
+                _logger.LogError("INITIALIZE UPDATE response is null");
                 return SmartCardError.InvalidArgument("Response cannot be null");
             }
 
             if (hostChallenge?.Length != 8)
             {
+                _logger.LogError("Invalid host challenge length in response processing");
                 return SmartCardError.InvalidData("Host challenge must be 8 bytes");
             }
+
+            _logger.LogDebug("Response SCP ID: {ScpId:X2}", response.ScpId);
+            _logger.LogDebug("Card challenge: {Challenge}", response.CardChallenge.ToHexString());
+            _logger.LogDebug("Card cryptogram: {Cryptogram}", response.CardCryptogram.ToHexString());
 
             // Verify the response is for SCP03
             if ((response.ScpId & ProtocolIdentifiers.ProtocolMask) != ProtocolIdentifiers.Scp03)
             {
+                _logger.LogError("Invalid SCP version: expected SCP03, got SCP{ScpId:X2}", response.ScpId);
                 return SmartCardError.InvalidResponse($"Expected SCP03 but received SCP{response.ScpId:X2}");
             }
 
             // Extract implementation parameter from response
             var cardImplementation = (byte)(response.ScpId & 0xF0);
+            _logger.LogDebug("Card implementation parameter: {Implementation:X2}", cardImplementation);
 
             // Verify implementation matches what we expect
             if (cardImplementation != _implementation)
             {
-                // Log warning but continue - card may report different i-value
-                // This is common during protocol transition
+                _logger.LogWarning("Card reports different implementation parameter: expected {Expected:X2}, got {Actual:X2}", 
+                    _implementation, cardImplementation);
+                // Continue - card may report different i-value during protocol transition
             }
 
             // Determine key length from the static keys
             var keyLength = _keySet.EncKey.Length * 8;
+            _logger.LogDebug("Key length: {KeyLength} bits", keyLength);
 
             // Derive session keys
-            var sessionKeys = KeyDerivation.DeriveScp03SessionKeys(
+            _logger.LogDebug("Deriving session keys...");
+            var sessionKeysResult = KeyDerivation.DeriveScp03SessionKeys(
                 (Scp03KeySet)_keySet,
                 hostChallenge,
                 response.CardChallenge,
                 keyLength
             );
-
+            
+            if (sessionKeysResult.IsFailure)
+            {
+                _logger.LogError("Failed to derive session keys: {Error}", sessionKeysResult.Error.Message);
+                return SmartCardError.CryptographicError($"Session key derivation failed: {sessionKeysResult.Error.Message}");
+            }
+            
+            var sessionKeys = sessionKeysResult.Value;
+            _logger.LogDebug("Session keys derived successfully");
+            _logger.LogTrace("S-ENC: {SEnc}", sessionKeys.SEnc.ToHexString());
+            _logger.LogTrace("S-MAC: {SMac}", sessionKeys.SMac.ToHexString());
+            _logger.LogTrace("S-RMAC: {SRMac}", sessionKeys.SrMac.ToHexString());
 
             // Strict spec: verify card cryptogram
+            _logger.LogDebug("Verifying card cryptogram...");
             if (!VerifyCardCryptogram(response, hostChallenge, sessionKeys))
             {
+                _logger.LogError("Card cryptogram verification failed!");
+                _logger.LogError("Expected cryptogram based on context: HostChallenge={Host}, CardChallenge={Card}", 
+                    hostChallenge.ToHexString(), response.CardChallenge.ToHexString());
                 return SmartCardError.SecurityError("Card cryptogram verification failed");
             }
+            _logger.LogDebug("Card cryptogram verified successfully");
 
             var context = new SecureChannelContext(
                 hostChallenge,
@@ -153,18 +193,15 @@ namespace Gp4Net.Domain.Protocol
                 _keySet
             );
 
-            return Result<SecureChannelContext, SmartCardError>.Ok(context);
+            return Result.Success<SecureChannelContext, SmartCardError>(context);
         }
 
         private byte[]? _lastExternalAuthMac; // Store the full MAC for chaining value
 
-        /// <summary>
-        /// Creates an EXTERNAL AUTHENTICATE command.
-        /// </summary>
-        public Result<ExternalAuthenticateCommand, SmartCardError> CreateExternalAuthenticateCommand(
+        /// <inheritdoc />
+        protected override Result<ExternalAuthenticateCommand, SmartCardError> CreateExternalAuthenticateCommandImpl(
             SecureChannelContext context,
-            SecurityLevel securityLevel
-        )
+            SecurityLevel securityLevel)
         {
             ArgumentNullException.ThrowIfNull(context);
 
@@ -190,27 +227,24 @@ namespace Gp4Net.Domain.Protocol
 
                 // Calculate full MAC over the command
                 var fullMac = CalculateCMacForCommand(macApdu, context.SessionKeys.SMac);
-                
+
                 // Store the full MAC for use as initial chaining value
                 _lastExternalAuthMac = fullMac;
-                
+
                 // Return only the truncated 8-byte MAC for the command
                 var mac = new byte[8];
                 Array.Copy(fullMac, 0, mac, 0, 8);
-                
+
                 return ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, mac);
             }
 
             return ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
         }
 
-        /// <summary>
-        /// Creates a secure channel session from the context after successful authentication.
-        /// </summary>
-        public SecureChannelSession CreateSecureChannelSession(
+        /// <inheritdoc />
+        public override SecureChannelSession CreateSecureChannelSession(
             SecureChannelContext context,
-            SecurityLevel securityLevel
-        )
+            SecurityLevel securityLevel)
         {
             ArgumentNullException.ThrowIfNull(context);
 
@@ -240,7 +274,7 @@ namespace Gp4Net.Domain.Protocol
         /// Calculates C-MAC for a command during authentication.
         /// Returns the full 16-byte MAC (caller must truncate if needed).
         /// </summary>
-        private byte[] CalculateCMacForCommand(byte[] command, byte[] sMacKey)
+        private static byte[] CalculateCMacForCommand(byte[] command, byte[] sMacKey)
         {
             // For SCP03 authentication, MAC is calculated over the command with zero ICV
             var zeroIcv = new byte[16];
@@ -252,10 +286,10 @@ namespace Gp4Net.Domain.Protocol
             var cmac = new CMac(new AesEngine(), 128); // 128-bit MAC for full output
             cmac.Init(new KeyParameter(sMacKey));
             cmac.BlockUpdate(macInput, 0, macInput.Length);
-            
+
             var fullMac = new byte[16];
             _ = cmac.DoFinal(fullMac, 0);
-            
+
             return fullMac;
         }
 
@@ -309,80 +343,11 @@ namespace Gp4Net.Domain.Protocol
             );
         }
 
-        /// <summary>
-        /// Builds the input data for card cryptogram calculation.
-        /// </summary>
-        private byte[] BuildCardCryptogramData(
-            InitializeUpdateResponse response,
-            byte[] hostChallenge
-        )
-        {
-            // Card cryptogram data: Label || 0x00 || 0x00 || L || Host Challenge || Card Challenge
-            var data = new byte[11 + 1 + 1 + 2 + 8 + 8];
-            var offset = 0;
-
-            // Label (11 bytes of 0x00)
-            offset += 11;
-
-            // Derivation constant for card cryptogram
-            data[offset++] = DerivationConstants.CardCryptogram;
-
-            // Separator
-            data[offset++] = 0x00;
-
-            // Length (64 bits = 8 bytes)
-            data[offset++] = 0x00;
-            data[offset++] = 0x40;
-
-            // Host challenge
-            Array.Copy(hostChallenge, 0, data, offset, 8);
-            offset += 8;
-
-            // Card challenge
-            Array.Copy(response.CardChallenge, 0, data, offset, 8);
-
-            return data;
-        }
-
-        /// <summary>
-        /// Builds the input data for host cryptogram calculation.
-        /// </summary>
-        private byte[] BuildHostCryptogramData(
-            InitializeUpdateResponse response,
-            byte[] hostChallenge
-        )
-        {
-            // Host cryptogram data: Label || 0x01 || 0x00 || L || Host Challenge || Card Challenge
-            var data = new byte[11 + 1 + 1 + 2 + 8 + 8];
-            var offset = 0;
-
-            // Label (11 bytes of 0x00)
-            offset += 11;
-
-            // Derivation constant for host cryptogram
-            data[offset++] = DerivationConstants.HostCryptogram;
-
-            // Separator
-            data[offset++] = 0x00;
-
-            // Length (64 bits = 8 bytes)
-            data[offset++] = 0x00;
-            data[offset++] = 0x40;
-
-            // Host challenge
-            Array.Copy(hostChallenge, 0, data, offset, 8);
-            offset += 8;
-
-            // Card challenge
-            Array.Copy(response.CardChallenge, 0, data, offset, 8);
-
-            return data;
-        }
 
         /// <summary>
         /// Derives SCP03 cryptogram using the same KDF structure as session keys.
         /// </summary>
-        private byte[] DeriveScp03Cryptogram(
+        private static byte[] DeriveScp03Cryptogram(
             byte[] kdk,
             byte derivationConstant,
             byte[] context,
@@ -390,7 +355,7 @@ namespace Gp4Net.Domain.Protocol
         )
         {
             // Build the "fixed input data" (everything that's constant for this derivation)
-            // This includes: Label + Separator + L + Context 
+            // This includes: Label + Separator + L + Context
             // The counter will be inserted by the KDF library between L and Context
             var fixedInputBeforeCounter = new byte[11 + 1 + 1 + 2]; // Label + derivation + separator + L
             var offset = 0;
@@ -441,7 +406,7 @@ namespace Gp4Net.Domain.Protocol
         /// <summary>
         /// Calculates a cryptogram using CMAC-AES.
         /// </summary>
-        private byte[] CalculateCryptogram(byte[] key, byte[] data)
+        private static byte[] CalculateCryptogram(byte[] key, byte[] data)
         {
             var cmac = new CMac(new AesEngine(), 64); // 64-bit MAC
             cmac.Init(new KeyParameter(key));
@@ -453,22 +418,28 @@ namespace Gp4Net.Domain.Protocol
             return cryptogram;
         }
 
+        /// <inheritdoc />
+        protected override Result<byte[], SmartCardError> BuildCardCryptogramData(
+            InitializeUpdateResponse response,
+            byte[] hostChallenge)
+        {
+            return CryptogramBuilder.BuildScp03CardCryptogramData(response, hostChallenge);
+        }
+
+        /// <inheritdoc />
+        protected override Result<byte[], SmartCardError> BuildHostCryptogramData(
+            InitializeUpdateResponse response,
+            byte[] hostChallenge)
+        {
+            return CryptogramBuilder.BuildScp03HostCryptogramData(response, hostChallenge);
+        }
+
         /// <summary>
         /// Compares two byte arrays in constant time.
         /// </summary>
         private static bool CompareBytes(byte[] a, byte[] b)
         {
-            if (a.Length != b.Length)
-            {
-                return false;
-            }
-
-            var result = 0;
-            for (int i = 0; i < a.Length; i++)
-            {
-                result |= a[i] ^ b[i];
-            }
-            return result == 0;
+            return CryptographicOperations.CompareBytes(a, b);
         }
     }
 }

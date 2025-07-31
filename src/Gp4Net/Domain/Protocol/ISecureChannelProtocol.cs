@@ -1,5 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;

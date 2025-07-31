@@ -37,7 +37,7 @@ namespace Gp4Net.Tool.Commands.Debug
             public bool Recursive { get; set; } = true;
         }
 
-        public Task<int> ExecuteAsync(ICommandContext context, Settings settings)
+        public Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
         {
             try
             {
@@ -84,7 +84,7 @@ namespace Gp4Net.Tool.Commands.Debug
             }
         }
 
-        private void DisplayTlvElement(ICommandContext context, ParsedTlvElement element, int index, int depth, Settings settings)
+        private void DisplayTlvElement(ICliExecutionContext context, ParsedTlvElement element, int index, int depth, Settings settings)
         {
             var indent = new string(' ', depth * 2);
             var tagInfo = GetTagInfo(element.Tag);
@@ -271,7 +271,7 @@ namespace Gp4Net.Tool.Commands.Debug
             return true;
         }
 
-        private void DisplayKnownTagInterpretation(ICommandContext context, ParsedTlvElement element, string indent, Settings settings)
+        private void DisplayKnownTagInterpretation(ICliExecutionContext context, ParsedTlvElement element, string indent, Settings settings)
         {
             switch (element.Tag)
             {

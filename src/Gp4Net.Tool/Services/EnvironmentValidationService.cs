@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
@@ -75,7 +76,7 @@ namespace Gp4Net.Tool.Services
                 var cardEnvResult = await DetectCardEnvironmentAsync(channel, transport, cancellationToken);
                 if (cardEnvResult.IsFailure)
                 {
-                    return Result<EnvironmentValidationResult, SmartCardError>.Fail(cardEnvResult.Error);
+                    return Result.Failure<EnvironmentValidationResult, SmartCardError>(cardEnvResult.Error);
                 }
 
                 var cardEnvironment = cardEnvResult.Value;
@@ -99,12 +100,12 @@ namespace Gp4Net.Tool.Services
                     isSafe
                 );
 
-                return Result<EnvironmentValidationResult, SmartCardError>.Ok(result);
+                return Result.Success<EnvironmentValidationResult, SmartCardError>(result);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to validate environment");
-                return Result<EnvironmentValidationResult, SmartCardError>.Fail(
+                return Result.Failure<EnvironmentValidationResult, SmartCardError>(
                     SmartCardError.UnexpectedError("Environment validation failed", ex)
                 );
             }
@@ -144,7 +145,7 @@ namespace Gp4Net.Tool.Services
                 // Check if this is a virtual/mock card
                 if (IsVirtualCard(channel))
                 {
-                    return Result<CardEnvironment, SmartCardError>.Ok(CardEnvironment.Virtual);
+                    return Result.Success<CardEnvironment, SmartCardError>(CardEnvironment.Virtual);
                 }
 
                 // Try to get CPLC data to identify card type
@@ -154,18 +155,18 @@ namespace Gp4Net.Tool.Services
                     var environment = AnalyzeCplcData(cplcResult.Value);
                     if (environment != CardEnvironment.Unknown)
                     {
-                        return Result<CardEnvironment, SmartCardError>.Ok(environment);
+                        return Result.Success<CardEnvironment, SmartCardError>(environment);
                     }
                 }
 
                 // Fallback: analyze card behavior patterns
                 var behaviorEnvironment = await AnalyzeCardBehaviorAsync(channel, transport, cancellationToken);
-                return Result<CardEnvironment, SmartCardError>.Ok(behaviorEnvironment);
+                return Result.Success<CardEnvironment, SmartCardError>(behaviorEnvironment);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to detect card environment, defaulting to Unknown");
-                return Result<CardEnvironment, SmartCardError>.Ok(CardEnvironment.Unknown);
+                return Result.Success<CardEnvironment, SmartCardError>(CardEnvironment.Unknown);
             }
         }
 
@@ -191,23 +192,23 @@ namespace Gp4Net.Tool.Services
                 var commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardProductionLifeCycle);
                 if (commandResult.IsFailure)
                 {
-                    return Result<byte[], SmartCardError>.Fail(commandResult.Error);
+                    return Result.Failure<byte[], SmartCardError>(commandResult.Error);
                 }
                 
                 var response = await transport.TransmitAsync(commandResult.Value, channel, cancellationToken);
 
                 if (response.IsSuccess && response.Data.Length > 0)
                 {
-                    return Result<byte[], SmartCardError>.Ok(response.Data);
+                    return Result.Success<byte[], SmartCardError>(response.Data);
                 }
 
-                return Result<byte[], SmartCardError>.Fail(
+                return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.CardError("CPLC data not available")
                 );
             }
             catch (Exception ex)
             {
-                return Result<byte[], SmartCardError>.Fail(
+                return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.CommunicationError("Failed to retrieve CPLC data", ex)
                 );
             }

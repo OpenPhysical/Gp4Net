@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 
 namespace Gp4Net.Domain.CardInfo
@@ -158,24 +159,24 @@ namespace Gp4Net.Domain.CardInfo
         {
             if (data == null)
             {
-                return Result<CplcData, SmartCardError>.Fail(
+                return Result.Failure<CplcData, SmartCardError>(
                     SmartCardError.InvalidData("CPLC data cannot be null"));
             }
 
             if (data.Length < 42)
             {
-                return Result<CplcData, SmartCardError>.Fail(
+                return Result.Failure<CplcData, SmartCardError>(
                     SmartCardError.InvalidData($"CPLC data must be at least 42 bytes, got {data.Length}"));
             }
 
             try
             {
                 var cplc = Parse(data);
-                return Result<CplcData, SmartCardError>.Ok(cplc);
+                return Result.Success<CplcData, SmartCardError>(cplc);
             }
             catch (Exception ex)
             {
-                return Result<CplcData, SmartCardError>.Fail(
+                return Result.Failure<CplcData, SmartCardError>(
                     SmartCardError.InvalidData($"Failed to parse CPLC data: {ex.Message}"));
             }
         }

@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Core.Tlv;
 using Gp4Net.Transport;
@@ -121,14 +122,14 @@ namespace Gp4Net.Domain.Commands
         {
             if (aid == null)
             {
-                return Result<SelectCommand, SmartCardError>.Fail(
+                return Result.Failure<SelectCommand, SmartCardError>(
                     SmartCardError.InvalidData("AID cannot be null")
                 );
             }
 
             if (aid.Length > 16)
             {
-                return Result<SelectCommand, SmartCardError>.Fail(
+                return Result.Failure<SelectCommand, SmartCardError>(
                     SmartCardError.InvalidData("AID must be 16 bytes or less")
                 );
             }
@@ -140,7 +141,7 @@ namespace Gp4Net.Domain.Commands
                 ? FileControlInfo.ReturnFci
                 : (FileControlInfo)((byte)FileControlInfo.ReturnFci | (byte)mode);
 
-            return Result<SelectCommand, SmartCardError>.Ok(
+            return Result.Success<SelectCommand, SmartCardError>(
                 new SelectCommand(aid, control, controlInfo)
             );
         }
@@ -335,7 +336,7 @@ namespace Gp4Net.Domain.Commands
         {
             if (response == null)
             {
-                return Result<SelectResponse, SmartCardError>.Fail(
+                return Result.Failure<SelectResponse, SmartCardError>(
                     SmartCardError.InvalidData("Response data cannot be null")
                 );
             }
@@ -344,13 +345,13 @@ namespace Gp4Net.Domain.Commands
             {
                 // Try to parse FCI data
                 var fci = ParseFciData(response);
-                return Result<SelectResponse, SmartCardError>.Ok(
+                return Result.Success<SelectResponse, SmartCardError>(
                     new SelectResponse(response, fci)
                 );
             }
             catch (Exception ex)
             {
-                return Result<SelectResponse, SmartCardError>.Fail(
+                return Result.Failure<SelectResponse, SmartCardError>(
                     SmartCardError.InvalidResponse($"Failed to parse SELECT response: {ex.Message}")
                 );
             }

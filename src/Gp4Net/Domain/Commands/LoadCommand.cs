@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.CapFile;
@@ -198,20 +199,20 @@ namespace Gp4Net.Domain.Commands
         {
             if (data == null)
             {
-                return Result<LoadCommand, SmartCardError>.Fail(
+                return Result.Failure<LoadCommand, SmartCardError>(
                     SmartCardError.InvalidArgument("Data cannot be null."));
             }
 
             if (data.Length == 0)
             {
-                return Result<LoadCommand, SmartCardError>.Fail(
+                return Result.Failure<LoadCommand, SmartCardError>(
                     SmartCardError.InvalidArgument("Data cannot be empty."));
             }
 
             uint? totalCapSize = blockNumber == 0 ? (uint)data.Length : null;
             
             var command = new LoadCommand(blockNumber, data, isLastBlock, totalCapSize);
-            return Result<LoadCommand, SmartCardError>.Ok(command);
+            return Result.Success<LoadCommand, SmartCardError>(command);
         }
 
         /// <summary>
@@ -227,19 +228,19 @@ namespace Gp4Net.Domain.Commands
         {
             if (capFileData == null)
             {
-                return Result<IList<LoadCommand>, SmartCardError>.Fail(
+                return Result.Failure<IList<LoadCommand>, SmartCardError>(
                     SmartCardError.InvalidArgument("CAP file data cannot be null."));
             }
 
             if (capFileData.Length == 0)
             {
-                return Result<IList<LoadCommand>, SmartCardError>.Fail(
+                return Result.Failure<IList<LoadCommand>, SmartCardError>(
                     SmartCardError.InvalidArgument("CAP file data cannot be empty."));
             }
 
             if (maxBlockSize < 1 || maxBlockSize > 255)
             {
-                return Result<IList<LoadCommand>, SmartCardError>.Fail(
+                return Result.Failure<IList<LoadCommand>, SmartCardError>(
                     SmartCardError.InvalidArgument(
                         "Block size must be between 1 and 255 bytes."));
             }
@@ -275,7 +276,7 @@ namespace Gp4Net.Domain.Commands
                 blockNumber++;
             }
 
-            return Result<IList<LoadCommand>, SmartCardError>.Ok(commands);
+            return Result.Success<IList<LoadCommand>, SmartCardError>(commands);
         }
 
         /// <summary>
@@ -323,7 +324,7 @@ namespace Gp4Net.Domain.Commands
         {
             if (capFile == null)
             {
-                return Result<IList<LoadCommand>, SmartCardError>.Fail(
+                return Result.Failure<IList<LoadCommand>, SmartCardError>(
                     SmartCardError.InvalidArgument("CAP file structure cannot be null."));
             }
 
@@ -334,7 +335,7 @@ namespace Gp4Net.Domain.Commands
             }
             catch (Exception ex)
             {
-                return Result<IList<LoadCommand>, SmartCardError>.Fail(
+                return Result.Failure<IList<LoadCommand>, SmartCardError>(
                     SmartCardError.InvalidData($"Failed to convert CAP file to binary format: {ex.Message}"));
             }
         }

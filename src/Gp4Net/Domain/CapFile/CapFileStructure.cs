@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using JetBrains.Annotations;
 
@@ -188,21 +189,21 @@ namespace Gp4Net.Domain.CapFile
         {
             if (capFileData == null)
             {
-                return Result<CapFileStructure, SmartCardError>.Fail(
+                return Result.Failure<CapFileStructure, SmartCardError>(
                     SmartCardError.InvalidData("CAP file data cannot be null"));
             }
 
             // Only support ZIP/JAR format CAP files
             if (capFileData.Length < 4)
             {
-                return Result<CapFileStructure, SmartCardError>.Fail(
+                return Result.Failure<CapFileStructure, SmartCardError>(
                     SmartCardError.InvalidData("CAP file data is too short to be valid"));
             }
 
             if (!(capFileData[0] == 0x50 && capFileData[1] == 0x4B && 
                   capFileData[2] == 0x03 && capFileData[3] == 0x04))
             {
-                return Result<CapFileStructure, SmartCardError>.Fail(
+                return Result.Failure<CapFileStructure, SmartCardError>(
                     SmartCardError.InvalidData(
                         "Only ZIP/JAR format CAP files are supported. Raw binary CAP format is not supported."));
             }
@@ -210,16 +211,16 @@ namespace Gp4Net.Domain.CapFile
             try
             {
                 var result = ParseZipFormat(capFileData);
-                return Result<CapFileStructure, SmartCardError>.Ok(result);
+                return Result.Success<CapFileStructure, SmartCardError>(result);
             }
             catch (InvalidDataException ex)
             {
-                return Result<CapFileStructure, SmartCardError>.Fail(
+                return Result.Failure<CapFileStructure, SmartCardError>(
                     SmartCardError.InvalidData($"CAP file parsing failed: {ex.Message}"));
             }
             catch (Exception ex)
             {
-                return Result<CapFileStructure, SmartCardError>.Fail(
+                return Result.Failure<CapFileStructure, SmartCardError>(
                     SmartCardError.UnexpectedError("Unexpected error during CAP file parsing", ex));
             }
         }

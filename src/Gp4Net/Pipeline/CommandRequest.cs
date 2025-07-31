@@ -8,25 +8,25 @@ namespace Gp4Net.Pipeline
     /// </summary>
     public record CommandRequest(
         IApduCommand Command,
-        ICommandContext Context,
+        IPipelineContext Context,
         CommandOptions? Options = null)
     {
         /// <summary>
         /// Creates a simple request with just a command.
         /// </summary>
         public static CommandRequest Create(IApduCommand command) =>
-            new(command, ImmutableCommandContext.Empty);
+            new(command, ImmutablePipelineContext.Empty);
 
         /// <summary>
         /// Creates a request with a command and context.
         /// </summary>
-        public static CommandRequest Create(IApduCommand command, ICommandContext context) =>
+        public static CommandRequest Create(IApduCommand command, IPipelineContext context) =>
             new(command, context);
 
         /// <summary>
         /// Creates a new request with updated context.
         /// </summary>
-        public CommandRequest WithContext(ICommandContext context) =>
+        public CommandRequest WithContext(IPipelineContext context) =>
             this with { Context = context };
 
         /// <summary>

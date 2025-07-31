@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
@@ -116,7 +117,7 @@ namespace Gp4Net.Domain.CapFile
                 
                 if (installForLoadResult.IsFailure)
                 {
-                    return Result<IList<IApduCommand>, SmartCardError>.Fail(installForLoadResult.Error);
+                    return Result.Failure<IList<IApduCommand>, SmartCardError>(installForLoadResult.Error);
                 }
                 commands.Add(installForLoadResult.Value);
 
@@ -125,7 +126,7 @@ namespace Gp4Net.Domain.CapFile
                 var loadCommandsResult = LoadCommand.CreateFromCapFile(capFile, maxLoadBlockSize);
                 if (loadCommandsResult.IsFailure)
                 {
-                    return Result<IList<IApduCommand>, SmartCardError>.Fail(loadCommandsResult.Error);
+                    return Result.Failure<IList<IApduCommand>, SmartCardError>(loadCommandsResult.Error);
                 }
                 commands.AddRange(loadCommandsResult.Value);
 
@@ -144,17 +145,17 @@ namespace Gp4Net.Domain.CapFile
                         
                         if (installForInstallResult.IsFailure)
                         {
-                            return Result<IList<IApduCommand>, SmartCardError>.Fail(installForInstallResult.Error);
+                            return Result.Failure<IList<IApduCommand>, SmartCardError>(installForInstallResult.Error);
                         }
                         commands.Add(installForInstallResult.Value);
                     }
                 }
 
-                return Result<IList<IApduCommand>, SmartCardError>.Ok(commands);
+                return Result.Success<IList<IApduCommand>, SmartCardError>(commands);
             }
             catch (Exception ex)
             {
-                return Result<IList<IApduCommand>, SmartCardError>.Fail(
+                return Result.Failure<IList<IApduCommand>, SmartCardError>(
                     SmartCardError.InvalidData($"Failed to create loading commands: {ex.Message}"));
             }
         }

@@ -25,14 +25,14 @@ namespace Gp4Net.Tool.Commands.Card
         /// <summary>
         /// Executes the get-data command to retrieve data objects from the card.
         /// </summary>
-        public async Task<int> ExecuteAsync(ICommandContext context, Settings settings)
+        public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
         {
             var ctx = await context.WithVerbose(settings.Verbose).RequireCardConnection(settings);
 
             return await GetDataObjectsAsync(ctx, settings);
         }
 
-        private static async Task<int> GetDataObjectsAsync(ICommandContext context, Settings settings)
+        private static async Task<int> GetDataObjectsAsync(ICliExecutionContext context, Settings settings)
         {
             try
             {
@@ -76,7 +76,7 @@ namespace Gp4Net.Tool.Commands.Card
         }
 
         private static async Task<int> GetSingleDataObjectAsync(
-            ICommandContext context,
+            ICliExecutionContext context,
             Settings settings,
             string name,
             ushort tag
@@ -85,17 +85,16 @@ namespace Gp4Net.Tool.Commands.Card
             try
             {
                 var dataResult = await context.GetGlobalPlatformService().GetDataAsync(tag);
-                return await dataResult.MatchAsync(
-                    async response =>
-                    {
-                        DisplaySingleDataObject(context, settings, name, new GetDataResponse(tag, response));
-                        return 0;
-                    },
-                    async error =>
-                    {
-                        context.Display.Warning($"Could not retrieve {name}: {error.Message}");
-                        return 1;
-                    });
+                if (dataResult.IsSuccess)
+                {
+                    DisplaySingleDataObject(context, settings, name, new GetDataResponse(tag, dataResult.Value));
+                    return 0;
+                }
+                else
+                {
+                    context.Display.Warning($"Could not retrieve {name}: {dataResult.Error.Message}");
+                    return 1;
+                }
             }
             catch (Exception ex)
             {
@@ -105,7 +104,7 @@ namespace Gp4Net.Tool.Commands.Card
         }
 
         private static async Task<int> GetRawDataObjectAsync(
-            ICommandContext context,
+            ICliExecutionContext context,
             Settings settings,
             string hexTag
         )
@@ -129,22 +128,21 @@ namespace Gp4Net.Tool.Commands.Card
                 }
 
                 var dataResult = await context.GetGlobalPlatformService().GetDataAsync(tag);
-                return await dataResult.MatchAsync(
-                    async response =>
-                    {
-                        DisplaySingleDataObject(
-                            context,
-                            settings,
-                            $"Tag {hexTag.ToUpperInvariant()}",
-                            new GetDataResponse(tag, response)
-                        );
-                        return 0;
-                    },
-                    async error =>
-                    {
-                        context.Display.Warning($"Tag {hexTag} is not supported by this card: {error.Message}");
-                        return 1;
-                    });
+                if (dataResult.IsSuccess)
+                {
+                    DisplaySingleDataObject(
+                        context,
+                        settings,
+                        $"Tag {hexTag.ToUpperInvariant()}",
+                        new GetDataResponse(tag, dataResult.Value)
+                    );
+                    return 0;
+                }
+                else
+                {
+                    context.Display.Warning($"Tag {hexTag} is not supported by this card: {dataResult.Error.Message}");
+                    return 1;
+                }
             }
             catch (Exception ex)
             {
@@ -153,7 +151,7 @@ namespace Gp4Net.Tool.Commands.Card
             }
         }
 
-        private static async Task<int> GetOpidDataAsync(ICommandContext context, Settings settings)
+        private static async Task<int> GetOpidDataAsync(ICliExecutionContext context, Settings settings)
         {
             try
             {
@@ -228,7 +226,7 @@ namespace Gp4Net.Tool.Commands.Card
             }
         }
 
-        private static async Task<int> GetAllDataAsync(ICommandContext context, Settings settings)
+        private static async Task<int> GetAllDataAsync(ICliExecutionContext context, Settings settings)
         {
             var results = new Dictionary<string, string>();
             var errors = new List<string>();
@@ -259,18 +257,15 @@ namespace Gp4Net.Tool.Commands.Card
                 try
                 {
                     var dataResult = await context.GetGlobalPlatformService().GetDataAsync(tag);
-                    await dataResult.MatchAsync(
-                        async response =>
-                        {
-                            results[name] = FormatDataForDisplay(new GetDataResponse(tag, response), settings.Format);
-                            return Task.CompletedTask;
-                        },
-                        async error =>
-                        {
-                            errors.Add($"{name}: {error.Message}");
-                            results[name] = "[red]Not available[/]";
-                            return Task.CompletedTask;
-                        });
+                    if (dataResult.IsSuccess)
+                    {
+                        results[name] = FormatDataForDisplay(new GetDataResponse(tag, dataResult.Value), settings.Format);
+                    }
+                    else
+                    {
+                        errors.Add($"{name}: {dataResult.Error.Message}");
+                        results[name] = "[red]Not available[/]";
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -313,7 +308,7 @@ namespace Gp4Net.Tool.Commands.Card
             return errors.Count > 0 ? 1 : 0;
         }
 
-        private static int HandleInvalidDataObject(ICommandContext context, string dataObject)
+        private static int HandleInvalidDataObject(ICliExecutionContext context, string dataObject)
         {
             context.Display.Error($"Unknown data object: {dataObject}");
             context.Display.Info(
@@ -323,7 +318,7 @@ namespace Gp4Net.Tool.Commands.Card
         }
 
         private static void DisplaySingleDataObject(
-            ICommandContext context,
+            ICliExecutionContext context,
             Settings settings,
             string name,
             GetDataResponse response
@@ -366,7 +361,7 @@ namespace Gp4Net.Tool.Commands.Card
         }
 
         private static void DisplayOpidData(
-            ICommandContext context,
+            ICliExecutionContext context,
             Settings settings,
             OpenPhysicalId opid,
             string iin,
@@ -415,7 +410,7 @@ namespace Gp4Net.Tool.Commands.Card
         }
 
         private static void DisplayAllData(
-            ICommandContext context,
+            ICliExecutionContext context,
             Settings settings,
             Dictionary<string, string> results,
             List<string> errors

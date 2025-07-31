@@ -16,7 +16,7 @@ namespace Gp4Net.Tool.Commands.Card
         /// <summary>
         /// Executes the connect command to establish a connection to a smart card.
         /// </summary>
-        public async Task<int> ExecuteAsync(ICommandContext context, Settings settings)
+        public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
         {
             return await context.ExecuteCardCommand(
                 settings,
@@ -29,34 +29,32 @@ namespace Gp4Net.Tool.Commands.Card
                     {
                         var selectResult = await ctx.GetGlobalPlatformService().SelectIsdAsync();
                         
-                        await selectResult.MatchAsync<object>(
-                            selectResponse =>
-                            {
-                                ctx.Display.Success("✓ ISD successfully selected");
+                        if (selectResult.IsSuccess)
+                        {
+                            var selectResponse = selectResult.Value;
+                            ctx.Display.Success("✓ ISD successfully selected");
 
-                                if (selectResponse.RawData != null && selectResponse.RawData.Length > 0)
-                                {
-                                    ctx.Display.Verbose(
-                                        $"Response data: {Convert.ToHexString(selectResponse.RawData)}"
-                                    );
-                                }
-
-                                if (
-                                    selectResponse.Fci?.CardData != null
-                                    && selectResponse.Fci.CardData.Length > 0
-                                )
-                                {
-                                    ctx.Display.Verbose(
-                                        $"Card data: {Convert.ToHexString(selectResponse.Fci.CardData)}"
-                                    );
-                                }
-                                return Task.FromResult<object>(null!);
-                            },
-                            error =>
+                            if (selectResponse.RawData != null && selectResponse.RawData.Length > 0)
                             {
-                                ctx.Display.Warning($"Could not select ISD: {error.Message}");
-                                return Task.FromResult<object>(null!);
-                            });
+                                ctx.Display.Verbose(
+                                    $"Response data: {Convert.ToHexString(selectResponse.RawData)}"
+                                );
+                            }
+
+                            if (
+                                selectResponse.Fci?.CardData != null
+                                && selectResponse.Fci.CardData.Length > 0
+                            )
+                            {
+                                ctx.Display.Verbose(
+                                    $"Card data: {Convert.ToHexString(selectResponse.Fci.CardData)}"
+                                );
+                            }
+                        }
+                        else
+                        {
+                            ctx.Display.Warning($"Could not select ISD: {selectResult.Error.Message}");
+                        }
                     }
                     catch (Exception ex)
                     {

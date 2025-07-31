@@ -6,6 +6,7 @@
 namespace Gp4Net.Domain.Keys
 {
     using System;
+    using CSharpFunctionalExtensions;
     using Gp4Net.Core;
 
     /// <summary>
@@ -128,7 +129,9 @@ namespace Gp4Net.Domain.Keys
                 this.macKey.GetKeyCopy(),
                 this.dekKey.GetKeyCopy(),
                 this.KeyVersion
-            ).GetOrThrow(error => new InvalidOperationException(error.Message));
+            ).Match(
+                onSuccess: keySet => keySet,
+                onFailure: error => throw new InvalidOperationException(error.Message));
         }
 
         /// <summary>
@@ -143,7 +146,9 @@ namespace Gp4Net.Domain.Keys
                 this.macKey.GetKeyCopy(),
                 this.dekKey.GetKeyCopy(),
                 this.KeyVersion
-            ).GetOrThrow(error => new InvalidOperationException(error.Message));
+            ).Match(
+                onSuccess: keySet => keySet,
+                onFailure: error => throw new InvalidOperationException(error.Message));
         }
 
         /// <summary>

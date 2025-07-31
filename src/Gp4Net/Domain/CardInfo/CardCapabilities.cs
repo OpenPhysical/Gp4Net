@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Core.Tlv;
 using JetBrains.Annotations;
@@ -76,7 +77,9 @@ namespace Gp4Net.Domain.CardInfo
         /// <remarks>Consider using TryParse for functional error handling.</remarks>
         public static CardCapabilities Parse(byte[] data)
         {
-            return TryParse(new Option<byte[]>.Some(data)).GetOrThrow(error => new InvalidOperationException(error.Message));
+            return TryParse(Maybe<byte[]>.From(data)).Match(
+                onSuccess: caps => caps,
+                onFailure: error => throw new InvalidOperationException(error.Message));
         }
 
         /// <summary>
@@ -84,13 +87,13 @@ namespace Gp4Net.Domain.CardInfo
         /// </summary>
         /// <param name="data">The capabilities data bytes.</param>
         /// <returns>A result containing the parsed capabilities or an error.</returns>
-        public static Result<CardCapabilities, SmartCardError> TryParse(Option<byte[]> data)
+        public static Result<CardCapabilities, SmartCardError> TryParse(Maybe<byte[]> data)
         {
             return data.Match(
-                some: bytes => bytes.Length == 0 
-                    ? SmartCardError.InvalidData("Capabilities data cannot be empty")
+                Some: bytes => bytes.Length == 0 
+                    ? Result.Failure<CardCapabilities, SmartCardError>(SmartCardError.InvalidData("Capabilities data cannot be empty"))
                     : TryParseFromBytes(bytes),
-                none: () => SmartCardError.InvalidData("Capabilities data cannot be null")
+                None: () => Result.Failure<CardCapabilities, SmartCardError>(SmartCardError.InvalidData("Capabilities data cannot be null"))
             );
         }
 
@@ -151,8 +154,8 @@ namespace Gp4Net.Domain.CardInfo
         {
             // Parse according to Table H-6: SCP Information
             byte scpType = 0;
-            Option<byte[]> supportedOptions = new Option<byte[]>.None();
-            Option<byte[]> supportedKeys = new Option<byte[]>.None();
+            Maybe<byte[]> supportedOptions = Maybe<byte[]>.None;
+            Maybe<byte[]> supportedKeys = Maybe<byte[]>.None;
 
             foreach (var element in SimpleTlvParser.Enumerate(data))
             {
@@ -166,24 +169,24 @@ namespace Gp4Net.Domain.CardInfo
 
                         break;
                     case 0x81: // List of supported options
-                        supportedOptions = new Option<byte[]>.Some(element.Content);
+                        supportedOptions = Maybe<byte[]>.From(element.Content);
                         break;
                     case 0x82: // Supported keys for SCP03
-                        supportedKeys = new Option<byte[]>.Some(element.Content);
+                        supportedKeys = Maybe<byte[]>.From(element.Content);
                         break;
                 }
             }
 
             // Parse supported options (i parameters)
-            supportedOptions.Match<object>(
-                some: options => {
+            supportedOptions.Match(
+                Some: options => {
                     if (scpType > 0)
                     {
                         // Parse supported key lengths for SCP03
                         if (scpType == 0x03)
                         {
-                            supportedKeys.Match<object>(
-                                some: keys => {
+                            supportedKeys.Match(
+                                Some: keys => {
                                     if (keys.Length > 0)
                                     {
                                         var keyLengthsBuilder = ImmutableList.CreateBuilder<int>();
@@ -207,7 +210,7 @@ namespace Gp4Net.Domain.CardInfo
                                     }
                                     return new object();
                                 },
-                                none: () => new object()
+                                None: () => new object()
                             );
                         }
 
@@ -227,17 +230,17 @@ namespace Gp4Net.Domain.CardInfo
                     }
                     return new object();
                 },
-                none: () => new object()
+                None: () => new object()
             );
         }
 
-        private static int DetermineKeyLength(byte scpId, Option<byte[]> supportedKeys)
+        private static int DetermineKeyLength(byte scpId, Maybe<byte[]> supportedKeys)
         {
             // For SCP03, parse supported keys according to Table H-7
             if (scpId == 0x03)
             {
                 return supportedKeys.Match(
-                    some: keys => {
+                    Some: keys => {
                         if (keys.Length > 0)
                         {
                             var keyByte = keys[0];
@@ -259,7 +262,7 @@ namespace Gp4Net.Domain.CardInfo
                         }
                         return 128; // Default
                     },
-                    none: () => 128 // Default
+                    None: () => 128 // Default
                 );
             }
             return 128; // Default

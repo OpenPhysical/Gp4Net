@@ -252,7 +252,7 @@ namespace Gp4Net.Tool
 
             // Register pipeline services
             _ = services.AddSingleton<IDisplayService>(provider => new DisplayService(false));
-            _ = services.AddScoped<Gp4Net.Tool.Pipeline.ICommandContext>(provider => 
+            _ = services.AddScoped<Gp4Net.Tool.Pipeline.ICliExecutionContext>(provider => 
             {
                 var display = provider.GetRequiredService<IDisplayService>();
                 var cardService = provider.GetRequiredService<ICardService>();

@@ -156,6 +156,24 @@ namespace Gp4Net.CardEmulator.Functional
         }
 
         /// <summary>
+        /// Creates a dual-protocol card supporting both SCP02 and SCP03.
+        /// Defaults to SCP02 i=15 but supports SCP03 i=70 as well.
+        /// </summary>
+        public static FunctionalVirtualCard DualProtocolCard()
+        {
+            return new FunctionalVirtualCard(CardConfiguration.DualProtocol(), new TestCryptographicService());
+        }
+
+        /// <summary>
+        /// Creates an SCP03-first card configuration.
+        /// Defaults to SCP03 i=70 but supports SCP02 fallback.
+        /// </summary>
+        public static FunctionalVirtualCard Scp03FirstCard()
+        {
+            return new FunctionalVirtualCard(CardConfiguration.Scp03First(), new TestCryptographicService());
+        }
+
+        /// <summary>
         /// Creates a card builder for complex test scenarios.
         /// </summary>
         public static VirtualCardBuilder Builder() => new();

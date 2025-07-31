@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Pipeline;
@@ -33,9 +34,14 @@ namespace Gp4Net.Pipeline.Middleware
             var result = await next(request, cancellationToken);
 
             // Process successful responses to capture state
-            return await result.MatchAsync(
-                async success => await CaptureStateFromResponse(request, success),
-                failure => Task.FromResult(Result<CommandResponse, SmartCardError>.Fail(failure)));
+            if (result.IsSuccess)
+            {
+                return await CaptureStateFromResponse(request, result.Value);
+            }
+            else
+            {
+                return Result.Failure<CommandResponse, SmartCardError>(result.Error);
+            }
         }
 
         private Task<Result<CommandResponse, SmartCardError>> CaptureStateFromResponse(
@@ -62,24 +68,24 @@ namespace Gp4Net.Pipeline.Middleware
                     _logger?.LogDebug("State captured from {CommandType} response", 
                         request.Command.GetType().Name);
                     
-                    return Task.FromResult(Result<CommandResponse, SmartCardError>.Ok(
+                    return Task.FromResult(Result.Success<CommandResponse, SmartCardError>(
                         response.WithContext(updatedContext)));
                 }
 
-                return Task.FromResult(Result<CommandResponse, SmartCardError>.Ok(response));
+                return Task.FromResult(Result.Success<CommandResponse, SmartCardError>(response));
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to capture state from response");
                 // Don't fail the command, just return the original response
-                return Task.FromResult(Result<CommandResponse, SmartCardError>.Ok(response));
+                return Task.FromResult(Result.Success<CommandResponse, SmartCardError>(response));
             }
         }
 
-        private ICommandContext CaptureSelectState(
+        private IPipelineContext CaptureSelectState(
             SelectCommand command,
             CommandResponse response,
-            ICommandContext context)
+            IPipelineContext context)
         {
             if (!response.IsSuccess || response.Data.Length == 0)
                 return context;
@@ -103,9 +109,9 @@ namespace Gp4Net.Pipeline.Middleware
             return context;
         }
 
-        private ICommandContext CaptureInitializeUpdateState(
+        private IPipelineContext CaptureInitializeUpdateState(
             CommandResponse response,
-            ICommandContext context)
+            IPipelineContext context)
         {
             if (!response.IsSuccess || response.Data.Length < 28)
                 return context;
@@ -122,9 +128,9 @@ namespace Gp4Net.Pipeline.Middleware
             return context;
         }
 
-        private ICommandContext CaptureGetStatusState(
+        private IPipelineContext CaptureGetStatusState(
             CommandResponse response,
-            ICommandContext context)
+            IPipelineContext context)
         {
             if (!response.IsSuccess || response.Data.Length == 0)
                 return context;
@@ -135,10 +141,10 @@ namespace Gp4Net.Pipeline.Middleware
             return context;
         }
 
-        private ICommandContext CaptureGetDataState(
+        private IPipelineContext CaptureGetDataState(
             GetDataCommand command,
             CommandResponse response,
-            ICommandContext context)
+            IPipelineContext context)
         {
             if (!response.IsSuccess || response.Data.Length == 0)
                 return context;

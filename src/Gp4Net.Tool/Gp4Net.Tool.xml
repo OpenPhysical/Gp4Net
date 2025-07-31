@@ -36,7 +36,7 @@
             dependencies exist (0x6985), and security conditions not satisfied (0x6982).</para>
             </remarks>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Applet.DeleteCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings)">
+        <member name="M:Gp4Net.Tool.Commands.Applet.DeleteCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings)">
             <summary>
             Executes the delete command to remove applications or packages from the GlobalPlatform smart card.
             </summary>
@@ -68,7 +68,7 @@
             <exception cref="T:System.InvalidOperationException">Thrown when no deletion target is specified.</exception>
             <exception cref="T:System.IO.FileNotFoundException">Thrown when a specified CAP file does not exist.</exception>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Applet.DeleteCommand.DetermineAidsToDelete(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings)">
+        <member name="M:Gp4Net.Tool.Commands.Applet.DeleteCommand.DetermineAidsToDelete(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Applet.DeleteCommand.Settings)">
             <summary>
             Determines the list of AIDs to delete based on the command settings.
             </summary>
@@ -656,7 +656,7 @@
             Command to connect to a smart card.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.ConnectCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.Card.ConnectCommand.Settings)">
+        <member name="M:Gp4Net.Tool.Commands.Card.ConnectCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Card.ConnectCommand.Settings)">
             <summary>
             Executes the connect command to establish a connection to a smart card.
             </summary>
@@ -666,12 +666,27 @@
             Settings for the connect command.
             </summary>
         </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.FunctionalConnectCommand">
+            <summary>
+            Functional implementation of the connect command demonstrating pure error handling.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalConnectCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Card.FunctionalConnectCommand.Settings)">
+            <summary>
+            Executes the connect command using functional patterns without exceptions.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.FunctionalConnectCommand.Settings">
+            <summary>
+            Settings for the functional connect command.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Tool.Commands.Card.GetIsdDataCommand">
             <summary>
             Command to retrieve data from ISD using GET DATA operations.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.GetIsdDataCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.Card.GetIsdDataCommand.Settings)">
+        <member name="M:Gp4Net.Tool.Commands.Card.GetIsdDataCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Card.GetIsdDataCommand.Settings)">
             <summary>
             Executes the get-data command to retrieve data objects from the card.
             </summary>
@@ -702,12 +717,12 @@
             Command to display detailed card information.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.Card.InfoCommand.Settings)">
+        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Card.InfoCommand.Settings)">
             <summary>
             Executes the info command to display detailed card information.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.AddGetDataToTable(Gp4Net.Tool.Pipeline.ICommandContext,Spectre.Console.Table,System.String,System.UInt16)">
+        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.AddGetDataToTable(Gp4Net.Tool.Pipeline.ICliExecutionContext,Spectre.Console.Table,System.String,System.UInt16)">
             <summary>
             Retrieves data using GET DATA command and adds it to the display table.
             Provides special handling for different data object types.
@@ -760,7 +775,7 @@
             Command to list available card readers.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.ListReadersCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.Card.ListReadersCommand.Settings)">
+        <member name="M:Gp4Net.Tool.Commands.Card.ListReadersCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Card.ListReadersCommand.Settings)">
             <summary>
             Executes the list readers command to enumerate available smart card readers.
             </summary>
@@ -775,7 +790,7 @@
             Command to write data to ISD using PUT DATA operations.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.PutIsdDataCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.Card.PutIsdDataCommand.Settings)">
+        <member name="M:Gp4Net.Tool.Commands.Card.PutIsdDataCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Card.PutIsdDataCommand.Settings)">
             <summary>
             Executes the put-data command to write data objects to the card.
             </summary>
@@ -1386,61 +1401,61 @@
         </member>
         <member name="T:Gp4Net.Tool.Pipeline.CommandContext">
             <summary>
-            Default implementation of ICommandContext.
+            Default implementation of ICliExecutionContext.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Pipeline.CommandContextExtensions">
             <summary>
-            Extension methods for ICommandContext to provide fluent middleware pipeline capabilities.
+            Extension methods for ICliExecutionContext to provide fluent middleware pipeline capabilities.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.RequireCardConnection(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.BaseCommandSettings)">
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.RequireCardConnection(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.BaseCommandSettings)">
             <summary>
             Ensures a card connection using settings from BaseCommandSettings.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.RequireSecureChannel(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.BaseCommandSettings)">
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.RequireSecureChannel(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.BaseCommandSettings)">
             <summary>
             Ensures a secure channel using settings from BaseCommandSettings.
             Only establishes secure channel if required by the command settings.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.DisplayCardInfo(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.BaseCommandSettings)">
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.DisplayCardInfo(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.BaseCommandSettings)">
             <summary>
             Displays card information if not suppressed in settings.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.WithVerbose(Gp4Net.Tool.Pipeline.ICommandContext,System.Boolean)">
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.WithVerbose(Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Boolean)">
             <summary>
             Sets verbose mode on the display service.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ExecuteCardCommand(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.BaseCommandSettings,System.Func{Gp4Net.Tool.Pipeline.ICommandContext,System.Threading.Tasks.Task{System.Int32}})">
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ExecuteCardCommand(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.BaseCommandSettings,System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Threading.Tasks.Task{System.Int32}})">
             <summary>
             Executes a command with common card operations setup.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ExecuteCardCommand(Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Commands.BaseCommandSettings,System.Func{Gp4Net.Tool.Pipeline.ICommandContext,System.Int32})">
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ExecuteCardCommand(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.BaseCommandSettings,System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Int32})">
             <summary>
             Executes a command with common card operations setup (synchronous version).
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICommandContext},System.Func{Gp4Net.Tool.Pipeline.ICommandContext,Gp4Net.Tool.Pipeline.ICommandContext})">
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICliExecutionContext},System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Pipeline.ICliExecutionContext})">
             <summary>
             Continues with a synchronous operation.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICommandContext},System.Func{Gp4Net.Tool.Pipeline.ICommandContext,System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICommandContext}})">
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICliExecutionContext},System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICliExecutionContext}})">
             <summary>
             Continues with an asynchronous operation.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICommandContext},System.Func{Gp4Net.Tool.Pipeline.ICommandContext,System.Threading.Tasks.Task{System.Int32}})">
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICliExecutionContext},System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Threading.Tasks.Task{System.Int32}})">
             <summary>
             Continues with command execution.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICommandContext},System.Func{Gp4Net.Tool.Pipeline.ICommandContext,System.Int32})">
+        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICliExecutionContext},System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Int32})">
             <summary>
             Continues with synchronous command execution.
             </summary>
@@ -1560,61 +1575,107 @@
             Default implementation of IDisplayService using Spectre.Console.
             </summary>
         </member>
+        <member name="T:Gp4Net.Tool.Pipeline.FunctionalCliContext">
+            <summary>
+            Functional implementation of CLI execution context using Result patterns.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.FunctionalCommandExtensions">
+            <summary>
+            Extension methods for functional command execution without exceptions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.FunctionalCommandExtensions.ExecuteFunctionalAsync``1(Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{``0,System.String}}})">
+            <summary>
+            Executes a command with functional error handling.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.FunctionalCommandExtensions.RequireCardConnectionFunctional(Gp4Net.Tool.Pipeline.ICliExecutionContext,System.String)">
+            <summary>
+            Ensures a card connection using functional patterns.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.FunctionalCommandExtensions.RequireSecureChannelFunctional(Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Byte,System.String)">
+            <summary>
+            Ensures a secure channel using functional patterns.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.FunctionalCommandExtensions.ExecuteCardCommandFunctional(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.BaseCommandSettings,System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{System.Boolean,System.String}}})">
+            <summary>
+            Executes a card command with functional composition.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.FunctionalCommandExtensions.ThenAsync``1(System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.String}},System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{``0,System.String}}})">
+            <summary>
+            Chains functional operations on the CLI context.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.FunctionalCommandExtensions.ThenAsync(System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.String}},System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.String}}})">
+            <summary>
+            Chains functional operations that return the context.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.FunctionalCommandExtensions.MapAsync``1(System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.String}},System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,``0})">
+            <summary>
+            Maps a successful context result.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.ICliExecutionContext">
+            <summary>
+            Provides context and services for CLI command execution.
+            This is separate from the core pipeline's IPipelineContext.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.ICliExecutionContext.Display">
+            <summary>
+            Gets the display service for console output.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.ICliExecutionContext.CardService">
+            <summary>
+            Gets the card service for smart card operations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.ICliExecutionContext.GetGlobalPlatformService">
+            <summary>
+            Gets the GlobalPlatform service for GP operations.
+            Creates the service on demand with proper pipeline context.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.ICliExecutionContext.KeysetResolver">
+            <summary>
+            Gets the keyset resolver for key management.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.ICliExecutionContext.RequireCardConnection(System.String)">
+            <summary>
+            Ensures a card connection is established with the specified reader.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.ICliExecutionContext.RequireSecureChannel(System.Byte,System.String)">
+            <summary>
+            Ensures a secure channel is established with the specified security level.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.ICliExecutionContext.ExecuteAsync(System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Threading.Tasks.Task{System.Int32}})">
+            <summary>
+            Executes the command logic with the current context.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.ICliExecutionContext.ExecuteAsync(System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Int32})">
+            <summary>
+            Executes the command logic with the current context synchronously.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Tool.Pipeline.IPipelineCommand`1">
             <summary>
             Interface for commands using the new pipeline architecture.
             </summary>
             <typeparam name="TSettings">The settings type for the command.</typeparam>
         </member>
-        <member name="M:Gp4Net.Tool.Pipeline.IPipelineCommand`1.ExecuteAsync(Gp4Net.Tool.Pipeline.ICommandContext,`0)">
+        <member name="M:Gp4Net.Tool.Pipeline.IPipelineCommand`1.ExecuteAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext,`0)">
             <summary>
             Executes the command with the provided context and settings.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Pipeline.ICommandContext">
-            <summary>
-            Provides context and services for command execution.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Pipeline.ICommandContext.Display">
-            <summary>
-            Gets the display service for console output.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Pipeline.ICommandContext.CardService">
-            <summary>
-            Gets the card service for smart card operations.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Pipeline.ICommandContext.GetGlobalPlatformService">
-            <summary>
-            Gets the GlobalPlatform service for GP operations.
-            Creates the service on demand with proper pipeline context.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Pipeline.ICommandContext.KeysetResolver">
-            <summary>
-            Gets the keyset resolver for key management.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Pipeline.ICommandContext.RequireCardConnection(System.String)">
-            <summary>
-            Ensures a card connection is established with the specified reader.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Pipeline.ICommandContext.RequireSecureChannel(System.Byte,System.String)">
-            <summary>
-            Ensures a secure channel is established with the specified security level.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Pipeline.ICommandContext.ExecuteAsync(System.Func{Gp4Net.Tool.Pipeline.ICommandContext,System.Threading.Tasks.Task{System.Int32}})">
-            <summary>
-            Executes the command logic with the current context.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Pipeline.ICommandContext.ExecuteAsync(System.Func{Gp4Net.Tool.Pipeline.ICommandContext,System.Int32})">
-            <summary>
-            Executes the command logic with the current context synchronously.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Pipeline.IDisplayService">
@@ -1664,7 +1725,7 @@
         </member>
         <member name="T:Gp4Net.Tool.Pipeline.MockCommandContext">
             <summary>
-            Mock implementation of ICommandContext for testing.
+            Mock implementation of ICliExecutionContext for testing.
             </summary>
         </member>
         <member name="P:Gp4Net.Tool.Pipeline.MockCommandContext.MethodCalls">

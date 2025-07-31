@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Transport;
@@ -79,7 +80,7 @@ namespace Gp4Net.Domain.Protocol
                     cardId
                 );
 
-                return Result<SecureChannelSession, SmartCardError>.Fail(
+                return Result.Failure<SecureChannelSession, SmartCardError>(
                     SmartCardError.AuthenticationBlocked(
                         $"Too many failed attempts ({tracker.FailedAttempts}/{_maxAttempts}). " +
                         "Card protection activated to prevent lockout."
@@ -121,7 +122,7 @@ namespace Gp4Net.Domain.Protocol
                     cardId
                 );
 
-                return Result<SecureChannelSession, SmartCardError>.Ok(session);
+                return Result.Success<SecureChannelSession, SmartCardError>(session);
             }
             catch (InvalidOperationException ex) when (ex.Message.Contains("EXTERNAL AUTHENTICATE failed"))
             {
@@ -146,7 +147,7 @@ namespace Gp4Net.Domain.Protocol
                     );
                 }
 
-                return Result<SecureChannelSession, SmartCardError>.Fail(
+                return Result.Failure<SecureChannelSession, SmartCardError>(
                     SmartCardError.AuthenticationFailed(
                         $"Authentication failed ({tracker.FailedAttempts}/{_maxAttempts}): {ex.Message}"
                     )
@@ -161,7 +162,7 @@ namespace Gp4Net.Domain.Protocol
                     ex.Message
                 );
 
-                return Result<SecureChannelSession, SmartCardError>.Fail(
+                return Result.Failure<SecureChannelSession, SmartCardError>(
                     SmartCardError.InitializationFailed(ex.Message)
                 );
             }
@@ -169,7 +170,7 @@ namespace Gp4Net.Domain.Protocol
             {
                 _logger.LogError(ex, "Unexpected error during secure channel establishment for card {CardId}", cardId);
                 
-                return Result<SecureChannelSession, SmartCardError>.Fail(
+                return Result.Failure<SecureChannelSession, SmartCardError>(
                     SmartCardError.UnexpectedError($"Secure channel establishment failed: {ex.Message}")
                 );
             }
@@ -199,7 +200,7 @@ namespace Gp4Net.Domain.Protocol
                     cardId
                 );
 
-                return Result<SecureChannelSession, SmartCardError>.Fail(
+                return Result.Failure<SecureChannelSession, SmartCardError>(
                     SmartCardError.AuthenticationBlocked(
                         $"Too many failed attempts ({tracker.FailedAttempts}/{_maxAttempts}). " +
                         "Card protection activated."
@@ -224,13 +225,13 @@ namespace Gp4Net.Domain.Protocol
 
                 var session = sessionResult.Value;
                 tracker.Reset();
-                return Result<SecureChannelSession, SmartCardError>.Ok(session);
+                return Result.Success<SecureChannelSession, SmartCardError>(session);
             }
             catch (InvalidOperationException ex) when (ex.Message.Contains("EXTERNAL AUTHENTICATE failed"))
             {
                 tracker.IncrementFailedAttempts();
                 
-                return Result<SecureChannelSession, SmartCardError>.Fail(
+                return Result.Failure<SecureChannelSession, SmartCardError>(
                     SmartCardError.AuthenticationFailed(
                         $"Auto-detect authentication failed ({tracker.FailedAttempts}/{_maxAttempts}): {ex.Message}"
                     )
@@ -238,7 +239,7 @@ namespace Gp4Net.Domain.Protocol
             }
             catch (Exception ex)
             {
-                return Result<SecureChannelSession, SmartCardError>.Fail(
+                return Result.Failure<SecureChannelSession, SmartCardError>(
                     SmartCardError.UnexpectedError($"Auto-detect authentication failed: {ex.Message}")
                 );
             }

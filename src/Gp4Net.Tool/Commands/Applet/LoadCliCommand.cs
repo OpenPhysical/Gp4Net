@@ -99,10 +99,14 @@ namespace Gp4Net.Tool.Commands.Applet
 
                         task.Value = 100;
 
-                        return await result.MatchAsync(
-                            async installResult => await DisplayLoadSuccess(installResult, settings),
-                            error => Task.FromResult(DisplayLoadError(error))
-                        );
+                        if (result.IsSuccess)
+                        {
+                            return await DisplayLoadSuccess(result.Value, settings);
+                        }
+                        else
+                        {
+                            return DisplayLoadError(result.Error);
+                        }
                     });
 
                 return progressResult;

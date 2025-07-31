@@ -278,21 +278,18 @@ namespace Gp4Net.Tool.Scripting
             var script = new Script();
             var resultTable = new Table(script);
 
-            result.Match<object?>(
-                success =>
-                {
-                    resultTable["success"] = true;
-                    resultTable["error"] = null;
-                    resultTable["deleted_aids"] = new[] { aid }; // Simplified - just return the deleted AID
-                    return null;
-                },
-                error =>
-                {
-                    resultTable["success"] = false;
-                    resultTable["error"] = error.Message;
-                    resultTable["deleted_aids"] = new byte[0][];
-                    return null;
-                });
+            if (result.IsSuccess)
+            {
+                resultTable["success"] = true;
+                resultTable["error"] = null;
+                resultTable["deleted_aids"] = new[] { aid }; // Simplified - just return the deleted AID
+            }
+            else
+            {
+                resultTable["success"] = false;
+                resultTable["error"] = result.Error.Message;
+                resultTable["deleted_aids"] = new byte[0][];
+            }
 
             return resultTable;
         }
@@ -315,19 +312,16 @@ namespace Gp4Net.Tool.Scripting
             var script = new Script();
             var resultTable = new Table(script);
 
-            result.Match<object?>(
-                success =>
-                {
-                    resultTable["success"] = true;
-                    resultTable["error"] = null;
-                    return null;
-                },
-                error =>
-                {
-                    resultTable["success"] = false;
-                    resultTable["error"] = error.Message;
-                    return null;
-                });
+            if (result.IsSuccess)
+            {
+                resultTable["success"] = true;
+                resultTable["error"] = null;
+            }
+            else
+            {
+                resultTable["success"] = false;
+                resultTable["error"] = result.Error.Message;
+            }
 
             return resultTable;
         }

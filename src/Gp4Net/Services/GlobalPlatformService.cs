@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Core.Tlv;
@@ -51,15 +52,22 @@ namespace Gp4Net.Services
 
             // First try empty SELECT for auto-detection
             var selectResult = SelectCommand.CreateForIssuerSecurityDomain();
-            return await selectResult.MatchAsync<Result<SelectResponse, SmartCardError>>(
-                async emptySelect =>
-                {
-                    var result = await _cardService.ExecuteCommandAsync(emptySelect, cancellationToken);
-                    return await result.MatchAsync(
-                        async success => await ProcessSelectResponse(success, emptySelect),
-                        async failure => await TryKnownIsdAids(cancellationToken));
-                },
-                async error => await Task.FromResult(Result<SelectResponse, SmartCardError>.Fail(error)));
+            if (selectResult.IsFailure)
+            {
+                return Result.Failure<SelectResponse, SmartCardError>(selectResult.Error);
+            }
+
+            var emptySelect = selectResult.Value;
+            var result = await _cardService.ExecuteCommandAsync(emptySelect, cancellationToken);
+            
+            if (result.IsSuccess)
+            {
+                return await ProcessSelectResponse(result.Value, emptySelect);
+            }
+            else
+            {
+                return await TryKnownIsdAids(cancellationToken);
+            }
         }
 
         /// <summary>
@@ -78,16 +86,21 @@ namespace Gp4Net.Services
             
             if (initUpdateResult.IsFailure)
             {
-                return Result<SecureChannelSession, SmartCardError>.Fail(initUpdateResult.Error);
+                return Result.Failure<SecureChannelSession, SmartCardError>(initUpdateResult.Error);
             }
             
             var initUpdate = initUpdateResult.Value;
 
             var result = await _cardService.ExecuteCommandAsync(initUpdate, cancellationToken);
 
-            return await result.MatchAsync(
-                async success => await EstablishSecureChannelFromResponse(success, keySet, securityLevel),
-                failure => Task.FromResult(Result<SecureChannelSession, SmartCardError>.Fail(failure)));
+            if (result.IsSuccess)
+            {
+                return await EstablishSecureChannelFromResponse(result.Value, keySet, securityLevel);
+            }
+            else
+            {
+                return Result.Failure<SecureChannelSession, SmartCardError>(result.Error);
+            }
         }
 
         /// <summary>
@@ -101,7 +114,7 @@ namespace Gp4Net.Services
 
             var commandResult = GetStatusCommand.Create((GetStatusCommand.StatusSubset)(byte)subset);
             if (commandResult.IsFailure)
-                return Result<ImmutableList<ApplicationInfo>, SmartCardError>.Fail(commandResult.Error);
+                return Result.Failure<ImmutableList<ApplicationInfo>, SmartCardError>(commandResult.Error);
 
             var result = await _cardService.ExecuteCommandAsync(commandResult.Value, cancellationToken);
 
@@ -126,7 +139,7 @@ namespace Gp4Net.Services
             // Validate CAP file
             var validationResult = ValidateCapFile(capFileData);
             if (validationResult.IsFailure)
-                return Result<InstallationResult, SmartCardError>.Fail(validationResult.Error);
+                return Result.Failure<InstallationResult, SmartCardError>(validationResult.Error);
 
             var capFile = validationResult.Value;
 
@@ -134,10 +147,10 @@ namespace Gp4Net.Services
             var isdAid = _cardService.Context.Get<byte[]>(ContextKeys.IssuerSecurityDomainAid);
             
             // Create loading commands
-            var commandsResult = CreateLoadingCommands(capFile, capFileData, isdAid, options);
+            var commandsResult = CreateLoadingCommands(capFile, capFileData, isdAid.HasValue ? isdAid.Value : null, options);
             if (commandsResult.IsFailure)
             {
-                return Result<InstallationResult, SmartCardError>.Fail(commandsResult.Error);
+                return Result.Failure<InstallationResult, SmartCardError>(commandsResult.Error);
             }
 
             // Execute commands
@@ -147,7 +160,7 @@ namespace Gp4Net.Services
         /// <summary>
         /// Deletes an application from the card.
         /// </summary>
-        public async Task<Result<Core.Unit, SmartCardError>> DeleteApplicationAsync(
+        public async Task<Result<bool, SmartCardError>> DeleteApplicationAsync(
             byte[] aid,
             bool deleteRelated = false,
             CancellationToken cancellationToken = default)
@@ -155,17 +168,20 @@ namespace Gp4Net.Services
             _logger?.LogInformation("Deleting application: {AID}", Convert.ToHexString(aid));
 
             var createResult = DeleteCommand.CreateForApplication(aid, deleteRelated);
-            return await createResult.BindAsync(async deleteCommand =>
+            if (createResult.IsFailure)
             {
-                var result = await _cardService.ExecuteCommandAsync(deleteCommand, cancellationToken);
-                return result.Map(_ => Core.Unit.Value);
-            });
+                return Result.Failure<bool, SmartCardError>(createResult.Error);
+            }
+
+            var deleteCommand = createResult.Value;
+            var result = await _cardService.ExecuteCommandAsync(deleteCommand, cancellationToken);
+            return result.Map(_ => true);
         }
 
         /// <summary>
         /// Performs a PUT KEY operation to change card keys.
         /// </summary>
-        public async Task<Result<Core.Unit, SmartCardError>> PutKeysAsync(
+        public async Task<Result<bool, SmartCardError>> PutKeysAsync(
             KeySet keySet,
             byte keyVersion,
             CancellationToken cancellationToken = default)
@@ -215,7 +231,7 @@ namespace Gp4Net.Services
                 }
                 else
                 {
-                    return Result<Core.Unit, SmartCardError>.Fail(
+                    return Result.Failure<bool, SmartCardError>(
                         SmartCardError.InvalidData($"Unsupported key set type: {keySet.GetType().Name}"));
                 }
 
@@ -229,12 +245,12 @@ namespace Gp4Net.Services
                 // Execute the command
                 var result = await _cardService.ExecuteCommandAsync(putKeyCommandResult.Value, cancellationToken);
                 
-                return result.Map(_ => Core.Unit.Value);
+                return result.Map(_ => true);
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to perform PUT KEY operation");
-                return Result<Core.Unit, SmartCardError>.Fail(
+                return Result.Failure<bool, SmartCardError>(
                     SmartCardError.CommunicationError("PUT KEY operation failed", ex));
             }
         }
@@ -253,7 +269,7 @@ namespace Gp4Net.Services
                 var commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardProductionLifeCycle);
                 if (commandResult.IsFailure)
                 {
-                    return Result<CplcData, SmartCardError>.Fail(commandResult.Error);
+                    return Result.Failure<CplcData, SmartCardError>(commandResult.Error);
                 }
                 
                 var result = await _cardService.ExecuteCommandAsync(commandResult.Value, cancellationToken);
@@ -272,7 +288,7 @@ namespace Gp4Net.Services
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to get CPLC data");
-                return Result<CplcData, SmartCardError>.Fail(
+                return Result.Failure<CplcData, SmartCardError>(
                     SmartCardError.CommunicationError("Failed to get CPLC data", ex));
             }
         }
@@ -291,7 +307,7 @@ namespace Gp4Net.Services
                 var commandResult = GetDataCommand.Create(tag);
                 if (commandResult.IsFailure)
                 {
-                    return Result<byte[], SmartCardError>.Fail(commandResult.Error);
+                    return Result.Failure<byte[], SmartCardError>(commandResult.Error);
                 }
                 
                 var result = await _cardService.ExecuteCommandAsync(commandResult.Value, cancellationToken);
@@ -301,7 +317,7 @@ namespace Gp4Net.Services
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to get data for tag {Tag:X4}", tag);
-                return Result<byte[], SmartCardError>.Fail(
+                return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.CommunicationError($"Failed to get data for tag {tag:X4}", ex));
             }
         }
@@ -309,7 +325,7 @@ namespace Gp4Net.Services
         /// <summary>
         /// Sets the lifecycle state of an application.
         /// </summary>
-        public Task<Result<Core.Unit, SmartCardError>> SetLifecycleStateAsync(
+        public Task<Result<bool, SmartCardError>> SetLifecycleStateAsync(
             byte[] aid,
             LifecycleState state,
             CancellationToken cancellationToken = default)
@@ -318,7 +334,7 @@ namespace Gp4Net.Services
 
             // TODO: Implement SET STATUS command for lifecycle state change
             // For now, return a not implemented error
-            return Task.FromResult(Result<Core.Unit, SmartCardError>.Fail(
+            return Task.FromResult(Result.Failure<bool, SmartCardError>(
                 SmartCardError.Unsupported("SetLifecycleState is not yet implemented - requires SET STATUS command implementation")));
         }
 
@@ -330,25 +346,28 @@ namespace Gp4Net.Services
             SelectCommand command)
         {
             var parseResult = SelectResponse.Parse(response.Data);
-            return await parseResult.MatchAsync<Result<SelectResponse, SmartCardError>>(
-                async selectResponse =>
+            if (parseResult.IsSuccess)
+            {
+                var selectResponse = parseResult.Value;
+                if (selectResponse.Fci?.ApplicationAid != null)
                 {
-                    if (selectResponse.Fci?.ApplicationAid != null)
-                    {
-                        var detectedAid = selectResponse.Fci.ApplicationAid;
-                        _logger?.LogInformation("Auto-detected ISD: {AID}", Convert.ToHexString(detectedAid));
-                        
-                        // Update context with ISD AID
-                        var newService = _cardService.WithContextValue(ContextKeys.IssuerSecurityDomainAid, detectedAid);
-                        // Note: In a pure functional approach, we'd return the new service instance
-                        
-                        return await Task.FromResult(Result<SelectResponse, SmartCardError>.Ok(selectResponse));
-                    }
+                    var detectedAid = selectResponse.Fci.ApplicationAid;
+                    _logger?.LogInformation("Auto-detected ISD: {AID}", Convert.ToHexString(detectedAid));
+                    
+                    // Update context with ISD AID
+                    var newService = _cardService.WithContextValue(ContextKeys.IssuerSecurityDomainAid, detectedAid);
+                    // Note: In a pure functional approach, we'd return the new service instance
+                    
+                    return Result.Success<SelectResponse, SmartCardError>(selectResponse);
+                }
 
-                    return await Task.FromResult(Result<SelectResponse, SmartCardError>.Fail(
-                        SmartCardError.InvalidResponse("No AID in SELECT response")));
-                },
-                async error => await Task.FromResult(Result<SelectResponse, SmartCardError>.Fail(error)));
+                return Result.Failure<SelectResponse, SmartCardError>(
+                    SmartCardError.InvalidResponse("No AID in SELECT response"));
+            }
+            else
+            {
+                return Result.Failure<SelectResponse, SmartCardError>(parseResult.Error);
+            }
         }
 
         private async Task<Result<SelectResponse, SmartCardError>> TryKnownIsdAids(
@@ -381,17 +400,13 @@ namespace Gp4Net.Services
                     // Update context with ISD AID
                     var newService = _cardService.WithContextValue(ContextKeys.IssuerSecurityDomainAid, aid);
                     
-                    return await result.MatchAsync<Result<SelectResponse, SmartCardError>>(
-                        async response => 
-                        {
-                            var parseResult = SelectResponse.Parse(response.Data);
-                            return await Task.FromResult(parseResult);
-                        },
-                        async error => await Task.FromResult(Result<SelectResponse, SmartCardError>.Fail(error)));
+                    var response = result.Value;
+                    var parseResult = SelectResponse.Parse(response.Data);
+                    return parseResult;
                 }
             }
 
-            return Result<SelectResponse, SmartCardError>.Fail(
+            return Result.Failure<SelectResponse, SmartCardError>(
                 SmartCardError.CardError("No ISD found on card"));
         }
 
@@ -406,16 +421,16 @@ namespace Gp4Net.Services
                 var channel = _cardService.Context.Get<ICardChannel>("CardChannel");
                 var transport = _cardService.Context.Get<IApduTransport>("ApduTransport");
                 
-                if (channel == null || transport == null)
+                if (!channel.HasValue || !transport.HasValue)
                 {
-                    return Result<SecureChannelSession, SmartCardError>.Fail(
+                    return Result.Failure<SecureChannelSession, SmartCardError>(
                         SmartCardError.SecurityError("Missing card channel or transport for secure channel establishment"));
                 }
 
                 // Use the secure channel manager to establish the session
                 var sessionResult = await _secureChannelManager.EstablishAsync(
-                    channel, 
-                    transport, 
+                    channel.Value, 
+                    transport.Value, 
                     keySet, 
                     securityLevel);
 
@@ -429,12 +444,12 @@ namespace Gp4Net.Services
                 // Update service context with secure channel session
                 var newService = _cardService.WithContextValue(ContextKeys.SecureChannelSession, session);
 
-                return Result<SecureChannelSession, SmartCardError>.Ok(session);
+                return Result.Success<SecureChannelSession, SmartCardError>(session);
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to establish secure channel");
-                return Result<SecureChannelSession, SmartCardError>.Fail(
+                return Result.Failure<SecureChannelSession, SmartCardError>(
                     SmartCardError.SecurityError("Failed to establish secure channel", response.StatusWord));
             }
         }
@@ -448,15 +463,15 @@ namespace Gp4Net.Services
                 var validationResult = CapFileLoadingWorkflow.ValidateCapFile(capFileData);
                 if (!validationResult.IsValid)
                 {
-                    return Result<CapFileStructure, SmartCardError>.Fail(
+                    return Result.Failure<CapFileStructure, SmartCardError>(
                         SmartCardError.InvalidData($"Invalid CAP file: {validationResult.ErrorMessage}"));
                 }
 
-                return Result<CapFileStructure, SmartCardError>.Ok(validationResult.CapFile!);
+                return Result.Success<CapFileStructure, SmartCardError>(validationResult.CapFile!);
             }
             catch (Exception ex)
             {
-                return Result<CapFileStructure, SmartCardError>.Fail(
+                return Result.Failure<CapFileStructure, SmartCardError>(
                     SmartCardError.InvalidData($"Failed to parse CAP file: {ex.Message}"));
             }
         }
@@ -479,7 +494,7 @@ namespace Gp4Net.Services
             
             if (installForLoadResult.IsFailure)
             {
-                return Result<ImmutableList<IApduCommand>, SmartCardError>.Fail(installForLoadResult.Error);
+                return Result.Failure<ImmutableList<IApduCommand>, SmartCardError>(installForLoadResult.Error);
             }
             commands.Add(installForLoadResult.Value);
 
@@ -487,7 +502,7 @@ namespace Gp4Net.Services
             var loadCommandsResult = LoadCommand.CreateFromCapFile(capFileData, options.MaxLoadBlockSize);
             if (loadCommandsResult.IsFailure)
             {
-                return Result<ImmutableList<IApduCommand>, SmartCardError>.Fail(loadCommandsResult.Error);
+                return Result.Failure<ImmutableList<IApduCommand>, SmartCardError>(loadCommandsResult.Error);
             }
             commands.AddRange(loadCommandsResult.Value);
 
@@ -508,14 +523,14 @@ namespace Gp4Net.Services
 
                     if (installCommandResult.IsFailure)
                     {
-                        return Result<ImmutableList<IApduCommand>, SmartCardError>.Fail(installCommandResult.Error);
+                        return Result.Failure<ImmutableList<IApduCommand>, SmartCardError>(installCommandResult.Error);
                     }
                     
                     commands.Add(installCommandResult.Value);
                 }
             }
 
-            return Result<ImmutableList<IApduCommand>, SmartCardError>.Ok(commands.ToImmutableList());
+            return Result.Success<ImmutableList<IApduCommand>, SmartCardError>(commands.ToImmutableList());
         }
 
         private async Task<Result<InstallationResult, SmartCardError>> ExecuteInstallationCommands(
@@ -532,7 +547,7 @@ namespace Gp4Net.Services
 
                 if (result.IsFailure)
                 {
-                    return Result<InstallationResult, SmartCardError>.Fail(
+                    return Result.Failure<InstallationResult, SmartCardError>(
                         result.Error.WithContext("Command", command.GetType().Name)
                                     .WithContext("ExecutedCommands", executedCommands));
                 }
@@ -551,7 +566,7 @@ namespace Gp4Net.Services
                 installedApplets.ToImmutableList(),
                 executedCommands);
 
-            return Result<InstallationResult, SmartCardError>.Ok(installResult);
+            return Result.Success<InstallationResult, SmartCardError>(installResult);
         }
 
         /// <summary>

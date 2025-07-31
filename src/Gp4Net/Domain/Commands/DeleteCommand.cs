@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
@@ -103,7 +104,9 @@ namespace Gp4Net.Domain.Commands
         /// <summary>
         /// Gets the command data.
         /// </summary>
-        public byte[]? Data => GetDeleteData().GetOrDefault(null);
+        public byte[]? Data => GetDeleteData().Match(
+            onSuccess: data => data,
+            onFailure: _ => null);
 
         /// <summary>
         /// Gets the expected response length. DELETE commands do not use LE byte per GP traces.
@@ -178,7 +181,7 @@ namespace Gp4Net.Domain.Commands
                 }
             }
 
-            return Result<byte[], SmartCardError>.Ok([.. data]);
+            return Result.Success<byte[], SmartCardError>([.. data]);
         }
 
         /// <summary>

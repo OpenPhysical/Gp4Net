@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Constants;
 using Gp4Net.CardEmulator.Core;
@@ -39,9 +40,9 @@ namespace Gp4Net.CardEmulator.Functional
         {
             return ParseInitializeUpdateCommand(command)
                 .Bind(request => ValidateInitializeUpdatePreconditions(request, state))
-                .Bind(request => GenerateCardChallengeForRequest(request, crypto))
+                .Bind(request => GenerateCardChallengeForRequest(request, state, config, crypto))
                 .Bind(data => CalculateInitializeUpdateCryptogram(data, state, config, crypto))
-                .Map(result => CreateInitializeUpdateResult(result, state));
+                .Map(result => CreateInitializeUpdateResult(result, state, config));
         }
 
         /// <summary>
@@ -71,7 +72,7 @@ namespace Gp4Net.CardEmulator.Functional
             return ParseGetDataCommand(command)
                 .Bind(tag => ValidateGetDataAccess(tag, state))
                 .Bind(tag => RetrieveDataObject(tag, state, config))
-                .Map(data => (new ApduResponse(data, StatusWords.SUCCESS), state));
+                .Map(data => (new ApduResponse(data, StatusWords.Success), state));
         }
 
         /// <summary>
@@ -85,7 +86,7 @@ namespace Gp4Net.CardEmulator.Functional
             return ParseGetStatusCommand(command)
                 .Bind(request => ValidateGetStatusAccess(request, state))
                 .Bind(request => RetrieveStatusData(request, state, config))
-                .Map(data => (new ApduResponse(data, StatusWords.SUCCESS), state));
+                .Map(data => (new ApduResponse(data, StatusWords.Success), state));
         }
 
         // Helper methods for command parsing and validation
@@ -93,38 +94,38 @@ namespace Gp4Net.CardEmulator.Functional
         private static Result<byte[], SmartCardError> ParseSelectCommand(byte[] command)
         {
             if (command.Length < 4)
-                return new Result<byte[], SmartCardError>.Failure(SmartCardError.WrongLength());
+                return Result.Failure<byte[], SmartCardError>(SmartCardError.WrongLength());
 
             if (command[0] != 0x00 || command[1] != 0xA4)
-                return new Result<byte[], SmartCardError>.Failure(SmartCardError.InstructionNotSupported());
+                return Result.Failure<byte[], SmartCardError>(SmartCardError.InstructionNotSupported());
 
             // Handle SELECT with no data (select by default)
             if (command.Length == 4)
-                return new Result<byte[], SmartCardError>.Success(Array.Empty<byte>());
+                return Result.Success<byte[], SmartCardError>(Array.Empty<byte>());
 
             if (command.Length < 5)
-                return new Result<byte[], SmartCardError>.Failure(SmartCardError.WrongLength());
+                return Result.Failure<byte[], SmartCardError>(SmartCardError.WrongLength());
 
             var lc = command[4];
             if (command.Length != 5 + lc)
-                return new Result<byte[], SmartCardError>.Failure(SmartCardError.WrongLength());
+                return Result.Failure<byte[], SmartCardError>(SmartCardError.WrongLength());
 
             var aid = command.Skip(5).Take(lc).ToArray();
-            return new Result<byte[], SmartCardError>.Success(aid);
+            return Result.Success<byte[], SmartCardError>(aid);
         }
 
         private static Result<byte[], SmartCardError> ValidateSelectAid(byte[] aid, CardConfiguration config)
         {
             // Empty AID means select default (ISD)
             if (aid.Length == 0)
-                return new Result<byte[], SmartCardError>.Success(config.IsdAid);
+                return Result.Success<byte[], SmartCardError>(config.IsdAid);
 
             // Check if it's the ISD AID
             if (aid.SequenceEqual(config.IsdAid))
-                return new Result<byte[], SmartCardError>.Success(aid);
+                return Result.Success<byte[], SmartCardError>(aid);
 
             // For now, only support ISD selection
-            return new Result<byte[], SmartCardError>.Failure(SmartCardError.FileNotFound());
+            return Result.Failure<byte[], SmartCardError>(SmartCardError.FileNotFound());
         }
 
         private static ApduResponse CreateSelectResponse(byte[] aid, CardConfiguration config)
@@ -138,27 +139,27 @@ namespace Gp4Net.CardEmulator.Functional
                 0xA5, 0x04, // FCI Proprietary Template
                 0x9F, 0x65, 0x01, 0x00 // Maximum length of data field in command message
             };
-            return new ApduResponse(fciData, StatusWords.SUCCESS);
+            return new ApduResponse(fciData, StatusWords.Success);
         }
 
         private static Result<InitializeUpdateRequest, SmartCardError> ParseInitializeUpdateCommand(byte[] command)
         {
             if (command.Length < 13) // CLA INS P1 P2 LC + 8 bytes challenge
-                return new Result<InitializeUpdateRequest, SmartCardError>.Failure(SmartCardError.WrongLength());
+                return Result.Failure<InitializeUpdateRequest, SmartCardError>(SmartCardError.WrongLength());
 
             if (command[0] != 0x80 || command[1] != 0x50)
-                return new Result<InitializeUpdateRequest, SmartCardError>.Failure(SmartCardError.InstructionNotSupported());
+                return Result.Failure<InitializeUpdateRequest, SmartCardError>(SmartCardError.InstructionNotSupported());
 
             var keyVersion = command[2];
             var keyIdentifier = command[3];
             var lc = command[4];
 
             if (lc != 8 || command.Length != 13)
-                return new Result<InitializeUpdateRequest, SmartCardError>.Failure(SmartCardError.WrongLength());
+                return Result.Failure<InitializeUpdateRequest, SmartCardError>(SmartCardError.WrongLength());
 
             var hostChallenge = command.Skip(5).Take(8).ToArray();
 
-            return new Result<InitializeUpdateRequest, SmartCardError>.Success(
+            return Result.Success<InitializeUpdateRequest, SmartCardError>(
                 new InitializeUpdateRequest(keyVersion, keyIdentifier, hostChallenge));
         }
 
@@ -167,17 +168,57 @@ namespace Gp4Net.CardEmulator.Functional
             CardState state)
         {
             if (!state.IsSelected)
-                return new Result<InitializeUpdateRequest, SmartCardError>.Failure(
+                return Result.Failure<InitializeUpdateRequest, SmartCardError>(
                     SmartCardError.ConditionsNotSatisfied());
 
-            return new Result<InitializeUpdateRequest, SmartCardError>.Success(request);
+            return Result.Success<InitializeUpdateRequest, SmartCardError>(request);
         }
 
         private static Result<(InitializeUpdateRequest, byte[]), SmartCardError> GenerateCardChallengeForRequest(
             InitializeUpdateRequest request,
+            CardState state,
+            CardConfiguration config,
             ICryptographicService crypto)
         {
-            return crypto.GenerateChallenge(8)
+            // Check if pseudo-random challenge generation is required (SCP03 i=70)
+            if (state.ScpVersion == 0x03 && (state.ScpImplementation & 0xF0) == 0x70)
+            {
+                // SCP03 i=70: Use pseudo-random challenge generation
+                return GeneratePseudoRandomChallenge(request, state, config, crypto);
+            }
+            else
+            {
+                // Standard random challenge generation
+                return crypto.GenerateChallenge(8)
+                    .Map(challenge => (request, challenge));
+            }
+        }
+
+        private static Result<(InitializeUpdateRequest, byte[]), SmartCardError> GeneratePseudoRandomChallenge(
+            InitializeUpdateRequest request,
+            CardState state,
+            CardConfiguration config,
+            ICryptographicService crypto)
+        {
+            // Get the keyset for the requested key version
+            var keySet = state.InstalledKeys.TryGetValue(request.KeyVersion, out var keys) 
+                ? keys 
+                : config.StaticKeys.TryGetValue(request.KeyVersion, out var staticKeys)
+                    ? staticKeys 
+                    : config.StaticKeys.Values.FirstOrDefault();
+
+            if (keySet is not Gp4Net.Domain.Keys.Scp03KeySet scp03Keys)
+            {
+                return SmartCardError.InvalidArgument("SCP03 pseudo-random challenge requires SCP03 keys");
+            }
+
+            // Get sequence counter for this key version
+            var sequenceCounter = state.GetSequenceCounter(request.KeyVersion);
+
+            // Use the ISD AID for challenge generation
+            var aid = config.IsdAid;
+
+            return crypto.GeneratePseudoRandomChallenge(scp03Keys.EncKey, sequenceCounter, aid, 8)
                 .Map(challenge => (request, challenge));
         }
 
@@ -212,7 +253,7 @@ namespace Gp4Net.CardEmulator.Functional
                 // Not found in either, try to get any available key
                 keys = config.StaticKeys.Values.FirstOrDefault();
                 if (keys is null)
-                    return new Result<InitializeUpdateData, SmartCardError>.Failure(
+                    return Result.Failure<InitializeUpdateData, SmartCardError>(
                         SmartCardError.ReferencedDataNotFound());
                 effectiveKeyVersion = keys.KeyVersion;
             }
@@ -222,7 +263,7 @@ namespace Gp4Net.CardEmulator.Functional
             }
 
             if (keys is null)
-                return new Result<InitializeUpdateData, SmartCardError>.Failure(
+                return Result.Failure<InitializeUpdateData, SmartCardError>(
                     SmartCardError.ReferencedDataNotFound());
 
             return crypto.CalculateCardCryptogram(
@@ -242,7 +283,8 @@ namespace Gp4Net.CardEmulator.Functional
 
         private static (ApduResponse, CardState) CreateInitializeUpdateResult(
             InitializeUpdateData data,
-            CardState state)
+            CardState state,
+            CardConfiguration config)
         {
             // Build INITIALIZE UPDATE response
             var response = new byte[32]; // Typical SCP response length
@@ -277,21 +319,28 @@ namespace Gp4Net.CardEmulator.Functional
             offset += 8;
 
             // Sequence counter for SCP03 (3 bytes)
+            var newState = state;
             if (data.ScpVersion == 0x03)
             {
-                response[offset++] = 0x00;
-                response[offset++] = 0x00;
-                response[offset++] = 0x00;
+                var sequenceCounter = state.GetSequenceCounter(data.KeyVersion);
+                Array.Copy(sequenceCounter, 0, response, offset, 3);
+                offset += 3;
+                
+                // Increment sequence counter if pseudo-random challenges are used (i=70)
+                if ((data.ScpImplementation & 0xF0) == 0x70)
+                {
+                    newState = newState.WithIncrementedSequenceCounter(data.KeyVersion);
+                }
             }
 
             var actualResponse = new byte[offset];
             Array.Copy(response, actualResponse, offset);
 
-            var newState = state
+            newState = newState
                 .WithChallenges(data.HostChallenge, data.CardChallenge)
                 .WithKeys(data.Keys);
 
-            return (new ApduResponse(actualResponse, StatusWords.SUCCESS), newState);
+            return (new ApduResponse(actualResponse, StatusWords.Success), newState);
         }
 
         // Additional helper records for command data
@@ -309,10 +358,10 @@ namespace Gp4Net.CardEmulator.Functional
         private static Result<ExternalAuthenticateRequest, SmartCardError> ParseExternalAuthenticateCommand(byte[] command)
         {
             if (command.Length < 5)
-                return new Result<ExternalAuthenticateRequest, SmartCardError>.Failure(SmartCardError.WrongLength());
+                return Result.Failure<ExternalAuthenticateRequest, SmartCardError>(SmartCardError.WrongLength());
 
             if (command[0] != 0x84 || command[1] != 0x82)
-                return new Result<ExternalAuthenticateRequest, SmartCardError>.Failure(SmartCardError.InstructionNotSupported());
+                return Result.Failure<ExternalAuthenticateRequest, SmartCardError>(SmartCardError.InstructionNotSupported());
 
             var securityLevel = command[2];
             var p2 = command[3];
@@ -321,12 +370,12 @@ namespace Gp4Net.CardEmulator.Functional
             // For SCP02, expect 16 bytes (8 byte cryptogram + 8 byte MAC)
             // For SCP03, expect 16 bytes (8 byte cryptogram + 8 byte MAC)
             if (lc != 16 || command.Length != 21)
-                return new Result<ExternalAuthenticateRequest, SmartCardError>.Failure(SmartCardError.WrongLength());
+                return Result.Failure<ExternalAuthenticateRequest, SmartCardError>(SmartCardError.WrongLength());
 
             var hostCryptogram = command.Skip(5).Take(8).ToArray();
             var hostMac = command.Skip(13).Take(8).ToArray();
 
-            return new Result<ExternalAuthenticateRequest, SmartCardError>.Success(
+            return Result.Success<ExternalAuthenticateRequest, SmartCardError>(
                 new ExternalAuthenticateRequest(securityLevel, hostCryptogram, hostMac));
         }
 
@@ -334,25 +383,25 @@ namespace Gp4Net.CardEmulator.Functional
             ExternalAuthenticateRequest request, CardState state)
         {
             if (!state.IsSelected)
-                return new Result<ExternalAuthenticateRequest, SmartCardError>.Failure(
+                return Result.Failure<ExternalAuthenticateRequest, SmartCardError>(
                     SmartCardError.ConditionsNotSatisfied());
 
             if (state.HostChallenge == null || state.CardChallenge == null)
-                return new Result<ExternalAuthenticateRequest, SmartCardError>.Failure(
+                return Result.Failure<ExternalAuthenticateRequest, SmartCardError>(
                     SmartCardError.ConditionsNotSatisfied());
 
             if (state.CurrentKeys == null)
-                return new Result<ExternalAuthenticateRequest, SmartCardError>.Failure(
+                return Result.Failure<ExternalAuthenticateRequest, SmartCardError>(
                     SmartCardError.ConditionsNotSatisfied());
 
-            return new Result<ExternalAuthenticateRequest, SmartCardError>.Success(request);
+            return Result.Success<ExternalAuthenticateRequest, SmartCardError>(request);
         }
 
         private static Result<ExternalAuthenticateRequest, SmartCardError> VerifyHostCryptogram(
             ExternalAuthenticateRequest request, CardState state, CardConfiguration config, ICryptographicService crypto)
         {
             if (state.HostChallenge == null || state.CardChallenge == null || state.CurrentKeys == null)
-                return new Result<ExternalAuthenticateRequest, SmartCardError>.Failure(
+                return Result.Failure<ExternalAuthenticateRequest, SmartCardError>(
                     SmartCardError.ConditionsNotSatisfied());
 
             return crypto.CalculateHostCryptogram(
@@ -361,9 +410,9 @@ namespace Gp4Net.CardEmulator.Functional
                     state.CurrentKeys, 
                     state.ScpVersion)
                 .Bind(expectedCryptogram => crypto.VerifyCryptogram(request.HostCryptogram, expectedCryptogram))
-                .Bind<ExternalAuthenticateRequest>(verified => verified
-                    ? new Result<ExternalAuthenticateRequest, SmartCardError>.Success(request)
-                    : new Result<ExternalAuthenticateRequest, SmartCardError>.Failure(
+                .Bind(verified => verified
+                    ? Result.Success<ExternalAuthenticateRequest, SmartCardError>(request)
+                    : Result.Failure<ExternalAuthenticateRequest, SmartCardError>(
                         SmartCardError.SecurityStatusNotSatisfied()));
         }
 
@@ -371,7 +420,7 @@ namespace Gp4Net.CardEmulator.Functional
             ExternalAuthenticateRequest request, CardState state, CardConfiguration config, ICryptographicService crypto)
         {
             if (state.HostChallenge == null || state.CardChallenge == null || state.CurrentKeys == null)
-                return new Result<SessionKeys, SmartCardError>.Failure(
+                return Result.Failure<SessionKeys, SmartCardError>(
                     SmartCardError.ConditionsNotSatisfied());
 
             return crypto.DeriveSessionKeys(
@@ -392,7 +441,7 @@ namespace Gp4Net.CardEmulator.Functional
             );
 
             // EXTERNAL AUTHENTICATE response is typically empty on success
-            return (new ApduResponse(Array.Empty<byte>(), StatusWords.SUCCESS), newState);
+            return (new ApduResponse(Array.Empty<byte>(), StatusWords.Success), newState);
         }
 
         // Placeholder implementations for other commands
@@ -401,17 +450,17 @@ namespace Gp4Net.CardEmulator.Functional
             // GET DATA command format: CLA INS P1 P2 [Le]
             // P1P2 contains the tag (2 bytes)
             if (command.Length < 4)
-                return new Result<ushort, SmartCardError>.Failure(SmartCardError.WrongLength());
+                return Result.Failure<ushort, SmartCardError>(SmartCardError.WrongLength());
             
             var tag = (ushort)((command[2] << 8) | command[3]);
-            return new Result<ushort, SmartCardError>.Success(tag);
+            return Result.Success<ushort, SmartCardError>(tag);
         }
 
         private static Result<ushort, SmartCardError> ValidateGetDataAccess(ushort tag, CardState state)
         {
             // For now, allow access to all data objects regardless of authentication state
             // In a real implementation, some objects might require secure channel
-            return new Result<ushort, SmartCardError>.Success(tag);
+            return Result.Success<ushort, SmartCardError>(tag);
         }
 
         private static Result<byte[], SmartCardError> RetrieveDataObject(
@@ -420,28 +469,28 @@ namespace Gp4Net.CardEmulator.Functional
             // Check if this tag exists in the card configuration
             if (config.DefaultDataObjects.TryGetValue(tag, out var data))
             {
-                return new Result<byte[], SmartCardError>.Success(data);
+                return Result.Success<byte[], SmartCardError>(data);
             }
             
             // Check if this tag exists in the card state
             if (state.DataObjects.TryGetValue(tag, out var stateData))
             {
-                return new Result<byte[], SmartCardError>.Success(stateData);
+                return Result.Success<byte[], SmartCardError>(stateData);
             }
             
-            return new Result<byte[], SmartCardError>.Failure(SmartCardError.ReferencedDataNotFound());
+            return Result.Failure<byte[], SmartCardError>(SmartCardError.ReferencedDataNotFound());
         }
 
         private static Result<GetStatusRequest, SmartCardError> ParseGetStatusCommand(byte[] command) =>
-            new Result<GetStatusRequest, SmartCardError>.Failure(SmartCardError.InstructionNotSupported());
+            Result.Failure<GetStatusRequest, SmartCardError>(SmartCardError.InstructionNotSupported());
 
         private static Result<GetStatusRequest, SmartCardError> ValidateGetStatusAccess(
             GetStatusRequest request, CardState state) =>
-            new Result<GetStatusRequest, SmartCardError>.Failure(SmartCardError.InstructionNotSupported());
+            Result.Failure<GetStatusRequest, SmartCardError>(SmartCardError.InstructionNotSupported());
 
         private static Result<byte[], SmartCardError> RetrieveStatusData(
             GetStatusRequest request, CardState state, CardConfiguration config) =>
-            new Result<byte[], SmartCardError>.Failure(SmartCardError.InstructionNotSupported());
+            Result.Failure<byte[], SmartCardError>(SmartCardError.InstructionNotSupported());
 
         private record ExternalAuthenticateRequest(byte SecurityLevel, byte[] HostCryptogram, byte[] HostMac);
         private record GetStatusRequest();

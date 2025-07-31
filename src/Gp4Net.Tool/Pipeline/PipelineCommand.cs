@@ -20,9 +20,9 @@ namespace Gp4Net.Tool.Pipeline
         );
 
         private readonly IPipelineCommand<TSettings> _command;
-        private readonly ICommandContext _context;
+        private readonly ICliExecutionContext _context;
 
-        public PipelineCommand(IPipelineCommand<TSettings> command, ICommandContext context)
+        public PipelineCommand(IPipelineCommand<TSettings> command, ICliExecutionContext context)
         {
             _command = command ?? throw new ArgumentNullException(nameof(command));
             _context = context ?? throw new ArgumentNullException(nameof(context));

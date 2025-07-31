@@ -101,7 +101,8 @@ namespace Gp4Net.Domain.Protocol
                 );
             }
 
-            return new Scp03Protocol(scp03KeySet);
+            var keyDerivationService = _serviceProvider.GetRequiredService<IKeyDerivationService>();
+            return new Scp03Protocol(scp03KeySet, keyDerivationService);
         }
     }
 }

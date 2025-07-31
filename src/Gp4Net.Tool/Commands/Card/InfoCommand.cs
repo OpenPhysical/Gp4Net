@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.CardInfo;
@@ -28,7 +29,7 @@ namespace Gp4Net.Tool.Commands.Card
         /// <summary>
         /// Executes the info command to display detailed card information.
         /// </summary>
-        public async Task<int> ExecuteAsync(ICommandContext context, Settings settings)
+        public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
         {
             try
             {
@@ -66,40 +67,35 @@ namespace Gp4Net.Tool.Commands.Card
                 try
                 {
                     var selectResult = await ctx.GetGlobalPlatformService().SelectIsdAsync();
-                    await selectResult.MatchAsync(
-                        async selectResponse =>
-                        {
-                            _ = table.AddRow("ISD Status", "[green]✓ Available[/]");
+                    if (selectResult.IsSuccess)
+                    {
+                        var selectResponse = selectResult.Value;
+                        _ = table.AddRow("ISD Status", "[green]✓ Available[/]");
 
-                            if (selectResponse.RawData != null && selectResponse.RawData.Length > 0)
-                            {
-                                AddIsdDataToTable(table, selectResponse);
-                            }
-                            return Task.CompletedTask;
-                        },
-                        async error =>
+                        if (selectResponse.RawData != null && selectResponse.RawData.Length > 0)
                         {
-                            Logger.Debug($"Could not select ISD: {error.Message}");
-                            _ = table.AddRow("ISD Status", "[red]Not available[/]");
-                            return Task.CompletedTask;
-                        });
+                            AddIsdDataToTable(table, selectResponse);
+                        }
+                    }
+                    else
+                    {
+                        Logger.Debug($"Could not select ISD: {selectResult.Error.Message}");
+                        _ = table.AddRow("ISD Status", "[red]Not available[/]");
+                    }
 
                     // Add CPLC data to table (doesn't require secure channel)
                     try
                     {
                         var cplcResult = await ctx.GetGlobalPlatformService().GetCplcAsync();
-                        await cplcResult.MatchAsync(
-                            async cplc =>
-                            {
-                                AddCplcToTable(table, cplc);
-                                return Task.CompletedTask;
-                            },
-                            async error =>
-                            {
-                                Logger.Debug($"Could not get CPLC data: {error.Message}");
-                                _ = table.AddRow("CPLC Data", "[red]Not available[/]");
-                                return Task.CompletedTask;
-                            });
+                        if (cplcResult.IsSuccess)
+                        {
+                            AddCplcToTable(table, cplcResult.Value);
+                        }
+                        else
+                        {
+                            Logger.Debug($"Could not get CPLC data: {cplcResult.Error.Message}");
+                            _ = table.AddRow("CPLC Data", "[red]Not available[/]");
+                        }
                     }
                     catch (Exception cplcEx)
                     {
@@ -134,27 +130,25 @@ namespace Gp4Net.Tool.Commands.Card
                         try
                         {
                             var statusResult = await ctx.GetGlobalPlatformService().GetStatusAsync(StatusSubset.Applications);
-                            await statusResult.MatchAsync(
-                                async applications =>
-                                {
-                                    var appCounts = applications
-                                        .GroupBy(a => a.Type)
-                                        .ToDictionary(g => g.Key, g => g.Count());
+                            if (statusResult.IsSuccess)
+                            {
+                                var applications = statusResult.Value;
+                                var appCounts = applications
+                                    .GroupBy(a => a.Type)
+                                    .ToDictionary(g => g.Key, g => g.Count());
 
-                                    _ = table.AddRow("Total Applications", applications.Count.ToString());
+                                _ = table.AddRow("Total Applications", applications.Count.ToString());
 
-                                    foreach (var kvp in appCounts)
-                                    {
-                                        _ = table.AddRow($"  - {kvp.Key}", kvp.Value.ToString());
-                                    }
-                                    return Task.CompletedTask;
-                                },
-                                async error =>
+                                foreach (var kvp in appCounts)
                                 {
-                                    Logger.Debug($"Could not get applications: {error.Message}");
-                                    _ = table.AddRow("Applications", "[red]Error retrieving[/]");
-                                    return Task.CompletedTask;
-                                });
+                                    _ = table.AddRow($"  - {kvp.Key}", kvp.Value.ToString());
+                                }
+                            }
+                            else
+                            {
+                                Logger.Debug($"Could not get applications: {statusResult.Error.Message}");
+                                _ = table.AddRow("Applications", "[red]Error retrieving[/]");
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -274,8 +268,8 @@ namespace Gp4Net.Tool.Commands.Card
         /// <param name="table">The table to add the data to.</param>
         /// <param name="name">The display name for this data.</param>
         /// <param name="tag">The data object identifier tag.</param>
-        private async Task AddGetDataToTable(
-            ICommandContext context,
+        private static async Task AddGetDataToTable(
+            ICliExecutionContext context,
             Table table,
             string name,
             ushort tag
@@ -284,39 +278,39 @@ namespace Gp4Net.Tool.Commands.Card
             try
             {
                 var dataResult = await context.GetGlobalPlatformService().GetDataAsync(tag);
-                await dataResult.MatchAsync(
-                    async response =>
+                if (dataResult.IsSuccess)
+                {
+                    var response = dataResult.Value;
+                    if (response != null && response.Length > 0)
                     {
-                        if (response != null && response.Length > 0)
+                        // Special handling for specific data types
+                        if (tag == GetDataCommand.DataObjects.CardData)
                         {
-                            // Special handling for specific data types
-                            if (tag == GetDataCommand.DataObjects.CardData)
+                            var cardData = response.ParseAsCardData();
+                            if (cardData != null)
                             {
-                                var cardData = response.ParseAsCardData();
-                                if (cardData != null)
+                                // Prefer OID-based version (matches GP Pro behavior)
+                                var gpVersion = cardData.GlobalPlatformVersionFromOid ?? cardData.GlobalPlatformVersion?.ToString();
+                                if (!string.IsNullOrEmpty(gpVersion))
                                 {
-                                    // Prefer OID-based version (matches GP Pro behavior)
-                                    var gpVersion = cardData.GlobalPlatformVersionFromOid ?? cardData.GlobalPlatformVersion?.ToString();
-                                    if (!string.IsNullOrEmpty(gpVersion))
-                                    {
-                                        _ = table.AddRow("GlobalPlatform Version", gpVersion);
-                                    }
-                                    else
-                                    {
-                                        _ = table.AddRow(name, $"[dim]{Convert.ToHexString(response)}[/]");
-                                    }
+                                    _ = table.AddRow("GlobalPlatform Version", gpVersion);
                                 }
                                 else
                                 {
                                     _ = table.AddRow(name, $"[dim]{Convert.ToHexString(response)}[/]");
                                 }
                             }
-                            else if (tag == GetDataCommand.DataObjects.CardCapabilities)
+                            else
                             {
-                                var capabilities = response.ParseAsCardCapabilities();
-                                if (capabilities != null)
-                                {
-                                    // Display SCP support from capabilities
+                                _ = table.AddRow(name, $"[dim]{Convert.ToHexString(response)}[/]");
+                            }
+                        }
+                        else if (tag == GetDataCommand.DataObjects.CardCapabilities)
+                        {
+                            var capabilities = response.ParseAsCardCapabilities();
+                            if (capabilities != null)
+                            {
+                                // Display SCP support from capabilities
                                     var scpSupport = ScpCapabilitiesParser.Parse(response);
                                     if (!string.IsNullOrEmpty(scpSupport))
                                     {
@@ -351,7 +345,7 @@ namespace Gp4Net.Tool.Commands.Card
                             else if (tag == GetDataCommand.DataObjects.DiversificationData)
                             {
                                 // Extract and display SCP support from diversification data
-                                var scpSupport = DiversificationDataParser.ParseScpSupport(new Option<byte[]>.Some(response));
+                                var scpSupport = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(response));
                                 _ = table.AddRow("SCP Support", scpSupport);
                             }
                             else if (tag == GetDataCommand.DataObjects.KeyInformationTemplate)
@@ -386,14 +380,12 @@ namespace Gp4Net.Tool.Commands.Card
                         {
                             _ = table.AddRow(name, "[dim]Not supported[/]");
                         }
-                        return Task.CompletedTask;
-                    },
-                    async error =>
-                    {
-                        Logger.Debug($"Could not get {name}: {error.Message}");
-                        _ = table.AddRow(name, "[red]Error retrieving data[/]");
-                        return Task.CompletedTask;
-                    });
+                    }
+                else
+                {
+                    Logger.Debug($"Could not get {name}: {dataResult.Error.Message}");
+                    _ = table.AddRow(name, "[red]Error retrieving data[/]");
+                }
             }
             catch (Exception ex)
             {

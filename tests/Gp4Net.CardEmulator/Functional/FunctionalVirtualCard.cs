@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Constants;
 using Gp4Net.CardEmulator.Core;
@@ -97,9 +97,9 @@ namespace Gp4Net.CardEmulator.Functional
         private static Result<ParsedCommand, SmartCardError> ValidateCommand(byte[] command)
         {
             if (command.Length < 4)
-                return new Result<ParsedCommand, SmartCardError>.Failure(SmartCardError.WrongLength());
+                return Result.Failure<ParsedCommand, SmartCardError>(SmartCardError.WrongLength());
 
-            return new Result<ParsedCommand, SmartCardError>.Success(new ParsedCommand(
+            return Result.Success<ParsedCommand, SmartCardError>(new ParsedCommand(
                 Cla: command[0],
                 Ins: command[1],
                 P1: command[2],
@@ -113,9 +113,9 @@ namespace Gp4Net.CardEmulator.Functional
             CardConfiguration config)
         {
             if (!config.SupportedInstructions.Contains(cmd.Ins))
-                return new Result<ParsedCommand, SmartCardError>.Failure(SmartCardError.InstructionNotSupported());
+                return Result.Failure<ParsedCommand, SmartCardError>(SmartCardError.InstructionNotSupported());
 
-            return new Result<ParsedCommand, SmartCardError>.Success(cmd);
+            return Result.Success<ParsedCommand, SmartCardError>(cmd);
         }
 
         private static Result<(ApduResponse, CardState), SmartCardError> RouteCommand(
@@ -153,7 +153,7 @@ namespace Gp4Net.CardEmulator.Functional
                 0xFE when config.CardType.Contains("P71") => 
                     P71CommandProcessors.ProcessIdentify(cmd.FullCommand, state, config),
                 
-                _ => new Result<(ApduResponse, CardState), SmartCardError>.Failure(
+                _ => Result.Failure<(ApduResponse, CardState), SmartCardError>(
                     SmartCardError.InstructionNotSupported())
             };
         }
@@ -167,29 +167,29 @@ namespace Gp4Net.CardEmulator.Functional
         // Placeholder implementations for commands not yet implemented
         private static Result<(ApduResponse, CardState), SmartCardError> ProcessInstallCommand(
             byte[] command, CardState state, CardConfiguration config) =>
-            new Result<(ApduResponse, CardState), SmartCardError>.Success(
-                (new ApduResponse(Array.Empty<byte>(), StatusWords.SUCCESS), state));
+            Result.Success<(ApduResponse, CardState), SmartCardError>(
+                (new ApduResponse(Array.Empty<byte>(), StatusWords.Success), state));
 
         private static Result<(ApduResponse, CardState), SmartCardError> ProcessLoadCommand(
             byte[] command, CardState state, CardConfiguration config) =>
-            new Result<(ApduResponse, CardState), SmartCardError>.Success(
-                (new ApduResponse(Array.Empty<byte>(), StatusWords.SUCCESS), state));
+            Result.Success<(ApduResponse, CardState), SmartCardError>(
+                (new ApduResponse(Array.Empty<byte>(), StatusWords.Success), state));
 
         private static Result<(ApduResponse, CardState), SmartCardError> ProcessDeleteCommand(
             byte[] command, CardState state, CardConfiguration config) =>
-            new Result<(ApduResponse, CardState), SmartCardError>.Success(
-                (new ApduResponse(Array.Empty<byte>(), StatusWords.SUCCESS), state));
+            Result.Success<(ApduResponse, CardState), SmartCardError>(
+                (new ApduResponse(Array.Empty<byte>(), StatusWords.Success), state));
 
         private static Result<(ApduResponse, CardState), SmartCardError> ProcessPutKeyCommand(
             byte[] command, CardState state, CardConfiguration config)
         {
             if (command.Length < 6) // Minimum command length check
-                return new Result<(ApduResponse, CardState), SmartCardError>.Failure(
+                return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                     SmartCardError.WrongLength());
             
             var lc = command[4];
             if (command.Length < 5 + lc)
-                return new Result<(ApduResponse, CardState), SmartCardError>.Failure(
+                return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                     SmartCardError.WrongLength());
             
             // Parse PUT KEY command data
@@ -207,7 +207,9 @@ namespace Gp4Net.CardEmulator.Functional
                 encKey: gpTestKey,
                 macKey: gpTestKey, 
                 dekKey: gpTestKey,
-                keyVersion: keyVersion).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp03KeySet: {e.Message}"));
+                keyVersion: keyVersion).Match(
+                    onSuccess: keySet => keySet,
+                    onFailure: error => throw new InvalidOperationException($"Failed to create Scp03KeySet: {error.Message}"));
             
             // Update state with new key set
             var newState = state.WithInstalledKey(keyVersion, newKeySet);
@@ -217,7 +219,7 @@ namespace Gp4Net.CardEmulator.Functional
             response[0] = keyVersion;
             
             // Add dummy KCVs for 3 keys (3 bytes each)
-            for (int i = 0; i < 3; i++)
+            for (var i = 0; i < 3; i++)
             {
                 var kcvOffset = 1 + (i * 3);
                 response[kcvOffset] = 0x50;
@@ -225,15 +227,15 @@ namespace Gp4Net.CardEmulator.Functional
                 response[kcvOffset + 2] = 0x77;
             }
             
-            return new Result<(ApduResponse, CardState), SmartCardError>.Success(
-                (new ApduResponse(response, StatusWords.SUCCESS), newState));
+            return Result.Success<(ApduResponse, CardState), SmartCardError>(
+                (new ApduResponse(response, StatusWords.Success), newState));
         }
 
         private static Result<(ApduResponse, CardState), SmartCardError> ProcessStoreDataCommand(
             byte[] command, CardState state, CardConfiguration config)
         {
             if (command.Length < 5)
-                return new Result<(ApduResponse, CardState), SmartCardError>.Failure(
+                return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                     SmartCardError.WrongLength());
 
             var p1 = command[2];
@@ -241,7 +243,7 @@ namespace Gp4Net.CardEmulator.Functional
             var lc = command[4];
 
             if (command.Length < 5 + lc)
-                return new Result<(ApduResponse, CardState), SmartCardError>.Failure(
+                return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                     SmartCardError.WrongLength());
 
             var data = new byte[lc];
@@ -272,14 +274,14 @@ namespace Gp4Net.CardEmulator.Functional
                     var newDefaultKeyVersion = data[3];
                     var newState = state.WithDefaultKeyVersion(newDefaultKeyVersion);
                     
-                    return new Result<(ApduResponse, CardState), SmartCardError>.Success(
-                        (new ApduResponse(Array.Empty<byte>(), StatusWords.SUCCESS), newState));
+                    return Result.Success<(ApduResponse, CardState), SmartCardError>(
+                        (new ApduResponse(Array.Empty<byte>(), StatusWords.Success), newState));
                 }
             }
 
             // Default: return success without state change for other STORE DATA commands
-            return new Result<(ApduResponse, CardState), SmartCardError>.Success(
-                (new ApduResponse(Array.Empty<byte>(), StatusWords.SUCCESS), state));
+            return Result.Success<(ApduResponse, CardState), SmartCardError>(
+                (new ApduResponse(Array.Empty<byte>(), StatusWords.Success), state));
         }
 
         private record ParsedCommand(byte Cla, byte Ins, byte P1, byte P2, byte[] FullCommand);

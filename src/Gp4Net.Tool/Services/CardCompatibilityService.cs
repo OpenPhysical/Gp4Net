@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Domain.Commands;
@@ -110,7 +111,7 @@ namespace Gp4Net.Tool.Services
                 var cardTypeResult = await DetectCardTypeAsync(channel, transport, cancellationToken);
                 if (cardTypeResult.IsFailure)
                 {
-                    return Result<CardCompatibilityResult, SmartCardError>.Fail(cardTypeResult.Error);
+                    return Result.Failure<CardCompatibilityResult, SmartCardError>(cardTypeResult.Error);
                 }
 
                 var cardType = cardTypeResult.Value;
@@ -121,7 +122,7 @@ namespace Gp4Net.Tool.Services
                 
                 if (envResult.IsFailure)
                 {
-                    return Result<CardCompatibilityResult, SmartCardError>.Fail(envResult.Error);
+                    return Result.Failure<CardCompatibilityResult, SmartCardError>(envResult.Error);
                 }
 
                 var envValidation = envResult.Value;
@@ -137,12 +138,12 @@ namespace Gp4Net.Tool.Services
                     "Compatibility check: Operation={Operation}, Card={CardType}, Compatible={IsCompatible}, Safe={IsSafe}",
                     operation, cardType.DisplayName, isCompatible, isSafe);
 
-                return Result<CardCompatibilityResult, SmartCardError>.Ok(result);
+                return Result.Success<CardCompatibilityResult, SmartCardError>(result);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to check card compatibility");
-                return Result<CardCompatibilityResult, SmartCardError>.Fail(
+                return Result.Failure<CardCompatibilityResult, SmartCardError>(
                     SmartCardError.UnexpectedError("Compatibility check failed", ex));
             }
         }
@@ -163,7 +164,7 @@ namespace Gp4Net.Tool.Services
                 var atrHash = GetChannelIdentifier(channel);
                 if (KnownCardTypes.TryGetValue(atrHash, out var knownType))
                 {
-                    return Result<CardTypeInfo, SmartCardError>.Ok(knownType);
+                    return Result.Success<CardTypeInfo, SmartCardError>(knownType);
                 }
 
                 // Try to get CPLC data for manufacturer identification
@@ -173,7 +174,7 @@ namespace Gp4Net.Tool.Services
                     var cardType = AnalyzeCplcForCardType(cplcResult.Value);
                     if (cardType != null)
                     {
-                        return Result<CardTypeInfo, SmartCardError>.Ok(cardType);
+                        return Result.Success<CardTypeInfo, SmartCardError>(cardType);
                     }
                 }
 
@@ -188,12 +189,12 @@ namespace Gp4Net.Tool.Services
                     knownLimitations: ["Unknown card type - exercise extreme caution"]
                 );
 
-                return Result<CardTypeInfo, SmartCardError>.Ok(genericCard);
+                return Result.Success<CardTypeInfo, SmartCardError>(genericCard);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to detect card type");
-                return Result<CardTypeInfo, SmartCardError>.Fail(
+                return Result.Failure<CardTypeInfo, SmartCardError>(
                     SmartCardError.UnexpectedError("Card type detection failed", ex));
             }
         }
@@ -212,7 +213,7 @@ namespace Gp4Net.Tool.Services
                 var commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.ConfirmationCounter);
                 if (commandResult.IsFailure)
                 {
-                    return Result<int?, SmartCardError>.Fail(commandResult.Error);
+                    return Result.Failure<int?, SmartCardError>(commandResult.Error);
                 }
                 
                 var response = await transport.TransmitAsync(commandResult.Value, channel, cancellationToken);
@@ -229,12 +230,12 @@ namespace Gp4Net.Tool.Services
                 }
 
                 // Attempt count not available
-                return Result<int?, SmartCardError>.Ok(null);
+                return Result.Success<int?, SmartCardError>(null);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Could not retrieve authentication attempt count");
-                return Result<int?, SmartCardError>.Ok(null);
+                return Result.Success<int?, SmartCardError>(null);
             }
         }
 
@@ -249,22 +250,22 @@ namespace Gp4Net.Tool.Services
                 var commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardProductionLifeCycle);
                 if (commandResult.IsFailure)
                 {
-                    return Result<byte[], SmartCardError>.Fail(commandResult.Error);
+                    return Result.Failure<byte[], SmartCardError>(commandResult.Error);
                 }
                 var getDataCmd = commandResult.Value;
                 var response = await transport.TransmitAsync(getDataCmd, channel, cancellationToken);
 
                 if (response.IsSuccess && response.Data.Length > 0)
                 {
-                    return Result<byte[], SmartCardError>.Ok(response.Data);
+                    return Result.Success<byte[], SmartCardError>(response.Data);
                 }
 
-                return Result<byte[], SmartCardError>.Fail(
+                return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.CardError("CPLC data not available"));
             }
             catch (Exception ex)
             {
-                return Result<byte[], SmartCardError>.Fail(
+                return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.CommunicationError("Failed to retrieve CPLC data", ex));
             }
         }

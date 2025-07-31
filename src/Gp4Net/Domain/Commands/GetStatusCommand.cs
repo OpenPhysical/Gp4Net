@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
 using JetBrains.Annotations;

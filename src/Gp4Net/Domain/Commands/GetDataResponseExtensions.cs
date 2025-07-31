@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
 
@@ -62,9 +63,9 @@ namespace Gp4Net.Domain.Commands
                 return null;
             }
 
-            var result = CardCapabilities.TryParse(new Option<byte[]>.Some(data));
+            var result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
             return result.Match(
-                success: capabilities => {
+                onSuccess: capabilities => {
                     // If the raw data has content but no capabilities were parsed, it's likely malformed
                     // Check if we have any meaningful capabilities or if this looks like malformed data
                     if (data.Length >= 3 && 
@@ -82,7 +83,7 @@ namespace Gp4Net.Domain.Commands
                     }
                     return capabilities;
                 },
-                failure: error => null
+                onFailure: error => null
             );
         }
 

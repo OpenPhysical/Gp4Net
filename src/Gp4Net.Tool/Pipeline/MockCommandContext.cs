@@ -9,10 +9,10 @@ using JetBrains.Annotations;
 namespace Gp4Net.Tool.Pipeline
 {
     /// <summary>
-    /// Mock implementation of ICommandContext for testing.
+    /// Mock implementation of ICliExecutionContext for testing.
     /// </summary>
     [PublicAPI]
-    public class MockCommandContext : ICommandContext
+    public class MockCommandContext : ICliExecutionContext
     {
         public IDisplayService Display { get; }
         public ICardService CardService { get; }
@@ -53,7 +53,7 @@ namespace Gp4Net.Tool.Pipeline
             return _globalPlatformService;
         }
 
-        public async Task<ICommandContext> RequireCardConnection(string? readerName = null)
+        public async Task<ICliExecutionContext> RequireCardConnection(string? readerName = null)
         {
             MethodCalls.Add($"RequireCardConnection({readerName})");
 
@@ -66,7 +66,7 @@ namespace Gp4Net.Tool.Pipeline
             return this;
         }
 
-        public async Task<ICommandContext> RequireSecureChannel(
+        public async Task<ICliExecutionContext> RequireSecureChannel(
             byte securityLevel = 1,
             string? keyset = null
         )
@@ -82,13 +82,13 @@ namespace Gp4Net.Tool.Pipeline
             return this;
         }
 
-        public async Task<int> ExecuteAsync(Func<ICommandContext, Task<int>> commandLogic)
+        public async Task<int> ExecuteAsync(Func<ICliExecutionContext, Task<int>> commandLogic)
         {
             MethodCalls.Add("ExecuteAsync(async)");
             return await commandLogic(this);
         }
 
-        public async Task<int> ExecuteAsync(Func<ICommandContext, int> commandLogic)
+        public async Task<int> ExecuteAsync(Func<ICliExecutionContext, int> commandLogic)
         {
             MethodCalls.Add("ExecuteAsync(sync)");
             return await Task.FromResult(commandLogic(this));

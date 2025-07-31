@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
@@ -442,12 +443,20 @@ namespace Gp4Net.Tool.Services
             {
                 // For now, assume SCP02 with test keys
                 // In a real implementation, this would be configurable
-                var scp02KeySet = Scp02KeySet.Create(
+                var keySetResult = Scp02KeySet.Create(
                     keySet, // ENC key
                     keySet, // MAC key
                     keySet, // DEK key
-                    0xFF
-                ).GetOrThrow(e => new InvalidOperationException($"Failed to create Scp02KeySet: {e.Message}")); // Key version
+                    0xFF // Key version
+                );
+
+                if (keySetResult.IsFailure)
+                {
+                    Logger.Error($"Failed to create Scp02KeySet: {keySetResult.Error.Message}");
+                    return false;
+                }
+
+                var scp02KeySet = keySetResult.Value;
 
                 var secLevel = (SecurityLevel)securityLevel;
                 var cardChannel = new CardServiceChannelAdapter(this, TransportProtocol.T0);

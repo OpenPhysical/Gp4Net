@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Transport;
@@ -74,29 +75,29 @@ namespace Gp4Net.Domain.Commands
         {
             if (hostCryptogram == null)
             {
-                return Result<ExternalAuthenticateCommand, SmartCardError>.Fail(
+                return Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
                     SmartCardError.InvalidArgument("Host cryptogram cannot be null"));
             }
 
             if (mac == null)
             {
-                return Result<ExternalAuthenticateCommand, SmartCardError>.Fail(
+                return Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
                     SmartCardError.InvalidArgument("MAC cannot be null"));
             }
 
             if (hostCryptogram.Length != 8)
             {
-                return Result<ExternalAuthenticateCommand, SmartCardError>.Fail(
+                return Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
                     SmartCardError.InvalidArgument($"Host cryptogram must be 8 bytes, got {hostCryptogram.Length}"));
             }
 
             if (mac.Length != 8)
             {
-                return Result<ExternalAuthenticateCommand, SmartCardError>.Fail(
+                return Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
                     SmartCardError.InvalidArgument($"MAC must be 8 bytes, got {mac.Length}"));
             }
 
-            return Result<ExternalAuthenticateCommand, SmartCardError>.Ok(
+            return Result.Success<ExternalAuthenticateCommand, SmartCardError>(
                 new ExternalAuthenticateCommand(securityLevel, hostCryptogram, mac));
         }
 
@@ -113,17 +114,17 @@ namespace Gp4Net.Domain.Commands
         {
             if (hostCryptogram == null)
             {
-                return Result<ExternalAuthenticateCommand, SmartCardError>.Fail(
+                return Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
                     SmartCardError.InvalidArgument("Host cryptogram cannot be null"));
             }
 
             if (hostCryptogram.Length != 8)
             {
-                return Result<ExternalAuthenticateCommand, SmartCardError>.Fail(
+                return Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
                     SmartCardError.InvalidArgument($"Host cryptogram must be 8 bytes, got {hostCryptogram.Length}"));
             }
 
-            return Result<ExternalAuthenticateCommand, SmartCardError>.Ok(
+            return Result.Success<ExternalAuthenticateCommand, SmartCardError>(
                 new ExternalAuthenticateCommand(securityLevel, hostCryptogram, Array.Empty<byte>()));
         }
 

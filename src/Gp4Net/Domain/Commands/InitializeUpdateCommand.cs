@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
@@ -93,11 +94,11 @@ namespace Gp4Net.Domain.Commands
         {
             if (hostChallenge.Length != 8)
             {
-                return Result<InitializeUpdateCommand, SmartCardError>.Fail(
+                return Result.Failure<InitializeUpdateCommand, SmartCardError>(
                     SmartCardError.InvalidData($"Host challenge must be 8 bytes, got {hostChallenge.Length}"));
             }
 
-            return Result<InitializeUpdateCommand, SmartCardError>.Ok(
+            return Result.Success<InitializeUpdateCommand, SmartCardError>(
                 new InitializeUpdateCommand(keyVersion, keyIdentifier, hostChallenge));
         }
 
@@ -117,11 +118,11 @@ namespace Gp4Net.Domain.Commands
         {
             if (hostChallenge.Length != 8)
             {
-                return Result<InitializeUpdateCommand, SmartCardError>.Fail(
+                return Result.Failure<InitializeUpdateCommand, SmartCardError>(
                     SmartCardError.InvalidData($"Host challenge must be 8 bytes, got {hostChallenge.Length}"));
             }
 
-            return Result<InitializeUpdateCommand, SmartCardError>.Ok(
+            return Result.Success<InitializeUpdateCommand, SmartCardError>(
                 new InitializeUpdateCommand(keyVersion, keyIdentifier, hostChallenge, useMaxResponseLength));
         }
 

@@ -7,9 +7,10 @@ using WSCT.Core;
 namespace Gp4Net.Tool.Pipeline
 {
     /// <summary>
-    /// Provides context and services for command execution.
+    /// Provides context and services for CLI command execution.
+    /// This is separate from the core pipeline's IPipelineContext.
     /// </summary>
-    public interface ICommandContext
+    public interface ICliExecutionContext
     {
         /// <summary>
         /// Gets the display service for console output.
@@ -35,21 +36,21 @@ namespace Gp4Net.Tool.Pipeline
         /// <summary>
         /// Ensures a card connection is established with the specified reader.
         /// </summary>
-        Task<ICommandContext> RequireCardConnection(string? readerName = null);
+        Task<ICliExecutionContext> RequireCardConnection(string? readerName = null);
 
         /// <summary>
         /// Ensures a secure channel is established with the specified security level.
         /// </summary>
-        Task<ICommandContext> RequireSecureChannel(byte securityLevel = 1, string? keyset = null);
+        Task<ICliExecutionContext> RequireSecureChannel(byte securityLevel = 1, string? keyset = null);
 
         /// <summary>
         /// Executes the command logic with the current context.
         /// </summary>
-        Task<int> ExecuteAsync(Func<ICommandContext, Task<int>> commandLogic);
+        Task<int> ExecuteAsync(Func<ICliExecutionContext, Task<int>> commandLogic);
 
         /// <summary>
         /// Executes the command logic with the current context synchronously.
         /// </summary>
-        Task<int> ExecuteAsync(Func<ICommandContext, int> commandLogic);
+        Task<int> ExecuteAsync(Func<ICliExecutionContext, int> commandLogic);
     }
 }

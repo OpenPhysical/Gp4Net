@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Core.Tlv;
 
@@ -16,11 +17,11 @@ namespace Gp4Net.Domain.CardInfo
         /// </summary>
         /// <param name="data">The raw diversification data.</param>
         /// <returns>Hex string representation of the data.</returns>
-        public static string ParseAsHex(Option<byte[]> data)
+        public static string ParseAsHex(Maybe<byte[]> data)
         {
             return data.Match(
-                some: bytes => bytes.Length == 0 ? string.Empty : Convert.ToHexString(bytes),
-                none: () => string.Empty
+                Some: bytes => bytes.Length == 0 ? string.Empty : Convert.ToHexString(bytes),
+                None: () => string.Empty
             );
         }
 
@@ -31,11 +32,11 @@ namespace Gp4Net.Domain.CardInfo
         /// </summary>
         /// <param name="data">The diversification data containing SCP support info.</param>
         /// <returns>Formatted SCP support string.</returns>
-        public static string ParseScpSupport(Option<byte[]> data)
+        public static string ParseScpSupport(Maybe<byte[]> data)
         {
             return data.Match(
-                some: bytes => ParseScpSupportFromBytes(bytes),
-                none: () => "[red]None[/]"
+                Some: bytes => ParseScpSupportFromBytes(bytes),
+                None: () => "[red]None[/]"
             );
         }
 

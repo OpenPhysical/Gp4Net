@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Services;
 using Gp4Net.Transport;
@@ -30,7 +31,7 @@ namespace Gp4Net.Pipeline
         /// <inheritdoc/>
         public Task<Result<CommandResponse, SmartCardError>> ExecuteAsync(
             IApduCommand command,
-            ICommandContext context,
+            IPipelineContext context,
             CancellationToken cancellationToken = default)
         {
             var request = new CommandRequest(command, context);
@@ -51,11 +52,16 @@ namespace Gp4Net.Pipeline
 
                 var result = await _pipeline(request, cancellationToken).ConfigureAwait(false);
 
-                if (result.IsSuccess && _logger?.IsEnabled(LogLevel.Trace) == true)
+                if (_logger?.IsEnabled(LogLevel.Trace) == true)
                 {
-                    result.Match<Core.Unit>(
-                        success => { _logger.LogTrace("Command succeeded with SW={SW:X4}", success.StatusWord); return Core.Unit.Value; },
-                        failure => { _logger.LogTrace("Command failed: {Error}", failure.Message); return Core.Unit.Value; });
+                    if (result.IsSuccess)
+                    {
+                        _logger.LogTrace("Command succeeded with SW={SW:X4}", result.Value.StatusWord);
+                    }
+                    else
+                    {
+                        _logger.LogTrace("Command failed: {Error}", result.Error.Message);
+                    }
                 }
 
                 return result;
@@ -63,7 +69,7 @@ namespace Gp4Net.Pipeline
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Pipeline execution failed");
-                return Result<CommandResponse, SmartCardError>.Fail(
+                return Result.Failure<CommandResponse, SmartCardError>(
                     SmartCardError.CommunicationError("Pipeline execution failed", ex));
             }
         }
@@ -124,7 +130,7 @@ namespace Gp4Net.Pipeline
                 // Terminal middleware - should never be reached if pipeline is properly constructed
                 var error = SmartCardError.CommunicationError(
                     "Pipeline terminated without handling the command. Ensure a terminal middleware (like TransportMiddleware) is registered.");
-                return Task.FromResult(Result<CommandResponse, SmartCardError>.Fail(error));
+                return Task.FromResult(Result.Failure<CommandResponse, SmartCardError>(error));
             };
 
             // Build pipeline in reverse order

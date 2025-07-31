@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
@@ -72,14 +73,14 @@ namespace Gp4Net.Domain.Commands
         protected static Result<ImmutableArray<byte>, SmartCardError> ValidatePackageAid(byte[]? packageAid)
         {
             if (packageAid == null)
-                return Result<ImmutableArray<byte>, SmartCardError>.Fail(
+                return Result.Failure<ImmutableArray<byte>, SmartCardError>(
                     SmartCardError.InvalidArgument("Package AID cannot be null."));
             
             if (packageAid.Length == 0)
-                return Result<ImmutableArray<byte>, SmartCardError>.Fail(
+                return Result.Failure<ImmutableArray<byte>, SmartCardError>(
                     SmartCardError.InvalidArgument("Package AID cannot be empty."));
             
-            return Result<ImmutableArray<byte>, SmartCardError>.Ok(packageAid.ToImmutableArray());
+            return Result.Success<ImmutableArray<byte>, SmartCardError>(packageAid.ToImmutableArray());
         }
 
         /// <summary>
@@ -145,7 +146,7 @@ namespace Gp4Net.Domain.Commands
             {
                 var packageAidResult = ValidatePackageAid(packageAid);
                 if (packageAidResult.IsFailure)
-                    return Result<InstallForLoadCommand, SmartCardError>.Fail(packageAidResult.Error);
+                    return Result.Failure<InstallForLoadCommand, SmartCardError>(packageAidResult.Error);
 
                 // Convert maxDataBlockSize to load parameters if provided
                 var loadParameters = maxDataBlockSize.HasValue 
@@ -159,7 +160,7 @@ namespace Gp4Net.Domain.Commands
                     loadParameters?.ToImmutableArray() ?? default,
                     installToken?.ToImmutableArray() ?? default);
 
-                return Result<InstallForLoadCommand, SmartCardError>.Ok(command);
+                return Result.Success<InstallForLoadCommand, SmartCardError>(command);
             }
 
             /// <inheritdoc/>
@@ -322,18 +323,18 @@ namespace Gp4Net.Domain.Commands
             {
                 var packageAidResult = ValidatePackageAid(packageAid);
                 if (packageAidResult.IsFailure)
-                    return Result<InstallForInstallCommand, SmartCardError>.Fail(packageAidResult.Error);
+                    return Result.Failure<InstallForInstallCommand, SmartCardError>(packageAidResult.Error);
 
                 if (moduleAid == null || moduleAid.Length == 0)
-                    return Result<InstallForInstallCommand, SmartCardError>.Fail(
+                    return Result.Failure<InstallForInstallCommand, SmartCardError>(
                         SmartCardError.InvalidArgument("Module AID cannot be null or empty."));
 
                 if (applicationAid == null || applicationAid.Length == 0)
-                    return Result<InstallForInstallCommand, SmartCardError>.Fail(
+                    return Result.Failure<InstallForInstallCommand, SmartCardError>(
                         SmartCardError.InvalidArgument("Application AID cannot be null or empty."));
 
                 if (privileges == null)
-                    return Result<InstallForInstallCommand, SmartCardError>.Fail(
+                    return Result.Failure<InstallForInstallCommand, SmartCardError>(
                         SmartCardError.InvalidArgument("Privileges cannot be null."));
 
                 var command = new InstallForInstallCommand(
@@ -345,7 +346,7 @@ namespace Gp4Net.Domain.Commands
                     installParameters?.ToImmutableArray() ?? default,
                     installToken?.ToImmutableArray() ?? default);
 
-                return Result<InstallForInstallCommand, SmartCardError>.Ok(command);
+                return Result.Success<InstallForInstallCommand, SmartCardError>(command);
             }
 
             /// <summary>
@@ -368,18 +369,18 @@ namespace Gp4Net.Domain.Commands
             {
                 var packageAidResult = ValidatePackageAid(packageAid);
                 if (packageAidResult.IsFailure)
-                    return Result<InstallForInstallCommand, SmartCardError>.Fail(packageAidResult.Error);
+                    return Result.Failure<InstallForInstallCommand, SmartCardError>(packageAidResult.Error);
 
                 if (moduleAid == null || moduleAid.Length == 0)
-                    return Result<InstallForInstallCommand, SmartCardError>.Fail(
+                    return Result.Failure<InstallForInstallCommand, SmartCardError>(
                         SmartCardError.InvalidArgument("Module AID cannot be null or empty."));
 
                 if (applicationAid == null || applicationAid.Length == 0)
-                    return Result<InstallForInstallCommand, SmartCardError>.Fail(
+                    return Result.Failure<InstallForInstallCommand, SmartCardError>(
                         SmartCardError.InvalidArgument("Application AID cannot be null or empty."));
 
                 if (privileges == null)
-                    return Result<InstallForInstallCommand, SmartCardError>.Fail(
+                    return Result.Failure<InstallForInstallCommand, SmartCardError>(
                         SmartCardError.InvalidArgument("Privileges cannot be null."));
 
                 var command = new InstallForInstallCommand(
@@ -391,7 +392,7 @@ namespace Gp4Net.Domain.Commands
                     installParameters?.ToImmutableArray() ?? default,
                     installToken?.ToImmutableArray() ?? default);
 
-                return Result<InstallForInstallCommand, SmartCardError>.Ok(command);
+                return Result.Success<InstallForInstallCommand, SmartCardError>(command);
             }
 
             /// <inheritdoc/>

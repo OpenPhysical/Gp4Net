@@ -1,5 +1,6 @@
 using System;
 using System.Text.RegularExpressions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 
 namespace Gp4Net.Domain.Commands
@@ -18,7 +19,7 @@ namespace Gp4Net.Domain.Commands
         {
             if (string.IsNullOrWhiteSpace(dataObject))
             {
-                return Result<(ushort tag, byte[] data), SmartCardError>.Fail(
+                return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
                     SmartCardError.InvalidArgument("Data object cannot be null or empty"));
             }
 
@@ -26,7 +27,7 @@ namespace Gp4Net.Domain.Commands
             var match = Regex.Match(dataObject, @"^([0-9A-Fa-f]{2,4})[:=](.*)$");
             if (!match.Success)
             {
-                return Result<(ushort tag, byte[] data), SmartCardError>.Fail(
+                return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
                     SmartCardError.InvalidArgument("Invalid data object format"));
             }
 
@@ -38,14 +39,14 @@ namespace Gp4Net.Domain.Commands
             {
                 if (!Regex.IsMatch(dataHex, @"^[0-9A-Fa-f]*$"))
                 {
-                    return Result<(ushort tag, byte[] data), SmartCardError>.Fail(
+                    return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
                         SmartCardError.InvalidArgument("Data must contain only hex characters"));
                 }
                 
                 // Ensure even number of hex characters for data
                 if (dataHex.Length % 2 != 0)
                 {
-                    return Result<(ushort tag, byte[] data), SmartCardError>.Fail(
+                    return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
                         SmartCardError.InvalidArgument("Data must have even number of hex characters"));
                 }
             }
@@ -57,7 +58,7 @@ namespace Gp4Net.Domain.Commands
             }
             catch (Exception ex)
             {
-                return Result<(ushort tag, byte[] data), SmartCardError>.Fail(
+                return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
                     SmartCardError.InvalidArgument($"Invalid tag format: {ex.Message}"));
             }
 
@@ -68,11 +69,11 @@ namespace Gp4Net.Domain.Commands
             }
             catch (Exception ex)
             {
-                return Result<(ushort tag, byte[] data), SmartCardError>.Fail(
+                return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
                     SmartCardError.InvalidArgument($"Invalid data format: {ex.Message}"));
             }
 
-            return Result<(ushort tag, byte[] data), SmartCardError>.Ok((tag, data));
+            return Result.Success<(ushort tag, byte[] data), SmartCardError>((tag, data));
         }
 
         /// <summary>

@@ -1,5 +1,6 @@
 using System;
 using System.Security.Cryptography;
+using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
@@ -15,7 +16,7 @@ namespace Gp4Net.Domain
     /// <summary>
     /// Represents an active secure channel session.
     /// </summary>
-    public class SecureChannelSession
+    public class SecureChannelSession : IDisposable
     {
         private readonly SessionKeys _sessionKeys;
         private readonly SecurityLevel _securityLevel;
@@ -79,7 +80,7 @@ namespace Gp4Net.Domain
         /// </summary>
         /// <param name="command">The command to wrap.</param>
         /// <returns>A result containing the wrapped command data (without Le) and the expected response length, or an error.</returns>
-        public Result<(byte[] wrappedData, int? expectedResponseLength), SmartCardError> WrapCommand(IApduCommand command)
+        public virtual Result<(byte[] wrappedData, int? expectedResponseLength), SmartCardError> WrapCommand(IApduCommand command)
         {
             if (command == null)
             {
@@ -122,7 +123,7 @@ namespace Gp4Net.Domain
                     }
 
                     // Return wrapped data and original Le
-                    return Result<(byte[] wrappedData, int? expectedResponseLength), SmartCardError>.Ok(
+                    return Result.Success<(byte[] wrappedData, int? expectedResponseLength), SmartCardError>(
                         (wrappedCommand, command.ExpectedResponseLength));
                 }
             }
@@ -142,7 +143,7 @@ namespace Gp4Net.Domain
         /// </summary>
         /// <param name="response">The response APDU to unwrap.</param>
         /// <returns>A result containing the unwrapped response APDU or an error.</returns>
-        public Result<byte[], SmartCardError> UnwrapResponse(byte[] response)
+        public virtual Result<byte[], SmartCardError> UnwrapResponse(byte[] response)
         {
             if (response == null || response.Length < 2)
             {
@@ -168,7 +169,7 @@ namespace Gp4Net.Domain
                         unwrappedResponse = DecryptResponse(unwrappedResponse);
                     }
 
-                    return Result<byte[], SmartCardError>.Ok(unwrappedResponse);
+                    return Result.Success<byte[], SmartCardError>(unwrappedResponse);
                 }
             }
             catch (InvalidOperationException ex)
@@ -619,6 +620,57 @@ namespace Gp4Net.Domain
                 result |= a[i] ^ b[i];
             }
             return result == 0;
+        }
+
+        /// <summary>
+        /// Gets the session keys (for internal use).
+        /// </summary>
+        internal SessionKeys GetSessionKeys() => _sessionKeys;
+
+        /// <summary>
+        /// Gets the current MAC chaining value (for internal use).
+        /// </summary>
+        internal byte[] GetMacChainingValue()
+        {
+            lock (_lock)
+            {
+                return (byte[])_macChainingValue.Clone();
+            }
+        }
+
+        /// <summary>
+        /// Gets the current encryption counter (for internal use).
+        /// </summary>
+        internal uint GetEncryptionCounter()
+        {
+            lock (_lock)
+            {
+                return _encryptionCounter;
+            }
+        }
+
+        /// <summary>
+        /// Disposes of any resources used by the session.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Disposes of resources used by the session.
+        /// </summary>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // Clear sensitive data
+                if (_macChainingValue != null)
+                {
+                    Array.Clear(_macChainingValue, 0, _macChainingValue.Length);
+                }
+            }
         }
     }
 }

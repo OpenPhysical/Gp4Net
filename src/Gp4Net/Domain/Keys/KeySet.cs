@@ -5,6 +5,7 @@
 
 using System;
 using System.Security.Cryptography;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 
 namespace Gp4Net.Domain.Keys
@@ -142,7 +143,7 @@ namespace Gp4Net.Domain.Keys
                 .Map(_ => new Scp02KeySet(encKey, macKey, dekKey, keyVersion, keyId));
         }
 
-        private static Result<Unit, SmartCardError> ValidateKey(byte[] key, string paramName)
+        private static Result<bool, SmartCardError> ValidateKey(byte[] key, string paramName)
         {
             if (key is null)
                 return SmartCardError.InvalidArgument($"Key {paramName} cannot be null");
@@ -150,7 +151,7 @@ namespace Gp4Net.Domain.Keys
             if (key.Length != 16 && key.Length != 24)
                 return SmartCardError.InvalidArgument($"3DES key {paramName} must be 16 or 24 bytes, got {key.Length} bytes");
             
-            return Unit.Value;
+            return true;
         }
     }
 
@@ -185,7 +186,7 @@ namespace Gp4Net.Domain.Keys
                 .Map(_ => new Scp03KeySet(encKey, macKey, dekKey, keyVersion, keyId));
         }
 
-        private static Result<Unit, SmartCardError> ValidateKey(byte[] key, string paramName)
+        private static Result<bool, SmartCardError> ValidateKey(byte[] key, string paramName)
         {
             if (key is null)
                 return SmartCardError.InvalidArgument($"Key {paramName} cannot be null");
@@ -193,15 +194,15 @@ namespace Gp4Net.Domain.Keys
             if (key.Length != 16 && key.Length != 24 && key.Length != 32)
                 return SmartCardError.InvalidArgument($"AES key {paramName} must be 16, 24, or 32 bytes, got {key.Length} bytes");
             
-            return Unit.Value;
+            return true;
         }
 
-        private static Result<Unit, SmartCardError> ValidateKeyLengthsMatch(byte[] encKey, byte[] macKey, byte[] dekKey)
+        private static Result<bool, SmartCardError> ValidateKeyLengthsMatch(byte[] encKey, byte[] macKey, byte[] dekKey)
         {
             if (encKey.Length != macKey.Length || macKey.Length != dekKey.Length)
                 return SmartCardError.InvalidArgument($"All AES keys must have the same length. Got ENC: {encKey.Length}, MAC: {macKey.Length}, DEK: {dekKey.Length} bytes");
             
-            return Unit.Value;
+            return true;
         }
     }
 }
