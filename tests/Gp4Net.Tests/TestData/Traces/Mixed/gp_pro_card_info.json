@@ -1,0 +1,182 @@
+{
+  "metadata": {
+    "source": {
+      "file": "docs/traces/gp_pro_card_info.txt",
+      "type": "gp_pro",
+      "generated": "2025-08-04T03:11:28.539542Z",
+      "tool_version": "gp4net-converter-1.0"
+    },
+    "card": {
+      "atr": "3BD518FF8191FE1FC38073C821100A",
+      "isd_aid": "A000000151000000",
+      "card_type": "UNKNOWN",
+      "cplc": null
+    },
+    "sessions": [],
+    "conversion": {
+      "tool_version": "2.0",
+      "timestamp": "2025-08-04T10:11:28.540929Z",
+      "warnings": [],
+      "enhancements": [
+        "added_test_hints",
+        "analyzed_operations"
+      ]
+    }
+  },
+  "operations": {
+    "unknown6": {
+      "description": "Unknown operation",
+      "session_id": "session_1",
+      "start_exchange": 1,
+      "end_exchange": 9,
+      "commands": [
+        "UNKNOWN (INS=A4)",
+        "UNKNOWN (INS=CA)"
+      ],
+      "expected_cli": "gp4net unknown",
+      "package_aid": null,
+      "applet_aid": null,
+      "target_aid": null
+    }
+  },
+  "usage_examples": [
+    {
+      "description": "Unknown operation only",
+      "command": "gp4net unknown -r 'lua:trace.lua?operations=unknown6'"
+    }
+  ],
+  "exchanges": [
+    {
+      "index": 1,
+      "operation": "unknown6",
+      "session_id": "",
+      "step_in_operation": 1,
+      "command": "00A4040000",
+      "response": "6F108408A000000151000000A5049F6501FF9000",
+      "response_time_ms": 20,
+      "description": "UNKNOWN (INS=A4)",
+      "source_line": 12,
+      "secure_messaging": false,
+      "scp_data": null
+    },
+    {
+      "index": 2,
+      "operation": "unknown6",
+      "session_id": "",
+      "step_in_operation": 2,
+      "command": "80CA9F7F00",
+      "response": "9F7F2A4790D32147000000000023455589192048390000000000000000186495353839313900000000000000009000",
+      "response_time_ms": 13,
+      "description": "UNKNOWN (INS=CA)",
+      "source_line": 15,
+      "secure_messaging": false,
+      "scp_data": null
+    },
+    {
+      "index": 3,
+      "operation": "unknown6",
+      "session_id": "",
+      "step_in_operation": 3,
+      "command": "80CA004200",
+      "response": "6A88",
+      "response_time_ms": 11,
+      "description": "UNKNOWN (INS=CA)",
+      "source_line": 41,
+      "secure_messaging": false,
+      "scp_data": null
+    },
+    {
+      "index": 4,
+      "operation": "unknown6",
+      "session_id": "",
+      "step_in_operation": 4,
+      "command": "80CA004500",
+      "response": "6A88",
+      "response_time_ms": 11,
+      "description": "UNKNOWN (INS=CA)",
+      "source_line": 44,
+      "secure_messaging": false,
+      "scp_data": null
+    },
+    {
+      "index": 5,
+      "operation": "unknown6",
+      "session_id": "",
+      "step_in_operation": 5,
+      "command": "80CA00CF00",
+      "response": "CF0A037000000000000000009000",
+      "response_time_ms": 11,
+      "description": "UNKNOWN (INS=CA)",
+      "source_line": 47,
+      "secure_messaging": false,
+      "scp_data": null
+    },
+    {
+      "index": 6,
+      "operation": "unknown6",
+      "session_id": "",
+      "step_in_operation": 6,
+      "command": "80CA00C100",
+      "response": "C1030000199000",
+      "response_time_ms": 12,
+      "description": "UNKNOWN (INS=CA)",
+      "source_line": 50,
+      "secure_messaging": false,
+      "scp_data": null
+    },
+    {
+      "index": 7,
+      "operation": "unknown6",
+      "session_id": "",
+      "step_in_operation": 7,
+      "command": "80CA006600",
+      "response": "664D734B06072A864886FC6B01600B06092A864886FC6B020203630906072A864886FC6B03640B06092A864886FC6B040370650D060B2A864886FC6B0507020000660C060A2B060104012A026E01039000",
+      "response_time_ms": 18,
+      "description": "UNKNOWN (INS=CA)",
+      "source_line": 54,
+      "secure_messaging": false,
+      "scp_data": null
+    },
+    {
+      "index": 8,
+      "operation": "unknown6",
+      "session_id": "",
+      "step_in_operation": 8,
+      "command": "80CA006700",
+      "response": "6728A00D800103810500102060708201078103E5BEC082031E030083010284010285017B86010C87017B9000",
+      "response_time_ms": 14,
+      "description": "UNKNOWN (INS=CA)",
+      "source_line": 67,
+      "secure_messaging": false,
+      "scp_data": null
+    },
+    {
+      "index": 9,
+      "operation": "unknown6",
+      "session_id": "",
+      "step_in_operation": 9,
+      "command": "80CA00E000",
+      "response": "E012C00401018810C00402018810C004030188109000",
+      "response_time_ms": 14,
+      "description": "UNKNOWN (INS=CA)",
+      "source_line": 76,
+      "secure_messaging": false,
+      "scp_data": null
+    }
+  ],
+  "test_hints": {
+    "testable_operations": [
+      {
+        "name": "select",
+        "exchange_index": 0,
+        "verify": [
+          "response_parsing"
+        ],
+        "required_data": []
+      }
+    ],
+    "skip_reason": null,
+    "scp_version": null,
+    "detected_from": "trace_analysis"
+  }
+}

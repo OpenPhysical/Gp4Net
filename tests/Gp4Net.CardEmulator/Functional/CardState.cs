@@ -1,215 +1,269 @@
+using System;
 using System.Collections.Immutable;
+using CSharpFunctionalExtensions;
 using Gp4Net.Domain.Keys;
+using Gp4Net.Domain.Protocol;
+using Gp4Net.Domain.Security;
 using JetBrains.Annotations;
 
-namespace Gp4Net.CardEmulator.Functional
+namespace Gp4Net.CardEmulator.Functional;
+
+/// <summary>
+/// Immutable card state representing the current state of a virtual card.
+/// All state transitions produce new instances rather than mutating existing state.
+/// Uses functional programming patterns with Maybe and immutable secure channel state.
+/// </summary>
+[PublicAPI]
+public record CardState(
+    bool IsSelected,
+    byte ScpVersion,
+    Gp4Net.Domain.Protocol.ScpImplementation ScpImplementation,
+    Maybe<SecureChannelState> SecureChannel,
+    IKeySet? CurrentKeys,
+    byte[]? HostChallenge,
+    byte[]? CardChallenge,
+    ImmutableDictionary<ushort, byte[]> DataObjects,
+    ImmutableDictionary<string, InstalledApplication> Applications,
+    ImmutableList<LoadFile> LoadFiles,
+    ImmutableDictionary<byte, IKeySet> InstalledKeys,
+    byte DefaultKeyVersion,
+    ImmutableDictionary<byte, byte[]> SequenceCounters
+)
 {
     /// <summary>
-    /// Immutable card state representing the current state of a virtual card.
-    /// All state transitions produce new instances rather than mutating existing state.
+    /// Creates the initial state for a new card.
     /// </summary>
-    [PublicAPI]
-    public record CardState(
-        bool IsSelected,
-        bool IsSecureChannelEstablished,
-        byte ScpVersion,
-        byte ScpImplementation,
-        IKeySet? CurrentKeys,
-        byte[]? HostChallenge,
-        byte[]? CardChallenge,
-        SessionKeys? SessionKeys,
-        byte SecurityLevel,
-        ImmutableDictionary<ushort, byte[]> DataObjects,
-        ImmutableDictionary<string, InstalledApplication> Applications,
-        ImmutableList<LoadFile> LoadFiles,
-        ImmutableDictionary<byte, IKeySet> InstalledKeys,
-        byte DefaultKeyVersion,
-        ImmutableDictionary<byte, byte[]> SequenceCounters
-    )
+    public static CardState Initial => new(
+        IsSelected: false,
+        ScpVersion: 0x02,
+        ScpImplementation: Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac,
+        SecureChannel: Maybe<SecureChannelState>.None,
+        CurrentKeys: null,
+        HostChallenge: null,
+        CardChallenge: null,
+        DataObjects: ImmutableDictionary<ushort, byte[]>.Empty,
+        Applications: ImmutableDictionary<string, InstalledApplication>.Empty,
+        LoadFiles: ImmutableList<LoadFile>.Empty,
+        InstalledKeys: ImmutableDictionary<byte, IKeySet>.Empty,
+        DefaultKeyVersion: 0xFF,
+        SequenceCounters: ImmutableDictionary<byte, byte[]>.Empty
+    );
+
+    /// <summary>
+    /// Gets whether a secure channel is established.
+    /// </summary>
+    public bool IsSecureChannelEstablished => SecureChannel.HasValue;
+
+    /// <summary>
+    /// Gets the current security level.
+    /// </summary>
+    public byte SecurityLevel => SecureChannel.HasValue ? (byte)SecureChannel.Value.SecurityLevel : (byte)0x00;
+
+    /// <summary>
+    /// Gets the session keys if a secure channel is established.
+    /// </summary>
+    public Maybe<Gp4Net.Domain.Keys.SessionKeys> SessionKeys => 
+        SecureChannel.Map(sc => sc.SessionKeys);
+
+    /// <summary>
+    /// Gets the MAC chaining value if a secure channel is established.
+    /// </summary>
+    public Maybe<ImmutableArray<byte>> MacChainingValue => 
+        SecureChannel.Map(sc => sc.MacChaining.Value);
+
+    /// <summary>
+    /// Gets the encryption counter if a secure channel is established.
+    /// </summary>
+    public Maybe<uint> EncryptionCounter => 
+        SecureChannel.Map(sc => sc.EncryptionCounter);
+
+    /// <summary>
+    /// Creates a new state with the card selected.
+    /// </summary>
+    public CardState WithSelected(bool selected = true) => this with { IsSelected = selected };
+
+    /// <summary>
+    /// Creates a new state with secure channel established using functional SecureChannelState.
+    /// </summary>
+    public CardState WithSecureChannel(SecureChannelState secureChannelState) =>
+        this with { SecureChannel = Maybe<SecureChannelState>.From(secureChannelState) };
+
+    /// <summary>
+    /// Creates a new state with secure channel cleared.
+    /// </summary>
+    public CardState WithoutSecureChannel() =>
+        this with { SecureChannel = Maybe<SecureChannelState>.None };
+
+    /// <summary>
+    /// Creates a new state with updated secure channel state.
+    /// This is used when the secure channel state changes (e.g., counter increments).
+    /// </summary>
+    public CardState WithUpdatedSecureChannel(SecureChannelState newSecureChannelState) =>
+        this with { SecureChannel = Maybe<SecureChannelState>.From(newSecureChannelState) };
+
+    /// <summary>
+    /// Creates a new state with updated challenges.
+    /// </summary>
+    public CardState WithChallenges(byte[]? hostChallenge, byte[]? cardChallenge) => this with
     {
-        /// <summary>
-        /// Creates the initial state for a new card.
-        /// </summary>
-        public static CardState Initial => new(
-            IsSelected: false,
-            IsSecureChannelEstablished: false,
-            ScpVersion: 0x02,
-            ScpImplementation: 0x15,
-            CurrentKeys: null,
-            HostChallenge: null,
-            CardChallenge: null,
-            SessionKeys: null,
-            SecurityLevel: 0x00,
-            DataObjects: ImmutableDictionary<ushort, byte[]>.Empty,
-            Applications: ImmutableDictionary<string, InstalledApplication>.Empty,
-            LoadFiles: ImmutableList<LoadFile>.Empty,
-            InstalledKeys: ImmutableDictionary<byte, IKeySet>.Empty,
-            DefaultKeyVersion: 0xFF,
-            SequenceCounters: ImmutableDictionary<byte, byte[]>.Empty
-        );
-
-        /// <summary>
-        /// Creates a new state with the card selected.
-        /// </summary>
-        public CardState WithSelected(bool selected = true) => this with { IsSelected = selected };
-
-        /// <summary>
-        /// Creates a new state with secure channel established.
-        /// </summary>
-        public CardState WithSecureChannel(
-            bool established, 
-            SessionKeys? sessionKeys = null, 
-            byte securityLevel = 0x00) => this with 
-        { 
-            IsSecureChannelEstablished = established,
-            SessionKeys = sessionKeys,
-            SecurityLevel = securityLevel
-        };
-
-        /// <summary>
-        /// Creates a new state with updated challenges.
-        /// </summary>
-        public CardState WithChallenges(byte[]? hostChallenge, byte[]? cardChallenge) => this with
-        {
-            HostChallenge = hostChallenge,
-            CardChallenge = cardChallenge
-        };
+        HostChallenge = hostChallenge,
+        CardChallenge = cardChallenge
+    };
 
 
-        /// <summary>
-        /// Creates a new state with updated current keys.
-        /// </summary>
-        public CardState WithKeys(IKeySet keys) => this with { CurrentKeys = keys };
+    /// <summary>
+    /// Creates a new state with updated current keys.
+    /// </summary>
+    public CardState WithKeys(IKeySet keys) => this with { CurrentKeys = keys };
 
-        /// <summary>
-        /// Creates a new state with an added data object.
-        /// </summary>
-        public CardState WithDataObject(ushort tag, byte[] data) => this with
-        {
-            DataObjects = DataObjects.SetItem(tag, data)
-        };
+    /// <summary>
+    /// Creates a new state with an added data object.
+    /// </summary>
+    public CardState WithDataObject(ushort tag, byte[] data) => this with
+    {
+        DataObjects = DataObjects.SetItem(tag, data)
+    };
 
-        /// <summary>
-        /// Creates a new state with an installed application.
-        /// </summary>
-        public CardState WithApplication(string aid, InstalledApplication application) => this with
-        {
-            Applications = Applications.SetItem(aid, application)
-        };
+    /// <summary>
+    /// Creates a new state with an installed application.
+    /// </summary>
+    public CardState WithApplication(string aid, InstalledApplication application) => this with
+    {
+        Applications = Applications.SetItem(aid, application)
+    };
 
-        /// <summary>
-        /// Creates a new state with a loaded file.
-        /// </summary>
-        public CardState WithLoadFile(LoadFile loadFile) => this with
-        {
-            LoadFiles = LoadFiles.Add(loadFile)
-        };
+    /// <summary>
+    /// Creates a new state with a loaded file.
+    /// </summary>
+    public CardState WithLoadFile(LoadFile loadFile) => this with
+    {
+        LoadFiles = LoadFiles.Add(loadFile)
+    };
 
-        /// <summary>
-        /// Creates a new state with an installed key set.
-        /// </summary>
-        public CardState WithInstalledKey(byte keyVersion, IKeySet keySet) => this with
-        {
-            InstalledKeys = InstalledKeys.SetItem(keyVersion, keySet)
-        };
+    /// <summary>
+    /// Creates a new state with an installed key set.
+    /// </summary>
+    public CardState WithInstalledKey(byte keyVersion, IKeySet keySet) => this with
+    {
+        InstalledKeys = InstalledKeys.SetItem(keyVersion, keySet)
+    };
 
-        /// <summary>
-        /// Creates a new state with updated default key version.
-        /// </summary>
-        public CardState WithDefaultKeyVersion(byte keyVersion) => this with
-        {
-            DefaultKeyVersion = keyVersion
-        };
+    /// <summary>
+    /// Creates a new state with updated default key version.
+    /// </summary>
+    public CardState WithDefaultKeyVersion(byte keyVersion) => this with
+    {
+        DefaultKeyVersion = keyVersion
+    };
 
-        /// <summary>
-        /// Gets the sequence counter for a specific key version.
-        /// Returns a 3-byte counter starting at 000001 if not found.
-        /// </summary>
-        public byte[] GetSequenceCounter(byte keyVersion)
-        {
-            return SequenceCounters.TryGetValue(keyVersion, out var counter) 
-                ? counter 
-                : new byte[] { 0x00, 0x00, 0x01 }; // Default starting counter
-        }
-
-        /// <summary>
-        /// Creates a new state with an incremented sequence counter for the specified key version.
-        /// </summary>
-        public CardState WithIncrementedSequenceCounter(byte keyVersion)
-        {
-            var currentCounter = GetSequenceCounter(keyVersion);
-            var newCounter = IncrementCounter(currentCounter);
-            return this with { SequenceCounters = SequenceCounters.SetItem(keyVersion, newCounter) };
-        }
-
-        /// <summary>
-        /// Creates a new state with a reset sequence counter for the specified key version.
-        /// This should be called when a keyset is created or replaced.
-        /// </summary>
-        public CardState WithResetSequenceCounter(byte keyVersion)
-        {
-            var resetCounter = new byte[] { 0x00, 0x00, 0x01 };
-            return this with { SequenceCounters = SequenceCounters.SetItem(keyVersion, resetCounter) };
-        }
-
-        /// <summary>
-        /// Increments a 3-byte counter in big-endian format.
-        /// </summary>
-        private static byte[] IncrementCounter(byte[] counter)
-        {
-            var newCounter = new byte[3];
-            System.Array.Copy(counter, newCounter, 3);
-            
-            // Increment in big-endian format
-            var value = (newCounter[0] << 16) | (newCounter[1] << 8) | newCounter[2];
-            value++;
-            
-            newCounter[0] = (byte)(value >> 16);
-            newCounter[1] = (byte)(value >> 8);
-            newCounter[2] = (byte)value;
-            
-            return newCounter;
-        }
-
-        /// <summary>
-        /// Resets the card state to initial conditions.
-        /// </summary>
-        public CardState Reset() => Initial with
-        {
-            ScpVersion = this.ScpVersion,
-            ScpImplementation = this.ScpImplementation,
-            DataObjects = this.DataObjects,
-            InstalledKeys = this.InstalledKeys,
-            DefaultKeyVersion = this.DefaultKeyVersion
-        };
+    /// <summary>
+    /// Gets the sequence counter for a specific key version.
+    /// Returns a 2-byte counter for SCP02 or 3-byte counter for SCP03.
+    /// </summary>
+    public byte[] GetSequenceCounter(byte keyVersion)
+    {
+        if (SequenceCounters.TryGetValue(keyVersion, out var counter))
+            return counter;
+        
+        // Return appropriate default counter based on SCP version
+        return ScpVersion == 0x02 
+            ? new byte[] { 0x00, 0x01 } // 2-byte counter for SCP02
+            : new byte[] { 0x00, 0x00, 0x01 }; // 3-byte counter for SCP03
     }
 
     /// <summary>
-    /// Represents an installed application on the card.
+    /// Creates a new state with an incremented sequence counter for the specified key version.
     /// </summary>
-    public record InstalledApplication(
-        byte[] Aid,
-        byte[] ExecutableModuleAid,
-        byte LifeCycleState,
-        byte Privileges,
-        ImmutableDictionary<string, byte[]> ApplicationData
-    );
+    public CardState WithIncrementedSequenceCounter(byte keyVersion)
+    {
+        var currentCounter = GetSequenceCounter(keyVersion);
+        var newCounter = IncrementCounter(currentCounter);
+        return this with { SequenceCounters = SequenceCounters.SetItem(keyVersion, newCounter) };
+    }
 
     /// <summary>
-    /// Represents a loaded CAP file on the card.
+    /// Creates a new state with a reset sequence counter for the specified key version.
+    /// This should be called when a keyset is created or replaced.
     /// </summary>
-    public record LoadFile(
-        byte[] Aid,
-        byte[] SecurityDomainAid,
-        byte LifeCycleState,
-        ImmutableList<ExecutableModule> Modules
-    );
+    public CardState WithResetSequenceCounter(byte keyVersion)
+    {
+        // Return appropriate reset counter based on SCP version
+        var resetCounter = ScpVersion == 0x02 
+            ? new byte[] { 0x00, 0x01 } // 2-byte counter for SCP02
+            : new byte[] { 0x00, 0x00, 0x01 }; // 3-byte counter for SCP03
+        return this with { SequenceCounters = SequenceCounters.SetItem(keyVersion, resetCounter) };
+    }
 
     /// <summary>
-    /// Represents an executable module within a load file.
+    /// Increments a counter in big-endian format.
+    /// Handles both 2-byte (SCP02) and 3-byte (SCP03) counters.
     /// </summary>
-    public record ExecutableModule(
-        byte[] Aid,
-        byte LifeCycleState
-    );
+    private static byte[] IncrementCounter(byte[] counter)
+    {
+        var newCounter = new byte[counter.Length];
+        System.Array.Copy(counter, newCounter, counter.Length);
+            
+        // Increment in big-endian format
+        if (counter.Length == 2)
+        {
+            // 2-byte counter for SCP02
+            var value = (newCounter[0] << 8) | newCounter[1];
+            value++;
+            newCounter[0] = (byte)(value >> 8);
+            newCounter[1] = (byte)value;
+        }
+        else if (counter.Length == 3)
+        {
+            // 3-byte counter for SCP03
+            var value = (newCounter[0] << 16) | (newCounter[1] << 8) | newCounter[2];
+            value++;
+            newCounter[0] = (byte)(value >> 16);
+            newCounter[1] = (byte)(value >> 8);
+            newCounter[2] = (byte)value;
+        }
+            
+        return newCounter;
+    }
+
+    /// <summary>
+    /// Resets the card state to initial conditions.
+    /// </summary>
+    public CardState Reset() => Initial with
+    {
+        ScpVersion = this.ScpVersion,
+        ScpImplementation = this.ScpImplementation,
+        DataObjects = this.DataObjects,
+        InstalledKeys = this.InstalledKeys,
+        DefaultKeyVersion = this.DefaultKeyVersion,
+        SequenceCounters = this.SequenceCounters // Preserve sequence counters across resets
+    };
 }
+
+/// <summary>
+/// Represents an installed application on the card.
+/// </summary>
+public record InstalledApplication(
+    byte[] Aid,
+    byte[] ExecutableModuleAid,
+    byte LifeCycleState,
+    byte Privileges,
+    ImmutableDictionary<string, byte[]> ApplicationData
+);
+
+/// <summary>
+/// Represents a loaded CAP file on the card.
+/// </summary>
+public record LoadFile(
+    byte[] Aid,
+    byte[] SecurityDomainAid,
+    byte LifeCycleState,
+    ImmutableList<ExecutableModule> Modules
+);
+
+/// <summary>
+/// Represents an executable module within a load file.
+/// </summary>
+public record ExecutableModule(
+    byte[] Aid,
+    byte LifeCycleState
+);

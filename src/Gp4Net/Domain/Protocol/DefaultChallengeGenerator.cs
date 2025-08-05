@@ -8,45 +8,44 @@ using System.Security.Cryptography;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 
-namespace Gp4Net.Domain.Protocol
+namespace Gp4Net.Domain.Protocol;
+
+/// <summary>
+/// Default implementation of challenge generator using cryptographically secure random number generation.
+/// </summary>
+[PublicAPI]
+public class DefaultChallengeGenerator : IChallengeGenerator
 {
+    private readonly ILogger<DefaultChallengeGenerator> _logger;
+
     /// <summary>
-    /// Default implementation of challenge generator using cryptographically secure random number generation.
+    /// Initializes a new instance of DefaultChallengeGenerator.
     /// </summary>
-    [PublicAPI]
-    public class DefaultChallengeGenerator : IChallengeGenerator
+    /// <param name="logger">The logger.</param>
+    public DefaultChallengeGenerator(ILogger<DefaultChallengeGenerator> logger)
     {
-        private readonly ILogger<DefaultChallengeGenerator> _logger;
+        ArgumentNullException.ThrowIfNull(logger);
+        _logger = logger;
+    }
 
-        /// <summary>
-        /// Initializes a new instance of DefaultChallengeGenerator.
-        /// </summary>
-        /// <param name="logger">The logger.</param>
-        public DefaultChallengeGenerator(ILogger<DefaultChallengeGenerator> logger)
+    /// <inheritdoc />
+    public byte[] GenerateChallenge(int length)
+    {
+        if (length <= 0)
         {
-            ArgumentNullException.ThrowIfNull(logger);
-            _logger = logger;
+            throw new ArgumentException("Challenge length must be positive.", nameof(length));
         }
 
-        /// <inheritdoc />
-        public byte[] GenerateChallenge(int length)
-        {
-            if (length <= 0)
-            {
-                throw new ArgumentException("Challenge length must be positive.", nameof(length));
-            }
+        var challenge = new byte[length];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(challenge);
 
-            var challenge = new byte[length];
-            using var rng = RandomNumberGenerator.Create();
-            rng.GetBytes(challenge);
+        _logger.LogDebug(
+            "Generated {Length}-byte challenge: {Challenge}",
+            length,
+            Convert.ToHexString(challenge)
+        );
 
-            _logger.LogDebug(
-                "Generated {Length}-byte challenge: {Challenge}",
-                length,
-                BitConverter.ToString(challenge)
-            );
-
-            return challenge;
-        }
+        return challenge;
     }
 }

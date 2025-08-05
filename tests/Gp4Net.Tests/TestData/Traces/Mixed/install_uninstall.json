@@ -1,0 +1,258 @@
+{
+  "metadata": {
+    "source": {
+      "file": "/Users/mistial/Projects/Gp4Net/docs/traces/gp_pro_applet_uninstall.txt",
+      "type": "gp_pro",
+      "generated": "2025-08-05T03:54:03Z",
+      "tool_version": "gp4net-1.0"
+    },
+    "card": {
+      "atr": "3BD518FF8191FE1FC38073C821100A",
+      "isd_aid": "A000000151000000",
+      "card_type": "UNKNOWN"
+    },
+    "sessions": [
+      {
+        "session_id": "session_1",
+        "scp_version": 3,
+        "scp_implementation": "i=70",
+        "key_version": 1,
+        "security_level": "C_MAC|R_MAC|C_ENC|R_ENC",
+        "key_diversification": "none",
+        "host_challenge": "FA4C144173EEA5DA",
+        "card_challenge": "2F9C4061653AA1AE",
+        "sequence_counter": "000001",
+        "derivation_data": {
+          "kdd": "0370000000000000000001",
+          "host_challenge": "FA4C144173EEA5DA",
+          "card_challenge": "2F9C4061653AA1AE",
+          "card_cryptogram": "EA9F46AF46B20000"
+        },
+        "operations": [
+          "secure_channel_establish",
+          "list",
+          "list2",
+          "list3",
+          "list4",
+          "uninstall"
+        ]
+      }
+    ]
+  },
+  "operations": {
+    "select_isd": {
+      "description": "SELECT ISD",
+      "session_id": "session_1",
+      "start_exchange": 1,
+      "end_exchange": 1,
+      "commands": [
+        "SELECT"
+      ],
+      "expected_cli": "gp4net card info"
+    },
+    "secure_channel_establish": {
+      "description": "SCP authentication",
+      "session_id": "session_1",
+      "start_exchange": 2,
+      "end_exchange": 3,
+      "commands": [
+        "INITIALIZE UPDATE",
+        "EXTERNAL AUTHENTICATE"
+      ],
+      "expected_cli": "gp4net card test-sc -k gp_test_keys"
+    },
+    "list": {
+      "description": "List applications on card",
+      "session_id": "session_1",
+      "start_exchange": 4,
+      "end_exchange": 4,
+      "commands": [
+        "GET STATUS"
+      ],
+      "expected_cli": "gp4net applet list"
+    },
+    "list2": {
+      "description": "List applications on card",
+      "session_id": "session_1",
+      "start_exchange": 5,
+      "end_exchange": 5,
+      "commands": [
+        "GET STATUS"
+      ],
+      "expected_cli": "gp4net applet list"
+    },
+    "list3": {
+      "description": "List applications on card",
+      "session_id": "session_1",
+      "start_exchange": 6,
+      "end_exchange": 6,
+      "commands": [
+        "GET STATUS"
+      ],
+      "expected_cli": "gp4net applet list"
+    },
+    "list4": {
+      "description": "List applications on card",
+      "session_id": "session_1",
+      "start_exchange": 7,
+      "end_exchange": 7,
+      "commands": [
+        "GET STATUS"
+      ],
+      "expected_cli": "gp4net applet list"
+    },
+    "uninstall": {
+      "description": "Remove application",
+      "session_id": "session_1",
+      "start_exchange": 8,
+      "end_exchange": 8,
+      "commands": [
+        "DELETE"
+      ],
+      "expected_cli": "gp4net applet delete {aid}"
+    }
+  },
+  "usage_examples": [
+    {
+      "description": "SELECT ISD only",
+      "command": "gp4net card info -r \u0027lua:trace.lua?operations=select_isd\u0027"
+    },
+    {
+      "description": "SCP authentication only",
+      "command": "gp4net card test-sc -k gp_test_keys -r \u0027lua:trace.lua?operations=secure_channel_establish\u0027"
+    },
+    {
+      "description": "List applications on card only",
+      "command": "gp4net applet list -r \u0027lua:trace.lua?operations=list\u0027"
+    },
+    {
+      "description": "List applications on card only",
+      "command": "gp4net applet list -r \u0027lua:trace.lua?operations=list2\u0027"
+    },
+    {
+      "description": "List applications on card only",
+      "command": "gp4net applet list -r \u0027lua:trace.lua?operations=list3\u0027"
+    },
+    {
+      "description": "List applications on card only",
+      "command": "gp4net applet list -r \u0027lua:trace.lua?operations=list4\u0027"
+    },
+    {
+      "description": "Remove application only",
+      "command": "gp4net applet delete {aid} -r \u0027lua:trace.lua?operations=uninstall\u0027"
+    },
+    {
+      "description": "Install workflow",
+      "command": "gp4net applet install app.cap -r \u0027lua:trace.lua?operations=secure_channel_establish,uninstall\u0027"
+    },
+    {
+      "description": "Complete workflow",
+      "command": "gp4net script eval \u0027full_workflow()\u0027 -r \u0027lua:trace.lua?operations=select_isd,secure_channel_establish,list,list2,list3,list4,uninstall\u0027"
+    }
+  ],
+  "exchanges": [
+    {
+      "index": 1,
+      "operation": "select_isd",
+      "session_id": "",
+      "step_in_operation": 1,
+      "command": "00A4040000",
+      "response": "6F108408A000000151000000A5049F6501FF9000",
+      "response_time_ms": 19,
+      "description": "SELECT",
+      "source_line": 12,
+      "secure_messaging": false
+    },
+    {
+      "index": 2,
+      "operation": "secure_channel_establish",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "8050000008FA4C144173EEA5DA00",
+      "response": "0370000000000000000001037081E02F9C4061653AA1AEEA9F46AF46B20000109000",
+      "response_time_ms": 51,
+      "description": "INITIALIZE UPDATE",
+      "source_line": 17,
+      "secure_messaging": false,
+      "scp_data": {
+        "host_challenge": "FA4C144173EEA5DA",
+        "card_challenge": "2F9C4061653AA1AE",
+        "card_cryptogram": "EA9F46AF46B20000",
+        "key_version": 1,
+        "scp_id": "03"
+      }
+    },
+    {
+      "index": 3,
+      "operation": "secure_channel_establish",
+      "session_id": "session_1",
+      "step_in_operation": 2,
+      "command": "8482010010A1883C4B93BE2B01FFC7CC05DCC39D2E",
+      "response": "9000",
+      "response_time_ms": 18,
+      "description": "EXTERNAL AUTHENTICATE",
+      "source_line": 28,
+      "secure_messaging": true
+    },
+    {
+      "index": 4,
+      "operation": "list",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "84F280020A4F00442EA795FFF66F7B00",
+      "response": "E3264F08A0000001510000009F700101C5039EFE80C407A0000001515350CC08A0000001510000009000",
+      "response_time_ms": 20,
+      "description": "GET STATUS",
+      "source_line": 30,
+      "secure_messaging": true
+    },
+    {
+      "index": 5,
+      "operation": "list2",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "84F240020A4F00CEFEB6C1F221B24000",
+      "response": "6A88",
+      "response_time_ms": 13,
+      "description": "GET STATUS",
+      "source_line": 32,
+      "secure_messaging": true
+    },
+    {
+      "index": 6,
+      "operation": "list3",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "84F210020A4F00231A78EACDCE108500",
+      "response": "E3254F07A00000015153509F700101CE02FFFF8408A000000151535041CC08A000000151000000E3314F0DA00000016443446F634C6974659F700101CE020100840EA00000016443446F634C69746501CC08A000000151000000E31B4F07A00000006202049F700101CE020100CC08A000000151000000E31B4F07A00000006202029F700101CE020103CC08A0000001510000009000",
+      "response_time_ms": 43,
+      "description": "GET STATUS",
+      "source_line": 34,
+      "secure_messaging": true
+    },
+    {
+      "index": 7,
+      "operation": "list4",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "84F220020A4F00051D723F53636AC600",
+      "response": "E31B4F07A00000015153509F700101CE02FFFFCC08A000000151000000E3214F0DA00000016443446F634C6974659F700101CE020100CC08A000000151000000E31B4F07A00000006202049F700101CE020100CC08A000000151000000E31B4F07A00000006202029F700101CE020103CC08A0000001510000009000",
+      "response_time_ms": 39,
+      "description": "GET STATUS",
+      "source_line": 36,
+      "secure_messaging": true
+    },
+    {
+      "index": 8,
+      "operation": "uninstall",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "84E40080134F09A000000308000010007547C55C046E221C",
+      "response": "6A88",
+      "response_time_ms": 19,
+      "description": "DELETE",
+      "source_line": 39,
+      "secure_messaging": true
+    }
+  ]
+}

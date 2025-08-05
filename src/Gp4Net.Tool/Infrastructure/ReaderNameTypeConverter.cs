@@ -6,210 +6,209 @@ using System.Linq;
 using Gp4Net.Tool.Services;
 using Spectre.Console;
 
-namespace Gp4Net.Tool.Infrastructure
+namespace Gp4Net.Tool.Infrastructure;
+
+/// <summary>
+/// Type converter for smart card reader names that supports:
+/// - Partial name matching (case-insensitive)
+/// - Auto-detection with user prompts
+/// - Virtual card emulator support
+/// - Intelligent error handling
+/// </summary>
+public class ReaderNameTypeConverter : TypeConverter
 {
-    /// <summary>
-    /// Type converter for smart card reader names that supports:
-    /// - Partial name matching (case-insensitive)
-    /// - Auto-detection with user prompts
-    /// - Virtual card emulator support
-    /// - Intelligent error handling
-    /// </summary>
-    public class ReaderNameTypeConverter : TypeConverter
+    /// <inheritdoc />
+    public override bool CanConvertFrom(ITypeDescriptorContext? context, Type sourceType)
     {
-        /// <inheritdoc />
-        public override bool CanConvertFrom(ITypeDescriptorContext? context, Type sourceType)
+        return sourceType == typeof(string) || base.CanConvertFrom(context, sourceType);
+    }
+
+    /// <inheritdoc />
+    public override object? ConvertFrom(
+        ITypeDescriptorContext? context,
+        CultureInfo? culture,
+        object value
+    )
+    {
+        if (value is string stringValue || value is null)
         {
-            return sourceType == typeof(string) || base.CanConvertFrom(context, sourceType);
-        }
-
-        /// <inheritdoc />
-        public override object? ConvertFrom(
-            ITypeDescriptorContext? context,
-            CultureInfo? culture,
-            object value
-        )
-        {
-            if (value is string stringValue || value is null)
+            // Get the card service from the context
+            var cardService = GetCardServiceFromContext(context);
+            if (cardService == null)
             {
-                // Get the card service from the context
-                var cardService = GetCardServiceFromContext(context);
-                if (cardService == null)
-                {
-                    throw new InvalidOperationException(
-                        "CardService not available in conversion context"
-                    );
-                }
-
-                var inputValue = value as string ?? string.Empty;
-                return ResolveReader(inputValue, cardService);
-            }
-
-            return base.ConvertFrom(context, culture, value);
-        }
-
-        /// <summary>
-        /// Resolves a reader from the input string.
-        /// </summary>
-        /// <param name="input">The input reader specification.</param>
-        /// <param name="cardService">The card service for reader enumeration.</param>
-        /// <returns>The resolved reader.</returns>
-        private static Reader ResolveReader(string input, ICardService cardService)
-        {
-            // Check for virtual card emulator keywords
-            if (!string.IsNullOrWhiteSpace(input))
-            {
-                var normalizedInput = input.Trim().ToLowerInvariant();
-                
-                // Handle different emulator types - be explicit with virtual- prefix
-                switch (normalizedInput)
-                {
-                    case "virtual" or "virtual-emulator":
-                        return new Reader("Virtual Card Emulator", isVirtual: true);
-                    
-                    case "virtual-p71":
-                        return new Reader("Virtual P71 Reader 00 00", isVirtual: true);
-                    
-                    case "virtual-dual" or "virtual-dual-protocol":
-                        return new Reader("Virtual Dual Protocol Reader 01 00", isVirtual: true);
-                    
-                    case "virtual-scp03":
-                        return new Reader("Virtual SCP03 Reader 02 00", isVirtual: true);
-                    
-                    case "virtual-generic":
-                        return new Reader("Virtual Generic Reader 03 00", isVirtual: true);
-                    
-                    case "virtual-scp02":
-                        return new Reader("Virtual SCP02 Reader 04 00", isVirtual: true);
-                }
-                
-                // No partial matching - be explicit
-                // User must use exact virtual-* names
-            }
-
-            if (string.IsNullOrWhiteSpace(input))
-            {
-                input = "auto";
-            }
-
-            // Handle explicit JSON reader specification
-            if (input.StartsWith("json:", StringComparison.OrdinalIgnoreCase))
-            {
-                // JSON readers are not discoverable, but can be explicitly used
-                return new Reader(input);
-            }
-
-            // Get all available readers
-            var allReaders = cardService.GetReaders();
-
-            if (allReaders.Count == 0)
-            {
-                throw new ArgumentException(
-                    "No card readers found. Please ensure a card reader is connected and drivers are installed."
+                throw new InvalidOperationException(
+                    "CardService not available in conversion context"
                 );
             }
 
-            // Handle "auto" mode
-            if (string.Equals(input, "auto", StringComparison.OrdinalIgnoreCase))
+            var inputValue = value as string ?? string.Empty;
+            return ResolveReader(inputValue, cardService);
+        }
+
+        return base.ConvertFrom(context, culture, value);
+    }
+
+    /// <summary>
+    /// Resolves a reader from the input string.
+    /// </summary>
+    /// <param name="input">The input reader specification.</param>
+    /// <param name="cardService">The card service for reader enumeration.</param>
+    /// <returns>The resolved reader.</returns>
+    private static Reader ResolveReader(string input, ICardService cardService)
+    {
+        // Check for virtual card emulator keywords
+        if (!string.IsNullOrWhiteSpace(input))
+        {
+            var normalizedInput = input.Trim().ToLowerInvariant();
+                
+            // Handle different emulator types - be explicit with virtual- prefix
+            switch (normalizedInput)
             {
-                return HandleAutoDetection(allReaders);
+                case "virtual" or "virtual-emulator":
+                    return new Reader("Virtual Card Emulator", isVirtual: true);
+                    
+                case "virtual-p71":
+                    return new Reader("Virtual P71 Reader 00 00", isVirtual: true);
+                    
+                case "virtual-dual" or "virtual-dual-protocol":
+                    return new Reader("Virtual Dual Protocol Reader 01 00", isVirtual: true);
+                    
+                case "virtual-scp03":
+                    return new Reader("Virtual SCP03 Reader 02 00", isVirtual: true);
+                    
+                case "virtual-generic":
+                    return new Reader("Virtual Generic Reader 03 00", isVirtual: true);
+                    
+                case "virtual-scp02":
+                    return new Reader("Virtual SCP02 Reader 04 00", isVirtual: true);
             }
+                
+            // No partial matching - be explicit
+            // User must use exact virtual-* names
+        }
 
-            // Try exact match first (case-insensitive)
-            var exactMatch = allReaders.FirstOrDefault(r =>
-                string.Equals(r, input, StringComparison.OrdinalIgnoreCase)
-            );
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            input = "auto";
+        }
 
-            if (exactMatch != null)
-            {
-                return new Reader(exactMatch);
-            }
+        // Handle explicit JSON reader specification
+        if (input.StartsWith("json:", StringComparison.OrdinalIgnoreCase))
+        {
+            // JSON readers are not discoverable, but can be explicitly used
+            return new Reader(input);
+        }
 
-            // Try partial match (case-insensitive)
-            var partialMatches = allReaders
-                .Where(r => r.Contains(input, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+        // Get all available readers
+        var allReaders = cardService.GetReaders();
 
-            if (partialMatches.Count == 1)
-            {
-                var selectedReader = partialMatches[0];
-                AnsiConsole.MarkupLine(
-                    $"[yellow]Using reader with partial match:[/] {selectedReader}"
-                );
-                return new Reader(selectedReader, isPartialMatch: true);
-            }
-
-            if (partialMatches.Count > 1)
-            {
-                AnsiConsole.MarkupLine($"[yellow]Multiple readers found matching '{input}':[/]");
-                var selected = PromptUserToSelectReader(partialMatches);
-                return new Reader(selected, isPartialMatch: true);
-            }
-
-            // No matches found
-            AnsiConsole.MarkupLine($"[red]No reader found matching '{input}'.[/]");
-            AnsiConsole.MarkupLine("[yellow]Available readers:[/]");
-
-            foreach (var reader in allReaders)
-            {
-                AnsiConsole.MarkupLine($"  • {reader}");
-            }
-
+        if (allReaders.Count == 0)
+        {
             throw new ArgumentException(
-                $"Reader '{input}' not found. Use exact name, partial name, or 'auto' for automatic detection."
+                "No card readers found. Please ensure a card reader is connected and drivers are installed."
             );
         }
 
-        /// <summary>
-        /// Handles automatic reader detection.
-        /// </summary>
-        /// <param name="readers">List of available readers.</param>
-        /// <returns>The selected reader.</returns>
-        private static Reader HandleAutoDetection(IReadOnlyList<string> readers)
+        // Handle "auto" mode
+        if (string.Equals(input, "auto", StringComparison.OrdinalIgnoreCase))
         {
-            if (readers.Count == 1)
-            {
-                var selectedReader = readers[0];
-                AnsiConsole.MarkupLine($"[green]Auto-detected reader:[/] {selectedReader}");
-                return new Reader(selectedReader, isAutoDetected: true);
-            }
-
-            // Multiple readers found - prompt user to choose
-            AnsiConsole.MarkupLine("[yellow]Multiple card readers detected:[/]");
-            var selected = PromptUserToSelectReader(readers);
-            return new Reader(selected, isAutoDetected: true);
+            return HandleAutoDetection(allReaders);
         }
 
-        /// <summary>
-        /// Prompts the user to select a reader from the available options.
-        /// </summary>
-        /// <param name="readers">List of available readers.</param>
-        /// <returns>The selected reader name.</returns>
-        private static string PromptUserToSelectReader(IReadOnlyList<string> readers)
-        {
-            var prompt = new SelectionPrompt<string>()
-                .Title("Please select a card reader:")
-                .AddChoices(readers)
-                .HighlightStyle(Style.Parse("bold cyan"));
+        // Try exact match first (case-insensitive)
+        var exactMatch = allReaders.FirstOrDefault(r =>
+            string.Equals(r, input, StringComparison.OrdinalIgnoreCase)
+        );
 
-            return AnsiConsole.Prompt(prompt);
+        if (exactMatch != null)
+        {
+            return new Reader(exactMatch);
         }
 
-        /// <summary>
-        /// Gets the card service from the conversion context.
-        /// </summary>
-        /// <param name="context">The type descriptor context.</param>
-        /// <returns>The card service if available.</returns>
-        private static ICardService? GetCardServiceFromContext(ITypeDescriptorContext? context)
+        // Try partial match (case-insensitive)
+        var partialMatches = allReaders
+            .Where(r => r.Contains(input, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (partialMatches.Count == 1)
         {
-            try
-            {
-                return CardServiceProvider.GetCardService();
-            }
-            catch (InvalidOperationException)
-            {
-                return null;
-            }
+            var selectedReader = partialMatches[0];
+            AnsiConsole.MarkupLine(
+                $"[yellow]Using reader with partial match:[/] {selectedReader}"
+            );
+            return new Reader(selectedReader, isPartialMatch: true);
+        }
+
+        if (partialMatches.Count > 1)
+        {
+            AnsiConsole.MarkupLine($"[yellow]Multiple readers found matching '{input}':[/]");
+            var selected = PromptUserToSelectReader(partialMatches);
+            return new Reader(selected, isPartialMatch: true);
+        }
+
+        // No matches found
+        AnsiConsole.MarkupLine($"[red]No reader found matching '{input}'.[/]");
+        AnsiConsole.MarkupLine("[yellow]Available readers:[/]");
+
+        foreach (var reader in allReaders)
+        {
+            AnsiConsole.MarkupLine($"  • {reader}");
+        }
+
+        throw new ArgumentException(
+            $"Reader '{input}' not found. Use exact name, partial name, or 'auto' for automatic detection."
+        );
+    }
+
+    /// <summary>
+    /// Handles automatic reader detection.
+    /// </summary>
+    /// <param name="readers">List of available readers.</param>
+    /// <returns>The selected reader.</returns>
+    private static Reader HandleAutoDetection(IReadOnlyList<string> readers)
+    {
+        if (readers.Count == 1)
+        {
+            var selectedReader = readers[0];
+            AnsiConsole.MarkupLine($"[green]Auto-detected reader:[/] {selectedReader}");
+            return new Reader(selectedReader, isAutoDetected: true);
+        }
+
+        // Multiple readers found - prompt user to choose
+        AnsiConsole.MarkupLine("[yellow]Multiple card readers detected:[/]");
+        var selected = PromptUserToSelectReader(readers);
+        return new Reader(selected, isAutoDetected: true);
+    }
+
+    /// <summary>
+    /// Prompts the user to select a reader from the available options.
+    /// </summary>
+    /// <param name="readers">List of available readers.</param>
+    /// <returns>The selected reader name.</returns>
+    private static string PromptUserToSelectReader(IReadOnlyList<string> readers)
+    {
+        var prompt = new SelectionPrompt<string>()
+            .Title("Please select a card reader:")
+            .AddChoices(readers)
+            .HighlightStyle(Style.Parse("bold cyan"));
+
+        return AnsiConsole.Prompt(prompt);
+    }
+
+    /// <summary>
+    /// Gets the card service from the conversion context.
+    /// </summary>
+    /// <param name="context">The type descriptor context.</param>
+    /// <returns>The card service if available.</returns>
+    private static ICardService? GetCardServiceFromContext(ITypeDescriptorContext? context)
+    {
+        try
+        {
+            return CardServiceProvider.GetCardService();
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
         }
     }
 }

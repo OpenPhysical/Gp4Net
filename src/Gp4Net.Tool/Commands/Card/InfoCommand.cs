@@ -1,11 +1,7 @@
 using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
-using Gp4Net.Domain;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Services;
@@ -13,41 +9,41 @@ using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using log4net;
 using Spectre.Console;
-using Spectre.Console.Cli;
+using StatusSubset = Gp4Net.Domain.Commands.GetStatusCommand.StatusSubset;
 
-namespace Gp4Net.Tool.Commands.Card
+namespace Gp4Net.Tool.Commands.Card;
+
+/// <summary>
+/// Command to display detailed card information.
+/// </summary>
+[PublicAPI]
+[CommandHandler(Description = "Display detailed card information")]
+public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
 {
+    private static readonly ILog Logger = LogManager.GetLogger(typeof(InfoCommand));
+
     /// <summary>
-    /// Command to display detailed card information.
+    /// Executes the info command to display detailed card information.
     /// </summary>
-    [PublicAPI]
-    [CommandHandler(Description = "Display detailed card information")]
-    public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
+    public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
     {
-        private static readonly ILog Logger = LogManager.GetLogger(typeof(InfoCommand));
-
-        /// <summary>
-        /// Executes the info command to display detailed card information.
-        /// </summary>
-        public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
+        try
         {
-            try
+            // Build custom pipeline for info command - never establish secure channel, always show card info
+            var ctx = context.WithVerbose(settings.Verbose);
+            ctx = await ctx.RequireCardConnection(settings);
+
+            return await ctx.ExecuteAsync(async ctx =>
             {
-                // Build custom pipeline for info command - never establish secure channel, always show card info
-                var ctx = context.WithVerbose(settings.Verbose);
-                ctx = await ctx.RequireCardConnection(settings);
+                Logger.Debug("InfoCommand: Starting execution");
 
-                return await ctx.ExecuteAsync(async ctx =>
-                {
-                    Logger.Debug("InfoCommand: Starting execution");
+                var table = new Table().AddColumn("Property").AddColumn("Value");
 
-                    var table = new Table().AddColumn("Property").AddColumn("Value");
+                // Basic card information (always available)
+                Logger.Debug("InfoCommand: About to call GetAtr()");
 
-                    // Basic card information (always available)
-                    Logger.Debug("InfoCommand: About to call GetAtr()");
-
-                    var atr = ctx.CardService.GetAtr();
-                    Logger.Debug("InfoCommand: GetAtr() returned");
+                var atr = ctx.CardService.GetAtr();
+                Logger.Debug("InfoCommand: GetAtr() returned");
 
                 if (atr != null)
                 {
@@ -72,7 +68,7 @@ namespace Gp4Net.Tool.Commands.Card
                         var selectResponse = selectResult.Value;
                         _ = table.AddRow("ISD Status", "[green]✓ Available[/]");
 
-                        if (selectResponse.RawData != null && selectResponse.RawData.Length > 0)
+                        if (selectResponse.RawData is { Length: > 0 })
                         {
                             AddIsdDataToTable(table, selectResponse);
                         }
@@ -129,7 +125,7 @@ namespace Gp4Net.Tool.Commands.Card
                     {
                         try
                         {
-                            var statusResult = await ctx.GetGlobalPlatformService().GetStatusAsync(StatusSubset.Applications);
+                            var statusResult = await ctx.GetGlobalPlatformService().GetStatusAsync(StatusSubset.ApplicationsAndSupplementaryDomains);
                             if (statusResult.IsSuccess)
                             {
                                 var applications = statusResult.Value;
@@ -183,193 +179,117 @@ namespace Gp4Net.Tool.Commands.Card
                 }
 
                 return 0;
-                });
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("Error executing info command", ex);
-                AnsiConsole.MarkupLine($"[red]Error: {ex.Message}[/]");
-                return 1;
-            }
+            });
         }
-
-        private void AddIsdDataToTable(Table table, SelectResponse selectResponse)
+        catch (Exception ex)
         {
-            try
+            Logger.Error("Error executing info command", ex);
+            AnsiConsole.MarkupLine($"[red]Error: {ex.Message}[/]");
+            return 1;
+        }
+    }
+
+    private static void AddIsdDataToTable(Table table, SelectResponse selectResponse)
+    {
+        try
+        {
+            var fci = selectResponse.Fci;
+            if (fci != null)
             {
-                var fci = selectResponse.Fci;
-                if (fci != null)
+                if (fci.ApplicationAid != null)
                 {
-                    if (fci.ApplicationAid != null)
-                    {
-                        _ = table.AddRow("ISD AID", Convert.ToHexString(fci.ApplicationAid));
-                    }
+                    _ = table.AddRow("ISD AID", Convert.ToHexString(fci.ApplicationAid));
+                }
 
-                    if (!string.IsNullOrEmpty(fci.ApplicationLabel))
-                    {
-                        _ = table.AddRow("ISD Label", fci.ApplicationLabel);
-                    }
+                if (!string.IsNullOrEmpty(fci.ApplicationLabel))
+                {
+                    _ = table.AddRow("ISD Label", fci.ApplicationLabel);
+                }
 
-                    if (fci.IssuerIdentificationNumber != null)
-                    {
-                        _ = table.AddRow(
-                            "Issuer ID Number",
-                            Convert.ToHexString(fci.IssuerIdentificationNumber)
-                        );
-                    }
+                if (fci.IssuerIdentificationNumber != null)
+                {
+                    _ = table.AddRow(
+                        "Issuer ID Number",
+                        Convert.ToHexString(fci.IssuerIdentificationNumber)
+                    );
+                }
 
-                    if (fci.CardImageNumber != null)
-                    {
-                        _ = table.AddRow(
-                            "Card Image Number",
-                            Convert.ToHexString(fci.CardImageNumber)
-                        );
-                    }
+                if (fci.CardImageNumber != null)
+                {
+                    _ = table.AddRow(
+                        "Card Image Number",
+                        Convert.ToHexString(fci.CardImageNumber)
+                    );
+                }
 
-                    if (fci.DiscretionaryData != null)
+                if (fci.DiscretionaryData != null)
+                {
+                    var decoded = SecurityDomainDataParser.Decode(fci.DiscretionaryData);
+                    if (!string.IsNullOrEmpty(decoded))
                     {
-                        var decoded = SecurityDomainDataParser.Decode(fci.DiscretionaryData);
-                        if (!string.IsNullOrEmpty(decoded))
-                        {
-                            _ = table.AddRow("Discretionary Data", decoded);
-                        }
+                        _ = table.AddRow("Discretionary Data", decoded);
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                Logger.Debug($"Could not parse ISD data: {ex.Message}");
-                _ = table.AddRow(
-                    "ISD Data",
-                    $"[dim]{Convert.ToHexString(selectResponse.RawData)}[/]"
-                );
-            }
         }
-
-
-        private void AddCplcToTable(Table table, CplcData cplc)
+        catch (Exception ex)
         {
-            _ = table.AddRow("IC Fabricator", $"{cplc.IcFabricator:X4}");
-            _ = table.AddRow("IC Type", $"{cplc.IcType:X4}");
-            _ = table.AddRow("Operating System ID", $"{cplc.OperatingSystemId:X4}");
+            Logger.Debug($"Could not parse ISD data: {ex.Message}");
             _ = table.AddRow(
-                "IC Fabrication Date",
-                $"{cplc.IcFabricationDate:X4} ({CplcDateParser.FormatDate(cplc.IcFabricationDate)})"
+                "ISD Data",
+                $"[dim]{Convert.ToHexString(selectResponse.RawData)}[/]"
             );
-            _ = table.AddRow("IC Serial Number", $"{cplc.IcSerialNumber:X8}");
-            _ = table.AddRow("IC Batch Identifier", $"{cplc.IcBatchIdentifier:X4}");
         }
+    }
 
-        /// <summary>
-        /// Retrieves data using GET DATA command and adds it to the display table.
-        /// Provides special handling for different data object types.
-        /// </summary>
-        /// <param name="context">The command context for GP operations.</param>
-        /// <param name="table">The table to add the data to.</param>
-        /// <param name="name">The display name for this data.</param>
-        /// <param name="tag">The data object identifier tag.</param>
-        private static async Task AddGetDataToTable(
-            ICliExecutionContext context,
-            Table table,
-            string name,
-            ushort tag
-        )
+
+    private static void AddCplcToTable(Table table, CplcData cplc)
+    {
+        _ = table.AddRow("IC Fabricator", $"{cplc.IcFabricator:X4}");
+        _ = table.AddRow("IC Type", $"{cplc.IcType:X4}");
+        _ = table.AddRow("Operating System ID", $"{cplc.OperatingSystemId:X4}");
+        _ = table.AddRow(
+            "IC Fabrication Date",
+            $"{cplc.IcFabricationDate:X4} ({CplcDateParser.FormatDate(cplc.IcFabricationDate)})"
+        );
+        _ = table.AddRow("IC Serial Number", $"{cplc.IcSerialNumber:X8}");
+        _ = table.AddRow("IC Batch Identifier", $"{cplc.IcBatchIdentifier:X4}");
+    }
+
+    /// <summary>
+    /// Retrieves data using GET DATA command and adds it to the display table.
+    /// Provides special handling for different data object types.
+    /// </summary>
+    /// <param name="context">The command context for GP operations.</param>
+    /// <param name="table">The table to add the data to.</param>
+    /// <param name="name">The display name for this data.</param>
+    /// <param name="tag">The data object identifier tag.</param>
+    private static async Task AddGetDataToTable(
+        ICliExecutionContext context,
+        Table table,
+        string name,
+        ushort tag
+    )
+    {
+        try
         {
-            try
+            var dataResult = await context.GetGlobalPlatformService().GetDataAsync(tag);
+            if (dataResult.IsSuccess)
             {
-                var dataResult = await context.GetGlobalPlatformService().GetDataAsync(tag);
-                if (dataResult.IsSuccess)
+                var response = dataResult.Value;
+                if (response is { Length: > 0 })
                 {
-                    var response = dataResult.Value;
-                    if (response != null && response.Length > 0)
+                    // Special handling for specific data types
+                    if (tag == GetDataCommand.DataObjects.CardData)
                     {
-                        // Special handling for specific data types
-                        if (tag == GetDataCommand.DataObjects.CardData)
+                        var cardData = response.ParseAsCardData();
+                        if (cardData != null)
                         {
-                            var cardData = response.ParseAsCardData();
-                            if (cardData != null)
+                            // Prefer OID-based version (matches GP Pro behavior)
+                            var gpVersion = cardData.GlobalPlatformVersionFromOid ?? cardData.GlobalPlatformVersion?.ToString();
+                            if (!string.IsNullOrEmpty(gpVersion))
                             {
-                                // Prefer OID-based version (matches GP Pro behavior)
-                                var gpVersion = cardData.GlobalPlatformVersionFromOid ?? cardData.GlobalPlatformVersion?.ToString();
-                                if (!string.IsNullOrEmpty(gpVersion))
-                                {
-                                    _ = table.AddRow("GlobalPlatform Version", gpVersion);
-                                }
-                                else
-                                {
-                                    _ = table.AddRow(name, $"[dim]{Convert.ToHexString(response)}[/]");
-                                }
-                            }
-                            else
-                            {
-                                _ = table.AddRow(name, $"[dim]{Convert.ToHexString(response)}[/]");
-                            }
-                        }
-                        else if (tag == GetDataCommand.DataObjects.CardCapabilities)
-                        {
-                            var capabilities = response.ParseAsCardCapabilities();
-                            if (capabilities != null)
-                            {
-                                // Display SCP support from capabilities
-                                    var scpSupport = ScpCapabilitiesParser.Parse(response);
-                                    if (!string.IsNullOrEmpty(scpSupport))
-                                    {
-                                        _ = table.AddRow("SCP Support (Capabilities)", scpSupport);
-                                    }
-
-                                    // Display other capability information (algorithms, cipher suites, etc.)
-                                    if (capabilities.Algorithms != null)
-                                    {
-                                        var hashAlgs = capabilities.Algorithms.GetHashAlgorithms();
-                                        if (!string.IsNullOrEmpty(hashAlgs) && hashAlgs != "None")
-                                        {
-                                            _ = table.AddRow("Hash Algorithms", hashAlgs);
-                                        }
-                                    }
-
-                                    // Display cipher suites if available
-                                    if (capabilities.CipherSuites.Count > 0)
-                                    {
-                                        foreach (var kvp in capabilities.CipherSuites.Take(3)) // Limit to avoid clutter
-                                        {
-                                            var cipherNames = string.Join(", ", kvp.Value.Take(3).Select(c => c.ToFriendlyString()));
-                                            _ = table.AddRow($"{kvp.Key} Ciphers", cipherNames);
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    _ = table.AddRow(name, $"[dim]{Convert.ToHexString(response)}[/]");
-                                }
-                            }
-                            else if (tag == GetDataCommand.DataObjects.DiversificationData)
-                            {
-                                // Extract and display SCP support from diversification data
-                                var scpSupport = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(response));
-                                _ = table.AddRow("SCP Support", scpSupport);
-                            }
-                            else if (tag == GetDataCommand.DataObjects.KeyInformationTemplate)
-                            {
-                                var keyInfo = response.ParseAsKeyInformation();
-                                if (keyInfo != null && keyInfo.Keys.Count > 0)
-                                {
-                                    foreach (var key in keyInfo.Keys.OrderBy(k => k.KeyId))
-                                    {
-                                        var keyName = key.KeyId switch
-                                        {
-                                            1 => "ENC Key",
-                                            2 => "MAC Key",
-                                            3 => "DEK Key",
-                                            _ => $"Key {key.KeyId}"
-                                        };
-                                        var keyDesc = $"v{key.KeyVersion} {key.PrimaryKeyType.ToFriendlyString()} ({key.KeyLength} bit)";
-                                        _ = table.AddRow(keyName, keyDesc);
-                                    }
-                                }
-                                else
-                                {
-                                    _ = table.AddRow("Key Information", "[dim]No keys found[/]");
-                                }
+                                _ = table.AddRow("GlobalPlatform Version", gpVersion);
                             }
                             else
                             {
@@ -378,29 +298,104 @@ namespace Gp4Net.Tool.Commands.Card
                         }
                         else
                         {
-                            _ = table.AddRow(name, "[dim]Not supported[/]");
+                            _ = table.AddRow(name, $"[dim]{Convert.ToHexString(response)}[/]");
                         }
                     }
+                    else if (tag == GetDataCommand.DataObjects.CardCapabilities)
+                    {
+                        var capabilities = response.ParseAsCardCapabilities();
+                        if (capabilities != null)
+                        {
+                            // Display SCP support from capabilities
+                            var scpSupport = ScpCapabilitiesParser.Parse(response);
+                            if (!string.IsNullOrEmpty(scpSupport))
+                            {
+                                _ = table.AddRow("SCP Support (Capabilities)", scpSupport);
+                            }
+
+                            // Display other capability information (algorithms, cipher suites, etc.)
+                            if (capabilities.Algorithms.HasValue)
+                            {
+                                var hashAlgs = capabilities.Algorithms.Value.GetHashAlgorithms();
+                                if (!string.IsNullOrEmpty(hashAlgs) && hashAlgs != "None")
+                                {
+                                    _ = table.AddRow("Hash Algorithms", hashAlgs);
+                                }
+                            }
+
+                            // Display cipher suites if available
+                            if (capabilities.CipherSuites.Count > 0)
+                            {
+                                foreach (var kvp in capabilities.CipherSuites.Take(3)) // Limit to avoid clutter
+                                {
+                                    var cipherNames = string.Join(", ", kvp.Value.Take(3).Select(c => c.ToFriendlyString()));
+                                    _ = table.AddRow($"{kvp.Key} Ciphers", cipherNames);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            _ = table.AddRow(name, $"[dim]{Convert.ToHexString(response)}[/]");
+                        }
+                    }
+                    else if (tag == GetDataCommand.DataObjects.DiversificationData)
+                    {
+                        // Extract and display SCP support from diversification data
+                        var scpSupport = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(response));
+                        _ = table.AddRow("SCP Support", scpSupport);
+                    }
+                    else if (tag == GetDataCommand.DataObjects.KeyInformationTemplate)
+                    {
+                        var keyInfo = response.ParseAsKeyInformation();
+                        if (keyInfo != null && keyInfo.Keys.Count > 0)
+                        {
+                            foreach (var key in keyInfo.Keys.OrderBy(k => k.KeyId))
+                            {
+                                var keyName = key.KeyId switch
+                                {
+                                    1 => "ENC Key",
+                                    2 => "MAC Key",
+                                    3 => "DEK Key",
+                                    _ => $"Key {key.KeyId}"
+                                };
+                                var keyDesc = $"v{key.KeyVersion} {key.PrimaryKeyType.ToFriendlyString()} ({key.KeyLength} bit)";
+                                _ = table.AddRow(keyName, keyDesc);
+                            }
+                        }
+                        else
+                        {
+                            _ = table.AddRow("Key Information", "[dim]No keys found[/]");
+                        }
+                    }
+                    else
+                    {
+                        _ = table.AddRow(name, $"[dim]{Convert.ToHexString(response)}[/]");
+                    }
+                }
                 else
                 {
-                    Logger.Debug($"Could not get {name}: {dataResult.Error.Message}");
-                    _ = table.AddRow(name, "[red]Error retrieving data[/]");
+                    _ = table.AddRow(name, "[dim]Not supported[/]");
                 }
             }
-            catch (Exception ex)
+            else
             {
-                Logger.Debug($"Could not get {name}: {ex.Message}");
+                Logger.Debug($"Could not get {name}: {dataResult.Error.Message}");
                 _ = table.AddRow(name, "[red]Error retrieving data[/]");
             }
         }
-
-
-
-
-
-        /// <summary>
-        /// Settings for the info command.
-        /// </summary>
-        public class Settings : CardCommandSettings { }
+        catch (Exception ex)
+        {
+            Logger.Debug($"Could not get {name}: {ex.Message}");
+            _ = table.AddRow(name, "[red]Error retrieving data[/]");
+        }
     }
+
+
+
+
+
+    /// <summary>
+    /// Settings for the info command.
+    /// </summary>
+    public class Settings : CardCommandSettings { }
 }

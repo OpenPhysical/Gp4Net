@@ -4,150 +4,121 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Services;
 using Gp4Net.Core;
+using Gp4Net.Pipeline;
 using Gp4Net.Services;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 
-namespace Gp4Net.Tool.Services
+namespace Gp4Net.Tool.Services;
+
+/// <summary>
+/// Adapter that allows virtual card services to be used as smart card services in the CLI.
+/// Provides seamless integration between the card emulator and CLI tools.
+/// </summary>
+[PublicAPI]
+public class VirtualCardServiceAdapter : ISmartCardService
 {
+    private readonly VirtualCardService _virtualCardService;
+    private readonly ILogger<VirtualCardServiceAdapter> _logger;
+    private IPipelineContext _context;
+    private bool _disposed;
+
     /// <summary>
-    /// Adapter that allows virtual card services to be used as smart card services in the CLI.
-    /// Provides seamless integration between the card emulator and CLI tools.
+    /// Initializes a new instance of the VirtualCardServiceAdapter class.
     /// </summary>
-    [PublicAPI]
-    public class VirtualCardServiceAdapter : ISmartCardService
+    /// <param name="virtualCardService">The virtual card service to adapt.</param>
+    /// <param name="logger">The logger.</param>
+    public VirtualCardServiceAdapter(
+        VirtualCardService virtualCardService,
+        ILogger<VirtualCardServiceAdapter> logger)
     {
-        private readonly VirtualCardService _virtualCardService;
-        private readonly ILogger<VirtualCardServiceAdapter> _logger;
-
-        /// <summary>
-        /// Initializes a new instance of the VirtualCardServiceAdapter class.
-        /// </summary>
-        /// <param name="virtualCardService">The virtual card service to adapt.</param>
-        /// <param name="logger">The logger.</param>
-        public VirtualCardServiceAdapter(
-            VirtualCardService virtualCardService,
-            ILogger<VirtualCardServiceAdapter> logger)
-        {
-            ArgumentNullException.ThrowIfNull(virtualCardService);
-            ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(virtualCardService);
+        ArgumentNullException.ThrowIfNull(logger);
             
-            _virtualCardService = virtualCardService;
-            _logger = logger;
+        _virtualCardService = virtualCardService;
+        _logger = logger;
+        _context = ImmutablePipelineContext.Empty;
+    }
+
+    /// <inheritdoc />
+    public IPipelineContext Context => _context;
+
+    /// <inheritdoc />
+    public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
+        IApduCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        return await ExecuteCommandAsync(command, CommandOptions.Default, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
+        IApduCommand command,
+        CommandOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        if (_disposed)
+        {
+            return SmartCardError.CommunicationError("Service has been disposed");
         }
 
-        /// <inheritdoc />
-        public Result<string[], SmartCardError> ListReaders()
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(options);
+
+        _logger.LogDebug("Executing command on virtual card: {Ins:X2}", command.Ins);
+
+        try
         {
-            _logger.LogDebug("Listing virtual card readers");
-            
-            // Virtual card service provides a single "emulated" reader
-            return new[] { "Virtual Card Emulator" };
+            // Execute synchronously since VirtualCardService is synchronous
+            var result = await Task.Run(() => 
+            {
+                var response = _virtualCardService.ProcessCommand(command);
+                return Result.Success<CommandResponse, SmartCardError>(response);
+            }, cancellationToken);
+
+            return result;
         }
-
-        /// <inheritdoc />
-        public Result<(ICardChannel, CardProtocol), SmartCardError> ConnectToCard(
-            string readerName, 
-            CardProtocol preferredProtocol = CardProtocol.Any)
+        catch (Exception ex)
         {
-            _logger.LogDebug("Connecting to virtual card on reader: {ReaderName}", readerName);
-            
-            if (readerName != "Virtual Card Emulator")
-            {
-                return SmartCardError.CommunicationError($"Virtual reader '{readerName}' not found");
-            }
-
-            try
-            {
-                var channel = new VirtualCardChannel(_virtualCardService, _logger);
-                var protocol = CardProtocol.T1; // Virtual cards use T=1 protocol
-                
-                _logger.LogDebug("Successfully connected to virtual card");
-                return (channel, protocol);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to connect to virtual card");
-                return SmartCardError.CommunicationError($"Failed to connect to virtual card: {ex.Message}", ex);
-            }
-        }
-
-        /// <inheritdoc />
-        public Result<CommandResponse[], SmartCardError> SendCommands(ICardChannel channel, params IApduCommand[] commands)
-        {
-            if (channel is not VirtualCardChannel virtualChannel)
-            {
-                return SmartCardError.InvalidArgument("Channel must be a VirtualCardChannel");
-            }
-
-            _logger.LogDebug("Sending {CommandCount} commands to virtual card", commands.Length);
-            
-            try
-            {
-                return virtualChannel.SendCommands(commands);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send commands to virtual card");
-                return SmartCardError.CommunicationError($"Failed to send commands: {ex.Message}", ex);
-            }
+            _logger.LogError(ex, "Failed to execute command on virtual card");
+            return SmartCardError.CommunicationError($"Failed to execute command: {ex.Message}", ex);
         }
     }
 
-    /// <summary>
-    /// Virtual card channel implementation that forwards commands to the virtual card service.
-    /// </summary>
-    internal class VirtualCardChannel : ICardChannel
+    /// <inheritdoc />
+    public ISmartCardService WithContext(IPipelineContext context)
     {
-        private readonly VirtualCardService _virtualCardService;
-        private readonly ILogger _logger;
-        private bool _disposed;
-
-        public VirtualCardChannel(VirtualCardService virtualCardService, ILogger logger)
+        ArgumentNullException.ThrowIfNull(context);
+            
+        return new VirtualCardServiceAdapter(_virtualCardService, _logger)
         {
-            _virtualCardService = virtualCardService ?? throw new ArgumentNullException(nameof(virtualCardService));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
+            _context = context
+        };
+    }
 
-        public Result<CommandResponse[], SmartCardError> SendCommands(params IApduCommand[] commands)
-        {
-            if (_disposed)
-            {
-                return SmartCardError.CommunicationError("Card channel has been disposed");
-            }
+    /// <inheritdoc />
+    public ISmartCardService WithContextValue<T>(string key, T value)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+            
+        var newContext = _context.With(key, value);
+        return WithContext(newContext);
+    }
 
-            try
-            {
-                var responses = new CommandResponse[commands.Length];
-                
-                for (int i = 0; i < commands.Length; i++)
-                {
-                    var response = _virtualCardService.ProcessCommand(commands[i]);
-                    responses[i] = response;
-                    
-                    _logger.LogDebug("Command {Index}: {Command} -> SW={SW:X4}", 
-                        i + 1, commands[i].GetType().Name, response.StatusWord);
-                }
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
 
-                return responses;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing commands in virtual card");
-                return SmartCardError.CommunicationError($"Virtual card error: {ex.Message}", ex);
-            }
-        }
-
-        public void Dispose()
-        {
-            if (!_disposed)
-            {
-                _logger.LogDebug("Disposing virtual card channel");
-                _disposed = true;
-            }
-        }
+        _disposed = true;
+        _virtualCardService?.Disconnect();
+        _logger.LogDebug("Virtual card service adapter disposed");
     }
 }

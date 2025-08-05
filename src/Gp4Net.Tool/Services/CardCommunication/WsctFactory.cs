@@ -2,29 +2,28 @@ using WSCT.Core.APDU;
 using WSCT.ISO7816;
 using Gp4Net.Tool.Services.CardCommunication.Wsct;
 
-namespace Gp4Net.Tool.Services.CardCommunication
+namespace Gp4Net.Tool.Services.CardCommunication;
+
+/// <summary>
+/// Concrete implementation of IWsctFactory.
+/// </summary>
+public class WsctFactory : IWsctFactory
 {
-    /// <summary>
-    /// Concrete implementation of IWsctFactory.
-    /// </summary>
-    public class WsctFactory : IWsctFactory
+    /// <inheritdoc />
+    public ICardContextWrapper CreateCardContext()
     {
-        /// <inheritdoc />
-        public ICardContextWrapper CreateCardContext()
-        {
-            return new WsctCardContextWrapper();
-        }
+        return new WsctCardContextWrapper();
+    }
 
-        /// <inheritdoc />
-        public ICardCommand CreateCommandApdu(byte[] command)
-        {
-            return new CommandAPDU(command);
-        }
+    /// <inheritdoc />
+    public ICardCommand CreateCommandApdu(byte[] command)
+    {
+        return new CommandAPDU(command);
+    }
 
-        /// <inheritdoc />
-        public ICardResponse CreateResponseApdu()
-        {
-            return new ResponseAPDU();
-        }
+    /// <inheritdoc />
+    public ICardResponse CreateResponseApdu()
+    {
+        return new ResponseAPDU();
     }
 }

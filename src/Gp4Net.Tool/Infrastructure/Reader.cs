@@ -1,56 +1,62 @@
 using System;
 
-namespace Gp4Net.Tool.Infrastructure
+namespace Gp4Net.Tool.Infrastructure;
+
+/// <summary>
+/// Represents a resolved smart card reader.
+/// </summary>
+public class Reader
 {
     /// <summary>
-    /// Represents a resolved smart card reader.
+    /// Gets the reader name.
     /// </summary>
-    public class Reader
+    public string Name { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether this reader was auto-detected.
+    /// </summary>
+    public bool IsAutoDetected { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether this reader was selected via partial match.
+    /// </summary>
+    public bool IsPartialMatch { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether this is a virtual card emulator reader.
+    /// </summary>
+    public bool IsVirtual { get; }
+
+    /// <summary>
+    /// Initializes a new instance of the Reader class.
+    /// </summary>
+    /// <param name="name">The reader name.</param>
+    /// <param name="isAutoDetected">Whether this reader was auto-detected.</param>
+    /// <param name="isPartialMatch">Whether this reader was selected via partial match.</param>
+    /// <param name="isVirtual">Whether this is a virtual card emulator reader.</param>
+    public Reader(string name, bool isAutoDetected = false, bool isPartialMatch = false, bool isVirtual = false)
     {
-        /// <summary>
-        /// Gets the reader name.
-        /// </summary>
-        public string Name { get; }
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+        IsAutoDetected = isAutoDetected;
+        IsPartialMatch = isPartialMatch;
+        IsVirtual = isVirtual;
+    }
 
-        /// <summary>
-        /// Gets a value indicating whether this reader was auto-detected.
-        /// </summary>
-        public bool IsAutoDetected { get; }
+    /// <summary>
+    /// Returns the reader name.
+    /// </summary>
+    /// <returns>The reader name.</returns>
+    public override string ToString()
+    {
+        return Name;
+    }
 
-        /// <summary>
-        /// Gets a value indicating whether this reader was selected via partial match.
-        /// </summary>
-        public bool IsPartialMatch { get; }
-
-        /// <summary>
-        /// Initializes a new instance of the Reader class.
-        /// </summary>
-        /// <param name="name">The reader name.</param>
-        /// <param name="isAutoDetected">Whether this reader was auto-detected.</param>
-        /// <param name="isPartialMatch">Whether this reader was selected via partial match.</param>
-        public Reader(string name, bool isAutoDetected = false, bool isPartialMatch = false)
-        {
-            Name = name ?? throw new ArgumentNullException(nameof(name));
-            IsAutoDetected = isAutoDetected;
-            IsPartialMatch = isPartialMatch;
-        }
-
-        /// <summary>
-        /// Returns the reader name.
-        /// </summary>
-        /// <returns>The reader name.</returns>
-        public override string ToString()
-        {
-            return Name;
-        }
-
-        /// <summary>
-        /// Implicit conversion to string.
-        /// </summary>
-        /// <param name="reader">The reader.</param>
-        public static implicit operator string(Reader reader)
-        {
-            return reader?.Name ?? string.Empty;
-        }
+    /// <summary>
+    /// Implicit conversion to string.
+    /// </summary>
+    /// <param name="reader">The reader.</param>
+    public static implicit operator string(Reader reader)
+    {
+        return reader?.Name ?? string.Empty;
     }
 }

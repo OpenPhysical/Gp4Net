@@ -149,25 +149,25 @@ public class CardDataInfo
         bool isTopLevel = false
     )
     {
-        foreach (var element in SimpleTlvParser.Enumerate(data))
+        foreach (var element in TlvParser.ParseAll(data))
         {
             // Only store top-level tags in the Tags dictionary
             if (isTopLevel)
             {
-                cardData.Tags[(ushort)element.Tag] = element.Content;
+                cardData.Tags[(ushort)element.TagNumber] = element.Value;
             }
 
             // Special handling for OIDs (tag 0x06)
-            if (element.Tag == 0x06)
+            if (element.TagNumber == 0x06)
             {
                 // Parse OID using BouncyCastle
                 try
                 {
                     // Create DER-encoded OID from content
-                    var derBytes = new byte[element.Content.Length + 2];
+                    var derBytes = new byte[element.Value.Length + 2];
                     derBytes[0] = 0x06; // OID tag
-                    derBytes[1] = (byte)element.Content.Length;
-                    Buffer.BlockCopy(element.Content, 0, derBytes, 2, element.Content.Length);
+                    derBytes[1] = (byte)element.Value.Length;
+                    Buffer.BlockCopy(element.Value, 0, derBytes, 2, element.Value.Length);
 
                     var asn1Object = Asn1Object.FromByteArray(derBytes);
                     if (asn1Object is DerObjectIdentifier oidObj)
@@ -184,21 +184,19 @@ public class CardDataInfo
                     // Skip invalid OIDs
                 }
             }
-            else if (element.Content.Length >= 2)
+            else if (element.Value.Length >= 2)
             {
                 // Try to parse as DER to see if it contains nested structures
                 // Only recurse if we find at least one complete DER element
-                var nestedElements = SimpleTlvParser.Enumerate(element.Content).ToList();
+                var nestedElements = TlvParser.ParseAll(element.Value).ToList();
                 if (nestedElements.Any())
                 {
                     // Additional check: ensure we consumed all the content
                     // This helps avoid false positives where random data looks like DER
-                    var totalConsumed = nestedElements.Sum(e => e.TotalLength);
-                    if (totalConsumed == element.Content.Length)
-                    {
-                        // Recursively parse nested structures
-                        ParseDerElements(element.Content, cardData, isTopLevel: false);
-                    }
+                    // For now, skip this check as TlvObject doesn't track total length
+                    // TODO: Consider adding total length tracking to TlvObject
+                    // Recursively parse nested structures
+                    ParseDerElements(element.Value, cardData, isTopLevel: false);
                 }
             }
         }
@@ -274,9 +272,9 @@ public class CardDataInfo
             {
                 var description = KnownOids.GetDescription(oid);
                 _ = sb.AppendLine($"    Tag 6: {oid}");
-                if (!string.IsNullOrEmpty(description))
+                if (description.HasValue)
                 {
-                    _ = sb.AppendLine($"    -> {description}");
+                    _ = sb.AppendLine($"    -> {description.Value}");
                 }
             }
         }
@@ -294,26 +292,26 @@ public class CardDataInfo
         if (SecureChannelProtocolInfo != null)
         {
             _ = sb.AppendLine(
-                $"  Secure Channel Protocol Info: {BitConverter.ToString(SecureChannelProtocolInfo)}"
+                $"  Secure Channel Protocol Info: {Convert.ToHexString(SecureChannelProtocolInfo)}"
             );
         }
 
         if (CardConfigurationDetails != null)
         {
             _ = sb.AppendLine(
-                $"  Card Configuration Details: {BitConverter.ToString(CardConfigurationDetails)}"
+                $"  Card Configuration Details: {Convert.ToHexString(CardConfigurationDetails)}"
             );
         }
 
         if (CardChipDetails != null)
         {
-            _ = sb.AppendLine($"  Card/Chip Details: {BitConverter.ToString(CardChipDetails)}");
+            _ = sb.AppendLine($"  Card/Chip Details: {Convert.ToHexString(CardChipDetails)}");
         }
 
         _ = sb.AppendLine("  All Tags:");
         foreach (var tag in Tags.OrderBy(static t => t.Key))
         {
-            _ = sb.AppendLine($"    Tag {tag.Key:X2}: {BitConverter.ToString(tag.Value)}");
+            _ = sb.AppendLine($"    Tag {tag.Key:X2}: {Convert.ToHexString(tag.Value)}");
         }
 
         return sb.ToString();

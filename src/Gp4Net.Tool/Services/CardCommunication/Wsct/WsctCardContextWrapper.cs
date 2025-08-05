@@ -1,75 +1,72 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using Gp4Net.Transport;
 using WSCT.Wrapper;
 using WSCT.Wrapper.Desktop.Core;
 
-namespace Gp4Net.Tool.Services.CardCommunication.Wsct
+namespace Gp4Net.Tool.Services.CardCommunication.Wsct;
+
+/// <summary>
+/// Concrete implementation of ICardContextWrapper using WSCT.
+/// </summary>
+public class WsctCardContextWrapper : ICardContextWrapper
 {
+    private readonly CardContext _context;
+    private bool _disposed;
+
     /// <summary>
-    /// Concrete implementation of ICardContextWrapper using WSCT.
+    /// Initializes a new instance of the WsctCardContextWrapper class.
     /// </summary>
-    public class WsctCardContextWrapper : ICardContextWrapper
+    public WsctCardContextWrapper()
     {
-        private readonly CardContext _context;
-        private bool _disposed;
+        _context = new CardContext();
+    }
 
-        /// <summary>
-        /// Initializes a new instance of the WsctCardContextWrapper class.
-        /// </summary>
-        public WsctCardContextWrapper()
+    /// <inheritdoc />
+    public IReadOnlyList<string> Readers => _context.Readers ?? [];
+
+    /// <inheritdoc />
+    public ErrorCode Establish()
+    {
+        return _context.Establish();
+    }
+
+    /// <inheritdoc />
+    public ErrorCode ListReaders(string groups)
+    {
+        return _context.ListReaders(groups);
+    }
+
+    /// <inheritdoc />
+    public ICardChannelWrapper CreateCardChannel(string readerName)
+    {
+        return new WsctCardChannelWrapper(_context, readerName, WSCT.Wrapper.ShareMode.Exclusive);
+    }
+
+    /// <inheritdoc />
+    public ErrorCode Release()
+    {
+        if (!_disposed)
         {
-            _context = new CardContext();
+            return _context.Release();
         }
+        return ErrorCode.Success;
+    }
 
-        /// <inheritdoc />
-        public IReadOnlyList<string> Readers => _context.Readers ?? Array.Empty<string>();
 
-        /// <inheritdoc />
-        public ErrorCode Establish()
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (!_disposed)
         {
-            return _context.Establish();
-        }
-
-        /// <inheritdoc />
-        public ErrorCode ListReaders(string groups)
-        {
-            return _context.ListReaders(groups);
-        }
-
-        /// <inheritdoc />
-        public ICardChannelWrapper CreateCardChannel(string readerName)
-        {
-            return new WsctCardChannelWrapper(_context, readerName, WSCT.Wrapper.ShareMode.Exclusive);
-        }
-
-        /// <inheritdoc />
-        public ErrorCode Release()
-        {
-            if (!_disposed)
+            try
             {
-                return _context.Release();
+                _ = _context.Release();
             }
-            return ErrorCode.Success;
-        }
-
-
-        /// <inheritdoc />
-        public void Dispose()
-        {
-            if (!_disposed)
+            catch
             {
-                try
-                {
-                    _ = _context.Release();
-                }
-                catch
-                {
-                    // Ignore errors during cleanup
-                }
-                _disposed = true;
+                // Ignore errors during cleanup
             }
+            _disposed = true;
         }
     }
 }

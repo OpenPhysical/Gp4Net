@@ -5,262 +5,261 @@ using System.Text;
 using Gp4Net.Core.Tlv;
 using JetBrains.Annotations;
 
-namespace Gp4Net.Domain.CardInfo
+namespace Gp4Net.Domain.CardInfo;
+
+/// <summary>
+/// Key Information Template parser for GlobalPlatform tag 0xE0.
+/// Based on GlobalPlatform Card Specification section 9.3.3.1.
+/// </summary>
+[PublicAPI]
+public class KeyInformationTemplate
 {
     /// <summary>
-    /// Key Information Template parser for GlobalPlatform tag 0xE0.
-    /// Based on GlobalPlatform Card Specification section 9.3.3.1.
+    /// Gets the raw data.
     /// </summary>
-    [PublicAPI]
-    public class KeyInformationTemplate
+    public byte[] RawData { get; }
+
+    /// <summary>
+    /// Gets the list of key entries.
+    /// </summary>
+    public List<KeyEntry> Keys { get; } = [];
+
+    private KeyInformationTemplate(byte[] rawData)
     {
-        /// <summary>
-        /// Gets the raw data.
-        /// </summary>
-        public byte[] RawData { get; }
+        ArgumentNullException.ThrowIfNull(rawData);
+        RawData = rawData;
+    }
 
-        /// <summary>
-        /// Gets the list of key entries.
-        /// </summary>
-        public List<KeyEntry> Keys { get; } = [];
-
-        private KeyInformationTemplate(byte[] rawData)
+    /// <summary>
+    /// Parses Key Information Template from tag 0xE0 data.
+    /// </summary>
+    public static KeyInformationTemplate Parse(byte[] data)
+    {
+        if (data == null || data.Length == 0)
         {
-            ArgumentNullException.ThrowIfNull(rawData);
-            RawData = rawData;
+            throw new ArgumentException(
+                "Key information data cannot be null or empty",
+                nameof(data)
+            );
         }
 
-        /// <summary>
-        /// Parses Key Information Template from tag 0xE0 data.
-        /// </summary>
-        public static KeyInformationTemplate Parse(byte[] data)
+        var template = new KeyInformationTemplate(data);
+
+        // Check if data starts with E0 tag and extract the content
+        var contentToParse = data;
+        if (data.Length >= 2 && data[0] == 0xE0)
         {
-            if (data == null || data.Length == 0)
-            {
-                throw new ArgumentException(
-                    "Key information data cannot be null or empty",
-                    nameof(data)
-                );
-            }
-
-            var template = new KeyInformationTemplate(data);
-
-            // Check if data starts with E0 tag and extract the content
-            byte[] contentToParse = data;
-            if (data.Length >= 2 && data[0] == 0xE0)
-            {
-                // This is an E0 tag, extract its content
-                int offset = 1;
-                int length = 0;
+            // This is an E0 tag, extract its content
+            var offset = 1;
+            var length = 0;
                 
-                if ((data[1] & 0x80) == 0)
+            if ((data[1] & 0x80) == 0)
+            {
+                // Short form length
+                length = data[1];
+                offset = 2;
+            }
+            else
+            {
+                // Long form length
+                var lenLength = data[1] & 0x7F;
+                if (lenLength is > 0 and <= 4 && 2 + lenLength <= data.Length)
                 {
-                    // Short form length
-                    length = data[1];
                     offset = 2;
-                }
-                else
-                {
-                    // Long form length
-                    int lenLength = data[1] & 0x7F;
-                    if (lenLength > 0 && lenLength <= 4 && 2 + lenLength <= data.Length)
+                    for (var i = 0; i < lenLength; i++)
                     {
-                        offset = 2;
-                        for (int i = 0; i < lenLength; i++)
-                        {
-                            length = (length << 8) | data[offset++];
-                        }
+                        length = (length << 8) | data[offset++];
                     }
                 }
+            }
                 
-                if (length > 0 && offset + length <= data.Length)
-                {
-                    contentToParse = new byte[length];
-                    Array.Copy(data, offset, contentToParse, 0, length);
-                }
+            if (length > 0 && offset + length <= data.Length)
+            {
+                contentToParse = new byte[length];
+                Array.Copy(data, offset, contentToParse, 0, length);
             }
+        }
 
-            // Parse the content for C0 tags
-            var elements = SimpleTlvParser.Enumerate(contentToParse).ToList();
+        // Parse the content for C0 tags
+        var elements = TlvParser.ParseAll(contentToParse).ToList();
             
-            foreach (var element in elements)
-            {
-                if (element.Tag == 0xC0) // Key Information Data
-                {
-                    template.ParseKeyInformationData(element.Content);
-                }
-            }
-
-            return template;
-        }
-
-        private void ParseKeyInformationData(byte[] data)
+        foreach (var element in elements)
         {
-            if (data == null || data.Length < 3)
+            if (element.TagNumber == 0xC0) // Key Information Data
             {
-                return;
+                template.ParseKeyInformationData(element.Value);
             }
-
-            var keyEntry = new KeyEntry { KeyId = data[0], KeyVersion = data[1] };
-
-            // Parse key types starting from byte 2
-            // The format is: ID, Version, KeyType1, KeyType2, KeyType3, ...
-            for (int i = 2; i < data.Length; i++)
-            {
-                var keyType = ParseKeyType(data[i]);
-                if (keyType != KeyType.Unknown)
-                {
-                    keyEntry.KeyTypes.Add(keyType);
-                }
-            }
-
-            Keys.Add(keyEntry);
         }
 
-        private static KeyType ParseKeyType(byte value)
+        return template;
+    }
+
+    private void ParseKeyInformationData(byte[] data)
+    {
+        if (data == null || data.Length < 3)
         {
-            return value switch
-            {
-                0x80 => KeyType.Des,
-                0x81 => KeyType.TripleDes2Key,
-                0x82 => KeyType.TripleDes3Key,
-                0x83 => KeyType.Des3,
-                0x88 => KeyType.Aes,
-                0xA0 => KeyType.RsaPublicExponentECleartext,
-                0xA1 => KeyType.RsaModulusNCleartext,
-                0xA2 => KeyType.RsaModulusN,
-                0xA3 => KeyType.RsaPrivateExponentD,
-                0xA4 => KeyType.RsaChineseRemainderP,
-                0xA5 => KeyType.RsaChineseRemainderQ,
-                0xA6 => KeyType.RsaChineseRemainderPq,
-                0xA7 => KeyType.RsaChineseRemainderDpi,
-                0xA8 => KeyType.RsaChineseRemainderDqi,
-                0xFF => KeyType.NotAvailable,
-                _ => KeyType.Unknown
-            };
+            return;
         }
 
-        /// <summary>
-        /// Formats the key information as a human-readable string.
-        /// </summary>
-        public override string ToString()
+        var keyEntry = new KeyEntry { KeyId = data[0], KeyVersion = data[1] };
+
+        // Parse key types starting from byte 2
+        // The format is: ID, Version, KeyType1, KeyType2, KeyType3, ...
+        for (var i = 2; i < data.Length; i++)
         {
-            var sb = new StringBuilder();
-            _ = sb.AppendLine("Key Information Template:");
-
-            foreach (var key in Keys)
+            var keyType = ParseKeyType(data[i]);
+            if (keyType != KeyType.Unknown)
             {
-                _ = sb.AppendLine(key.ToString());
+                keyEntry.KeyTypes.Add(keyType);
             }
-
-            return sb.ToString();
         }
+
+        Keys.Add(keyEntry);
+    }
+
+    private static KeyType ParseKeyType(byte value)
+    {
+        return value switch
+        {
+            0x80 => KeyType.Des,
+            0x81 => KeyType.TripleDes2Key,
+            0x82 => KeyType.TripleDes3Key,
+            0x83 => KeyType.Des3,
+            0x88 => KeyType.Aes,
+            0xA0 => KeyType.RsaPublicExponentECleartext,
+            0xA1 => KeyType.RsaModulusNCleartext,
+            0xA2 => KeyType.RsaModulusN,
+            0xA3 => KeyType.RsaPrivateExponentD,
+            0xA4 => KeyType.RsaChineseRemainderP,
+            0xA5 => KeyType.RsaChineseRemainderQ,
+            0xA6 => KeyType.RsaChineseRemainderPq,
+            0xA7 => KeyType.RsaChineseRemainderDpi,
+            0xA8 => KeyType.RsaChineseRemainderDqi,
+            0xFF => KeyType.NotAvailable,
+            _ => KeyType.Unknown
+        };
     }
 
     /// <summary>
-    /// Represents a single key entry in the Key Information Template.
+    /// Formats the key information as a human-readable string.
     /// </summary>
-    public class KeyEntry
+    public override string ToString()
     {
-        /// <summary>
-        /// Gets or sets the key identifier.
-        /// </summary>
-        public byte KeyId { get; set; }
+        var sb = new StringBuilder();
+        _ = sb.AppendLine("Key Information Template:");
 
-        /// <summary>
-        /// Gets or sets the key version number.
-        /// </summary>
-        public byte KeyVersion { get; set; }
-
-        /// <summary>
-        /// Gets the list of key types supported for this key.
-        /// </summary>
-        public List<KeyType> KeyTypes { get; } = [];
-
-        /// <summary>
-        /// Gets the primary key type (first in the list).
-        /// </summary>
-        public KeyType PrimaryKeyType => KeyTypes.FirstOrDefault();
-
-        /// <summary>
-        /// Gets the key length in bits based on the key type.
-        /// </summary>
-        public int KeyLength => DetermineKeyLength(PrimaryKeyType);
-
-        private static int DetermineKeyLength(KeyType keyType)
+        foreach (var key in Keys)
         {
-            return keyType switch
-            {
-                KeyType.Des => 64,
-                KeyType.TripleDes2Key => 128,
-                KeyType.TripleDes3Key => 192,
-                KeyType.Des3 => 192,
-                KeyType.Aes => 128, // Default AES, actual length may vary
-                _ => 0
-            };
+            _ = sb.AppendLine(key.ToString());
         }
 
-        /// <summary>
-        /// Formats the key entry as a human-readable string.
-        /// </summary>
-        public override string ToString()
-        {
-            var keyTypeStr = PrimaryKeyType.ToFriendlyString();
-            var lengthStr = KeyLength > 0 ? $"length: {KeyLength / 8} ({keyTypeStr})" : keyTypeStr;
+        return sb.ToString();
+    }
+}
 
-            return $"Version: {KeyVersion} (0x{KeyVersion:X2}) ID: {KeyId} (0x{KeyId:X2}) type: {keyTypeStr, -12} {lengthStr}";
-        }
+/// <summary>
+/// Represents a single key entry in the Key Information Template.
+/// </summary>
+public class KeyEntry
+{
+    /// <summary>
+    /// Gets or sets the key identifier.
+    /// </summary>
+    public byte KeyId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the key version number.
+    /// </summary>
+    public byte KeyVersion { get; set; }
+
+    /// <summary>
+    /// Gets the list of key types supported for this key.
+    /// </summary>
+    public List<KeyType> KeyTypes { get; } = [];
+
+    /// <summary>
+    /// Gets the primary key type (first in the list).
+    /// </summary>
+    public KeyType PrimaryKeyType => KeyTypes.FirstOrDefault();
+
+    /// <summary>
+    /// Gets the key length in bits based on the key type.
+    /// </summary>
+    public int KeyLength => DetermineKeyLength(PrimaryKeyType);
+
+    private static int DetermineKeyLength(KeyType keyType)
+    {
+        return keyType switch
+        {
+            KeyType.Des => 64,
+            KeyType.TripleDes2Key => 128,
+            KeyType.TripleDes3Key => 192,
+            KeyType.Des3 => 192,
+            KeyType.Aes => 128, // Default AES, actual length may vary
+            _ => 0
+        };
     }
 
     /// <summary>
-    /// Key types as defined in GlobalPlatform specification.
+    /// Formats the key entry as a human-readable string.
     /// </summary>
-    public enum KeyType
+    public override string ToString()
     {
-        Unknown = 0,
-        Des = 0x80,
-        TripleDes2Key = 0x81,
-        TripleDes3Key = 0x82,
-        Des3 = 0x83,
-        Aes = 0x88,
-        RsaPublicExponentECleartext = 0xA0,
-        RsaModulusNCleartext = 0xA1,
-        RsaModulusN = 0xA2,
-        RsaPrivateExponentD = 0xA3,
-        RsaChineseRemainderP = 0xA4,
-        RsaChineseRemainderQ = 0xA5,
-        RsaChineseRemainderPq = 0xA6,
-        RsaChineseRemainderDpi = 0xA7,
-        RsaChineseRemainderDqi = 0xA8,
-        NotAvailable = 0xFF
-    }
+        var keyTypeStr = PrimaryKeyType.ToFriendlyString();
+        var lengthStr = KeyLength > 0 ? $"length: {KeyLength / 8} ({keyTypeStr})" : keyTypeStr;
 
-    /// <summary>
-    /// Extension methods for KeyType formatting.
-    /// </summary>
-    public static class KeyTypeExtensions
+        return $"Version: {KeyVersion} (0x{KeyVersion:X2}) ID: {KeyId} (0x{KeyId:X2}) type: {keyTypeStr, -12} {lengthStr}";
+    }
+}
+
+/// <summary>
+/// Key types as defined in GlobalPlatform specification.
+/// </summary>
+public enum KeyType
+{
+    Unknown = 0,
+    Des = 0x80,
+    TripleDes2Key = 0x81,
+    TripleDes3Key = 0x82,
+    Des3 = 0x83,
+    Aes = 0x88,
+    RsaPublicExponentECleartext = 0xA0,
+    RsaModulusNCleartext = 0xA1,
+    RsaModulusN = 0xA2,
+    RsaPrivateExponentD = 0xA3,
+    RsaChineseRemainderP = 0xA4,
+    RsaChineseRemainderQ = 0xA5,
+    RsaChineseRemainderPq = 0xA6,
+    RsaChineseRemainderDpi = 0xA7,
+    RsaChineseRemainderDqi = 0xA8,
+    NotAvailable = 0xFF
+}
+
+/// <summary>
+/// Extension methods for KeyType formatting.
+/// </summary>
+public static class KeyTypeExtensions
+{
+    public static string ToFriendlyString(this KeyType keyType)
     {
-        public static string ToFriendlyString(this KeyType keyType)
+        return keyType switch
         {
-            return keyType switch
-            {
-                KeyType.Des => "DES",
-                KeyType.TripleDes2Key => "3DES-2KEY",
-                KeyType.TripleDes3Key => "3DES-3KEY",
-                KeyType.Des3 => "3DES",
-                KeyType.Aes => "AES",
-                KeyType.RsaPublicExponentECleartext => "RSA-PUB-E",
-                KeyType.RsaModulusNCleartext => "RSA-MOD-N",
-                KeyType.RsaModulusN => "RSA-MOD-N-ENC",
-                KeyType.RsaPrivateExponentD => "RSA-PRIV-D",
-                KeyType.RsaChineseRemainderP => "RSA-CRT-P",
-                KeyType.RsaChineseRemainderQ => "RSA-CRT-Q",
-                KeyType.RsaChineseRemainderPq => "RSA-CRT-PQ",
-                KeyType.RsaChineseRemainderDpi => "RSA-CRT-DPI",
-                KeyType.RsaChineseRemainderDqi => "RSA-CRT-DQI",
-                KeyType.NotAvailable => "N/A",
-                _ => $"Unknown(0x{(byte)keyType:X2})"
-            };
-        }
+            KeyType.Des => "DES",
+            KeyType.TripleDes2Key => "3DES-2KEY",
+            KeyType.TripleDes3Key => "3DES-3KEY",
+            KeyType.Des3 => "3DES",
+            KeyType.Aes => "AES",
+            KeyType.RsaPublicExponentECleartext => "RSA-PUB-E",
+            KeyType.RsaModulusNCleartext => "RSA-MOD-N",
+            KeyType.RsaModulusN => "RSA-MOD-N-ENC",
+            KeyType.RsaPrivateExponentD => "RSA-PRIV-D",
+            KeyType.RsaChineseRemainderP => "RSA-CRT-P",
+            KeyType.RsaChineseRemainderQ => "RSA-CRT-Q",
+            KeyType.RsaChineseRemainderPq => "RSA-CRT-PQ",
+            KeyType.RsaChineseRemainderDpi => "RSA-CRT-DPI",
+            KeyType.RsaChineseRemainderDqi => "RSA-CRT-DQI",
+            KeyType.NotAvailable => "N/A",
+            _ => $"Unknown(0x{(byte)keyType:X2})"
+        };
     }
 }

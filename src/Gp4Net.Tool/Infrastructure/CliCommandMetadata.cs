@@ -1,23 +1,20 @@
-using System;
+namespace Gp4Net.Tool.Infrastructure;
 
-namespace Gp4Net.Tool.Infrastructure
+/// <summary>
+/// Marker interface for CLI commands to enable Scrutor scanning.
+/// </summary>
+public interface ICliCommand
 {
     /// <summary>
-    /// Marker interface for CLI commands to enable Scrutor scanning.
+    /// Gets the command metadata.
     /// </summary>
-    public interface ICliCommand
-    {
-        /// <summary>
-        /// Gets the command metadata.
-        /// </summary>
-        static abstract CliCommandMetadata Metadata { get; }
-    }
-
-    /// <summary>
-    /// Metadata for CLI commands.
-    /// </summary>
-    public record CliCommandMetadata(
-        string Name,
-        string Description,
-        string? ParentCommand = null);
+    static abstract CliCommandMetadata Metadata { get; }
 }
+
+/// <summary>
+/// Metadata for CLI commands.
+/// </summary>
+public record CliCommandMetadata(
+    string Name,
+    string Description,
+    string? ParentCommand = null);

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using CSharpFunctionalExtensions;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Core.Asn1;
@@ -29,10 +30,12 @@ public static class KnownOids
     /// Gets the description for a known OID.
     /// </summary>
     /// <param name="oid">The OID in dotted notation.</param>
-    /// <returns>The description if known, otherwise null.</returns>
-    public static string? GetDescription(string oid)
+    /// <returns>The description if known, otherwise None.</returns>
+    public static Maybe<string> GetDescription(string oid)
     {
-        return OidDescriptions.GetValueOrDefault(oid);
+        return OidDescriptions.TryGetValue(oid, out var description) 
+            ? Maybe<string>.From(description) 
+            : Maybe<string>.None;
     }
 
     /// <summary>

@@ -1,81 +1,77 @@
-using System;
-using Gp4Net.Transport;
 using WSCT.Core.APDU;
-using WSCT.ISO7816;
 using WSCT.Wrapper;
 using WSCT.Wrapper.Desktop.Core;
 
-namespace Gp4Net.Tool.Services.CardCommunication.Wsct
+namespace Gp4Net.Tool.Services.CardCommunication.Wsct;
+
+/// <summary>
+/// Concrete implementation of ICardChannelWrapper using WSCT.
+/// </summary>
+public class WsctCardChannelWrapper : ICardChannelWrapper
 {
+    private readonly CardChannel _channel;
+    private bool _disposed;
+
+
     /// <summary>
-    /// Concrete implementation of ICardChannelWrapper using WSCT.
+    /// Initializes a new instance of the WsctCardChannelWrapper class.
     /// </summary>
-    public class WsctCardChannelWrapper : ICardChannelWrapper
+    /// <param name="context">The WSCT card context.</param>
+    /// <param name="readerName">The reader name.</param>
+    /// <param name="shareMode">The share mode.</param>
+    public WsctCardChannelWrapper(CardContext context, string readerName, WSCT.Wrapper.ShareMode shareMode)
     {
-        private readonly CardChannel _channel;
-        private bool _disposed;
+        _channel = new CardChannel(context, readerName);
+    }
 
+    /// <inheritdoc />
+    public ErrorCode Connect(WSCT.Wrapper.ShareMode shareMode, WSCT.Wrapper.Protocol protocol)
+    {
+        return _channel.Connect(shareMode, protocol);
+    }
 
-        /// <summary>
-        /// Initializes a new instance of the WsctCardChannelWrapper class.
-        /// </summary>
-        /// <param name="context">The WSCT card context.</param>
-        /// <param name="readerName">The reader name.</param>
-        /// <param name="shareMode">The share mode.</param>
-        public WsctCardChannelWrapper(CardContext context, string readerName, WSCT.Wrapper.ShareMode shareMode)
+    /// <inheritdoc />
+    public ErrorCode Disconnect(Disposition disposition)
+    {
+        if (!_disposed)
         {
-            _channel = new CardChannel(context, readerName);
+            return _channel.Disconnect(disposition);
         }
+        return ErrorCode.Success;
+    }
 
-        /// <inheritdoc />
-        public ErrorCode Connect(WSCT.Wrapper.ShareMode shareMode, WSCT.Wrapper.Protocol protocol)
-        {
-            return _channel.Connect(shareMode, protocol);
-        }
+    /// <inheritdoc />
+    public State GetStatus()
+    {
+        return _channel.GetStatus();
+    }
 
-        /// <inheritdoc />
-        public ErrorCode Disconnect(Disposition disposition)
+    /// <inheritdoc />
+    public ErrorCode GetAttrib(Attrib attrib, ref byte[] buffer)
+    {
+        return _channel.GetAttrib(attrib, ref buffer);
+    }
+
+    /// <inheritdoc />
+    public ErrorCode Transmit(ICardCommand command, ICardResponse response)
+    {
+        return _channel.Transmit(command, response);
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (!_disposed)
         {
-            if (!_disposed)
+            try
             {
-                return _channel.Disconnect(disposition);
+                _channel.Disconnect(Disposition.UnpowerCard);
             }
-            return ErrorCode.Success;
-        }
-
-        /// <inheritdoc />
-        public State GetStatus()
-        {
-            return _channel.GetStatus();
-        }
-
-        /// <inheritdoc />
-        public ErrorCode GetAttrib(Attrib attrib, ref byte[] buffer)
-        {
-            return _channel.GetAttrib(attrib, ref buffer);
-        }
-
-        /// <inheritdoc />
-        public ErrorCode Transmit(ICardCommand command, ICardResponse response)
-        {
-            return _channel.Transmit(command, response);
-        }
-
-        /// <inheritdoc />
-        public void Dispose()
-        {
-            if (!_disposed)
+            catch
             {
-                try
-                {
-                    _channel.Disconnect(Disposition.UnpowerCard);
-                }
-                catch
-                {
-                    // Ignore errors during cleanup
-                }
-                _disposed = true;
+                // Ignore errors during cleanup
             }
+            _disposed = true;
         }
     }
 }

@@ -1290,13 +1290,19 @@
             Gets a value indicating whether this reader was selected via partial match.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Infrastructure.Reader.#ctor(System.String,System.Boolean,System.Boolean)">
+        <member name="P:Gp4Net.Tool.Infrastructure.Reader.IsVirtual">
+            <summary>
+            Gets a value indicating whether this is a virtual card emulator reader.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.Reader.#ctor(System.String,System.Boolean,System.Boolean,System.Boolean)">
             <summary>
             Initializes a new instance of the Reader class.
             </summary>
             <param name="name">The reader name.</param>
             <param name="isAutoDetected">Whether this reader was auto-detected.</param>
             <param name="isPartialMatch">Whether this reader was selected via partial match.</param>
+            <param name="isVirtual">Whether this is a virtual card emulator reader.</param>
         </member>
         <member name="M:Gp4Net.Tool.Infrastructure.Reader.ToString">
             <summary>
@@ -1315,6 +1321,7 @@
             Type converter for smart card reader names that supports:
             - Partial name matching (case-insensitive)
             - Auto-detection with user prompts
+            - Virtual card emulator support
             - Intelligent error handling
             </summary>
         </member>
@@ -1580,6 +1587,24 @@
             Functional implementation of CLI execution context using Result patterns.
             </summary>
         </member>
+        <member name="M:Gp4Net.Tool.Pipeline.FunctionalCliContext.GetGlobalPlatformService">
+            <summary>
+            Retrieves the instance of the <c>IGlobalPlatformService</c> associated with the context.
+            If the service is already initialized, the cached instance is returned. Otherwise, it
+            initializes the service using the provided <c>IDomainServiceFactory</c> and <c>ICardService</c>.
+            </summary>
+            <returns>The initialized <c>IGlobalPlatformService</c> instance.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.FunctionalCliContext.RequireCardConnection(CSharpFunctionalExtensions.Maybe{System.String})">
+            <summary>
+            Ensures that a card connection is established using the <c>ICardService</c>.
+            If already connected, the current instance of <c>ICliExecutionContext</c> is returned.
+            If not, attempts to connect to the card using the specified reader name.
+            </summary>
+            <param name="readerName">The optional name of the card reader to use for the connection.</param>
+            <returns>The current <c>ICliExecutionContext</c> if the connection is successful, or throws an exception on failure.</returns>
+            <exception cref="T:System.InvalidOperationException">Thrown when the connection attempt fails with an error message.</exception>
+        </member>
         <member name="T:Gp4Net.Tool.Pipeline.FunctionalCommandExtensions">
             <summary>
             Extension methods for functional command execution without exceptions.
@@ -1647,12 +1672,12 @@
             Gets the keyset resolver for key management.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Pipeline.ICliExecutionContext.RequireCardConnection(System.String)">
+        <member name="M:Gp4Net.Tool.Pipeline.ICliExecutionContext.RequireCardConnection(CSharpFunctionalExtensions.Maybe{System.String})">
             <summary>
             Ensures a card connection is established with the specified reader.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Pipeline.ICliExecutionContext.RequireSecureChannel(System.Byte,System.String)">
+        <member name="M:Gp4Net.Tool.Pipeline.ICliExecutionContext.RequireSecureChannel(System.Byte,CSharpFunctionalExtensions.Maybe{System.String})">
             <summary>
             Ensures a secure channel is established with the specified security level.
             </summary>
@@ -2662,6 +2687,57 @@
         <member name="M:Gp4Net.Tool.Services.EnvironmentValidationService.DetectCardEnvironmentAsync(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="T:Gp4Net.Tool.Services.HybridCardService">
+            <summary>
+            Hybrid card service that supports both real smart cards and virtual card emulators.
+            Routes requests to the appropriate service based on reader type.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.HybridCardService.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Tool.Services.VirtualCardServiceAdapter,Microsoft.Extensions.Logging.ILogger{Gp4Net.Tool.Services.HybridCardService})">
+            <summary>
+            Initializes a new instance of the HybridCardService class.
+            </summary>
+            <param name="realCardService">The real card service for physical readers.</param>
+            <param name="virtualCardService">The virtual card service adapter.</param>
+            <param name="logger">The logger.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.HybridCardService.GetReaders">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.HybridCardService.Connect(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.HybridCardService.Disconnect">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.HybridCardService.IsConnected">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.HybridCardService.GetAtr">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.HybridCardService.SendCommand(System.Byte[])">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.HybridCardService.SendCommand(Gp4Net.Transport.IApduCommand)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.HybridCardService.EstablishSecureChannel(System.Byte[],System.Byte)">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Tool.Services.HybridCardService.IsSecureChannelEstablished">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.HybridCardService.IsVirtualReader(System.String)">
+            <summary>
+            Determines if a reader name refers to a virtual card emulator.
+            </summary>
+            <param name="readerName">The reader name to check.</param>
+            <returns>True if the reader is virtual, false otherwise.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.HybridCardService.Dispose">
+            <inheritdoc />
+        </member>
         <member name="T:Gp4Net.Tool.Services.ICardCompatibilityService">
             <summary>
             Service for checking card compatibility with operations to prevent damage or lockout.
@@ -3217,6 +3293,37 @@
             <summary>
             Parses a trace reader name to extract path and operations.
             </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.VirtualCardServiceAdapter">
+            <summary>
+            Adapter that allows virtual card services to be used as smart card services in the CLI.
+            Provides seamless integration between the card emulator and CLI tools.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.VirtualCardServiceAdapter.#ctor(Gp4Net.CardEmulator.Services.VirtualCardService,Microsoft.Extensions.Logging.ILogger{Gp4Net.Tool.Services.VirtualCardServiceAdapter})">
+            <summary>
+            Initializes a new instance of the VirtualCardServiceAdapter class.
+            </summary>
+            <param name="virtualCardService">The virtual card service to adapt.</param>
+            <param name="logger">The logger.</param>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.VirtualCardServiceAdapter.Context">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.VirtualCardServiceAdapter.ExecuteCommandAsync(Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.VirtualCardServiceAdapter.ExecuteCommandAsync(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.CommandOptions,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.VirtualCardServiceAdapter.WithContext(Gp4Net.Pipeline.IPipelineContext)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.VirtualCardServiceAdapter.WithContextValue``1(System.String,``0)">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.VirtualCardServiceAdapter.Dispose">
+            <inheritdoc />
         </member>
         <member name="T:Gp4Net.Tool.Services.WsctCardService">
             <summary>

@@ -1,67 +1,67 @@
 using System;
 using System.Collections.Generic;
+using CSharpFunctionalExtensions;
 
-namespace Gp4Net.Tests.Domain.Commands.TestHelpers
+namespace Gp4Net.Tests.Domain.Commands.TestHelpers;
+
+/// <summary>
+/// Helper class to build TLV structures for testing.
+/// </summary>
+internal class TlvTestBuilder
 {
-    /// <summary>
-    /// Helper class to build TLV structures for testing.
-    /// </summary>
-    internal class TlvTestBuilder
+    private readonly List<byte> _data = new();
+
+    public void Add(int tag, byte[] value)
     {
-        private readonly List<byte> _data = new();
+        AddTag(tag);
+        AddLength(value.Length);
+        _data.AddRange(value);
+    }
 
-        public void Add(int tag, byte[] value)
+    public void Add(int tag, Action<TlvTestBuilder> constructedContent)
+    {
+        var subBuilder = new TlvTestBuilder();
+        constructedContent(subBuilder);
+        var value = subBuilder.Build();
+        Add(tag, value);
+    }
+
+    public byte[] Build()
+    {
+        return _data.ToArray();
+    }
+
+    private void AddTag(int tag)
+    {
+        if (tag <= 0xFF)
         {
-            AddTag(tag);
-            AddLength(value.Length);
-            _data.AddRange(value);
+            _data.Add((byte)tag);
         }
-
-        public void Add(int tag, Action<TlvTestBuilder> constructedContent)
+        else if (tag <= 0xFFFF)
         {
-            var subBuilder = new TlvTestBuilder();
-            constructedContent(subBuilder);
-            var value = subBuilder.Build();
-            Add(tag, value);
+            _data.Add((byte)(tag >> 8));
+            _data.Add((byte)(tag & 0xFF));
         }
-
-        public byte[] Build()
+        else
         {
-            return _data.ToArray();
+            throw new NotSupportedException("Tags larger than 2 bytes not supported in this helper");
         }
+    }
 
-        private void AddTag(int tag)
+    private void AddLength(int length)
+    {
+        if (length <= 127)
         {
-            if (tag <= 0xFF)
-            {
-                _data.Add((byte)tag);
-            }
-            else if (tag <= 0xFFFF)
-            {
-                _data.Add((byte)(tag >> 8));
-                _data.Add((byte)(tag & 0xFF));
-            }
-            else
-            {
-                throw new NotSupportedException("Tags larger than 2 bytes not supported in this helper");
-            }
+            _data.Add((byte)length);
         }
-
-        private void AddLength(int length)
+        else if (length <= 255)
         {
-            if (length <= 127)
-            {
-                _data.Add((byte)length);
-            }
-            else if (length <= 255)
-            {
-                _data.Add(0x81);
-                _data.Add((byte)length);
-            }
-            else
-            {
-                throw new NotSupportedException("Lengths larger than 255 not supported in this helper");
-            }
+            _data.Add(0x81);
+            _data.Add((byte)length);
+        }
+        else
+        {
+            throw new NotSupportedException("Lengths larger than 255 not supported in this helper");
         }
     }
 }
