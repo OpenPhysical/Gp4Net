@@ -3,7 +3,6 @@ using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
 using Gp4Net.Core;
-using Gp4Net.Domain;
 using Gp4Net.Services;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Services;
@@ -170,7 +169,13 @@ public class InstallCliCommand : BaseCommand<InstallCliCommand.Settings>
         /// <summary>
         /// Gets a value indicating whether to install applets.
         /// </summary>
-        public bool InstallApplets => !NoInstallApplets;
+        public bool InstallApplets
+        {
+            get
+            {
+                return !NoInstallApplets;
+            }
+        }
 
         /// <summary>
         /// Gets or sets a value indicating whether to make applets selectable.
@@ -182,10 +187,24 @@ public class InstallCliCommand : BaseCommand<InstallCliCommand.Settings>
         /// <summary>
         /// Gets a value indicating whether to make applets selectable.
         /// </summary>
-        public bool MakeSelectable => !NoMakeSelectable;
+        public bool MakeSelectable
+        {
+            get
+            {
+                return !NoMakeSelectable;
+            }
+        }
 
         /// <inheritdoc />
-        public override bool RequiresSecureChannel => true; // Installation always requires secure channel
+        public override bool RequiresSecureChannel
+        {
+            get
+            {
+                return true;
+
+                // Installation always requires secure channel
+            }
+        }
 
         /// <summary>
         /// Validates the command settings.

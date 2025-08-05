@@ -17,4 +17,4 @@ public interface ICliCommand
 public record CliCommandMetadata(
     string Name,
     string Description,
-    string? ParentCommand = null);
+    string ParentCommand = null);

@@ -267,8 +267,11 @@ public class ParseTlvCommand : IPipelineCommand<ParseTlvCommand.Settings>
 
     private static bool IsLikelyTlv(byte[] data)
     {
-        if (data.Length < 2) return false;
-            
+        if (data.Length < 2)
+        {
+            return false;
+        }
+
         try
         {
             var elements = TlvParser.ParseAll(data);
@@ -284,7 +287,10 @@ public class ParseTlvCommand : IPipelineCommand<ParseTlvCommand.Settings>
     {
         foreach (var b in data)
         {
-            if (b < 32 || b > 126) return false;
+            if (b < 32 || b > 126)
+            {
+                return false;
+            }
         }
         return true;
     }

@@ -128,19 +128,43 @@ public class ExternalAuthenticateCommand : BaseApduCommand
     }
 
     /// <inheritdoc />
-    public override byte Cla => ClassByte;
+    public override byte Cla
+    {
+        get
+        {
+            return ClassByte;
+        }
+    }
 
     /// <inheritdoc />
-    public override byte Ins => InstructionByte;
+    public override byte Ins
+    {
+        get
+        {
+            return InstructionByte;
+        }
+    }
 
     /// <inheritdoc />
-    public override byte P1 => (byte)SecurityLevel;
+    public override byte P1
+    {
+        get
+        {
+            return (byte)SecurityLevel;
+        }
+    }
 
     /// <inheritdoc />
-    public override byte P2 => 0x00;
+    public override byte P2
+    {
+        get
+        {
+            return 0x00;
+        }
+    }
 
     /// <inheritdoc />
-    public override byte[]? Data
+    public override byte[] Data
     {
         get
         {
@@ -157,28 +181,16 @@ public class ExternalAuthenticateCommand : BaseApduCommand
     }
 
     /// <inheritdoc />
-    public override int? ExpectedResponseLength => null; // No response data expected
-
-    /// <summary>
-    /// Converts this command to an APDU byte array.
-    /// This method is obsolete. Use IApduTransport.TransmitAsync instead.
-    /// </summary>
-    /// <returns>The APDU command bytes.</returns>
-    [Obsolete("Use IApduTransport.TransmitAsync instead of manual APDU building")]
-    public new byte[] ToApdu()
+    public override Maybe<int> ExpectedResponseLength
     {
-        return base.ToApdu();
+        get
+        {
+            return Maybe<int>.None;
+
+            // No response data expected
+        }
     }
 
-    /// <summary>
-    /// Gets the APDU byte array for this command (backward compatibility alias for ToApdu).
-    /// </summary>
-    /// <returns>The APDU command bytes.</returns>
-    [Obsolete("Use IApduTransport.TransmitAsync instead of manual APDU building")]
-    public byte[] GetApdu()
-    {
-        return ToApdu();
-    }
 
     /// <summary>
     /// Returns a string representation of this command.

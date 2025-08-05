@@ -1,12 +1,13 @@
 using System;
 using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Transport;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
 [TestFixture]
+[Category("Unit")]
 public class SelectCommandAutoDetectionTests
 {
     [Test]
@@ -33,9 +34,7 @@ public class SelectCommandAutoDetectionTests
         var command = result.Value;
 
         // Act
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.ToApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 });

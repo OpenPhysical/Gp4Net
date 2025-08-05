@@ -187,11 +187,19 @@ public sealed class SecureKeyStore
         var dekKeyResult = GetKey(dekKeyId);
 
         if (encKeyResult.IsFailure)
+        {
             return Result.Failure<IKeySet, SmartCardError>(encKeyResult.Error);
+        }
+
         if (macKeyResult.IsFailure)
+        {
             return Result.Failure<IKeySet, SmartCardError>(macKeyResult.Error);
+        }
+
         if (dekKeyResult.IsFailure)
+        {
             return Result.Failure<IKeySet, SmartCardError>(dekKeyResult.Error);
+        }
 
         using (var encKey = encKeyResult.Value)
         using (var macKey = macKeyResult.Value)

@@ -15,7 +15,13 @@ public class ApduTrace
     /// <summary>
     /// Gets the list of APDU exchanges in the trace.
     /// </summary>
-    public IReadOnlyList<ApduExchange> Exchanges => _exchanges.AsReadOnly();
+    public IReadOnlyList<ApduExchange> Exchanges
+    {
+        get
+        {
+            return _exchanges.AsReadOnly();
+        }
+    }
 
     /// <summary>
     /// Gets the ATR if captured in the trace.
@@ -88,7 +94,13 @@ public class ApduExchange
     /// <summary>
     /// Gets whether this exchange has a response.
     /// </summary>
-    public bool HasResponse => Response != null;
+    public bool HasResponse
+    {
+        get
+        {
+            return Response != null;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the ApduExchange class.

@@ -32,7 +32,13 @@ public class TraceReplayCard : IVirtualCard
     /// <summary>
     /// Gets the executed exchanges for verification.
     /// </summary>
-    public IReadOnlyList<ApduExchange> ExecutedExchanges => _executedExchanges.AsReadOnly();
+    public IReadOnlyList<ApduExchange> ExecutedExchanges
+    {
+        get
+        {
+            return _executedExchanges.AsReadOnly();
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the TraceReplayCard class.

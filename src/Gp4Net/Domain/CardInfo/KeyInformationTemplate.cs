@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Core.Tlv;
 using JetBrains.Annotations;
 
@@ -26,20 +28,19 @@ public class KeyInformationTemplate
 
     private KeyInformationTemplate(byte[] rawData)
     {
-        ArgumentNullException.ThrowIfNull(rawData);
+        // rawData is guaranteed to be non-null by static factory methods
         RawData = rawData;
     }
 
     /// <summary>
     /// Parses Key Information Template from tag 0xE0 data.
     /// </summary>
-    public static KeyInformationTemplate Parse(byte[] data)
+    public static Result<KeyInformationTemplate, SmartCardError> Parse(byte[] data)
     {
         if (data == null || data.Length == 0)
         {
-            throw new ArgumentException(
-                "Key information data cannot be null or empty",
-                nameof(data)
+            return SmartCardError.InvalidArgument(
+                "Key information data cannot be null or empty"
             );
         }
 
@@ -91,7 +92,7 @@ public class KeyInformationTemplate
             }
         }
 
-        return template;
+        return Result.Success<KeyInformationTemplate, SmartCardError>(template);
     }
 
     private void ParseKeyInformationData(byte[] data)
@@ -180,12 +181,24 @@ public class KeyEntry
     /// <summary>
     /// Gets the primary key type (first in the list).
     /// </summary>
-    public KeyType PrimaryKeyType => KeyTypes.FirstOrDefault();
+    public KeyType PrimaryKeyType
+    {
+        get
+        {
+            return KeyTypes.FirstOrDefault();
+        }
+    }
 
     /// <summary>
     /// Gets the key length in bits based on the key type.
     /// </summary>
-    public int KeyLength => DetermineKeyLength(PrimaryKeyType);
+    public int KeyLength
+    {
+        get
+        {
+            return DetermineKeyLength(PrimaryKeyType);
+        }
+    }
 
     private static int DetermineKeyLength(KeyType keyType)
     {

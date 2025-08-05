@@ -47,6 +47,13 @@ public enum ScpImplementation : byte
     Scp02AesKeys = 0x1A,
     
     /// <summary>
+    /// SCP02: 3 Secure Channel Keys with R-MAC support (35)
+    /// Initiation mode explicit, C-MAC on modified APDU, ICV set to zero,
+    /// ICV encryption for C-MAC session, R-MAC support
+    /// </summary>
+    Scp02ThreeKeysRMac = 0x35,
+    
+    /// <summary>
     /// SCP02: Well-known pseudo-random algorithm (55)
     /// Uses specific PRF for key derivation
     /// </summary>
@@ -79,6 +86,14 @@ public enum ScpImplementation : byte
     /// Alias for Scp02ThreeKeys - same implementation value
     /// </summary>
     Scp02ImplicitInitVector = 0x05,
+    
+    /// <summary>
+    /// SCP02: 3 Secure Channel Keys with pseudo-random and R-MAC support (75)
+    /// Initiation mode explicit, C-MAC on modified APDU, ICV set to zero,
+    /// ICV encryption for C-MAC session, well-known pseudo-random algorithm,
+    /// R-MAC support
+    /// </summary>
+    Scp02PseudoRandomRMac = 0x75,
     
     /// <summary>
     /// SCP03: AES with 128-bit keys
@@ -185,9 +200,20 @@ public static class ScpImplementationExtensions
     public static bool UsesPseudoRandom(this ScpImplementation implementation)
     {
         var value = (byte)implementation;
-        // SCP02: i=55
+        // SCP02: i=55, i=75
         // SCP03: i=70
-        return value is 0x55 or 0x70;
+        return value is 0x55 or 0x75 or 0x70;
+    }
+    
+    /// <summary>
+    /// Determines if this implementation supports R-MAC (Response MAC).
+    /// </summary>
+    public static bool SupportsRMac(this ScpImplementation implementation)
+    {
+        var value = (byte)implementation;
+        // SCP02: Check bit 6 (0x20) for R-MAC support
+        // i=35, i=75 have R-MAC support
+        return (value & 0x20) != 0;
     }
     
     /// <summary>
@@ -212,9 +238,9 @@ public static class ScpImplementationExtensions
     public static bool IsScp02(this ScpImplementation implementation)
     {
         var value = (byte)implementation;
-        // SCP02: i=00, 04, 05, 14, 15, 1A, 55
+        // SCP02: i=00, 04, 05, 14, 15, 1A, 35, 55, 75
         // Note: Some values have multiple enum names (aliases) for clarity
-        return value is 0x00 or 0x04 or 0x05 or 0x14 or 0x15 or 0x1A or 0x55;
+        return value is 0x00 or 0x04 or 0x05 or 0x14 or 0x15 or 0x1A or 0x35 or 0x55 or 0x75;
     }
     
     /// <summary>

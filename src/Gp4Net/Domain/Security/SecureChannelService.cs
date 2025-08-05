@@ -77,7 +77,9 @@ public class SecureChannelService : ISecureChannelService
     private static Result<IApduCommand, SmartCardError> ValidateCommand(IApduCommand command)
     {
         if (command == null)
+        {
             return SmartCardError.InvalidArgument("Command cannot be null");
+        }
 
         return Result.Success<IApduCommand, SmartCardError>(command);
     }
@@ -85,10 +87,14 @@ public class SecureChannelService : ISecureChannelService
     private static Result<byte[], SmartCardError> ValidateResponse(byte[] response)
     {
         if (response == null)
+        {
             return SmartCardError.InvalidArgument("Response cannot be null");
+        }
 
         if (response.Length < 2)
+        {
             return SmartCardError.InvalidData("Response must contain at least status word");
+        }
 
         return Result.Success<byte[], SmartCardError>(response);
     }
@@ -110,7 +116,9 @@ public class SecureChannelService : ISecureChannelService
     {
         // For command wrapping, we need at least C-MAC capability
         if (!state.HasCommandMac)
+        {
             return SmartCardError.InvalidArgument("Command wrapping requires C-MAC capability");
+        }
 
         return Result.Success<SecureChannelState, SmartCardError>(state);
     }
@@ -119,7 +127,9 @@ public class SecureChannelService : ISecureChannelService
     {
         // For response unwrapping, we need at least R-MAC capability
         if (!state.HasResponseMac)
+        {
             return SmartCardError.InvalidArgument("Response unwrapping requires R-MAC capability");
+        }
 
         return Result.Success<SecureChannelState, SmartCardError>(state);
     }

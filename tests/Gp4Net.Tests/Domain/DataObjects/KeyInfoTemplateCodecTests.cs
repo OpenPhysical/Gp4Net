@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
-using System;
 using AwesomeAssertions;
 using Gp4Net.Domain.DataObjects;
 using NUnit.Framework;
@@ -74,8 +73,10 @@ public class KeyInfoTemplateCodecTests
         result.IsSuccess.Should().BeTrue();
         var keyInfo = result.Value;
 
-        keyInfo.KeyVersionNumber.Should().Be(0x01);
-        keyInfo.KeyIdentifier.Should().Be(0x00);
+        keyInfo.KeyVersionNumber.HasValue.Should().BeTrue();
+        keyInfo.KeyVersionNumber.Value.Should().Be(0x01);
+        keyInfo.KeyIdentifier.HasValue.Should().BeTrue();
+        keyInfo.KeyIdentifier.Value.Should().Be(0x00);
         keyInfo.KeyTypesAndLengths.Should().HaveCount(2);
 
         var firstKeyType = keyInfo.KeyTypesAndLengths[0];
@@ -112,8 +113,10 @@ public class KeyInfoTemplateCodecTests
 
         result.IsSuccess.Should().BeTrue();
         var keyInfo = result.Value;
-        keyInfo.KeyVersionNumber.Should().Be(0x01);
-        keyInfo.KeyIdentifier.Should().Be(0x00);
+        keyInfo.KeyVersionNumber.HasValue.Should().BeTrue();
+        keyInfo.KeyVersionNumber.Value.Should().Be(0x01);
+        keyInfo.KeyIdentifier.HasValue.Should().BeTrue();
+        keyInfo.KeyIdentifier.Value.Should().Be(0x00);
     }
 
     [Test]
@@ -121,8 +124,8 @@ public class KeyInfoTemplateCodecTests
     {
         var original = new KeyInfoTemplate
         {
-            KeyVersionNumber = 0x02,
-            KeyIdentifier = 0x01,
+            KeyVersionNumber = Maybe<byte>.From(0x02),
+            KeyIdentifier = Maybe<byte>.From(0x01),
             KeyTypesAndLengths =
             {
                 new KeyTypeAndLength { Type = 0x80, Length = 0x18 }, // 3DES, 24 bytes
@@ -170,8 +173,8 @@ public class KeyInfoTemplateCodecTests
 
         result.IsSuccess.Should().BeTrue();
         var keyInfo = result.Value;
-        keyInfo.KeyVersionNumber.Should().BeNull();
-        keyInfo.KeyIdentifier.Should().BeNull();
+        keyInfo.KeyVersionNumber.HasValue.Should().BeFalse();
+        keyInfo.KeyIdentifier.HasValue.Should().BeFalse();
         keyInfo.KeyTypesAndLengths.Should().BeEmpty();
     }
 
@@ -189,7 +192,8 @@ public class KeyInfoTemplateCodecTests
 
         result.IsSuccess.Should().BeTrue();
         var keyInfo = result.Value;
-        keyInfo.KeyVersionNumber.Should().Be(0x01);
+        keyInfo.KeyVersionNumber.HasValue.Should().BeTrue();
+        keyInfo.KeyVersionNumber.Value.Should().Be(0x01);
         keyInfo.KeyTypesAndLengths.Should().BeEmpty(); // Should not add incomplete pair
     }
 

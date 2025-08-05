@@ -2,12 +2,13 @@ using System;
 using System.Linq;
 using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Transport;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
 [TestFixture]
+[Category("Unit")]
 public class SelectCommandTests
 {
     [Test]
@@ -125,9 +126,7 @@ public class SelectCommandTests
         var result = SelectCommand.CreateForIssuerSecurityDomain();
         var command = result.Value;
 
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.ToApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 });
     }
@@ -139,9 +138,7 @@ public class SelectCommandTests
         var result = SelectCommand.Create(aid);
         var command = result.Value;
 
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.ToApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         var expected = new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x08 }
             .Concat(aid)
@@ -157,9 +154,7 @@ public class SelectCommandTests
         var result = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
         var command = result.Value;
 
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.ToApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         var expected = new byte[] { 0x00, 0xA4, 0x04, 0x02, 0x08 }
             .Concat(aid)
@@ -257,7 +252,9 @@ public class SelectCommandTests
         {
             var aid = new byte[length];
             if (length > 0)
+            {
                 aid[0] = 0xA0; // Make it look like a valid AID
+            }
 
             var result = SelectCommand.Create(aid);
 
@@ -278,7 +275,7 @@ public class SelectCommandTests
     {
         var command = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.NoResponseData);
 
-        command.ExpectedResponseLength.Should().BeNull();
+        command.ExpectedResponseLength.HasNoValue.Should().BeTrue();
     }
 
     [Test]
@@ -310,9 +307,7 @@ public class SelectCommandTests
     {
         var command = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.NoResponseData);
 
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.ToApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x0C });
     }
@@ -322,9 +317,7 @@ public class SelectCommandTests
     {
         var command = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.ReturnFcp);
 
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.ToApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x04, 0x00 });
     }
@@ -334,9 +327,7 @@ public class SelectCommandTests
     {
         var command = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.ReturnFmd);
 
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.ToApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x08, 0x00 });
     }
@@ -353,9 +344,7 @@ public class SelectCommandTests
         // Create manually with ReturnFcp since we can't easily combine Create with different FileControlInfo
         var manualCommand = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.ReturnFcp);
 
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = manualCommand.ToApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(manualCommand);
 
         apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x04, 0x00 });
     }

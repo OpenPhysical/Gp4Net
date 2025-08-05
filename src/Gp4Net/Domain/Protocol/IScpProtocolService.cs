@@ -1,4 +1,3 @@
-using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
@@ -144,18 +143,26 @@ public interface IScpProtocolService<TSelf> where TSelf : IScpProtocolService<TS
         // Specific protocols can override if needed
         
         if (response == null)
+        {
             return SmartCardError.InvalidArgument("Response cannot be null");
-            
+        }
+
         if (hostChallenge == null || hostChallenge.Length != 8)
+        {
             return SmartCardError.InvalidArgument("Host challenge must be 8 bytes");
-            
+        }
+
         if (keySet == null)
+        {
             return SmartCardError.InvalidArgument("Key set cannot be null");
-            
+        }
+
         if (response.ScpId != TSelf.ProtocolVersion)
+        {
             return SmartCardError.InvalidResponse(
                 $"Expected {TSelf.ProtocolVersion:X2} but received {response.ScpId:X2}");
-        
+        }
+
         // Protocol-specific implementations should override this method
         // to add their own key derivation and cryptogram verification logic
         return SmartCardError.UnexpectedError("ProcessInitializeUpdate must be implemented by protocol");
@@ -173,8 +180,10 @@ public interface IScpProtocolService<TSelf> where TSelf : IScpProtocolService<TS
         SecurityLevel securityLevel)
     {
         if (context == null)
+        {
             return SmartCardError.InvalidArgument("Context cannot be null");
-            
+        }
+
         // Protocol-specific implementations should override this method
         // to add their own cryptogram and MAC calculation logic
         return SmartCardError.UnexpectedError("CreateExternalAuthenticate must be implemented by protocol");

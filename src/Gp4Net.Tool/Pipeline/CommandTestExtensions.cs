@@ -16,11 +16,11 @@ public static class CommandTestExtensions
     public static async Task<CommandTestResult> ExecuteWithMockContext<TSettings>(
         this IPipelineCommand<TSettings> command,
         TSettings settings,
-        MockCommandContext? mockContext = null
+        MockCliContext mockContext = null
     )
         where TSettings : CommandSettings
     {
-        mockContext ??= new MockCommandContext();
+        mockContext ??= new MockCliContext();
 
         var result = await command.ExecuteAsync(mockContext, settings);
 
@@ -36,12 +36,12 @@ public static class CommandTestExtensions
     /// <summary>
     /// Creates a mock context with specific configuration.
     /// </summary>
-    public static MockCommandContext CreateMockContext(
+    public static MockCliContext CreateMockContext(
         bool shouldConnectSucceed = true,
         bool shouldSecureChannelSucceed = true
     )
     {
-        return new MockCommandContext
+        return new MockCliContext
         {
             ShouldConnectSucceed = shouldConnectSucceed,
             ShouldSecureChannelSucceed = shouldSecureChannelSucceed
@@ -63,7 +63,7 @@ public class CommandTestResult
     /// <summary>
     /// Gets or sets the mock context used during execution.
     /// </summary>
-    public MockCommandContext Context { get; set; } = null!;
+    public MockCliContext Context { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the display messages captured during execution.
@@ -78,10 +78,22 @@ public class CommandTestResult
     /// <summary>
     /// Gets a value indicating whether the command succeeded.
     /// </summary>
-    public bool Succeeded => ExitCode == 0;
+    public bool Succeeded
+    {
+        get
+        {
+            return ExitCode == 0;
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether the command failed.
     /// </summary>
-    public bool Failed => ExitCode != 0;
+    public bool Failed
+    {
+        get
+        {
+            return ExitCode != 0;
+        }
+    }
 }

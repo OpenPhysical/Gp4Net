@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 
@@ -17,55 +18,60 @@ public class ConnectCommand : IPipelineCommand<ConnectCommand.Settings>
     /// </summary>
     public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
     {
-        return await context.ExecuteCardCommand(
+        return await context.ExecuteCardCommandFunctional(
             settings,
-            async ctx =>
+            async ctx => await ConnectAndGetCardInfoAsync(ctx));
+    }
+
+    /// <summary>
+    /// Connects to card and retrieves basic information using functional patterns.
+    /// </summary>
+    private static async Task<Result<bool, string>> ConnectAndGetCardInfoAsync(
+        ICliExecutionContext context)
+    {
+        context.Display.Success("Successfully connected to card");
+
+        // Try to select ISD and get basic card information
+        var gpService = context.GetGlobalPlatformService();
+        var selectResult = await gpService.SelectIsdAsync();
+
+        if (selectResult.IsSuccess)
+        {
+            var response = selectResult.Value;
+            context.Display.Success("✓ ISD successfully selected");
+            
+            // Display AID if available
+            if (response.Fci?.ApplicationAid is { Length: > 0 })
             {
-                ctx.Display.Success("Successfully connected to card");
-
-                // Try to select ISD and get basic card information
-                try
-                {
-                    var selectResult = await ctx.GetGlobalPlatformService().SelectIsdAsync();
-                        
-                    if (selectResult.IsSuccess)
-                    {
-                        var selectResponse = selectResult.Value;
-                        ctx.Display.Success("✓ ISD successfully selected");
-
-                        if (selectResponse.RawData is { Length: > 0 })
-                        {
-                            ctx.Display.Verbose(
-                                $"Response data: {Convert.ToHexString(selectResponse.RawData)}"
-                            );
-                        }
-
-                        if (
-                            selectResponse.Fci?.CardData is { Length: > 0 }
-                        )
-                        {
-                            ctx.Display.Verbose(
-                                $"Card data: {Convert.ToHexString(selectResponse.Fci.CardData)}"
-                            );
-                        }
-                    }
-                    else
-                    {
-                        ctx.Display.Warning($"Could not select ISD: {selectResult.Error.Message}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    ctx.Display.Warning($"Error selecting ISD: {ex.Message}");
-                }
-
-                return 0;
+                context.Display.Info($"ISD AID: {Convert.ToHexString(response.Fci.ApplicationAid)}");
             }
-        );
+            
+            // Display raw response data in verbose mode
+            if (response.RawData is { Length: > 0 })
+            {
+                context.Display.Verbose($"Response data: {Convert.ToHexString(response.RawData)}");
+            }
+            
+            // Display card data if available
+            if (response.Fci?.CardData is { Length: > 0 })
+            {
+                context.Display.Verbose($"Card data: {Convert.ToHexString(response.Fci.CardData)}");
+            }
+        }
+        else
+        {
+            context.Display.Warning($"Could not select ISD: {selectResult.Error.Message}");
+        }
+        
+        // Connection is still considered successful even if ISD selection fails
+        return Result.Success<bool, string>(true);
     }
 
     /// <summary>
     /// Settings for the connect command.
     /// </summary>
-    public class Settings : CardCommandSettings { }
+    public class Settings : BaseCommandSettings
+    {
+        // Connect command doesn't require secure channel by default
+    }
 }

@@ -6,7 +6,6 @@ using Gp4Net.Cryptography;
 using Gp4Net.Domain.Protocol;
 using Kdf108.Domain.Kdf;
 using Kdf108.Domain.Kdf.Modes;
-using static Kdf108.Domain.Kdf.KdfOptions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Org.BouncyCastle.Crypto;
@@ -30,7 +29,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
     /// Initializes a new instance of the <see cref="KeyDerivationService"/> class.
     /// </summary>
     /// <param name="logger">The logger instance. If null, uses NullLogger.</param>
-    public KeyDerivationService(ILogger<KeyDerivationService>? logger = null)
+    public KeyDerivationService(ILogger<KeyDerivationService> logger = null)
     {
         _logger = logger ?? NullLogger<KeyDerivationService>.Instance;
         _kdf = new CounterModeKdf();
@@ -71,13 +70,13 @@ public sealed class KeyDerivationService : IKeyDerivationService
         {
             // Get SCP i parameter for key derivation context modification
             var iParameter = context.GetImplementationParameter();
-            
+
             // Context is concatenation of host challenge and card challenge
             // Per GP SCP03 v1.1.1, some implementations may modify the context based on i parameter
             var derivationContext = new byte[16];
             Array.Copy(context.HostChallenge, 0, derivationContext, 0, 8);
             Array.Copy(context.CardChallenge, 0, derivationContext, 8, 8);
-            
+
             _logger.LogDebug("SCP03 key derivation with i parameter: 0x{IParameter:X2}", iParameter);
 
             // Determine key length based on key set
@@ -91,7 +90,9 @@ public sealed class KeyDerivationService : IKeyDerivationService
                 keyLength);
 
             if (sEncResult.IsFailure)
+            {
                 return Result.Failure<SessionKeys, SmartCardError>(sEncResult.Error);
+            }
 
             var sMacResult = DeriveScp03Key(
                 scp03KeySet.MacKey,
@@ -100,7 +101,9 @@ public sealed class KeyDerivationService : IKeyDerivationService
                 keyLength);
 
             if (sMacResult.IsFailure)
+            {
                 return Result.Failure<SessionKeys, SmartCardError>(sMacResult.Error);
+            }
 
             var sRMacResult = DeriveScp03Key(
                 scp03KeySet.MacKey,
@@ -109,7 +112,9 @@ public sealed class KeyDerivationService : IKeyDerivationService
                 keyLength);
 
             if (sRMacResult.IsFailure)
+            {
                 return Result.Failure<SessionKeys, SmartCardError>(sRMacResult.Error);
+            }
 
             _logger.LogInformation("Successfully derived SCP03 session keys");
             return Result.Success<SessionKeys, SmartCardError>(
@@ -141,7 +146,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
             // Label (12 bytes: 11 zeros + derivation constant) + Separator (1 byte) + L (2 bytes) + Counter (1 byte) + Context (16 bytes)
             // Total: 32 bytes
             // The spec says counter comes after L field, so we need to split the fixed input data
-            
+
             // Build fixed input data before counter
             var dataBeforeCounter = new byte[15]; // Label + Separator + L
             var offset = 0;
@@ -218,16 +223,22 @@ public sealed class KeyDerivationService : IKeyDerivationService
         {
             // Validate inputs
             if (key == null || key.Length == 0)
+            {
                 return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidArgument("Key cannot be null or empty"));
+            }
 
             if (context == null || context.Length == 0)
+            {
                 return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidArgument("Context cannot be null or empty"));
+            }
 
             if (outputLengthBits % 8 != 0 || outputLengthBits <= 0 || outputLengthBits > 256)
+            {
                 return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidArgument("Output length must be a positive multiple of 8 bits, up to 256"));
+            }
 
             _logger.LogDebug("Deriving SCP03 data with constant 0x{Constant:X2}, output length {Length} bits",
                 derivationConstant, outputLengthBits);
@@ -273,11 +284,13 @@ public sealed class KeyDerivationService : IKeyDerivationService
                 sequenceCounter);
 
             if (sEncResult.IsFailure)
+            {
                 return Result.Failure<SessionKeys, SmartCardError>(sEncResult.Error);
+            }
 
             // For basic SCP02, MAC keys are often not derived (depends on implementation)
             var implementation = context.Implementation.GetValueOrDefault(ScpImplementation.Scp02StaticMac);
-            
+
             byte[] sMac;
             byte[] sRMac;
 
@@ -296,7 +309,9 @@ public sealed class KeyDerivationService : IKeyDerivationService
                     sequenceCounter);
 
                 if (sMacResult.IsFailure)
+                {
                     return Result.Failure<SessionKeys, SmartCardError>(sMacResult.Error);
+                }
 
                 // Derive R-MAC key separately using SCP02 constant 0x0102
                 var sRMacResult = DeriveScp02Key(
@@ -305,7 +320,9 @@ public sealed class KeyDerivationService : IKeyDerivationService
                     sequenceCounter);
 
                 if (sRMacResult.IsFailure)
+                {
                     return Result.Failure<SessionKeys, SmartCardError>(sRMacResult.Error);
+                }
 
                 sMac = sMacResult.Value;
                 sRMac = sRMacResult.Value;
@@ -318,7 +335,9 @@ public sealed class KeyDerivationService : IKeyDerivationService
                 sequenceCounter);
 
             if (sDekResult.IsFailure)
+            {
                 return Result.Failure<SessionKeys, SmartCardError>(sDekResult.Error);
+            }
 
             _logger.LogInformation("Successfully derived SCP02 session keys");
             return Result.Success<SessionKeys, SmartCardError>(
@@ -381,7 +400,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
             var len = cipher.ProcessBytes(derivationData, 0, derivationData.Length, output, 0);
             cipher.DoFinal(output, len);
 
-            // Per GP Card Spec v2.3.1 Figure E-2: Session Key is 16 bytes 
+            // Per GP Card Spec v2.3.1 Figure E-2: Session Key is 16 bytes
             // The 3DES-CBC encryption of 16-byte derivation data produces exactly 16 bytes
             // Return the entire output as the session key
             return Result.Success<byte[], SmartCardError>(output);
@@ -426,11 +445,11 @@ public sealed class KeyDerivationService : IKeyDerivationService
     /// <returns>The calculated cryptogram or an error.</returns>
     public Result<byte[], SmartCardError> CalculateCryptogram(ICryptogramContext context)
     {
-        _logger.LogDebug("Calculating cryptogram of type {Type} for protocol 0x{Protocol:X2}", 
+        _logger.LogDebug("Calculating cryptogram of type {Type} for protocol 0x{Protocol:X2}",
             context.Type, context.ProtocolVersion);
 
         // For SCP03 authentication cryptograms, use the data derivation scheme
-        if (context.ProtocolVersion == 0x03 && 
+        if (context.ProtocolVersion == 0x03 &&
             (context.Type == CryptogramType.CardCryptogram || context.Type == CryptogramType.HostCryptogram))
         {
             // Validate context data length
@@ -458,7 +477,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
 
         // For other cases, delegate to CryptogramService
         var cryptogramService = new Gp4Net.Domain.Security.CryptogramService();
-        
+
         return context.Type switch
         {
             CryptogramType.CardCryptogram => cryptogramService.CalculateCardCryptogram(
@@ -467,14 +486,14 @@ public sealed class KeyDerivationService : IKeyDerivationService
                 context.Data.Length >= 16 ? context.Data[8..16] : new byte[8], // card challenge
                 Maybe<byte[]>.None, // sequence counter - would need to be in context
                 GetProtocolFromContext(context)),
-                
+
             CryptogramType.HostCryptogram => cryptogramService.CalculateHostCryptogram(
                 context.Key,
                 context.Data.Length >= 8 ? context.Data[..8] : context.Data, // host challenge
                 context.Data.Length >= 16 ? context.Data[8..16] : new byte[8], // card challenge
                 Maybe<byte[]>.None, // sequence counter - would need to be in context
                 GetProtocolFromContext(context)),
-                
+
             _ => cryptogramService.CalculateCryptogram(
                 context.Key,
                 context.Data,

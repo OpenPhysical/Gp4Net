@@ -8,7 +8,7 @@ public interface IResponseWrapper
     /// <summary>
     /// Gets the response data.
     /// </summary>
-    byte[]? Data { get; }
+    byte[] Data { get; }
 
     /// <summary>
     /// Gets the status word.

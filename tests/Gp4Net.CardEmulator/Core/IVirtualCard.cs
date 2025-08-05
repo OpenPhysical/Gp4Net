@@ -57,7 +57,13 @@ public class ApduResponse
     /// <summary>
     /// Gets a value indicating whether the command was successful.
     /// </summary>
-    public bool IsSuccessful => StatusWord == 0x9000;
+    public bool IsSuccessful
+    {
+        get
+        {
+            return StatusWord == 0x9000;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the ApduResponse class.

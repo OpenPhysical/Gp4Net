@@ -15,13 +15,13 @@ public record InstallationResult(
 /// </summary>
 public record DeletionResult(
     bool IsSuccessful,
-    string? ErrorMessage = null,
-    ImmutableList<byte[]>? DeletedAids = null)
+    string ErrorMessage = null,
+    ImmutableList<byte[]> DeletedAids = null)
 {
     /// <summary>
     /// Creates a successful deletion result.
     /// </summary>
-    public static DeletionResult Success(ImmutableList<byte[]>? deletedAids = null) =>
+    public static DeletionResult Success(ImmutableList<byte[]> deletedAids = null) =>
         new(true, null, deletedAids);
 
     /// <summary>
@@ -36,13 +36,13 @@ public record DeletionResult(
 /// </summary>
 public record PutKeyResult(
     bool IsSuccessful,
-    string? ErrorMessage = null,
-    ImmutableList<byte[]>? KeyCheckValues = null)
+    string ErrorMessage = null,
+    ImmutableList<byte[]> KeyCheckValues = null)
 {
     /// <summary>
     /// Creates a successful PUT KEY result.
     /// </summary>
-    public static PutKeyResult Success(ImmutableList<byte[]>? keyCheckValues = null) =>
+    public static PutKeyResult Success(ImmutableList<byte[]> keyCheckValues = null) =>
         new(true, null, keyCheckValues);
 
     /// <summary>

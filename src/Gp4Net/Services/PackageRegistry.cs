@@ -29,7 +29,13 @@ public class PackageRegistry
     /// <summary>
     /// Gets the total number of packages in the registry.
     /// </summary>
-    public int PackageCount => _packages.Count;
+    public int PackageCount
+    {
+        get
+        {
+            return _packages.Count;
+        }
+    }
 
     /// <summary>
     /// Tries to resolve an AID to package information.
@@ -37,7 +43,7 @@ public class PackageRegistry
     /// <param name="aid">The AID bytes.</param>
     /// <param name="packageInfo">The resolved package information, if found.</param>
     /// <returns>True if the AID was resolved, false otherwise.</returns>
-    public bool TryResolveAid(byte[] aid, out PackageInfo? packageInfo)
+    public bool TryResolveAid(byte[] aid, out PackageInfo packageInfo)
     {
         var aidHex = Convert.ToHexString(aid).ToUpper();
         return TryResolveAid(aidHex, out packageInfo);
@@ -49,7 +55,7 @@ public class PackageRegistry
     /// <param name="aidHex">The AID as a hex string.</param>
     /// <param name="packageInfo">The resolved package information, if found.</param>
     /// <returns>True if the AID was resolved, false otherwise.</returns>
-    public bool TryResolveAid(string aidHex, out PackageInfo? packageInfo)
+    public bool TryResolveAid(string aidHex, out PackageInfo packageInfo)
     {
         return _aidLookup.TryGetValue(aidHex.ToUpper(), out packageInfo);
     }
@@ -134,18 +140,18 @@ public class PackageRegistry
 
     private class PackageDatabase
     {
-        public Dictionary<string, PackageEntry>? Packages { get; set; }
+        public Dictionary<string, PackageEntry> Packages { get; set; }
     }
 
     private class PackageEntry
     {
-        public string? Name { get; set; }
-        public string? Aid { get; set; }
-        public string? Version { get; set; }
+        public string Name { get; set; }
+        public string Aid { get; set; }
+        public string Version { get; set; }
         public int MajorVersion { get; set; }
         public int MinorVersion { get; set; }
-        public string? SourceFile { get; set; }
-        public string? SdkVersion { get; set; }
+        public string SourceFile { get; set; }
+        public string SdkVersion { get; set; }
     }
 }
 
@@ -198,5 +204,11 @@ public class PackageInfo
     /// <summary>
     /// Gets the display name for the package.
     /// </summary>
-    public string DisplayName => $"{Name} v{Version}";
+    public string DisplayName
+    {
+        get
+        {
+            return $"{Name} v{Version}";
+        }
+    }
 }

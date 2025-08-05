@@ -24,41 +24,12 @@ public interface ICardContext : IDisposable
     /// <param name="readerName">The reader name.</param>
     /// <param name="shareMode">The share mode.</param>
     /// <returns>A card channel for communication.</returns>
-    ILegacyCardChannel Connect(string readerName, ShareMode shareMode);
+    ICardChannel Connect(string readerName, ShareMode shareMode);
 
     /// <summary>
     /// Releases the card context.
     /// </summary>
     void Release();
-}
-
-/// <summary>
-/// Legacy card channel interface (replaced by new functional ICardChannel).
-/// </summary>
-public interface ILegacyCardChannel : IDisposable
-{
-    /// <summary>
-    /// Gets the Answer To Reset (ATR) of the card.
-    /// </summary>
-    byte[] Atr { get; }
-
-    /// <summary>
-    /// Gets the active protocol.
-    /// </summary>
-    Protocol Protocol { get; }
-
-    /// <summary>
-    /// Transmits an APDU command to the card.
-    /// </summary>
-    /// <param name="command">The command bytes.</param>
-    /// <returns>The response bytes.</returns>
-    byte[] Transmit(byte[] command);
-
-    /// <summary>
-    /// Disconnects from the card.
-    /// </summary>
-    /// <param name="disposition">The card disposition.</param>
-    void Disconnect(CardDisposition disposition);
 }
 
 /// <summary>

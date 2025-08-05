@@ -47,7 +47,13 @@ public class VirtualCardServiceAdapter : ISmartCardService
     }
 
     /// <inheritdoc />
-    public IPipelineContext Context => _context;
+    public IPipelineContext Context
+    {
+        get
+        {
+            return _context;
+        }
+    }
 
     /// <inheritdoc />
     public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
@@ -115,7 +121,9 @@ public class VirtualCardServiceAdapter : ISmartCardService
     public void Dispose()
     {
         if (_disposed)
+        {
             return;
+        }
 
         _disposed = true;
         _virtualCardService?.Disconnect();

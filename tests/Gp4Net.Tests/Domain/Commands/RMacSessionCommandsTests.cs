@@ -1,13 +1,12 @@
-using System;
 using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
 [TestFixture]
+[Category("Unit")]
 public class RMacSessionCommandsTests
 {
     [Test]

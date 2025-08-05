@@ -2,7 +2,6 @@ using System;
 using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
@@ -18,12 +17,12 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardData();
 
         // Assert
-        result.Should().NotBeNull();
+        result.HasValue.Should().BeTrue();
         // Further assertions would require knowing the expected CardDataInfo structure
     }
 
     [Test]
-    public void ParseAsCardData_WithInvalidData_ReturnsNull()
+    public void ParseAsCardData_WithInvalidData_ReturnsNone()
     {
         // Arrange
         var data = new byte[] { 0x00, 0x01, 0x02 };
@@ -32,11 +31,11 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardData();
 
         // Assert
-        result.Should().BeNull();
+        result.HasValue.Should().BeFalse();
     }
 
     [Test]
-    public void ParseAsCardData_WithEmptyData_ReturnsNull()
+    public void ParseAsCardData_WithEmptyData_ReturnsNone()
     {
         // Arrange
         var data = Array.Empty<byte>();
@@ -45,11 +44,11 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardData();
 
         // Assert
-        result.Should().BeNull();
+        result.HasValue.Should().BeFalse();
     }
 
     [Test]
-    public void ParseAsCardData_WithNullData_ReturnsNull()
+    public void ParseAsCardData_WithNullData_ReturnsNone()
     {
         // Arrange
         byte[] data = null;
@@ -58,7 +57,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardData();
 
         // Assert
-        result.Should().BeNull();
+        result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -71,12 +70,12 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardCapabilities();
 
         // Assert
-        result.Should().NotBeNull();
+        result.HasValue.Should().BeTrue();
         // Further assertions would require knowing the expected CardCapabilities structure
     }
 
     [Test]
-    public void ParseAsCardCapabilities_WithInvalidData_ReturnsNull()
+    public void ParseAsCardCapabilities_WithInvalidData_ReturnsNone()
     {
         // Arrange
         var data = new byte[] { 0xFF };
@@ -85,11 +84,11 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardCapabilities();
 
         // Assert
-        result.Should().BeNull();
+        result.HasValue.Should().BeFalse();
     }
 
     [Test]
-    public void ParseAsCardCapabilities_WithEmptyData_ReturnsNull()
+    public void ParseAsCardCapabilities_WithEmptyData_ReturnsNone()
     {
         // Arrange
         var data = Array.Empty<byte>();
@@ -98,11 +97,11 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardCapabilities();
 
         // Assert
-        result.Should().BeNull();
+        result.HasValue.Should().BeFalse();
     }
 
     [Test]
-    public void ParseAsCardCapabilities_WithNullData_ReturnsNull()
+    public void ParseAsCardCapabilities_WithNullData_ReturnsNone()
     {
         // Arrange
         byte[] data = null;
@@ -111,7 +110,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardCapabilities();
 
         // Assert
-        result.Should().BeNull();
+        result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -124,12 +123,12 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsKeyInformation();
 
         // Assert
-        result.Should().NotBeNull();
-        result.Keys.Should().NotBeEmpty();
+        result.HasValue.Should().BeTrue();
+        result.Value.Keys.Should().NotBeEmpty();
     }
 
     [Test]
-    public void ParseAsKeyInformation_WithInvalidData_ReturnsNull()
+    public void ParseAsKeyInformation_WithInvalidData_ReturnsNone()
     {
         // Arrange
         var data = new byte[] { 0x00 };
@@ -138,11 +137,11 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsKeyInformation();
 
         // Assert
-        result.Should().BeNull();
+        result.HasValue.Should().BeFalse();
     }
 
     [Test]
-    public void ParseAsKeyInformation_WithEmptyData_ReturnsNull()
+    public void ParseAsKeyInformation_WithEmptyData_ReturnsNone()
     {
         // Arrange
         var data = Array.Empty<byte>();
@@ -151,11 +150,11 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsKeyInformation();
 
         // Assert
-        result.Should().BeNull();
+        result.HasValue.Should().BeFalse();
     }
 
     [Test]
-    public void ParseAsKeyInformation_WithNullData_ReturnsNull()
+    public void ParseAsKeyInformation_WithNullData_ReturnsNone()
     {
         // Arrange
         byte[] data = null;
@@ -164,7 +163,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsKeyInformation();
 
         // Assert
-        result.Should().BeNull();
+        result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -181,12 +180,12 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCplc();
 
         // Assert
-        result.Should().NotBeNull();
-        result.IcFabricator.Should().Be(0x1234);
+        result.HasValue.Should().BeTrue();
+        result.Value.IcFabricator.Should().Be(0x1234);
     }
 
     [Test]
-    public void ParseAsCplc_WithWrongLength_ReturnsNull()
+    public void ParseAsCplc_WithWrongLength_ReturnsNone()
     {
         // Arrange - CPLC must be exactly 42 bytes
         var data = new byte[40];
@@ -195,11 +194,11 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCplc();
 
         // Assert
-        result.Should().BeNull();
+        result.HasValue.Should().BeFalse();
     }
 
     [Test]
-    public void ParseAsCplc_WithEmptyData_ReturnsNull()
+    public void ParseAsCplc_WithEmptyData_ReturnsNone()
     {
         // Arrange
         var data = Array.Empty<byte>();
@@ -208,11 +207,11 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCplc();
 
         // Assert
-        result.Should().BeNull();
+        result.HasValue.Should().BeFalse();
     }
 
     [Test]
-    public void ParseAsCplc_WithNullData_ReturnsNull()
+    public void ParseAsCplc_WithNullData_ReturnsNone()
     {
         // Arrange
         byte[] data = null;
@@ -221,7 +220,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCplc();
 
         // Assert
-        result.Should().BeNull();
+        result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -230,10 +229,10 @@ public class GetDataResponseExtensionsTests
         // Arrange - Data that might cause parsing exceptions
         var malformedData = new byte[] { 0xFF, 0xFF, 0xFF };
 
-        // Act & Assert - None should throw, all should return null
-        malformedData.ParseAsCardData().Should().BeNull();
-        malformedData.ParseAsCardCapabilities().Should().BeNull();
-        malformedData.ParseAsKeyInformation().Should().BeNull();
-        malformedData.ParseAsCplc().Should().BeNull();
+        // Act & Assert - None should throw, all should return None
+        malformedData.ParseAsCardData().HasValue.Should().BeFalse();
+        malformedData.ParseAsCardCapabilities().HasValue.Should().BeFalse();
+        malformedData.ParseAsKeyInformation().HasValue.Should().BeFalse();
+        malformedData.ParseAsCplc().HasValue.Should().BeFalse();
     }
 }

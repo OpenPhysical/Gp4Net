@@ -87,37 +87,79 @@ public class StoreDataCommand : IApduCommand
     /// <summary>
     /// Gets the class byte.
     /// </summary>
-    byte IApduCommand.Cla => Cla;
+    byte IApduCommand.Cla
+    {
+        get
+        {
+            return Cla;
+        }
+    }
 
     /// <summary>
     /// Gets the instruction byte.
     /// </summary>
-    byte IApduCommand.Ins => Ins;
+    byte IApduCommand.Ins
+    {
+        get
+        {
+            return Ins;
+        }
+    }
 
     /// <summary>
     /// Gets the parameter 1 byte.
     /// </summary>
-    public byte P1 => (byte)StructureFormat;
+    public byte P1
+    {
+        get
+        {
+            return (byte)StructureFormat;
+        }
+    }
 
     /// <summary>
     /// Gets the parameter 2 byte.
     /// </summary>
-    public byte P2 => (byte)Block;
+    public byte P2
+    {
+        get
+        {
+            return (byte)Block;
+        }
+    }
 
     /// <summary>
     /// Gets the command data.
     /// </summary>
-    public byte[]? Data => StoreData.Length > 0 ? StoreData : null;
+    public byte[] Data
+    {
+        get
+        {
+            return StoreData.Length > 0 ? StoreData : [];
+        }
+    }
 
     /// <summary>
-    /// Gets the expected response length (null for STORE DATA as it's a case 3 command).
+    /// Gets the expected response length (None for STORE DATA as it's a case 3 command).
     /// </summary>
-    public int? ExpectedResponseLength => null;
+    public Maybe<int> ExpectedResponseLength
+    {
+        get
+        {
+            return Maybe<int>.None;
+        }
+    }
 
     /// <summary>
     /// Gets whether this command uses extended length.
     /// </summary>
-    public bool IsExtendedLength => false;
+    public bool IsExtendedLength
+    {
+        get
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the StoreDataCommand class.
@@ -140,7 +182,9 @@ public class StoreDataCommand : IApduCommand
     public static Result<StoreDataCommand, SmartCardError> Create(byte[] data)
     {
         if (data == null)
+        {
             return SmartCardError.InvalidArgument("Data cannot be null.");
+        }
 
         return new StoreDataCommand(DataStructureFormat.Plain, BlockFormat.FirstOrOnly, data);
     }
@@ -158,7 +202,9 @@ public class StoreDataCommand : IApduCommand
         byte[] data)
     {
         if (data == null)
+        {
             return SmartCardError.InvalidArgument("Data cannot be null.");
+        }
 
         return new StoreDataCommand(structureFormat, block, data);
     }

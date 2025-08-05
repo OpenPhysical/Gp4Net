@@ -17,12 +17,12 @@ namespace Gp4Net.Pipeline.Middleware;
 public class TransportMiddleware : CommandMiddlewareBase
 {
     private readonly IApduTransport _transport;
-    private readonly ILogger<TransportMiddleware>? _logger;
+    private readonly ILogger<TransportMiddleware> _logger;
 
     /// <summary>
     /// Initializes a new instance of TransportMiddleware.
     /// </summary>
-    public TransportMiddleware(IApduTransport transport, ILogger<TransportMiddleware>? logger = null)
+    public TransportMiddleware(IApduTransport transport, ILogger<TransportMiddleware> logger = null)
     {
         _transport = transport ?? throw new ArgumentNullException(nameof(transport));
         _logger = logger;
@@ -67,7 +67,8 @@ public class TransportMiddleware : CommandMiddlewareBase
             var response = new CommandResponse(
                     responseData,
                     statusWord,
-                    request.Context)
+                    request.Context,
+                    new Dictionary<string, object>())
                 .WithMetadata(ResponseMetadata.ExecutionTime, stopwatch.Elapsed)
                 .WithMetadata(ResponseMetadata.TransmittedBytes, commandBytes)
                 .WithMetadata(ResponseMetadata.ReceivedBytes, CombineResponseBytes(responseData, statusWord));

@@ -96,8 +96,14 @@ public record Scp02TestVector : IScpTestVector
     public required string Name { get; init; }
     public required string Description { get; init; }
     public required string Source { get; init; }
-    public string Protocol => "SCP02";
-    
+    public string Protocol
+    {
+        get
+        {
+            return "SCP02";
+        }
+    }
+
     /// <summary>
     /// SCP02 implementation option (i parameter).
     /// </summary>
@@ -147,8 +153,14 @@ public record Scp03TestVector : IScpTestVector
     public required string Name { get; init; }
     public required string Description { get; init; }
     public required string Source { get; init; }
-    public string Protocol => "SCP03";
-    
+    public string Protocol
+    {
+        get
+        {
+            return "SCP03";
+        }
+    }
+
     public required byte[] StaticEncKey { get; init; }
     public required byte[] StaticMacKey { get; init; }
     public required byte[] StaticDekKey { get; init; }
@@ -203,27 +215,50 @@ public static class ScpTestVectors
     /// All SCP02 test vectors from scripts/scp02_test_vectors.json.
     /// Generated from scripts/SCP02_minimal.py - verified reference implementation.
     /// </summary>
-    public static IReadOnlyList<Scp02TestVector> Scp02Vectors => _scp02Vectors.Value;
+    public static IReadOnlyList<Scp02TestVector> Scp02Vectors
+    {
+        get
+        {
+            return _scp02Vectors.Value;
+        }
+    }
 
     /// <summary>
     /// All SCP03 test vectors from scripts/scp03_test_vectors.json.
     /// Generated from scripts/SCP03_minimal.py - verified reference implementation.
     /// </summary>
-    public static IReadOnlyList<Scp03TestVector> Scp03Vectors => _scp03Vectors.Value;
+    public static IReadOnlyList<Scp03TestVector> Scp03Vectors
+    {
+        get
+        {
+            return _scp03Vectors.Value;
+        }
+    }
 
     /// <summary>
     /// All SCP02 C-MAC test vectors for command MAC validation.
     /// </summary>
-    public static IReadOnlyList<Scp02CMacTestVector> Scp02CMacVectors => _scp02CMacVectors.Value;
+    public static IReadOnlyList<Scp02CMacTestVector> Scp02CMacVectors
+    {
+        get
+        {
+            return _scp02CMacVectors.Value;
+        }
+    }
 
     /// <summary>
     /// All SCP test vectors (both SCP02 and SCP03) as common interface.
     /// </summary>
-    public static IReadOnlyList<IScpTestVector> AllVectors => 
-        Scp02Vectors.Cast<IScpTestVector>()
-            .Concat(Scp03Vectors.Cast<IScpTestVector>())
-            .ToList()
-            .AsReadOnly();
+    public static IReadOnlyList<IScpTestVector> AllVectors
+    {
+        get
+        {
+            return Scp02Vectors.Cast<IScpTestVector>()
+                .Concat(Scp03Vectors.Cast<IScpTestVector>())
+                .ToList()
+                .AsReadOnly();
+        }
+    }
 
     /// <summary>
     /// Gets a specific SCP02 test vector by name.
@@ -359,12 +394,16 @@ public static class ScpTestVectors
         }
         
         if (currentDir == null)
+        {
             throw new FileNotFoundException($"Could not locate project root with scripts directory from {assemblyDir}");
-        
+        }
+
         var jsonPath = Path.Combine(currentDir.FullName, "scripts", fileName);
         if (!File.Exists(jsonPath))
+        {
             throw new FileNotFoundException($"Test vector file not found: {jsonPath}");
-        
+        }
+
         return jsonPath;
     }
 }

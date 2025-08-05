@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Services;
 using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
 using Spectre.Console;

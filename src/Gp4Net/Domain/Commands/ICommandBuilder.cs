@@ -173,7 +173,7 @@ public interface IExternalAuthenticateCommandBuilder
     /// </summary>
     /// <param name="mac">The MAC (8 bytes, optional).</param>
     /// <returns>This builder for chaining.</returns>
-    IExternalAuthenticateCommandBuilder WithMac(byte[]? mac);
+    IExternalAuthenticateCommandBuilder WithMac(byte[] mac);
 }
 
 /// <summary>
@@ -201,7 +201,7 @@ public interface IGetStatusCommandBuilder : ICommandBuilder<GetStatusCommand>
     /// </summary>
     /// <param name="searchCriteria">The search criteria (AID).</param>
     /// <returns>This builder for chaining.</returns>
-    IGetStatusCommandBuilder WithSearchCriteria(byte[]? searchCriteria);
+    IGetStatusCommandBuilder WithSearchCriteria(byte[] searchCriteria);
 
     /// <summary>
     /// Configures to query the ISD.
@@ -258,7 +258,7 @@ public interface IInstallCommandBuilder : ICommandBuilder<InstallCommand>
     /// </summary>
     /// <param name="securityDomainAid">The security domain AID.</param>
     /// <returns>This builder for chaining.</returns>
-    IInstallCommandBuilder WithSecurityDomainAid(byte[]? securityDomainAid);
+    IInstallCommandBuilder WithSecurityDomainAid(byte[] securityDomainAid);
 }
 
 /// <summary>

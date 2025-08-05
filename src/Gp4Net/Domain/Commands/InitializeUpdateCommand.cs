@@ -48,22 +48,58 @@ public class InitializeUpdateCommand : BaseApduCommand
     private readonly bool _useMaxResponseLength;
 
     /// <inheritdoc />
-    public override byte Cla => ClassByte;
+    public override byte Cla
+    {
+        get
+        {
+            return ClassByte;
+        }
+    }
 
     /// <inheritdoc />
-    public override byte Ins => InstructionByte;
+    public override byte Ins
+    {
+        get
+        {
+            return InstructionByte;
+        }
+    }
 
     /// <inheritdoc />
-    public override byte P1 => KeyVersion;
+    public override byte P1
+    {
+        get
+        {
+            return KeyVersion;
+        }
+    }
 
     /// <inheritdoc />
-    public override byte P2 => KeyIdentifier;
+    public override byte P2
+    {
+        get
+        {
+            return KeyIdentifier;
+        }
+    }
 
     /// <inheritdoc />
-    public override byte[]? Data => HostChallenge;
+    public override byte[] Data
+    {
+        get
+        {
+            return HostChallenge;
+        }
+    }
 
     /// <inheritdoc />
-    public override int? ExpectedResponseLength => _useMaxResponseLength ? 256 : 28;
+    public override Maybe<int> ExpectedResponseLength
+    {
+        get
+        {
+            return Maybe<int>.From(_useMaxResponseLength ? 256 : 28);
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the InitializeUpdateCommand class.
@@ -126,26 +162,6 @@ public class InitializeUpdateCommand : BaseApduCommand
             new InitializeUpdateCommand(keyVersion, keyIdentifier, hostChallenge, useMaxResponseLength));
     }
 
-    /// <summary>
-    /// Converts this command to an APDU byte array.
-    /// This method is obsolete. Use IApduTransport.TransmitAsync instead.
-    /// </summary>
-    /// <returns>The APDU command bytes.</returns>
-    [Obsolete("Use IApduTransport.TransmitAsync instead of manual APDU building")]
-    public new byte[] ToApdu()
-    {
-        return base.ToApdu();
-    }
-
-    /// <summary>
-    /// Gets the APDU byte array for this command (backward compatibility alias for ToApdu).
-    /// </summary>
-    /// <returns>The APDU command bytes.</returns>
-    [Obsolete("Use IApduTransport.TransmitAsync instead of manual APDU building")]
-    public byte[] GetApdu()
-    {
-        return ToApdu();
-    }
 
     /// <summary>
     /// Returns a string representation of this command.
@@ -184,22 +200,40 @@ public class InitializeUpdateResponse
     /// <summary>
     /// Gets the sequence counter (3 bytes, only for SCP02).
     /// </summary>
-    public byte[]? SequenceCounter { get; }
+    public byte[] SequenceCounter { get; }
 
     /// <summary>
     /// Gets the key version from the key information.
     /// </summary>
-    public byte KeyVersion => KeyInformation[0];
+    public byte KeyVersion
+    {
+        get
+        {
+            return KeyInformation[0];
+        }
+    }
 
     /// <summary>
     /// Gets the secure channel protocol identifier.
     /// </summary>
-    public byte ScpId => KeyInformation[1];
+    public byte ScpId
+    {
+        get
+        {
+            return KeyInformation[1];
+        }
+    }
 
     /// <summary>
     /// Gets the secure channel protocol parameter.
     /// </summary>
-    public byte ScpParameter => KeyInformation[2];
+    public byte ScpParameter
+    {
+        get
+        {
+            return KeyInformation[2];
+        }
+    }
 
     /// <summary>
     /// Parses an INITIALIZE UPDATE response.
@@ -236,7 +270,7 @@ public class InitializeUpdateResponse
         System.Diagnostics.Debug.WriteLine($"[InitializeUpdateResponse.Parse] SCP ID byte: {scpVersion:X2}");
         System.Diagnostics.Debug.WriteLine($"[InitializeUpdateResponse.Parse] SCP version (masked): {(scpVersion & 0x03):X2}");
             
-        byte[]? sequenceCounter = null;
+        byte[] sequenceCounter = [];
         byte[] cardChallenge;
         byte[] cardCryptogram;
             
@@ -345,7 +379,7 @@ public class InitializeUpdateResponse
         byte[] keyInformation,
         byte[] cardChallenge,
         byte[] cardCryptogram,
-        byte[]? sequenceCounter
+        byte[] sequenceCounter
     )
     {
         KeyDiversificationData = keyDiversificationData;

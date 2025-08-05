@@ -1,8 +1,6 @@
-using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
 using JetBrains.Annotations;
 
@@ -31,11 +29,19 @@ public static class MacOperations
         where TProtocol : IScpProtocolService<TProtocol>
     {
         if (commandData == null)
+        {
             return SmartCardError.InvalidArgument("Command data cannot be null");
+        }
+
         if (macKey == null)
+        {
             return SmartCardError.InvalidArgument("MAC key cannot be null");
+        }
+
         if (chainingState == null)
+        {
             return SmartCardError.InvalidArgument("Chaining state cannot be null");
+        }
 
         // Calculate the MAC
         return TProtocol.CalculateCommandMac(commandData, macKey, chainingState.ToArray())
@@ -61,11 +67,19 @@ public static class MacOperations
         where TProtocol : IScpProtocolService<TProtocol>
     {
         if (responseData == null)
+        {
             return SmartCardError.InvalidArgument("Response data cannot be null");
+        }
+
         if (rmacKey == null)
+        {
             return SmartCardError.InvalidArgument("R-MAC key cannot be null");
+        }
+
         if (chainingState == null)
+        {
             return SmartCardError.InvalidArgument("Chaining state cannot be null");
+        }
 
         // Calculate the R-MAC
         return TProtocol.CalculateResponseMac(responseData, rmacKey, chainingState.ToArray())
@@ -85,7 +99,7 @@ public static class MacOperations
     public static Result<MacChainingState, SmartCardError> CreateInitialChainingState(
         byte protocolVersion,
         byte implementationParameter = 0x00,
-        byte[]? initialValue = null)
+        byte[] initialValue = null)
     {
         if (initialValue != null)
         {

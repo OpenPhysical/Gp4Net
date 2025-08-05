@@ -1,6 +1,6 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using JetBrains.Annotations;
 
@@ -98,13 +98,13 @@ public interface IApduCommand
     /// <summary>
     /// Gets the command data (may be null or empty).
     /// </summary>
-    byte[]? Data { get; }
+    byte[] Data { get; }
 
     /// <summary>
-    /// Gets the expected response length (null if no response expected).
+    /// Gets the expected response length (None if no response expected).
     /// 0 means maximum length (256 for short, 65536 for extended).
     /// </summary>
-    int? ExpectedResponseLength { get; }
+    Maybe<int> ExpectedResponseLength { get; }
 
     /// <summary>
     /// Gets whether this command uses extended length.
@@ -131,17 +131,35 @@ public class ApduResponse
     /// <summary>
     /// Gets SW1.
     /// </summary>
-    public byte Sw1 => (byte)(StatusWord >> 8);
+    public byte Sw1
+    {
+        get
+        {
+            return (byte)(StatusWord >> 8);
+        }
+    }
 
     /// <summary>
     /// Gets SW2.
     /// </summary>
-    public byte Sw2 => (byte)(StatusWord & 0xFF);
+    public byte Sw2
+    {
+        get
+        {
+            return (byte)(StatusWord & 0xFF);
+        }
+    }
 
     /// <summary>
     /// Gets whether the command was successful (SW=9000).
     /// </summary>
-    public bool IsSuccess => StatusWord == 0x9000;
+    public bool IsSuccess
+    {
+        get
+        {
+            return StatusWord == 0x9000;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of ApduResponse.

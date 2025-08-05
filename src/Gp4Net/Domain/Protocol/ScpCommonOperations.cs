@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using JetBrains.Annotations;
@@ -24,7 +23,7 @@ public static class ScpCommonOperations
     /// <param name="le">Expected response length (optional).</param>
     /// <returns>The complete APDU command.</returns>
     public static Result<byte[], SmartCardError> BuildApdu(
-        byte cla, byte ins, byte p1, byte p2, byte[]? data = null, byte? le = null)
+        byte cla, byte ins, byte p1, byte p2, byte[] data = null, byte? le = null)
     {
         try
         {
@@ -77,18 +76,26 @@ public static class ScpCommonOperations
     public static Result<byte[], SmartCardError> ExtractCommandData(byte[] command)
     {
         if (command == null)
+        {
             return SmartCardError.InvalidArgument("Command cannot be null");
-            
+        }
+
         if (command.Length < 5)
+        {
             return Result.Success<byte[], SmartCardError>([]);
-            
+        }
+
         var lc = command[4];
         if (lc == 0)
+        {
             return Result.Success<byte[], SmartCardError>([]);
-            
+        }
+
         if (command.Length < 5 + lc)
+        {
             return SmartCardError.InvalidData($"Command too short for declared data length {lc}");
-            
+        }
+
         var data = new byte[lc];
         Array.Copy(command, 5, data, 0, lc);
         return Result.Success<byte[], SmartCardError>(data);
@@ -102,11 +109,15 @@ public static class ScpCommonOperations
     public static Result<ushort, SmartCardError> ExtractStatusWord(byte[] response)
     {
         if (response == null)
+        {
             return SmartCardError.InvalidArgument("Response cannot be null");
-            
+        }
+
         if (response.Length < 2)
+        {
             return SmartCardError.InvalidData("Response must contain at least status word");
-            
+        }
+
         var sw = (ushort)((response[response.Length - 2] << 8) | response[response.Length - 1]);
         return Result.Success<ushort, SmartCardError>(sw);
     }
@@ -138,12 +149,20 @@ public static class ScpCommonOperations
     public static Result<byte[], SmartCardError> InsertMacInCommand(byte[] command, byte[] mac, int macSize)
     {
         if (command == null)
+        {
             return SmartCardError.InvalidArgument("Command cannot be null");
+        }
+
         if (mac == null)
+        {
             return SmartCardError.InvalidArgument("MAC cannot be null");
+        }
+
         if (mac.Length < macSize)
+        {
             return SmartCardError.InvalidArgument($"MAC must be at least {macSize} bytes");
-            
+        }
+
         try
         {
             // Check if command has data
@@ -210,10 +229,15 @@ public static class ScpCommonOperations
         byte[] response, int macSize)
     {
         if (response == null)
+        {
             return SmartCardError.InvalidArgument("Response cannot be null");
+        }
+
         if (response.Length < 2 + macSize)
+        {
             return SmartCardError.InvalidData($"Response too short to contain {macSize}-byte MAC and status word");
-            
+        }
+
         try
         {
             var macOffset = response.Length - 2 - macSize;
@@ -302,9 +326,15 @@ public static class ScpCommonOperations
     public static Result ValidateHostChallenge(byte[] challenge)
     {
         if (challenge == null)
+        {
             return Result.Failure("Host challenge cannot be null");
+        }
+
         if (challenge.Length != 8)
+        {
             return Result.Failure($"Host challenge must be 8 bytes, got {challenge.Length}");
+        }
+
         return Result.Success();
     }
     
@@ -317,9 +347,15 @@ public static class ScpCommonOperations
     public static Result ValidateCardChallenge(byte[] challenge, int expectedLength)
     {
         if (challenge == null)
+        {
             return Result.Failure("Card challenge cannot be null");
+        }
+
         if (challenge.Length != expectedLength)
+        {
             return Result.Failure($"Card challenge must be {expectedLength} bytes, got {challenge.Length}");
+        }
+
         return Result.Success();
     }
     
@@ -329,12 +365,18 @@ public static class ScpCommonOperations
     /// <param name="counter">The sequence counter to validate.</param>
     /// <param name="minLength">The minimum required length.</param>
     /// <returns>Success if valid, failure otherwise.</returns>
-    public static Result ValidateSequenceCounter(byte[]? counter, int minLength)
+    public static Result ValidateSequenceCounter(byte[] counter, int minLength)
     {
         if (counter == null)
+        {
             return Result.Failure("Sequence counter cannot be null");
+        }
+
         if (counter.Length < minLength)
+        {
             return Result.Failure($"Sequence counter must be at least {minLength} bytes, got {counter.Length}");
+        }
+
         return Result.Success();
     }
 }

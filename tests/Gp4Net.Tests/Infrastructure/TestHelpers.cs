@@ -38,7 +38,7 @@ public class TestCommandPipeline : ICommandPipeline
         var response = await transport.TransmitAsync(command, channel, cancellationToken);
             
         return Result.Success<CommandResponse, SmartCardError>(
-            new CommandResponse(response.Data, response.StatusWord, context));
+            new CommandResponse(response.Data, response.StatusWord, context, new Dictionary<string, object>()));
     }
 
     public async Task<Result<CommandResponse, SmartCardError>> ExecuteAsync(
@@ -61,7 +61,7 @@ public class TestCommandPipeline : ICommandPipeline
         var response = await transport.TransmitAsync(request.Command, channel, cancellationToken);
             
         return Result.Success<CommandResponse, SmartCardError>(
-            new CommandResponse(response.Data, response.StatusWord, request.Context));
+            new CommandResponse(response.Data, response.StatusWord, request.Context, new Dictionary<string, object>()));
     }
 }
 
@@ -167,8 +167,20 @@ public class TestCardServiceChannelAdapter : ICardChannel
         _cardService = cardService ?? throw new ArgumentNullException(nameof(cardService));
     }
 
-    public TransportProtocol Protocol => TransportProtocol.T0;
-    public bool IsOpen => _cardService.IsSecureChannelEstablished;
+    public TransportProtocol Protocol
+    {
+        get
+        {
+            return TransportProtocol.T0;
+        }
+    }
+    public bool IsOpen
+    {
+        get
+        {
+            return _cardService.IsSecureChannelEstablished;
+        }
+    }
 
     public Task<byte[]> TransmitAsync(byte[] command, CancellationToken cancellationToken = default)
     {

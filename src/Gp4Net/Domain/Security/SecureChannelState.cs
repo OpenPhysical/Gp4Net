@@ -1,9 +1,7 @@
-using System;
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Security;
@@ -36,8 +34,10 @@ public record SecureChannelState(
     public Result<SecureChannelState, SmartCardError> UpdateMacChaining(MacChainingState newMacChaining)
     {
         if (newMacChaining == null)
+        {
             return SmartCardError.InvalidArgument("MAC chaining state cannot be null");
-            
+        }
+
         return Result.Success<SecureChannelState, SmartCardError>(
             this with { MacChaining = newMacChaining });
     }
@@ -49,8 +49,10 @@ public record SecureChannelState(
     public Result<SecureChannelState, SmartCardError> UpdateCounterAndMac(uint newCounter, MacChainingState newMacChaining)
     {
         if (newMacChaining == null)
+        {
             return SmartCardError.InvalidArgument("MAC chaining state cannot be null");
-            
+        }
+
         return Result.Success<SecureChannelState, SmartCardError>(
             this with 
             { 
@@ -62,32 +64,68 @@ public record SecureChannelState(
     /// <summary>
     /// Gets whether this session supports command MAC (C-MAC).
     /// </summary>
-    public bool HasCommandMac => SecurityLevel.HasCMac();
+    public bool HasCommandMac
+    {
+        get
+        {
+            return SecurityLevel.HasCMac();
+        }
+    }
 
     /// <summary>
     /// Gets whether this session supports command encryption (C-ENC).
     /// </summary>
-    public bool HasCommandEncryption => SecurityLevel.HasCEncryption();
+    public bool HasCommandEncryption
+    {
+        get
+        {
+            return SecurityLevel.HasCEncryption();
+        }
+    }
 
     /// <summary>
     /// Gets whether this session supports response MAC (R-MAC).
     /// </summary>
-    public bool HasResponseMac => SecurityLevel.HasRMac();
+    public bool HasResponseMac
+    {
+        get
+        {
+            return SecurityLevel.HasRMac();
+        }
+    }
 
     /// <summary>
     /// Gets whether this session supports response encryption (R-ENC).
     /// </summary>
-    public bool HasResponseEncryption => SecurityLevel.HasREncryption();
+    public bool HasResponseEncryption
+    {
+        get
+        {
+            return SecurityLevel.HasREncryption();
+        }
+    }
 
     /// <summary>
     /// Gets whether this is an SCP03 session.
     /// </summary>
-    public bool IsScp03 => ProtocolVersion == 0x03;
+    public bool IsScp03
+    {
+        get
+        {
+            return ProtocolVersion == 0x03;
+        }
+    }
 
     /// <summary>
     /// Gets whether this is an SCP02 session.
     /// </summary>
-    public bool IsScp02 => ProtocolVersion == 0x02;
+    public bool IsScp02
+    {
+        get
+        {
+            return ProtocolVersion == 0x02;
+        }
+    }
 
     /// <summary>
     /// Creates a new secure channel state for the specified protocol and security level.
@@ -106,13 +144,19 @@ public record SecureChannelState(
         byte implementationParameter)
     {
         if (sessionKeys == null)
+        {
             return SmartCardError.InvalidArgument("Session keys cannot be null");
+        }
 
         if (protocolVersion != 0x02 && protocolVersion != 0x03)
+        {
             return SmartCardError.InvalidArgument($"Unsupported protocol version: 0x{protocolVersion:X2}");
+        }
 
         if (initialMacChainingValue == null)
+        {
             return SmartCardError.InvalidArgument("Initial MAC chaining value cannot be null");
+        }
 
         // Create the MAC chaining state
         var macChainingResult = MacChainingState.Create(
@@ -121,7 +165,9 @@ public record SecureChannelState(
             implementationParameter);
             
         if (macChainingResult.IsFailure)
+        {
             return macChainingResult.Error;
+        }
 
         // Generate cryptographically secure session ID
         var sessionId = new byte[8];
@@ -148,20 +194,28 @@ public record SecureChannelState(
     public Result<SecureChannelState, SmartCardError> Validate()
     {
         if (SessionKeys == null)
+        {
             return SmartCardError.InvalidData("Session keys are null");
+        }
 
         if (ProtocolVersion != 0x02 && ProtocolVersion != 0x03)
+        {
             return SmartCardError.InvalidData($"Invalid protocol version: 0x{ProtocolVersion:X2}");
+        }
 
         if (MacChaining == null)
+        {
             return SmartCardError.InvalidData("MAC chaining state cannot be null");
+        }
 
         // Encryption counter starts at 0 and increments with each encryption operation
         // No validation needed for counter value
 
         // Validate security level combinations
         if (HasResponseEncryption && !HasResponseMac)
+        {
             return SmartCardError.InvalidData("R-ENC requires R-MAC to be enabled");
+        }
 
         return Result.Success<SecureChannelState, SmartCardError>(this);
     }

@@ -661,24 +661,14 @@
             Executes the connect command to establish a connection to a smart card.
             </summary>
         </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ConnectCommand.ConnectAndGetCardInfoAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext)">
+            <summary>
+            Connects to card and retrieves basic information using functional patterns.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Tool.Commands.Card.ConnectCommand.Settings">
             <summary>
             Settings for the connect command.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Commands.Card.FunctionalConnectCommand">
-            <summary>
-            Functional implementation of the connect command demonstrating pure error handling.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalConnectCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Card.FunctionalConnectCommand.Settings)">
-            <summary>
-            Executes the connect command using functional patterns without exceptions.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Commands.Card.FunctionalConnectCommand.Settings">
-            <summary>
-            Settings for the functional connect command.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Card.GetIsdDataCommand">
@@ -731,6 +721,11 @@
             <param name="table">The table to add the data to.</param>
             <param name="name">The display name for this data.</param>
             <param name="tag">The data object identifier tag.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.GetImplementationDescription(Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Gets a human-readable description for an SCP implementation option.
+            </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Card.InfoCommand.Settings">
             <summary>
@@ -1144,16 +1139,6 @@
             Generates usage examples for trace replay.
             </summary>
         </member>
-        <member name="T:Gp4Net.Tool.Commands.Trace.SimpleTraceData">
-            <summary>
-            Simplified JSON trace format for virtual card testing.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Commands.Trace.SimpleExchange">
-            <summary>
-            Simplified APDU exchange.
-            </summary>
-        </member>
         <member name="T:Gp4Net.Tool.Commands.Trace.SimpleJsonConverter">
             <summary>
             Simplified trace converter that produces minimal JSON.
@@ -1406,9 +1391,34 @@
         <member name="M:Gp4Net.Tool.Infrastructure.TypeResolver.Dispose">
             <inheritdoc />
         </member>
-        <member name="T:Gp4Net.Tool.Pipeline.CommandContext">
+        <member name="T:Gp4Net.Tool.Pipeline.CliContext">
             <summary>
-            Default implementation of ICliExecutionContext.
+            Implementation of CLI execution context using functional patterns.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CliContext.GetGlobalPlatformService">
+            <summary>
+            Gets or creates the GlobalPlatform service instance.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CliContext.RequireCardConnection(CSharpFunctionalExtensions.Maybe{System.String})">
+            <summary>
+            Ensures a card connection is established.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CliContext.RequireSecureChannel(System.Byte,CSharpFunctionalExtensions.Maybe{System.String})">
+            <summary>
+            Ensures a secure channel is established.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CliContext.ExecuteAsync(System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Threading.Tasks.Task{System.Int32}})">
+            <summary>
+            Executes command logic with error handling.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CliContext.ExecuteAsync(System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Int32})">
+            <summary>
+            Executes synchronous command logic with error handling.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Pipeline.CommandContextExtensions">
@@ -1445,26 +1455,6 @@
         <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ExecuteCardCommand(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.BaseCommandSettings,System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Int32})">
             <summary>
             Executes a command with common card operations setup (synchronous version).
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICliExecutionContext},System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Pipeline.ICliExecutionContext})">
-            <summary>
-            Continues with a synchronous operation.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICliExecutionContext},System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICliExecutionContext}})">
-            <summary>
-            Continues with an asynchronous operation.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICliExecutionContext},System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Threading.Tasks.Task{System.Int32}})">
-            <summary>
-            Continues with command execution.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandContextExtensions.ContinueWith(System.Threading.Tasks.Task{Gp4Net.Tool.Pipeline.ICliExecutionContext},System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Int32})">
-            <summary>
-            Continues with synchronous command execution.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Pipeline.CommandHandlerAttribute">
@@ -1532,7 +1522,7 @@
             Extension methods for testing commands.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandTestExtensions.ExecuteWithMockContext``1(Gp4Net.Tool.Pipeline.IPipelineCommand{``0},``0,Gp4Net.Tool.Pipeline.MockCommandContext)">
+        <member name="M:Gp4Net.Tool.Pipeline.CommandTestExtensions.ExecuteWithMockContext``1(Gp4Net.Tool.Pipeline.IPipelineCommand{``0},``0,Gp4Net.Tool.Pipeline.MockCliContext)">
             <summary>
             Executes a command with a mock context for testing.
             </summary>
@@ -1581,29 +1571,6 @@
             <summary>
             Default implementation of IDisplayService using Spectre.Console.
             </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Pipeline.FunctionalCliContext">
-            <summary>
-            Functional implementation of CLI execution context using Result patterns.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Pipeline.FunctionalCliContext.GetGlobalPlatformService">
-            <summary>
-            Retrieves the instance of the <c>IGlobalPlatformService</c> associated with the context.
-            If the service is already initialized, the cached instance is returned. Otherwise, it
-            initializes the service using the provided <c>IDomainServiceFactory</c> and <c>ICardService</c>.
-            </summary>
-            <returns>The initialized <c>IGlobalPlatformService</c> instance.</returns>
-        </member>
-        <member name="M:Gp4Net.Tool.Pipeline.FunctionalCliContext.RequireCardConnection(CSharpFunctionalExtensions.Maybe{System.String})">
-            <summary>
-            Ensures that a card connection is established using the <c>ICardService</c>.
-            If already connected, the current instance of <c>ICliExecutionContext</c> is returned.
-            If not, attempts to connect to the card using the specified reader name.
-            </summary>
-            <param name="readerName">The optional name of the card reader to use for the connection.</param>
-            <returns>The current <c>ICliExecutionContext</c> if the connection is successful, or throws an exception on failure.</returns>
-            <exception cref="T:System.InvalidOperationException">Thrown when the connection attempt fails with an error message.</exception>
         </member>
         <member name="T:Gp4Net.Tool.Pipeline.FunctionalCommandExtensions">
             <summary>
@@ -1748,22 +1715,22 @@
             Displays raw markup text.
             </summary>
         </member>
-        <member name="T:Gp4Net.Tool.Pipeline.MockCommandContext">
+        <member name="T:Gp4Net.Tool.Pipeline.MockCliContext">
             <summary>
             Mock implementation of ICliExecutionContext for testing.
             </summary>
         </member>
-        <member name="P:Gp4Net.Tool.Pipeline.MockCommandContext.MethodCalls">
+        <member name="P:Gp4Net.Tool.Pipeline.MockCliContext.MethodCalls">
             <summary>
             Gets the list of method calls made to this mock.
             </summary>
         </member>
-        <member name="P:Gp4Net.Tool.Pipeline.MockCommandContext.ShouldConnectSucceed">
+        <member name="P:Gp4Net.Tool.Pipeline.MockCliContext.ShouldConnectSucceed">
             <summary>
             Gets or sets whether card connection should succeed.
             </summary>
         </member>
-        <member name="P:Gp4Net.Tool.Pipeline.MockCommandContext.ShouldSecureChannelSucceed">
+        <member name="P:Gp4Net.Tool.Pipeline.MockCliContext.ShouldSecureChannelSucceed">
             <summary>
             Gets or sets whether secure channel establishment should succeed.
             </summary>
@@ -2576,42 +2543,6 @@
         <member name="P:Gp4Net.Tool.Services.CardServiceChannelAdapter.IsOpen">
             <inheritdoc />
         </member>
-        <member name="T:Gp4Net.Tool.Services.CardServiceFactory">
-            <summary>
-            Factory that selects the appropriate card service based on reader name.
-            Supports both physical readers (via WSCT) and virtual readers (via Lua scripts).
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.GetReaders">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.Connect(System.String)">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.Disconnect">
-            <inheritdoc />
-        </member>
-        <member name="P:Gp4Net.Tool.Services.CardServiceFactory.IsConnected">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.GetAtr">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.SendCommand(System.Byte[])">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.SendCommand(Gp4Net.Transport.IApduCommand)">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.EstablishSecureChannel(System.Byte[],System.Byte)">
-            <inheritdoc />
-        </member>
-        <member name="P:Gp4Net.Tool.Services.CardServiceFactory.IsSecureChannelEstablished">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.CardServiceFactory.Dispose">
-            <inheritdoc />
-        </member>
         <member name="T:Gp4Net.Tool.Services.IDomainServiceFactory">
             <summary>
             Factory interface for creating domain services with proper pipeline context.
@@ -3178,51 +3109,6 @@
         <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.Dispose">
             <inheritdoc />
         </member>
-        <member name="T:Gp4Net.Tool.Services.SimpleCardServiceFactory">
-            <summary>
-            Simplified factory that selects between physical and virtual card services.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.GetReaders">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.Connect(System.String)">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.Disconnect">
-            <inheritdoc />
-        </member>
-        <member name="P:Gp4Net.Tool.Services.SimpleCardServiceFactory.IsConnected">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.GetAtr">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.SendCommand(System.Byte[])">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.SendCommand(Gp4Net.Transport.IApduCommand)">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.EstablishSecureChannel(System.Byte[],System.Byte)">
-            <inheritdoc />
-        </member>
-        <member name="P:Gp4Net.Tool.Services.SimpleCardServiceFactory.IsSecureChannelEstablished">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.SimpleCardServiceFactory.Dispose">
-            <inheritdoc />
-        </member>
-        <member name="T:Gp4Net.Tool.Services.SimpleTraceData">
-            <summary>
-            Simplified JSON trace format for virtual card testing.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Services.SimpleExchange">
-            <summary>
-            Simplified APDU exchange.
-            </summary>
-        </member>
         <member name="T:Gp4Net.Tool.Services.SimpleJsonCardService">
             <summary>
             Simple JSON card service that uses minimal trace format.
@@ -3292,6 +3178,86 @@
         <member name="M:Gp4Net.Tool.Services.TraceBasedCardServiceExtensions.ParseTraceReaderName(System.String)">
             <summary>
             Parses a trace reader name to extract path and operations.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.TraceMetadata">
+            <summary>
+            Metadata for trace data.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.TraceMetadata.CardType">
+            <summary>
+            Card type identifier.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.TraceMetadata.Atr">
+            <summary>
+            Answer to Reset (ATR) value.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.TraceMetadata.IsdAid">
+            <summary>
+            Issuer Security Domain AID.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.OperationRange">
+            <summary>
+            Range of exchanges for a specific operation.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.OperationRange.StartIndex">
+            <summary>
+            Starting exchange index.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.OperationRange.EndIndex">
+            <summary>
+            Ending exchange index.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.SimpleExchange">
+            <summary>
+            Simplified APDU exchange.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.SimpleExchange.Command">
+            <summary>
+            Command APDU (hex string).
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.SimpleExchange.Response">
+            <summary>
+            Response APDU (hex string).
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.SimpleExchange.Description">
+            <summary>
+            Optional description of the command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.SimpleExchange.ResponseTimeMs">
+            <summary>
+            Optional response time in milliseconds.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.SimpleTraceData">
+            <summary>
+            Simplified JSON trace format for virtual card testing.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.SimpleTraceData.Metadata">
+            <summary>
+            Trace metadata.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.SimpleTraceData.Operations">
+            <summary>
+            Operations mapped to exchange ranges.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.SimpleTraceData.Exchanges">
+            <summary>
+            List of APDU exchanges.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Services.VirtualCardServiceAdapter">

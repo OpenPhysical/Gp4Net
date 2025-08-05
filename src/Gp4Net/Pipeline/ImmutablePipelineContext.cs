@@ -42,9 +42,8 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     public IPipelineContext With<T>(string key, T value)
     {
         ArgumentNullException.ThrowIfNull(key);
-        if (value == null)
-            throw new ArgumentNullException(nameof(value));
-            
+        ArgumentNullException.ThrowIfNull(value);
+
         return new ImmutablePipelineContext(_values.SetItem(key, value));
     }
 
@@ -59,7 +58,13 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     }
 
     /// <inheritdoc/>
-    public ImmutableArray<string> Keys => _values.Keys.ToImmutableArray();
+    public ImmutableArray<string> Keys
+    {
+        get
+        {
+            return _values.Keys.ToImmutableArray();
+        }
+    }
 
     /// <inheritdoc/>
     public IPipelineContext WithMany(ImmutableDictionary<string, object> values)
@@ -67,7 +72,9 @@ public sealed class ImmutablePipelineContext : IPipelineContext
         ArgumentNullException.ThrowIfNull(values);
             
         if (values.IsEmpty)
+        {
             return this;
+        }
 
         var builder = _values.ToBuilder();
         foreach (var kvp in values)
@@ -84,7 +91,13 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     /// <summary>
     /// Creates an empty context.
     /// </summary>
-    public static IPipelineContext Empty => new ImmutablePipelineContext();
+    public static IPipelineContext Empty
+    {
+        get
+        {
+            return new ImmutablePipelineContext();
+        }
+    }
 
     /// <summary>
     /// Creates a context with a single value.
@@ -104,7 +117,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
         return $"PipelineContext[{string.Join(", ", items)}]";
     }
 
-    public override bool Equals(object? obj) =>
+    public override bool Equals(object obj) =>
         obj is ImmutablePipelineContext other &&
         _values.SequenceEqual(other._values);
 

@@ -1,9 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
-using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
@@ -81,9 +79,14 @@ public class Scp03TraceBasedTests
             .Returns<ICryptogramContext>(ctx => 
             {
                 if (ctx.Type == CryptogramType.CardCryptogram)
+                {
                     return Convert.FromHexString("148C0CAF84B0E110"); // From trace
+                }
                 else if (ctx.Type == CryptogramType.HostCryptogram)
+                {
                     return Convert.FromHexString("7B54E3B21E27DA5F"); // From trace
+                }
+
                 return new byte[8];
             });
         
@@ -132,9 +135,14 @@ public class Scp03TraceBasedTests
             .Returns<ICryptogramContext>(ctx => 
             {
                 if (ctx.Type == CryptogramType.CardCryptogram)
+                {
                     return Convert.FromHexString("148C0CAF84B0E110"); // From trace
+                }
                 else if (ctx.Type == CryptogramType.HostCryptogram)
+                {
                     return Convert.FromHexString("7B54E3B21E27DA5F"); // From trace
+                }
+
                 return new byte[8];
             });
         
@@ -194,6 +202,7 @@ public class Scp03TraceBasedTests
         // Setup minimal service provider for SecureChannelProtocolFactory
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton<IKeyDerivationService, KeyDerivationService>();
         var serviceProvider = services.BuildServiceProvider();
             
         var factoryLogger = new Mock<ILogger<SecureChannelProtocolFactory>>();

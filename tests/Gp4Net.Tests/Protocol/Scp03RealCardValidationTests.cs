@@ -6,12 +6,9 @@
 using System;
 using System.Linq;
 using AwesomeAssertions;
-using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 

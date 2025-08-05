@@ -11,7 +11,6 @@ using Gp4Net.Cryptography;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Security;
-using Gp4Net.Utils;
 using JetBrains.Annotations;
 using Kdf108.Domain.Kdf;
 using Kdf108.Domain.Kdf.Modes;
@@ -34,12 +33,24 @@ public class Scp03Protocol : SecureChannelProtocolBase
     /// <summary>
     /// Gets the protocol version identifier.
     /// </summary>
-    public override byte ProtocolVersion => ProtocolIdentifiers.Scp03;
+    public override byte ProtocolVersion
+    {
+        get
+        {
+            return ProtocolIdentifiers.Scp03;
+        }
+    }
 
     /// <summary>
     /// Gets the SCP03 implementation parameter.
     /// </summary>
-    public byte Implementation => _implementation;
+    public byte Implementation
+    {
+        get
+        {
+            return _implementation;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the Scp03Protocol class.
@@ -268,7 +279,9 @@ public class Scp03Protocol : SecureChannelProtocolBase
         SecurityLevel securityLevel)
     {
         if (context == null)
+        {
             return SmartCardError.InvalidArgument("Context cannot be null");
+        }
 
         // Calculate initial MAC chaining value using the new static service
         byte[] macChainingValue;
@@ -349,7 +362,7 @@ public class Scp03Protocol : SecureChannelProtocolBase
     /// <param name="hostChallenge">The host challenge.</param>
     /// <param name="sessionKeys">The session keys.</param>
     /// <returns>True if valid, false otherwise.</returns>
-    public bool VerifyCardCryptogram(
+    public new bool VerifyCardCryptogram(
         InitializeUpdateResponse response,
         byte[] hostChallenge,
         SessionKeys sessionKeys)

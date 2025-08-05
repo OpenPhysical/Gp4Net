@@ -27,7 +27,7 @@ public class GlobalPlatformService : IGlobalPlatformService
 {
     private readonly ISmartCardService _cardService;
     private readonly ISecureChannelManager _secureChannelManager;
-    private readonly ILogger<GlobalPlatformService>? _logger;
+    private readonly ILogger<GlobalPlatformService> _logger;
 
     /// <summary>
     /// Initializes a new instance of the GlobalPlatformService class.
@@ -35,23 +35,25 @@ public class GlobalPlatformService : IGlobalPlatformService
     public GlobalPlatformService(
         ISmartCardService cardService,
         ISecureChannelManager secureChannelManager,
-        ILogger<GlobalPlatformService>? logger = null)
+        ILogger<GlobalPlatformService> logger)
     {
         _cardService = cardService ?? throw new ArgumentNullException(nameof(cardService));
         _secureChannelManager = secureChannelManager ?? throw new ArgumentNullException(nameof(secureChannelManager));
-        _logger = logger;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <inheritdoc/>
     public async Task<Result<SelectResponse, SmartCardError>> SelectIsdAsync(
         CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation("Selecting Issuer Security Domain with auto-detection");
+        _logger.LogInformation("Selecting Issuer Security Domain with auto-detection");
 
         // Pure function approach: create command
         var selectResult = CreateSelectIsdCommand();
         if (selectResult.IsFailure)
+        {
             return Result.Failure<SelectResponse, SmartCardError>(selectResult.Error);
+        }
 
         // Execute command
         var response = await _cardService.ExecuteCommandAsync(selectResult.Value, cancellationToken);
@@ -69,7 +71,7 @@ public class GlobalPlatformService : IGlobalPlatformService
         SecurityLevel securityLevel = SecurityLevel.CMac,
         CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation("Establishing secure channel with security level: {SecurityLevel}", securityLevel);
+        _logger.LogInformation("Establishing secure channel with security level: {SecurityLevel}", securityLevel);
 
         // Generate host challenge
         var hostChallenge = GenerateHostChallenge();
@@ -77,12 +79,16 @@ public class GlobalPlatformService : IGlobalPlatformService
         // Create INITIALIZE UPDATE command
         var initUpdateResult = CreateInitializeUpdateCommand(keySet.KeyVersion, keySet.KeyId, hostChallenge);
         if (initUpdateResult.IsFailure)
+        {
             return Result.Failure<Domain.Security.SecureChannelState, SmartCardError>(initUpdateResult.Error);
+        }
 
         // Execute command
         var response = await _cardService.ExecuteCommandAsync(initUpdateResult.Value, cancellationToken);
         if (response.IsFailure)
+        {
             return Result.Failure<Domain.Security.SecureChannelState, SmartCardError>(response.Error);
+        }
 
         // Process response and establish secure channel
         return await EstablishSecureChannelFromResponse(response.Value, keySet, securityLevel, hostChallenge);
@@ -93,11 +99,13 @@ public class GlobalPlatformService : IGlobalPlatformService
         StatusSubset subset = StatusSubset.IssuerSecurityDomain,
         CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation("Getting status for subset: {Subset}", subset);
+        _logger.LogInformation("Getting status for subset: {Subset}", subset);
 
         var commandResult = CreateGetStatusCommand(subset);
         if (commandResult.IsFailure)
+        {
             return Result.Failure<ImmutableList<ApplicationInfo>, SmartCardError>(commandResult.Error);
+        }
 
         var result = await _cardService.ExecuteCommandAsync(commandResult.Value, cancellationToken);
 
@@ -107,10 +115,10 @@ public class GlobalPlatformService : IGlobalPlatformService
     /// <inheritdoc/>
     public async Task<Result<InstallationResult, SmartCardError>> InstallCapFileAsync(
         byte[] capFileData,
-        InstallOptions? options = null,
+        InstallOptions options,
         CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation("Installing CAP file ({Length} bytes)", capFileData.Length);
+        _logger.LogInformation("Installing CAP file ({Length} bytes)", capFileData.Length);
             
         // Validate secure channel is established
         var session = _cardService.Context.Get<Domain.Security.SecureChannelState>(ContextKeys.SecureChannelSession);
@@ -139,11 +147,13 @@ public class GlobalPlatformService : IGlobalPlatformService
         bool deleteRelated = false,
         CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation("Deleting application with AID: {AID}", Convert.ToHexString(aid));
+        _logger.LogInformation("Deleting application with AID: {AID}", Convert.ToHexString(aid));
 
         var commandResult = CreateDeleteCommand(aid, deleteRelated);
         if (commandResult.IsFailure)
+        {
             return Result.Failure<bool, SmartCardError>(commandResult.Error);
+        }
 
         var response = await _cardService.ExecuteCommandAsync(commandResult.Value, cancellationToken);
         return response.Map(_ => true);
@@ -155,7 +165,7 @@ public class GlobalPlatformService : IGlobalPlatformService
         byte keyVersion,
         CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation("Putting keys with version: {KeyVersion}", keyVersion);
+        _logger.LogInformation("Putting keys with version: {KeyVersion}", keyVersion);
             
         // Validate secure channel is established
         var session = _cardService.Context.Get<Domain.Security.SecureChannelState>(ContextKeys.SecureChannelSession);
@@ -179,7 +189,9 @@ public class GlobalPlatformService : IGlobalPlatformService
             .MapError(e => SmartCardError.InvalidData($"Failed to create PUT KEY command: {e.Message}"));
 
         if (commandResult.IsFailure)
+        {
             return commandResult.Error;
+        }
 
         // Execute command
         var response = await _cardService.ExecuteCommandAsync(commandResult.Value, cancellationToken);
@@ -190,11 +202,13 @@ public class GlobalPlatformService : IGlobalPlatformService
     public async Task<Result<CplcData, SmartCardError>> GetCplcAsync(
         CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation("Getting CPLC data");
+        _logger.LogInformation("Getting CPLC data");
 
         var commandResult = CreateGetDataCommand(GetDataCommand.DataObjects.CardProductionLifeCycle);
         if (commandResult.IsFailure)
+        {
             return Result.Failure<CplcData, SmartCardError>(commandResult.Error);
+        }
 
         var response = await _cardService.ExecuteCommandAsync(commandResult.Value, cancellationToken);
             
@@ -206,11 +220,13 @@ public class GlobalPlatformService : IGlobalPlatformService
         ushort tag,
         CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation("Getting data for tag: {Tag:X4}", tag);
+        _logger.LogInformation("Getting data for tag: {Tag:X4}", tag);
 
         var commandResult = CreateGetDataCommand(tag);
         if (commandResult.IsFailure)
+        {
             return Result.Failure<byte[], SmartCardError>(commandResult.Error);
+        }
 
         var response = await _cardService.ExecuteCommandAsync(commandResult.Value, cancellationToken);
             
@@ -223,7 +239,7 @@ public class GlobalPlatformService : IGlobalPlatformService
         LifecycleState state,
         CancellationToken cancellationToken = default)
     {
-        _logger?.LogInformation("Setting lifecycle state for AID: {AID} to {State}", 
+        _logger.LogInformation("Setting lifecycle state for AID: {AID} to {State}", 
             Convert.ToHexString(aid), state);
             
         // Validate secure channel is established
@@ -275,8 +291,10 @@ public class GlobalPlatformService : IGlobalPlatformService
     private static Result<SelectResponse, SmartCardError> ProcessSelectResponse(CommandResponse response)
     {
         if (!response.IsSuccess)
+        {
             return Result.Failure<SelectResponse, SmartCardError>(
                 SmartCardError.FromStatusWord(response.StatusWord));
+        }
 
         return SelectResponse.Parse(response.Data);
     }
@@ -346,7 +364,7 @@ public class GlobalPlatformService : IGlobalPlatformService
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Failed to establish secure channel");
+            _logger.LogError(ex, "Failed to establish secure channel");
             return Result.Failure<Domain.Security.SecureChannelState, SmartCardError>(
                 SmartCardError.SecurityError("Failed to establish secure channel", (ushort)response.StatusWord));
         }
@@ -363,8 +381,10 @@ public class GlobalPlatformService : IGlobalPlatformService
         CommandResponse response)
     {
         if (!response.IsSuccess)
+        {
             return Result.Failure<ImmutableList<ApplicationInfo>, SmartCardError>(
                 SmartCardError.FromStatusWord(response.StatusWord));
+        }
 
         var parseResult = GetStatusResponse.Parse(response.Data);
         return parseResult.Map(parsed => ConvertToApplicationInfos(parsed));
@@ -392,14 +412,45 @@ public class GlobalPlatformService : IGlobalPlatformService
             if (entry.Privileges.Length > 0)
             {
                 var privileges = entry.Privileges[0];
-                if ((privileges & 0x80) != 0) privList.Add(Privilege.SecurityDomain);
-                if ((privileges & 0x40) != 0) privList.Add(Privilege.DapVerification);
-                if ((privileges & 0x20) != 0) privList.Add(Privilege.DelegatedManagement);
-                if ((privileges & 0x10) != 0) privList.Add(Privilege.CardLock);
-                if ((privileges & 0x08) != 0) privList.Add(Privilege.CardTerminate);
-                if ((privileges & 0x04) != 0) privList.Add(Privilege.CardReset);
-                if ((privileges & 0x02) != 0) privList.Add(Privilege.CvmManagement);
-                if ((privileges & 0x01) != 0) privList.Add(Privilege.MandatedDapVerification);
+                if ((privileges & 0x80) != 0)
+                {
+                    privList.Add(Privilege.SecurityDomain);
+                }
+
+                if ((privileges & 0x40) != 0)
+                {
+                    privList.Add(Privilege.DapVerification);
+                }
+
+                if ((privileges & 0x20) != 0)
+                {
+                    privList.Add(Privilege.DelegatedManagement);
+                }
+
+                if ((privileges & 0x10) != 0)
+                {
+                    privList.Add(Privilege.CardLock);
+                }
+
+                if ((privileges & 0x08) != 0)
+                {
+                    privList.Add(Privilege.CardTerminate);
+                }
+
+                if ((privileges & 0x04) != 0)
+                {
+                    privList.Add(Privilege.CardReset);
+                }
+
+                if ((privileges & 0x02) != 0)
+                {
+                    privList.Add(Privilege.CvmManagement);
+                }
+
+                if ((privileges & 0x01) != 0)
+                {
+                    privList.Add(Privilege.MandatedDapVerification);
+                }
             }
                 
             // Determine application type based on privileges
@@ -430,8 +481,10 @@ public class GlobalPlatformService : IGlobalPlatformService
     private static Result<CplcData, SmartCardError> ProcessCplcResponse(CommandResponse response)
     {
         if (!response.IsSuccess)
+        {
             return Result.Failure<CplcData, SmartCardError>(
                 SmartCardError.FromStatusWord(response.StatusWord));
+        }
 
         // Extract the TLV value from the response
         var cplcBytes = ExtractTlvValue(response.Data, GetDataCommand.DataObjects.CardProductionLifeCycle);
@@ -468,7 +521,7 @@ public class GlobalPlatformService : IGlobalPlatformService
 
             if (response.IsSuccess)
             {
-                _logger?.LogInformation("Successfully selected ISD with AID: {AID}", aidHex);
+                _logger.LogInformation("Successfully selected ISD with AID: {AID}", aidHex);
                     
                 // Update context with ISD AID
                 var newService = _cardService.WithContextValue(ContextKeys.IssuerSecurityDomainAid, aid);
@@ -481,10 +534,12 @@ public class GlobalPlatformService : IGlobalPlatformService
             SmartCardError.CardError("No ISD found on card"));
     }
 
-    private static byte[]? ExtractTlvValue(byte[] data, ushort expectedTag)
+    private static byte[] ExtractTlvValue(byte[] data, ushort expectedTag)
     {
         if (data == null || data.Length < 2)
-            return null;
+        {
+            return Array.Empty<byte>();
+        }
 
         // For two-byte tags like 9F7F, we need to handle them specially
         if (expectedTag > 0xFF && data.Length >= 3)
@@ -510,28 +565,36 @@ public class GlobalPlatformService : IGlobalPlatformService
         // Try single-byte tag parsing
         var elements = TlvParser.ParseAll(data).ToList();
         if (elements.Count == 0)
+        {
             return data; // Not TLV format, return as-is
+        }
 
         // Look for the expected tag (only works for single-byte tags)
         if (expectedTag <= 0xFF)
         {
             var element = elements.FirstOrDefault(e => e.TagNumber == expectedTag);
             if (element != null)
+            {
                 return element.Value;
+            }
         }
 
         // If we have a single TLV element and no specific tag match,
         // return its content (common for GET DATA responses)
         if (elements.Count == 1)
+        {
             return elements[0].Value;
+        }
 
-        return null;
+        return Array.Empty<byte>();
     }
 
     private static int ParseLength(byte[] data, ref int offset)
     {
         if (offset >= data.Length)
+        {
             return -1;
+        }
 
         var lenByte = data[offset++];
 

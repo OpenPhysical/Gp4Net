@@ -75,7 +75,9 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
                             0x00);
                             
                         if (macChainingStateResult.IsFailure)
+                        {
                             return Result.Failure<(byte[], SecureChannelState), SmartCardError>(macChainingStateResult.Error);
+                        }
 
                         // Create new state with updated values
                         var newStateResult = SecureChannelState.Create(
@@ -87,7 +89,9 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
                             .Bind(state => state.UpdateCounterAndMac(newEncryptionCounter, macChainingStateResult.Value));
                             
                         if (newStateResult.IsFailure)
+                        {
                             return Result.Failure<(byte[], SecureChannelState), SmartCardError>(newStateResult.Error);
+                        }
 
                         return Result.Success<(byte[], SecureChannelState), SmartCardError>((decryptedResponse, newStateResult.Value));
                     });
@@ -102,7 +106,9 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
         byte protocolVersion)
     {
         if (!securityLevel.HasRMac() || !HasRMac(response))
+        {
             return Result.Success<(byte[], ImmutableArray<byte>), SmartCardError>((response, macChainingValue));
+        }
 
         return VerifyAndRemoveRMac(response, sessionKeys, macChainingValue, protocolVersion)
             .Map(responseWithoutMac => (responseWithoutMac, macChainingValue)); // MAC chaining not updated for R-MAC
@@ -116,7 +122,9 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
         byte protocolVersion)
     {
         if (!securityLevel.HasREncryption() || !SecurityValidation.HasResponseData(response))
+        {
             return Result.Success<(byte[], uint), SmartCardError>((response, encryptionCounter));
+        }
 
         return DecryptResponseData(response, sessionKeys, encryptionCounter, protocolVersion)
             .Map(decryptedData => (decryptedData, encryptionCounter + 1));
@@ -134,7 +142,9 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
         try
         {
             if (response.Length < 10) // Minimum: 8 bytes R-MAC + 2 bytes SW
+            {
                 return SmartCardError.InvalidData("Response too short to contain R-MAC");
+            }
 
             // Extract R-MAC (8 bytes before status word)
             var rmacOffset = response.Length - 10;
@@ -150,13 +160,17 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
             // Calculate expected R-MAC
             var expectedRMacResult = CalculateRMac(dataForMac, sessionKeys, macChainingValue, protocolVersion);
             if (expectedRMacResult.IsFailure)
+            {
                 return expectedRMacResult.Error;
+            }
 
             var expectedRMac = expectedRMacResult.Value;
 
             // Verify R-MAC (compare first 8 bytes)
             if (!receivedRMac.SequenceEqual(expectedRMac.Take(8).ToArray()))
+            {
                 return SmartCardError.SecurityError("R-MAC verification failed");
+            }
 
             // Return response without R-MAC
             return Result.Success<byte[], SmartCardError>(dataForMac);
@@ -220,7 +234,9 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
 
             // Encrypted data should be padded to block size
             if (encryptedData.Length % 16 != 0)
+            {
                 return SmartCardError.InvalidData("Encrypted response data not aligned to AES block size");
+            }
 
             var decrypted = new byte[encryptedData.Length];
 
@@ -232,7 +248,9 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
             // Remove PKCS#7 padding
             var unpaddedResult = Protocol.CryptographicOperations.RemovePkcs7Padding(decrypted);
             if (unpaddedResult.IsFailure)
+            {
                 return unpaddedResult.Error;
+            }
 
             // Combine decrypted data with original status word
             var result = new byte[unpaddedResult.Value.Length + 2];
@@ -330,9 +348,11 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
             // We need to reconstruct the full R-MAC input data
             
             if (response.Length < 2)
+            {
                 return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidData("Response too short for R-MAC calculation"));
-            
+            }
+
             // Extract response data and status word
             var statusOffset = response.Length - 2;
             var responseData = new byte[statusOffset];

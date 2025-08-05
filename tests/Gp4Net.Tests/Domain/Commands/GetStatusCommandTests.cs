@@ -4,11 +4,11 @@ using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
 [TestFixture]
+[Category("Unit")]
 public class GetStatusCommandTests
 {
 
@@ -24,7 +24,7 @@ public class GetStatusCommandTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Subset.Should().Be(subset);
         result.Value.Format.Should().Be(GetStatusCommand.ResponseFormat.None);
-        result.Value.SearchCriteria.Should().BeNull();
+        result.Value.SearchCriteria.Should().BeEmpty();
     }
 
     [Test]
@@ -141,7 +141,7 @@ public class GetStatusCommandTests
         );
         var command = result.Value;
 
-        var apdu = command.ToApdu();
+        var apdu = ApduBuilder.BuildApdu(command);
 
         apdu.Length.Should().Be(5); // CLA INS P1 P2 Le
         apdu[0].Should().Be(0x80); // CLA
@@ -162,7 +162,7 @@ public class GetStatusCommandTests
         );
         var command = result.Value;
 
-        var apdu = command.ToApdu();
+        var apdu = ApduBuilder.BuildApdu(command);
 
         apdu.Length.Should().Be(5 + aid.Length + 1); // CLA INS P1 P2 Lc Data Le
         apdu[0].Should().Be(0x80); // CLA
@@ -184,7 +184,7 @@ public class GetStatusCommandTests
         var result = GetStatusCommand.Create(subset);
         var command = result.Value;
 
-        var apdu = command.ToApdu();
+        var apdu = ApduBuilder.BuildApdu(command);
 
         apdu[2].Should().Be(expectedP1);
     }
@@ -200,7 +200,7 @@ public class GetStatusCommandTests
         );
         var command = result.Value;
 
-        var apdu = command.ToApdu();
+        var apdu = ApduBuilder.BuildApdu(command);
 
         apdu[3].Should().Be(expectedP2);
     }
@@ -232,7 +232,7 @@ public class GetStatusCommandTests
         iApduCommand.Ins.Should().Be(0xF2);
         command.P1.Should().Be(0x40);
         command.P2.Should().Be(0x02);
-        command.Data.Should().BeNull();
+        command.Data.Should().BeEmpty();
         command.ExpectedResponseLength.Should().Be(256);
         command.IsExtendedLength.Should().BeFalse();
     }

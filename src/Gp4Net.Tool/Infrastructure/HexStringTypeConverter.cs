@@ -12,15 +12,15 @@ namespace Gp4Net.Tool.Infrastructure;
 public class HexStringTypeConverter : TypeConverter
 {
     /// <inheritdoc />
-    public override bool CanConvertFrom(ITypeDescriptorContext? context, Type sourceType)
+    public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
     {
         return sourceType == typeof(string) || base.CanConvertFrom(context, sourceType);
     }
 
     /// <inheritdoc />
-    public override object? ConvertFrom(
-        ITypeDescriptorContext? context,
-        CultureInfo? culture,
+    public override object ConvertFrom(
+        ITypeDescriptorContext context,
+        CultureInfo culture,
         object value
     )
     {

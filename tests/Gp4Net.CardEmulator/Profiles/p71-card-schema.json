@@ -1,0 +1,451 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gp4net.org/schemas/p71-card-profile.json",
+  "title": "P71 Smart Card Profile",
+  "description": "Comprehensive profile for P71D321 SmartMX3 smart card emulation",
+  "type": "object",
+  "required": ["cardProfile", "chipInfo", "cardData"],
+  "properties": {
+    "cardProfile": {
+      "type": "object",
+      "required": ["name", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique identifier for this card profile"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the card"
+        }
+      }
+    },
+    "chipInfo": {
+      "type": "object",
+      "required": ["manufacturer", "platform", "model", "memoryConfig", "architecture"],
+      "properties": {
+        "manufacturer": {
+          "type": "string",
+          "enum": ["NXP", "Infineon", "STMicroelectronics", "Samsung", "Gemalto", "Atmel"]
+        },
+        "platform": {
+          "type": "string",
+          "enum": ["SmartMX3", "SmartMX2", "SmartMX", "SLE66", "SLE78", "ST31", "ST33"]
+        },
+        "model": {
+          "type": "string",
+          "description": "Chip model identifier (e.g., P71D321)"
+        },
+        "memoryConfig": {
+          "type": "string",
+          "enum": ["P71D251", "P71D301", "P71D351", "P71D352"]
+        },
+        "architecture": {
+          "type": "string",
+          "description": "Security architecture (e.g., IntegralSecurity 2.0)"
+        }
+      }
+    },
+    "certifications": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["CommonCriteriaEAL4Plus", "CommonCriteriaEAL5Plus", "CommonCriteriaEAL6Plus", "FIPS140-2_Level1", "FIPS140-2_Level2", "FIPS140-2_Level3", "EMVCo"]
+      }
+    },
+    "javaCard": {
+      "type": "object",
+      "required": ["version", "edition"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "edition": {
+          "type": "string",
+          "enum": ["Classic", "Connected"]
+        }
+      }
+    },
+    "globalPlatform": {
+      "type": "object",
+      "required": ["version"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+(\\.\\d+)?$"
+        },
+        "amendmentD": {
+          "type": "string"
+        }
+      }
+    },
+    "operatingSystem": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "cryptoCapabilities": {
+      "type": "object",
+      "properties": {
+        "symmetric": {
+          "type": "object",
+          "properties": {
+            "algorithms": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["DES", "3DES", "AES"]
+              }
+            },
+            "aesKeySizes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "enum": [128, 192, 256]
+              }
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["ECB", "CBC", "CTR", "OFB", "CFB"]
+              }
+            },
+            "mac": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["CMAC", "CBC-MAC", "HMAC", "Retail-MAC"]
+              }
+            }
+          }
+        },
+        "asymmetric": {
+          "type": "object",
+          "properties": {
+            "rsa": {
+              "type": "object",
+              "properties": {
+                "keySizes": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "enum": [1024, 2048, 3072, 4096]
+                  }
+                },
+                "padding": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["PKCS1", "PSS", "OAEP"]
+                  }
+                }
+              }
+            },
+            "ecc": {
+              "type": "object",
+              "properties": {
+                "curves": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "maxBits": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "hash": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["SHA-1", "SHA-256", "SHA-384", "SHA-512"]
+          }
+        },
+        "random": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["TrueRNG", "PseudoRNG"]
+            },
+            "fips": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "interfaces": {
+      "type": "object",
+      "properties": {
+        "contact": {
+          "type": "boolean"
+        },
+        "contactless": {
+          "type": "object",
+          "properties": {
+            "supported": {
+              "type": "boolean"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["TypeA", "TypeB"]
+            },
+            "maxDataRate": {
+              "type": "integer"
+            },
+            "vhbr": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "cardData": {
+      "type": "object",
+      "required": ["atr", "isdAid"],
+      "properties": {
+        "atr": {
+          "type": "string",
+          "pattern": "^[0-9A-Fa-f]+$"
+        },
+        "isdAid": {
+          "type": "string",
+          "pattern": "^[0-9A-Fa-f]+$"
+        },
+        "cplc": {
+          "$ref": "#/definitions/cplcData"
+        },
+        "oids": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "capabilities": {
+          "$ref": "#/definitions/cardCapabilities"
+        },
+        "keyInfo": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/keyInfo"
+          }
+        },
+        "diversificationData": {
+          "type": "string",
+          "pattern": "^[0-9A-Fa-f]+$"
+        },
+        "securityDomainStatus": {
+          "type": "string",
+          "pattern": "^[0-9A-Fa-f]+$"
+        }
+      }
+    },
+    "staticKeys": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/keySet"
+      }
+    }
+  },
+  "definitions": {
+    "cplcData": {
+      "type": "object",
+      "properties": {
+        "icFabricator": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "icType": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "operatingSystemId": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "operatingSystemReleaseDate": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "operatingSystemReleaseLevel": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "icFabricationDate": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "icSerialNumber": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{8}$"
+        },
+        "icBatchIdentifier": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "icModuleFabricator": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "icModulePackagingDate": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "iccManufacturer": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "icEmbeddingDate": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "icPrePersonalizer": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "icPrePersonalizationEquipmentDate": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "icPrePersonalizationEquipmentId": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{8}$"
+        },
+        "icPersonalizer": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "icPersonalizationDate": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{4}$"
+        },
+        "icPersonalizationEquipmentId": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{8}$"
+        }
+      }
+    },
+    "cardCapabilities": {
+      "type": "object",
+      "properties": {
+        "scpSupport": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "protocol": {
+                "type": "string",
+                "pattern": "^0x[0-9A-Fa-f]{2}$"
+              },
+              "implementations": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^0x[0-9A-Fa-f]{2}$"
+                }
+              },
+              "keySizes": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "domainPrivileges": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "applicationPrivileges": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hashAlgorithms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cipherSuites": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "keyInfo": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "type": {
+          "type": "string"
+        },
+        "length": {
+          "type": "integer"
+        }
+      }
+    },
+    "keySet": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["SCP02", "SCP03"]
+        },
+        "keys": {
+          "type": "object",
+          "properties": {
+            "enc": {
+              "type": "string",
+              "pattern": "^[0-9A-Fa-f]+$"
+            },
+            "mac": {
+              "type": "string",
+              "pattern": "^[0-9A-Fa-f]+$"
+            },
+            "dek": {
+              "type": "string",
+              "pattern": "^[0-9A-Fa-f]+$"
+            }
+          }
+        }
+      }
+    }
+  }
+}

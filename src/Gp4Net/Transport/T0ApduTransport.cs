@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 
@@ -17,16 +18,40 @@ public class T0ApduTransport : IApduTransport
     private readonly ILogger<T0ApduTransport> _logger;
 
     /// <inheritdoc />
-    public TransportProtocol Protocol => TransportProtocol.T0;
+    public TransportProtocol Protocol
+    {
+        get
+        {
+            return TransportProtocol.T0;
+        }
+    }
 
     /// <inheritdoc />
-    public int MaxCommandDataLength => 255;
+    public int MaxCommandDataLength
+    {
+        get
+        {
+            return 255;
+        }
+    }
 
     /// <inheritdoc />
-    public int MaxResponseDataLength => 256;
+    public int MaxResponseDataLength
+    {
+        get
+        {
+            return 256;
+        }
+    }
 
     /// <inheritdoc />
-    public bool SupportsExtendedLength => false;
+    public bool SupportsExtendedLength
+    {
+        get
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of T0ApduTransport.
@@ -79,7 +104,7 @@ public class T0ApduTransport : IApduTransport
             // Case 4: Lc + Data + Le
             apduList.Add((byte)command.Data!.Length);
             apduList.AddRange(command.Data);
-            apduList.Add(GetLeByte(command.ExpectedResponseLength!.Value));
+            apduList.Add(GetLeByte(command.ExpectedResponseLength.Value));
         }
         else if (hasData)
         {
@@ -90,7 +115,7 @@ public class T0ApduTransport : IApduTransport
         else if (expectsResponse)
         {
             // Case 2: Le only
-            apduList.Add(GetLeByte(command.ExpectedResponseLength!.Value));
+            apduList.Add(GetLeByte(command.ExpectedResponseLength.Value));
         }
         // Case 1: No Lc, no Le
 
@@ -219,12 +244,54 @@ public class T0ApduTransport : IApduTransport
             _newExpectedLength = newExpectedLength;
         }
 
-        public byte Cla => _inner.Cla;
-        public byte Ins => _inner.Ins;
-        public byte P1 => _inner.P1;
-        public byte P2 => _inner.P2;
-        public byte[]? Data => _inner.Data;
-        public int? ExpectedResponseLength => _newExpectedLength;
-        public bool IsExtendedLength => false;
+        public byte Cla
+        {
+            get
+            {
+                return _inner.Cla;
+            }
+        }
+        public byte Ins
+        {
+            get
+            {
+                return _inner.Ins;
+            }
+        }
+        public byte P1
+        {
+            get
+            {
+                return _inner.P1;
+            }
+        }
+        public byte P2
+        {
+            get
+            {
+                return _inner.P2;
+            }
+        }
+        public byte[] Data
+        {
+            get
+            {
+                return _inner.Data;
+            }
+        }
+        public Maybe<int> ExpectedResponseLength
+        {
+            get
+            {
+                return Maybe<int>.From(_newExpectedLength);
+            }
+        }
+        public bool IsExtendedLength
+        {
+            get
+            {
+                return false;
+            }
+        }
     }
 }

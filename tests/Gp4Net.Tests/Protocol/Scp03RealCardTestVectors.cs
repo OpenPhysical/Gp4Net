@@ -20,7 +20,6 @@
 // -----------------------------------------------------------------------------
 
 using System;
-using CSharpFunctionalExtensions;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Tests.Protocol;

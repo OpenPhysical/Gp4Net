@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
@@ -13,9 +12,9 @@ using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
 using Gp4Net.Pipeline;
 using Gp4Net.Services;
-using Gp4Net.Tests.TestHelpers;
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Services;
@@ -29,14 +28,14 @@ public class GlobalPlatformServiceTests
     private TestSmartCardService _testCardService;
     private TestSecureChannelManager _testSecureChannelManager;
     private GlobalPlatformService _service;
-    private ILogger<GlobalPlatformService>? _logger;
+    private ILogger<GlobalPlatformService> _logger;
 
     [SetUp]
     public void SetUp()
     {
         _testCardService = new TestSmartCardService();
         _testSecureChannelManager = new TestSecureChannelManager();
-        _logger = null;
+        _logger = NullLogger<GlobalPlatformService>.Instance;
         _service = new GlobalPlatformService(_testCardService, _testSecureChannelManager, _logger);
     }
 
@@ -50,7 +49,7 @@ public class GlobalPlatformServiceTests
     public void Constructor_WithNullCardService_ThrowsArgumentNullException()
     {
         Action act = () => new GlobalPlatformService(null!, _testSecureChannelManager, _logger);
-        
+
         act.Should().ThrowExactly<ArgumentNullException>();
     }
 
@@ -58,7 +57,7 @@ public class GlobalPlatformServiceTests
     public void Constructor_WithNullSecureChannelManager_ThrowsArgumentNullException()
     {
         Action act = () => new GlobalPlatformService(_testCardService, null!, _logger);
-        
+
         act.Should().ThrowExactly<ArgumentNullException>();
     }
 
@@ -94,7 +93,7 @@ public class GlobalPlatformServiceTests
     [Test]
     public async Task GetStatusAsync_WithValidApplications_ReturnsApplicationList()
     {
-        // GET STATUS response format per entry: 
+        // GET STATUS response format per entry:
         // AID length, AID, lifecycle state, privileges length, privileges
         var statusResponse = new byte[] {
             // Entry 1
@@ -157,9 +156,9 @@ public class GlobalPlatformServiceTests
     {
         // This test verifies that the service properly coordinates with the secure channel manager
         // It doesn't test cryptographic validation, which is covered in protocol-specific tests
-        
+
         var keySet = GpTestKeys.CreateScp03TestKeySet(keyVersion: 0x01);
-        
+
         // Set up a mock INITIALIZE UPDATE response that will fail cryptogram verification
         // This is expected - the test verifies service coordination, not crypto
         var initUpdateResponse = new byte[] {
@@ -207,7 +206,7 @@ public class GlobalPlatformServiceTests
         _testCardService = (TestSmartCardService)_testCardService.WithContextValue(
             ContextKeys.SecureChannelSession, testSessionResult.Value);
         _service = new GlobalPlatformService(_testCardService, _testSecureChannelManager, _logger);
-        
+
         var result = await _service.InstallCapFileAsync(capFileData, options);
 
         // The implementation currently returns unsupported
@@ -268,11 +267,17 @@ public class GlobalPlatformServiceTests
             .With("CardChannel", new TestCardChannel())
             .With("ApduTransport", new TestApduTransport());
 
-        public IPipelineContext Context => _context;
+        public IPipelineContext Context
+        {
+            get
+            {
+                return _context;
+            }
+        }
 
         public void SetNextResponse(byte[] response)
         {
-            _responses.Enqueue(new CommandResponse(response, StatusWords.Success, new ImmutablePipelineContext()));
+            _responses.Enqueue(new CommandResponse(response, StatusWords.Success, new ImmutablePipelineContext(), new Dictionary<string, object>()));
         }
 
         public void SetNextError(SmartCardError error)
@@ -311,9 +316,15 @@ public class GlobalPlatformServiceTests
             var newService = new TestSmartCardService();
             newService._context = context;
             foreach (var response in _responses)
+            {
                 newService._responses.Enqueue(response);
+            }
+
             foreach (var error in _errors)
+            {
                 newService._errors.Enqueue(error);
+            }
+
             return newService;
         }
 
@@ -374,9 +385,21 @@ public class GlobalPlatformServiceTests
     /// </summary>
     private class TestCardChannel : ICardChannel
     {
-        public TransportProtocol Protocol => TransportProtocol.T0;
-        public bool IsOpen => true;
-        
+        public TransportProtocol Protocol
+        {
+            get
+            {
+                return TransportProtocol.T0;
+            }
+        }
+        public bool IsOpen
+        {
+            get
+            {
+                return true;
+            }
+        }
+
         public Task<byte[]> TransmitAsync(byte[] command, CancellationToken cancellationToken = default)
         {
             // Return a simple success response
@@ -389,11 +412,35 @@ public class GlobalPlatformServiceTests
     /// </summary>
     private class TestApduTransport : IApduTransport
     {
-        public TransportProtocol Protocol => TransportProtocol.T0;
-        public int MaxCommandDataLength => 255;
-        public int MaxResponseDataLength => 256;
-        public bool SupportsExtendedLength => false;
-        
+        public TransportProtocol Protocol
+        {
+            get
+            {
+                return TransportProtocol.T0;
+            }
+        }
+        public int MaxCommandDataLength
+        {
+            get
+            {
+                return 255;
+            }
+        }
+        public int MaxResponseDataLength
+        {
+            get
+            {
+                return 256;
+            }
+        }
+        public bool SupportsExtendedLength
+        {
+            get
+            {
+                return false;
+            }
+        }
+
         public Task<ApduResponse> TransmitAsync(
             IApduCommand command,
             ICardChannel channel,

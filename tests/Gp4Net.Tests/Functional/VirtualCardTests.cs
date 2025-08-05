@@ -4,10 +4,9 @@ using AwesomeAssertions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
 using Gp4Net.Constants;
-using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Transport;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Functional;
 
@@ -152,9 +151,7 @@ public class VirtualCardTests
         // Create DELETE command for a test application
         var testAid = Convert.FromHexString("A00000030800001000");
         var deleteCommand = DeleteCommand.CreateForApplication(testAid, deleteRelated: true).Value;
-#pragma warning disable CS0618 // Testing APDU format in integration test
-        var deleteApdu = deleteCommand.ToApdu();
-#pragma warning restore CS0618
+        var deleteApdu = ApduBuilder.BuildApdu(deleteCommand);
         
         // Act
         var response = card.ProcessCommand(deleteApdu);
@@ -181,9 +178,7 @@ public class VirtualCardTests
         ).Value;
         
         // Act
-#pragma warning disable CS0618 // Testing APDU format in integration test
-        var response = card.ProcessCommand(installForLoadCommand.ToApdu());
-#pragma warning restore CS0618
+        var response = card.ProcessCommand(ApduBuilder.BuildApdu(installForLoadCommand));
         
         // Assert
         response.StatusWord.Should().Be(StatusWords.Success);

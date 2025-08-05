@@ -4,19 +4,17 @@
 // -----------------------------------------------------------------------------
 
 using System;
-using System.Collections.Immutable;
 using AwesomeAssertions;
 using Gp4Net.Constants;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Security;
-using Gp4Net.Tests.TestHelpers;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain;
 
 [TestFixture]
+[Category("Unit")]
 public class SecureChannelStateTests
 {
     private SessionKeys _sessionKeys = null!;

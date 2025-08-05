@@ -1,8 +1,6 @@
 using System;
 using System.Linq;
 using AwesomeAssertions;
-using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
 using NUnit.Framework;

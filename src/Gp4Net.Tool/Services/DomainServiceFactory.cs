@@ -6,6 +6,7 @@ using Gp4Net.Services;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Gp4Net.Tool.Services;
 
@@ -40,7 +41,7 @@ public class DomainServiceFactory : IDomainServiceFactory, ISingletonService
     private readonly ICommandPipeline _pipeline;
     private readonly IApduTransportFactory _transportFactory;
     private readonly ISecureChannelManager _secureChannelManager;
-    private readonly ILogger<DomainServiceFactory>? _logger;
+    private readonly ILogger<DomainServiceFactory> _logger;
 
     /// <summary>
     /// Initializes a new instance of the DomainServiceFactory.
@@ -49,7 +50,7 @@ public class DomainServiceFactory : IDomainServiceFactory, ISingletonService
         ICommandPipeline pipeline,
         IApduTransportFactory transportFactory,
         ISecureChannelManager secureChannelManager,
-        ILogger<DomainServiceFactory>? logger = null)
+        ILogger<DomainServiceFactory> logger = null)
     {
         ArgumentNullException.ThrowIfNull(pipeline);
         ArgumentNullException.ThrowIfNull(transportFactory);
@@ -98,9 +99,9 @@ public class DomainServiceFactory : IDomainServiceFactory, ISingletonService
         var smartCardService = CreateSmartCardService(cardService);
 
         // Then wrap it with GlobalPlatform functionality
-        var logger = _logger != null 
+        ILogger<GlobalPlatformService> logger = _logger != null 
             ? new LoggerWrapper<GlobalPlatformService>(_logger) 
-            : null;
+            : NullLogger<GlobalPlatformService>.Instance;
 
         return new GlobalPlatformService(
             smartCardService, 
@@ -121,9 +122,9 @@ internal class LoggerWrapper<T> : ILogger<T>
         _innerLogger = innerLogger;
     }
 
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => _innerLogger.BeginScope(state);
+    public IDisposable BeginScope<TState>(TState state) where TState : notnull => _innerLogger.BeginScope(state);
     public bool IsEnabled(LogLevel logLevel) => _innerLogger.IsEnabled(logLevel);
-    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
     {
         _innerLogger.Log(logLevel, eventId, state, exception, formatter);
     }

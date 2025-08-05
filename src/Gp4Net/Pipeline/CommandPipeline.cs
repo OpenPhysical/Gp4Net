@@ -16,12 +16,12 @@ namespace Gp4Net.Pipeline;
 public class CommandPipeline : ICommandPipeline
 {
     private readonly CommandDelegate _pipeline;
-    private readonly ILogger<CommandPipeline>? _logger;
+    private readonly ILogger<CommandPipeline> _logger;
 
     /// <summary>
     /// Initializes a new instance of CommandPipeline.
     /// </summary>
-    public CommandPipeline(CommandDelegate pipeline, ILogger<CommandPipeline>? logger = null)
+    public CommandPipeline(CommandDelegate pipeline, ILogger<CommandPipeline> logger = null)
     {
         _pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
         _logger = logger;
@@ -80,13 +80,13 @@ public class CommandPipeline : ICommandPipeline
 public class CommandPipelineBuilder : ICommandPipelineBuilder
 {
     private readonly List<Func<CommandDelegate, CommandDelegate>> _components = new();
-    private readonly IServiceProvider? _serviceProvider;
-    private readonly ILogger<CommandPipeline>? _logger;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<CommandPipeline> _logger;
 
     /// <summary>
     /// Initializes a new instance of CommandPipelineBuilder.
     /// </summary>
-    public CommandPipelineBuilder(IServiceProvider? serviceProvider = null)
+    public CommandPipelineBuilder(IServiceProvider serviceProvider = null)
     {
         _serviceProvider = serviceProvider;
         _logger = serviceProvider?.GetService(typeof(ILogger<CommandPipeline>)) as ILogger<CommandPipeline>;
@@ -144,7 +144,7 @@ public class CommandPipelineBuilder : ICommandPipelineBuilder
     /// <summary>
     /// Creates a new pipeline builder.
     /// </summary>
-    public static ICommandPipelineBuilder Create(IServiceProvider? serviceProvider = null) =>
+    public static ICommandPipelineBuilder Create(IServiceProvider serviceProvider = null) =>
         new CommandPipelineBuilder(serviceProvider);
 }
 

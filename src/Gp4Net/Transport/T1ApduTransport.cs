@@ -18,16 +18,40 @@ public class T1ApduTransport : IApduTransport
     private readonly bool _supportsExtendedLength;
 
     /// <inheritdoc />
-    public TransportProtocol Protocol => TransportProtocol.T1;
+    public TransportProtocol Protocol
+    {
+        get
+        {
+            return TransportProtocol.T1;
+        }
+    }
 
     /// <inheritdoc />
-    public int MaxCommandDataLength => _supportsExtendedLength ? 65535 : 255;
+    public int MaxCommandDataLength
+    {
+        get
+        {
+            return _supportsExtendedLength ? 65535 : 255;
+        }
+    }
 
     /// <inheritdoc />
-    public int MaxResponseDataLength => _supportsExtendedLength ? 65536 : 256;
+    public int MaxResponseDataLength
+    {
+        get
+        {
+            return _supportsExtendedLength ? 65536 : 256;
+        }
+    }
 
     /// <inheritdoc />
-    public bool SupportsExtendedLength => _supportsExtendedLength;
+    public bool SupportsExtendedLength
+    {
+        get
+        {
+            return _supportsExtendedLength;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of T1ApduTransport.

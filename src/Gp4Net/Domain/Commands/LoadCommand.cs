@@ -70,47 +70,101 @@ public class LoadCommand : IApduCommand
     /// <summary>
     /// Gets a value indicating whether this is the first block.
     /// </summary>
-    public bool IsFirstBlock => BlockNumber == 0;
+    public bool IsFirstBlock
+    {
+        get
+        {
+            return BlockNumber == 0;
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether this is the final block.
     /// </summary>
-    public bool IsFinalBlock => Type == LoadType.Final;
+    public bool IsFinalBlock
+    {
+        get
+        {
+            return Type == LoadType.Final;
+        }
+    }
 
     /// <summary>
     /// Gets the class byte.
     /// </summary>
-    byte IApduCommand.Cla => Cla;
+    byte IApduCommand.Cla
+    {
+        get
+        {
+            return Cla;
+        }
+    }
 
     /// <summary>
     /// Gets the instruction byte.
     /// </summary>
-    byte IApduCommand.Ins => Ins;
+    byte IApduCommand.Ins
+    {
+        get
+        {
+            return Ins;
+        }
+    }
 
     /// <summary>
     /// Gets the parameter 1 byte.
     /// </summary>
-    public byte P1 => (byte)Type;
+    public byte P1
+    {
+        get
+        {
+            return (byte)Type;
+        }
+    }
 
     /// <summary>
     /// Gets the parameter 2 byte.
     /// </summary>
-    public byte P2 => BlockNumber;
+    public byte P2
+    {
+        get
+        {
+            return BlockNumber;
+        }
+    }
 
     /// <summary>
     /// Gets the command data.
     /// </summary>
-    byte[]? IApduCommand.Data => GetCommandData();
+    byte[] IApduCommand.Data
+    {
+        get
+        {
+            return GetCommandData();
+        }
+    }
 
     /// <summary>
     /// Gets the expected response length.
     /// </summary>
-    public int? ExpectedResponseLength => null;
+    public Maybe<int> ExpectedResponseLength
+    {
+        get
+        {
+            return Maybe<int>.None;
+        }
+    }
 
     /// <summary>
     /// Gets whether this command uses extended length.
     /// </summary>
-    public bool IsExtendedLength => false;
+    public bool IsExtendedLength
+    {
+        get
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Gets the command data for the IApduCommand interface.

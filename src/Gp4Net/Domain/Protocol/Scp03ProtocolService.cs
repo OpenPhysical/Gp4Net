@@ -16,14 +16,36 @@ namespace Gp4Net.Domain.Protocol;
 public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolService>
 {
     /// <inheritdoc />
-    public static byte ProtocolVersion => 0x03;
-    
+    public static byte ProtocolVersion
+    {
+        get
+        {
+            return 0x03;
+        }
+    }
+
     /// <inheritdoc />
-    public static int MacSize => 8; // Truncated MAC
-    
+    public static int MacSize
+    {
+        get
+        {
+            return 8;
+
+            // Truncated MAC
+        }
+    }
+
     /// <inheritdoc />
-    public static int ChainingValueSize => 16; // AES block size
-    
+    public static int ChainingValueSize
+    {
+        get
+        {
+            return 16;
+
+            // AES block size
+        }
+    }
+
     /// <inheritdoc />
     public static Result<byte[], SmartCardError> CalculateCommandMac(
         byte[] command, 
@@ -31,14 +53,25 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
         byte[] chainingValue)
     {
         if (command == null)
+        {
             return SmartCardError.InvalidArgument("Command cannot be null");
+        }
+
         if (macKey == null)
+        {
             return SmartCardError.InvalidArgument("MAC key cannot be null");
+        }
+
         if (chainingValue == null)
+        {
             return SmartCardError.InvalidArgument("Chaining value cannot be null");
+        }
+
         if (chainingValue.Length != ChainingValueSize)
+        {
             return SmartCardError.InvalidArgument($"Chaining value must be {ChainingValueSize} bytes for SCP03");
-            
+        }
+
         // SCP03 C-MAC: AES-CMAC over (chaining_value || command)
         var macInput = new byte[chainingValue.Length + command.Length];
         Array.Copy(chainingValue, 0, macInput, 0, chainingValue.Length);
@@ -55,14 +88,25 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
         byte[] chainingValue)
     {
         if (response == null)
+        {
             return SmartCardError.InvalidArgument("Response cannot be null");
+        }
+
         if (rMacKey == null)
+        {
             return SmartCardError.InvalidArgument("R-MAC key cannot be null");
+        }
+
         if (chainingValue == null)
+        {
             return SmartCardError.InvalidArgument("Chaining value cannot be null");
+        }
+
         if (chainingValue.Length != ChainingValueSize)
+        {
             return SmartCardError.InvalidArgument($"Chaining value must be {ChainingValueSize} bytes for SCP03");
-            
+        }
+
         // SCP03 R-MAC: AES-CMAC over (chaining_value || response)
         var macInput = new byte[chainingValue.Length + response.Length];
         Array.Copy(chainingValue, 0, macInput, 0, chainingValue.Length);
@@ -78,10 +122,15 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
         byte[] macKey)
     {
         if (command == null)
+        {
             return SmartCardError.InvalidArgument("Command cannot be null");
+        }
+
         if (macKey == null)
+        {
             return SmartCardError.InvalidArgument("MAC key cannot be null");
-            
+        }
+
         // Build the EXTERNAL AUTHENTICATE APDU for MAC calculation
         // This must match exactly what the client calculates MAC over
         var apdu = new byte[5 + command.HostCryptogram.Length];
@@ -111,14 +160,25 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
         byte[] chainingValue)
     {
         if (command == null)
+        {
             return SmartCardError.InvalidArgument("Command cannot be null");
+        }
+
         if (sessionKeys == null)
+        {
             return SmartCardError.InvalidArgument("Session keys cannot be null");
+        }
+
         if (chainingValue == null)
+        {
             return SmartCardError.InvalidArgument("Chaining value cannot be null");
+        }
+
         if (chainingValue.Length != ChainingValueSize)
+        {
             return SmartCardError.InvalidArgument($"Chaining value must be {ChainingValueSize} bytes for SCP03");
-            
+        }
+
         var processedCommand = command;
         var newChainingValue = chainingValue;
         
@@ -127,7 +187,10 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
         {
             var encryptResult = ApplyCommandEncryption(processedCommand, sessionKeys.SEnc);
             if (encryptResult.IsFailure)
+            {
                 return encryptResult.Error;
+            }
+
             processedCommand = encryptResult.Value;
         }
         
@@ -136,8 +199,10 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
         {
             var macResult = CalculateCommandMac(processedCommand, sessionKeys.SMac, chainingValue);
             if (macResult.IsFailure)
+            {
                 return macResult.Error;
-                
+            }
+
             var mac = macResult.Value;
             
             // Calculate new chaining value (full 16-byte MAC)
@@ -145,7 +210,10 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
                 sessionKeys.SMac, 
                 ConcatenateArrays(chainingValue, processedCommand));
             if (fullMacResult.IsFailure)
+            {
                 return fullMacResult.Error;
+            }
+
             newChainingValue = fullMacResult.Value;
             
             // Append MAC to command
@@ -170,16 +238,30 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
         uint encryptionCounter = 0)
     {
         if (response == null)
+        {
             return SmartCardError.InvalidArgument("Response cannot be null");
+        }
+
         if (response.Length < 2)
+        {
             return SmartCardError.InvalidArgument("Response must contain at least status word");
+        }
+
         if (sessionKeys == null)
+        {
             return SmartCardError.InvalidArgument("Session keys cannot be null");
+        }
+
         if (chainingValue == null)
+        {
             return SmartCardError.InvalidArgument("Chaining value cannot be null");
+        }
+
         if (chainingValue.Length != ChainingValueSize)
+        {
             return SmartCardError.InvalidArgument($"Chaining value must be {ChainingValueSize} bytes for SCP03");
-            
+        }
+
         var processedResponse = response;
         var newChainingValue = chainingValue;
         
@@ -195,7 +277,10 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
         {
             var encryptResult = ApplyResponseEncryption(processedResponse, sessionKeys.SEnc, encryptionCounter);
             if (encryptResult.IsFailure)
+            {
                 return encryptResult.Error;
+            }
+
             processedResponse = encryptResult.Value;
         }
         
@@ -204,8 +289,10 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
         {
             var macResult = CalculateResponseMac(processedResponse, sessionKeys.SrMac, chainingValue);
             if (macResult.IsFailure)
+            {
                 return macResult.Error;
-                
+            }
+
             var mac = macResult.Value;
             
             // Calculate new chaining value (full 16-byte MAC)
@@ -213,7 +300,10 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
                 sessionKeys.SrMac, 
                 ConcatenateArrays(chainingValue, processedResponse));
             if (fullMacResult.IsFailure)
+            {
                 return fullMacResult.Error;
+            }
+
             newChainingValue = fullMacResult.Value;
             
             // Insert R-MAC before status word
@@ -233,12 +323,16 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
     private static Result<byte[], SmartCardError> ApplyCommandEncryption(byte[] command, byte[] sEncKey)
     {
         if (command.Length <= 5) // No data to encrypt
+        {
             return Result.Success<byte[], SmartCardError>(command);
-            
+        }
+
         var lc = command[4];
         if (lc == 0 || command.Length < 5 + lc)
+        {
             return Result.Success<byte[], SmartCardError>(command);
-            
+        }
+
         // Extract data to encrypt
         var dataToEncrypt = new byte[lc];
         Array.Copy(command, 5, dataToEncrypt, 0, lc);
@@ -263,8 +357,10 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
                 
                 // Copy Le if present
                 if (command.Length > 5 + lc)
+                {
                     newCommand[newCommand.Length - 1] = command[command.Length - 1];
-                    
+                }
+
                 return newCommand;
             });
     }
@@ -276,8 +372,10 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
     {
         var statusOffset = response.Length - 2;
         if (statusOffset <= 0) // No data to encrypt
+        {
             return Result.Success<byte[], SmartCardError>(response);
-            
+        }
+
         var responseData = new byte[statusOffset];
         Array.Copy(response, 0, responseData, 0, statusOffset);
         
@@ -335,11 +433,19 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
         byte[] macKey)
     {
         if (current == null)
+        {
             return SmartCardError.InvalidArgument("Current chaining state cannot be null");
+        }
+
         if (commandData == null)
+        {
             return SmartCardError.InvalidArgument("Command data cannot be null");
+        }
+
         if (macKey == null)
+        {
             return SmartCardError.InvalidArgument("MAC key cannot be null");
+        }
 
         // For SCP03, the new chaining value is the full 16-byte MAC calculated over
         // (current_chaining_value || command_data)

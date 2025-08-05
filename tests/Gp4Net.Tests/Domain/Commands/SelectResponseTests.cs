@@ -4,11 +4,11 @@ using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Tests.Domain.Commands.TestHelpers;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
 [TestFixture]
+[Category("Unit")]
 public class SelectResponseTests
 {
     [Test]
@@ -270,15 +270,15 @@ public class FileControlInformationTests
     {
         var fci = new FileControlInformation();
 
-        fci.ApplicationAid.Should().BeNull();
+        fci.ApplicationAid.Should().BeEmpty();
         fci.ApplicationLabel.Should().BeNull();
         fci.ApplicationPriorityIndicator.Should().BeNull();
         fci.MaxCommandDataLength.Should().BeNull();
         fci.MaxResponseDataLength.Should().BeNull();
-        fci.IssuerIdentificationNumber.Should().BeNull();
-        fci.CardImageNumber.Should().BeNull();
-        fci.CardData.Should().BeNull();
-        fci.DiscretionaryData.Should().BeNull();
+        fci.IssuerIdentificationNumber.Should().BeEmpty();
+        fci.CardImageNumber.Should().BeEmpty();
+        fci.CardData.Should().BeEmpty();
+        fci.DiscretionaryData.Should().BeEmpty();
     }
 
     [Test]

@@ -1,12 +1,13 @@
 using System;
 using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Transport;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
 [TestFixture]
+[Category("Unit")]
 public class InitializeUpdateCommandTests
 {
     [Test]
@@ -49,9 +50,7 @@ public class InitializeUpdateCommandTests
         var result = InitializeUpdateCommand.Create(keyVersion, keyId, hostChallenge);
         var command = result.Value;
 
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.GetApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         apdu[0].Should().Be(0x80); // CLA - GlobalPlatform
         apdu[1].Should().Be(0x50); // INS - INITIALIZE UPDATE
@@ -72,9 +71,7 @@ public class InitializeUpdateCommandTests
         {
             var result = InitializeUpdateCommand.Create(keyVersion, 0x00, hostChallenge);
             var command = result.Value;
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-            var apdu = command.GetApdu();
-#pragma warning restore CS0618
+            var apdu = ApduBuilder.BuildApdu(command);
 
             apdu[2].Should().Be(keyVersion); // P1
         }
@@ -90,9 +87,7 @@ public class InitializeUpdateCommandTests
         {
             var result = InitializeUpdateCommand.Create(0x01, keyId, hostChallenge);
             var command = result.Value;
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-            var apdu = command.GetApdu();
-#pragma warning restore CS0618
+            var apdu = ApduBuilder.BuildApdu(command);
 
             apdu[3].Should().Be(keyId); // P2
         }
@@ -106,9 +101,7 @@ public class InitializeUpdateCommandTests
         var result = InitializeUpdateCommand.Create(0x01, 0x00, hostChallenge);
         var command = result.Value;
 
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.GetApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         apdu[3].Should().Be(0x00); // P2 must be 0x00 for SCP03
     }
@@ -119,10 +112,8 @@ public class InitializeUpdateCommandTests
         var result = InitializeUpdateCommand.Create(0x01, 0x00, new byte[8]);
         var command = result.Value;
 
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu1 = command.GetApdu();
-        var apdu2 = command.GetApdu();
-#pragma warning restore CS0618
+        var apdu1 = ApduBuilder.BuildApdu(command);
+        var apdu2 = ApduBuilder.BuildApdu(command);
 
         apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
         apdu2.Should().BeEquivalentTo(apdu1); // But with same content
@@ -155,9 +146,7 @@ public class InitializeUpdateCommandTests
 
         var result = InitializeUpdateCommand.Create(0x01, 0x00, new byte[8]);
         var command = result.Value;
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.GetApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         apdu.Length.Should().Be(14); // 5 header + 8 data + 1 Le
         apdu[0].Should().Be(0x80); // CLA

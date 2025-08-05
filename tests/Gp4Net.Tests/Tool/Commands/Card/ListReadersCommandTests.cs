@@ -14,7 +14,6 @@ using Gp4Net.Tool.Pipeline;
 using Gp4Net.Tool.Services;
 using Moq;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 /// <summary>
 /// Unit tests for the <see cref="ListReadersCommand"/> class.
@@ -26,7 +25,7 @@ public class ListReadersCommandTests
     private Mock<ICardService> _mockCardService;
     private Mock<IGlobalPlatformService> _mockGlobalPlatformService;
     private Mock<IKeysetResolver> _mockKeysetResolver;
-    private MockCommandContext _mockContext;
+    private MockCliContext _mockContext;
     private ListReadersCommand _command;
 
     /// <summary>
@@ -40,7 +39,7 @@ public class ListReadersCommandTests
         this._mockGlobalPlatformService = new Mock<IGlobalPlatformService>();
         this._mockKeysetResolver = new Mock<IKeysetResolver>();
 
-        this._mockContext = new MockCommandContext(
+        this._mockContext = new MockCliContext(
             this._mockDisplayService.Object,
             this._mockCardService.Object,
             this._mockGlobalPlatformService.Object,

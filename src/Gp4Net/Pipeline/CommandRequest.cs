@@ -9,7 +9,7 @@ namespace Gp4Net.Pipeline;
 public record CommandRequest(
     IApduCommand Command,
     IPipelineContext Context,
-    CommandOptions? Options = null)
+    CommandOptions Options = null)
 {
     /// <summary>
     /// Creates a simple request with just a command.

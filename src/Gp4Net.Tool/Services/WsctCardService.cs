@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Gp4Net.Domain;
@@ -26,10 +25,10 @@ public class WsctCardService : ICardService
     private readonly ICardContextWrapper _context;
     private readonly ISecureChannelManager _secureChannelManager;
     private readonly IApduTransportFactory _transportFactory;
-    private ICardChannelWrapper? _channel;
+    private ICardChannelWrapper _channel;
     // Legacy session removed - using functional SecureChannelState instead
-    private Domain.Security.SecureChannelState? _secureChannelState;
-    private IApduTransport? _transport;
+    private Domain.Security.SecureChannelState _secureChannelState;
+    private IApduTransport _transport;
     private bool _disposed;
 
     /// <summary>
@@ -165,7 +164,7 @@ public class WsctCardService : ICardService
     }
 
     /// <inheritdoc />
-    public byte[]? GetAtr()
+    public byte[] GetAtr()
     {
         if (!IsConnected || _channel == null)
         {
@@ -187,14 +186,14 @@ public class WsctCardService : ICardService
         }
     }
 
-    private byte[]? GetAtrUsingGetAttrib()
+    private byte[] GetAtrUsingGetAttrib()
     {
         try
         {
             Logger.Debug("Using GetAttrib for ATR retrieval");
 
             // Direct call like in working implementation - no timeout needed
-            byte[]? atrBuffer = null;
+            byte[] atrBuffer = null;
             var result = _channel?.GetAttrib(Attrib.AtrString, ref atrBuffer!) ?? ErrorCode.InternalError;
 
             if (result != ErrorCode.Success)
@@ -284,87 +283,9 @@ public class WsctCardService : ICardService
         {
             try
             {
-                // Temporarily disabled - needs refactor to use functional API
-                // var wrapResult = ApplyCommandSecurity(command, _secureChannelState);
-                throw new NotImplementedException("Secure channel support in WsctCardService needs refactor to functional API");
-                
-                // var (wrappedData, expectedResponseLength) = wrapResult.Value;
-                var wrappedData = Array.Empty<byte>(); // Placeholder
-                int? expectedResponseLength = null; // Placeholder
-
-                // Build final APDU with wrapped data and Le
-                var finalApdu = new List<byte>(wrappedData);
-                    
-                // Add Le if needed
-                if (expectedResponseLength.HasValue)
-                {
-                    var le = expectedResponseLength.Value;
-                    if (command.IsExtendedLength && le > 255)
-                    {
-                        // Extended length Le
-                        if (wrappedData.Length == 4) // No data, need 00 before Le
-                        {
-                            finalApdu.Add(0x00);
-                        }
-                        finalApdu.Add((byte)(le >> 8));
-                        finalApdu.Add((byte)(le & 0xFF));
-                    }
-                    else
-                    {
-                        // Short length Le
-                        finalApdu.Add(le == 0 || le == 256 ? (byte)0x00 : (byte)le);
-                    }
-                }
-
-                // Send wrapped command and get response
-                var response = SendCommand([.. finalApdu]);
-                    
-                // Unwrap response if secure channel has R-MAC or R-ENC
-                // TODO: Update to use functional response security processors
-                if (false) // Temporarily disabled: _secureChannelState.SecurityLevel.HasRMac() || _secureChannelState.SecurityLevel.HasREncryption()
-                {
-                    // Combine data and SW for unwrapping
-                    var fullResponse = new byte[response.Data.Length + 2];
-                    Array.Copy(response.Data, 0, fullResponse, 0, response.Data.Length);
-                    fullResponse[fullResponse.Length - 2] = (byte)(response.StatusWord >> 8);
-                    fullResponse[fullResponse.Length - 1] = (byte)(response.StatusWord & 0xFF);
-
-                    if (Logger.IsDebugEnabled)
-                    {
-                        Logger.Debug($"Secure channel unwrapping:");
-                        Logger.Debug($"  Wrapped response: {Convert.ToHexString(fullResponse)}");
-                    }
-
-                    // var unwrapResult = ProcessResponseSecurity(fullResponse, _secureChannelState);
-                    // if (unwrapResult.IsFailure)
-                    // {
-                    //     throw new InvalidOperationException($"Failed to unwrap response: {unwrapResult.Error.Message}");
-                    // }
-                    // var unwrapped = unwrapResult.Value;
-                    var unwrapped = fullResponse; // Temporary fallback
-
-                    // Extract unwrapped data and SW
-                    var unwrappedData = Array.Empty<byte>();
-                    ushort unwrappedSw = 0x6F00;
-                        
-                    if (unwrapped.Length >= 2)
-                    {
-                        unwrappedData = new byte[unwrapped.Length - 2];
-                        Array.Copy(unwrapped, 0, unwrappedData, 0, unwrappedData.Length);
-                        unwrappedSw = (ushort)(
-                            (unwrapped[unwrapped.Length - 2] << 8) | unwrapped[unwrapped.Length - 1]
-                        );
-                    }
-
-                    if (Logger.IsDebugEnabled)
-                    {
-                        Logger.Debug($"  Unwrapped: Data={Convert.ToHexString(unwrappedData)}, SW={unwrappedSw:X4}");
-                    }
-
-                    return new CardResponse(unwrappedData, unwrappedSw);
-                }
-                    
-                return response;
+                // Secure channel wrapping disabled - use GlobalPlatformService for secure channel operations
+                Logger.Error("Direct secure channel operations not supported in WsctCardService. Use GlobalPlatformService instead.");
+                return new CardResponse([], 0x6F00); // SW_UNKNOWN_ERROR
             }
             catch (Exception ex)
             {
@@ -508,7 +429,13 @@ public class WsctCardService : ICardService
     }
 
     /// <inheritdoc />
-    public bool IsSecureChannelEstablished => _secureChannelState != null;
+    public bool IsSecureChannelEstablished
+    {
+        get
+        {
+            return _secureChannelState != null;
+        }
+    }
 
     /// <inheritdoc />
     public void Dispose()

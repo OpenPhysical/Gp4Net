@@ -21,17 +21,24 @@ namespace Gp4Net.CardEmulator.Services;
 public class VirtualCardService : ICardService
 {
     protected internal readonly VirtualReaderManager ReaderManager;
-    private VirtualCardReader? _connectedReader;
-    private VirtualCard? _currentCard;
+    private Maybe<VirtualCardReader> _connectedReader = Maybe<VirtualCardReader>.None;
+    private Maybe<VirtualCard> _currentCard = Maybe<VirtualCard>.None;
     private bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the VirtualCardService class.
     /// </summary>
-    /// <param name="readerManager">The virtual reader manager (optional).</param>
-    public VirtualCardService(VirtualReaderManager? readerManager = null)
+    /// <param name="readerManager">The virtual reader manager.</param>
+    public VirtualCardService(VirtualReaderManager readerManager)
     {
-        ReaderManager = readerManager ?? CreateDefaultReaderManager();
+        ReaderManager = readerManager;
+    }
+    
+    /// <summary>
+    /// Initializes a new instance with a default reader manager.
+    /// </summary>
+    public VirtualCardService() : this(CreateDefaultReaderManager())
+    {
     }
 
     /// <inheritdoc />
@@ -55,26 +62,40 @@ public class VirtualCardService : ICardService
         if (!reader.Connect())
             return false;
 
-        _connectedReader = reader;
-        _currentCard = reader.InsertedCard as VirtualCard;
+        _connectedReader = Maybe<VirtualCardReader>.From(reader);
+        _currentCard = reader.InsertedCard is VirtualCard card 
+            ? Maybe<VirtualCard>.From(card) 
+            : Maybe<VirtualCard>.None;
         return true;
     }
 
     /// <inheritdoc />
     public void Disconnect()
     {
-        _connectedReader?.Disconnect();
-        _connectedReader = null;
-        _currentCard = null;
+        _connectedReader.Execute(reader => reader.Disconnect());
+        _connectedReader = Maybe<VirtualCardReader>.None;
+        _currentCard = Maybe<VirtualCard>.None;
     }
 
     /// <inheritdoc />
-    public bool IsConnected => _connectedReader?.IsConnected == true;
+    public bool IsConnected
+    {
+        get
+        {
+            return _connectedReader.Match(
+                Some: reader => reader.IsConnected,
+                None: () => false
+            );
+        }
+    }
 
     /// <inheritdoc />
     public byte[]? GetAtr()
     {
-        return _connectedReader?.GetAtr();
+        return _connectedReader.Match(
+            Some: reader => reader.GetAtr(),
+            None: () => null
+        );
     }
 
     /// <inheritdoc />
@@ -82,10 +103,13 @@ public class VirtualCardService : ICardService
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        if (!IsConnected || _connectedReader == null)
+        if (!IsConnected)
             throw new InvalidOperationException("Card is not connected");
 
-        var response = _connectedReader.TransmitCommand(command);
+        var response = _connectedReader.Match(
+            Some: reader => reader.TransmitCommand(command),
+            None: () => throw new InvalidOperationException("Card is not connected")
+        );
         return new CardResponse(response.Data, response.StatusWord);
     }
 
@@ -140,14 +164,18 @@ public class VirtualCardService : ICardService
     {
         ArgumentNullException.ThrowIfNull(keySet);
 
-        if (!IsConnected || _currentCard == null)
+        if (!IsConnected)
             throw new InvalidOperationException("Card is not connected");
 
         try
         {
             // Create appropriate key set based on current card protocol
             IKeySet keys;
-            if (HasScp03Capability(_currentCard))
+            var hasScp03 = _currentCard.Match(
+                Some: card => HasScp03Capability(card),
+                None: () => false
+            );
+            if (hasScp03)
             {
                 keys = Scp03KeySet.Create(keySet, keySet, keySet, 0xFF).Match(
                     onSuccess: static k => k,
@@ -187,7 +215,16 @@ public class VirtualCardService : ICardService
     }
 
     /// <inheritdoc />
-    public bool IsSecureChannelEstablished => _currentCard?.IsSecureChannelEstablished == true;
+    public bool IsSecureChannelEstablished
+    {
+        get
+        {
+            return _currentCard.Match(
+                Some: card => card.IsSecureChannelEstablished,
+                None: () => false
+            );
+        }
+    }
 
     /// <summary>
     /// Processes an APDU command and returns a pipeline-compatible response.
@@ -237,7 +274,10 @@ public class VirtualCardService : ICardService
             }
                 
             // Send to virtual card
-            var response = _connectedReader!.TransmitCommand(commandBytes);
+            var response = _connectedReader.Match(
+                Some: reader => reader.TransmitCommand(commandBytes),
+                None: () => throw new InvalidOperationException("Card is not connected")
+            );
                 
             // Create CommandResponse with empty context (virtual cards don't need context)
             return new CommandResponse(

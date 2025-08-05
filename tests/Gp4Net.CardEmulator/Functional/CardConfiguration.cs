@@ -3,7 +3,6 @@ using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.DataObjects;
-using Gp4Net.Domain.Protocol;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Functional;

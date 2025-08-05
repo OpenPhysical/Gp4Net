@@ -132,7 +132,7 @@ public class CommandHandlerInfo
     /// <summary>
     /// Gets or sets the command description.
     /// </summary>
-    public string? Description { get; set; }
+    public string Description { get; set; }
 
     /// <summary>
     /// Gets or sets the command implementation type.

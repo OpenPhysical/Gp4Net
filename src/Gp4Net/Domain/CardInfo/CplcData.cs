@@ -110,16 +110,18 @@ public class CplcData
     /// Parses CPLC data from a byte array.
     /// </summary>
     /// <param name="data">The CPLC data bytes (must be at least 42 bytes).</param>
-    /// <returns>Parsed CPLC data.</returns>
-    public static CplcData Parse(byte[] data)
+    /// <returns>Result containing parsed CPLC data or error.</returns>
+    public static Result<CplcData, SmartCardError> Parse(byte[] data)
     {
-        ArgumentNullException.ThrowIfNull(data);
+        if (data == null)
+        {
+            return SmartCardError.InvalidArgument("CPLC data cannot be null");
+        }
 
         if (data.Length < 42)
         {
-            throw new ArgumentException(
-                $"CPLC data must be at least 42 bytes, got {data.Length}",
-                nameof(data)
+            return SmartCardError.InvalidData(
+                $"CPLC data must be at least 42 bytes, got {data.Length}"
             );
         }
 
@@ -147,38 +149,18 @@ public class CplcData
         cplc.IcPersonalizationDate = ReadUInt16(data, ref offset);
         cplc.IcPersonalizationEquipmentId = ReadUInt32(data, ref offset);
 
-        return cplc;
+        return Result.Success<CplcData, SmartCardError>(cplc);
     }
 
     /// <summary>
     /// Attempts to parse CPLC data using functional error handling.
+    /// Alias for Parse method for consistency with TryParse patterns.
     /// </summary>
     /// <param name="data">The CPLC data bytes (must be at least 42 bytes).</param>
     /// <returns>A result containing the parsed CPLC data or an error.</returns>
     public static Result<CplcData, SmartCardError> TryParse(byte[] data)
     {
-        if (data == null)
-        {
-            return Result.Failure<CplcData, SmartCardError>(
-                SmartCardError.InvalidData("CPLC data cannot be null"));
-        }
-
-        if (data.Length < 42)
-        {
-            return Result.Failure<CplcData, SmartCardError>(
-                SmartCardError.InvalidData($"CPLC data must be at least 42 bytes, got {data.Length}"));
-        }
-
-        try
-        {
-            var cplc = Parse(data);
-            return Result.Success<CplcData, SmartCardError>(cplc);
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<CplcData, SmartCardError>(
-                SmartCardError.InvalidData($"Failed to parse CPLC data: {ex.Message}"));
-        }
+        return Parse(data);
     }
 
     private static ushort ReadUInt16(byte[] data, ref int offset)
@@ -242,5 +224,47 @@ public class CplcData
     public static bool IsValidDate(ushort dateValue)
     {
         return dateValue != 0x0000 && dateValue != 0xFFFF;
+    }
+
+    /// <summary>
+    /// Gets chip information derived from this CPLC data.
+    /// </summary>
+    /// <returns>ChipInfo containing manufacturer, type, and platform details.</returns>
+    public ChipInfo GetChipInfo()
+    {
+        return ChipInfo.FromCplcData(this);
+    }
+
+    /// <summary>
+    /// Gets a human-readable manufacturer name.
+    /// </summary>
+    /// <returns>Manufacturer name or hex code if unknown.</returns>
+    public string GetManufacturerName()
+    {
+        return Enum.IsDefined(typeof(IcFabricator), IcFabricator)
+            ? ((IcFabricator)IcFabricator).ToString()
+            : $"Unknown (0x{IcFabricator:X4})";
+    }
+
+    /// <summary>
+    /// Gets a human-readable chip model name.
+    /// </summary>
+    /// <returns>Chip model name or hex code if unknown.</returns>
+    public string GetChipModel()
+    {
+        return Enum.IsDefined(typeof(IcType), IcType)
+            ? ((IcType)IcType).ToString()
+            : $"Unknown (0x{IcType:X4})";
+    }
+
+    /// <summary>
+    /// Gets a human-readable operating system name.
+    /// </summary>
+    /// <returns>Operating system name or hex code if unknown.</returns>
+    public string GetOperatingSystemName()
+    {
+        return Enum.IsDefined(typeof(OperatingSystemId), OperatingSystemId)
+            ? ((OperatingSystemId)OperatingSystemId).ToString()
+            : $"Unknown (0x{OperatingSystemId:X4})";
     }
 }

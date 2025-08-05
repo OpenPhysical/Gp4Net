@@ -110,7 +110,7 @@ public class CapFileStructure
     /// <summary>
     /// Gets the manifest information (if available from ZIP format).
     /// </summary>
-    public ManifestInfo? Manifest { get; }
+    public ManifestInfo Manifest { get; }
 
     /// <summary>
     /// Gets the Java Card CAP file format version.
@@ -137,7 +137,7 @@ public class CapFileStructure
         CapVersion packageVersion,
         IList<CapComponent> components,
         IList<AppletInfo> applets,
-        ManifestInfo? manifest = null,
+        ManifestInfo manifest = null,
         CapVersion? capFileVersion = null,
         byte headerFlags = 0
     )
@@ -237,11 +237,11 @@ public class CapFileStructure
 
         var components = new List<CapComponent>();
         var applets = new List<AppletInfo>();
-        byte[]? packageAid = null;
+        byte[] packageAid = null;
         CapVersion? packageVersion = null;
         CapVersion? capFileVersion = null;
         byte headerFlags = 0;
-        ManifestInfo? manifest = null;
+        ManifestInfo manifest = null;
 
         // Component name to tag mapping
         var componentMapping = new Dictionary<string, byte>
@@ -788,27 +788,27 @@ public class ManifestInfo
     /// <summary>
     /// Gets the Java Card CAP file version.
     /// </summary>
-    public string? CapFileVersion { get; }
+    public string CapFileVersion { get; }
 
     /// <summary>
     /// Gets the Java Card converter version.
     /// </summary>
-    public string? ConverterVersion { get; }
+    public string ConverterVersion { get; }
 
     /// <summary>
     /// Gets the converter provider.
     /// </summary>
-    public string? ConverterProvider { get; }
+    public string ConverterProvider { get; }
 
     /// <summary>
     /// Gets the creation time.
     /// </summary>
-    public string? CreationTime { get; }
+    public string CreationTime { get; }
 
     /// <summary>
     /// Gets the package name.
     /// </summary>
-    public string? PackageName { get; }
+    public string PackageName { get; }
 
     /// <summary>
     /// Gets the imported packages.
@@ -824,12 +824,12 @@ public class ManifestInfo
     /// Initializes a new instance of the ManifestInfo class.
     /// </summary>
     public ManifestInfo(
-        string? capFileVersion = null,
-        string? converterVersion = null,
-        string? converterProvider = null,
-        string? creationTime = null,
-        string? packageName = null,
-        IList<ImportedPackage>? importedPackages = null,
+        string capFileVersion = null,
+        string converterVersion = null,
+        string converterProvider = null,
+        string creationTime = null,
+        string packageName = null,
+        IList<ImportedPackage> importedPackages = null,
         bool? integerSupportRequired = null
     )
     {
@@ -855,8 +855,8 @@ public class ManifestInfo
         var lines = manifestContent.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         var properties = new Dictionary<string, string>();
 
-        string? currentKey = null;
-        string? currentValue = null;
+        string currentKey = null;
+        string currentValue = null;
 
         foreach (var line in lines)
         {

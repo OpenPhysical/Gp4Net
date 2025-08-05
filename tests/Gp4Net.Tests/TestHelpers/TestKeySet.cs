@@ -1,6 +1,5 @@
 using System;
 using Gp4Net.Domain.Keys;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.TestHelpers;
 
@@ -24,9 +23,27 @@ internal class TestKeySet : IKeySet
 
     public byte KeyVersion { get; }
     public byte KeyId { get; }
-    public byte[] EncKey => (byte[])_encKey.Clone();
-    public byte[] MacKey => (byte[])_macKey.Clone();
-    public byte[] DekKey => (byte[])_dekKey.Clone();
+    public byte[] EncKey
+    {
+        get
+        {
+            return (byte[])_encKey.Clone();
+        }
+    }
+    public byte[] MacKey
+    {
+        get
+        {
+            return (byte[])_macKey.Clone();
+        }
+    }
+    public byte[] DekKey
+    {
+        get
+        {
+            return (byte[])_dekKey.Clone();
+        }
+    }
 
     public void Dispose()
     {

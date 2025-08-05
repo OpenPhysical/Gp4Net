@@ -223,7 +223,7 @@ public class CardCompatibilityService : ICardCompatibilityService
                 return parseResult.Map(parsedResponse =>
                 {
                     var counter = parsedResponse.GetValueAsNumber();
-                    return (int?)counter;
+                    return counter.HasValue ? (int?)counter.Value : null;
                 });
             }
 
@@ -268,12 +268,14 @@ public class CardCompatibilityService : ICardCompatibilityService
         }
     }
 
-    private static CardTypeInfo? AnalyzeCplcForCardType(byte[] cplcData)
+    private static CardTypeInfo AnalyzeCplcForCardType(byte[] cplcData)
     {
         try
         {
             if (cplcData.Length < 10)
+            {
                 return null;
+            }
 
             // Extract manufacturer code from CPLC (typically at offset 8-9)
             var manufacturerCode = (ushort)((cplcData[8] << 8) | cplcData[9]);

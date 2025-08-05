@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Tool.Scripting;
@@ -51,7 +49,7 @@ public class TraceBasedSecureChannelTests
             );
             Assert.That(response.KeyVersion, Is.EqualTo(0x01)); // Key version 1
             Assert.That(response.ScpId, Is.EqualTo(0x02)); // SCP02
-            Assert.That(response.CardChallenge, Is.EqualTo(Convert.FromHexString("000303D2C0BAFBF0"))); // 8 bytes for SCP02
+            Assert.That(response.CardChallenge, Is.EqualTo(Convert.FromHexString("03D2C0BAFBF0"))); // 6 bytes for SCP02
             Assert.That(response.CardCryptogram, Is.EqualTo(Convert.FromHexString("D31B42E57648A0C5")));
         });
     }
@@ -76,7 +74,7 @@ public class TraceBasedSecureChannelTests
             );
             Assert.That(response.KeyVersion, Is.EqualTo(0xFF)); // Factory key version
             Assert.That(response.ScpId, Is.EqualTo(0x02)); // SCP02
-            Assert.That(response.CardChallenge, Is.EqualTo(Convert.FromHexString("0003A33DFDBFFADF"))); // 8 bytes for SCP02
+            Assert.That(response.CardChallenge, Is.EqualTo(Convert.FromHexString("A33DFDBFFADF"))); // 6 bytes for SCP02
             Assert.That(response.CardCryptogram, Is.EqualTo(Convert.FromHexString("57EB6A4A52CFB3E9")));
         });
     }

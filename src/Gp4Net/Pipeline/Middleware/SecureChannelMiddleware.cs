@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -16,12 +15,12 @@ namespace Gp4Net.Pipeline.Middleware;
 /// </summary>
 public class SecureChannelMiddleware : CommandMiddlewareBase
 {
-    private readonly ILogger<SecureChannelMiddleware>? _logger;
+    private readonly ILogger<SecureChannelMiddleware> _logger;
 
     /// <summary>
     /// Initializes a new instance of SecureChannelMiddleware.
     /// </summary>
-    public SecureChannelMiddleware(ILogger<SecureChannelMiddleware>? logger = null)
+    public SecureChannelMiddleware(ILogger<SecureChannelMiddleware> logger = null)
     {
         _logger = logger;
     }
@@ -52,7 +51,7 @@ public class SecureChannelMiddleware : CommandMiddlewareBase
             {
                 0x02 => WrapCommandWithScp02(request.Command, secureSession),
                 0x03 => WrapCommandWithScp03(request.Command, secureSession),
-                _ => Result.Failure<(byte[] wrappedData, int? expectedResponseLength, SecureChannelState newState), SmartCardError>(
+                _ => Result.Failure<(byte[] wrappedData, Maybe<int> expectedResponseLength, SecureChannelState newState), SmartCardError>(
                     SmartCardError.InvalidArgument($"Unsupported protocol version: {secureSession.ProtocolVersion:X2}"))
             };
             
@@ -95,7 +94,9 @@ public class SecureChannelMiddleware : CommandMiddlewareBase
     {
         // Check command options first
         if (request.Options?.RequiresSecureChannel == false)
+        {
             return false;
+        }
 
         // Some commands never require secure channel (e.g., SELECT before establishing SC)
         return request.Command switch
@@ -183,29 +184,73 @@ public class SecureChannelMiddleware : CommandMiddlewareBase
     /// <summary>
     /// Internal command wrapper that represents a complete wrapped APDU.
     /// </summary>
-    private record WrappedCommand(byte[] WrappedApdu, int? ExpectedResponseLength) : Transport.IApduCommand, ICompleteApduCommand
+    private record WrappedCommand(byte[] WrappedApdu, Maybe<int> ExpectedResponseLength) : Transport.IApduCommand, ICompleteApduCommand
     {
         // These properties are not used as the wrapped APDU is complete
-        public byte Cla => WrappedApdu[0];
-        public byte Ins => WrappedApdu[1];
-        public byte P1 => WrappedApdu[2];
-        public byte P2 => WrappedApdu[3];
-            
+        public byte Cla
+        {
+            get
+            {
+                return WrappedApdu[0];
+            }
+        }
+        public byte Ins
+        {
+            get
+            {
+                return WrappedApdu[1];
+            }
+        }
+        public byte P1
+        {
+            get
+            {
+                return WrappedApdu[2];
+            }
+        }
+        public byte P2
+        {
+            get
+            {
+                return WrappedApdu[3];
+            }
+        }
+
         // Return null as the wrapped APDU already contains everything
-        public byte[]? Data => null;
-            
+        public byte[] Data
+        {
+            get
+            {
+                return null;
+            }
+        }
+
         // ExpectedResponseLength is handled separately
-        int? Transport.IApduCommand.ExpectedResponseLength => ExpectedResponseLength;
-            
-        public bool IsExtendedLength => false; // Wrapped commands handle this internally
-            
+        Maybe<int> Transport.IApduCommand.ExpectedResponseLength
+        {
+            get
+            {
+                return ExpectedResponseLength;
+            }
+        }
+
+        public bool IsExtendedLength
+        {
+            get
+            {
+                return false;
+
+                // Wrapped commands handle this internally
+            }
+        }
+
         /// <summary>
         /// Gets the complete wrapped APDU bytes.
         /// </summary>
         public byte[] GetCompleteApdu() => WrappedApdu;
     }
 
-    private static Result<(byte[] wrappedData, int? expectedResponseLength, SecureChannelState newState), SmartCardError> 
+    private static Result<(byte[] wrappedData, Maybe<int> expectedResponseLength, SecureChannelState newState), SmartCardError> 
         WrapCommandWithScp02(Transport.IApduCommand command, SecureChannelState session)
     {
         // Use existing immutable array for functional processing
@@ -217,10 +262,10 @@ public class SecureChannelMiddleware : CommandMiddlewareBase
             session.SessionKeys,
             macChainingValue,
             session.EncryptionCounter)
-            .Map(result => (result.securedCommand, (int?)null, result.newState));
+            .Map(result => (result.securedCommand, Maybe<int>.None, result.newState));
     }
 
-    private static Result<(byte[] wrappedData, int? expectedResponseLength, SecureChannelState newState), SmartCardError> 
+    private static Result<(byte[] wrappedData, Maybe<int> expectedResponseLength, SecureChannelState newState), SmartCardError> 
         WrapCommandWithScp03(Transport.IApduCommand command, SecureChannelState session)
     {
         // Use existing immutable array for functional processing
@@ -232,7 +277,7 @@ public class SecureChannelMiddleware : CommandMiddlewareBase
             session.SessionKeys,
             macChainingValue,
             session.EncryptionCounter)
-            .Map(result => (result.securedCommand, (int?)null, result.newState));
+            .Map(result => (result.securedCommand, Maybe<int>.None, result.newState));
     }
 
     private static Result<(byte[] processedResponse, SecureChannelState newState), SmartCardError> 

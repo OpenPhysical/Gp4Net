@@ -13,7 +13,7 @@ namespace Gp4Net.Tool.Pipeline;
 /// </summary>
 public static class VerboseLoggingHelper
 {
-    private static ConsoleAppender? _verboseAppender;
+    private static ConsoleAppender _verboseAppender;
     private static bool _isVerboseEnabled;
 
     /// <summary>

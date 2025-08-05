@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands.TestHelpers;
 

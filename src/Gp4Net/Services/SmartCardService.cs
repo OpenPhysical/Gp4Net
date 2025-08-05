@@ -17,7 +17,7 @@ public class SmartCardService : ISmartCardService
     private readonly ICommandPipeline _pipeline;
     private readonly IPipelineContext _context;
     private readonly IApduTransport _transport;
-    private readonly ILogger<SmartCardService>? _logger;
+    private readonly ILogger<SmartCardService> _logger;
     private bool _disposed;
 
     /// <summary>
@@ -27,7 +27,7 @@ public class SmartCardService : ISmartCardService
         ICommandPipeline pipeline,
         IPipelineContext context,
         IApduTransport transport,
-        ILogger<SmartCardService>? logger = null)
+        ILogger<SmartCardService> logger = null)
     {
         _pipeline = pipeline ?? throw new ArgumentNullException(nameof(pipeline));
         _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -36,7 +36,13 @@ public class SmartCardService : ISmartCardService
     }
 
     /// <inheritdoc/>
-    public IPipelineContext Context => _context;
+    public IPipelineContext Context
+    {
+        get
+        {
+            return _context;
+        }
+    }
 
     /// <inheritdoc/>
     public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
@@ -105,7 +111,9 @@ public class SmartCardService : ISmartCardService
     public void Dispose()
     {
         if (_disposed)
+        {
             return;
+        }
 
         _disposed = true;
         // IApduTransport doesn't implement IDisposable
@@ -118,17 +126,17 @@ public class SmartCardService : ISmartCardService
 /// <summary>
 /// Factory implementation for creating smart card services.
 /// </summary>
-public class FunctionalSmartCardServiceFactory : ISmartCardServiceFactory
+public class SmartCardServiceFactory : ISmartCardServiceFactory
 {
-    private readonly ILoggerFactory? _loggerFactory;
-    private readonly IServiceProvider? _serviceProvider;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly IServiceProvider _serviceProvider;
 
     /// <summary>
-    /// Initializes a new instance of FunctionalSmartCardServiceFactory.
+    /// Initializes a new instance of SmartCardServiceFactory.
     /// </summary>
-    public FunctionalSmartCardServiceFactory(
-        ILoggerFactory? loggerFactory = null,
-        IServiceProvider? serviceProvider = null)
+    public SmartCardServiceFactory(
+        ILoggerFactory loggerFactory = null,
+        IServiceProvider serviceProvider = null)
     {
         _loggerFactory = loggerFactory;
         _serviceProvider = serviceProvider;
@@ -137,7 +145,7 @@ public class FunctionalSmartCardServiceFactory : ISmartCardServiceFactory
     /// <inheritdoc/>
     public async Task<Result<ISmartCardService, SmartCardError>> CreateAsync(
         string readerName,
-        SmartCardServiceOptions? options = null)
+        SmartCardServiceOptions options = null)
     {
         options ??= new SmartCardServiceOptions();
 
@@ -146,7 +154,9 @@ public class FunctionalSmartCardServiceFactory : ISmartCardServiceFactory
             // Create card context
             var contextResult = await CreateCardContextAsync();
             if (contextResult.IsFailure)
+            {
                 return Result.Failure<ISmartCardService, SmartCardError>(contextResult.Error);
+            }
 
             var cardContext = contextResult.Value;
 
@@ -189,7 +199,9 @@ public class FunctionalSmartCardServiceFactory : ISmartCardServiceFactory
         {
             var contextResult = await CreateCardContextAsync();
             if (contextResult.IsFailure)
+            {
                 return Result.Failure<string[], SmartCardError>(contextResult.Error);
+            }
 
             using var cardContext = contextResult.Value;
             var readers = cardContext.GetReaders();
@@ -228,11 +240,8 @@ public class FunctionalSmartCardServiceFactory : ISmartCardServiceFactory
     {
         try
         {
-            var legacyChannel = context.Connect(readerName, ConvertProtocol(requestedProtocol));
-            // TODO: Create proper adapter between ILegacyCardChannel and ICardChannel
-            // For now, this is a placeholder that needs architectural fix
-            var channel = CreateChannelAdapter(legacyChannel);
-            var actualProtocol = DetectProtocol(legacyChannel);
+            var channel = context.Connect(readerName, ConvertProtocol(requestedProtocol));
+            var actualProtocol = DetectProtocol(channel);
             return Result.Success<(ICardChannel, CardProtocol), SmartCardError>((channel, actualProtocol));
         }
         catch (Exception ex)
@@ -240,24 +249,6 @@ public class FunctionalSmartCardServiceFactory : ISmartCardServiceFactory
             return Result.Failure<(ICardChannel, CardProtocol), SmartCardError>(
                 SmartCardError.CommunicationError($"Failed to connect to card: {ex.Message}", ex));
         }
-    }
-
-    private ICardChannel CreateChannelAdapter(ILegacyCardChannel legacyChannel)
-    {
-        // TODO: Implement proper adapter pattern
-        // For now, this is a design issue that needs architectural solution
-        throw new NotImplementedException("Channel adapter between ILegacyCardChannel and ICardChannel not implemented");
-    }
-
-    private static CardProtocol DetectProtocol(ILegacyCardChannel channel)
-    {
-        return channel.Protocol switch
-        {
-            Protocol.T0 => CardProtocol.T0,
-            Protocol.T1 => CardProtocol.T1,
-            Protocol.Raw => CardProtocol.Tcl,
-            _ => CardProtocol.T0
-        };
     }
 
     private static IApduTransport CreateTransport(ICardChannel channel, CardProtocol protocol)
@@ -326,9 +317,14 @@ public class FunctionalSmartCardServiceFactory : ISmartCardServiceFactory
 
     private static CardProtocol DetectProtocol(ICardChannel channel)
     {
-        // Simple protocol detection based on ATR
-        // In a real implementation, this would parse the ATR properly
-        return CardProtocol.T0; // Default
+        // Map transport protocol to card protocol
+        return channel.Protocol switch
+        {
+            TransportProtocol.T0 => CardProtocol.T0,
+            TransportProtocol.T1 => CardProtocol.T1,
+            TransportProtocol.Tcl => CardProtocol.Tcl,
+            _ => CardProtocol.T0
+        };
     }
 }
 
@@ -353,7 +349,9 @@ public static class SmartCardServiceExtensions
             var result = await currentService.ExecuteCommandAsync(commands[i], cancellationToken);
                 
             if (result.IsFailure)
+            {
                 return Result.Failure<CommandResponse[], SmartCardError>(result.Error);
+            }
 
             var response = result.Value;
             responses[i] = response;

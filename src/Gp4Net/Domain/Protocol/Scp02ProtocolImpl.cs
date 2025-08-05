@@ -1,6 +1,5 @@
 using System;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
@@ -17,20 +16,58 @@ namespace Gp4Net.Domain.Protocol;
 public sealed class Scp02ProtocolImpl : IScpProtocol<Scp02ProtocolImpl>
 {
     /// <inheritdoc />
-    public static byte ProtocolVersion => 0x02;
-    
+    public static byte ProtocolVersion
+    {
+        get
+        {
+            return 0x02;
+        }
+    }
+
     /// <inheritdoc />
-    public static int BlockSize => 8; // 3DES block size
-    
+    public static int BlockSize
+    {
+        get
+        {
+            return 8;
+
+            // 3DES block size
+        }
+    }
+
     /// <inheritdoc />
-    public static int MacSize => 8; // 8-byte MAC for SCP02
-    
+    public static int MacSize
+    {
+        get
+        {
+            return 8;
+
+            // 8-byte MAC for SCP02
+        }
+    }
+
     /// <inheritdoc />
-    public static int ChainingValueSize => 8; // 3DES block size
-    
+    public static int ChainingValueSize
+    {
+        get
+        {
+            return 8;
+
+            // 3DES block size
+        }
+    }
+
     /// <inheritdoc />
-    public static int CardChallengeLength => 6; // SCP02 uses 6-byte card challenge
-    
+    public static int CardChallengeLength
+    {
+        get
+        {
+            return 6;
+
+            // SCP02 uses 6-byte card challenge
+        }
+    }
+
     /// <inheritdoc />
     public static Result<byte[], SmartCardError> CalculateMac(byte[] key, byte[] data)
     {
@@ -64,12 +101,20 @@ public sealed class Scp02ProtocolImpl : IScpProtocol<Scp02ProtocolImpl>
     public static Result<byte[], SmartCardError> UpdateMacChaining(byte[] currentChaining, byte[] calculatedMac)
     {
         if (currentChaining == null)
+        {
             return SmartCardError.InvalidArgument("Current chaining cannot be null");
+        }
+
         if (calculatedMac == null)
+        {
             return SmartCardError.InvalidArgument("Calculated MAC cannot be null");
+        }
+
         if (calculatedMac.Length < MacSize)
+        {
             return SmartCardError.InvalidArgument($"MAC must be at least {MacSize} bytes");
-            
+        }
+
         // For SCP02, the MAC itself becomes the new chaining value
         var newChaining = new byte[ChainingValueSize];
         Array.Copy(calculatedMac, 0, newChaining, 0, Math.Min(MacSize, ChainingValueSize));
@@ -82,16 +127,21 @@ public sealed class Scp02ProtocolImpl : IScpProtocol<Scp02ProtocolImpl>
         IKeySet keySet,
         byte[] hostChallenge,
         byte[] cardChallenge,
-        byte[]? sequenceCounter,
+        byte[] sequenceCounter,
         byte implementationParameter)
     {
         // Per GlobalPlatform Card Specification v2.3.1 Section E.4.1 - Session Key Derivation
         // Validate inputs
         if (keySet == null)
+        {
             return SmartCardError.InvalidArgument("KeySet cannot be null");
+        }
+
         if (sequenceCounter == null)
+        {
             return SmartCardError.InvalidArgument("Sequence counter is required for SCP02");
-            
+        }
+
         // Map implementation parameter to ScpImplementation enum
         var implementation = implementationParameter switch
         {
@@ -112,8 +162,10 @@ public sealed class Scp02ProtocolImpl : IScpProtocol<Scp02ProtocolImpl>
             implementation);
             
         if (contextResult.IsFailure)
+        {
             return Result.Failure<SessionKeys, SmartCardError>(contextResult.Error);
-            
+        }
+
         // Use centralized key derivation service
         var keyDerivationService = new KeyDerivationService();
         return keyDerivationService.DeriveSessionKeys(contextResult.Value);
@@ -145,10 +197,15 @@ public sealed class Scp02ProtocolImpl : IScpProtocol<Scp02ProtocolImpl>
         uint encryptionCounter)
     {
         if (chainingValue == null)
+        {
             return SmartCardError.InvalidArgument("Chaining value cannot be null");
+        }
+
         if (chainingValue.Length != ChainingValueSize)
+        {
             return SmartCardError.InvalidArgument($"Chaining value must be {ChainingValueSize} bytes");
-            
+        }
+
         // For SCP02 C-ENC, IV is the current MAC chaining value
         var iv = new byte[ChainingValueSize];
         Array.Copy(chainingValue, 0, iv, 0, ChainingValueSize);

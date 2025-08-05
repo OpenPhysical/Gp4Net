@@ -197,9 +197,9 @@ public class OpidValidationResult
     /// <summary>
     /// Gets the error message if validation failed.
     /// </summary>
-    public string? ErrorMessage { get; }
+    public string ErrorMessage { get; }
 
-    private OpidValidationResult(bool isValid, string? errorMessage)
+    private OpidValidationResult(bool isValid, string errorMessage)
     {
         IsValid = isValid;
         ErrorMessage = errorMessage;

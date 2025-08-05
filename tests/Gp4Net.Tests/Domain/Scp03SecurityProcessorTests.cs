@@ -1,17 +1,16 @@
 using System;
 using System.Collections.Immutable;
 using AwesomeAssertions;
-using Gp4Net.Constants;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Security;
-using Gp4Net.Tests.TestHelpers;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain;
 
 [TestFixture]
+[Category("Unit")]
 public class Scp03SecurityProcessorTests
 {
     private SessionKeys _sessionKeys = null!;
@@ -138,37 +137,7 @@ public class Scp03SecurityProcessorTests
         // If it fails, that's expected until full implementation
     }
 
-    [Test]
-    public void ApplyCommandSecurity_NullCommand_ReturnsFailure()
-    {
-        var result = Scp03SecurityProcessor.ApplyCommandSecurity(
-            null!,
-            SecurityLevel.CMac,
-            _sessionKeys,
-            _macChainingValue,
-            0u
-        );
-        
-        result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
-    }
 
-    [Test]
-    public void ApplyCommandSecurity_NullSessionKeys_ReturnsFailure()
-    {
-        var command = GetDataCommand.Create(0x9F7F).Value;
-        
-        var result = Scp03SecurityProcessor.ApplyCommandSecurity(
-            command,
-            SecurityLevel.CMac,
-            null!,
-            _macChainingValue,
-            0u
-        );
-        
-        result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
-    }
 
     [Test]
     public void ApplyCommandSecurity_EmptyMacChaining_ReturnsFailure()

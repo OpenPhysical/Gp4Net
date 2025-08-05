@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
-using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Security;
 using Gp4Net.Tests.TestHelpers;
+using Gp4Net.Transport;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Integration;
@@ -86,9 +85,7 @@ public class CapLoadingIntegrationTests
         Assert.That(lastCommand.IsFinalBlock, Is.True, "Last command should be marked as final block");
 
         // Convert to APDUs for secure channel wrapping
-#pragma warning disable CS0618 // Testing APDU format generation in integration test
-        var plainApdus = loadCommands.Select(cmd => cmd.ToApdu()).ToList();
-#pragma warning restore CS0618
+        var plainApdus = loadCommands.Select(cmd => ApduBuilder.BuildApdu(cmd)).ToList();
 
         // Verify APDU structure matches trace format
         var firstApdu = plainApdus[0];
@@ -112,9 +109,7 @@ public class CapLoadingIntegrationTests
         var result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
         Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
         var loadCommands = result.Value;
-#pragma warning disable CS0618 // Testing APDU format generation in integration test
-        var plainApdus = loadCommands.Select(cmd => cmd.ToApdu()).ToList();
-#pragma warning restore CS0618
+        var plainApdus = loadCommands.Select(cmd => ApduBuilder.BuildApdu(cmd)).ToList();
 
         // Simulate what wrapped APDUs would look like (for demonstration)
         var wrappedApdus = plainApdus
@@ -174,17 +169,13 @@ public class CapLoadingIntegrationTests
             
         Assert.That(installForLoadResult.IsSuccess, Is.True, "CreateForLoad should succeed");
         var installForLoadCmd = installForLoadResult.Value;
-#pragma warning disable CS0618 // Testing APDU format generation in integration test
-        var installForLoadApdu = installForLoadCmd.ToApdu();
-#pragma warning restore CS0618
+        var installForLoadApdu = ApduBuilder.BuildApdu(installForLoadCmd);
 
         // Generate LOAD commands
         var result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
         Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
         var loadCommands = result.Value;
-#pragma warning disable CS0618 // Testing APDU format generation in integration test
-        var firstLoadApdu = loadCommands[0].ToApdu();
-#pragma warning restore CS0618
+        var firstLoadApdu = ApduBuilder.BuildApdu(loadCommands[0]);
 
         Assert.Multiple(() =>
         {
@@ -322,9 +313,7 @@ public class SecureChannelWorkflow
         
         // Use functional approach - create result even on failure
         var loadCommands = result.IsSuccess ? result.Value : new List<LoadCommand>();
-#pragma warning disable CS0618 // Testing APDU format generation in integration test
-        var plainApdus = loadCommands.Select(cmd => cmd.ToApdu()).ToList();
-#pragma warning restore CS0618
+        var plainApdus = loadCommands.Select(cmd => ApduBuilder.BuildApdu(cmd)).ToList();
 
         // Create proper session keys using existing key derivation
         SessionKeys sessionKeys;

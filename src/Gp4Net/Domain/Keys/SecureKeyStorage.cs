@@ -13,13 +13,19 @@ using System.Security.Cryptography;
 /// </summary>
 public sealed class SecureKeyStorage : IDisposable
 {
-    private byte[]? _keyData;
+    private byte[] _keyData;
     private bool _isDisposed;
 
     /// <summary>
     /// Gets the length of the key in bytes.
     /// </summary>
-    public int Length => this._keyData?.Length ?? 0;
+    public int Length
+    {
+        get
+        {
+            return this._keyData?.Length ?? 0;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SecureKeyStorage"/> class.
@@ -127,7 +133,7 @@ public sealed class SecureSessionKeys : IDisposable
     private readonly SecureKeyStorage _sEnc;
     private readonly SecureKeyStorage _sMac;
     private readonly SecureKeyStorage _sRMac;
-    private readonly SecureKeyStorage? _dek;
+    private readonly SecureKeyStorage _dek;
     private bool _isDisposed;
 
     /// <summary>
@@ -137,7 +143,7 @@ public sealed class SecureSessionKeys : IDisposable
     /// <param name="sMac">The session MAC key.</param>
     /// <param name="sRMac">The session R-MAC key.</param>
     /// <param name="dek">The data encryption key (optional).</param>
-    public SecureSessionKeys(byte[] sEnc, byte[] sMac, byte[] sRMac, byte[]? dek = null)
+    public SecureSessionKeys(byte[] sEnc, byte[] sMac, byte[] sRMac, byte[] dek = null)
     {
         this._sEnc = new SecureKeyStorage(sEnc);
         this._sMac = new SecureKeyStorage(sMac);
@@ -215,7 +221,7 @@ public sealed class SecureSessionKeys : IDisposable
     /// Uses the data encryption key if available.
     /// </summary>
     /// <param name="action">The action to execute with the key.</param>
-    public void UseDek(Action<byte[]?> action)
+    public void UseDek(Action<byte[]> action)
     {
         this.ThrowIfDisposed();
         if (this._dek != null)

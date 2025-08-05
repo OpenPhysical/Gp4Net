@@ -2,8 +2,8 @@ using System;
 using System.Linq;
 using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Transport;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
@@ -198,7 +198,7 @@ public class DeleteCommandTests
         var command = commandResult.Value;
 
         // Act
-        var apdu = command.ToApdu();
+        var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         apdu[0].Should().Be(0x80); // CLA
@@ -222,7 +222,7 @@ public class DeleteCommandTests
         var command = commandResult.Value;
 
         // Act
-        var apdu = command.ToApdu();
+        var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         apdu[0].Should().Be(0x80); // CLA
@@ -257,7 +257,7 @@ public class DeleteCommandTests
         var command = commandResult.Value;
 
         // Act
-        var apdu = command.ToApdu();
+        var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         var totalAidLength = aids.Sum(aid => aid.Length); // 9 + 7 + 5 = 21
@@ -285,7 +285,7 @@ public class DeleteCommandTests
         var command = commandResult.Value;
 
         // Act
-        var apdu = command.ToApdu();
+        var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         // Total length should be: 5 (header) + Lc value

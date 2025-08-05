@@ -1,10 +1,7 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Gp4Net.Constants;
-using Gp4Net.Core;
 using Gp4Net.Transport;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.TestHelpers;
 
@@ -14,7 +11,13 @@ namespace Gp4Net.Tests.TestHelpers;
 public class MockCardChannel : ICardChannel
 {
     public bool IsOpen { get; private set; } = true;
-    public TransportProtocol Protocol => TransportProtocol.T1;
+    public TransportProtocol Protocol
+    {
+        get
+        {
+            return TransportProtocol.T1;
+        }
+    }
 
     public Task<byte[]> TransmitAsync(
         byte[] command,
@@ -41,10 +44,34 @@ public class MockCardChannel : ICardChannel
 /// </summary>
 public class MockApduTransport : IApduTransport
 {
-    public TransportProtocol Protocol => TransportProtocol.T1;
-    public int MaxCommandDataLength => 255;
-    public int MaxResponseDataLength => 256;
-    public bool SupportsExtendedLength => false;
+    public TransportProtocol Protocol
+    {
+        get
+        {
+            return TransportProtocol.T1;
+        }
+    }
+    public int MaxCommandDataLength
+    {
+        get
+        {
+            return 255;
+        }
+    }
+    public int MaxResponseDataLength
+    {
+        get
+        {
+            return 256;
+        }
+    }
+    public bool SupportsExtendedLength
+    {
+        get
+        {
+            return false;
+        }
+    }
 
     public Task<ApduResponse> TransmitAsync(
         IApduCommand command,

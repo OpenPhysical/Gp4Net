@@ -18,22 +18,46 @@ public class VirtualCardReader
     /// <summary>
     /// Gets the name of the virtual reader.
     /// </summary>
-    public string ReaderName => _readerName;
+    public string ReaderName
+    {
+        get
+        {
+            return _readerName;
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether a card is present in the reader.
     /// </summary>
-    public bool IsCardPresent => _insertedCard != null;
+    public bool IsCardPresent
+    {
+        get
+        {
+            return _insertedCard != null;
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether the reader is connected.
     /// </summary>
-    public bool IsConnected => _connected;
+    public bool IsConnected
+    {
+        get
+        {
+            return _connected;
+        }
+    }
 
     /// <summary>
     /// Gets the currently inserted card, if any.
     /// </summary>
-    public IVirtualCard? InsertedCard => _insertedCard;
+    public IVirtualCard? InsertedCard
+    {
+        get
+        {
+            return _insertedCard;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the VirtualCardReader class.

@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Domain.Commands;
-using Gp4Net.Services;
+using Gp4Net.Domain.Protocol;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using log4net;
@@ -37,7 +37,9 @@ public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
             {
                 Logger.Debug("InfoCommand: Starting execution");
 
-                var table = new Table().AddColumn("Property").AddColumn("Value");
+                var table = new Table()
+                    .AddColumn(new TableColumn("Property").NoWrap())
+                    .AddColumn(new TableColumn("Value"));
 
                 // Basic card information (always available)
                 Logger.Debug("InfoCommand: About to call GetAtr()");
@@ -86,6 +88,10 @@ public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
                         if (cplcResult.IsSuccess)
                         {
                             AddCplcToTable(table, cplcResult.Value);
+                            
+                            // Add chip information if available
+                            var chipInfo = cplcResult.Value.GetChipInfo();
+                            AddChipInfoToTable(table, chipInfo);
                         }
                         else
                         {
@@ -96,7 +102,7 @@ public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
                     catch (Exception cplcEx)
                     {
                         Logger.Debug($"Could not get CPLC data: {cplcEx.Message}");
-                        _ = table.AddRow("ISD Status", $"[red]✗ Error: {cplcEx.Message}[/]");
+                        _ = table.AddRow("CPLC Data", $"[red]✗ Error: {cplcEx.Message}[/]");
                     }
 
                     // Add other GET DATA commands to table (these don't require secure channel)
@@ -118,6 +124,12 @@ public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
                         table,
                         "Diversification Data",
                         GetDataCommand.DataObjects.DiversificationData
+                    );
+                    await AddGetDataToTable(
+                        ctx,
+                        table,
+                        "Security Domain Status",
+                        GetDataCommand.DataObjects.SecurityDomainManagementData
                     );
 
                     // Only get applications if we have a secure channel (requires GET STATUS commands)
@@ -245,15 +257,53 @@ public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
 
     private static void AddCplcToTable(Table table, CplcData cplc)
     {
-        _ = table.AddRow("IC Fabricator", $"{cplc.IcFabricator:X4}");
-        _ = table.AddRow("IC Type", $"{cplc.IcType:X4}");
-        _ = table.AddRow("Operating System ID", $"{cplc.OperatingSystemId:X4}");
-        _ = table.AddRow(
-            "IC Fabrication Date",
-            $"{cplc.IcFabricationDate:X4} ({CplcDateParser.FormatDate(cplc.IcFabricationDate)})"
+        _ = table.AddRow("[dim]───CPLC Data───[/]", string.Empty);
+        _ = table.AddRow("IC Fabricator", $"{cplc.GetManufacturerName()} (0x{cplc.IcFabricator:X4})");
+        _ = table.AddRow("IC Type", $"{cplc.GetChipModel()} (0x{cplc.IcType:X4})");
+        _ = table.AddRow("Operating System", $"{cplc.GetOperatingSystemName()} (0x{cplc.OperatingSystemId:X4})");
+        
+        // Display all date fields with validity check
+        AddDateField(table, "OS Release Date", cplc.OperatingSystemReleaseDate);
+        AddDateField(table, "IC Fabrication Date", cplc.IcFabricationDate);
+        
+        _ = table.AddRow("IC Serial Number", $"0x{cplc.IcSerialNumber:X8} ({cplc.IcSerialNumber})");
+        _ = table.AddRow("IC Batch ID", $"0x{cplc.IcBatchIdentifier:X4}");
+        
+        // Additional CPLC fields
+        AddDateField(table, "Module Packaging Date", cplc.IcModulePackagingDate);
+        AddDateField(table, "Embedding Date", cplc.IcEmbeddingDate);
+        _ = table.AddRow("Pre-Personalizer", $"0x{cplc.IcPrePersonalizer:X4}");
+        AddDateField(table, "Pre-Perso Equip Date", cplc.IcPrePersonalizationEquipmentDate);
+        _ = table.AddRow("Pre-Perso Equip ID", $"0x{cplc.IcPrePersonalizationEquipmentId:X8}");
+        AddDateField(table, "Personalization Date", cplc.IcPersonalizationDate);
+    }
+    
+    private static void AddDateField(Table table, string name, ushort dateValue)
+    {
+        var dateStr = CplcData.IsValidDate(dateValue) 
+            ? $"0x{dateValue:X4} ({CplcDateParser.FormatDate(dateValue)})"
+            : $"0x{dateValue:X4} [dim](invalid date format)[/]";
+        _ = table.AddRow(name, dateStr);
+    }
+    
+    private static void AddChipInfoToTable(Table table, ChipInfo chipInfo)
+    {
+        _ = table.AddRow("[dim]───Chip Details───[/]", string.Empty);
+        _ = table.AddRow("Chip Platform", $"{chipInfo.Platform} ({chipInfo.Architecture})");
+        chipInfo.MemoryConfig.Match(
+            Some: config => table.AddRow("Memory Config", chipInfo.GetMemoryDescription()),
+            None: () => { }
         );
-        _ = table.AddRow("IC Serial Number", $"{cplc.IcSerialNumber:X8}");
-        _ = table.AddRow("IC Batch Identifier", $"{cplc.IcBatchIdentifier:X4}");
+        _ = table.AddRow("Certifications", chipInfo.GetCertificationsString());
+        chipInfo.JavaCardVersion.Match(
+            Some: version => table.AddRow("Java Card Version", version),
+            None: () => { }
+        );
+        chipInfo.GlobalPlatformVersion.Match(
+            Some: version => table.AddRow("GlobalPlatform Version", version),
+            None: () => { }
+        );
+        _ = table.AddRow("Crypto Support", chipInfo.GetCryptoSummary());
     }
 
     /// <summary>
@@ -283,10 +333,10 @@ public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
                     if (tag == GetDataCommand.DataObjects.CardData)
                     {
                         var cardData = response.ParseAsCardData();
-                        if (cardData != null)
+                        if (cardData.HasValue)
                         {
                             // Prefer OID-based version (matches GP Pro behavior)
-                            var gpVersion = cardData.GlobalPlatformVersionFromOid ?? cardData.GlobalPlatformVersion?.ToString();
+                            var gpVersion = cardData.Value.GlobalPlatformVersionFromOid ?? cardData.Value.GlobalPlatformVersion?.ToString();
                             if (!string.IsNullOrEmpty(gpVersion))
                             {
                                 _ = table.AddRow("GlobalPlatform Version", gpVersion);
@@ -304,19 +354,34 @@ public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
                     else if (tag == GetDataCommand.DataObjects.CardCapabilities)
                     {
                         var capabilities = response.ParseAsCardCapabilities();
-                        if (capabilities != null)
+                        if (capabilities.HasValue)
                         {
                             // Display SCP support from capabilities
-                            var scpSupport = ScpCapabilitiesParser.Parse(response);
-                            if (!string.IsNullOrEmpty(scpSupport))
+                            var scpInfo = ScpCapabilitiesParser.ParseDetailed(response);
+                            if (scpInfo.Protocols.Count > 0)
                             {
-                                _ = table.AddRow("SCP Support (Capabilities)", scpSupport);
+                                // Display each SCP protocol on its own line with details
+                                _ = table.AddRow("SCP Support", scpInfo.Protocols[0].ToShortString());
+                                foreach (var protocol in scpInfo.Protocols.Skip(1))
+                                {
+                                    _ = table.AddRow("", protocol.ToShortString());
+                                }
+                                
+                                // Add detailed implementation descriptions
+                                foreach (var protocol in scpInfo.Protocols)
+                                {
+                                    foreach (var impl in protocol.ImplementationOptions)
+                                    {
+                                        var description = GetImplementationDescription(impl);
+                                        _ = table.AddRow($"  {impl:X2}", description);
+                                    }
+                                }
                             }
 
                             // Display other capability information (algorithms, cipher suites, etc.)
-                            if (capabilities.Algorithms.HasValue)
+                            if (capabilities.Value.Algorithms.HasValue)
                             {
-                                var hashAlgs = capabilities.Algorithms.Value.GetHashAlgorithms();
+                                var hashAlgs = capabilities.Value.Algorithms.Value.GetHashAlgorithms();
                                 if (!string.IsNullOrEmpty(hashAlgs) && hashAlgs != "None")
                                 {
                                     _ = table.AddRow("Hash Algorithms", hashAlgs);
@@ -324,9 +389,9 @@ public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
                             }
 
                             // Display cipher suites if available
-                            if (capabilities.CipherSuites.Count > 0)
+                            if (capabilities.Value.CipherSuites.Count > 0)
                             {
-                                foreach (var kvp in capabilities.CipherSuites.Take(3)) // Limit to avoid clutter
+                                foreach (var kvp in capabilities.Value.CipherSuites.Take(3)) // Limit to avoid clutter
                                 {
                                     var cipherNames = string.Join(", ", kvp.Value.Take(3).Select(c => c.ToFriendlyString()));
                                     _ = table.AddRow($"{kvp.Key} Ciphers", cipherNames);
@@ -340,16 +405,36 @@ public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
                     }
                     else if (tag == GetDataCommand.DataObjects.DiversificationData)
                     {
-                        // Extract and display SCP support from diversification data
-                        var scpSupport = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(response));
-                        _ = table.AddRow("SCP Support", scpSupport);
+                        // Diversification data doesn't always contain SCP support
+                        // Only parse as SCP support if it follows the CF0A format
+                        if (response.Length >= 12 && response[0] == 0xCF && response[1] == 0x0A)
+                        {
+                            var scpSupport = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(response));
+                            if (!scpSupport.Contains("None") && !scpSupport.Contains("error"))
+                            {
+                                _ = table.AddRow("SCP Support (CF)", scpSupport);
+                            }
+                        }
+                        _ = table.AddRow(name, $"[dim]{Convert.ToHexString(response)}[/]");
+                    }
+                    else if (tag == GetDataCommand.DataObjects.SecurityDomainManagementData)
+                    {
+                        var statusResult = response.ParseAsSecurityDomainStatus();
+                        if (statusResult.HasValue)
+                        {
+                            _ = table.AddRow(name, statusResult.Value.GetShortDescription());
+                        }
+                        else
+                        {
+                            _ = table.AddRow(name, $"[dim]{Convert.ToHexString(response)}[/]");
+                        }
                     }
                     else if (tag == GetDataCommand.DataObjects.KeyInformationTemplate)
                     {
                         var keyInfo = response.ParseAsKeyInformation();
-                        if (keyInfo != null && keyInfo.Keys.Count > 0)
+                        if (keyInfo.HasValue && keyInfo.Value.Keys.Count > 0)
                         {
-                            foreach (var key in keyInfo.Keys.OrderBy(k => k.KeyId))
+                            foreach (var key in keyInfo.Value.Keys.OrderBy(k => k.KeyId))
                             {
                                 var keyName = key.KeyId switch
                                 {
@@ -389,10 +474,32 @@ public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
             _ = table.AddRow(name, "[red]Error retrieving data[/]");
         }
     }
-
-
-
-
+    
+    /// <summary>
+    /// Gets a human-readable description for an SCP implementation option.
+    /// </summary>
+    private static string GetImplementationDescription(ScpImplementation implementation)
+    {
+        return implementation switch
+        {
+            ScpImplementation.Scp02NoDerivation => "3 Secure Channel Keys (no derivation)",
+            ScpImplementation.Scp02OneKey => "1 Secure Channel base key",
+            ScpImplementation.Scp02ThreeKeys => "3 Secure Channel base keys",
+            ScpImplementation.Scp02OneKeyStaticMac => "1 base key with static MAC",
+            ScpImplementation.Scp02StaticMac => "3 keys with static MAC",
+            ScpImplementation.Scp02AesKeys => "3 keys with AES encryption",
+            ScpImplementation.Scp02ThreeKeysRMac => "3 keys with R-MAC support",
+            ScpImplementation.Scp02PseudoRandom => "Pseudo-random card challenge",
+            ScpImplementation.Scp02PseudoRandomRMac => "Pseudo-random with R-MAC support",
+            ScpImplementation.Scp03Aes128 => "AES-128",
+            ScpImplementation.Scp03Aes192 => "AES-192", 
+            ScpImplementation.Scp03Aes256 => "AES-256",
+            ScpImplementation.Scp03NoResponseMac => "AES-128 (no R-MAC)",
+            ScpImplementation.Scp03RandomChallenge => "Random card challenge",
+            ScpImplementation.Scp03PseudoRandom => "Pseudo-random card challenge",
+            _ => $"Implementation 0x{implementation:X2}"
+        };
+    }
 
     /// <summary>
     /// Settings for the info command.

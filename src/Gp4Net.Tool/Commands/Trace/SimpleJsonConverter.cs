@@ -4,31 +4,10 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Gp4Net.Tool.Services;
 
 namespace Gp4Net.Tool.Commands.Trace;
 
-/// <summary>
-/// Simplified JSON trace format for virtual card testing.
-/// </summary>
-public class SimpleTraceData
-{
-    public string CardType { get; set; } = "NXP_P71";
-    public string Atr { get; set; } = "3BD518FF8191FE1FC38073C821100A";
-    public string IsdAid { get; set; } = "A000000151000000";
-    public Dictionary<string, int[]>? Operations { get; set; }
-    public List<SimpleExchange> Exchanges { get; set; } = new();
-}
-
-/// <summary>
-/// Simplified APDU exchange.
-/// </summary>
-public class SimpleExchange
-{
-    public string C { get; set; } = "";  // Command
-    public string R { get; set; } = "";  // Response
-    public string? D { get; set; }       // Description (optional)
-    public int? T { get; set; }          // Response time ms (optional)
-}
 
 /// <summary>
 /// Simplified trace converter that produces minimal JSON.
@@ -57,10 +36,10 @@ public class SimpleJsonConverter
             Operations = operations,
             Exchanges = exchanges.Select((ex, idx) => new SimpleExchange
             {
-                C = ex.Command,
-                R = ex.Response,
-                D = includeDescriptions ? GetDescription(ex.Command) : null,
-                T = ex.ResponseTime > 20 ? ex.ResponseTime : null // Only include if > 20ms
+                Command = ex.Command,
+                Response = ex.Response,
+                Description = includeDescriptions ? GetDescription(ex.Command) : null,
+                ResponseTimeMs = ex.ResponseTime > 20 ? ex.ResponseTime : null // Only include if > 20ms
             }).ToList()
         };
 
@@ -82,7 +61,7 @@ public class SimpleJsonConverter
         var commandPattern = new Regex(@"^A>> T=\d+ \([\d+]+\) ([0-9A-F\s]+)$");
         var responsePattern = new Regex(@"^A<< \([\d+]+\) \((\d+)ms\) ([0-9A-F\s]+)$");
 
-        string? currentCommand = null;
+        string currentCommand = null;
         var lines = await File.ReadAllLinesAsync(filename);
             
         foreach (var line in lines)
@@ -109,9 +88,9 @@ public class SimpleJsonConverter
         return exchanges;
     }
 
-    private Dictionary<string, int[]> DetectOperations(List<(string Command, string Response, int ResponseTime)> exchanges)
+    private Dictionary<string, OperationRange> DetectOperations(List<(string Command, string Response, int ResponseTime)> exchanges)
     {
-        var operations = new Dictionary<string, int[]>();
+        var operations = new Dictionary<string, OperationRange>();
         var currentOp = "";
         var opStart = 0;
 
@@ -124,7 +103,7 @@ public class SimpleJsonConverter
             {
                 if (!string.IsNullOrEmpty(currentOp))
                 {
-                    operations[currentOp] = new[] { opStart + 1, i };
+                    operations[currentOp] = new OperationRange { StartIndex = opStart + 1, EndIndex = i };
                 }
                 currentOp = newOp;
                 opStart = i;
@@ -133,7 +112,7 @@ public class SimpleJsonConverter
 
         if (!string.IsNullOrEmpty(currentOp))
         {
-            operations[currentOp] = new[] { opStart + 1, exchanges.Count };
+            operations[currentOp] = new OperationRange { StartIndex = opStart + 1, EndIndex = exchanges.Count };
         }
 
         return operations;
@@ -142,22 +121,40 @@ public class SimpleJsonConverter
     private static string DetectOperationType(string description)
     {
         if (description.Contains("SELECT") || description.Contains("GET") && !description.Contains("STATUS"))
+        {
             return "info";
+        }
+
         if (description.Contains("INITIALIZE") || description.Contains("AUTHENTICATE"))
+        {
             return "auth";
+        }
+
         if (description.Contains("STATUS"))
+        {
             return "list";
+        }
+
         if (description.Contains("INSTALL") || description.Contains("LOAD"))
+        {
             return "install";
+        }
+
         if (description.Contains("DELETE"))
+        {
             return "delete";
+        }
+
         return "other";
     }
 
     private static string GetDescription(string command)
     {
-        if (command.Length < 4) return "";
-            
+        if (command.Length < 4)
+        {
+            return "";
+        }
+
         var prefix = command.Substring(0, 4);
         if (CommandNames.TryGetValue(prefix, out var name))
         {
@@ -186,14 +183,16 @@ public class SimpleJsonConverter
             // Extract ISD AID from SELECT response
             if (ex.Command.StartsWith("00A4") && ex.Response.Contains("A000000151"))
             {
-                data.IsdAid = "A000000151000000";
+                data.Metadata.IsdAid = "A000000151000000";
             }
                 
             // Extract card type from CPLC
             if (ex.Command.StartsWith("80CA9F7F") && ex.Response.StartsWith("9F7F"))
             {
                 if (ex.Response.Contains("4790"))
-                    data.CardType = "NXP_P71";
+                {
+                    data.Metadata.CardType = "NXP_P71";
+                }
             }
         }
     }

@@ -4,10 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Pipeline;
 using Gp4Net.Services;
 using DeleteCliCommand = Gp4Net.Tool.Commands.Applet.DeleteCommand;
-using Gp4Net.Tool.Commands;
 using Gp4Net.Tool.Pipeline;
 using Gp4Net.Tool.Services;
 using Moq;
@@ -55,7 +53,7 @@ namespace Gp4Net.Tests.Integration;
 [Category("Integration")]
 public class DeleteCommandCryptoIntegrationTests
 {
-    private MockCommandContext _commandContext;
+    private MockCliContext _commandContext;
     private Mock<IGlobalPlatformService> _mockGlobalPlatformService;
     private Mock<ICardService> _mockCardService;
     private DeleteCliCommand _deleteCommand;
@@ -69,8 +67,8 @@ public class DeleteCommandCryptoIntegrationTests
         _mockCardService = new Mock<ICardService>();
         _deleteCommand = new DeleteCliCommand();
 
-        // Create MockCommandContext with mocked services
-        _commandContext = new MockCommandContext(
+        // Create MockCliContext with mocked services
+        _commandContext = new MockCliContext(
             display: new MockDisplayService(),
             cardService: _mockCardService.Object,
             globalPlatformService: _mockGlobalPlatformService.Object,
@@ -235,7 +233,7 @@ public class DeleteCommandCryptoIntegrationTests
             // Assert
             Assert.That(result, Is.EqualTo(0), "Delete command should succeed with proper crypto");
 
-            // Verify secure channel was established (tracked by MockCommandContext)
+            // Verify secure channel was established (tracked by MockCliContext)
             Assert.That(_commandContext.MethodCalls, Does.Contain("RequireSecureChannel(1, )"),
                 "Secure channel should have been established for crypto verification");
         });

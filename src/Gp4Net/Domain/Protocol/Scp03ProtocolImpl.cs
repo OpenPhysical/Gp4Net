@@ -1,6 +1,5 @@
 using System;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
@@ -16,20 +15,58 @@ namespace Gp4Net.Domain.Protocol;
 public sealed class Scp03ProtocolImpl : IScpProtocol<Scp03ProtocolImpl>
 {
     /// <inheritdoc />
-    public static byte ProtocolVersion => 0x03;
-    
+    public static byte ProtocolVersion
+    {
+        get
+        {
+            return 0x03;
+        }
+    }
+
     /// <inheritdoc />
-    public static int BlockSize => 16; // AES block size
-    
+    public static int BlockSize
+    {
+        get
+        {
+            return 16;
+
+            // AES block size
+        }
+    }
+
     /// <inheritdoc />
-    public static int MacSize => 8; // Truncated MAC for commands/responses
-    
+    public static int MacSize
+    {
+        get
+        {
+            return 8;
+
+            // Truncated MAC for commands/responses
+        }
+    }
+
     /// <inheritdoc />
-    public static int ChainingValueSize => 16; // Full AES-CMAC size for chaining
-    
+    public static int ChainingValueSize
+    {
+        get
+        {
+            return 16;
+
+            // Full AES-CMAC size for chaining
+        }
+    }
+
     /// <inheritdoc />
-    public static int CardChallengeLength => 8; // SCP03 uses 8-byte card challenge
-    
+    public static int CardChallengeLength
+    {
+        get
+        {
+            return 8;
+
+            // SCP03 uses 8-byte card challenge
+        }
+    }
+
     /// <inheritdoc />
     public static Result<byte[], SmartCardError> CalculateMac(byte[] key, byte[] data)
     {
@@ -59,12 +96,20 @@ public sealed class Scp03ProtocolImpl : IScpProtocol<Scp03ProtocolImpl>
     public static Result<byte[], SmartCardError> UpdateMacChaining(byte[] currentChaining, byte[] calculatedMac)
     {
         if (currentChaining == null)
+        {
             return SmartCardError.InvalidArgument("Current chaining cannot be null");
+        }
+
         if (calculatedMac == null)
+        {
             return SmartCardError.InvalidArgument("Calculated MAC cannot be null");
+        }
+
         if (calculatedMac.Length < ChainingValueSize)
+        {
             return SmartCardError.InvalidArgument($"MAC must be at least {ChainingValueSize} bytes for SCP03");
-            
+        }
+
         // For SCP03, the full 16-byte MAC becomes the new chaining value
         var newChaining = new byte[ChainingValueSize];
         Array.Copy(calculatedMac, 0, newChaining, 0, ChainingValueSize);
@@ -77,7 +122,7 @@ public sealed class Scp03ProtocolImpl : IScpProtocol<Scp03ProtocolImpl>
         IKeySet keySet,
         byte[] hostChallenge,
         byte[] cardChallenge,
-        byte[]? sequenceCounter,
+        byte[] sequenceCounter,
         byte implementationParameter)
     {
         // Note: implementationParameter is unused for SCP03 key derivation
@@ -85,8 +130,10 @@ public sealed class Scp03ProtocolImpl : IScpProtocol<Scp03ProtocolImpl>
         
         // Validate inputs
         if (keySet == null)
+        {
             return SmartCardError.InvalidArgument("KeySet cannot be null");
-            
+        }
+
         // Map implementation parameter to ScpImplementation enum
         var implementation = implementationParameter switch
         {
@@ -104,8 +151,10 @@ public sealed class Scp03ProtocolImpl : IScpProtocol<Scp03ProtocolImpl>
             Maybe<ScpImplementation>.From(implementation));
             
         if (contextResult.IsFailure)
+        {
             return Result.Failure<SessionKeys, SmartCardError>(contextResult.Error);
-            
+        }
+
         // Use centralized key derivation service
         var keyDerivationService = new KeyDerivationService();
         return keyDerivationService.DeriveSessionKeys(contextResult.Value);
@@ -133,8 +182,10 @@ public sealed class Scp03ProtocolImpl : IScpProtocol<Scp03ProtocolImpl>
         uint encryptionCounter)
     {
         if (chainingValue == null)
+        {
             return SmartCardError.InvalidArgument("Chaining value cannot be null");
-            
+        }
+
         // For SCP03 C-ENC, IV is derived from encryption counter
         var iv = new byte[BlockSize];
         

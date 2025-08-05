@@ -22,8 +22,10 @@ public static class ApduParser
     public static Result<ParsedSecuredCommand, SmartCardError> ParseSecuredCommand(byte[] securedCommand)
     {
         if (securedCommand.Length < 5)
+        {
             return Result.Failure<ParsedSecuredCommand, SmartCardError>(
                 SmartCardError.InvalidData("Secured command too short"));
+        }
 
         var cla = securedCommand[0];
         var ins = securedCommand[1];
@@ -32,8 +34,10 @@ public static class ApduParser
         var lc = securedCommand[4];
 
         if (securedCommand.Length < 5 + lc)
+        {
             return Result.Failure<ParsedSecuredCommand, SmartCardError>(
                 SmartCardError.InvalidData("Secured command length inconsistent with Lc"));
+        }
 
         // Extract data field (contains original data + MAC)
         var dataField = new byte[lc];
@@ -41,7 +45,7 @@ public static class ApduParser
 
         // Parse data field to separate original data from MAC
         byte[] originalData;
-        byte[]? mac = null;
+        byte[] mac = null;
         byte? le = null;
 
         if (lc >= 8) // Minimum MAC size
@@ -156,5 +160,5 @@ public readonly record struct ParsedSecuredCommand(
     byte P1,
     byte P2,
     byte[] Data,
-    byte[]? Mac,
+    byte[] Mac,
     byte? Le);

@@ -12,7 +12,7 @@ namespace Gp4Net.Tool.Infrastructure;
 public class ByteTypeConverter : TypeConverter
 {
     /// <inheritdoc />
-    public override bool CanConvertFrom(ITypeDescriptorContext? context, Type sourceType)
+    public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
     {
         return sourceType == typeof(string)
                || sourceType == typeof(int)
@@ -21,9 +21,9 @@ public class ByteTypeConverter : TypeConverter
     }
 
     /// <inheritdoc />
-    public override object? ConvertFrom(
-        ITypeDescriptorContext? context,
-        CultureInfo? culture,
+    public override object ConvertFrom(
+        ITypeDescriptorContext context,
+        CultureInfo culture,
         object value
     )
     {
@@ -112,16 +112,16 @@ public class ByteTypeConverter : TypeConverter
     }
 
     /// <inheritdoc />
-    public override bool CanConvertTo(ITypeDescriptorContext? context, Type? destinationType)
+    public override bool CanConvertTo(ITypeDescriptorContext context, Type destinationType)
     {
         return destinationType == typeof(string) || base.CanConvertTo(context, destinationType);
     }
 
     /// <inheritdoc />
-    public override object? ConvertTo(
-        ITypeDescriptorContext? context,
-        CultureInfo? culture,
-        object? value,
+    public override object ConvertTo(
+        ITypeDescriptorContext context,
+        CultureInfo culture,
+        object value,
         Type destinationType
     )
     {

@@ -1,9 +1,7 @@
-using System;
 using System.Linq;
 using AwesomeAssertions;
 using Gp4Net.Domain.CardInfo;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.CardInfo;
 
@@ -28,10 +26,10 @@ public class KeyInformationTemplateTests
         var template = KeyInformationTemplate.Parse(data);
 
         // Assert
-        template.Should().NotBeNull();
-        template.Keys.Should().HaveCount(1);
+        template.IsSuccess.Should().BeTrue();
+        template.Value.Keys.Should().HaveCount(1);
 
-        var key = template.Keys.First();
+        var key = template.Value.Keys.First();
         key.KeyId.Should().Be(1);
         key.KeyVersion.Should().Be(1);
         key.KeyTypes.Should().HaveCount(2);
@@ -58,7 +56,7 @@ public class KeyInformationTemplateTests
 
         // Assert
         template.Should().NotBeNull();
-        var key = template.Keys.First();
+        var key = template.Value.Keys.First();
         key.KeyId.Should().Be(16);
         key.KeyVersion.Should().Be(2);
         key.PrimaryKeyType.Should().Be(KeyType.Aes);
@@ -84,7 +82,7 @@ public class KeyInformationTemplateTests
         var template = KeyInformationTemplate.Parse(data);
 
         // Assert
-        var key = template.Keys.First();
+        var key = template.Value.Keys.First();
         key.KeyTypes.Should().HaveCount(3);
         key.KeyTypes.Should().Contain(KeyType.Des);
         key.KeyTypes.Should().Contain(KeyType.TripleDes2Key);
@@ -131,24 +129,24 @@ public class KeyInformationTemplateTests
         var template = KeyInformationTemplate.Parse(data[2..]);
 
         // Assert
-        template.Keys.Should().HaveCount(4);
+        template.Value.Keys.Should().HaveCount(4);
 
         // First three keys have same ID but different versions
-        template.Keys[0].KeyId.Should().Be(1);
-        template.Keys[0].KeyVersion.Should().Be(1);
+        template.Value.Keys[0].KeyId.Should().Be(1);
+        template.Value.Keys[0].KeyVersion.Should().Be(1);
 
-        template.Keys[1].KeyId.Should().Be(1);
-        template.Keys[1].KeyVersion.Should().Be(2);
+        template.Value.Keys[1].KeyId.Should().Be(1);
+        template.Value.Keys[1].KeyVersion.Should().Be(2);
 
-        template.Keys[2].KeyId.Should().Be(1);
-        template.Keys[2].KeyVersion.Should().Be(3);
+        template.Value.Keys[2].KeyId.Should().Be(1);
+        template.Value.Keys[2].KeyVersion.Should().Be(3);
 
         // Fourth key has different ID
-        template.Keys[3].KeyId.Should().Be(2);
-        template.Keys[3].KeyVersion.Should().Be(1);
+        template.Value.Keys[3].KeyId.Should().Be(2);
+        template.Value.Keys[3].KeyVersion.Should().Be(1);
 
         // All are AES keys
-        foreach (var key in template.Keys)
+        foreach (var key in template.Value.Keys)
         {
             key.PrimaryKeyType.Should().Be(KeyType.Aes);
         }
@@ -169,7 +167,7 @@ public class KeyInformationTemplateTests
 
         // Act
         var template = KeyInformationTemplate.Parse(data);
-        var output = template.Keys.First().ToString();
+        var output = template.Value.Keys.First().ToString();
 
         // Assert
         output.Should().Contain("Version: 2 (0x02)");
@@ -223,14 +221,17 @@ public class KeyInformationTemplateTests
     }
 
     [Test]
-    public void Parse_EmptyData_ThrowsException()
+    public void Parse_EmptyData_ReturnsFailure()
     {
         // Arrange
         var emptyData = new byte[0];
 
-        // Act & Assert
-        Action act = () => KeyInformationTemplate.Parse(emptyData);
-        act.Should().ThrowExactly<ArgumentException>();
+        // Act
+        var result = KeyInformationTemplate.Parse(emptyData);
+
+        // Assert
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("INVALID_ARGUMENT");
     }
 
     [Test]
@@ -249,6 +250,6 @@ public class KeyInformationTemplateTests
         var template = KeyInformationTemplate.Parse(data);
 
         // Assert
-        template.Keys.Should().BeEmpty(); // Should not add incomplete key
+        template.Value.Keys.Should().BeEmpty(); // Should not add incomplete key
     }
 }

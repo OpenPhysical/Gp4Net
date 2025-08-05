@@ -6,7 +6,6 @@ using Gp4Net.Tool.Pipeline;
 using Gp4Net.Tool.Services;
 using Moq;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 using Spectre.Console.Testing;
 
 namespace Gp4Net.Tests.Tool.Commands;
@@ -22,7 +21,7 @@ public class BaseCommandTests
     private Mock<IGlobalPlatformService> _mockGlobalPlatformService;
     private Mock<IDomainServiceFactory> _mockDomainServiceFactory;
     private Mock<IKeysetResolver> _mockKeysetResolver;
-    private CommandContext _commandContext;
+    private CliContext _cliContext;
     private TestConsole _console;
 
     [SetUp]
@@ -40,11 +39,12 @@ public class BaseCommandTests
             .Setup(f => f.CreateGlobalPlatformService(It.IsAny<ICardService>()))
             .Returns(_mockGlobalPlatformService.Object);
 
-        _commandContext = new CommandContext(
+        _cliContext = new CliContext(
             _mockDisplayService.Object,
             _mockCardService.Object,
             _mockDomainServiceFactory.Object,
-            _mockKeysetResolver.Object
+            _mockKeysetResolver.Object,
+            null // logger is optional
         );
     }
 
@@ -61,10 +61,10 @@ public class BaseCommandTests
         _ = _mockCardService.Setup(s => s.IsConnected).Returns(true);
 
         // Act
-        var result = await _commandContext.RequireCardConnection("TestReader");
+        var result = await _cliContext.RequireCardConnection("TestReader");
 
         // Assert
-        result.Should().BeEquivalentTo(_commandContext);
+        result.Should().BeEquivalentTo(_cliContext);
         _mockCardService.Verify(s => s.Connect(It.IsAny<string>()), Times.Never);
     }
 
@@ -76,10 +76,10 @@ public class BaseCommandTests
         _ = _mockCardService.Setup(s => s.Connect("TestReader")).Returns(true);
 
         // Act
-        var result = await _commandContext.RequireCardConnection("TestReader");
+        var result = await _cliContext.RequireCardConnection("TestReader");
 
         // Assert
-        result.Should().BeEquivalentTo(_commandContext);
+        result.Should().BeEquivalentTo(_cliContext);
         _mockCardService.Verify(s => s.Connect("TestReader"), Times.Once);
     }
 
@@ -92,10 +92,10 @@ public class BaseCommandTests
         _ = _mockCardService.Setup(s => s.Connect("Reader1")).Returns(true);
 
         // Act
-        var result = await _commandContext.RequireCardConnection("auto");
+        var result = await _cliContext.RequireCardConnection("auto");
 
         // Assert
-        result.Should().BeEquivalentTo(_commandContext);
+        result.Should().BeEquivalentTo(_cliContext);
         _mockCardService.Verify(s => s.Connect("Reader1"), Times.Once);
     }
 
@@ -107,7 +107,7 @@ public class BaseCommandTests
         _ = _mockCardService.Setup(s => s.GetReaders()).Returns(Array.Empty<string>());
 
         // Act & Assert
-        Action act = () => { var _ = _commandContext.RequireCardConnection("auto").GetAwaiter().GetResult(); };
+        Action act = () => { var _ = _cliContext.RequireCardConnection("auto").GetAwaiter().GetResult(); };
         act.Should().ThrowExactly<InvalidOperationException>();
     }
 
@@ -119,7 +119,7 @@ public class BaseCommandTests
         _ = _mockCardService.Setup(s => s.Connect(It.IsAny<string>())).Returns(false);
 
         // Act & Assert
-        Action act = () => { var _ = _commandContext.RequireCardConnection("TestReader").GetAwaiter().GetResult(); };
+        Action act = () => { var _ = _cliContext.RequireCardConnection("TestReader").GetAwaiter().GetResult(); };
         act.Should().ThrowExactly<InvalidOperationException>();
     }
 
@@ -130,10 +130,10 @@ public class BaseCommandTests
         _ = _mockCardService.Setup(s => s.IsSecureChannelEstablished).Returns(true);
 
         // Act
-        var result = await _commandContext.RequireSecureChannel();
+        var result = await _cliContext.RequireSecureChannel();
 
         // Assert
-        result.Should().BeEquivalentTo(_commandContext);
+        result.Should().BeEquivalentTo(_cliContext);
         _mockCardService.Verify(
             s => s.EstablishSecureChannel(It.IsAny<byte[]>(), It.IsAny<byte>()),
             Times.Never
@@ -150,10 +150,10 @@ public class BaseCommandTests
             .Returns(true);
 
         // Act
-        var result = await _commandContext.RequireSecureChannel(1);
+        var result = await _cliContext.RequireSecureChannel(1);
 
         // Assert
-        result.Should().BeEquivalentTo(_commandContext);
+        result.Should().BeEquivalentTo(_cliContext);
         _mockCardService.Verify(
             s => s.EstablishSecureChannel(It.IsAny<byte[]>(), (byte)1),
             Times.Once
@@ -170,7 +170,7 @@ public class BaseCommandTests
             .Returns(false);
 
         // Act & Assert
-        Action act = () => { var _ = _commandContext.RequireSecureChannel().GetAwaiter().GetResult(); };
+        Action act = () => { var _ = _cliContext.RequireSecureChannel().GetAwaiter().GetResult(); };
         act.Should().ThrowExactly<InvalidOperationException>();
     }
 
@@ -181,7 +181,7 @@ public class BaseCommandTests
         var executed = false;
 
         // Act
-        var result = await _commandContext.ExecuteAsync(async ctx =>
+        var result = await _cliContext.ExecuteAsync(async ctx =>
         {
             executed = true;
             await Task.Delay(1);
@@ -200,7 +200,7 @@ public class BaseCommandTests
         var executed = false;
 
         // Act
-        var result = await _commandContext.ExecuteAsync(ctx =>
+        var result = await _cliContext.ExecuteAsync(ctx =>
         {
             executed = true;
             return 42;
@@ -215,7 +215,7 @@ public class BaseCommandTests
     public async Task ExecuteAsync_WithException_ReturnsErrorCode()
     {
         // Act
-        var result = await _commandContext.ExecuteAsync((Func<ICliExecutionContext, int>)(ctx =>
+        var result = await _cliContext.ExecuteAsync((Func<ICliExecutionContext, int>)(ctx =>
             {
                 throw new InvalidOperationException("Test exception");
             }));

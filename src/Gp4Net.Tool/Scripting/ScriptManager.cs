@@ -20,7 +20,7 @@ public class ScriptManager : IScriptManager
     private readonly ICardService _cardService;
     private readonly IDomainServiceFactory _domainServiceFactory;
     private readonly Dictionary<string, Script> _scriptCache;
-    private Gp4Net.Services.IGlobalPlatformService? _cachedGlobalPlatformService;
+    private Gp4Net.Services.IGlobalPlatformService _cachedGlobalPlatformService;
 
     /// <summary>
     /// Initializes a new instance of the ScriptManager class.
@@ -100,7 +100,7 @@ public class ScriptManager : IScriptManager
     /// </summary>
     public DynValue ExecuteFunction(
         string scriptFunction,
-        Dictionary<string, object>? parameters = null
+        Dictionary<string, object> parameters = null
     )
     {
         // Parse script:function format
@@ -154,7 +154,7 @@ public class ScriptManager : IScriptManager
         string scriptPath,
         string functionName,
         string[] args,
-        Dictionary<string, object>? context = null
+        Dictionary<string, object> context = null
     )
     {
         // Find and load script

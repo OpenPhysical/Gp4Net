@@ -1,6 +1,6 @@
 using System;
-using Gp4Net.Transport;
 using CSharpFunctionalExtensions;
+using Gp4Net.Transport;
 
 namespace Gp4Net.Tests.TestHelpers;
 
@@ -25,7 +25,7 @@ public class TestApduCommand : IApduCommand
     public byte[]? Data { get; }
 
     /// <inheritdoc />
-    public int? ExpectedResponseLength { get; }
+    public Maybe<int> ExpectedResponseLength { get; }
 
     /// <inheritdoc />
     public bool IsExtendedLength { get; }
@@ -46,7 +46,7 @@ public class TestApduCommand : IApduCommand
         byte p1,
         byte p2,
         byte[]? data = null,
-        int? expectedResponseLength = null,
+        Maybe<int> expectedResponseLength = default,
         bool isExtendedLength = false)
     {
         Cla = cla;
@@ -76,7 +76,7 @@ public class TestApduCommand : IApduCommand
         var p2 = apduBytes[3];
 
         byte[]? data = null;
-        int? expectedResponseLength = null;
+        Maybe<int> expectedResponseLength = Maybe<int>.None;
 
         if (apduBytes.Length == 4)
         {
@@ -86,7 +86,7 @@ public class TestApduCommand : IApduCommand
         {
             // Case 2: No data, Le present
             var le = apduBytes[4];
-            expectedResponseLength = le == 0 ? 256 : le;
+            expectedResponseLength = Maybe<int>.From(le == 0 ? 256 : le);
         }
         else
         {
@@ -105,7 +105,7 @@ public class TestApduCommand : IApduCommand
                 data = new byte[lc];
                 Array.Copy(apduBytes, 5, data, 0, lc);
                 var le = apduBytes[5 + lc];
-                expectedResponseLength = le == 0 ? 256 : le;
+                expectedResponseLength = Maybe<int>.From(le == 0 ? 256 : le);
             }
             else
             {

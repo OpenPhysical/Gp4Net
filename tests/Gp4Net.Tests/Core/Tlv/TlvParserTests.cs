@@ -1,7 +1,6 @@
 using AwesomeAssertions;
 using Gp4Net.Core.Tlv;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Core.Tlv;
 
@@ -9,6 +8,7 @@ namespace Gp4Net.Tests.Core.Tlv;
 /// Tests for the TLV parser functionality.
 /// </summary>
 [TestFixture]
+[Category("Unit")]
 public class TlvParserTests
 {
     [Test]

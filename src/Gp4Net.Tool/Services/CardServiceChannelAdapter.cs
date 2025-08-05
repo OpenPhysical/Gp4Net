@@ -67,8 +67,20 @@ public class CardServiceChannelAdapter : ICardChannel
     }
 
     /// <inheritdoc />
-    public TransportProtocol Protocol => _protocol;
+    public TransportProtocol Protocol
+    {
+        get
+        {
+            return _protocol;
+        }
+    }
 
     /// <inheritdoc />
-    public bool IsOpen => _cardService.IsConnected;
+    public bool IsOpen
+    {
+        get
+        {
+            return _cardService.IsConnected;
+        }
+    }
 }

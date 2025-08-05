@@ -8,10 +8,8 @@ using System.Text.Json.Serialization;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
-using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
 using Gp4Net.Domain.Security;
 using JetBrains.Annotations;
 using NUnit.Framework;
@@ -23,6 +21,7 @@ namespace Gp4Net.Tests.Integration;
 /// Each trace/operation combination becomes a separate test visible in the IDE.
 /// </summary>
 [TestFixture]
+[Category("Integration")]
 public class DynamicTraceTests
 {
     /// <summary>
@@ -33,10 +32,10 @@ public class DynamicTraceTests
     {
         // Create appropriate verifier based on operation
         var verifier = OperationVerifierFactory.Create(testCase.OperationName, testCase.Trace);
-        
+
         // Run verification
         var result = verifier.Verify();
-        
+
         // Assert success with detailed error message if failed
         result.IsSuccess.Should().BeTrue(
             $"Operation '{testCase.OperationName}' verification failed: {(result.IsFailure ? result.Error : "Unknown error")}"
@@ -52,14 +51,14 @@ public class TraceTestCase
     public TraceData Trace { get; }
     public string OperationName { get; }
     public string TestName { get; }
-    
+
     public TraceTestCase(TraceData trace, string operationName, string testName)
     {
         Trace = trace;
         OperationName = operationName;
         TestName = testName;
     }
-    
+
     public override string ToString() => TestName;
 }
 
@@ -69,24 +68,24 @@ public class TraceTestCase
 public class TraceTestDiscovery : IEnumerable
 {
     private const string TraceDirectory = "TestData/Traces";
-    
+
     public IEnumerator GetEnumerator()
     {
         var baseDir = Path.Combine(TestContext.CurrentContext.TestDirectory, TraceDirectory);
         Console.WriteLine($"[TraceTestDiscovery] Looking for traces in: {baseDir}");
         Console.WriteLine($"[TraceTestDiscovery] Directory exists: {Directory.Exists(baseDir)}");
-        
+
         if (!Directory.Exists(baseDir))
         {
             Console.WriteLine($"[TraceTestDiscovery] Trace directory not found, yielding no tests");
             yield break;
         }
-        
+
         var traceFiles = Directory.GetFiles(baseDir, "*.json", SearchOption.AllDirectories)
             .OrderBy(f => f);
-        
+
         Console.WriteLine($"[TraceTestDiscovery] Found {traceFiles.Count()} JSON files");
-        
+
         foreach (var traceFile in traceFiles)
         {
             TraceData trace;
@@ -98,8 +97,12 @@ public class TraceTestDiscovery : IEnumerable
                     PropertyNameCaseInsensitive = true,
                     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
                 });
-                
-                if (deserializedTrace == null) continue;
+
+                if (deserializedTrace == null)
+                {
+                    continue;
+                }
+
                 trace = deserializedTrace;
             }
             catch (Exception ex)
@@ -107,17 +110,17 @@ public class TraceTestDiscovery : IEnumerable
                 TestContext.WriteLine($"Failed to load trace {traceFile}: {ex.Message}");
                 continue;
             }
-            
+
             // Set trace file path for reference
             trace.FilePath = traceFile;
-            
+
             // Skip if marked as untestable
             if (trace.TestHints?.SkipReason != null)
             {
                 TestContext.WriteLine($"Skipping {Path.GetFileName(traceFile)}: {trace.TestHints.SkipReason}");
                 continue;
             }
-            
+
             // Generate tests for each testable operation
             var operations = AnalyzeOperations(trace);
             Console.WriteLine($"[TraceTestDiscovery] Found {operations.Count()} operations in {Path.GetFileName(traceFile)}");
@@ -129,7 +132,7 @@ public class TraceTestDiscovery : IEnumerable
             }
         }
     }
-    
+
     private IEnumerable<TestableOperation> AnalyzeOperations(TraceData trace)
     {
         // Use test hints if available
@@ -145,39 +148,41 @@ public class TraceTestDiscovery : IEnumerable
             }
             yield break;
         }
-        
+
         // Otherwise, analyze exchanges
         for (int i = 0; i < trace.Exchanges?.Count; i++)
         {
             var exchange = trace.Exchanges[i];
             if (string.IsNullOrEmpty(exchange.Command) || exchange.Command.Length < 4)
+            {
                 continue;
-                
+            }
+
             var claIns = exchange.Command.Substring(0, 4).ToUpperInvariant();
-            
+
             switch (claIns)
             {
                 case "00A4": // SELECT
                     yield return new TestableOperation { Name = "select", ExchangeIndex = i };
                     break;
-                    
+
                 case "8050": // INITIALIZE UPDATE
                     yield return new TestableOperation { Name = "initialize_update", ExchangeIndex = i };
                     break;
-                    
+
                 case "8482": // EXTERNAL AUTHENTICATE
                 case "0482":
                     yield return new TestableOperation { Name = "external_authenticate", ExchangeIndex = i };
                     break;
-                    
+
                 case "80E6": // INSTALL
                     yield return new TestableOperation { Name = "install", ExchangeIndex = i };
                     break;
-                    
+
                 case "80E4": // DELETE
                     yield return new TestableOperation { Name = "delete", ExchangeIndex = i };
                     break;
-                    
+
                 case "80E8": // LOAD
                     yield return new TestableOperation { Name = "load", ExchangeIndex = i };
                     break;
@@ -221,35 +226,39 @@ public abstract class BaseOperationVerifier : IOperationVerifier
 {
     protected readonly TraceData Trace;
     protected readonly int ExchangeIndex;
-    
+
     protected BaseOperationVerifier(TraceData trace)
     {
         Trace = trace;
         ExchangeIndex = FindExchangeIndex();
     }
-    
+
     protected abstract string OperationName { get; }
-    
+
     public abstract Result<bool, string> Verify();
-    
+
     protected int FindExchangeIndex()
     {
         // Find from test hints first
         var hint = Trace.TestHints?.TestableOperations?.FirstOrDefault(op => op.Name == OperationName);
         if (hint != null)
+        {
             return hint.ExchangeIndex;
-            
+        }
+
         // Otherwise search for the command
         return FindExchangeByCommand();
     }
-    
+
     protected abstract int FindExchangeByCommand();
-    
+
     protected TraceExchange GetExchange()
     {
         if (ExchangeIndex < 0 || ExchangeIndex >= Trace.Exchanges?.Count)
+        {
             throw new InvalidOperationException($"Exchange index {ExchangeIndex} out of range");
-            
+        }
+
         return Trace.Exchanges[ExchangeIndex];
     }
 }
@@ -259,37 +268,47 @@ public abstract class BaseOperationVerifier : IOperationVerifier
 /// </summary>
 public class InitializeUpdateVerifier : BaseOperationVerifier
 {
-    protected override string OperationName => "initialize_update";
-    
+    protected override string OperationName
+    {
+        get
+        {
+            return "initialize_update";
+        }
+    }
+
     public InitializeUpdateVerifier(TraceData trace) : base(trace) { }
-    
+
     protected override int FindExchangeByCommand()
     {
         for (int i = 0; i < Trace.Exchanges?.Count; i++)
         {
             if (Trace.Exchanges[i].Command?.StartsWith("8050") == true)
+            {
                 return i;
+            }
         }
         return -1;
     }
-    
+
     public override Result<bool, string> Verify()
     {
         try
         {
             var exchange = GetExchange();
-            
+
             // Parse command and response
             var commandBytes = Convert.FromHexString(exchange.Command);
             var responseBytes = Convert.FromHexString(exchange.Response);
-            
+
             // Extract host challenge from command
             if (commandBytes.Length < 13) // CLA INS P1 P2 Lc + 8 bytes
+            {
                 return Result.Failure<bool, string>("INITIALIZE UPDATE command too short");
-                
+            }
+
             var hostChallenge = new byte[8];
             Array.Copy(commandBytes, 5, hostChallenge, 0, 8);
-            
+
             // Parse response
             InitializeUpdateResponse response;
             try
@@ -300,29 +319,31 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
             {
                 return Result.Failure<bool, string>($"Failed to parse response: {ex.Message}");
             }
-            
+
             // Determine SCP version
             var scpVersion = response.KeyDiversificationData.Length == 10 ? ScpVersion.Scp02 : ScpVersion.Scp03;
-            
+
             // If we have static keys, verify key derivation
             if (Trace.Metadata?.Hints?.StaticKeys != null)
             {
                 var staticKeyBytes = Convert.FromHexString(Trace.Metadata.Hints.StaticKeys);
-                
+
                 if (scpVersion == ScpVersion.Scp03)
                 {
                     var keySet = new Scp03KeySet(staticKeyBytes, staticKeyBytes, staticKeyBytes, response.KeyVersion);
-                    
+
                     // Derive session keys
                     var keyDerivation = new KeyDerivationService();
                     var sessionKeysResult = keyDerivation.DeriveSessionKeys(
-                        keySet, 
-                        hostChallenge, 
+                        keySet,
+                        hostChallenge,
                         response.CardChallenge);
-                        
+
                     if (sessionKeysResult.IsFailure)
+                    {
                         return Result.Failure<bool, string>($"Key derivation failed: {sessionKeysResult.Error.Message}");
-                        
+                    }
+
                     // Verify card cryptogram
                     var cryptogramService = new CryptogramService();
                     var expectedCryptogramResult = cryptogramService.CalculateCardCryptogram(
@@ -331,16 +352,20 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
                         response.CardChallenge,
                         Maybe<byte[]>.None,
                         ScpVersion.Scp03);
-                        
+
                     if (expectedCryptogramResult.IsFailure)
+                    {
                         return Result.Failure<bool, string>($"Cryptogram calculation failed: {expectedCryptogramResult.Error.Message}");
-                        
+                    }
+
                     if (!response.CardCryptogram.SequenceEqual(expectedCryptogramResult.Value))
+                    {
                         return Result.Failure<bool, string>("Card cryptogram verification failed");
+                    }
                 }
                 // Similar for SCP02...
             }
-            
+
             return Result.Success<bool, string>(true);
         }
         catch (Exception ex)
@@ -357,13 +382,13 @@ public class GenericVerifier : IOperationVerifier
 {
     private readonly TraceData _trace;
     private readonly string _operationName;
-    
+
     public GenericVerifier(TraceData trace, string operationName)
     {
         _trace = trace;
         _operationName = operationName;
     }
-    
+
     public Result<bool, string> Verify()
     {
         // For now, just verify the operation exists in the trace
@@ -405,7 +430,7 @@ public class TraceData
     public TestHints? TestHints { get; set; }
     public List<TraceExchange>? Exchanges { get; set; }
     public Dictionary<string, SessionInfo> Sessions { get; set; } = null!;
-    
+
     [JsonIgnore]
     public string FilePath { get; set; } = null!;
 }
@@ -424,7 +449,7 @@ public class TestHintMetadata
 {
     [JsonPropertyName("static_keys")]
     public string? StaticKeys { get; set; }
-    
+
     [JsonPropertyName("expected_session_keys")]
     public ExpectedSessionKeys? ExpectedSessionKeys { get; set; }
 }
@@ -434,10 +459,10 @@ public class ExpectedSessionKeys
 {
     [JsonPropertyName("s_enc")]
     public string SEnc { get; set; } = null!;
-    
+
     [JsonPropertyName("s_mac")]
     public string SMac { get; set; } = null!;
-    
+
     [JsonPropertyName("s_rmac")]
     public string SRMac { get; set; } = null!;
 }
@@ -469,10 +494,10 @@ public class TestHints
 {
     [JsonPropertyName("testable_operations")]
     public List<TestHintOperation>? TestableOperations { get; set; }
-    
+
     [JsonPropertyName("skip_reason")]
     public string? SkipReason { get; set; }
-    
+
     [JsonPropertyName("scp_version")]
     public int? ScpVersion { get; set; }
 }
@@ -499,10 +524,10 @@ public class SessionInfo
 {
     [JsonPropertyName("scp_version")]
     public int ScpVersion { get; set; }
-    
+
     [JsonPropertyName("host_challenge")]
     public string HostChallenge { get; set; } = null!;
-    
+
     [JsonPropertyName("card_challenge")]
     public string CardChallenge { get; set; } = null!;
 }

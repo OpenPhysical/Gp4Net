@@ -27,10 +27,19 @@ public static class DeleteTokenCalculator
         Maybe<byte[]> optionalTlv = default)
     {
         if (macKey.Length != 16 && macKey.Length != 24 && macKey.Length != 32)
+        {
             throw new ArgumentException("Delete Token MAC key must be 16, 24, or 32 bytes for AES.");
+        }
+
         if (aid.Length == 0)
+        {
             throw new ArgumentException("AID cannot be empty.");
-        if (aid.Length < 5 || aid.Length > 16) throw new ArgumentException("AID length must be 5-16 bytes per GP spec.");
+        }
+
+        if (aid.Length < 5 || aid.Length > 16)
+        {
+            throw new ArgumentException("AID length must be 5-16 bytes per GP spec.");
+        }
 
         // Step 1: build TLV for object to delete (AID)
         var body = new List<byte>();
@@ -68,9 +77,14 @@ public static class DeleteTokenCalculator
     private static byte[] EncodeBerLength(int length)
     {
         if (length < 0x80)
+        {
             return new byte[] { (byte)length };
+        }
+
         if (length <= 0xFF)
+        {
             return new byte[] { 0x81, (byte)length };
+        }
         // Larger not expected for GP, but included for completeness
         return new byte[] { 0x82, (byte)((length >> 8) & 0xFF), (byte)(length & 0xFF) };
     }

@@ -1,12 +1,12 @@
-using System;
 using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Transport;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
 [TestFixture]
+[Category("Unit")]
 public class GetDataCommandTests
 {
     [Test]
@@ -35,7 +35,7 @@ public class GetDataCommandTests
         var command = commandResult.Value;
 
         // Act
-        var apdu = command.ToApdu();
+        var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         apdu[0].Should().Be(0x80); // CLA - GlobalPlatform
@@ -61,7 +61,7 @@ public class GetDataCommandTests
         var command = commandResult.Value;
 
         // Act
-        var apdu = command.ToApdu();
+        var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         apdu[2].Should().Be(expectedP1); // P1
@@ -130,7 +130,7 @@ public class GetDataCommandTests
         var commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardData);
         commandResult.IsSuccess.Should().BeTrue();
         var command = commandResult.Value;
-        var apdu = command.ToApdu();
+        var apdu = ApduBuilder.BuildApdu(command);
 
         apdu.Length.Should().Be(5); // 5 header bytes only
         apdu[0].Should().Be(0x80); // CLA
@@ -167,7 +167,7 @@ public class GetDataCommandTests
         var commandResult = GetDataCommand.Create(0x9F7F); // CPLC
         commandResult.IsSuccess.Should().BeTrue();
         var command = commandResult.Value;
-        var apdu = command.ToApdu();
+        var apdu = ApduBuilder.BuildApdu(command);
 
         // We use GP class
         apdu[0].Should().Be(0x80);

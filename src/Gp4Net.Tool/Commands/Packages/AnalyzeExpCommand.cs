@@ -62,7 +62,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
 
     private static Task<ExpFileAnalysis> AnalyzeExpFileAsync(
         string expFilePath,
-        string? sdkVersion = null
+        string sdkVersion = null
     )
     {
         var fileBytes = File.ReadAllBytes(expFilePath);
@@ -284,7 +284,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
         ];
     }
 
-    private static string? ExtractPackageNameFromPath(string expFilePath)
+    private static string ExtractPackageNameFromPath(string expFilePath)
     {
         var parts = expFilePath.Replace('\\', '/').Split('/');
 
@@ -327,10 +327,10 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
         return "unknown";
     }
 
-    private static PackageInfo? TryExtractAidMapping(
+    private static PackageInfo TryExtractAidMapping(
         byte[] fileBytes,
         string packageName,
-        string? sdkVersion,
+        string sdkVersion,
         string expFilePath
     )
     {
@@ -666,14 +666,14 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
         /// </summary>
         [CommandOption("-s|--sdk-version")]
         [Description("Specify the SDK version for the package (e.g., jc310b43)")]
-        public string? SdkVersion { get; set; }
+        public string SdkVersion { get; set; }
 
         /// <summary>
         /// Gets or sets the database path to save discovered packages.
         /// </summary>
         [CommandOption("-o|--output")]
         [Description("Save discovered package to JSON database file")]
-        public string? DatabasePath { get; set; }
+        public string DatabasePath { get; set; }
 
         /// <inheritdoc />
         public override ValidationResult Validate()
@@ -700,10 +700,10 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
         public List<string> PossibleAids { get; set; } = [];
         public List<string> PossibleVersions { get; set; } = [];
         public List<string> ExportImportInfo { get; set; } = [];
-        public string? PathBasedPackageName { get; set; }
-        public string? DetectedPackageName { get; set; }
-        public string? SdkVersion { get; set; }
-        public PackageInfo? PackageInfo { get; set; }
+        public string PathBasedPackageName { get; set; }
+        public string DetectedPackageName { get; set; }
+        public string SdkVersion { get; set; }
+        public PackageInfo PackageInfo { get; set; }
     }
 
     private class PackageInfo
@@ -714,6 +714,6 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
         public byte MinorVersion { get; set; }
         public string Version { get; set; } = string.Empty;
         public string SdkVersion { get; set; } = string.Empty;
-        public string? SourceFile { get; set; }
+        public string SourceFile { get; set; }
     }
 }

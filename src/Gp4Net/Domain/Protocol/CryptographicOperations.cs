@@ -8,7 +8,6 @@ using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Security;
 using JetBrains.Annotations;
 using Org.BouncyCastle.Crypto;
@@ -75,11 +74,19 @@ public static class CryptographicOperations
         try
         {
             if (key == null || data == null)
+            {
                 return SmartCardError.InvalidArgument("Key and data cannot be null");
+            }
+
             if (key.Length != 16 && key.Length != 24)
+            {
                 return SmartCardError.InvalidArgument($"3DES key must be 16 or 24 bytes, got {key.Length}");
+            }
+
             if (data.Length % 8 != 0)
+            {
                 return SmartCardError.InvalidArgument("Data must be padded to 8-byte blocks");
+            }
 
             var expandedKey = ExpandTripleDesKey(key);
             
@@ -144,9 +151,14 @@ public static class CryptographicOperations
         try
         {
             if (key == null || iv == null || data == null)
+            {
                 return SmartCardError.InvalidArgument("Key, IV, and data cannot be null");
+            }
+
             if (iv.Length != 16)
+            {
                 return SmartCardError.InvalidArgument("IV must be 16 bytes for AES");
+            }
 
             // Use BouncyCastle's high-level API with integrated padding
             var cipher = new PaddedBufferedBlockCipher(
@@ -188,9 +200,14 @@ public static class CryptographicOperations
         try
         {
             if (key == null || iv == null || encryptedData == null)
+            {
                 return SmartCardError.InvalidArgument("Key, IV, and encrypted data cannot be null");
+            }
+
             if (iv.Length != 16)
+            {
                 return SmartCardError.InvalidArgument("IV must be 16 bytes for AES");
+            }
 
             // Use BouncyCastle's high-level API with integrated padding
             var cipher = new PaddedBufferedBlockCipher(
@@ -227,9 +244,14 @@ public static class CryptographicOperations
         try
         {
             if (key == null || iv == null || data == null)
+            {
                 return SmartCardError.InvalidArgument("Key, IV, and data cannot be null");
+            }
+
             if (iv.Length != 8)
+            {
                 return SmartCardError.InvalidArgument("IV must be 8 bytes for 3DES");
+            }
 
             var expandedKey = ExpandTripleDesKey(key);
 
@@ -273,9 +295,14 @@ public static class CryptographicOperations
         try
         {
             if (key == null || iv == null || encryptedData == null)
+            {
                 return SmartCardError.InvalidArgument("Key, IV, and encrypted data cannot be null");
+            }
+
             if (iv.Length != 8)
+            {
                 return SmartCardError.InvalidArgument("IV must be 8 bytes for 3DES");
+            }
 
             var expandedKey = ExpandTripleDesKey(key);
 
@@ -315,11 +342,19 @@ public static class CryptographicOperations
         try
         {
             if (key == null || iv == null || data == null)
+            {
                 return SmartCardError.InvalidArgument("Key, IV, and data cannot be null");
+            }
+
             if (iv.Length != 16)
+            {
                 return SmartCardError.InvalidArgument("IV must be 16 bytes for AES");
+            }
+
             if (data.Length % 16 != 0)
+            {
                 return SmartCardError.InvalidArgument("Data must be padded to 16-byte blocks");
+            }
 
             var cipher = new BufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
             cipher.Init(true, new ParametersWithIV(new KeyParameter(key), iv));
@@ -350,11 +385,19 @@ public static class CryptographicOperations
         try
         {
             if (key == null || iv == null || encryptedData == null)
+            {
                 return SmartCardError.InvalidArgument("Key, IV, and encrypted data cannot be null");
+            }
+
             if (iv.Length != 16)
+            {
                 return SmartCardError.InvalidArgument("IV must be 16 bytes for AES");
+            }
+
             if (encryptedData.Length % 16 != 0)
+            {
                 return SmartCardError.InvalidArgument("Encrypted data must be in 16-byte blocks");
+            }
 
             var cipher = new BufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
             cipher.Init(false, new ParametersWithIV(new KeyParameter(key), iv));
@@ -385,11 +428,19 @@ public static class CryptographicOperations
         try
         {
             if (key == null || iv == null || data == null)
+            {
                 return SmartCardError.InvalidArgument("Key, IV, and data cannot be null");
+            }
+
             if (iv.Length != 8)
+            {
                 return SmartCardError.InvalidArgument("IV must be 8 bytes for 3DES");
+            }
+
             if (data.Length % 8 != 0)
+            {
                 return SmartCardError.InvalidArgument("Data must be padded to 8-byte blocks");
+            }
 
             var expandedKey = ExpandTripleDesKey(key);
 
@@ -422,11 +473,19 @@ public static class CryptographicOperations
         try
         {
             if (key == null || iv == null || encryptedData == null)
+            {
                 return SmartCardError.InvalidArgument("Key, IV, and encrypted data cannot be null");
+            }
+
             if (iv.Length != 8)
+            {
                 return SmartCardError.InvalidArgument("IV must be 8 bytes for 3DES");
+            }
+
             if (encryptedData.Length % 8 != 0)
+            {
                 return SmartCardError.InvalidArgument("Encrypted data must be in 8-byte blocks");
+            }
 
             var expandedKey = ExpandTripleDesKey(key);
 
@@ -457,9 +516,14 @@ public static class CryptographicOperations
         try
         {
             if (data == null)
+            {
                 return SmartCardError.InvalidArgument("Data cannot be null");
+            }
+
             if (blockSize <= 0 || blockSize > 255)
+            {
                 return SmartCardError.InvalidArgument($"Invalid block size: {blockSize}");
+            }
 
             var padding = new ISO7816d4Padding();
             var paddingLength = blockSize - (data.Length % blockSize);
@@ -488,7 +552,9 @@ public static class CryptographicOperations
         try
         {
             if (paddedData == null || paddedData.Length == 0)
+            {
                 return SmartCardError.InvalidArgument("Padded data cannot be null or empty");
+            }
 
             var padding = new ISO7816d4Padding();
             var padCount = padding.PadCount(paddedData);
@@ -516,9 +582,14 @@ public static class CryptographicOperations
         try
         {
             if (data == null)
+            {
                 return SmartCardError.InvalidArgument("Data cannot be null");
+            }
+
             if (blockSize <= 0 || blockSize > 255)
+            {
                 return SmartCardError.InvalidArgument($"Invalid block size: {blockSize}");
+            }
 
             var padding = new Pkcs7Padding();
             var paddingLength = blockSize - (data.Length % blockSize);
@@ -547,7 +618,9 @@ public static class CryptographicOperations
         try
         {
             if (paddedData == null || paddedData.Length == 0)
+            {
                 return SmartCardError.InvalidArgument("Padded data cannot be null or empty");
+            }
 
             var padding = new Pkcs7Padding();
             var padCount = padding.PadCount(paddedData);
@@ -574,11 +647,19 @@ public static class CryptographicOperations
     public static Result<byte[], SmartCardError> PadToLength(byte[] data, int targetLength)
     {
         if (data == null)
+        {
             return SmartCardError.InvalidArgument("Data cannot be null");
+        }
+
         if (targetLength < 0)
+        {
             return SmartCardError.InvalidArgument("Target length cannot be negative");
+        }
+
         if (data.Length >= targetLength)
+        {
             return SmartCardError.InvalidArgument($"Data length {data.Length} must be less than target length {targetLength} to allow for padding");
+        }
 
         var paddedData = new byte[targetLength];
         Array.Copy(data, 0, paddedData, 0, data.Length);
@@ -599,8 +680,15 @@ public static class CryptographicOperations
     /// <returns>True if arrays are equal, false otherwise.</returns>
     public static bool CompareBytes(byte[] a, byte[] b)
     {
-        if (a == null || b == null) return false;
-        if (a.Length != b.Length) return false;
+        if (a == null || b == null)
+        {
+            return false;
+        }
+
+        if (a.Length != b.Length)
+        {
+            return false;
+        }
 
         var result = 0;
         for (var i = 0; i < a.Length; i++)
@@ -652,7 +740,9 @@ public static class CryptographicOperations
         try
         {
             if (protocolVersion != ProtocolIdentifiers.Scp03)
+            {
                 return Result.Success<byte[], SmartCardError>(new byte[8]); // Zero IV for SCP02
+            }
 
             // Per GP SCP03 spec section 6.2.6:
             // Command ICV uses encryption counter
@@ -684,7 +774,11 @@ public static class CryptographicOperations
     /// <returns>The hexadecimal string.</returns>
     public static string ToHexString(this byte[] bytes)
     {
-        if (bytes == null) return string.Empty;
+        if (bytes == null)
+        {
+            return string.Empty;
+        }
+
         return Convert.ToHexString(bytes);
     }
 }

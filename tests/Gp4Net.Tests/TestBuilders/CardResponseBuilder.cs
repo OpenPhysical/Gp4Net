@@ -1,6 +1,5 @@
 using System;
 using Gp4Net.Tool.Services;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.TestBuilders;
 

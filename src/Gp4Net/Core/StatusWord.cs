@@ -34,17 +34,35 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
     /// <summary>
     /// Gets the status word value as a 16-bit unsigned integer.
     /// </summary>
-    public ushort Value => _value;
+    public ushort Value
+    {
+        get
+        {
+            return _value;
+        }
+    }
 
     /// <summary>
     /// Gets the first status byte (SW1).
     /// </summary>
-    public byte SW1 => (byte)(_value >> 8);
+    public byte SW1
+    {
+        get
+        {
+            return (byte)(_value >> 8);
+        }
+    }
 
     /// <summary>
     /// Gets the second status byte (SW2).
     /// </summary>
-    public byte SW2 => (byte)(_value & 0xFF);
+    public byte SW2
+    {
+        get
+        {
+            return (byte)(_value & 0xFF);
+        }
+    }
 
     /// <summary>
     /// Implicitly converts a ushort to a StatusWord.
@@ -92,7 +110,7 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
     public bool Equals(StatusWord other) => _value == other._value;
 
     /// <inheritdoc />
-    public override bool Equals(object? obj) => obj is StatusWord other && Equals(other);
+    public override bool Equals(object obj) => obj is StatusWord other && Equals(other);
 
     /// <inheritdoc />
     public override int GetHashCode() => _value.GetHashCode();
@@ -133,7 +151,7 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
             0x6988 => "Incorrect Secure Messaging Data Objects",
             0x6700 => "Wrong Length Le",
             0x6A81 => "Function Not Supported",
-            0x6A83 => "Record Not Found", 
+            0x6A83 => "Record Not Found",
             0x6986 => "Command Not Allowed",
             0x6F99 => "PIN Blocked",
             0x63C0 => "Authentication Failed (0 tries remaining)",

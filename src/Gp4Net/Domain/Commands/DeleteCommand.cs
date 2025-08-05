@@ -85,39 +85,81 @@ public class DeleteCommand : IApduCommand
     /// <summary>
     /// Gets the class byte.
     /// </summary>
-    byte IApduCommand.Cla => Cla;
+    byte IApduCommand.Cla
+    {
+        get
+        {
+            return Cla;
+        }
+    }
 
     /// <summary>
     /// Gets the instruction byte.
     /// </summary>
-    byte IApduCommand.Ins => Ins;
+    byte IApduCommand.Ins
+    {
+        get
+        {
+            return Ins;
+        }
+    }
 
     /// <summary>
     /// Gets the parameter 1 byte.
     /// </summary>
-    public byte P1 => (byte)Type;
+    public byte P1
+    {
+        get
+        {
+            return (byte)Type;
+        }
+    }
 
     /// <summary>
     /// Gets the parameter 2 byte.
     /// </summary>
-    public byte P2 => (byte)Target;
+    public byte P2
+    {
+        get
+        {
+            return (byte)Target;
+        }
+    }
 
     /// <summary>
     /// Gets the command data.
     /// </summary>
-    public byte[]? Data => GetDeleteData().Match(
-        onSuccess: data => data,
-        onFailure: _ => null);
+    public byte[] Data
+    {
+        get
+        {
+            return GetDeleteData().Match(
+                onSuccess: data => data,
+                onFailure: _ => []);
+        }
+    }
 
     /// <summary>
     /// Gets the expected response length. DELETE commands do not use LE byte per GP traces.
     /// </summary>
-    public int? ExpectedResponseLength => null;
+    public Maybe<int> ExpectedResponseLength
+    {
+        get
+        {
+            return Maybe<int>.None;
+        }
+    }
 
     /// <summary>
     /// Gets whether this command uses extended length.
     /// </summary>
-    public bool IsExtendedLength => false;
+    public bool IsExtendedLength
+    {
+        get
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Gets the delete data for the IApduCommand interface.
@@ -144,7 +186,9 @@ public class DeleteCommand : IApduCommand
             {
                 // Compute token (simple heuristic: assume single AID, package removal)
                 if (Aids.Count != 1)
+                {
                     return SmartCardError.InvalidArgument("Delete token calculation requires exactly one AID.");
+                }
                 // Compute token using the DeleteTokenCalculator
                 try
                 {
@@ -226,10 +270,14 @@ public class DeleteCommand : IApduCommand
     )
     {
         if (aid == null)
+        {
             return SmartCardError.InvalidArgument("AID cannot be null.");
-            
+        }
+
         if (aid.Length == 0)
+        {
             return SmartCardError.InvalidArgument("AID cannot be empty.");
+        }
 
         var type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
@@ -254,10 +302,14 @@ public class DeleteCommand : IApduCommand
     )
     {
         if (aid == null)
+        {
             return SmartCardError.InvalidArgument("Package AID cannot be null.");
-            
+        }
+
         if (aid.Length == 0)
+        {
             return SmartCardError.InvalidArgument("Package AID cannot be empty.");
+        }
 
         var type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
@@ -282,10 +334,14 @@ public class DeleteCommand : IApduCommand
     )
     {
         if (aid == null)
+        {
             return SmartCardError.InvalidArgument("Executable load file AID cannot be null.");
-            
+        }
+
         if (aid.Length == 0)
+        {
             return SmartCardError.InvalidArgument("Executable load file AID cannot be empty.");
+        }
 
         var type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
@@ -310,18 +366,26 @@ public class DeleteCommand : IApduCommand
     )
     {
         if (aids == null)
+        {
             return SmartCardError.InvalidArgument("AIDs list cannot be null.");
-                
+        }
+
         if (aids.Count == 0)
+        {
             return SmartCardError.InvalidArgument("At least one AID must be provided.");
+        }
 
         foreach (var aid in aids)
         {
             if (aid == null)
+            {
                 return SmartCardError.InvalidArgument("AIDs cannot contain null values.");
-                    
+            }
+
             if (aid.Length == 0)
+            {
                 return SmartCardError.InvalidArgument("AIDs cannot be empty.");
+            }
         }
 
         var type = deleteRelated

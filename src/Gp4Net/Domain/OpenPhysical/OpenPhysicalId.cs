@@ -33,7 +33,13 @@ public class OpenPhysicalId
     /// <summary>
     /// Gets the manager URL (always the OpenPhysical URL).
     /// </summary>
-    public static string ManagerUrl => OpenPhysicalManagerUrl;
+    public static string ManagerUrl
+    {
+        get
+        {
+            return OpenPhysicalManagerUrl;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the OpenPhysicalId class.
@@ -56,7 +62,7 @@ public class OpenPhysicalId
     /// <param name="opid">The OPID string to parse (e.g., "1234-567-890").</param>
     /// <param name="result">The parsed OpenPhysicalId if successful.</param>
     /// <returns>True if parsing was successful, false otherwise.</returns>
-    public static bool TryParse(string opid, out OpenPhysicalId? result)
+    public static bool TryParse(string opid, out OpenPhysicalId result)
     {
         result = null;
 
@@ -115,7 +121,7 @@ public class OpenPhysicalId
         string iin,
         string cin,
         string managerUrl,
-        out OpenPhysicalId? result
+        out OpenPhysicalId result
     )
     {
         result = null;
@@ -215,7 +221,7 @@ public class OpenPhysicalId
     /// </summary>
     /// <param name="obj">The object to compare with the current OPID.</param>
     /// <returns>True if the specified object is equal to the current OPID.</returns>
-    public override bool Equals(object? obj)
+    public override bool Equals(object obj)
     {
         return obj is OpenPhysicalId other
                && Iin == other.Iin

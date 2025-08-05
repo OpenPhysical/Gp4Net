@@ -39,12 +39,12 @@ public class BeginRMacSessionCommand
     /// <summary>
     /// Gets the data field (optional).
     /// </summary>
-    public byte[]? Data { get; }
+    public byte[] Data { get; }
 
     /// <summary>
     /// Gets the MAC value (optional).
     /// </summary>
-    public byte[]? Mac { get; }
+    public byte[] Mac { get; }
 
     /// <summary>
     /// Initializes a new instance of the BeginRMacSessionCommand class.
@@ -53,7 +53,7 @@ public class BeginRMacSessionCommand
     /// <param name="p1">The P1 parameter (0x10 for R-MAC, 0x30 for R-ENCRYPTION and R-MAC).</param>
     /// <param name="data">Optional data field.</param>
     /// <param name="mac">Optional MAC value (8 bytes).</param>
-    private BeginRMacSessionCommand(byte cla, byte p1, byte[]? data = null, byte[]? mac = null)
+    private BeginRMacSessionCommand(byte cla, byte p1, byte[] data = null, byte[] mac = null)
     {
         Cla = cla;
         P1 = p1;
@@ -105,8 +105,8 @@ public class BeginRMacSessionCommand
     public static Result<BeginRMacSessionCommand, SmartCardError> Create(
         SecurityLevel securityLevel,
         byte cla = Cla80,
-        byte[]? data = null,
-        byte[]? mac = null)
+        byte[] data = null,
+        byte[] mac = null)
     {
         // Validate security level
         if (!System.Enum.IsDefined(typeof(SecurityLevel), securityLevel))
@@ -177,7 +177,7 @@ public class EndRMacSessionCommand
     /// <summary>
     /// Gets the MAC value (optional).
     /// </summary>
-    public byte[]? Mac { get; }
+    public byte[] Mac { get; }
 
     /// <summary>
     /// Initializes a new instance of the EndRMacSessionCommand class.
@@ -185,7 +185,7 @@ public class EndRMacSessionCommand
     /// <param name="cla">The command class byte.</param>
     /// <param name="p2">The P2 parameter (0x03 to end session and return R-MAC).</param>
     /// <param name="mac">Optional C-MAC value (8 bytes).</param>
-    private EndRMacSessionCommand(byte cla, byte p2, byte[]? mac = null)
+    private EndRMacSessionCommand(byte cla, byte p2, byte[] mac = null)
     {
         Cla = cla;
         P2 = p2;
@@ -226,7 +226,7 @@ public class EndRMacSessionCommand
     public static Result<EndRMacSessionCommand, SmartCardError> Create(
         SecurityLevel securityLevel,
         byte cla = Cla80,
-        byte[]? mac = null)
+        byte[] mac = null)
     {
         // Validate security level
         if (!System.Enum.IsDefined(typeof(SecurityLevel), securityLevel))

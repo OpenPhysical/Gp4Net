@@ -4,6 +4,7 @@ using Gp4Net.Domain.Protocol;
 using Gp4Net.Pipeline;
 using Gp4Net.Pipeline.Middleware;
 using Gp4Net.Transport;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Gp4Net.Services;
 
@@ -54,7 +55,7 @@ public static class ServiceFactory
         }
 
         return Result.Success<IGlobalPlatformService, ServiceConfigurationError>(
-            new GlobalPlatformService(cardService, secureChannelManager));
+            new GlobalPlatformService(cardService, secureChannelManager, NullLogger<GlobalPlatformService>.Instance));
     }
 
     /// <summary>
@@ -158,12 +159,12 @@ public record ServiceConfiguration(
 /// Represents errors that can occur during service configuration.
 /// Uses functional error handling instead of exceptions.
 /// </summary>
-public record ServiceConfigurationError(string Message, string? Details = null)
+public record ServiceConfigurationError(string Message, string Details = null)
 {
     public static ServiceConfigurationError MissingDependency(string dependencyName) =>
         new($"Missing required dependency: {dependencyName}");
 
-    public static ServiceConfigurationError ConfigurationFailure(string reason, string? details = null) =>
+    public static ServiceConfigurationError ConfigurationFailure(string reason, string details = null) =>
         new($"Service configuration failed: {reason}", details);
 
     public static ServiceConfigurationError InvalidConfiguration(string reason) =>

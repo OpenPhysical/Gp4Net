@@ -173,34 +173,59 @@ public class SelectCommand : BaseApduCommand
     }
 
     /// <inheritdoc />
-    public override byte Cla => ClassByte;
-
-    /// <inheritdoc />
-    public override byte Ins => InstructionByte;
-
-    /// <inheritdoc />
-    public override byte P1 => (byte)Control;
-
-    /// <inheritdoc />
-    public override byte P2 => (byte)ControlInfo;
-
-    /// <inheritdoc />
-    public override byte[]? Data => Aid;
-
-    /// <inheritdoc />
-    public override int? ExpectedResponseLength =>
-        ControlInfo == FileControlInfo.NoResponseData ? null : 256;
-
-    /// <summary>
-    /// Converts this command to an APDU byte array.
-    /// This method is obsolete. Use IApduTransport.TransmitAsync instead.
-    /// </summary>
-    /// <returns>The APDU command bytes.</returns>
-    [Obsolete("Use IApduTransport.TransmitAsync instead of manual APDU building")]
-    public new byte[] ToApdu()
+    public override byte Cla
     {
-        return base.ToApdu();
+        get
+        {
+            return ClassByte;
+        }
     }
+
+    /// <inheritdoc />
+    public override byte Ins
+    {
+        get
+        {
+            return InstructionByte;
+        }
+    }
+
+    /// <inheritdoc />
+    public override byte P1
+    {
+        get
+        {
+            return (byte)Control;
+        }
+    }
+
+    /// <inheritdoc />
+    public override byte P2
+    {
+        get
+        {
+            return (byte)ControlInfo;
+        }
+    }
+
+    /// <inheritdoc />
+    public override byte[] Data
+    {
+        get
+        {
+            return Aid;
+        }
+    }
+
+    /// <inheritdoc />
+    public override Maybe<int> ExpectedResponseLength
+    {
+        get
+        {
+            return ControlInfo == FileControlInfo.NoResponseData ? Maybe<int>.None : Maybe<int>.From(256);
+        }
+    }
+
 
     /// <summary>
     /// Returns a string representation of this command.
@@ -218,12 +243,12 @@ public class FileControlInformation
     /// <summary>
     /// Gets the application AID.
     /// </summary>
-    public byte[]? ApplicationAid { get; }
+    public byte[] ApplicationAid { get; }
 
     /// <summary>
     /// Gets the application label.
     /// </summary>
-    public string? ApplicationLabel { get; }
+    public string ApplicationLabel { get; }
 
     /// <summary>
     /// Gets the application priority indicator.
@@ -243,22 +268,22 @@ public class FileControlInformation
     /// <summary>
     /// Gets the issuer identification number.
     /// </summary>
-    public byte[]? IssuerIdentificationNumber { get; }
+    public byte[] IssuerIdentificationNumber { get; }
 
     /// <summary>
     /// Gets the card image number.
     /// </summary>
-    public byte[]? CardImageNumber { get; }
+    public byte[] CardImageNumber { get; }
 
     /// <summary>
     /// Gets the card data.
     /// </summary>
-    public byte[]? CardData { get; }
+    public byte[] CardData { get; }
 
     /// <summary>
     /// Gets the discretionary data.
     /// </summary>
-    public byte[]? DiscretionaryData { get; }
+    public byte[] DiscretionaryData { get; }
 
     /// <summary>
     /// Initializes a new instance of the FileControlInformation class.
@@ -273,18 +298,18 @@ public class FileControlInformation
     /// <param name="cardData">The card data.</param>
     /// <param name="discretionaryData">The discretionary data.</param>
     public FileControlInformation(
-        byte[]? applicationAid = null,
-        string? applicationLabel = null,
+        byte[] applicationAid = null,
+        string applicationLabel = null,
         byte? applicationPriorityIndicator = null,
         ushort? maxCommandDataLength = null,
         ushort? maxResponseDataLength = null,
-        byte[]? issuerIdentificationNumber = null,
-        byte[]? cardImageNumber = null,
-        byte[]? cardData = null,
-        byte[]? discretionaryData = null
+        byte[] issuerIdentificationNumber = null,
+        byte[] cardImageNumber = null,
+        byte[] cardData = null,
+        byte[] discretionaryData = null
     )
     {
-        ApplicationAid = applicationAid != null ? (byte[])applicationAid.Clone() : null;
+        ApplicationAid = applicationAid != null ? (byte[])applicationAid.Clone() : [];
         ApplicationLabel = applicationLabel;
         ApplicationPriorityIndicator = applicationPriorityIndicator;
         MaxCommandDataLength = maxCommandDataLength;
@@ -292,11 +317,11 @@ public class FileControlInformation
         IssuerIdentificationNumber =
             issuerIdentificationNumber != null
                 ? (byte[])issuerIdentificationNumber.Clone()
-                : null;
-        CardImageNumber = cardImageNumber != null ? (byte[])cardImageNumber.Clone() : null;
-        CardData = cardData != null ? (byte[])cardData.Clone() : null;
+                : [];
+        CardImageNumber = cardImageNumber != null ? (byte[])cardImageNumber.Clone() : [];
+        CardData = cardData != null ? (byte[])cardData.Clone() : [];
         DiscretionaryData =
-            discretionaryData != null ? (byte[])discretionaryData.Clone() : null;
+            discretionaryData != null ? (byte[])discretionaryData.Clone() : [];
     }
 }
 
@@ -309,7 +334,7 @@ public class SelectResponse
     /// <summary>
     /// Gets the File Control Information.
     /// </summary>
-    public FileControlInformation? Fci { get; }
+    public FileControlInformation Fci { get; }
 
     /// <summary>
     /// Gets the raw response data.
@@ -321,7 +346,7 @@ public class SelectResponse
     /// </summary>
     /// <param name="rawData">The raw response data.</param>
     /// <param name="fci">The parsed FCI (optional).</param>
-    public SelectResponse(byte[] rawData, FileControlInformation? fci = null)
+    public SelectResponse(byte[] rawData, FileControlInformation fci = null)
     {
         RawData = (byte[])rawData.Clone();
         Fci = fci;
@@ -372,7 +397,7 @@ public class SelectResponse
     /// </summary>
     /// <param name="data">The FCI data.</param>
     /// <returns>The parsed FCI.</returns>
-    private static FileControlInformation? ParseFciData(byte[] data)
+    private static FileControlInformation ParseFciData(byte[] data)
     {
         if (data == null || data.Length == 0)
         {
@@ -389,15 +414,15 @@ public class SelectResponse
                 return null;
             }
 
-            byte[]? applicationAid = null;
-            string? applicationLabel = null;
+            byte[] applicationAid = [];
+            string applicationLabel = null;
             byte? applicationPriorityIndicator = null;
             ushort? maxCommandDataLength = null;
             ushort? maxResponseDataLength = null;
-            byte[]? issuerIdentificationNumber = null;
-            byte[]? cardImageNumber = null;
-            byte[]? cardData = null;
-            byte[]? discretionaryData = null;
+            byte[] issuerIdentificationNumber = [];
+            byte[] cardImageNumber = [];
+            byte[] cardData = [];
+            byte[] discretionaryData = [];
 
             // Parse direct children of FCI template
             var children = fciTemplate.ParseNestedTlv();
@@ -463,9 +488,9 @@ public class SelectResponse
         TlvObject proprietaryTemplate,
         ref ushort? maxCommandDataLength,
         ref ushort? maxResponseDataLength,
-        ref byte[]? issuerIdentificationNumber,
-        ref byte[]? cardImageNumber,
-        ref byte[]? cardData
+        ref byte[] issuerIdentificationNumber,
+        ref byte[] cardImageNumber,
+        ref byte[] cardData
     )
     {
         var children = proprietaryTemplate.ParseNestedTlv();

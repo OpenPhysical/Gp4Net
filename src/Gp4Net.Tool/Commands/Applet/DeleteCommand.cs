@@ -516,7 +516,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
         /// </example>
         [CommandOption("-a|--aid <AID>")]
         [Description("The AID of the application to delete (hex string)")]
-        public string? Aid { get; set; }
+        public string Aid { get; set; }
 
         /// <summary>
         /// Gets or sets the path to a CAP file from which to extract the package AID for deletion.
@@ -544,7 +544,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
         /// </example>
         [CommandOption("-c|--cap <FILE>")]
         [Description("Delete the package from the specified CAP file")]
-        public string? CapFile { get; set; }
+        public string CapFile { get; set; }
 
         /// <summary>
         /// Gets or sets whether to use interactive mode.

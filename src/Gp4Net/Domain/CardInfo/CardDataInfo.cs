@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Core.Asn1;
 using Gp4Net.Core.Tlv;
 using Org.BouncyCastle.Asn1;
@@ -41,7 +43,7 @@ public class CardDataInfo
     /// This property is read-only and may be null if the version information
     /// is not available in the provided data.
     /// </summary>
-    public Version? GlobalPlatformVersion { get; private set; }
+    public Version GlobalPlatformVersion { get; private set; }
 
     /// <summary>
     /// Gets the secure channel protocol information extracted from the card data.
@@ -50,14 +52,14 @@ public class CardDataInfo
     /// The value is extracted from the card data and corresponds to the tag
     /// associated with secure channel protocol information, if available.
     /// </summary>
-    public byte[]? SecureChannelProtocolInfo { get; private set; }
+    public byte[] SecureChannelProtocolInfo { get; private set; }
 
     /// <summary>
     /// Represents the card configuration details as a byte array, which may
     /// include information such as available features or settings on the card.
     /// This property is populated during the parsing of the raw card data.
     /// </summary>
-    public byte[]? CardConfigurationDetails { get; private set; }
+    public byte[] CardConfigurationDetails { get; private set; }
 
     /// <summary>
     /// Represents the details associated with the card chip as retrieved from the parsed data tags.
@@ -66,7 +68,7 @@ public class CardDataInfo
     /// This property is populated from the data tag with identifier 0x66 during the parsing process.
     /// It may contain chip-specific information in a byte array format, or be null if the tag is not found in the input data.
     /// </remarks>
-    public byte[]? CardChipDetails { get; private set; }
+    public byte[] CardChipDetails { get; private set; }
 
     /// <summary>
     /// Represents a collection of Object Identifiers (OIDs)
@@ -94,15 +96,17 @@ public class CardDataInfo
     /// If no valid GlobalPlatform version OID is found during parsing, this
     /// property will return <c>null</c>.
     /// </remarks>
-    public string? GlobalPlatformVersionFromOid { get; private set; }
+    public string GlobalPlatformVersionFromOid { get; private set; }
 
     /// Parses the given byte array to extract card information and populate a CardDataInfo object.
     /// <param name="data">The byte array containing card data to be parsed.</param>
-    /// <returns>A CardDataInfo object populated with the extracted card information.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if the input data is null.</exception>
-    public static CardDataInfo Parse(byte[] data)
+    /// <returns>Result containing a CardDataInfo object populated with the extracted card information.</returns>
+    public static Result<CardDataInfo, SmartCardError> Parse(byte[] data)
     {
-        ArgumentNullException.ThrowIfNull(data);
+        if (data == null)
+        {
+            return SmartCardError.InvalidArgument("Card data cannot be null");
+        }
 
         var cardData = new CardDataInfo { RawData = [.. data] };
 
@@ -140,7 +144,7 @@ public class CardDataInfo
         cardData.CardConfigurationDetails = cardConfigurationDetails;
         cardData.CardChipDetails = cardChipDetails;
 
-        return cardData;
+        return Result.Success<CardDataInfo, SmartCardError>(cardData);
     }
 
     private static void ParseDerElements(
@@ -209,7 +213,7 @@ public class CardDataInfo
     /// A <see cref="System.Version"/> object representing the parsed GlobalPlatform version,
     /// or null if the data length is insufficient to determine a valid version.
     /// </return>
-    private static Version? ParseGlobalPlatformVersion(byte[] data)
+    private static Version ParseGlobalPlatformVersion(byte[] data)
     {
         if (data == null || data.Length == 0)
         {

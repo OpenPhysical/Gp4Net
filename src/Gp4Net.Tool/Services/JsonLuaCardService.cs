@@ -21,11 +21,11 @@ public class JsonLuaCardService : ICardService
 {
     private static readonly ILog Logger = LogManager.GetLogger(typeof(JsonLuaCardService));
         
-    private Script? _luaScript;
+    private Script _luaScript;
     private Dictionary<string, string> _parameters = new();
     private bool _isConnected;
-    private string? _readerName;
-    private TraceData? _traceData;
+    private string _readerName;
+    private TraceData _traceData;
     private List<string> _requestedOperations = new();
     private HashSet<int> _allowedExchanges = new();
     private HashSet<int> _usedExchanges = new();
@@ -122,10 +122,16 @@ public class JsonLuaCardService : ICardService
     }
 
     /// <inheritdoc />
-    public bool IsConnected => _isConnected && _luaScript != null && _traceData != null;
+    public bool IsConnected
+    {
+        get
+        {
+            return _isConnected && _luaScript != null && _traceData != null;
+        }
+    }
 
     /// <inheritdoc />
-    public byte[]? GetAtr()
+    public byte[] GetAtr()
     {
         if (!IsConnected || _traceData == null)
         {
@@ -269,7 +275,13 @@ public class JsonLuaCardService : ICardService
     }
 
     /// <inheritdoc />
-    public bool IsSecureChannelEstablished => _secureChannelEstablished;
+    public bool IsSecureChannelEstablished
+    {
+        get
+        {
+            return _secureChannelEstablished;
+        }
+    }
 
     /// <inheritdoc />
     public void Dispose()
@@ -327,7 +339,9 @@ public class JsonLuaCardService : ICardService
         var allowed = new HashSet<int>();
 
         if (_traceData?.Operations == null)
+        {
             return allowed;
+        }
 
         foreach (var operationName in operations)
         {
@@ -349,7 +363,10 @@ public class JsonLuaCardService : ICardService
 
     private void LoadTraceDataIntoLua(TraceData traceData)
     {
-        if (_luaScript == null) return;
+        if (_luaScript == null)
+        {
+            return;
+        }
 
         // Create a simple Lua representation of the trace data
         var luaScript = @"

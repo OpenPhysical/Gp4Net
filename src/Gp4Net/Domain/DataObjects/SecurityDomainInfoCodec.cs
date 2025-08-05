@@ -207,20 +207,20 @@ public class SecurityDomainInfo
     /// <summary>
     /// Object identifier (OID) for the security domain.
     /// </summary>
-    public byte[]? Oid { get; set; }
+    public byte[] Oid { get; set; }
         
     /// <summary>
     /// Security Domain AID with length encoding.
     /// </summary>
-    public byte[]? SecurityDomainAid { get; set; }
+    public byte[] SecurityDomainAid { get; set; }
         
     /// <summary>
     /// Image data for security domain.
     /// </summary>
-    public byte[]? ImageData { get; set; }
+    public byte[] ImageData { get; set; }
         
     /// <summary>
     /// Application production life cycle data.
     /// </summary>
-    public byte[]? LifeCycleData { get; set; }
+    public byte[] LifeCycleData { get; set; }
 }

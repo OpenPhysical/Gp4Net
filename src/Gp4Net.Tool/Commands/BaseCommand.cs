@@ -230,7 +230,7 @@ public class BaseCommandSettings : CommandSettings
     )]
     [TypeConverter(typeof(ReaderNameTypeConverter))]
     [DefaultValue("auto")]
-    public Reader? Reader { get; set; }
+    public Reader Reader { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether to use verbose output.
@@ -261,7 +261,7 @@ public class BaseCommandSettings : CommandSettings
     [Description(
         "Keyset function (e.g., 'gp_test_keys' or 'script:function'). Defaults to 'gp_test_keys'."
     )]
-    public string? Keyset { get; set; }
+    public string Keyset { get; set; }
 
     /// <summary>
     /// Gets or sets keyset parameters.
@@ -270,7 +270,7 @@ public class BaseCommandSettings : CommandSettings
     [Description(
         "Parameters for keyset function (format: key=value). Can be specified multiple times."
     )]
-    public string[]? KeysetParamArray { get; set; }
+    public string[] KeysetParamArray { get; set; }
 
     /// <summary>
     /// Gets the parsed keyset parameters.
@@ -301,7 +301,7 @@ public class BaseCommandSettings : CommandSettings
     [CommandOption("--key-enc")]
     [Description("Encryption key (hex string). Overrides keyset.")]
     [TypeConverter(typeof(HexStringTypeConverter))]
-    public byte[]? KeyEnc { get; set; }
+    public byte[] KeyEnc { get; set; }
 
     /// <summary>
     /// Gets or sets the MAC key.
@@ -309,7 +309,7 @@ public class BaseCommandSettings : CommandSettings
     [CommandOption("--key-mac")]
     [Description("MAC key (hex string). Overrides keyset.")]
     [TypeConverter(typeof(HexStringTypeConverter))]
-    public byte[]? KeyMac { get; set; }
+    public byte[] KeyMac { get; set; }
 
     /// <summary>
     /// Gets or sets the DEK key.
@@ -317,7 +317,7 @@ public class BaseCommandSettings : CommandSettings
     [CommandOption("--key-dek")]
     [Description("Data encryption key (hex string). Overrides keyset.")]
     [TypeConverter(typeof(HexStringTypeConverter))]
-    public byte[]? KeyDek { get; set; }
+    public byte[] KeyDek { get; set; }
 
     /// <summary>
     /// Gets or sets the key version.
@@ -331,5 +331,11 @@ public class BaseCommandSettings : CommandSettings
     /// Gets whether this command requires a secure channel.
     /// Override in derived settings to change default behavior.
     /// </summary>
-    public virtual bool RequiresSecureChannel => true;
+    public virtual bool RequiresSecureChannel
+    {
+        get
+        {
+            return true;
+        }
+    }
 }

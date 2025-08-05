@@ -3,7 +3,6 @@ using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
@@ -47,7 +46,7 @@ public class StoreDataCommandTests
         var command = result.Value;
 
         // Act
-        var apdu = command.ToApdu();
+        var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         apdu.Should().BeEquivalentTo(new byte[] { 0x80, 0xE2, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03 });
@@ -62,7 +61,7 @@ public class StoreDataCommandTests
         var command = result.Value;
 
         // Act
-        var apdu = command.ToApdu();
+        var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         apdu[0].Should().Be(0x80); // CLA
@@ -113,7 +112,7 @@ public class StoreDataCommandTests
         iapdu.P2.Should().Be(0x01); // More blocks
         iapdu.Data.Should().NotBeNull();
         iapdu.Data.Should().BeEquivalentTo(new byte[] { 0x01 });
-        iapdu.ExpectedResponseLength.Should().BeNull();
+        iapdu.ExpectedResponseLength.HasNoValue.Should().BeTrue();
         iapdu.IsExtendedLength.Should().BeFalse();
     }
 

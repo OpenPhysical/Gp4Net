@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core.Tlv;
 
@@ -77,6 +76,14 @@ public static class DiversificationDataParser
                 if (scpVersion == 0x00 && iParameter == 0x00)
                 {
                     continue;
+                }
+                
+                // Validate SCP version - only 01, 02, 03, 10, 11 are valid
+                // Values like 35, 55, 72, 85, 131 are not valid SCP versions
+                if (scpVersion > 0x11)
+                {
+                    // This is likely card identification data, not SCP support
+                    return "[red]None[/]";
                 }
 
                 scpSupport.Add($"SCP{scpVersion:X2} (i={iParameter:X2})");

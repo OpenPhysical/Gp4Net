@@ -102,52 +102,112 @@ public class ApduCommand
     /// <summary>
     /// Gets a value indicating whether this is a SELECT command.
     /// </summary>
-    public bool IsSelect => Ins == 0xA4;
+    public bool IsSelect
+    {
+        get
+        {
+            return Ins == 0xA4;
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether this is an INITIALIZE UPDATE command.
     /// </summary>
-    public bool IsInitializeUpdate => Cla == 0x80 && Ins == 0x50;
+    public bool IsInitializeUpdate
+    {
+        get
+        {
+            return Cla == 0x80 && Ins == 0x50;
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether this is an EXTERNAL AUTHENTICATE command.
     /// </summary>
-    public bool IsExternalAuthenticate => Cla == 0x84 && Ins == 0x82;
+    public bool IsExternalAuthenticate
+    {
+        get
+        {
+            return Cla == 0x84 && Ins == 0x82;
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether this is an INSTALL command.
     /// </summary>
-    public bool IsInstall => (Cla == 0x80 || Cla == 0x84) && Ins == 0xE6;
+    public bool IsInstall
+    {
+        get
+        {
+            return (Cla == 0x80 || Cla == 0x84) && Ins == 0xE6;
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether this is a LOAD command.
     /// </summary>
-    public bool IsLoad => (Cla == 0x80 || Cla == 0x84) && Ins == 0xE8;
+    public bool IsLoad
+    {
+        get
+        {
+            return (Cla == 0x80 || Cla == 0x84) && Ins == 0xE8;
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether this is a GET STATUS command.
     /// </summary>
-    public bool IsGetStatus => (Cla == 0x80 || Cla == 0x84) && Ins == 0xF2;
+    public bool IsGetStatus
+    {
+        get
+        {
+            return (Cla == 0x80 || Cla == 0x84) && Ins == 0xF2;
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether this is a DELETE command.
     /// </summary>
-    public bool IsDelete => (Cla == 0x80 || Cla == 0x84) && Ins == 0xE4;
+    public bool IsDelete
+    {
+        get
+        {
+            return (Cla == 0x80 || Cla == 0x84) && Ins == 0xE4;
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether this is a GET DATA command.
     /// </summary>
-    public bool IsGetData => Ins == 0xCA;
+    public bool IsGetData
+    {
+        get
+        {
+            return Ins == 0xCA;
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether this is a PUT KEY command.
     /// </summary>
-    public bool IsPutKey => (Cla == 0x80 || Cla == 0x84) && Ins == 0xD8;
+    public bool IsPutKey
+    {
+        get
+        {
+            return (Cla == 0x80 || Cla == 0x84) && Ins == 0xD8;
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether this is a SET STATUS command.
     /// </summary>
-    public bool IsSetStatus => (Cla == 0x80 || Cla == 0x84) && Ins == 0xF0;
+    public bool IsSetStatus
+    {
+        get
+        {
+            return (Cla == 0x80 || Cla == 0x84) && Ins == 0xF0;
+        }
+    }
 
     /// <summary>
     /// Returns a string representation of the APDU command.

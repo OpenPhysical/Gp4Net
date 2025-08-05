@@ -4,7 +4,6 @@ using System.Linq;
 using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
@@ -13,6 +12,7 @@ namespace Gp4Net.Tests.Domain.Commands;
 /// Tests pure functions without any I/O or mocking.
 /// </summary>
 [TestFixture]
+[Category("Unit")]
 public class PutKeyCommandTests
 {
 
@@ -141,7 +141,7 @@ public class PutKeyCommandTests
         keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Des);
         keyDataBlock.Length.Should().Be(8);
         keyDataBlock.Value.Should().BeEquivalentTo(ValidDesKey);
-        keyDataBlock.KeyCheckValue.Should().BeNull();
+        keyDataBlock.KeyCheckValue.Should().BeEmpty();
     }
 
     [Test]
@@ -208,7 +208,7 @@ public class PutKeyCommandTests
         keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.TripleDes2Key);
         keyDataBlock.Length.Should().Be(16);
         keyDataBlock.Value.Should().BeEquivalentTo(ValidTripleDes2Key);
-        keyDataBlock.KeyCheckValue.Should().BeNull();
+        keyDataBlock.KeyCheckValue.Should().BeEmpty();
     }
 
     [Test]
@@ -260,7 +260,7 @@ public class PutKeyCommandTests
         keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.TripleDes3Key);
         keyDataBlock.Length.Should().Be(24);
         keyDataBlock.Value.Should().BeEquivalentTo(ValidTripleDes3Key);
-        keyDataBlock.KeyCheckValue.Should().BeNull();
+        keyDataBlock.KeyCheckValue.Should().BeEmpty();
     }
 
     [Test]
@@ -312,7 +312,7 @@ public class PutKeyCommandTests
         keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Aes128);
         keyDataBlock.Length.Should().Be(16);
         keyDataBlock.Value.Should().BeEquivalentTo(ValidAes128Key);
-        keyDataBlock.KeyCheckValue.Should().BeNull();
+        keyDataBlock.KeyCheckValue.Should().BeEmpty();
     }
 
     [Test]
@@ -364,7 +364,7 @@ public class PutKeyCommandTests
         keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Aes192);
         keyDataBlock.Length.Should().Be(24);
         keyDataBlock.Value.Should().BeEquivalentTo(ValidAes192Key);
-        keyDataBlock.KeyCheckValue.Should().BeNull();
+        keyDataBlock.KeyCheckValue.Should().BeEmpty();
     }
 
     [Test]
@@ -416,7 +416,7 @@ public class PutKeyCommandTests
         keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Aes256);
         keyDataBlock.Length.Should().Be(32);
         keyDataBlock.Value.Should().BeEquivalentTo(ValidAes256Key);
-        keyDataBlock.KeyCheckValue.Should().BeNull();
+        keyDataBlock.KeyCheckValue.Should().BeEmpty();
     }
 
     [Test]
@@ -914,7 +914,7 @@ public class PutKeyCommandTests
 
         // LE should be at the end and match expected response length
         var leIndex = apdu.Length - 1;
-        apdu[leIndex].Should().Be((byte)command.ExpectedResponseLength!);
+        apdu[leIndex].Should().Be((byte)command.ExpectedResponseLength.Value);
     }
 
     [Test]

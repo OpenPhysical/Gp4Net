@@ -2241,8 +2241,7 @@
         <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.Parse(System.Byte[])">
             Parses the given byte array to extract card information and populate a CardDataInfo object.
             <param name="data">The byte array containing card data to be parsed.</param>
-            <returns>A CardDataInfo object populated with the extracted card information.</returns>
-            <exception cref="T:System.ArgumentNullException">Thrown if the input data is null.</exception>
+            <returns>Result containing a CardDataInfo object populated with the extracted card information.</returns>
         </member>
         <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.ParseGlobalPlatformVersion(System.Byte[])">
             Parses the GlobalPlatform version from the provided byte array.
@@ -2270,6 +2269,345 @@
             A string representation of the CardDataInfo instance, providing detailed information
             about its parsed contents and metadata.
             </returns>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.IcFabricator">
+            <summary>
+            IC (Integrated Circuit) fabricator identification codes per ISO 7816-6.
+            These values are found in CPLC data bytes 0-1.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IcFabricator.NXP">
+            <summary>
+            NXP Semiconductors (formerly Philips).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IcFabricator.Infineon">
+            <summary>
+            Infineon Technologies.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IcFabricator.STMicroelectronics">
+            <summary>
+            STMicroelectronics.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IcFabricator.Samsung">
+            <summary>
+            Samsung.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IcFabricator.Gemalto">
+            <summary>
+            Gemalto.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IcFabricator.Atmel">
+            <summary>
+            Atmel.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IcFabricator.Unknown">
+            <summary>
+            Unknown fabricator.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.IcType">
+            <summary>
+            IC (Integrated Circuit) type identification codes.
+            These values are found in CPLC data bytes 2-3.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IcType.P71D321">
+            <summary>
+            NXP SmartMX3 P71D321 secure microcontroller.
+            Features: Java Card 3.0.5, GlobalPlatform 2.3.1, JCOP 4.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IcType.P71D320">
+            <summary>
+            NXP SmartMX3 P71D320 secure microcontroller.
+            Features: Java Card 3.0.5, GlobalPlatform 2.3.1, JCOP 4.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IcType.P61">
+            <summary>
+            NXP SmartMX2 P61 secure microcontroller.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IcType.P60">
+            <summary>
+            NXP SmartMX2 P60 secure microcontroller.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IcType.P5CD081">
+            <summary>
+            NXP SmartMX P5CD081 secure microcontroller.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IcType.P5CD041">
+            <summary>
+            NXP SmartMX P5CD041 secure microcontroller.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IcType.Unknown">
+            <summary>
+            Unknown IC type.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.ChipPlatform">
+            <summary>
+            Chip platform families for smart card microcontrollers.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.ChipPlatform.Unknown">
+            <summary>
+            Unknown or unidentified platform.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.ChipPlatform.SmartMX3">
+            <summary>
+            NXP SmartMX3 platform with IntegralSecurity 2.0.
+            Features: Common Criteria EAL6+, advanced crypto coprocessors.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.ChipPlatform.SmartMX2">
+            <summary>
+            NXP SmartMX2 platform.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.ChipPlatform.SmartMX">
+            <summary>
+            NXP SmartMX platform (first generation).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.ChipPlatform.SLE66">
+            <summary>
+            Infineon SLE66 platform.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.ChipPlatform.SLE78">
+            <summary>
+            Infineon SLE78 platform.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.ChipPlatform.ST31">
+            <summary>
+            STMicroelectronics ST31 platform.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.ChipPlatform.ST33">
+            <summary>
+            STMicroelectronics ST33 platform.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.P71MemoryConfiguration">
+            <summary>
+            P71 memory configurations available for the SmartMX3 platform.
+            All P71D321 chips support these memory configurations.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.P71MemoryConfiguration.P71D251">
+            <summary>
+            256KB Flash memory with 12KB RAM.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.P71MemoryConfiguration.P71D301">
+            <summary>
+            304KB Flash memory with 12KB RAM.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.P71MemoryConfiguration.P71D351">
+            <summary>
+            344KB Flash memory with 12KB RAM.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.P71MemoryConfiguration.P71D352">
+            <summary>
+            344KB Flash memory with 1KB RAM.
+            Specialized configuration with minimal RAM.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.SecurityCertification">
+            <summary>
+            Security certification levels for smart card chips.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityCertification.None">
+            <summary>
+            No formal security certification.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityCertification.CommonCriteriaEAL4Plus">
+            <summary>
+            Common Criteria EAL4+ certification.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityCertification.CommonCriteriaEAL5Plus">
+            <summary>
+            Common Criteria EAL5+ certification.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityCertification.CommonCriteriaEAL6Plus">
+            <summary>
+            Common Criteria EAL6+ certification.
+            Highest commercially available security level.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityCertification.FIPS140_2_Level1">
+            <summary>
+            FIPS 140-2 Level 1 certification.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityCertification.FIPS140_2_Level2">
+            <summary>
+            FIPS 140-2 Level 2 certification.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityCertification.FIPS140_2_Level3">
+            <summary>
+            FIPS 140-2 Level 3 certification.
+            Physical security requirements.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityCertification.EMVCo">
+            <summary>
+            EMVCo security certification for payment cards.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.OperatingSystemId">
+            <summary>
+            Operating system identification codes.
+            These values are found in CPLC data bytes 4-5.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.OperatingSystemId.JCOP4">
+            <summary>
+            JCOP 4 operating system.
+            Java Card Open Platform version 4.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.OperatingSystemId.JCOP3">
+            <summary>
+            JCOP 3 operating system.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.OperatingSystemId.JCOP242">
+            <summary>
+            JCOP 2.4.2 operating system.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.OperatingSystemId.JCOP241">
+            <summary>
+            JCOP 2.4.1 operating system.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.OperatingSystemId.Unknown">
+            <summary>
+            Unknown operating system.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.ChipInfo">
+            <summary>
+            Comprehensive information about a smart card chip including manufacturer,
+            platform, capabilities, and certifications.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ChipInfo.Manufacturer">
+            <summary>
+            Gets or sets the IC fabricator/manufacturer.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ChipInfo.ChipType">
+            <summary>
+            Gets or sets the specific chip type/model.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ChipInfo.Platform">
+            <summary>
+            Gets or sets the chip platform family.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ChipInfo.MemoryConfig">
+            <summary>
+            Gets or sets the memory configuration for P71 chips.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ChipInfo.Architecture">
+            <summary>
+            Gets or sets the security architecture name.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ChipInfo.Certifications">
+            <summary>
+            Gets or sets the list of security certifications.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ChipInfo.CryptoCapabilities">
+            <summary>
+            Gets or sets the cryptographic capabilities.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ChipInfo.SecurityFeatures">
+            <summary>
+            Gets or sets the security features.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ChipInfo.OperatingSystem">
+            <summary>
+            Gets or sets the operating system identifier.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ChipInfo.JavaCardVersion">
+            <summary>
+            Gets or sets the Java Card version if applicable.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ChipInfo.GlobalPlatformVersion">
+            <summary>
+            Gets or sets the GlobalPlatform version if applicable.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ChipInfo.JcopVersion">
+            <summary>
+            Gets or sets the JCOP version if applicable.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ChipInfo.FromCplcData(Gp4Net.Domain.CardInfo.CplcData)">
+            <summary>
+            Creates chip information from CPLC data.
+            </summary>
+            <param name="cplc">The CPLC data to analyze.</param>
+            <returns>Chip information derived from CPLC data.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ChipInfo.GetDescription">
+            <summary>
+            Gets a human-readable description of the chip.
+            </summary>
+            <returns>Formatted chip description.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ChipInfo.GetMemoryDescription">
+            <summary>
+            Gets a description of the memory configuration.
+            </summary>
+            <returns>Memory configuration description.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ChipInfo.GetCertificationsString">
+            <summary>
+            Gets a formatted string of security certifications.
+            </summary>
+            <returns>Comma-separated list of certifications.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ChipInfo.GetOperatingSystemDescription">
+            <summary>
+            Gets the operating system description including version information.
+            </summary>
+            <returns>Operating system description.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ChipInfo.GetCryptoSummary">
+            <summary>
+            Gets a summary of cryptographic capabilities.
+            </summary>
+            <returns>Crypto capabilities summary.</returns>
         </member>
         <member name="T:Gp4Net.Domain.CardInfo.CplcData">
             <summary>
@@ -2377,11 +2715,12 @@
             Parses CPLC data from a byte array.
             </summary>
             <param name="data">The CPLC data bytes (must be at least 42 bytes).</param>
-            <returns>Parsed CPLC data.</returns>
+            <returns>Result containing parsed CPLC data or error.</returns>
         </member>
         <member name="M:Gp4Net.Domain.CardInfo.CplcData.TryParse(System.Byte[])">
             <summary>
             Attempts to parse CPLC data using functional error handling.
+            Alias for Parse method for consistency with TryParse patterns.
             </summary>
             <param name="data">The CPLC data bytes (must be at least 42 bytes).</param>
             <returns>A result containing the parsed CPLC data or an error.</returns>
@@ -2395,6 +2734,30 @@
             <summary>
             Checks if a date value represents a valid date (not 0x0000 or 0xFFFF).
             </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.CplcData.GetChipInfo">
+            <summary>
+            Gets chip information derived from this CPLC data.
+            </summary>
+            <returns>ChipInfo containing manufacturer, type, and platform details.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.CplcData.GetManufacturerName">
+            <summary>
+            Gets a human-readable manufacturer name.
+            </summary>
+            <returns>Manufacturer name or hex code if unknown.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.CplcData.GetChipModel">
+            <summary>
+            Gets a human-readable chip model name.
+            </summary>
+            <returns>Chip model name or hex code if unknown.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.CplcData.GetOperatingSystemName">
+            <summary>
+            Gets a human-readable operating system name.
+            </summary>
+            <returns>Operating system name or hex code if unknown.</returns>
         </member>
         <member name="T:Gp4Net.Domain.CardInfo.CplcDateParser">
             <summary>
@@ -2417,7 +2780,7 @@
             Parses a CPLC date value to a DateTime.
             </summary>
             <param name="cplcDate">The 2-byte CPLC date value.</param>
-            <returns>The parsed date, or null if the date is invalid.</returns>
+            <returns>The parsed date, or None if the date is invalid.</returns>
         </member>
         <member name="M:Gp4Net.Domain.CardInfo.CplcDateParser.FormatDate(System.UInt16)">
             <summary>
@@ -2447,6 +2810,369 @@
             <param name="fieldName">Name of the field.</param>
             <param name="dateValue">The CPLC date value.</param>
             <returns>Formatted string for display.</returns>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.CryptoCapabilities">
+            <summary>
+            Cryptographic capabilities supported by smart card chips.
+            These flags can be combined to indicate multiple algorithm support.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.None">
+            <summary>
+            No cryptographic capabilities.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.DES">
+            <summary>
+            DES (Data Encryption Standard) support.
+            Single DES with 56-bit effective key length.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.TripleDES">
+            <summary>
+            Triple DES (3DES) support.
+            168-bit effective key length (3 x 56-bit).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.AES128">
+            <summary>
+            AES-128 (Advanced Encryption Standard) support.
+            128-bit key length.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.AES192">
+            <summary>
+            AES-192 support.
+            192-bit key length.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.AES256">
+            <summary>
+            AES-256 support.
+            256-bit key length.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.RSA1024">
+            <summary>
+            RSA-1024 support.
+            1024-bit key length (legacy, not recommended).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.RSA2048">
+            <summary>
+            RSA-2048 support.
+            2048-bit key length (minimum recommended).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.RSA3072">
+            <summary>
+            RSA-3072 support.
+            3072-bit key length.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.RSA4096">
+            <summary>
+            RSA-4096 support.
+            4096-bit key length (maximum for P71).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.ECC256">
+            <summary>
+            ECC P-256 (secp256r1) support.
+            256-bit elliptic curve.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.ECC384">
+            <summary>
+            ECC P-384 (secp384r1) support.
+            384-bit elliptic curve.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.ECC521">
+            <summary>
+            ECC P-521 (secp521r1) support.
+            521-bit elliptic curve.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.ECC544">
+            <summary>
+            ECC P-544 support.
+            544-bit elliptic curve (P71 maximum).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.SHA1">
+            <summary>
+            SHA-1 hash algorithm support.
+            160-bit hash (legacy, not recommended).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.SHA256">
+            <summary>
+            SHA-256 hash algorithm support.
+            256-bit hash.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.SHA384">
+            <summary>
+            SHA-384 hash algorithm support.
+            384-bit hash.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.SHA512">
+            <summary>
+            SHA-512 hash algorithm support.
+            512-bit hash.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.HardwareRNG">
+            <summary>
+            Hardware random number generator support.
+            True RNG (TRNG) for cryptographic use.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.DPACountermeasures">
+            <summary>
+            DPA (Differential Power Analysis) countermeasures.
+            Hardware-level protection against side-channel attacks.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoCapabilities.P71D321Standard">
+            <summary>
+            Standard P71D321 cryptographic capabilities.
+            Includes all algorithms supported by the SmartMX3 platform.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.CipherMode">
+            <summary>
+            Symmetric cipher modes of operation.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CipherMode.None">
+            <summary>
+            No cipher mode.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CipherMode.ECB">
+            <summary>
+            Electronic Codebook mode.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CipherMode.CBC">
+            <summary>
+            Cipher Block Chaining mode.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CipherMode.CTR">
+            <summary>
+            Counter mode.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CipherMode.OFB">
+            <summary>
+            Output Feedback mode.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CipherMode.CFB">
+            <summary>
+            Cipher Feedback mode.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.MacAlgorithm">
+            <summary>
+            MAC (Message Authentication Code) algorithms.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.MacAlgorithm.None">
+            <summary>
+            No MAC algorithm.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.MacAlgorithm.DesMac">
+            <summary>
+            DES MAC (legacy).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.MacAlgorithm.CbcMac">
+            <summary>
+            CBC-MAC using block cipher.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.MacAlgorithm.Cmac">
+            <summary>
+            CMAC (Cipher-based MAC) per NIST SP 800-38B.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.MacAlgorithm.Hmac">
+            <summary>
+            HMAC (Hash-based MAC) per FIPS 198.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.MacAlgorithm.RetailMac">
+            <summary>
+            Retail MAC (ISO/IEC 9797-1 Algorithm 3).
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.RsaPadding">
+            <summary>
+            RSA padding schemes.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.RsaPadding.None">
+            <summary>
+            No padding.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.RsaPadding.Pkcs1">
+            <summary>
+            PKCS#1 v1.5 padding.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.RsaPadding.Pss">
+            <summary>
+            PKCS#1 PSS (Probabilistic Signature Scheme) padding.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.RsaPadding.Oaep">
+            <summary>
+            PKCS#1 OAEP (Optimal Asymmetric Encryption Padding).
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.CryptoKeyType">
+            <summary>
+            Key types supported by the smart card.
+            Values correspond to GlobalPlatform key type identifiers.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoKeyType.None">
+            <summary>
+            No key type specified.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoKeyType.DES">
+            <summary>
+            DES key (56-bit effective).
+            GlobalPlatform identifier: 0x80.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoKeyType.TripleDES">
+            <summary>
+            Triple DES key (168-bit effective).
+            GlobalPlatform identifier: 0x82.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoKeyType.AES">
+            <summary>
+            AES key (variable length based on key data).
+            GlobalPlatform identifier: 0x88.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoKeyType.RSAPublic">
+            <summary>
+            RSA public key.
+            GlobalPlatform identifier: 0xA0.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoKeyType.RSAPrivateCRT">
+            <summary>
+            RSA private key (CRT format).
+            GlobalPlatform identifier: 0xA1.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoKeyType.RSAPrivateModulus">
+            <summary>
+            RSA private key (modulus format).
+            GlobalPlatform identifier: 0xA2.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoKeyType.ECCPublic">
+            <summary>
+            ECC public key.
+            GlobalPlatform identifier: 0xB0.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoKeyType.ECCPrivate">
+            <summary>
+            ECC private key.
+            GlobalPlatform identifier: 0xB1.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoKeyType.ECCKeyPair">
+            <summary>
+            ECC key pair (public and private).
+            GlobalPlatform identifier: 0xB2.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.CryptoKeyType.Extended">
+            <summary>
+            Extended key type for future use.
+            GlobalPlatform identifier: 0xFF.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.SecurityFeatures">
+            <summary>
+            Security features supported by the chip.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityFeatures.None">
+            <summary>
+            No security features.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityFeatures.PhysicalUnclonableFunction">
+            <summary>
+            Physical Unclonable Function for unique chip identification.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityFeatures.SecureKeyStorage">
+            <summary>
+            Secure key storage with hardware protection.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityFeatures.TamperDetection">
+            <summary>
+            Tamper detection and response.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityFeatures.EnvironmentalSensors">
+            <summary>
+            Environmental sensors (voltage, temperature, etc.).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityFeatures.MemoryEncryption">
+            <summary>
+            Memory encryption for data at rest.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityFeatures.SecureBoot">
+            <summary>
+            Secure boot verification.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityFeatures.HardwareFirewall">
+            <summary>
+            Hardware firewall between applications.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityFeatures.SideChannelProtection">
+            <summary>
+            Side-channel attack countermeasures.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityFeatures.FaultInjectionProtection">
+            <summary>
+            Fault injection countermeasures.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityFeatures.GlitchProtection">
+            <summary>
+            Glitch detection and protection.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.SecurityFeatures.P71D321Standard">
+            <summary>
+            Standard P71D321 security features.
+            Includes all IntegralSecurity 2.0 features.
+            </summary>
         </member>
         <member name="T:Gp4Net.Domain.CardInfo.DiversificationDataParser">
             <summary>
@@ -2639,6 +3365,88 @@
             <param name="data">The raw capability data.</param>
             <returns>Comma-separated list of supported SCP protocols.</returns>
         </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ScpCapabilitiesParser.ParseDetailed(System.Byte[])">
+            <summary>
+            Parses SCP capabilities and returns detailed information.
+            </summary>
+            <param name="data">The raw capability data.</param>
+            <returns>Structured SCP information.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ScpCapabilitiesParser.ParseElements(System.Collections.Generic.IEnumerable{Gp4Net.Core.Tlv.TlvObject},System.Collections.Generic.Dictionary{System.Byte,System.Collections.Generic.List{Gp4Net.Domain.Protocol.ScpImplementation}})">
+            <summary>
+            Recursively parses TLV elements to extract SCP information.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ScpCapabilitiesParser.ParseA0Contents(System.Collections.Generic.IEnumerable{Gp4Net.Core.Tlv.TlvObject},System.Collections.Generic.Dictionary{System.Byte,System.Collections.Generic.List{Gp4Net.Domain.Protocol.ScpImplementation}})">
+            <summary>
+            Parses A0 tag contents to extract SCP information per GP Card Spec Table H-5.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.ScpInformation">
+            <summary>
+            Represents SCP (Secure Channel Protocol) information for a smart card.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ScpInformation.Protocols">
+            <summary>
+            Gets the list of supported SCP protocols with their implementation options.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ScpInformation.#ctor(System.Collections.Generic.IReadOnlyList{Gp4Net.Domain.CardInfo.ScpProtocolInfo})">
+            <summary>
+            Initializes a new instance of ScpInformation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ScpInformation.ToFormattedString(System.Boolean)">
+            <summary>
+            Gets a formatted string representation of the SCP support.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.ScpProtocolInfo">
+            <summary>
+            Represents information about a single SCP protocol with its implementation options.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ScpProtocolInfo.Version">
+            <summary>
+            Gets the SCP protocol version (e.g., 2 for SCP02, 3 for SCP03).
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.ScpProtocolInfo.ImplementationOptions">
+            <summary>
+            Gets the implementation options for this protocol.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ScpProtocolInfo.#ctor(System.Byte,System.Collections.Generic.IReadOnlyList{Gp4Net.Domain.Protocol.ScpImplementation})">
+            <summary>
+            Initializes a new instance of ScpProtocolInfo.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ScpProtocolInfo.ToShortString">
+            <summary>
+            Gets a short string representation suitable for single-line display.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ScpProtocolInfo.ToDetailedString">
+            <summary>
+            Gets a detailed string representation with descriptions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ScpProtocolInfo.GetImplementationDescription(Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Gets a human-readable description for an SCP implementation option.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ScpProtocolInfo.GetDetailedImplementationFeatures(Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Gets detailed features for an implementation option based on its bits.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.ScpProtocolInfo.FormatScpVersion(System.Byte)">
+            <summary>
+            Formats SCP version number for display.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Domain.CardInfo.SecurityDomainDataParser">
             <summary>
             Parses security domain data from A5 proprietary tag format.
@@ -2650,6 +3458,101 @@
             </summary>
             <param name="data">The raw security domain data.</param>
             <returns>Parsed security domain information as a formatted string.</returns>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.SecurityDomainStatus">
+            <summary>
+            Security Domain Management Data (tag C1) parser.
+            Contains information about the current state of the security domain.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.SecurityDomainStatus.RawData">
+            <summary>
+            Gets the raw status data.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.SecurityDomainStatus.StateByte">
+            <summary>
+            Gets the security domain state byte.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.SecurityDomainStatus.AdditionalData">
+            <summary>
+            Gets additional status bytes if present.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.SecurityDomainStatus.Parse(CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+            <summary>
+            Parses Security Domain Management Data from tag C1.
+            </summary>
+            <param name="data">The tag C1 data bytes.</param>
+            <returns>Result containing parsed status or error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.SecurityDomainStatus.GetIsdState">
+            <summary>
+            Gets the ISD state from the state byte.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.SecurityDomainStatus.IsPersonalized">
+            <summary>
+            Gets whether the ISD is personalized.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.SecurityDomainStatus.IsLocked">
+            <summary>
+            Gets whether the ISD is locked.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.SecurityDomainStatus.GetSequenceCounter">
+            <summary>
+            Gets the sequence counter value if present.
+            For C1020004, this would be 0x0004.
+            For C103000046, this would be 0x0046.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.SecurityDomainStatus.ToString">
+            <summary>
+            Formats the security domain status as a human-readable string.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.SecurityDomainStatus.GetShortDescription">
+            <summary>
+            Gets a short description of the status.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.IsdState">
+            <summary>
+            ISD (Issuer Security Domain) states.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IsdState.OpReady">
+            <summary>
+            OP_READY state - normal operational state.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IsdState.Initialized">
+            <summary>
+            INITIALIZED state.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IsdState.Secured">
+            <summary>
+            SECURED state.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IsdState.CardLocked">
+            <summary>
+            CARD_LOCKED state.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IsdState.Terminated">
+            <summary>
+            TERMINATED state.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.CardInfo.IsdState.Unknown">
+            <summary>
+            Unknown or invalid state.
+            </summary>
         </member>
         <member name="T:Gp4Net.Domain.Commands.DataObjectParser">
             <summary>
@@ -2989,19 +3892,6 @@
         <member name="P:Gp4Net.Domain.Commands.ExternalAuthenticateCommand.ExpectedResponseLength">
             <inheritdoc />
         </member>
-        <member name="M:Gp4Net.Domain.Commands.ExternalAuthenticateCommand.ToApdu">
-            <summary>
-            Converts this command to an APDU byte array.
-            This method is obsolete. Use IApduTransport.TransmitAsync instead.
-            </summary>
-            <returns>The APDU command bytes.</returns>
-        </member>
-        <member name="M:Gp4Net.Domain.Commands.ExternalAuthenticateCommand.GetApdu">
-            <summary>
-            Gets the APDU byte array for this command (backward compatibility alias for ToApdu).
-            </summary>
-            <returns>The APDU command bytes.</returns>
-        </member>
         <member name="M:Gp4Net.Domain.Commands.ExternalAuthenticateCommand.ToString">
             <summary>
             Returns a string representation of this command.
@@ -3065,6 +3955,13 @@
         <member name="F:Gp4Net.Domain.Commands.GetDataCommand.DataObjects.SequenceCounterDefaultKeyVersion">
             <summary>
             Sequence Counter of the default Key Version Number (tag 0x00C1).
+            Also known as Security Domain Management Data.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Commands.GetDataCommand.DataObjects.SecurityDomainManagementData">
+            <summary>
+            Security Domain Management Data (tag 0x00C1).
+            Same as SequenceCounterDefaultKeyVersion.
             </summary>
         </member>
         <member name="F:Gp4Net.Domain.Commands.GetDataCommand.DataObjects.ConfirmationCounter">
@@ -3204,13 +4101,13 @@
             <summary>
             Parses the response as CPLC data.
             </summary>
-            <returns>Parsed CPLC data or null if not applicable.</returns>
+            <returns>Parsed CPLC data or None if not applicable.</returns>
         </member>
         <member name="M:Gp4Net.Domain.Commands.GetDataResponse.ParseAsCardData">
             <summary>
             Parses the response as Card Data.
             </summary>
-            <returns>Parsed card data or null if not applicable.</returns>
+            <returns>Parsed card data or None if not applicable.</returns>
         </member>
         <member name="M:Gp4Net.Domain.Commands.GetDataResponse.ParseAsCardCapabilities">
             <summary>
@@ -3228,13 +4125,13 @@
             <summary>
             Gets the value as a numeric value (for counters, etc).
             </summary>
-            <returns>The numeric value or null if not applicable.</returns>
+            <returns>The numeric value or None if not applicable.</returns>
         </member>
         <member name="M:Gp4Net.Domain.Commands.GetDataResponse.ParseAsKeyInformation">
             <summary>
             Parses the response as Key Information Template.
             </summary>
-            <returns>Parsed key information or null if not applicable.</returns>
+            <returns>Parsed key information or None if not applicable.</returns>
         </member>
         <member name="T:Gp4Net.Domain.Commands.GetDataResponseExtensions">
             <summary>
@@ -3246,28 +4143,35 @@
             Parses the byte array as card data.
             </summary>
             <param name="data">The raw GET DATA response.</param>
-            <returns>Parsed card data or null if parsing fails.</returns>
+            <returns>Parsed card data or None if parsing fails.</returns>
         </member>
         <member name="M:Gp4Net.Domain.Commands.GetDataResponseExtensions.ParseAsCardCapabilities(System.Byte[])">
             <summary>
             Parses the byte array as card capabilities.
             </summary>
             <param name="data">The raw GET DATA response.</param>
-            <returns>Parsed card capabilities or null if parsing fails.</returns>
+            <returns>Parsed card capabilities or None if parsing fails.</returns>
         </member>
         <member name="M:Gp4Net.Domain.Commands.GetDataResponseExtensions.ParseAsKeyInformation(System.Byte[])">
             <summary>
             Parses the byte array as key information template.
             </summary>
             <param name="data">The raw GET DATA response.</param>
-            <returns>Parsed key information template or null if parsing fails.</returns>
+            <returns>Parsed key information template or None if parsing fails.</returns>
         </member>
         <member name="M:Gp4Net.Domain.Commands.GetDataResponseExtensions.ParseAsCplc(System.Byte[])">
             <summary>
             Parses the byte array as CPLC (Card Production Life Cycle) data.
             </summary>
             <param name="data">The raw GET DATA response.</param>
-            <returns>Parsed CPLC data or null if parsing fails.</returns>
+            <returns>Parsed CPLC data or None if parsing fails.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.GetDataResponseExtensions.ParseAsSecurityDomainStatus(System.Byte[])">
+            <summary>
+            Parses the byte array as security domain status (tag C1).
+            </summary>
+            <param name="data">The raw GET DATA response.</param>
+            <returns>Parsed security domain status or None if parsing fails.</returns>
         </member>
         <member name="T:Gp4Net.Domain.Commands.GetStatusCommand">
             <summary>
@@ -3909,19 +4813,6 @@
             <param name="hostChallenge">The host challenge (8 bytes).</param>
             <param name="useMaxResponseLength">Whether to use maximum response length for trace compatibility.</param>
             <returns>A result containing the command or an error.</returns>
-        </member>
-        <member name="M:Gp4Net.Domain.Commands.InitializeUpdateCommand.ToApdu">
-            <summary>
-            Converts this command to an APDU byte array.
-            This method is obsolete. Use IApduTransport.TransmitAsync instead.
-            </summary>
-            <returns>The APDU command bytes.</returns>
-        </member>
-        <member name="M:Gp4Net.Domain.Commands.InitializeUpdateCommand.GetApdu">
-            <summary>
-            Gets the APDU byte array for this command (backward compatibility alias for ToApdu).
-            </summary>
-            <returns>The APDU command bytes.</returns>
         </member>
         <member name="M:Gp4Net.Domain.Commands.InitializeUpdateCommand.ToString">
             <summary>
@@ -5089,13 +5980,6 @@
         <member name="P:Gp4Net.Domain.Commands.SelectCommand.ExpectedResponseLength">
             <inheritdoc />
         </member>
-        <member name="M:Gp4Net.Domain.Commands.SelectCommand.ToApdu">
-            <summary>
-            Converts this command to an APDU byte array.
-            This method is obsolete. Use IApduTransport.TransmitAsync instead.
-            </summary>
-            <returns>The APDU command bytes.</returns>
-        </member>
         <member name="M:Gp4Net.Domain.Commands.SelectCommand.ToString">
             <summary>
             Returns a string representation of this command.
@@ -5316,7 +6200,7 @@
         </member>
         <member name="P:Gp4Net.Domain.Commands.StoreDataCommand.ExpectedResponseLength">
             <summary>
-            Gets the expected response length (null for STORE DATA as it's a case 3 command).
+            Gets the expected response length (None for STORE DATA as it's a case 3 command).
             </summary>
         </member>
         <member name="P:Gp4Net.Domain.Commands.StoreDataCommand.IsExtendedLength">
@@ -8216,6 +9100,13 @@
             Uses AES instead of 3DES (vendor extension)
             </summary>
         </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02ThreeKeysRMac">
+            <summary>
+            SCP02: 3 Secure Channel Keys with R-MAC support (35)
+            Initiation mode explicit, C-MAC on modified APDU, ICV set to zero,
+            ICV encryption for C-MAC session, R-MAC support
+            </summary>
+        </member>
         <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02PseudoRandom">
             <summary>
             SCP02: Well-known pseudo-random algorithm (55)
@@ -8248,6 +9139,14 @@
             SCP02: Implicit initialization vector (05)
             Per GlobalPlatform Card Specification v2.3.1 Section E.4.2
             Alias for Scp02ThreeKeys - same implementation value
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02PseudoRandomRMac">
+            <summary>
+            SCP02: 3 Secure Channel Keys with pseudo-random and R-MAC support (75)
+            Initiation mode explicit, C-MAC on modified APDU, ICV set to zero,
+            ICV encryption for C-MAC session, well-known pseudo-random algorithm,
+            R-MAC support
             </summary>
         </member>
         <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03Aes128">
@@ -8331,6 +9230,11 @@
         <member name="M:Gp4Net.Domain.Protocol.ScpImplementationExtensions.UsesPseudoRandom(Gp4Net.Domain.Protocol.ScpImplementation)">
             <summary>
             Determines if this implementation uses pseudo-random challenge generation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.ScpImplementationExtensions.SupportsRMac(Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Determines if this implementation supports R-MAC (Response MAC).
             </summary>
         </member>
         <member name="M:Gp4Net.Domain.Protocol.ScpImplementationExtensions.GetAesKeyLength(Gp4Net.Domain.Protocol.ScpImplementation)">
@@ -10292,7 +11196,7 @@
             Internal command wrapper that represents a complete wrapped APDU.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.Middleware.SecureChannelMiddleware.WrappedCommand.#ctor(System.Byte[],System.Nullable{System.Int32})">
+        <member name="M:Gp4Net.Pipeline.Middleware.SecureChannelMiddleware.WrappedCommand.#ctor(System.Byte[],CSharpFunctionalExtensions.Maybe{System.Int32})">
             <summary>
             Internal command wrapper that represents a complete wrapped APDU.
             </summary>
@@ -10791,20 +11695,20 @@
         <member name="M:Gp4Net.Services.SmartCardService.Dispose">
             <inheritdoc/>
         </member>
-        <member name="T:Gp4Net.Services.FunctionalSmartCardServiceFactory">
+        <member name="T:Gp4Net.Services.SmartCardServiceFactory">
             <summary>
             Factory implementation for creating smart card services.
             </summary>
         </member>
-        <member name="M:Gp4Net.Services.FunctionalSmartCardServiceFactory.#ctor(Microsoft.Extensions.Logging.ILoggerFactory,System.IServiceProvider)">
+        <member name="M:Gp4Net.Services.SmartCardServiceFactory.#ctor(Microsoft.Extensions.Logging.ILoggerFactory,System.IServiceProvider)">
             <summary>
-            Initializes a new instance of FunctionalSmartCardServiceFactory.
+            Initializes a new instance of SmartCardServiceFactory.
             </summary>
         </member>
-        <member name="M:Gp4Net.Services.FunctionalSmartCardServiceFactory.CreateAsync(System.String,Gp4Net.Services.SmartCardServiceOptions)">
+        <member name="M:Gp4Net.Services.SmartCardServiceFactory.CreateAsync(System.String,Gp4Net.Services.SmartCardServiceOptions)">
             <inheritdoc/>
         </member>
-        <member name="M:Gp4Net.Services.FunctionalSmartCardServiceFactory.ListReadersAsync">
+        <member name="M:Gp4Net.Services.SmartCardServiceFactory.ListReadersAsync">
             <inheritdoc/>
         </member>
         <member name="T:Gp4Net.Services.SmartCardServiceExtensions">
@@ -10820,6 +11724,37 @@
         <member name="M:Gp4Net.Services.SmartCardServiceExtensions.ExecuteAndMapAsync``1(Gp4Net.Services.ISmartCardService,Gp4Net.Transport.IApduCommand,System.Func{Gp4Net.Pipeline.CommandResponse,``0},System.Threading.CancellationToken)">
             <summary>
             Executes a command and maps the successful response.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Transport.ApduBuilder">
+            <summary>
+            Utility class for building APDU byte arrays from IApduCommand instances.
+            Follows ISO 7816-4 APDU structure.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Transport.ApduBuilder.BuildApdu(Gp4Net.Transport.IApduCommand)">
+            <summary>
+            Builds an APDU byte array from an IApduCommand instance.
+            </summary>
+            <param name="command">The command to convert to APDU bytes.</param>
+            <returns>The APDU byte array.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when command is null.</exception>
+        </member>
+        <member name="M:Gp4Net.Transport.ApduBuilder.BuildApdu(System.Byte,System.Byte,System.Byte,System.Byte,System.Byte[],CSharpFunctionalExtensions.Maybe{System.Int32})">
+            <summary>
+            Builds an APDU byte array with explicit parameters.
+            </summary>
+            <param name="cla">Class byte.</param>
+            <param name="ins">Instruction byte.</param>
+            <param name="p1">Parameter 1.</param>
+            <param name="p2">Parameter 2.</param>
+            <param name="data">Optional data.</param>
+            <param name="le">Optional expected response length.</param>
+            <returns>The APDU byte array.</returns>
+        </member>
+        <member name="T:Gp4Net.Transport.ApduBuilder.SimpleApduCommand">
+            <summary>
+            Simple implementation of IApduCommand for building APDUs.
             </summary>
         </member>
         <member name="T:Gp4Net.Transport.ApduCommandExtensions">
@@ -10859,20 +11794,6 @@
         </member>
         <member name="P:Gp4Net.Transport.BaseApduCommand.IsExtendedLength">
             <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Transport.BaseApduCommand.ToApdu(Gp4Net.Transport.IApduTransport)">
-            <summary>
-            Converts this command to APDU bytes using the specified transport.
-            This method is provided for backward compatibility.
-            </summary>
-            <param name="transport">The transport to use for APDU formatting.</param>
-            <returns>The APDU bytes.</returns>
-        </member>
-        <member name="M:Gp4Net.Transport.BaseApduCommand.ToApdu">
-            <summary>
-            Legacy ToApdu method for backward compatibility.
-            </summary>
-            <returns>APDU bytes formatted for T=1.</returns>
         </member>
         <member name="T:Gp4Net.Transport.IApduTransport">
             <summary>
@@ -10962,7 +11883,7 @@
         </member>
         <member name="P:Gp4Net.Transport.IApduCommand.ExpectedResponseLength">
             <summary>
-            Gets the expected response length (null if no response expected).
+            Gets the expected response length (None if no response expected).
             0 means maximum length (256 for short, 65536 for extended).
             </summary>
         </member>
@@ -11095,34 +12016,6 @@
             <summary>
             Releases the card context.
             </summary>
-        </member>
-        <member name="T:Gp4Net.Transport.ILegacyCardChannel">
-            <summary>
-            Legacy card channel interface (replaced by new functional ICardChannel).
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Transport.ILegacyCardChannel.Atr">
-            <summary>
-            Gets the Answer To Reset (ATR) of the card.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Transport.ILegacyCardChannel.Protocol">
-            <summary>
-            Gets the active protocol.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Transport.ILegacyCardChannel.Transmit(System.Byte[])">
-            <summary>
-            Transmits an APDU command to the card.
-            </summary>
-            <param name="command">The command bytes.</param>
-            <returns>The response bytes.</returns>
-        </member>
-        <member name="M:Gp4Net.Transport.ILegacyCardChannel.Disconnect(Gp4Net.Transport.CardDisposition)">
-            <summary>
-            Disconnects from the card.
-            </summary>
-            <param name="disposition">The card disposition.</param>
         </member>
         <member name="T:Gp4Net.Transport.ShareMode">
             <summary>

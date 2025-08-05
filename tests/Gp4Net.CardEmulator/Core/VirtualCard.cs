@@ -4,10 +4,8 @@ using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Constants;
-using Gp4Net.Domain;
 using Gp4Net.Domain.Security;
 using Gp4Net.Core.Tlv;
-using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
@@ -52,10 +50,22 @@ public class VirtualCard : IVirtualCard
     public byte[] GetAtr() => _config.Atr;
 
     /// <inheritdoc />
-    public bool IsSelected => _state.IsSelected;
+    public bool IsSelected
+    {
+        get
+        {
+            return _state.IsSelected;
+        }
+    }
 
     /// <inheritdoc />
-    public bool IsSecureChannelEstablished => _state.IsSecureChannelEstablished;
+    public bool IsSecureChannelEstablished
+    {
+        get
+        {
+            return _state.IsSecureChannelEstablished;
+        }
+    }
 
     /// <inheritdoc />
     public void Reset()
@@ -99,12 +109,24 @@ public class VirtualCard : IVirtualCard
     /// <summary>
     /// Gets the current card state (for testing purposes).
     /// </summary>
-    public CardState CurrentState => _state;
+    public CardState CurrentState
+    {
+        get
+        {
+            return _state;
+        }
+    }
 
     /// <summary>
     /// Gets the card configuration (for testing purposes).
     /// </summary>
-    public CardConfiguration Configuration => _config;
+    public CardConfiguration Configuration
+    {
+        get
+        {
+            return _config;
+        }
+    }
 
     /// <summary>
     /// Pure functional command processing that returns new state without side effects.

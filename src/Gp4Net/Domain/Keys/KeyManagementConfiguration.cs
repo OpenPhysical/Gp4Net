@@ -84,11 +84,15 @@ public sealed record KeyManagementConfiguration
     public Result<bool, string> ValidateKey(byte[] key, string keyType)
     {
         if (key == null || key.Length == 0)
+        {
             return Result.Failure<bool, string>("Key cannot be null or empty");
+        }
 
         if (key.Length < MinimumKeyLength)
+        {
             return Result.Failure<bool, string>(
                 $"{keyType} key length ({key.Length} bytes) is below minimum ({MinimumKeyLength} bytes)");
+        }
 
         return Result.Success<bool, string>(true);
     }
@@ -135,7 +139,7 @@ public sealed class KeyLifecycleManager
     /// Creates a new key lifecycle manager.
     /// </summary>
     public static Result<KeyLifecycleManager, SmartCardError> Create(
-        KeyManagementConfiguration? config = null)
+        KeyManagementConfiguration config = null)
     {
         var configuration = config ?? KeyManagementConfiguration.Default;
 
@@ -229,17 +233,25 @@ public sealed class KeyLifecycleManager
     public bool IsKeyValid(string keyId)
     {
         if (!_metadata.TryGetValue(keyId, out var metadata))
+        {
             return false;
+        }
 
         if (_config.RequireKeyRotation && IsRotationRequired(metadata))
+        {
             return false;
+        }
 
         if (metadata.UsageCount >= _config.MaxKeyUsageCount)
+        {
             return false;
+        }
 
         var keyAge = DateTime.UtcNow - metadata.CreatedUtc;
         if (keyAge.TotalMinutes > _config.KeyLifetimeMinutes)
+        {
             return false;
+        }
 
         return true;
     }

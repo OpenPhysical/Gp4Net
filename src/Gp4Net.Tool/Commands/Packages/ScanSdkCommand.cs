@@ -114,7 +114,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         return Task.FromResult(mappings);
     }
 
-    private static PackageInfo? ParseExpFile(string expFilePath)
+    private static PackageInfo ParseExpFile(string expFilePath)
     {
         var fileBytes = File.ReadAllBytes(expFilePath);
         var relativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), expFilePath);
@@ -202,7 +202,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         return "unknown";
     }
 
-    private static string? ExtractPackageNameFromPath(string expFilePath)
+    private static string ExtractPackageNameFromPath(string expFilePath)
     {
         // Extract package name from path structure
         // e.g., javacard\framework\javacard\framework.exp -> javacard.framework
@@ -439,7 +439,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         /// </summary>
         [CommandOption("-o|--output")]
         [Description("Output file path for JSON package mappings")]
-        public string? OutputPath { get; set; }
+        public string OutputPath { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether to show verbose output.

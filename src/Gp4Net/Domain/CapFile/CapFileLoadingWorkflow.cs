@@ -250,10 +250,14 @@ public class CapFileLoadingWorkflow
     )
     {
         if (packageAid == null)
+        {
             return SmartCardError.InvalidArgument("Package AID cannot be null.");
+        }
 
         if (packageAid.Length == 0)
+        {
             return SmartCardError.InvalidArgument("Package AID cannot be empty.");
+        }
 
         var aidsToDelete = new List<byte[]> { packageAid };
 

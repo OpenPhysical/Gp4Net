@@ -2,8 +2,8 @@ using System;
 using System.Linq;
 using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Transport;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
@@ -12,6 +12,7 @@ namespace Gp4Net.Tests.Domain.Commands;
 /// Tests pure functions without any I/O or mocking.
 /// </summary>
 [TestFixture]
+[Category("Unit")]
 public class InstallCommandTests
 {
     private readonly byte[] _validPackageAid = Convert.FromHexString("A000000003000000");
@@ -176,9 +177,7 @@ public class InstallCommandTests
     {
         var command = InstallCommand.InstallForLoadCommand.Create(_validPackageAid).Value;
 
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.ToApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         apdu[0].Should().Be(0x80); // CLA
         apdu[1].Should().Be(0xE6); // INS

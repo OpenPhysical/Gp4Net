@@ -90,12 +90,17 @@ public static class CommandContextExtensions
         Func<ICliExecutionContext, Task<int>> commandLogic
     )
     {
-        return await context
-            .WithVerbose(settings.Verbose)
-            .RequireCardConnection(settings)
-            .ContinueWith(ctx => ctx.DisplayCardInfo(settings))
-            .ContinueWith(ctx => ctx.RequireSecureChannel(settings))
-            .ContinueWith(ctx => ctx.ExecuteAsync(commandLogic));
+        // Delegate to functional version and convert result
+        return await context.ExecuteCardCommandFunctional(
+            settings,
+            async ctx => 
+            {
+                var result = await commandLogic(ctx);
+                return result == 0 
+                    ? CSharpFunctionalExtensions.Result.Success<bool, string>(true)
+                    : CSharpFunctionalExtensions.Result.Failure<bool, string>($"Command failed with exit code {result}");
+            }
+        );
     }
 
     /// <summary>
@@ -107,59 +112,8 @@ public static class CommandContextExtensions
         Func<ICliExecutionContext, int> commandLogic
     )
     {
-        return await context
-            .WithVerbose(settings.Verbose)
-            .RequireCardConnection(settings)
-            .ContinueWith(ctx => ctx.DisplayCardInfo(settings))
-            .ContinueWith(ctx => ctx.RequireSecureChannel(settings))
-            .ContinueWith(ctx => ctx.ExecuteAsync(commandLogic));
+        // Delegate to async version
+        return await ExecuteCardCommand(context, settings, ctx => Task.FromResult(commandLogic(ctx)));
     }
 
-    /// <summary>
-    /// Continues with a synchronous operation.
-    /// </summary>
-    private static async Task<ICliExecutionContext> ContinueWith(
-        this Task<ICliExecutionContext> contextTask,
-        Func<ICliExecutionContext, ICliExecutionContext> operation
-    )
-    {
-        var context = await contextTask;
-        return operation(context);
-    }
-
-    /// <summary>
-    /// Continues with an asynchronous operation.
-    /// </summary>
-    private static async Task<ICliExecutionContext> ContinueWith(
-        this Task<ICliExecutionContext> contextTask,
-        Func<ICliExecutionContext, Task<ICliExecutionContext>> operation
-    )
-    {
-        var context = await contextTask;
-        return await operation(context);
-    }
-
-    /// <summary>
-    /// Continues with command execution.
-    /// </summary>
-    private static async Task<int> ContinueWith(
-        this Task<ICliExecutionContext> contextTask,
-        Func<ICliExecutionContext, Task<int>> operation
-    )
-    {
-        var context = await contextTask;
-        return await operation(context);
-    }
-
-    /// <summary>
-    /// Continues with synchronous command execution.
-    /// </summary>
-    private static async Task<int> ContinueWith(
-        this Task<ICliExecutionContext> contextTask,
-        Func<ICliExecutionContext, int> operation
-    )
-    {
-        var context = await contextTask;
-        return operation(context);
-    }
 }

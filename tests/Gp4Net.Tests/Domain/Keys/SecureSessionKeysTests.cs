@@ -9,12 +9,12 @@ using System;
 using AwesomeAssertions;
 using Gp4Net.Domain.Keys;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 /// <summary>
 /// Unit tests for the <see cref="SecureSessionKeys"/> class.
 /// </summary>
 [TestFixture]
+[Category("Unit")]
 public class SecureSessionKeysTests
 {
     private byte[] _testSEnc;

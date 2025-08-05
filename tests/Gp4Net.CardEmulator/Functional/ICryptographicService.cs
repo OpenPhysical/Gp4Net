@@ -46,7 +46,7 @@ public interface ICryptographicService
     /// <param name="keys">The key set to use.</param>
     /// <param name="scpVersion">The SCP version.</param>
     /// <param name="implementationParameter">The SCP implementation parameter (for SCP02).</param>
-    /// <param name="sequenceCounter">The sequence counter for SCP02 (2 bytes), null for SCP03.</param>
+    /// <param name="sequenceCounter">The sequence counter for SCP02 (2 bytes), empty for SCP03.</param>
     /// <returns>The calculated cryptogram.</returns>
     Result<byte[], SmartCardError> CalculateCardCryptogram(
         byte[] hostChallenge,
@@ -54,7 +54,7 @@ public interface ICryptographicService
         IKeySet keys,
         byte scpVersion,
         byte implementationParameter,
-        byte[]? sequenceCounter = null);
+        Maybe<byte[]> sequenceCounter);
 
     /// <summary>
     /// Calculates a host cryptogram for EXTERNAL AUTHENTICATE verification.
@@ -64,7 +64,7 @@ public interface ICryptographicService
     /// <param name="keys">The key set to use.</param>
     /// <param name="scpVersion">The SCP version.</param>
     /// <param name="implementationParameter">The SCP implementation parameter (for SCP02).</param>
-    /// <param name="sequenceCounter">The sequence counter for SCP02 (2 bytes), null for SCP03.</param>
+    /// <param name="sequenceCounter">The sequence counter for SCP02 (2 bytes), empty for SCP03.</param>
     /// <returns>The calculated cryptogram.</returns>
     Result<byte[], SmartCardError> CalculateHostCryptogram(
         byte[] hostChallenge,
@@ -72,7 +72,7 @@ public interface ICryptographicService
         IKeySet keys,
         byte scpVersion,
         byte implementationParameter,
-        byte[]? sequenceCounter = null);
+        Maybe<byte[]> sequenceCounter);
 
     /// <summary>
     /// Verifies that two cryptograms match.
@@ -216,7 +216,7 @@ public class TestCryptographicService : ICryptographicService
         IKeySet keys,
         byte scpVersion,
         byte implementationParameter,
-        byte[]? sequenceCounter = null)
+        Maybe<byte[]> sequenceCounter)
     {
         // Simplified test cryptogram - just XOR challenges
         var cryptogram = new byte[8];
@@ -233,7 +233,7 @@ public class TestCryptographicService : ICryptographicService
         IKeySet keys,
         byte scpVersion,
         byte implementationParameter,
-        byte[]? sequenceCounter = null)
+        Maybe<byte[]> sequenceCounter)
     {
         // Simplified test cryptogram - reverse XOR
         var cryptogram = new byte[8];
@@ -326,7 +326,7 @@ public class FailingCryptographicService : ICryptographicService
         IKeySet keys,
         byte scpVersion,
         byte implementationParameter,
-        byte[]? sequenceCounter = null) =>
+        Maybe<byte[]> sequenceCounter) =>
         Result.Failure<byte[], SmartCardError>(SmartCardError.CryptographicError("Mock failure"));
 
     public Result<byte[], SmartCardError> CalculateHostCryptogram(
@@ -335,7 +335,7 @@ public class FailingCryptographicService : ICryptographicService
         IKeySet keys,
         byte scpVersion,
         byte implementationParameter,
-        byte[]? sequenceCounter = null) =>
+        Maybe<byte[]> sequenceCounter) =>
         Result.Failure<byte[], SmartCardError>(SmartCardError.CryptographicError("Mock failure"));
 
     public Result<bool, SmartCardError> VerifyCryptogram(byte[] received, byte[] expected) =>

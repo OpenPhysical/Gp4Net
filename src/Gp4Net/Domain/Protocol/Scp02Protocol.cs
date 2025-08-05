@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
@@ -20,7 +19,13 @@ namespace Gp4Net.Domain.Protocol;
 public class Scp02Protocol : SecureChannelProtocolBase
 {
     /// <inheritdoc />
-    public override byte ProtocolVersion => ProtocolIdentifiers.Scp02;
+    public override byte ProtocolVersion
+    {
+        get
+        {
+            return ProtocolIdentifiers.Scp02;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the Scp02Protocol class.
@@ -68,9 +73,11 @@ public class Scp02Protocol : SecureChannelProtocolBase
         // For SCP02, we need the sequence counter from the response
         var validation = ProtocolValidation.ValidateSequenceCounter(response.SequenceCounter, 2);
         if (validation.IsFailure)
+        {
             return Result.Failure<SecureChannelContext, SmartCardError>(
                 SmartCardError.InvalidResponse(validation.Error));
-            
+        }
+
         return DeriveSessionKeysAndValidate(response, hostChallenge);
 
         Result<SecureChannelContext, SmartCardError> DeriveSessionKeysAndValidate(
@@ -79,8 +86,10 @@ public class Scp02Protocol : SecureChannelProtocolBase
         {
             // Validate sequence counter exists for SCP02
             if (response.SequenceCounter == null)
+            {
                 return Result.Failure<SecureChannelContext, SmartCardError>(
                     SmartCardError.InvalidResponse("SCP02 requires sequence counter in INITIALIZE UPDATE response"));
+            }
 
             // Create SCP02-specific key derivation context
             var contextResult = KeyDerivationContext.CreateForScp02(
@@ -92,12 +101,17 @@ public class Scp02Protocol : SecureChannelProtocolBase
             );
 
             if (contextResult.IsFailure)
+            {
                 return Result.Failure<SecureChannelContext, SmartCardError>(contextResult.Error);
+            }
 
             // Derive session keys
             var sessionKeysResult = _keyDerivationService.DeriveSessionKeys(contextResult.Value);
             if (sessionKeysResult.IsFailure)
+            {
                 return sessionKeysResult.Error;
+            }
+
             var sessionKeys = sessionKeysResult.Value;
 
             // Verify card cryptogram using shared base class logic
@@ -172,7 +186,9 @@ public class Scp02Protocol : SecureChannelProtocolBase
     )
     {
         if (context == null)
+        {
             return SmartCardError.InvalidArgument("Context cannot be null");
+        }
 
         // For SCP02, MAC chaining value starts with zero ICV
         // Per GP Card Specification v2.3.1 Section E.4.3:

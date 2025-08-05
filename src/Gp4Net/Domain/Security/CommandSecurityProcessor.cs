@@ -4,14 +4,12 @@ using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Macs;
-using Org.BouncyCastle.Crypto.Modes;
 using Org.BouncyCastle.Crypto.Parameters;
 
 namespace Gp4Net.Domain.Security;
@@ -132,7 +130,9 @@ public static class CommandSecurityProcessor
         byte protocolVersion)
     {
         if (command.Length < 4)
+        {
             return SmartCardError.InvalidData("Command too short for MAC");
+        }
 
         // Determine command structure
         var (hasData, originalLc, originalLe) = ParseCommandStructure(command);
@@ -163,11 +163,15 @@ public static class CommandSecurityProcessor
         byte protocolVersion)
     {
         if (command.Length <= 5) // No data to encrypt
+        {
             return Result.Success<byte[], SmartCardError>(command);
+        }
 
         var lc = command[4];
         if (lc == 0 || command.Length < 5 + lc)
+        {
             return Result.Success<byte[], SmartCardError>(command);
+        }
 
         // Extract data to encrypt
         var dataToEncrypt = new byte[lc];
@@ -251,7 +255,9 @@ public static class CommandSecurityProcessor
     private static Result<byte[], SmartCardError> CreateScp03MacInput(byte[] command, bool hasData, byte originalLc)
     {
         if (command.Length < 4)
+        {
             return SmartCardError.InvalidData("Command too short for SCP03 MAC");
+        }
 
         // Extract header
         var ins = command[1];
@@ -291,7 +297,9 @@ public static class CommandSecurityProcessor
     private static Result<byte[], SmartCardError> CreateScp02MacInput(byte[] command)
     {
         if (command.Length < 4)
+        {
             return SmartCardError.InvalidData("Command too short for SCP02 MAC");
+        }
 
         // Extract header
         var cla = command[0];
@@ -332,7 +340,9 @@ public static class CommandSecurityProcessor
     private static (bool hasData, byte originalLc, byte? originalLe) ParseCommandStructure(byte[] command)
     {
         if (command.Length <= 4)
+        {
             return (false, 0, null);
+        }
 
         if (command.Length == 5)
         {
@@ -421,7 +431,7 @@ public static class CommandSecurityProcessor
 
     private static byte[] BuildCommandData(IApduCommand command)
     {
-        // Use ToApdu() to get the exact command structure including Le byte if present
-        return command.ToApdu();
+        // Use ApduBuilder to get the exact command structure including Le byte if present
+        return ApduBuilder.BuildApdu(command);
     }
 }

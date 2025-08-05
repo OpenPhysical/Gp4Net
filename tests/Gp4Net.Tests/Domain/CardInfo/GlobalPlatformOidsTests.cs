@@ -1,7 +1,6 @@
 using Gp4Net.Domain.CardInfo;
 using NUnit.Framework;
 using AwesomeAssertions;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.CardInfo;
 

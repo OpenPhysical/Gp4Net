@@ -11,40 +11,6 @@ using log4net;
 namespace Gp4Net.Tool.Services;
 
 /// <summary>
-/// Simplified JSON trace format for virtual card testing.
-/// </summary>
-public class SimpleTraceData
-{
-    public TraceMetadata Metadata { get; set; } = new();
-    public Dictionary<string, OperationRange> Operations { get; set; } = new();
-    public List<SimpleExchange> Exchanges { get; set; } = new();
-}
-
-public class TraceMetadata
-{
-    public string CardType { get; set; } = "NXP_P71";
-    public string Atr { get; set; } = "3BD518FF8191FE1FC38073C821100A";
-    public string IsdAid { get; set; } = "A000000151000000";
-}
-
-public class OperationRange
-{
-    public int StartIndex { get; set; }
-    public int EndIndex { get; set; }
-}
-
-/// <summary>
-/// Simplified APDU exchange.
-/// </summary>
-public class SimpleExchange
-{
-    public string Command { get; set; } = "";
-    public string Response { get; set; } = "";
-    public string? Description { get; set; }
-    public int? ResponseTimeMs { get; set; }
-}
-
-/// <summary>
 /// Simple JSON card service that uses minimal trace format.
 /// </summary>
 [PublicAPI]
@@ -52,13 +18,13 @@ public class SimpleJsonCardService : ICardService
 {
     private static readonly ILog Logger = LogManager.GetLogger(typeof(SimpleJsonCardService));
         
-    private SimpleTraceData? _traceData;
+    private SimpleTraceData _traceData;
     private Dictionary<string, string> _parameters = new();
     private HashSet<int> _allowedExchanges = new();
     private HashSet<int> _usedExchanges = new();
     private bool _isConnected;
     private bool _secureChannelEstablished;
-    private string? _readerName;
+    private string _readerName;
 
     /// <inheritdoc />
     public IReadOnlyList<string> GetReaders()
@@ -81,10 +47,15 @@ public class SimpleJsonCardService : ICardService
             
         // Add examples if not already found
         if (!readers.Any(r => r.Contains("card_info.json")))
+        {
             readers.Add("json:simple_card_info.json");
+        }
+
         if (!readers.Any(r => r.Contains("scp03.json")))
+        {
             readers.Add("json:simple_scp03.json?ops=info,auth");
-            
+        }
+
         return readers.AsReadOnly();
     }
 
@@ -92,7 +63,9 @@ public class SimpleJsonCardService : ICardService
     public bool Connect(string readerName)
     {
         if (string.IsNullOrEmpty(readerName) || !readerName.StartsWith("json:"))
+        {
             return false;
+        }
 
         try
         {
@@ -157,13 +130,21 @@ public class SimpleJsonCardService : ICardService
     }
 
     /// <inheritdoc />
-    public bool IsConnected => _isConnected && _traceData != null;
+    public bool IsConnected
+    {
+        get
+        {
+            return _isConnected && _traceData != null;
+        }
+    }
 
     /// <inheritdoc />
-    public byte[]? GetAtr()
+    public byte[] GetAtr()
     {
         if (!IsConnected || _traceData == null)
+        {
             return null;
+        }
 
         try
         {
@@ -183,7 +164,9 @@ public class SimpleJsonCardService : ICardService
         ArgumentNullException.ThrowIfNull(command);
 
         if (!IsConnected || _traceData == null)
+        {
             throw new InvalidOperationException("Not connected to JSON virtual reader");
+        }
 
         var commandHex = Convert.ToHexString(command);
         Logger.Debug($"Processing APDU {commandHex}");
@@ -276,7 +259,13 @@ public class SimpleJsonCardService : ICardService
     }
 
     /// <inheritdoc />
-    public bool IsSecureChannelEstablished => _secureChannelEstablished;
+    public bool IsSecureChannelEstablished
+    {
+        get
+        {
+            return _secureChannelEstablished;
+        }
+    }
 
     /// <inheritdoc />
     public void Dispose()

@@ -31,7 +31,7 @@ public class SessionKeys : IDisposable
     /// <summary>
     /// Gets the data encryption key (DEK) if applicable.
     /// </summary>
-    public byte[]? Dek { get; }
+    public byte[] Dek { get; }
 
     private bool _disposed = false;
 
@@ -42,7 +42,7 @@ public class SessionKeys : IDisposable
     /// <param name="sMac">The session MAC key.</param>
     /// <param name="sRMac">The session R-MAC key.</param>
     /// <param name="dek">The data encryption key (optional).</param>
-    public SessionKeys(byte[] sEnc, byte[] sMac, byte[] sRMac, byte[]? dek = null)
+    public SessionKeys(byte[] sEnc, byte[] sMac, byte[] sRMac, byte[] dek = null)
     {
         ArgumentNullException.ThrowIfNull(sEnc);
         ArgumentNullException.ThrowIfNull(sMac);

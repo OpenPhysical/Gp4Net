@@ -125,8 +125,8 @@ public static class CardCapabilitiesCodec
             var elements = TlvParser.ParseAll(outerTlv.Value);
             
             // Track the current protocol and implementation context
-            SecureChannelProtocol? currentProtocol = null;
-            ScpImplementationSpecifier? currentImplementation = null;
+            SecureChannelProtocol currentProtocol = null;
+            ScpImplementationSpecifier currentImplementation = null;
                 
             foreach (var element in elements)
             {
@@ -229,12 +229,12 @@ public class CardCapabilities
     /// <summary>
     /// Card recognition data (OID).
     /// </summary>
-    public byte[]? CardRecognitionData { get; set; }
+    public byte[] CardRecognitionData { get; set; }
         
     /// <summary>
     /// Card management type and version (2 bytes).
     /// </summary>
-    public byte[]? CardManagementTypeAndVersion { get; set; }
+    public byte[] CardManagementTypeAndVersion { get; set; }
         
     /// <summary>
     /// Card identification scheme.
@@ -249,12 +249,12 @@ public class CardCapabilities
     /// <summary>
     /// Card configuration details.
     /// </summary>
-    public byte[]? CardConfigurationDetails { get; set; }
+    public byte[] CardConfigurationDetails { get; set; }
         
     /// <summary>
     /// Card/chip details.
     /// </summary>
-    public byte[]? CardChipDetails { get; set; }
+    public byte[] CardChipDetails { get; set; }
 }
     
 /// <summary>

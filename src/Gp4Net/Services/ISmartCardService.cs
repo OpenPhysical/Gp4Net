@@ -70,7 +70,7 @@ public interface ISmartCardServiceFactory
     /// <returns>A smart card service instance.</returns>
     Task<Result<ISmartCardService, SmartCardError>> CreateAsync(
         string readerName,
-        SmartCardServiceOptions? options = null);
+        SmartCardServiceOptions options);
 
     /// <summary>
     /// Lists available smart card readers.
@@ -102,12 +102,12 @@ public record SmartCardServiceOptions
     /// <summary>
     /// Custom middleware to add to the pipeline.
     /// </summary>
-    public ICommandMiddleware[]? CustomMiddleware { get; init; }
+    public ICommandMiddleware[] CustomMiddleware { get; init; } = Array.Empty<ICommandMiddleware>();
 
     /// <summary>
     /// Initial context values.
     /// </summary>
-    public IPipelineContext? InitialContext { get; init; }
+    public IPipelineContext InitialContext { get; init; }
 }
 
 /// <summary>

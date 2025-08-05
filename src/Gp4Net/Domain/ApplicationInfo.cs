@@ -18,17 +18,35 @@ public record ApplicationInfo(
     /// <summary>
     /// Gets the application AID as a hexadecimal string.
     /// </summary>
-    public string AidHex => Convert.ToHexString(Aid);
+    public string AidHex
+    {
+        get
+        {
+            return Convert.ToHexString(Aid);
+        }
+    }
 
     /// <summary>
     /// Gets the lifecycle state as a string.
     /// </summary>
-    public string LifecycleStateString => LifecycleState.ToString();
+    public string LifecycleStateString
+    {
+        get
+        {
+            return LifecycleState.ToString();
+        }
+    }
 
     /// <summary>
     /// Gets the application type as a string.
     /// </summary>
-    public string TypeString => Type.ToString();
+    public string TypeString
+    {
+        get
+        {
+            return Type.ToString();
+        }
+    }
 
     /// <summary>
     /// Checks if the application has a specific privilege.
@@ -38,12 +56,24 @@ public record ApplicationInfo(
     /// <summary>
     /// Checks if the application is selectable.
     /// </summary>
-    public bool IsSelectable => LifecycleState == LifecycleState.Selectable;
+    public bool IsSelectable
+    {
+        get
+        {
+            return LifecycleState == LifecycleState.Selectable;
+        }
+    }
 
     /// <summary>
     /// Checks if the application is an Issuer Security Domain.
     /// </summary>
-    public bool IsIssuerSecurityDomain => Type == ApplicationType.IssuerSecurityDomain;
+    public bool IsIssuerSecurityDomain
+    {
+        get
+        {
+            return Type == ApplicationType.IssuerSecurityDomain;
+        }
+    }
 }
 
 /// <summary>

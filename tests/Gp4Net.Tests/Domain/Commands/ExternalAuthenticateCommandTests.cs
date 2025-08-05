@@ -1,11 +1,9 @@
 using System;
 using AwesomeAssertions;
-using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Transport;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
@@ -106,9 +104,7 @@ public class ExternalAuthenticateCommandTests
         var command = result.Value;
 
         // Act
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.GetApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         apdu[0].Should().Be(0x84); // CLA - Secure messaging
@@ -133,9 +129,7 @@ public class ExternalAuthenticateCommandTests
         var command = result.Value;
 
         // Act
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.GetApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         apdu[0].Should().Be(0x84); // CLA - Secure messaging
@@ -163,9 +157,7 @@ public class ExternalAuthenticateCommandTests
         var command = result.Value;
 
         // Act
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.GetApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         apdu[2].Should().Be(expectedP1); // P1
@@ -183,10 +175,8 @@ public class ExternalAuthenticateCommandTests
         var command = result.Value;
 
         // Act
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu1 = command.GetApdu();
-        var apdu2 = command.GetApdu();
-#pragma warning restore CS0618
+        var apdu1 = ApduBuilder.BuildApdu(command);
+        var apdu2 = ApduBuilder.BuildApdu(command);
 
         // Assert
         apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
@@ -229,9 +219,7 @@ public class ExternalAuthenticateCommandTests
             new byte[8]);
         result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-        var apdu = command.GetApdu();
-#pragma warning restore CS0618
+        var apdu = ApduBuilder.BuildApdu(command);
 
         apdu.Length.Should().Be(21); // 5 header + 8 cryptogram + 8 MAC
         apdu[0].Should().Be(0x84); // CLA
@@ -261,9 +249,7 @@ public class ExternalAuthenticateCommandTests
             var result = ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, new byte[8]);
             result.IsSuccess.Should().BeTrue();
             var command = result.Value;
-#pragma warning disable CS0618 // Testing APDU format generation is core to this test
-            var apdu = command.GetApdu();
-#pragma warning restore CS0618
+            var apdu = ApduBuilder.BuildApdu(command);
             apdu[2].Should().Be(expectedP1);
         }
     }

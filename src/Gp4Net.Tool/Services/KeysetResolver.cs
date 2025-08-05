@@ -33,13 +33,13 @@ public class KeysetResolver : IKeysetResolver
     /// Resolves a keyset from various sources.
     /// </summary>
     public IKeySet ResolveKeyset(
-        string? keysetSpec,
-        Dictionary<string, string>? keysetParams,
-        byte[]? encKey,
-        byte[]? macKey,
-        byte[]? dekKey,
+        string keysetSpec,
+        Dictionary<string, string> keysetParams,
+        byte[] encKey,
+        byte[] macKey,
+        byte[] dekKey,
         byte keyVersion,
-        InitializeUpdateResponse? cardResponse = null
+        InitializeUpdateResponse cardResponse = null
     )
     {
         // Priority 1: Individual keys specified
@@ -61,8 +61,8 @@ public class KeysetResolver : IKeysetResolver
 
     private IKeySet ResolveFromScript(
         string keysetSpec,
-        Dictionary<string, string>? keysetParams,
-        InitializeUpdateResponse? cardResponse
+        Dictionary<string, string> keysetParams,
+        InitializeUpdateResponse cardResponse
     )
     {
         try
@@ -117,8 +117,8 @@ public class KeysetResolver : IKeysetResolver
     }
 
     private static Dictionary<string, object> CreateScriptContext(
-        Dictionary<string, string>? keysetParams,
-        InitializeUpdateResponse? cardResponse
+        Dictionary<string, string> keysetParams,
+        InitializeUpdateResponse cardResponse
     )
     {
         var context = new Dictionary<string, object>();
@@ -201,7 +201,7 @@ public class KeysetResolver : IKeysetResolver
         }
     }
 
-    private static byte[]? GetBytesFromTable(Table table, string key)
+    private static byte[] GetBytesFromTable(Table table, string key)
     {
         var value = table.Get(key);
         if (value.IsNil())
@@ -241,9 +241,9 @@ public class KeysetResolver : IKeysetResolver
     }
 
     private static IKeySet CreateKeysetFromIndividualKeys(
-        byte[]? encKey,
-        byte[]? macKey,
-        byte[]? dekKey,
+        byte[] encKey,
+        byte[] macKey,
+        byte[] dekKey,
         byte keyVersion
     )
     {

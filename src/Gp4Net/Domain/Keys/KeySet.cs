@@ -146,11 +146,15 @@ public class Scp02KeySet : KeySet
     private static Result<bool, SmartCardError> ValidateKey(byte[] key, string paramName)
     {
         if (key is null)
+        {
             return SmartCardError.InvalidArgument($"Key {paramName} cannot be null");
-            
+        }
+
         if (key.Length != 16 && key.Length != 24)
+        {
             return SmartCardError.InvalidArgument($"3DES key {paramName} must be 16 or 24 bytes, got {key.Length} bytes");
-            
+        }
+
         return true;
     }
 }
@@ -189,19 +193,25 @@ public class Scp03KeySet : KeySet
     private static Result<bool, SmartCardError> ValidateKey(byte[] key, string paramName)
     {
         if (key is null)
+        {
             return SmartCardError.InvalidArgument($"Key {paramName} cannot be null");
-            
+        }
+
         if (key.Length != 16 && key.Length != 24 && key.Length != 32)
+        {
             return SmartCardError.InvalidArgument($"AES key {paramName} must be 16, 24, or 32 bytes, got {key.Length} bytes");
-            
+        }
+
         return true;
     }
 
     private static Result<bool, SmartCardError> ValidateKeyLengthsMatch(byte[] encKey, byte[] macKey, byte[] dekKey)
     {
         if (encKey.Length != macKey.Length || macKey.Length != dekKey.Length)
+        {
             return SmartCardError.InvalidArgument($"All AES keys must have the same length. Got ENC: {encKey.Length}, MAC: {macKey.Length}, DEK: {dekKey.Length} bytes");
-            
+        }
+
         return true;
     }
 }

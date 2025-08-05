@@ -5,11 +5,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using CSharpFunctionalExtensions;
-using Gp4Net.CardEmulator.Services;
-using Gp4Net.Core;
-using Gp4Net.Services;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
@@ -114,7 +109,15 @@ public class HybridCardService : ICardService
     }
 
     /// <inheritdoc />
-    public bool IsConnected => _realCardService.IsConnected; // Virtual connections are always "connected" when available
+    public bool IsConnected
+    {
+        get
+        {
+            return _realCardService.IsConnected;
+
+            // Virtual connections are always "connected" when available
+        }
+    }
 
     /// <inheritdoc />
     public byte[] GetAtr()
@@ -163,7 +166,13 @@ public class HybridCardService : ICardService
     }
 
     /// <inheritdoc />
-    public bool IsSecureChannelEstablished => _realCardService.IsSecureChannelEstablished;
+    public bool IsSecureChannelEstablished
+    {
+        get
+        {
+            return _realCardService.IsSecureChannelEstablished;
+        }
+    }
 
     /// <summary>
     /// Determines if a reader name refers to a virtual card emulator.
@@ -173,8 +182,10 @@ public class HybridCardService : ICardService
     private static bool IsVirtualReader(string readerName)
     {
         if (string.IsNullOrEmpty(readerName))
+        {
             return false;
-                
+        }
+
         var normalized = readerName.ToLowerInvariant();
         return normalized.Contains("virtual") || 
                normalized.Contains("emulator") || 

@@ -66,8 +66,15 @@ public class GetDataCommand : IApduCommand
 
         /// <summary>
         /// Sequence Counter of the default Key Version Number (tag 0x00C1).
+        /// Also known as Security Domain Management Data.
         /// </summary>
         public static readonly ushort SequenceCounterDefaultKeyVersion = 0x00C1;
+        
+        /// <summary>
+        /// Security Domain Management Data (tag 0x00C1).
+        /// Same as SequenceCounterDefaultKeyVersion.
+        /// </summary>
+        public static readonly ushort SecurityDomainManagementData = 0x00C1;
 
         /// <summary>
         /// Confirmation Counter (tag 0x00C2).
@@ -123,12 +130,24 @@ public class GetDataCommand : IApduCommand
     /// <summary>
     /// Gets the P1 parameter (high byte of data object identifier).
     /// </summary>
-    public byte P1 => (byte)(DataObjectIdentifier >> 8);
+    public byte P1
+    {
+        get
+        {
+            return (byte)(DataObjectIdentifier >> 8);
+        }
+    }
 
     /// <summary>
     /// Gets the P2 parameter (low byte of data object identifier).
     /// </summary>
-    public byte P2 => (byte)(DataObjectIdentifier & 0xFF);
+    public byte P2
+    {
+        get
+        {
+            return (byte)(DataObjectIdentifier & 0xFF);
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the GetDataCommand class.
@@ -195,13 +214,55 @@ public class GetDataCommand : IApduCommand
     }
 
     // IApduCommand implementation
-    byte IApduCommand.Cla => Cla;
-    byte IApduCommand.Ins => Ins;
-    byte IApduCommand.P1 => P1;
-    byte IApduCommand.P2 => P2;
-    byte[]? IApduCommand.Data => null;
-    int? IApduCommand.ExpectedResponseLength => 256;
-    bool IApduCommand.IsExtendedLength => false;
+    byte IApduCommand.Cla
+    {
+        get
+        {
+            return Cla;
+        }
+    }
+    byte IApduCommand.Ins
+    {
+        get
+        {
+            return Ins;
+        }
+    }
+    byte IApduCommand.P1
+    {
+        get
+        {
+            return P1;
+        }
+    }
+    byte IApduCommand.P2
+    {
+        get
+        {
+            return P2;
+        }
+    }
+    byte[] IApduCommand.Data
+    {
+        get
+        {
+            return [];
+        }
+    }
+    Maybe<int> IApduCommand.ExpectedResponseLength
+    {
+        get
+        {
+            return Maybe<int>.From(256);
+        }
+    }
+    bool IApduCommand.IsExtendedLength
+    {
+        get
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Returns a string representation of the command.
@@ -234,7 +295,13 @@ public class GetDataResponse
     /// <summary>
     /// Gets a value indicating whether the response is in TLV format.
     /// </summary>
-    public bool IsTlvFormat => TlvObject.HasValue;
+    public bool IsTlvFormat
+    {
+        get
+        {
+            return TlvObject.HasValue;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the GetDataResponse class.
@@ -286,12 +353,12 @@ public class GetDataResponse
     /// <summary>
     /// Parses the response as CPLC data.
     /// </summary>
-    /// <returns>Parsed CPLC data or null if not applicable.</returns>
-    public CplcData? ParseAsCplc()
+    /// <returns>Parsed CPLC data or None if not applicable.</returns>
+    public Maybe<CplcData> ParseAsCplc()
     {
         if (DataObjectIdentifier != GetDataCommand.DataObjects.CardProductionLifeCycle)
         {
-            return null;
+            return Maybe<CplcData>.None;
         }
 
         // CPLC data can be in raw format or TLV format
@@ -299,72 +366,66 @@ public class GetDataResponse
 
         if (dataToparse.Length < 42)
         {
-            return null;
+            return Maybe<CplcData>.None;
         }
 
-        try
-        {
-            return CplcData.Parse(dataToparse);
-        }
-        catch
-        {
-            return null;
-        }
+        return CplcData.Parse(dataToparse)
+            .Match(
+                success => Maybe<CplcData>.From(success),
+                failure => Maybe<CplcData>.None
+            );
     }
 
     /// <summary>
     /// Parses the response as Card Data.
     /// </summary>
-    /// <returns>Parsed card data or null if not applicable.</returns>
-    public CardDataInfo? ParseAsCardData()
+    /// <returns>Parsed card data or None if not applicable.</returns>
+    public Maybe<CardDataInfo> ParseAsCardData()
     {
         if (DataObjectIdentifier != GetDataCommand.DataObjects.CardData)
         {
-            return null;
+            return Maybe<CardDataInfo>.None;
         }
 
         var dataToparse = IsTlvFormat && TlvObject.HasValue ? TlvObject.Value.Value : Data;
 
         if (dataToparse == null || dataToparse.Length == 0)
         {
-            return null;
+            return Maybe<CardDataInfo>.None;
         }
 
-        try
-        {
-            return CardDataInfo.Parse(dataToparse);
-        }
-        catch
-        {
-            return null;
-        }
+        return CardDataInfo.Parse(dataToparse)
+            .Match(
+                success => Maybe<CardDataInfo>.From(success),
+                failure => Maybe<CardDataInfo>.None
+            );
     }
 
     /// <summary>
     /// Parses the response as Card Capabilities (tag 0x67 format).
     /// </summary>
     /// <returns>Parsed card capabilities or null if not applicable.</returns>
-    public CardCapabilities? ParseAsCardCapabilities()
+    public Maybe<CardCapabilities> ParseAsCardCapabilities()
     {
         if (DataObjectIdentifier != GetDataCommand.DataObjects.CardCapabilities)
         {
-            return null;
+            return Maybe<CardCapabilities>.None;
         }
 
         var dataToparse = IsTlvFormat && TlvObject.HasValue ? TlvObject.Value.Value : Data;
 
         if (dataToparse == null || dataToparse.Length == 0)
         {
-            return null;
+            return Maybe<CardCapabilities>.None;
         }
 
         try
         {
-            return CardCapabilities.Parse(dataToparse);
+            return Maybe<CardCapabilities>.From(CardCapabilities.Parse(dataToparse));
         }
         catch
         {
-            return null;
+            return Maybe<CardCapabilities>.None;
         }
     }
 
@@ -383,14 +444,14 @@ public class GetDataResponse
     /// <summary>
     /// Gets the value as a numeric value (for counters, etc).
     /// </summary>
-    /// <returns>The numeric value or null if not applicable.</returns>
-    public uint? GetValueAsNumber()
+    /// <returns>The numeric value or None if not applicable.</returns>
+    public Maybe<uint> GetValueAsNumber()
     {
         var dataToUse = IsTlvFormat && TlvObject.HasValue ? TlvObject.Value.Value : Data;
 
         if (dataToUse == null || dataToUse.Length == 0 || dataToUse.Length > 4)
         {
-            return null;
+            return Maybe<uint>.None;
         }
 
         uint result = 0;
@@ -399,34 +460,31 @@ public class GetDataResponse
             result = (result << 8) | dataToUse[i];
         }
 
-        return result;
+        return Maybe<uint>.From(result);
     }
 
     /// <summary>
     /// Parses the response as Key Information Template.
     /// </summary>
-    /// <returns>Parsed key information or null if not applicable.</returns>
-    public KeyInformationTemplate? ParseAsKeyInformation()
+    /// <returns>Parsed key information or None if not applicable.</returns>
+    public Maybe<KeyInformationTemplate> ParseAsKeyInformation()
     {
         if (DataObjectIdentifier != GetDataCommand.DataObjects.KeyInformationTemplate)
         {
-            return null;
+            return Maybe<KeyInformationTemplate>.None;
         }
 
         var dataToparse = IsTlvFormat && TlvObject.HasValue ? TlvObject.Value.Value : Data;
 
         if (dataToparse == null || dataToparse.Length == 0)
         {
-            return null;
+            return Maybe<KeyInformationTemplate>.None;
         }
 
-        try
-        {
-            return KeyInformationTemplate.Parse(dataToparse);
-        }
-        catch
-        {
-            return null;
-        }
+        return KeyInformationTemplate.Parse(dataToparse)
+            .Match(
+                success => Maybe<KeyInformationTemplate>.From(success),
+                failure => Maybe<KeyInformationTemplate>.None
+            );
     }
 }

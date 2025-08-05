@@ -56,7 +56,7 @@ public interface IGlobalPlatformService
     /// <returns>The installation result.</returns>
     Task<Result<InstallationResult, SmartCardError>> InstallCapFileAsync(
         byte[] capFileData,
-        InstallOptions? options = null,
+        InstallOptions options = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -120,4 +120,4 @@ public interface IGlobalPlatformService
 public record InstallOptions(
     bool InstallApplets = true,
     bool MakeSelectable = true,
-    byte[]? InstallParameters = null);
+    byte[] InstallParameters = null);

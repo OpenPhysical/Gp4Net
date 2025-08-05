@@ -118,12 +118,16 @@ public static class CryptogramBuilder
     {
         var hostValidation = ProtocolValidation.ValidateHostChallenge(hostChallenge);
         if (hostValidation.IsFailure)
+        {
             return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidData(hostValidation.Error));
-            
+        }
+
         var cardValidation = ProtocolValidation.ValidateCardChallenge(response.CardChallenge, 6);
         if (cardValidation.IsFailure)
+        {
             return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidResponse(cardValidation.Error));
-            
+        }
+
         return ExtractScp02SequenceCounter(response)
             .Map(sequenceCounter =>
             {
@@ -153,12 +157,16 @@ public static class CryptogramBuilder
     {
         var hostValidation = ProtocolValidation.ValidateHostChallenge(hostChallenge);
         if (hostValidation.IsFailure)
+        {
             return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidData(hostValidation.Error));
-            
+        }
+
         var cardValidation = ProtocolValidation.ValidateCardChallenge(response.CardChallenge, 6);
         if (cardValidation.IsFailure)
+        {
             return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidResponse(cardValidation.Error));
-            
+        }
+
         return ExtractScp02SequenceCounter(response)
             .Map(sequenceCounter =>
             {
@@ -187,12 +195,16 @@ public static class CryptogramBuilder
     {
         var hostValidation = ProtocolValidation.ValidateHostChallenge(hostChallenge);
         if (hostValidation.IsFailure)
+        {
             return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidData(hostValidation.Error));
-            
+        }
+
         var cardValidation = ProtocolValidation.ValidateCardChallenge(response.CardChallenge, 8);
         if (cardValidation.IsFailure)
+        {
             return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidResponse(cardValidation.Error));
-            
+        }
+
         // SCP03 card cryptogram data: Host Challenge (8) || Card Challenge (8)
         return Result.Success<byte[], SmartCardError>(
             CryptographicOperations.ConcatenateArrays(hostChallenge, response.CardChallenge));
@@ -211,12 +223,16 @@ public static class CryptogramBuilder
     {
         var hostValidation = ProtocolValidation.ValidateHostChallenge(hostChallenge);
         if (hostValidation.IsFailure)
+        {
             return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidData(hostValidation.Error));
-            
+        }
+
         var cardValidation = ProtocolValidation.ValidateCardChallenge(response.CardChallenge, 8);
         if (cardValidation.IsFailure)
+        {
             return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidResponse(cardValidation.Error));
-            
+        }
+
         // SCP03 host cryptogram data: Card Challenge (8) || Host Challenge (8)
         return Result.Success<byte[], SmartCardError>(
             CryptographicOperations.ConcatenateArrays(response.CardChallenge, hostChallenge));

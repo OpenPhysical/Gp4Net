@@ -3,7 +3,6 @@ using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
 using Gp4Net.Core;
-using Gp4Net.Domain;
 using Gp4Net.Services;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Services;
@@ -165,7 +164,7 @@ public class LoadCommand : BaseCommand<LoadCommand.Settings>
         [CommandOption("--package-aid")]
         [Description("Override the package AID (hex string)")]
         [TypeConverter(typeof(HexStringTypeConverter))]
-        public byte[]? PackageAid { get; set; }
+        public byte[] PackageAid { get; set; }
 
         /// <summary>
         /// Gets or sets the security domain AID.
@@ -173,7 +172,7 @@ public class LoadCommand : BaseCommand<LoadCommand.Settings>
         [CommandOption("--security-domain")]
         [Description("Security domain AID for delegated management (hex string)")]
         [TypeConverter(typeof(HexStringTypeConverter))]
-        public byte[]? SecurityDomain { get; set; }
+        public byte[] SecurityDomain { get; set; }
 
         /// <summary>
         /// Gets or sets the maximum block size.
@@ -191,7 +190,13 @@ public class LoadCommand : BaseCommand<LoadCommand.Settings>
         public bool ShowDetails { get; set; }
 
         /// <inheritdoc />
-        public override bool RequiresSecureChannel => true;
+        public override bool RequiresSecureChannel
+        {
+            get
+            {
+                return true;
+            }
+        }
 
         /// <summary>
         /// Validates the command settings.

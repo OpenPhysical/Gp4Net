@@ -7,7 +7,6 @@ using Gp4Net.Tool.Services.CardCommunication;
 using Gp4Net.Transport;
 using Moq;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 using WSCT.Core.APDU;
 using WSCT.ISO7816;
 using WSCT.Wrapper;
@@ -736,8 +735,8 @@ public class WsctCardServiceTests
         _service.Dispose();
 
         // Assert
-        _mockChannel.Verify(ch => ch.Disconnect(Disposition.UnpowerCard), Times.Once);
-        _mockChannel.Verify(ch => ch.Dispose(), Times.Once);
+        _mockChannel.Verify(static ch => ch.Disconnect(Disposition.UnpowerCard), Times.Once);
+        _mockChannel.Verify(static ch => ch.Dispose(), Times.Once);
         _mockContext.Verify(c => c.Dispose(), Times.Once);
     }
 
@@ -755,7 +754,7 @@ public class WsctCardServiceTests
         _service.Dispose();
 
         // Assert
-        _mockContext.Verify(c => c.Dispose(), Times.Once);
+        _mockContext.Verify(static c => c.Dispose(), Times.Once);
     }
 
     [Test]

@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
@@ -13,38 +12,44 @@ public record CommandResponse(
     byte[] Data,
     StatusWord StatusWord,
     IPipelineContext UpdatedContext,
-    IReadOnlyDictionary<string, object>? Metadata = null)
+    IReadOnlyDictionary<string, object> Metadata)
 {
     /// <summary>
     /// Gets a value indicating whether the command was successful (SW=9000).
     /// </summary>
-    public bool IsSuccess => StatusWord == StatusWords.Success;
+    public bool IsSuccess
+    {
+        get
+        {
+            return StatusWord == StatusWords.Success;
+        }
+    }
 
     /// <summary>
     /// Creates a successful response.
     /// </summary>
     public static CommandResponse Success(
-        byte[]? data = null,
-        IPipelineContext? context = null,
-        IReadOnlyDictionary<string, object>? metadata = null) =>
+        byte[] data = null,
+        IPipelineContext context = null,
+        IReadOnlyDictionary<string, object> metadata = null) =>
         new(
             data ?? [],
             StatusWords.Success,
             context ?? ImmutablePipelineContext.Empty,
-            metadata);
+            metadata ?? new Dictionary<string, object>());
 
     /// <summary>
     /// Creates a failed response.
     /// </summary>
     public static CommandResponse Failure(
         StatusWord statusWord,
-        IPipelineContext? context = null,
-        IReadOnlyDictionary<string, object>? metadata = null) =>
+        IPipelineContext context = null,
+        IReadOnlyDictionary<string, object> metadata = null) =>
         new(
             [],
             statusWord,
             context ?? ImmutablePipelineContext.Empty,
-            metadata);
+            metadata ?? new Dictionary<string, object>());
 
     /// <summary>
     /// Converts this response to a Result type.
@@ -60,7 +65,7 @@ public record CommandResponse(
     /// </summary>
     public CommandResponse WithMetadata(string key, object value)
     {
-        var newMetadata = new Dictionary<string, object>(Metadata ?? new Dictionary<string, object>())
+        var newMetadata = new Dictionary<string, object>(Metadata)
         {
             [key] = value
         };

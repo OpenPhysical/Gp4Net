@@ -23,12 +23,12 @@ public interface IKeysetResolver
     /// <param name="cardResponse">Optional card response for key diversification.</param>
     /// <returns>The resolved keyset.</returns>
     IKeySet ResolveKeyset(
-        string? keysetSpec,
-        Dictionary<string, string>? keysetParams,
-        byte[]? encKey,
-        byte[]? macKey,
-        byte[]? dekKey,
+        string keysetSpec,
+        Dictionary<string, string> keysetParams,
+        byte[] encKey,
+        byte[] macKey,
+        byte[] dekKey,
         byte keyVersion,
-        InitializeUpdateResponse? cardResponse = null
+        InitializeUpdateResponse cardResponse = null
     );
 }

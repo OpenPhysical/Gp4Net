@@ -26,7 +26,7 @@ public interface IScriptManager
     /// </summary>
     DynValue ExecuteFunction(
         string scriptFunction,
-        Dictionary<string, object>? parameters = null
+        Dictionary<string, object> parameters = null
     );
 
     /// <summary>
@@ -36,7 +36,7 @@ public interface IScriptManager
         string scriptPath,
         string functionName,
         string[] args,
-        Dictionary<string, object>? context = null
+        Dictionary<string, object> context = null
     );
 
     /// <summary>

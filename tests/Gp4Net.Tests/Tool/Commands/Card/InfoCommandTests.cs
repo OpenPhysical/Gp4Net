@@ -13,7 +13,6 @@ using Gp4Net.Tool.Pipeline;
 using Gp4Net.Tool.Services;
 using Moq;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 using Spectre.Console.Testing;
 using StatusSubset = Gp4Net.Domain.Commands.GetStatusCommand.StatusSubset;
 
@@ -26,7 +25,7 @@ public class InfoCommandTests
     private Mock<ICardService> _mockCardService;
     private Mock<IGlobalPlatformService> _mockGlobalPlatformService;
     private Mock<IKeysetResolver> _mockKeysetResolver;
-    private MockCommandContext _mockContext;
+    private MockCliContext _mockContext;
     private InfoCommand _command;
     private TestConsole _console;
 
@@ -39,7 +38,7 @@ public class InfoCommandTests
         _mockKeysetResolver = new Mock<IKeysetResolver>();
         _console = new TestConsole();
 
-        _mockContext = new MockCommandContext(
+        _mockContext = new MockCliContext(
             _mockDisplayService.Object,
             _mockCardService.Object,
             _mockGlobalPlatformService.Object,

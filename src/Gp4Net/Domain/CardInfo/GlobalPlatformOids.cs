@@ -61,7 +61,7 @@ public static class GlobalPlatformOids
     /// </summary>
     /// <param name="oid">The OID in dotted notation.</param>
     /// <returns>The description if known, otherwise null.</returns>
-    public static string? GetDescription(string oid)
+    public static string GetDescription(string oid)
     {
         if (string.IsNullOrEmpty(oid))
         {
@@ -86,7 +86,7 @@ public static class GlobalPlatformOids
     /// </summary>
     /// <param name="oid">The OID in dotted notation.</param>
     /// <returns>The SCP version (e.g., "SCP03") or null if not an SCP OID.</returns>
-    public static string? GetScpVersion(string oid)
+    public static string GetScpVersion(string oid)
     {
         if (string.IsNullOrEmpty(oid))
         {
@@ -120,7 +120,7 @@ public static class GlobalPlatformOids
     /// </summary>
     /// <param name="oid">The OID in dotted notation.</param>
     /// <returns>A formatted string with OID and description.</returns>
-    public static string? FormatOid(string? oid)
+    public static string FormatOid(string oid)
     {
         if (string.IsNullOrEmpty(oid))
         {

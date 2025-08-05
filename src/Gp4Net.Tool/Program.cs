@@ -270,7 +270,8 @@ public class Program
             var domainServiceFactory = provider.GetRequiredService<IDomainServiceFactory>();
             var keysetResolver = provider.GetRequiredService<IKeysetResolver>();
                 
-            return new Pipeline.CommandContext(display, cardService, domainServiceFactory, keysetResolver);
+            var logger = provider.GetService<ILogger<Pipeline.CliContext>>();
+            return new Pipeline.CliContext(display, cardService, domainServiceFactory, keysetResolver, logger);
         });
             
         // Build the command pipeline

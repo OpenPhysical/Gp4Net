@@ -20,7 +20,7 @@ public class LoggingMiddleware : CommandMiddlewareBase
     /// <summary>
     /// Initializes a new instance of LoggingMiddleware.
     /// </summary>
-    public LoggingMiddleware(ILogger<LoggingMiddleware> logger, LoggingOptions? options = null)
+    public LoggingMiddleware(ILogger<LoggingMiddleware> logger, LoggingOptions options = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _options = options ?? new LoggingOptions();
@@ -65,7 +65,9 @@ public class LoggingMiddleware : CommandMiddlewareBase
     private void LogRequest(CommandRequest request, string requestId)
     {
         if (!_logger.IsEnabled(LogLevel.Debug))
+        {
             return;
+        }
 
         var logBuilder = new StringBuilder();
         logBuilder.AppendLine($"[{requestId}] Executing {request.Command.GetType().Name}");
@@ -132,7 +134,9 @@ public class LoggingMiddleware : CommandMiddlewareBase
         var level = response.IsSuccess ? LogLevel.Debug : LogLevel.Warning;
 
         if (!_logger.IsEnabled(level))
+        {
             return;
+        }
 
         var logBuilder = new StringBuilder();
         logBuilder.AppendLine($"[{requestId}] Command completed in {elapsed.TotalMilliseconds:F1}ms");
@@ -150,7 +154,7 @@ public class LoggingMiddleware : CommandMiddlewareBase
             }
         }
 
-        if (_options.LogMetadata && response.Metadata != null)
+        if (_options.LogMetadata && response.Metadata.Count > 0)
         {
             foreach (var (key, value) in response.Metadata)
             {

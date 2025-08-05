@@ -1,4 +1,5 @@
 using System;
+using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Domain.CardInfo;
 
@@ -24,23 +25,20 @@ public static class CplcDateParser
     /// Parses a CPLC date value to a DateTime.
     /// </summary>
     /// <param name="cplcDate">The 2-byte CPLC date value.</param>
-    /// <returns>The parsed date, or null if the date is invalid.</returns>
-    public static DateTime? ParseDate(ushort cplcDate)
+    /// <returns>The parsed date, or None if the date is invalid.</returns>
+    public static Maybe<DateTime> ParseDate(ushort cplcDate)
     {
         if (!IsValidDate(cplcDate))
         {
-            return null;
+            return Maybe<DateTime>.None;
         }
 
-        try
-        {
-            return BaseDate.AddDays(cplcDate);
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-            // Date value would result in DateTime outside valid range
-            return null;
-        }
+        // Check bounds to avoid DateTime overflow 
+        // Since ushort max is 65535, and BaseDate is 2000-01-01, max date would be ~2179
+        // This is well within DateTime range, but we validate for safety
+        // No additional check needed - ushort range is inherently safe
+
+        return Maybe<DateTime>.From(BaseDate.AddDays(cplcDate));
     }
 
     /// <summary>

@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Tests.TestHelpers;

@@ -1,14 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using AwesomeAssertions;
-using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
 using Gp4Net.Domain.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,6 +18,7 @@ namespace Gp4Net.Tests.Unit.Security;
 /// Tests the functional decryption service following established patterns.
 /// </summary>
 [TestFixture]
+[Category("Unit")]
 public class TraceApduDecryptorServiceTests
 {
     private readonly TraceApduDecryptorService _service;
@@ -36,7 +34,7 @@ public class TraceApduDecryptorServiceTests
     public void Constructor_WithNullLogger_ShouldCreateService()
     {
         var service = new TraceApduDecryptorService(null);
-        
+
         service.Should().NotBeNull();
     }
 
@@ -44,7 +42,7 @@ public class TraceApduDecryptorServiceTests
     public void Constructor_WithLogger_ShouldCreateService()
     {
         var service = new TraceApduDecryptorService(_logger);
-        
+
         service.Should().NotBeNull();
     }
 
@@ -70,7 +68,7 @@ public class TraceApduDecryptorServiceTests
         updatedState.Should().Be(sessionState); // State unchanged for plaintext
     }
 
-    [Test] 
+    [Test]
     public void DecryptApdu_WithSecureCommand_ShouldDetectSecureMessaging()
     {
         // Command with secure messaging indicator (CLA = 0x84)
@@ -110,7 +108,7 @@ public class TraceApduDecryptorServiceTests
     {
         var exchanges = new[]
         {
-            new TraceExchange(1, 
+            new TraceExchange(1,
                 new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x08, 0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x00 }, // SELECT
                 new byte[] { 0x90, 0x00 }) // Success
         };
@@ -123,7 +121,7 @@ public class TraceApduDecryptorServiceTests
         result.IsSuccess.Should().BeTrue();
         var decryptedTrace = result.Value;
         decryptedTrace.Exchanges.Should().HaveCount(1);
-        
+
         var exchange = decryptedTrace.Exchanges.First();
         exchange.Id.Should().Be(1);
         exchange.Command.Status.Should().Be(DecryptionStatus.PlainText);
@@ -140,7 +138,7 @@ public class TraceApduDecryptorServiceTests
                 new byte[] { 0x84, 0x50, 0x00, 0x00, 0x08, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 },
                 new byte[] { 0x90, 0x00 })
         };
-        
+
         // Invalid session keys (empty components)
         var emptyKey = new byte[0];
         var invalidKeys = new SessionKeys(emptyKey, emptyKey, emptyKey, emptyKey);
@@ -206,7 +204,7 @@ public class TraceApduDecryptorServiceTests
         var id = 42;
         var command = new byte[] { 0x01, 0x02 };
         var response = new byte[] { 0x03, 0x04 };
-        
+
         var exchange = new TraceExchange(id, command, response);
 
         exchange.Id.Should().Be(id);
@@ -234,7 +232,7 @@ public class TraceApduDecryptorServiceTests
     {
         var key = new byte[16]; // AES-128 key for SCP03
         Array.Fill(key, (byte)0x01);
-        
+
         return new SessionKeys(
             sEnc: key,
             sMac: key,
@@ -245,7 +243,7 @@ public class TraceApduDecryptorServiceTests
     private static SecureChannelState CreateTestSessionState(SessionKeys sessionKeys, SecurityLevel securityLevel, byte protocolVersion)
     {
         var macChaining = protocolVersion == ProtocolIdentifiers.Scp03 ? new byte[16] : new byte[8];
-        
+
         return SecureChannelState.Create(
             sessionKeys,
             securityLevel,

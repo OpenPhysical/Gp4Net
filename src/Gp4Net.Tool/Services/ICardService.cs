@@ -36,7 +36,7 @@ public interface ICardService : IDisposable
     /// <summary>
     /// Gets the ATR of the connected card.
     /// </summary>
-    byte[]? GetAtr();
+    byte[] GetAtr();
 
     /// <summary>
     /// Sends an APDU command to the card.
@@ -85,7 +85,13 @@ public class CardResponse
     /// <summary>
     /// Gets a value indicating whether the command was successful.
     /// </summary>
-    public bool IsSuccessful => StatusWord == 0x9000;
+    public bool IsSuccessful
+    {
+        get
+        {
+            return StatusWord == 0x9000;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the CardResponse class.

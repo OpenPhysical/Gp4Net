@@ -175,7 +175,9 @@ public static class GpTestKeys
     )
     {
         if (string.IsNullOrWhiteSpace(hexKey))
+        {
             return SmartCardError.InvalidArgument("Hex key cannot be null or empty.");
+        }
 
         try
         {

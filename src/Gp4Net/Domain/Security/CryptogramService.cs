@@ -28,7 +28,7 @@ public sealed class CryptogramService
     /// </summary>
     /// <param name="logger">Optional logger instance.</param>
     /// <param name="keyDerivationService">Optional key derivation service. If null, creates a new instance.</param>
-    public CryptogramService(ILogger<CryptogramService>? logger = null, KeyDerivationService? keyDerivationService = null)
+    public CryptogramService(ILogger<CryptogramService> logger = null, KeyDerivationService keyDerivationService = null)
     {
         _logger = logger ?? NullLogger<CryptogramService>.Instance;
         _keyDerivationService = keyDerivationService ?? new KeyDerivationService();

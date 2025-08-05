@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using NUnit.Framework;
 

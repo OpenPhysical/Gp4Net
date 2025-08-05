@@ -13,12 +13,12 @@ namespace Gp4Net.Pipeline.Middleware;
 /// </summary>
 public class StateCapturingMiddleware : CommandMiddlewareBase
 {
-    private readonly ILogger<StateCapturingMiddleware>? _logger;
+    private readonly ILogger<StateCapturingMiddleware> _logger;
 
     /// <summary>
     /// Initializes a new instance of StateCapturingMiddleware.
     /// </summary>
-    public StateCapturingMiddleware(ILogger<StateCapturingMiddleware>? logger = null)
+    public StateCapturingMiddleware(ILogger<StateCapturingMiddleware> logger = null)
     {
         _logger = logger;
     }
@@ -87,7 +87,9 @@ public class StateCapturingMiddleware : CommandMiddlewareBase
         IPipelineContext context)
     {
         if (!response.IsSuccess || response.Data.Length == 0)
+        {
             return context;
+        }
 
         // Capture selected AID
         var selectedAid = command.Aid;
@@ -113,7 +115,9 @@ public class StateCapturingMiddleware : CommandMiddlewareBase
         IPipelineContext context)
     {
         if (!response.IsSuccess || response.Data.Length < 28)
+        {
             return context;
+        }
 
         // Capture card challenge and other session data
         var cardChallenge = new byte[8];
@@ -132,11 +136,13 @@ public class StateCapturingMiddleware : CommandMiddlewareBase
         IPipelineContext context)
     {
         if (!response.IsSuccess || response.Data.Length == 0)
+        {
             return context;
+        }
 
         // TODO: Parse application/domain status information
         // This would involve TLV parsing of the response data
-            
+
         return context;
     }
 
@@ -146,7 +152,9 @@ public class StateCapturingMiddleware : CommandMiddlewareBase
         IPipelineContext context)
     {
         if (!response.IsSuccess || response.Data.Length == 0)
+        {
             return context;
+        }
 
         // Capture specific data based on tag
         return command.DataObjectIdentifier switch
@@ -158,14 +166,16 @@ public class StateCapturingMiddleware : CommandMiddlewareBase
         };
     }
 
-    private static byte[]? ExtractAidFromFci(byte[] fciData)
+    private static byte[] ExtractAidFromFci(byte[] fciData)
     {
         try
         {
             // Simple FCI parsing to extract AID
             // FCI is typically: 6F xx 84 yy AID ...
             if (fciData.Length < 4 || fciData[0] != 0x6F)
+            {
                 return null;
+            }
 
             var offset = 2; // Skip tag and length
             while (offset < fciData.Length - 2)

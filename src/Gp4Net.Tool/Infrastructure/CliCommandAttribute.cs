@@ -21,7 +21,7 @@ public class CliCommandAttribute : Attribute
     /// <summary>
     /// Gets the parent branch name for nested commands.
     /// </summary>
-    public string? Branch { get; }
+    public string Branch { get; }
 
     /// <summary>
     /// Gets whether this is an alias.
@@ -35,7 +35,7 @@ public class CliCommandAttribute : Attribute
     /// <param name="description">The command description.</param>
     /// <param name="branch">The parent branch name (e.g., "card", "applet", "script").</param>
     /// <param name="isAlias">Whether this is an alias for another command.</param>
-    public CliCommandAttribute(string name, string description, string? branch = null, bool isAlias = false)
+    public CliCommandAttribute(string name, string description, string branch = null, bool isAlias = false)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Description = description ?? throw new ArgumentNullException(nameof(description));

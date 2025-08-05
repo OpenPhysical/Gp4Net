@@ -289,12 +289,24 @@ public class TlvObject
     /// <summary>
     /// Gets the length of the value.
     /// </summary>
-    public int Length => Value.Length;
+    public int Length
+    {
+        get
+        {
+            return Value.Length;
+        }
+    }
 
     /// <summary>
     /// Gets the tag as a numeric value (for common 1-3 byte tags).
     /// </summary>
-    public uint TagNumber => TlvParser.TagToNumber(Tag);
+    public uint TagNumber
+    {
+        get
+        {
+            return TlvParser.TagToNumber(Tag);
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the TlvObject class.

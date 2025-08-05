@@ -191,12 +191,12 @@ public class KeyInfoTemplate
     /// <summary>
     /// Key version number.
     /// </summary>
-    public byte? KeyVersionNumber { get; set; }
+    public Maybe<byte> KeyVersionNumber { get; set; } = Maybe<byte>.None;
         
     /// <summary>
     /// Key identifier.
     /// </summary>
-    public byte? KeyIdentifier { get; set; }
+    public Maybe<byte> KeyIdentifier { get; set; } = Maybe<byte>.None;
         
     /// <summary>
     /// Key types and their lengths.

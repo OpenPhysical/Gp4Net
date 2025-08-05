@@ -131,6 +131,12 @@ public class KeysChangeCommand : BaseCommand<KeysChangeCommand.Settings>
         /// <summary>
         /// This command requires a secure channel to authenticate with current keys.
         /// </summary>
-        public override bool RequiresSecureChannel => true;
+        public override bool RequiresSecureChannel
+        {
+            get
+            {
+                return true;
+            }
+        }
     }
 }

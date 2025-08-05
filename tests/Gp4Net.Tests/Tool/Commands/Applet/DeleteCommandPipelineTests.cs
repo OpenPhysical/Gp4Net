@@ -49,7 +49,7 @@ namespace Gp4Net.Tests.Tool.Commands.Applet;
 [TestFixture]
 public class DeleteCommandPipelineTests
 {
-    private MockCommandContext _mockContext;
+    private MockCliContext _mockContext;
     private Mock<IGlobalPlatformService> _mockGlobalPlatformService;
     private Mock<ICardService> _mockCardService;
     private DeleteCommand _command;
@@ -62,8 +62,8 @@ public class DeleteCommandPipelineTests
         _mockCardService = new Mock<ICardService>();
         _command = new DeleteCommand();
 
-        // Create MockCommandContext with mocked services
-        _mockContext = new MockCommandContext(
+        // Create MockCliContext with mocked services
+        _mockContext = new MockCliContext(
             display: new MockDisplayService(),
             cardService: _mockCardService.Object,
             globalPlatformService: _mockGlobalPlatformService.Object,

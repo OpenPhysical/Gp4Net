@@ -1,10 +1,8 @@
-using System;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Domain.Protocol;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Security;
@@ -33,7 +31,9 @@ public record MacChainingState(
         byte implementationParameter)
     {
         if (initialValue == null)
+        {
             return SmartCardError.InvalidArgument("Initial chaining value cannot be null");
+        }
 
         // Validate protocol version
         if (protocolVersion != ProtocolIdentifiers.Scp02 && 
@@ -78,17 +78,35 @@ public record MacChainingState(
     /// <summary>
     /// Gets the size of the chaining value in bytes.
     /// </summary>
-    public int Size => Value.Length;
+    public int Size
+    {
+        get
+        {
+            return Value.Length;
+        }
+    }
 
     /// <summary>
     /// Gets whether this is an SCP03 chaining state.
     /// </summary>
-    public bool IsScp03 => ProtocolVersion == ProtocolIdentifiers.Scp03;
+    public bool IsScp03
+    {
+        get
+        {
+            return ProtocolVersion == ProtocolIdentifiers.Scp03;
+        }
+    }
 
     /// <summary>
     /// Gets whether this is an SCP02 chaining state.
     /// </summary>
-    public bool IsScp02 => ProtocolVersion == ProtocolIdentifiers.Scp02;
+    public bool IsScp02
+    {
+        get
+        {
+            return ProtocolVersion == ProtocolIdentifiers.Scp02;
+        }
+    }
 
     /// <summary>
     /// Converts the chaining value to a byte array.

@@ -10,7 +10,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Pipeline;
 using Gp4Net.Transport;
 using Gp4Net.Utils;
 using Microsoft.Extensions.Logging;
@@ -200,10 +199,25 @@ public class Scp03DiagnosticMiddleware : CommandMiddlewareBase
 
         // Decode security level
         var secLevel = new StringBuilder();
-        if ((command.P1 & 0x01) != 0) secLevel.Append("C-MAC ");
-        if ((command.P1 & 0x03) == 0x03) secLevel.Append("C-DECRYPTION ");
-        if ((command.P1 & 0x10) != 0) secLevel.Append("R-MAC ");
-        if ((command.P1 & 0x30) == 0x30) secLevel.Append("R-ENCRYPTION ");
+        if ((command.P1 & 0x01) != 0)
+        {
+            secLevel.Append("C-MAC ");
+        }
+
+        if ((command.P1 & 0x03) == 0x03)
+        {
+            secLevel.Append("C-DECRYPTION ");
+        }
+
+        if ((command.P1 & 0x10) != 0)
+        {
+            secLevel.Append("R-MAC ");
+        }
+
+        if ((command.P1 & 0x30) == 0x30)
+        {
+            secLevel.Append("R-ENCRYPTION ");
+        }
 
         if (secLevel.Length > 0)
         {
@@ -294,7 +308,9 @@ public class Scp03DiagnosticMiddleware : CommandMiddlewareBase
     private void LogHexDump(string commandId, byte[] data, string indent)
     {
         if (!_traceCrypto || data == null || data.Length == 0)
+        {
             return;
+        }
 
         var sb = new StringBuilder();
         for (var i = 0; i < data.Length; i += 16)
@@ -306,12 +322,18 @@ public class Scp03DiagnosticMiddleware : CommandMiddlewareBase
             for (var j = 0; j < 16; j++)
             {
                 if (i + j < data.Length)
+                {
                     sb.Append($"{data[i + j]:X2} ");
+                }
                 else
+                {
                     sb.Append("   ");
+                }
 
                 if (j == 7)
+                {
                     sb.Append(" ");
+                }
             }
 
             sb.Append(" |");

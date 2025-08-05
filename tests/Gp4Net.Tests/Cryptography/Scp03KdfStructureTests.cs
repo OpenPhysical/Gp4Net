@@ -10,7 +10,6 @@ using Gp4Net.Constants;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Cryptography;
 
@@ -18,6 +17,7 @@ namespace Gp4Net.Tests.Cryptography;
 /// Tests to verify the structure of SCP03 KDF input matches GlobalPlatform specifications.
 /// </summary>
 [TestFixture]
+[Category("Unit")]
 public class Scp03KdfStructureTests
 {
     [Test]

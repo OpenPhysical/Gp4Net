@@ -3,7 +3,6 @@ using System.Linq;
 using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
@@ -11,6 +10,7 @@ namespace Gp4Net.Tests.Domain.Commands;
 /// Tests for the LoadCommand class.
 /// </summary>
 [TestFixture]
+[Category("Unit")]
 public class LoadCommandTests
 {
 

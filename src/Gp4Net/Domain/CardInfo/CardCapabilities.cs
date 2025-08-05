@@ -55,12 +55,24 @@ public class CardCapabilities
     /// <summary>
     /// Gets a value indicating whether SCP02 is supported.
     /// </summary>
-    public bool SupportsScp02 => ScpOptions.Any(o => o.ScpId == 0x02);
+    public bool SupportsScp02
+    {
+        get
+        {
+            return ScpOptions.Any(o => o.ScpId == 0x02);
+        }
+    }
 
     /// <summary>
     /// Gets a value indicating whether SCP03 is supported.
     /// </summary>
-    public bool SupportsScp03 => ScpOptions.Any(o => o.ScpId == 0x03);
+    public bool SupportsScp03
+    {
+        get
+        {
+            return ScpOptions.Any(o => o.ScpId == 0x03);
+        }
+    }
 
     private CardCapabilities(byte[] rawData)
     {
@@ -443,28 +455,148 @@ public record SecurityDomainPrivileges(
     byte Byte3
 )
 {
-    public bool SecurityDomain => (Byte1 & 0x80) != 0;
-    public bool DapVerification => (Byte1 & 0x40) != 0;
-    public bool DelegatedManagement => (Byte1 & 0x20) != 0;
-    public bool CardLock => (Byte1 & 0x10) != 0;
-    public bool CardTerminate => (Byte1 & 0x08) != 0;
-    public bool CardReset => (Byte1 & 0x04) != 0;
-    public bool CvmManagement => (Byte1 & 0x02) != 0;
-    public bool MandatedDapVerification => (Byte1 & 0x01) != 0;
+    public bool SecurityDomain
+    {
+        get
+        {
+            return (Byte1 & 0x80) != 0;
+        }
+    }
+    public bool DapVerification
+    {
+        get
+        {
+            return (Byte1 & 0x40) != 0;
+        }
+    }
+    public bool DelegatedManagement
+    {
+        get
+        {
+            return (Byte1 & 0x20) != 0;
+        }
+    }
+    public bool CardLock
+    {
+        get
+        {
+            return (Byte1 & 0x10) != 0;
+        }
+    }
+    public bool CardTerminate
+    {
+        get
+        {
+            return (Byte1 & 0x08) != 0;
+        }
+    }
+    public bool CardReset
+    {
+        get
+        {
+            return (Byte1 & 0x04) != 0;
+        }
+    }
+    public bool CvmManagement
+    {
+        get
+        {
+            return (Byte1 & 0x02) != 0;
+        }
+    }
+    public bool MandatedDapVerification
+    {
+        get
+        {
+            return (Byte1 & 0x01) != 0;
+        }
+    }
 
-    public bool TrustedPath => (Byte2 & 0x80) != 0;
-    public bool AuthorizedManagement => (Byte2 & 0x40) != 0;
-    public bool TokenVerification => (Byte2 & 0x20) != 0;
-    public bool GlobalDelete => (Byte2 & 0x10) != 0;
-    public bool GlobalLock => (Byte2 & 0x08) != 0;
-    public bool GlobalRegistry => (Byte2 & 0x04) != 0;
-    public bool FinalApplication => (Byte2 & 0x02) != 0;
-    public bool GlobalService => (Byte2 & 0x01) != 0;
+    public bool TrustedPath
+    {
+        get
+        {
+            return (Byte2 & 0x80) != 0;
+        }
+    }
+    public bool AuthorizedManagement
+    {
+        get
+        {
+            return (Byte2 & 0x40) != 0;
+        }
+    }
+    public bool TokenVerification
+    {
+        get
+        {
+            return (Byte2 & 0x20) != 0;
+        }
+    }
+    public bool GlobalDelete
+    {
+        get
+        {
+            return (Byte2 & 0x10) != 0;
+        }
+    }
+    public bool GlobalLock
+    {
+        get
+        {
+            return (Byte2 & 0x08) != 0;
+        }
+    }
+    public bool GlobalRegistry
+    {
+        get
+        {
+            return (Byte2 & 0x04) != 0;
+        }
+    }
+    public bool FinalApplication
+    {
+        get
+        {
+            return (Byte2 & 0x02) != 0;
+        }
+    }
+    public bool GlobalService
+    {
+        get
+        {
+            return (Byte2 & 0x01) != 0;
+        }
+    }
 
-    public bool ReceiptGeneration => (Byte3 & 0x80) != 0;
-    public bool CipheredLoadFileDataBlock => (Byte3 & 0x40) != 0;
-    public bool ContactlessActivation => (Byte3 & 0x20) != 0;
-    public bool ContactlessSelfActivation => (Byte3 & 0x10) != 0;
+    public bool ReceiptGeneration
+    {
+        get
+        {
+            return (Byte3 & 0x80) != 0;
+        }
+    }
+    public bool CipheredLoadFileDataBlock
+    {
+        get
+        {
+            return (Byte3 & 0x40) != 0;
+        }
+    }
+    public bool ContactlessActivation
+    {
+        get
+        {
+            return (Byte3 & 0x20) != 0;
+        }
+    }
+    public bool ContactlessSelfActivation
+    {
+        get
+        {
+            return (Byte3 & 0x10) != 0;
+        }
+    }
 
     public override string ToString()
     {
@@ -584,13 +716,49 @@ public record ApplicationPrivileges(
 )
 {
     // Note: Many privilege bits have same meaning as SecurityDomainPrivileges
-    public bool CardLock => (Byte1 & 0x10) != 0;
-    public bool CardTerminate => (Byte1 & 0x08) != 0;
-    public bool CardReset => (Byte1 & 0x04) != 0;
-    public bool CvmManagement => (Byte1 & 0x02) != 0;
+    public bool CardLock
+    {
+        get
+        {
+            return (Byte1 & 0x10) != 0;
+        }
+    }
+    public bool CardTerminate
+    {
+        get
+        {
+            return (Byte1 & 0x08) != 0;
+        }
+    }
+    public bool CardReset
+    {
+        get
+        {
+            return (Byte1 & 0x04) != 0;
+        }
+    }
+    public bool CvmManagement
+    {
+        get
+        {
+            return (Byte1 & 0x02) != 0;
+        }
+    }
 
-    public bool FinalApplication => (Byte2 & 0x02) != 0;
-    public bool GlobalService => (Byte2 & 0x01) != 0;
+    public bool FinalApplication
+    {
+        get
+        {
+            return (Byte2 & 0x02) != 0;
+        }
+    }
+    public bool GlobalService
+    {
+        get
+        {
+            return (Byte2 & 0x01) != 0;
+        }
+    }
 
     public override string ToString()
     {

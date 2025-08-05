@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
@@ -27,17 +28,15 @@ public static class SecurityValidation
         SessionKeys sessionKeys,
         ImmutableArray<byte> macChainingValue)
     {
-        if (response == null)
-            return SmartCardError.InvalidArgument("Response cannot be null");
-
         if (response.Length < 2)
+        {
             return SmartCardError.InvalidData("Response must contain at least status word");
-
-        if (sessionKeys == null)
-            return SmartCardError.InvalidArgument("Session keys cannot be null");
+        }
 
         if (macChainingValue.IsDefaultOrEmpty)
+        {
             return SmartCardError.InvalidArgument("MAC chaining value cannot be empty");
+        }
 
         return Result.Success<byte[], SmartCardError>(response);
     }
@@ -54,14 +53,10 @@ public static class SecurityValidation
         SessionKeys sessionKeys,
         ImmutableArray<byte> macChainingValue)
     {
-        if (command == null)
-            return SmartCardError.InvalidArgument("Command cannot be null");
-            
-        if (sessionKeys == null)
-            return SmartCardError.InvalidArgument("Session keys cannot be null");
-            
         if (macChainingValue.IsDefaultOrEmpty)
+        {
             return SmartCardError.InvalidArgument("MAC chaining value cannot be empty");
+        }
 
         return Result.Success<IApduCommand, SmartCardError>(command);
     }
@@ -83,7 +78,9 @@ public static class SecurityValidation
     public static bool ShouldAddRMac(byte[] response)
     {
         if (response == null || response.Length < 2)
+        {
             return false;
+        }
 
         var sw = (ushort)((response[response.Length - 2] << 8) | response[response.Length - 1]);
         

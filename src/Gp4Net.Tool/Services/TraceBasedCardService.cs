@@ -23,9 +23,9 @@ public class TraceBasedCardService : ICardService
     private string _currentOperationFilter = string.Empty;
     private readonly HashSet<int> _allowedExchangeIndices = new();
     private bool _isConnected;
-    private TraceBasedCardChannel? _currentChannel;
+    private TraceBasedCardChannel _currentChannel;
 
-    public TraceBasedCardService(string tracePath, string? operationFilter = null)
+    public TraceBasedCardService(string tracePath, string operationFilter = null)
     {
         _tracePath = tracePath;
             
@@ -113,9 +113,15 @@ public class TraceBasedCardService : ICardService
         _currentChannel = null;
     }
 
-    public bool IsConnected => _isConnected;
+    public bool IsConnected
+    {
+        get
+        {
+            return _isConnected;
+        }
+    }
 
-    public byte[]? GetAtr()
+    public byte[] GetAtr()
     {
         return _isConnected ? Convert.FromHexString(_traceData.Metadata.Card.Atr) : null;
     }
@@ -132,7 +138,7 @@ public class TraceBasedCardService : ICardService
 
     public CardResponse SendCommand(IApduCommand command)
     {
-        return SendCommand(command.ToApdu());
+        return SendCommand(ApduBuilder.BuildApdu(command));
     }
 
     public bool EstablishSecureChannel(byte[] keySet, byte securityLevel)
@@ -142,7 +148,13 @@ public class TraceBasedCardService : ICardService
         return true;
     }
 
-    public bool IsSecureChannelEstablished => true;
+    public bool IsSecureChannelEstablished
+    {
+        get
+        {
+            return true;
+        }
+    }
 
     public void Dispose()
     {
@@ -152,7 +164,7 @@ public class TraceBasedCardService : ICardService
     /// <summary>
     /// Gets the next exchange in the trace that matches the provided command.
     /// </summary>
-    internal Exchange? GetNextExchange(byte[] commandApdu)
+    internal Exchange GetNextExchange(byte[] commandApdu)
     {
         var commandHex = BitConverter.ToString(commandApdu).Replace("-", "");
 
@@ -274,7 +286,7 @@ public static class TraceBasedCardServiceExtensions
     /// <summary>
     /// Creates a reader name for trace-based testing.
     /// </summary>
-    public static string CreateTraceReaderName(string tracePath, string? operations = null)
+    public static string CreateTraceReaderName(string tracePath, string operations = null)
     {
         var readerName = $"TraceBasedReader:{tracePath}";
         if (!string.IsNullOrEmpty(operations))
@@ -287,7 +299,7 @@ public static class TraceBasedCardServiceExtensions
     /// <summary>
     /// Parses a trace reader name to extract path and operations.
     /// </summary>
-    public static (string TracePath, string? Operations) ParseTraceReaderName(string readerName)
+    public static (string TracePath, string Operations) ParseTraceReaderName(string readerName)
     {
         if (!readerName.StartsWith("TraceBasedReader:"))
         {
@@ -298,7 +310,7 @@ public static class TraceBasedCardServiceExtensions
         var parts = pathAndQuery.Split('?', 2);
             
         var tracePath = parts[0];
-        string? operations = null;
+        string operations = null;
 
         if (parts.Length > 1)
         {

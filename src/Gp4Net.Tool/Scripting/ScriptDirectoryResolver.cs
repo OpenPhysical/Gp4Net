@@ -76,7 +76,7 @@ public class ScriptDirectoryResolver
     /// <summary>
     /// Finds a script file in the search paths.
     /// </summary>
-    public string? FindScript(string scriptName)
+    public string FindScript(string scriptName)
     {
         // If it's already a full path, check if it exists
         if (Path.IsPathRooted(scriptName))
@@ -106,7 +106,7 @@ public class ScriptDirectoryResolver
     /// <summary>
     /// Finds the configuration file.
     /// </summary>
-    public string? FindConfigFile()
+    public string FindConfigFile()
     {
         foreach (var configPath in GetConfigSearchPaths())
         {

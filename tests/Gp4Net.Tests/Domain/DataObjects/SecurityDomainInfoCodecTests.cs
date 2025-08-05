@@ -7,7 +7,6 @@ using System;
 using AwesomeAssertions;
 using Gp4Net.Domain.DataObjects;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.DataObjects;
 

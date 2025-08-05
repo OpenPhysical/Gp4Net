@@ -19,11 +19,11 @@ public class LuaVirtualCardService : ICardService
 {
     private static readonly ILog Logger = LogManager.GetLogger(typeof(LuaVirtualCardService));
         
-    private Script? _luaScript;
-    private string? _scriptPath;
+    private Script _luaScript;
+    private string _scriptPath;
     private Dictionary<string, string> _parameters = new();
     private bool _isConnected;
-    private string? _readerName;
+    private string _readerName;
 
     /// <inheritdoc />
     public IReadOnlyList<string> GetReaders()
@@ -143,10 +143,16 @@ public class LuaVirtualCardService : ICardService
     }
 
     /// <inheritdoc />
-    public bool IsConnected => _isConnected && _luaScript != null;
+    public bool IsConnected
+    {
+        get
+        {
+            return _isConnected && _luaScript != null;
+        }
+    }
 
     /// <inheritdoc />
-    public byte[]? GetAtr()
+    public byte[] GetAtr()
     {
         if (!IsConnected || _luaScript == null)
         {
@@ -309,7 +315,15 @@ public class LuaVirtualCardService : ICardService
     }
 
     /// <inheritdoc />
-    public bool IsSecureChannelEstablished => true; // Always true for virtual readers
+    public bool IsSecureChannelEstablished
+    {
+        get
+        {
+            return true;
+
+            // Always true for virtual readers
+        }
+    }
 
     /// <inheritdoc />
     public void Dispose()

@@ -25,7 +25,13 @@ public class StandardCommandSettings : CommandSettings
 public class CardCommandSettings : BaseCommandSettings
 {
     /// <inheritdoc />
-    public override bool RequiresSecureChannel => false;
+    public override bool RequiresSecureChannel
+    {
+        get
+        {
+            return false;
+        }
+    }
 }
 
 /// <summary>
@@ -35,5 +41,11 @@ public class CardCommandSettings : BaseCommandSettings
 public class SecureCommandSettings : BaseCommandSettings
 {
     /// <inheritdoc />
-    public override bool RequiresSecureChannel => true;
+    public override bool RequiresSecureChannel
+    {
+        get
+        {
+            return true;
+        }
+    }
 }

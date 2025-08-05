@@ -5,13 +5,11 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Constants;
-using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Security;
 using Gp4Net.Utils;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
-using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Modes;
@@ -29,18 +27,26 @@ public class CryptographicService : ICryptographicService
     private readonly IKeyDerivationService _keyDerivationService;
     private readonly ILogger<CryptographicService> _logger;
     
-    public CryptographicService(ILogger<CryptographicService>? logger = null)
+    public CryptographicService(ILogger<CryptographicService> logger)
     {
-        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<CryptographicService>.Instance;
-        
+        _logger = logger;
         // Use the simple test implementation defined in this file
         _keyDerivationService = new KeyDerivationService();
     }
     
-    public CryptographicService(IKeyDerivationService keyDerivationService, ILogger<CryptographicService>? logger = null)
+    public CryptographicService() : this(Microsoft.Extensions.Logging.Abstractions.NullLogger<CryptographicService>.Instance)
+    {
+    }
+    
+    public CryptographicService(IKeyDerivationService keyDerivationService, ILogger<CryptographicService> logger)
     {
         _keyDerivationService = keyDerivationService;
-        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<CryptographicService>.Instance;
+        _logger = logger;
+    }
+    
+    public CryptographicService(IKeyDerivationService keyDerivationService) 
+        : this(keyDerivationService, Microsoft.Extensions.Logging.Abstractions.NullLogger<CryptographicService>.Instance)
+    {
     }
 
     public Result<byte[], SmartCardError> GenerateChallenge(int length)
@@ -87,20 +93,23 @@ public class CryptographicService : ICryptographicService
     }
 
     public Result<byte[], SmartCardError> CalculateCardCryptogram(
-        byte[] hostChallenge, byte[] cardChallenge, IKeySet keys, byte scpVersion, byte implementationParameter, byte[]? sequenceCounter = null)
+        byte[] hostChallenge, byte[] cardChallenge, IKeySet keys, byte scpVersion, byte implementationParameter, Maybe<byte[]> sequenceCounter)
     {
         try
         {
             switch (scpVersion)
             {
                 case 0x02:
-                    if (sequenceCounter == null || sequenceCounter.Length != 2)
-                        return SmartCardError.InvalidArgument("SCP02 requires a 2-byte sequence counter");
-                    return CalculateScp02CardCryptogram(hostChallenge, cardChallenge, sequenceCounter, keys, implementationParameter);
+                    return sequenceCounter.Match(
+                        Some: counter => counter.Length == 2
+                            ? CalculateScp02CardCryptogram(hostChallenge, cardChallenge, counter, keys, implementationParameter)
+                            : SmartCardError.InvalidArgument("SCP02 requires a 2-byte sequence counter"),
+                        None: () => SmartCardError.InvalidArgument("SCP02 requires a sequence counter")
+                    );
                 case 0x03:
-                    if (sequenceCounter != null)
-                        return SmartCardError.InvalidArgument("SCP03 does not use a separate sequence counter");
-                    return CalculateScp03CardCryptogram(hostChallenge, cardChallenge, keys);
+                    return sequenceCounter.HasValue
+                        ? SmartCardError.InvalidArgument("SCP03 does not use a separate sequence counter")
+                        : CalculateScp03CardCryptogram(hostChallenge, cardChallenge, keys);
                 default:
                     return SmartCardError.InvalidArgument($"Unsupported SCP version: {scpVersion:X2}");
             }
@@ -112,20 +121,23 @@ public class CryptographicService : ICryptographicService
     }
 
     public Result<byte[], SmartCardError> CalculateHostCryptogram(
-        byte[] hostChallenge, byte[] cardChallenge, IKeySet keys, byte scpVersion, byte implementationParameter, byte[]? sequenceCounter = null)
+        byte[] hostChallenge, byte[] cardChallenge, IKeySet keys, byte scpVersion, byte implementationParameter, Maybe<byte[]> sequenceCounter)
     {
         try
         {
             switch (scpVersion)
             {
                 case 0x02:
-                    if (sequenceCounter == null || sequenceCounter.Length != 2)
-                        return SmartCardError.InvalidArgument("SCP02 requires a 2-byte sequence counter");
-                    return CalculateScp02HostCryptogram(hostChallenge, cardChallenge, sequenceCounter, keys, implementationParameter);
+                    return sequenceCounter.Match(
+                        Some: counter => counter.Length == 2
+                            ? CalculateScp02HostCryptogram(hostChallenge, cardChallenge, counter, keys, implementationParameter)
+                            : SmartCardError.InvalidArgument("SCP02 requires a 2-byte sequence counter"),
+                        None: () => SmartCardError.InvalidArgument("SCP02 requires a sequence counter")
+                    );
                 case 0x03:
-                    if (sequenceCounter != null)
-                        return SmartCardError.InvalidArgument("SCP03 does not use a separate sequence counter");
-                    return CalculateScp03HostCryptogram(hostChallenge, cardChallenge, keys);
+                    return sequenceCounter.HasValue
+                        ? SmartCardError.InvalidArgument("SCP03 does not use a separate sequence counter")
+                        : CalculateScp03HostCryptogram(hostChallenge, cardChallenge, keys);
                 default:
                     return SmartCardError.InvalidArgument($"Unsupported SCP version: {scpVersion:X2}");
             }
@@ -731,13 +743,31 @@ public class CryptographicService : ICryptographicService
     /// </summary>
     private class Scp03KeyDerivationContext : IKeyDerivationContext
     {
-        public ScpVersion Protocol => ScpVersion.Scp03;
+        public ScpVersion Protocol
+        {
+            get
+            {
+                return ScpVersion.Scp03;
+            }
+        }
         public IKeySet KeySet { get; }
         public byte[] HostChallenge { get; }
         public byte[] CardChallenge { get; }
-        public Maybe<byte[]> SequenceCounter => Maybe<byte[]>.None;
-        public Maybe<Gp4Net.Domain.Protocol.ScpImplementation> Implementation => Maybe<Gp4Net.Domain.Protocol.ScpImplementation>.None;
-        
+        public Maybe<byte[]> SequenceCounter
+        {
+            get
+            {
+                return Maybe<byte[]>.None;
+            }
+        }
+        public Maybe<Gp4Net.Domain.Protocol.ScpImplementation> Implementation
+        {
+            get
+            {
+                return Maybe<Gp4Net.Domain.Protocol.ScpImplementation>.None;
+            }
+        }
+
         public Scp03KeyDerivationContext(IKeySet keySet, byte[] hostChallenge, byte[] cardChallenge)
         {
             KeySet = keySet;

@@ -1,8 +1,6 @@
-using System;
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
 using Gp4Net.Domain.Security;
 using JetBrains.Annotations;
 
@@ -33,49 +31,82 @@ public record CardState(
     /// <summary>
     /// Creates the initial state for a new card.
     /// </summary>
-    public static CardState Initial => new(
-        IsSelected: false,
-        ScpVersion: 0x02,
-        ScpImplementation: Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac,
-        SecureChannel: Maybe<SecureChannelState>.None,
-        CurrentKeys: null,
-        HostChallenge: null,
-        CardChallenge: null,
-        DataObjects: ImmutableDictionary<ushort, byte[]>.Empty,
-        Applications: ImmutableDictionary<string, InstalledApplication>.Empty,
-        LoadFiles: ImmutableList<LoadFile>.Empty,
-        InstalledKeys: ImmutableDictionary<byte, IKeySet>.Empty,
-        DefaultKeyVersion: 0xFF,
-        SequenceCounters: ImmutableDictionary<byte, byte[]>.Empty
-    );
+    public static CardState Initial
+    {
+        get
+        {
+            return new CardState(
+                IsSelected: false,
+                ScpVersion: 0x02,
+                ScpImplementation: Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac,
+                SecureChannel: Maybe<SecureChannelState>.None,
+                CurrentKeys: null,
+                HostChallenge: null,
+                CardChallenge: null,
+                DataObjects: ImmutableDictionary<ushort, byte[]>.Empty,
+                Applications: ImmutableDictionary<string, InstalledApplication>.Empty,
+                LoadFiles: ImmutableList<LoadFile>.Empty,
+                InstalledKeys: ImmutableDictionary<byte, IKeySet>.Empty,
+                DefaultKeyVersion: 0xFF,
+                SequenceCounters: ImmutableDictionary<byte, byte[]>.Empty
+            );
+        }
+    }
 
     /// <summary>
     /// Gets whether a secure channel is established.
     /// </summary>
-    public bool IsSecureChannelEstablished => SecureChannel.HasValue;
+    public bool IsSecureChannelEstablished
+    {
+        get
+        {
+            return SecureChannel.HasValue;
+        }
+    }
 
     /// <summary>
     /// Gets the current security level.
     /// </summary>
-    public byte SecurityLevel => SecureChannel.HasValue ? (byte)SecureChannel.Value.SecurityLevel : (byte)0x00;
+    public byte SecurityLevel
+    {
+        get
+        {
+            return SecureChannel.HasValue ? (byte)SecureChannel.Value.SecurityLevel : (byte)0x00;
+        }
+    }
 
     /// <summary>
     /// Gets the session keys if a secure channel is established.
     /// </summary>
-    public Maybe<Gp4Net.Domain.Keys.SessionKeys> SessionKeys => 
-        SecureChannel.Map(sc => sc.SessionKeys);
+    public Maybe<Gp4Net.Domain.Keys.SessionKeys> SessionKeys
+    {
+        get
+        {
+            return SecureChannel.Map(sc => sc.SessionKeys);
+        }
+    }
 
     /// <summary>
     /// Gets the MAC chaining value if a secure channel is established.
     /// </summary>
-    public Maybe<ImmutableArray<byte>> MacChainingValue => 
-        SecureChannel.Map(sc => sc.MacChaining.Value);
+    public Maybe<ImmutableArray<byte>> MacChainingValue
+    {
+        get
+        {
+            return SecureChannel.Map(sc => sc.MacChaining.Value);
+        }
+    }
 
     /// <summary>
     /// Gets the encryption counter if a secure channel is established.
     /// </summary>
-    public Maybe<uint> EncryptionCounter => 
-        SecureChannel.Map(sc => sc.EncryptionCounter);
+    public Maybe<uint> EncryptionCounter
+    {
+        get
+        {
+            return SecureChannel.Map(sc => sc.EncryptionCounter);
+        }
+    }
 
     /// <summary>
     /// Creates a new state with the card selected.

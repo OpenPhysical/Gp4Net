@@ -1,13 +1,14 @@
-using System;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
 using Moq;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Transport;
 
+[TestFixture]
+[Category("Unit")]
 public class T0ApduTransportTests
 {
     private readonly Mock<ILogger<T0ApduTransport>> _mockLogger;
@@ -96,7 +97,7 @@ public class T0ApduTransportTests
     public async Task TransmitAsync_WithWrongLengthLe_RetriesWithCorrectLength()
     {
         // Arrange
-        var command = new TestCommand { ExpectedResponseLength = 256 };
+        var command = new TestCommand { ExpectedResponseLength = Maybe<int>.From(256) };
 
         // First response indicates wrong LE (SW1=0x6C)
         _ = _mockChannel
@@ -145,7 +146,7 @@ public class T0ApduTransportTests
     public async Task TransmitAsync_WithNoLe_DoesNotAddLeByte()
     {
         // Arrange
-        var command = new TestCommand { ExpectedResponseLength = null };
+        var command = new TestCommand { ExpectedResponseLength = Maybe<int>.None };
         byte[] capturedCommand = null;
 
         _ = _mockChannel
@@ -165,12 +166,42 @@ public class T0ApduTransportTests
 
     private class TestCommand : IApduCommand
     {
-        public byte Cla => 0x00;
-        public byte Ins => 0xA4;
-        public byte P1 => 0x04;
-        public byte P2 => 0x00;
+        public byte Cla
+        {
+            get
+            {
+                return 0x00;
+            }
+        }
+        public byte Ins
+        {
+            get
+            {
+                return 0xA4;
+            }
+        }
+        public byte P1
+        {
+            get
+            {
+                return 0x04;
+            }
+        }
+        public byte P2
+        {
+            get
+            {
+                return 0x00;
+            }
+        }
         public byte[] Data { get; set; } = [];
-        public int? ExpectedResponseLength { get; set; }
-        public bool IsExtendedLength => false;
+        public Maybe<int> ExpectedResponseLength { get; set; } = Maybe<int>.None;
+        public bool IsExtendedLength
+        {
+            get
+            {
+                return false;
+            }
+        }
     }
 }

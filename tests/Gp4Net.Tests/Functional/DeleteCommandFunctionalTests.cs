@@ -6,7 +6,6 @@ using Gp4Net.CardEmulator.Functional;
 using Gp4Net.CardEmulator.Services;
 using Gp4Net.Domain.Commands;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Functional;
 

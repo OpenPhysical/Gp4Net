@@ -89,27 +89,51 @@ public class PutKeyCommand : IApduCommand
     /// <summary>
     /// Gets the class byte.
     /// </summary>
-    byte IApduCommand.Cla => Cla;
+    byte IApduCommand.Cla
+    {
+        get
+        {
+            return Cla;
+        }
+    }
 
     /// <summary>
     /// Gets the instruction byte.
     /// </summary>
-    byte IApduCommand.Ins => Ins;
+    byte IApduCommand.Ins
+    {
+        get
+        {
+            return Ins;
+        }
+    }
 
     /// <summary>
     /// Gets the parameter 1 byte.
     /// </summary>
-    public byte P1 => (byte)UsageQualifier;
+    public byte P1
+    {
+        get
+        {
+            return (byte)UsageQualifier;
+        }
+    }
 
     /// <summary>
     /// Gets the parameter 2 byte.
     /// </summary>
-    public byte P2 => (byte)KekIdentifier;
+    public byte P2
+    {
+        get
+        {
+            return (byte)KekIdentifier;
+        }
+    }
 
     /// <summary>
     /// Gets the command data.
     /// </summary>
-    public byte[]? Data
+    public byte[] Data
     {
         get
         {
@@ -118,19 +142,31 @@ public class PutKeyCommand : IApduCommand
             {
                 data.AddRange(block.ToBytes());
             }
-            return data.Count > 0 ? [.. data] : null;
+            return data.Count > 0 ? [.. data] : [];
         }
     }
 
     /// <summary>
     /// Gets the expected response length (key check values, typically 3 bytes per key).
     /// </summary>
-    public int? ExpectedResponseLength => KeyDataBlocks.Count * 3;
+    public Maybe<int> ExpectedResponseLength
+    {
+        get
+        {
+            return Maybe<int>.From(KeyDataBlocks.Count * 3);
+        }
+    }
 
     /// <summary>
     /// Gets whether this command uses extended length.
     /// </summary>
-    public bool IsExtendedLength => false;
+    public bool IsExtendedLength
+    {
+        get
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the PutKeyCommand class.
@@ -301,7 +337,7 @@ public class KeyDataBlock
     /// <summary>
     /// Gets the key check value (optional).
     /// </summary>
-    public byte[]? KeyCheckValue { get; }
+    public byte[] KeyCheckValue { get; }
 
     /// <summary>
     /// Initializes a new instance of the KeyDataBlock class.
@@ -309,12 +345,12 @@ public class KeyDataBlock
     /// <param name="type">The key type.</param>
     /// <param name="value">The key value.</param>
     /// <param name="keyCheckValue">The key check value (optional, 3 bytes).</param>
-    private KeyDataBlock(KeyType type, byte[] value, byte[]? keyCheckValue = null)
+    private KeyDataBlock(KeyType type, byte[] value, byte[] keyCheckValue = null)
     {
         Type = type;
         Length = (byte)value.Length;
         Value = (byte[])value.Clone();
-        KeyCheckValue = keyCheckValue != null ? (byte[])keyCheckValue.Clone() : null;
+        KeyCheckValue = keyCheckValue != null ? (byte[])keyCheckValue.Clone() : [];
     }
 
     /// <summary>
@@ -327,7 +363,7 @@ public class KeyDataBlock
 
         result.AddRange(Value);
 
-        if (KeyCheckValue != null)
+        if (KeyCheckValue.Length > 0)
         {
             result.AddRange(KeyCheckValue);
         }
@@ -341,7 +377,7 @@ public class KeyDataBlock
     /// <param name="keyValue">The 8-byte DES key value.</param>
     /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
     /// <returns>A Result containing the KeyDataBlock for DES or an error.</returns>
-    public static Result<KeyDataBlock, SmartCardError> CreateDesKey(byte[] keyValue, byte[]? keyCheckValue = null)
+    public static Result<KeyDataBlock, SmartCardError> CreateDesKey(byte[] keyValue, byte[] keyCheckValue = null)
     {
         if (keyValue == null)
         {
@@ -369,7 +405,7 @@ public class KeyDataBlock
     /// <returns>A Result containing the KeyDataBlock for 3DES (double length) or an error.</returns>
     public static Result<KeyDataBlock, SmartCardError> CreateTripleDes2Key(
         byte[] keyValue,
-        byte[]? keyCheckValue = null
+        byte[] keyCheckValue = null
     )
     {
         if (keyValue == null)
@@ -398,7 +434,7 @@ public class KeyDataBlock
     /// <returns>A Result containing the KeyDataBlock for 3DES (triple length) or an error.</returns>
     public static Result<KeyDataBlock, SmartCardError> CreateTripleDes3Key(
         byte[] keyValue,
-        byte[]? keyCheckValue = null
+        byte[] keyCheckValue = null
     )
     {
         if (keyValue == null)
@@ -425,7 +461,7 @@ public class KeyDataBlock
     /// <param name="keyValue">The 16-byte AES key value.</param>
     /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
     /// <returns>A Result containing the KeyDataBlock for AES-128 or an error.</returns>
-    public static Result<KeyDataBlock, SmartCardError> CreateAes128Key(byte[] keyValue, byte[]? keyCheckValue = null)
+    public static Result<KeyDataBlock, SmartCardError> CreateAes128Key(byte[] keyValue, byte[] keyCheckValue = null)
     {
         if (keyValue == null)
         {
@@ -451,7 +487,7 @@ public class KeyDataBlock
     /// <param name="keyValue">The 24-byte AES key value.</param>
     /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
     /// <returns>A Result containing the KeyDataBlock for AES-192 or an error.</returns>
-    public static Result<KeyDataBlock, SmartCardError> CreateAes192Key(byte[] keyValue, byte[]? keyCheckValue = null)
+    public static Result<KeyDataBlock, SmartCardError> CreateAes192Key(byte[] keyValue, byte[] keyCheckValue = null)
     {
         if (keyValue == null)
         {
@@ -477,7 +513,7 @@ public class KeyDataBlock
     /// <param name="keyValue">The 32-byte AES key value.</param>
     /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
     /// <returns>A Result containing the KeyDataBlock for AES-256 or an error.</returns>
-    public static Result<KeyDataBlock, SmartCardError> CreateAes256Key(byte[] keyValue, byte[]? keyCheckValue = null)
+    public static Result<KeyDataBlock, SmartCardError> CreateAes256Key(byte[] keyValue, byte[] keyCheckValue = null)
     {
         if (keyValue == null)
         {

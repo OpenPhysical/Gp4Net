@@ -1,4 +1,3 @@
-using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
@@ -103,7 +102,7 @@ public interface IScpProtocol<TSelf> where TSelf : IScpProtocol<TSelf>
         IKeySet keySet,
         byte[] hostChallenge,
         byte[] cardChallenge,
-        byte[]? sequenceCounter,
+        byte[] sequenceCounter,
         byte implementationParameter);
     
     /// <summary>
@@ -174,12 +173,16 @@ public interface IScpProtocol<TSelf> where TSelf : IScpProtocol<TSelf>
     static virtual Result ValidateInitializeUpdateResponse(InitializeUpdateResponse response)
     {
         if (response == null)
+        {
             return Result.Failure("Response cannot be null");
-            
+        }
+
         var scpVersion = (byte)(response.ScpId & 0x03);
         if (scpVersion != TSelf.ProtocolVersion)
+        {
             return Result.Failure($"Expected {TSelf.ProtocolVersion:X2} but received {scpVersion:X2}");
-            
+        }
+
         return Result.Success();
     }
 }

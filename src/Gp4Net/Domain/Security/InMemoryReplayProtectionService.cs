@@ -20,13 +20,17 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
     public UnitResult<SmartCardError> ValidateSequenceCounter(byte keyVersion, byte[] sequenceCounter)
     {
         if (sequenceCounter == null || sequenceCounter.Length != 3)
+        {
             return UnitResult.Failure(SmartCardError.InvalidArgument("Sequence counter must be 3 bytes"));
+        }
 
         var counterKey = Convert.ToHexString(sequenceCounter);
         var keyCounters = _seenCounters.GetOrAdd(keyVersion, _ => new ConcurrentDictionary<string, bool>());
 
         if (keyCounters.ContainsKey(counterKey))
+        {
             return UnitResult.Failure(SmartCardError.SecurityError($"Replay attack detected: sequence counter {counterKey} has been used before"));
+        }
 
         return UnitResult.Success<SmartCardError>();
     }
@@ -35,13 +39,17 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
     public UnitResult<SmartCardError> RecordSequenceCounter(byte keyVersion, byte[] sequenceCounter)
     {
         if (sequenceCounter == null || sequenceCounter.Length != 3)
+        {
             return UnitResult.Failure(SmartCardError.InvalidArgument("Sequence counter must be 3 bytes"));
+        }
 
         var counterKey = Convert.ToHexString(sequenceCounter);
         var keyCounters = _seenCounters.GetOrAdd(keyVersion, _ => new ConcurrentDictionary<string, bool>());
 
         if (!keyCounters.TryAdd(counterKey, true))
+        {
             return UnitResult.Failure(SmartCardError.SecurityError($"Sequence counter {counterKey} already recorded"));
+        }
 
         // Per GP spec: sequence counter should increment, so we can validate ordering
         var counterValue = (sequenceCounter[0] << 16) | (sequenceCounter[1] << 8) | sequenceCounter[2];

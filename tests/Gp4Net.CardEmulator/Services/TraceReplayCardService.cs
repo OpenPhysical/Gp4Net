@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Cards;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Trace;
@@ -14,13 +15,13 @@ namespace Gp4Net.CardEmulator.Services;
 public class TraceReplayCardService : VirtualCardService
 {
     private readonly GpShellTraceParser _parser;
-    private TraceReplayCard? _currentCard;
+    private Maybe<TraceReplayCard> _currentCard = Maybe<TraceReplayCard>.None;
     private string _readerName = "Trace Replay Reader";
 
     /// <summary>
     /// Gets the current trace replay card if loaded.
     /// </summary>
-    public TraceReplayCard? CurrentCard => _currentCard;
+    public Maybe<TraceReplayCard> CurrentCard => _currentCard;
 
     /// <summary>
     /// Gets or sets options for trace replay.
@@ -39,7 +40,7 @@ public class TraceReplayCardService : VirtualCardService
     /// <summary>
     /// Loads a trace from a file and creates a virtual card.
     /// </summary>
-    public void LoadTraceFromFile(string filePath, string? readerName = null)
+    public void LoadTraceFromFile(string filePath, Maybe<string> readerName = default)
     {
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"Trace file not found: {filePath}", filePath);
@@ -51,7 +52,7 @@ public class TraceReplayCardService : VirtualCardService
     /// <summary>
     /// Loads a trace from a string and creates a virtual card.
     /// </summary>
-    public void LoadTraceFromString(string traceContent, string? readerName = null)
+    public void LoadTraceFromString(string traceContent, Maybe<string> readerName = default)
     {
         if (string.IsNullOrWhiteSpace(traceContent))
             throw new ArgumentException("Trace content cannot be empty", nameof(traceContent));
@@ -63,22 +64,28 @@ public class TraceReplayCardService : VirtualCardService
     /// <summary>
     /// Loads a pre-parsed trace and creates a virtual card.
     /// </summary>
-    public void LoadTrace(ApduTrace trace, string? readerName = null)
+    public void LoadTrace(ApduTrace trace, Maybe<string> readerName = default)
     {
         ArgumentNullException.ThrowIfNull(trace);
 
         // Remove any existing trace replay readers
         RemoveTraceReplayReaders();
 
-        // Use reader name from trace metadata if available
-        _readerName = readerName ?? trace.Metadata.ReaderName ?? "Trace Replay Reader";
+        // Use reader name from provided option, trace metadata, or default
+        _readerName = readerName.Match(
+            Some: name => name,
+            None: () => !string.IsNullOrEmpty(trace.Metadata.ReaderName) 
+                ? trace.Metadata.ReaderName 
+                : "Trace Replay Reader"
+        );
 
         // Create replay card
-        _currentCard = new TraceReplayCard(trace, ReplayOptions.StrictMode);
+        var replayCard = new TraceReplayCard(trace, ReplayOptions.StrictMode);
+        _currentCard = Maybe<TraceReplayCard>.From(replayCard);
 
         // Create virtual reader and insert card
         var reader = new VirtualCardReader(_readerName);
-        reader.InsertCard(_currentCard);
+        reader.InsertCard(replayCard);
 
         ReaderManager.AddReader(reader);
     }
@@ -88,10 +95,10 @@ public class TraceReplayCardService : VirtualCardService
     /// </summary>
     public TraceComparisonResult CompareWithOriginalTrace()
     {
-        if (_currentCard == null)
-            throw new InvalidOperationException("No trace loaded");
-
-        return new TraceComparisonResult(_currentCard);
+        return _currentCard.Match(
+            Some: card => new TraceComparisonResult(card),
+            None: () => throw new InvalidOperationException("No trace loaded")
+        );
     }
 
     /// <summary>
@@ -119,7 +126,7 @@ public class TraceReplayCardService : VirtualCardService
             ReaderManager.RemoveReader(reader);
         }
 
-        _currentCard = null;
+        _currentCard = Maybe<TraceReplayCard>.None;
     }
 
     /// <summary>
@@ -127,11 +134,10 @@ public class TraceReplayCardService : VirtualCardService
     /// </summary>
     public string GenerateComparisonReport()
     {
-        if (_currentCard == null)
-            return "No trace loaded";
-
-        var result = CompareWithOriginalTrace();
-        return result.GenerateReport();
+        return _currentCard.Match(
+            Some: card => CompareWithOriginalTrace().GenerateReport(),
+            None: () => "No trace loaded"
+        );
     }
 }
 
@@ -145,7 +151,13 @@ public class TraceComparisonResult
     /// <summary>
     /// Gets the number of executed exchanges.
     /// </summary>
-    public int ExecutedCount => _card.ExecutedExchanges.Count;
+    public int ExecutedCount
+    {
+        get
+        {
+            return _card.ExecutedExchanges.Count;
+        }
+    }
 
     /// <summary>
     /// Gets whether all exchanges matched.

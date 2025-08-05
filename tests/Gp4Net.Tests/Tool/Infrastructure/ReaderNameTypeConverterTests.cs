@@ -6,7 +6,6 @@ using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Services;
 using Moq;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Tool.Infrastructure;
 

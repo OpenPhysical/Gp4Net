@@ -61,8 +61,13 @@ public class DiversificationDataParserTests
     [Test]
     public void ParseScpSupport_WithMultipleScpVersions_ParsesAll()
     {
-        // Arrange - CF0A format with multiple SCP versions
-        var data = Convert.FromHexString("CF0A0215031060070301060000");
+        // Arrange - CF0A format with multiple valid SCP versions
+        // 02 15 - SCP02 with i=15
+        // 03 10 - SCP03 with i=10
+        // 10 07 - SCP10 with i=07
+        // 03 01 - SCP03 with i=01 (duplicate SCP03 with different option)
+        // 11 55 - SCP11 with i=55
+        var data = Convert.FromHexString("CF0A0215031010070301115500");
 
         // Act
         var result = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(data));
@@ -70,9 +75,9 @@ public class DiversificationDataParserTests
         // Assert
         result.Should().Contain("SCP02 (i=15)");
         result.Should().Contain("SCP03 (i=10)");
-        result.Should().Contain("SCP60 (i=07)");
+        result.Should().Contain("SCP10 (i=07)");
         result.Should().Contain("SCP03 (i=01)");
-        result.Should().Contain("SCP06 (i=00)");
+        result.Should().Contain("SCP11 (i=55)");
     }
 
     [Test]
@@ -156,7 +161,10 @@ public class DiversificationDataParserTests
     public void ParseScpSupport_FormatsMultipleVersionsWithCommas()
     {
         // Arrange - CF0A format with three SCP versions
-        var data = Convert.FromHexString("CF0A0215031060070000000000");
+        // 02 15 - SCP02 with i=15
+        // 03 10 - SCP03 with i=10  
+        // 10 70 - SCP10 with i=70
+        var data = Convert.FromHexString("CF0A0215031010700000000000");
 
         // Act
         var result = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(data));
@@ -182,5 +190,31 @@ public class DiversificationDataParserTests
         var scp03Index = result.IndexOf("SCP03");
         var scp02Index = result.IndexOf("SCP02");
         scp03Index.Should().BeLessThan(scp02Index);
+    }
+    
+    [Test]
+    [Category("Regression")]
+    public void ParseScpSupport_WithCardIdentificationData_DoesNotProduceInvalidScpVersions()
+    {
+        // Arrange - Real CF tag from card containing card ID data, not SCP support
+        // CF0A00002345558083204839
+        // This is actually:
+        // - 00 00 - padding
+        // - 23 45 - IC Fabrication Date (2345)
+        // - 55 80 83 20 - IC Serial Number (55808320)
+        // - 48 39 - IC Batch Identifier (4839)
+        var data = Convert.FromHexString("CF0A00002345558083204839");
+
+        // Act
+        var result = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(data));
+
+        // Assert
+        // Should not produce invalid SCP versions like SCP35, SCP85, SCP131, SCP72
+        result.Should().NotContain("SCP35");
+        result.Should().NotContain("SCP85");
+        result.Should().NotContain("SCP131");
+        result.Should().NotContain("SCP72");
+        // Actually, this card doesn't have SCP support in CF tag
+        result.Should().BeEquivalentTo("[red]None[/]");
     }
 }

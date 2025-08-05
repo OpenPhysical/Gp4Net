@@ -184,7 +184,8 @@ public static class Scp03CommandProcessors
                 data.CardChallenge,
                 keys,
                 0x03,
-                (byte)state.ScpImplementation)
+                (byte)state.ScpImplementation,
+                Maybe<byte[]>.None)
             .Map(cryptogram => new Scp03CryptogramData(
                 effectiveKeyVersion,
                 state.ScpImplementation,
@@ -336,7 +337,8 @@ public static class Scp03CommandProcessors
                 state.CardChallenge,
                 state.CurrentKeys,
                 0x03,
-                (byte)state.ScpImplementation)
+                (byte)state.ScpImplementation,
+                Maybe<byte[]>.None)
             .Bind(expectedCryptogram =>
             {
                 logger?.LogDebug("Expected Host Cryptogram: {Expected}", Convert.ToHexString(expectedCryptogram));

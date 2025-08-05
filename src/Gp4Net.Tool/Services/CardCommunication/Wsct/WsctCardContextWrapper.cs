@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using WSCT.Wrapper;
 using WSCT.Wrapper.Desktop.Core;
@@ -22,7 +21,13 @@ public class WsctCardContextWrapper : ICardContextWrapper
     }
 
     /// <inheritdoc />
-    public IReadOnlyList<string> Readers => _context.Readers ?? [];
+    public IReadOnlyList<string> Readers
+    {
+        get
+        {
+            return _context.Readers ?? [];
+        }
+    }
 
     /// <inheritdoc />
     public ErrorCode Establish()

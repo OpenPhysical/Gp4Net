@@ -4,12 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using AwesomeAssertions;
-using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
-using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
 using Gp4Net.Domain.Security;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
@@ -21,6 +18,7 @@ namespace Gp4Net.Tests.Integration;
 /// Tests end-to-end functionality with actual card trace data.
 /// </summary>
 [TestFixture]
+[Category("Integration")]
 public class TraceDecryptionIntegrationTests
 {
     private readonly TraceApduDecryptorService _decryptorService;
@@ -249,7 +247,9 @@ public class TraceDecryptionIntegrationTests
         // Remove any whitespace and ensure even length
         hex = hex.Replace(" ", "").Replace("\t", "").Replace("\n", "");
         if (hex.Length % 2 != 0)
+        {
             hex = "0" + hex;
+        }
 
         var bytes = new byte[hex.Length / 2];
         for (int i = 0; i < bytes.Length; i++)

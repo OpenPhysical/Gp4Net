@@ -9,8 +9,8 @@ namespace Gp4Net.Tool.Infrastructure;
 /// </summary>
 public sealed class TypeRegistrar : ITypeRegistrar
 {
-    private readonly IServiceCollection? _builder;
-    private readonly IServiceProvider? _provider;
+    private readonly IServiceCollection _builder;
+    private readonly IServiceProvider _provider;
 
     /// <summary>
     /// Initializes a new instance of the TypeRegistrar class.
@@ -94,7 +94,7 @@ public sealed class TypeResolver : ITypeResolver
     }
 
     /// <inheritdoc />
-    public object? Resolve(Type? type)
+    public object Resolve(Type type)
     {
         if (type == null)
         {

@@ -170,7 +170,9 @@ public class ParseAsn1Command : IPipelineCommand<ParseAsn1Command.Settings>
     {
         var encoded = obj.GetEncoded();
         if (encoded == null || encoded.Length == 0)
+        {
             return "[red]Invalid ASN.1 object[/]";
+        }
 
         var tag = encoded[0];
         var tagClass = (tag & 0xC0) >> 6;
@@ -194,8 +196,11 @@ public class ParseAsn1Command : IPipelineCommand<ParseAsn1Command.Settings>
 
     private static string GetLengthInfo(byte[] encoded)
     {
-        if (encoded.Length < 2) return "?";
-            
+        if (encoded.Length < 2)
+        {
+            return "?";
+        }
+
         var lengthByte = encoded[1];
         if ((lengthByte & 0x80) == 0)
         {
@@ -204,8 +209,11 @@ public class ParseAsn1Command : IPipelineCommand<ParseAsn1Command.Settings>
         else
         {
             var lengthBytes = lengthByte & 0x7F;
-            if (lengthBytes == 0) return "indefinite";
-                
+            if (lengthBytes == 0)
+            {
+                return "indefinite";
+            }
+
             var length = 0;
             for (var i = 0; i < lengthBytes && i + 2 < encoded.Length; i++)
             {
@@ -218,8 +226,11 @@ public class ParseAsn1Command : IPipelineCommand<ParseAsn1Command.Settings>
     private static int GetHeaderLength(Asn1Object obj)
     {
         var encoded = obj.GetEncoded();
-        if (encoded.Length < 2) return 2;
-            
+        if (encoded.Length < 2)
+        {
+            return 2;
+        }
+
         var lengthByte = encoded[1];
         if ((lengthByte & 0x80) == 0)
         {
@@ -233,14 +244,20 @@ public class ParseAsn1Command : IPipelineCommand<ParseAsn1Command.Settings>
 
     private static bool IsLikelyAsn1(byte[] data)
     {
-        if (data.Length < 2) return false;
-            
+        if (data.Length < 2)
+        {
+            return false;
+        }
+
         var tag = data[0];
         var length = data[1];
             
         // Check if tag looks reasonable (common ASN.1 tags)
-        if ((tag & 0x1F) > 30) return false;
-            
+        if ((tag & 0x1F) > 30)
+        {
+            return false;
+        }
+
         // Check length encoding
         if ((length & 0x80) == 0)
         {

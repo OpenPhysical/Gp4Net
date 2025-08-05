@@ -1,5 +1,4 @@
 using System;
-using Gp4Net.Domain.Protocol;
 using Gp4Net.CardEmulator.Core;
 using JetBrains.Annotations;
 

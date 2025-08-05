@@ -34,7 +34,7 @@ public static class FunctionalCommandExtensions
     /// </summary>
     public static async Task<Result<ICliExecutionContext, string>> RequireCardConnectionFunctional(
         this ICliExecutionContext context,
-        string? readerName = null)
+        string readerName = null)
     {
         if (context.CardService.IsConnected)
         {
@@ -58,7 +58,7 @@ public static class FunctionalCommandExtensions
     public static async Task<Result<ICliExecutionContext, string>> RequireSecureChannelFunctional(
         this ICliExecutionContext context,
         byte securityLevel = 1,
-        string? keyset = null)
+        string keyset = null)
     {
         try
         {

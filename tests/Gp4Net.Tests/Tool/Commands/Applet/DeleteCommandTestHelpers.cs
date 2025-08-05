@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using CSharpFunctionalExtensions;
 using Spectre.Console.Cli;
 
 namespace Gp4Net.Tests.Tool.Commands.Applet;
@@ -28,7 +27,19 @@ internal static class DeleteCommandTestHelpers
     /// </summary>
     private class TestRemainingArguments : IRemainingArguments
     {
-        public ILookup<string, string?> Parsed => new List<(string, string?)>().ToLookup(x => x.Item1, x => x.Item2);
-        public IReadOnlyList<string> Raw => new List<string>();
+        public ILookup<string, string?> Parsed
+        {
+            get
+            {
+                return new List<(string, string?)>().ToLookup(x => x.Item1, x => x.Item2);
+            }
+        }
+        public IReadOnlyList<string> Raw
+        {
+            get
+            {
+                return new List<string>();
+            }
+        }
     }
 }

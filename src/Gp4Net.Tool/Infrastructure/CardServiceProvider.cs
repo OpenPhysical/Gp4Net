@@ -9,7 +9,7 @@ namespace Gp4Net.Tool.Infrastructure;
 /// </summary>
 public static class CardServiceProvider
 {
-    private static ICardService? _cardService;
+    private static ICardService _cardService;
 
     /// <summary>
     /// Sets the card service instance.

@@ -8,11 +8,11 @@ using AwesomeAssertions;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Cryptography;
 
 [TestFixture]
+[Category("Unit")]
 public class KeyDerivationTests
 {
     [Test]

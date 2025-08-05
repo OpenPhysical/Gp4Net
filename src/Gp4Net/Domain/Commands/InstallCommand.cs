@@ -37,25 +37,63 @@ public abstract record InstallCommand : IApduCommand
     public ImmutableArray<byte> PackageAid { get; }
 
     /// <inheritdoc/>
-    public byte Cla => CommandCla;
+    public byte Cla
+    {
+        get
+        {
+            return CommandCla;
+        }
+    }
 
     /// <inheritdoc/>
-    public byte Ins => CommandIns;
+    public byte Ins
+    {
+        get
+        {
+            return CommandIns;
+        }
+    }
 
     /// <inheritdoc/>
-    public byte P1 => (byte)Type;
+    public byte P1
+    {
+        get
+        {
+            return (byte)Type;
+        }
+    }
 
     /// <inheritdoc/>
-    public byte P2 => 0x00;
+    public byte P2
+    {
+        get
+        {
+            return 0x00;
+        }
+    }
 
     /// <inheritdoc/>
     public abstract byte[] Data { get; }
 
     /// <inheritdoc/>
-    public int? ExpectedResponseLength => 0; // Le=00 for INSTALL commands
+    public Maybe<int> ExpectedResponseLength
+    {
+        get
+        {
+            return Maybe<int>.From(0);
+
+            // Le=00 for INSTALL commands
+        }
+    }
 
     /// <inheritdoc/>
-    public bool IsExtendedLength => false;
+    public bool IsExtendedLength
+    {
+        get
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Base constructor for InstallCommand.
@@ -70,16 +108,20 @@ public abstract record InstallCommand : IApduCommand
     /// </summary>
     /// <param name="packageAid">The package AID to validate.</param>
     /// <returns>A Result indicating success or failure with a SmartCardError.</returns>
-    protected static Result<ImmutableArray<byte>, SmartCardError> ValidatePackageAid(byte[]? packageAid)
+    protected static Result<ImmutableArray<byte>, SmartCardError> ValidatePackageAid(byte[] packageAid)
     {
         if (packageAid == null)
+        {
             return Result.Failure<ImmutableArray<byte>, SmartCardError>(
                 SmartCardError.InvalidArgument("Package AID cannot be null."));
-            
+        }
+
         if (packageAid.Length == 0)
+        {
             return Result.Failure<ImmutableArray<byte>, SmartCardError>(
                 SmartCardError.InvalidArgument("Package AID cannot be empty."));
-            
+        }
+
         return Result.Success<ImmutableArray<byte>, SmartCardError>(packageAid.ToImmutableArray());
     }
 
@@ -89,7 +131,13 @@ public abstract record InstallCommand : IApduCommand
     public sealed record InstallForLoadCommand : InstallCommand
     {
         /// <inheritdoc/>
-        public override InstallType Type => InstallType.ForLoad;
+        public override InstallType Type
+        {
+            get
+            {
+                return InstallType.ForLoad;
+            }
+        }
 
         /// <summary>
         /// Gets the security domain AID (optional).
@@ -140,13 +188,15 @@ public abstract record InstallCommand : IApduCommand
         public static Result<InstallForLoadCommand, SmartCardError> Create(
             byte[] packageAid,
             ushort? maxDataBlockSize = null,
-            byte[]? securityDomainAid = null,
-            byte[]? hash = null,
-            byte[]? installToken = null)
+            byte[] securityDomainAid = null,
+            byte[] hash = null,
+            byte[] installToken = null)
         {
             var packageAidResult = ValidatePackageAid(packageAid);
             if (packageAidResult.IsFailure)
+            {
                 return Result.Failure<InstallForLoadCommand, SmartCardError>(packageAidResult.Error);
+            }
 
             // Convert maxDataBlockSize to load parameters if provided
             var loadParameters = maxDataBlockSize.HasValue 
@@ -164,7 +214,13 @@ public abstract record InstallCommand : IApduCommand
         }
 
         /// <inheritdoc/>
-        public override byte[] Data => BuildData();
+        public override byte[] Data
+        {
+            get
+            {
+                return BuildData();
+            }
+        }
 
         private byte[] BuildData()
         {
@@ -318,24 +374,32 @@ public abstract record InstallCommand : IApduCommand
             byte[] moduleAid,
             byte[] applicationAid,
             byte[] privileges,
-            byte[]? installParameters = null,
-            byte[]? installToken = null)
+            byte[] installParameters = null,
+            byte[] installToken = null)
         {
             var packageAidResult = ValidatePackageAid(packageAid);
             if (packageAidResult.IsFailure)
+            {
                 return Result.Failure<InstallForInstallCommand, SmartCardError>(packageAidResult.Error);
+            }
 
             if (moduleAid == null || moduleAid.Length == 0)
+            {
                 return Result.Failure<InstallForInstallCommand, SmartCardError>(
                     SmartCardError.InvalidArgument("Module AID cannot be null or empty."));
+            }
 
             if (applicationAid == null || applicationAid.Length == 0)
+            {
                 return Result.Failure<InstallForInstallCommand, SmartCardError>(
                     SmartCardError.InvalidArgument("Application AID cannot be null or empty."));
+            }
 
             if (privileges == null)
+            {
                 return Result.Failure<InstallForInstallCommand, SmartCardError>(
                     SmartCardError.InvalidArgument("Privileges cannot be null."));
+            }
 
             var command = new InstallForInstallCommand(
                 InstallType.ForInstall,
@@ -364,24 +428,32 @@ public abstract record InstallCommand : IApduCommand
             byte[] moduleAid,
             byte[] applicationAid,
             byte[] privileges,
-            byte[]? installParameters = null,
-            byte[]? installToken = null)
+            byte[] installParameters = null,
+            byte[] installToken = null)
         {
             var packageAidResult = ValidatePackageAid(packageAid);
             if (packageAidResult.IsFailure)
+            {
                 return Result.Failure<InstallForInstallCommand, SmartCardError>(packageAidResult.Error);
+            }
 
             if (moduleAid == null || moduleAid.Length == 0)
+            {
                 return Result.Failure<InstallForInstallCommand, SmartCardError>(
                     SmartCardError.InvalidArgument("Module AID cannot be null or empty."));
+            }
 
             if (applicationAid == null || applicationAid.Length == 0)
+            {
                 return Result.Failure<InstallForInstallCommand, SmartCardError>(
                     SmartCardError.InvalidArgument("Application AID cannot be null or empty."));
+            }
 
             if (privileges == null)
+            {
                 return Result.Failure<InstallForInstallCommand, SmartCardError>(
                     SmartCardError.InvalidArgument("Privileges cannot be null."));
+            }
 
             var command = new InstallForInstallCommand(
                 InstallType.ForInstallAndMakeSelectable,
@@ -396,7 +468,13 @@ public abstract record InstallCommand : IApduCommand
         }
 
         /// <inheritdoc/>
-        public override byte[] Data => BuildData();
+        public override byte[] Data
+        {
+            get
+            {
+                return BuildData();
+            }
+        }
 
         private byte[] BuildData()
         {
@@ -500,10 +578,10 @@ public static class InstallCommandBuilder
     /// <returns>A Result containing the command or an error.</returns>
     public static Result<InstallCommand.InstallForLoadCommand, SmartCardError> CreateForLoad(
         byte[] packageAid,
-        byte[]? securityDomainAid = null,
-        byte[]? hash = null,
+        byte[] securityDomainAid = null,
+        byte[] hash = null,
         ushort? maxDataBlockSize = null,
-        byte[]? installToken = null)
+        byte[] installToken = null)
     {
         return InstallCommand.InstallForLoadCommand.Create(
             packageAid,
@@ -526,10 +604,10 @@ public static class InstallCommandBuilder
     public static Result<InstallCommand.InstallForInstallCommand, SmartCardError> CreateForInstall(
         byte[] packageAid,
         byte[] appletAid,
-        byte[]? moduleAid = null,
-        byte[]? privileges = null,
-        byte[]? installParameters = null,
-        byte[]? installToken = null)
+        byte[] moduleAid = null,
+        byte[] privileges = null,
+        byte[] installParameters = null,
+        byte[] installToken = null)
     {
         return InstallCommand.InstallForInstallCommand.Create(
             packageAid,
@@ -553,10 +631,10 @@ public static class InstallCommandBuilder
     public static Result<InstallCommand.InstallForInstallCommand, SmartCardError> CreateForInstallAndMakeSelectable(
         byte[] packageAid,
         byte[] appletAid,
-        byte[]? moduleAid = null,
-        byte[]? privileges = null,
-        byte[]? installParameters = null,
-        byte[]? installToken = null)
+        byte[] moduleAid = null,
+        byte[] privileges = null,
+        byte[] installParameters = null,
+        byte[] installToken = null)
     {
         return InstallCommand.InstallForInstallCommand.CreateAndMakeSelectable(
             packageAid,
@@ -579,18 +657,24 @@ public record InstallCommandResponse(
     /// <summary>
     /// Gets a value indicating whether the install was successful.
     /// </summary>
-    public bool IsSuccess => StatusWord == StatusWords.Success;
+    public bool IsSuccess
+    {
+        get
+        {
+            return StatusWord == StatusWords.Success;
+        }
+    }
 
     /// <summary>
     /// Creates a successful response.
     /// </summary>
-    public static InstallCommandResponse Success(byte[]? data = null) =>
+    public static InstallCommandResponse Success(byte[] data = null) =>
         new(data?.ToImmutableArray() ?? [], StatusWords.Success);
 
     /// <summary>
     /// Creates a failed response.
     /// </summary>
-    public static InstallCommandResponse Failure(ushort statusWord, byte[]? data = null) =>
+    public static InstallCommandResponse Failure(ushort statusWord, byte[] data = null) =>
         new(data?.ToImmutableArray() ?? [], statusWord);
 
     /// <summary>

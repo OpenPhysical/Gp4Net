@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Services;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
@@ -186,7 +185,13 @@ public class ListCliCommand : BaseCommand<ListCliCommand.Settings>
         /// <summary>
         /// Gets whether to show summary.
         /// </summary>
-        public bool ShowSummary => !NoSummary;
+        public bool ShowSummary
+        {
+            get
+            {
+                return !NoSummary;
+            }
+        }
 
         /// <summary>
         /// Gets or sets whether to use secure channel.
@@ -196,7 +201,13 @@ public class ListCliCommand : BaseCommand<ListCliCommand.Settings>
         public bool UseSecureChannel { get; set; }
 
         /// <inheritdoc />
-        public override bool RequiresSecureChannel => UseSecureChannel;
+        public override bool RequiresSecureChannel
+        {
+            get
+            {
+                return UseSecureChannel;
+            }
+        }
 
         /// <summary>
         /// Validates the command settings.

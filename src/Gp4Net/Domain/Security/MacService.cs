@@ -24,7 +24,7 @@ public sealed class MacService
     /// Initializes a new instance of the <see cref="MacService"/> class.
     /// </summary>
     /// <param name="logger">The logger instance. If null, uses NullLogger.</param>
-    public MacService(ILogger<MacService>? logger = null)
+    public MacService(ILogger<MacService> logger = null)
     {
         _logger = logger ?? NullLogger<MacService>.Instance;
     }
@@ -69,24 +69,29 @@ public sealed class MacService
         byte[] data,
         int macLength = 8)
     {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(data);
+
+        if (key.Length == 0)
+        {
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidArgument("Key cannot be empty"));
+        }
+
         try
         {
-            // Validate inputs
-            if (key == null || key.Length == 0)
-                return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("Key cannot be null or empty"));
-
-            if (data == null)
-                return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("Data cannot be null"));
 
             if (key.Length != 16 && key.Length != 24)
+            {
                 return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidArgument("3DES key must be 16 or 24 bytes"));
+            }
 
             if (macLength < 1 || macLength > 8)
+            {
                 return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidArgument("MAC length must be between 1 and 8 bytes"));
+            }
 
             _logger.LogTrace("Calculating 3DES MAC over {DataLength} bytes", data.Length);
 
@@ -137,24 +142,29 @@ public sealed class MacService
         byte[] data,
         int macLength = 8)
     {
+        ArgumentNullException.ThrowIfNull(key);
+        ArgumentNullException.ThrowIfNull(data);
+
+        if (key.Length == 0)
+        {
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidArgument("Key cannot be empty"));
+        }
+
         try
         {
-            // Validate inputs
-            if (key == null || key.Length == 0)
-                return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("Key cannot be null or empty"));
-
-            if (data == null)
-                return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("Data cannot be null"));
 
             if (key.Length != 16 && key.Length != 24 && key.Length != 32)
+            {
                 return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidArgument("AES key must be 16, 24, or 32 bytes"));
+            }
 
             if (macLength < 1 || macLength > 16)
+            {
                 return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidArgument("MAC length must be between 1 and 16 bytes"));
+            }
 
             _logger.LogTrace("Calculating AES-CMAC over {DataLength} bytes", data.Length);
 
@@ -249,8 +259,10 @@ public sealed class MacService
         ScpVersion protocol)
     {
         if (expectedMac == null || expectedMac.Length == 0)
+        {
             return Result.Failure<bool, SmartCardError>(
                 SmartCardError.InvalidArgument("Expected MAC cannot be null or empty"));
+        }
 
         return CalculateMac(key, data, protocol, expectedMac.Length)
             .Bind(calculatedMac =>

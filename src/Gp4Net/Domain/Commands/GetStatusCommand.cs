@@ -78,42 +78,84 @@ public class GetStatusCommand : IApduCommand
     /// <summary>
     /// Gets the search criteria (optional AID).
     /// </summary>
-    public byte[]? SearchCriteria { get; }
+    public byte[] SearchCriteria { get; }
 
     /// <summary>
     /// Gets the class byte.
     /// </summary>
-    byte IApduCommand.Cla => Cla;
+    byte IApduCommand.Cla
+    {
+        get
+        {
+            return Cla;
+        }
+    }
 
     /// <summary>
     /// Gets the instruction byte.
     /// </summary>
-    byte IApduCommand.Ins => Ins;
+    byte IApduCommand.Ins
+    {
+        get
+        {
+            return Ins;
+        }
+    }
 
     /// <summary>
     /// Gets the parameter 1 byte.
     /// </summary>
-    public byte P1 => (byte)Subset;
+    public byte P1
+    {
+        get
+        {
+            return (byte)Subset;
+        }
+    }
 
     /// <summary>
     /// Gets the parameter 2 byte.
     /// </summary>
-    public byte P2 => (byte)Format;
+    public byte P2
+    {
+        get
+        {
+            return (byte)Format;
+        }
+    }
 
     /// <summary>
     /// Gets the command data.
     /// </summary>
-    public byte[]? Data => SearchCriteria;
+    public byte[] Data
+    {
+        get
+        {
+            return SearchCriteria;
+        }
+    }
 
     /// <summary>
     /// Gets the expected response length (256 for maximum variable response data).
     /// </summary>
-    public int? ExpectedResponseLength => 256;
+    public Maybe<int> ExpectedResponseLength
+    {
+        get
+        {
+            return Maybe<int>.From(256);
+        }
+    }
 
     /// <summary>
     /// Gets whether this command uses extended length.
     /// </summary>
-    public bool IsExtendedLength => false;
+    public bool IsExtendedLength
+    {
+        get
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the GetStatusCommand class.
@@ -124,12 +166,12 @@ public class GetStatusCommand : IApduCommand
     private GetStatusCommand(
         StatusSubset subset,
         ResponseFormat format = ResponseFormat.None,
-        byte[]? searchCriteria = null
+        byte[] searchCriteria = null
     )
     {
         Subset = subset;
         Format = format;
-        SearchCriteria = searchCriteria != null ? (byte[])searchCriteria.Clone() : null;
+        SearchCriteria = searchCriteria != null ? (byte[])searchCriteria.Clone() : [];
     }
 
     /// <summary>
@@ -142,20 +184,26 @@ public class GetStatusCommand : IApduCommand
     public static Result<GetStatusCommand, SmartCardError> Create(
         StatusSubset subset,
         ResponseFormat format = ResponseFormat.None,
-        byte[]? searchCriteria = null
+        byte[] searchCriteria = null
     )
     {
         // Validate StatusSubset enum
         if (!IsValidStatusSubset(subset))
+        {
             return SmartCardError.InvalidArgument($"Invalid status subset: {subset}");
-            
+        }
+
         // Validate ResponseFormat enum
         if (!IsValidResponseFormat(format))
+        {
             return SmartCardError.InvalidArgument($"Invalid response format: {format}");
-            
+        }
+
         // Validate search criteria if provided
         if (searchCriteria != null && (searchCriteria.Length < 5 || searchCriteria.Length > 16))
+        {
             return SmartCardError.InvalidArgument("Search criteria AID must be between 5 and 16 bytes.");
+        }
 
         return new GetStatusCommand(subset, format, searchCriteria);
     }
@@ -317,7 +365,9 @@ public class GetStatusResponse
     public static Result<GetStatusResponse, SmartCardError> Parse(byte[] response)
     {
         if (response == null)
+        {
             return SmartCardError.InvalidArgument("Response data cannot be null");
+        }
 
         var applications = new List<ApplicationStatusEntry>();
         var offset = 0;

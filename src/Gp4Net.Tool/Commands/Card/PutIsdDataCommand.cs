@@ -534,14 +534,14 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         /// </summary>
         [CommandArgument(0, "[key=value...]")]
         [Description("Key-value pairs to write (e.g., iin=1234 cin=567890)")]
-        public string[]? KeyValuePairs { get; set; }
+        public string[] KeyValuePairs { get; set; }
 
         /// <summary>
         /// Gets or sets the configuration file path.
         /// </summary>
         [CommandOption("--file <FILE>")]
         [Description("Configuration file (JSON or key=value format). Use '-' for stdin")]
-        public string? ConfigFile { get; set; }
+        public string ConfigFile { get; set; }
 
         /// <summary>
         /// Gets or sets whether to use interactive mode.

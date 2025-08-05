@@ -172,7 +172,7 @@ public class CardInfo
     public string Atr { get; set; } = "3BD518FF8191FE1FC38073C821100A";
     public string IsdAid { get; set; } = "A000000151000000";
     public string CardType { get; set; } = "UNKNOWN";
-    public CplcData? Cplc { get; set; }
+    public CplcData Cplc { get; set; }
 }
 
 /// <summary>
@@ -200,7 +200,7 @@ public class SessionMetadata
     public string HostChallenge { get; set; } = string.Empty;
     public string CardChallenge { get; set; } = string.Empty;
     public string SequenceCounter { get; set; } = "000001";
-    public DerivationData? DerivationData { get; set; }
+    public DerivationData DerivationData { get; set; }
     public List<string> Operations { get; set; } = new();
 }
 
@@ -226,9 +226,9 @@ public class Operation
     public int EndExchange { get; set; }
     public List<string> Commands { get; set; } = new();
     public string ExpectedCli { get; set; } = string.Empty;
-    public string? PackageAid { get; set; }
-    public string? AppletAid { get; set; }
-    public string? TargetAid { get; set; }
+    public string PackageAid { get; set; }
+    public string AppletAid { get; set; }
+    public string TargetAid { get; set; }
 }
 
 /// <summary>
@@ -255,7 +255,7 @@ public class Exchange
     public string Description { get; set; } = string.Empty;
     public int SourceLine { get; set; }
     public bool SecureMessaging { get; set; }
-    public ScpData? ScpData { get; set; }
+    public ScpData ScpData { get; set; }
 }
 
 /// <summary>
@@ -263,12 +263,12 @@ public class Exchange
 /// </summary>
 public class ScpData
 {
-    public string? HostChallenge { get; set; }
-    public string? CardChallenge { get; set; }
-    public string? CardCryptogram { get; set; }
+    public string HostChallenge { get; set; }
+    public string CardChallenge { get; set; }
+    public string CardCryptogram { get; set; }
     public int? KeyVersion { get; set; }
-    public string? ScpId { get; set; }
-    public string? HostCryptogram { get; set; }
+    public string ScpId { get; set; }
+    public string HostCryptogram { get; set; }
     public bool? SessionEstablished { get; set; }
 }
 
@@ -294,17 +294,23 @@ public class TraceConverter
         };
 
         if (verbose)
+        {
             AnsiConsole.MarkupLine($"[dim]Found {exchanges.Count} APDU exchanges[/]");
+        }
 
         // Detect operations
         var operations = _operationDetector.AnalyzeTrace(exchanges);
         if (verbose)
+        {
             AnsiConsole.MarkupLine($"[dim]Detected operations: {string.Join(", ", operations.Keys)}[/]");
+        }
 
         // Analyze sessions
         var sessions = _sessionAnalyzer.DetectSessions(exchanges);
         if (verbose)
+        {
             AnsiConsole.MarkupLine($"[dim]Detected {sessions.Count} session(s)[/]");
+        }
 
         // Link operations to sessions
         LinkOperationsToSessions(operations, sessions);
@@ -331,7 +337,7 @@ public class TraceConverter
         var commandPattern = new Regex(@"^A>> T=\d+ \([\d+]+\) ([0-9A-F\s]+)$");
         var responsePattern = new Regex(@"^A<< \([\d+]+\) \((\d+)ms\) ([0-9A-F\s]+)$");
 
-        string? currentCommand = null;
+        string currentCommand = null;
         var currentLine = 0;
 
         var lines = await File.ReadAllLinesAsync(filename);
@@ -341,7 +347,9 @@ public class TraceConverter
 
             // Skip empty lines and comments
             if (string.IsNullOrEmpty(line) || line.StartsWith('#') || line.StartsWith('[') || line.StartsWith("WARNING:"))
+            {
                 continue;
+            }
 
             // Try to match command
             var cmdMatch = commandPattern.Match(line);
@@ -376,7 +384,7 @@ public class TraceConverter
         var sendPattern = new Regex(@"Command --> ([0-9A-F\s]+)");
         var recvPattern = new Regex(@"Response <-- ([0-9A-F\s]+)");
 
-        string? currentCommand = null;
+        string currentCommand = null;
         var currentLine = 0;
 
         var lines = await File.ReadAllLinesAsync(filename);
@@ -484,7 +492,9 @@ public class ApduAnalyzer
     public static string GetCommandDescription(string commandHex)
     {
         if (commandHex.Length < 4)
+        {
             return "UNKNOWN";
+        }
 
         var ins = commandHex.Substring(2, 2);
 
@@ -495,7 +505,10 @@ public class ApduAnalyzer
             {
                 var tag = commandHex.Substring(4, 4);
                 if (GetDataTags.TryGetValue(tag, out var tagDesc))
+                {
                     return $"GET {tagDesc}";
+                }
+
                 return $"GET DATA (tag {tag})";
             }
 
@@ -521,13 +534,15 @@ public class ApduAnalyzer
     public static bool IsSecureMessaging(string commandHex)
     {
         if (commandHex.Length < 2)
+        {
             return false;
+        }
 
         var cla = Convert.ToByte(commandHex.Substring(0, 2), 16);
         return (cla & 0x04) != 0;
     }
 
-    public static ScpData? ExtractScpData(string commandHex, string responseHex, string description)
+    public static ScpData ExtractScpData(string commandHex, string responseHex, string description)
     {
         var scpData = new ScpData();
         var hasData = false;
@@ -672,7 +687,10 @@ public class OperationDetector
                         // Extend the existing LOAD operation
                         lastOp.EndIndex = i;
                         if (!lastOp.Commands.Contains(exchange.Description))
+                        {
                             lastOp.Commands.Add(exchange.Description);
+                        }
+
                         continue;
                     }
                 }
@@ -706,8 +724,10 @@ public class OperationDetector
                 op.EndExchange - 1 >= detectedOp.StartIndex);
                 
             if (existingOp != null)
+            {
                 continue; // Skip if already part of another operation
-            
+            }
+
             // Create operation
             var opName = GetUniqueOperationName(detectedOp.Type);
             operations[opName] = new Operation
@@ -740,7 +760,10 @@ public class OperationDetector
                 if (requiredCommands.Any(cmd => op.Commands.Any(c => c.Contains(cmd))))
                 {
                     if (sequenceStart == -1)
+                    {
                         sequenceStart = j;
+                    }
+
                     sequenceEnd = j;
                     foundCommands.AddRange(op.Commands);
                     
@@ -770,7 +793,9 @@ public class OperationDetector
             }
             
             if (sequenceStart == -1)
+            {
                 i++;
+            }
         }
     }
     
@@ -868,7 +893,7 @@ public class SessionAnalyzer
     public List<SessionMetadata> DetectSessions(List<Exchange> exchanges)
     {
         var sessions = new List<SessionMetadata>();
-        SessionMetadata? currentSession = null;
+        SessionMetadata currentSession = null;
 
         foreach (var exchange in exchanges)
         {
@@ -905,7 +930,7 @@ public class SessionAnalyzer
         _sessionCounter++;
 
         var scpData = exchange.ScpData;
-        DerivationData? derivationData = null;
+        DerivationData derivationData = null;
 
         if (scpData != null)
         {
@@ -999,7 +1024,7 @@ public class MetadataExtractor
         return "A000000151000000"; // Default ISD AID
     }
 
-    private static CplcData? FindCplcData(List<Exchange> exchanges)
+    private static CplcData FindCplcData(List<Exchange> exchanges)
     {
         foreach (var exchange in exchanges)
         {
@@ -1026,7 +1051,7 @@ public class MetadataExtractor
         return null;
     }
 
-    private static string DetectCardType(CplcData? cplcData)
+    private static string DetectCardType(CplcData cplcData)
     {
         if (cplcData?.IcFabricator == "4790")
         {

@@ -3,13 +3,11 @@ using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
 using JetBrains.Annotations;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Macs;
-using Org.BouncyCastle.Crypto.Modes;
 using Org.BouncyCastle.Crypto.Parameters;
 
 namespace Gp4Net.Domain.Security;
@@ -109,7 +107,9 @@ public static class CardResponseSecurityProcessor
         byte protocolVersion)
     {
         if (response == null || response.Length < 10) // Minimum: 2 status bytes + 8 MAC bytes
+        {
             return SmartCardError.SecurityError("Response too short for R-MAC");
+        }
 
         // Extract R-MAC (last 8 bytes before status)
         var rmacOffset = response.Length - 10;
@@ -125,7 +125,9 @@ public static class CardResponseSecurityProcessor
             .Bind(expectedRMac =>
             {
                 if (!CryptographicOperations.CompareBytes(receivedRMac, expectedRMac))
+                {
                     return SmartCardError.SecurityError("R-MAC verification failed");
+                }
 
                 // Remove R-MAC from response
                 var result = new byte[response.Length - 8];
@@ -146,7 +148,9 @@ public static class CardResponseSecurityProcessor
         byte protocolVersion)
     {
         if (response == null || response.Length <= 2) // Only status word, no data to decrypt
+        {
             return Result.Success<byte[], SmartCardError>(response);
+        }
 
         // Extract data (everything except the last 2 bytes which are status word)
         var statusOffset = response.Length - 2;
@@ -257,7 +261,9 @@ public static class CardResponseSecurityProcessor
         byte protocolVersion)
     {
         if (protocolVersion != ProtocolIdentifiers.Scp03)
+        {
             return Result.Success<byte[], SmartCardError>(new byte[8]); // Zero IV for SCP02
+        }
 
         // Per GP SCP03 spec section 6.2.7:
         // Response ICV uses same counter as command but with MSB set to 0x80

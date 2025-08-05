@@ -67,14 +67,18 @@ public abstract class SecureChannelProtocolBase : ISecureChannelProtocol
             
         var hostValidation = ProtocolValidation.ValidateHostChallenge(hostChallenge);
         if (hostValidation.IsFailure)
+        {
             return Result.Failure<SecureChannelContext, SmartCardError>(
                 SmartCardError.InvalidData(hostValidation.Error));
-            
+        }
+
         var protocolValidation = ProtocolValidation.ValidateProtocolVersion(response.ScpId, ProtocolVersion);
         if (protocolValidation.IsFailure)
+        {
             return Result.Failure<SecureChannelContext, SmartCardError>(
                 SmartCardError.InvalidResponse(protocolValidation.Error));
-            
+        }
+
         return ProcessInitializeUpdateResponseImpl(response, hostChallenge);
     }
 

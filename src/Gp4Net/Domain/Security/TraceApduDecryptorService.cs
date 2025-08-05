@@ -27,7 +27,7 @@ public sealed class TraceApduDecryptorService
     /// Initializes a new instance of the <see cref="TraceApduDecryptorService"/> class.
     /// </summary>
     /// <param name="logger">The logger instance. If null, uses NullLogger.</param>
-    public TraceApduDecryptorService(ILogger<TraceApduDecryptorService>? logger = null)
+    public TraceApduDecryptorService(ILogger<TraceApduDecryptorService> logger = null)
     {
         _logger = logger ?? NullLogger<TraceApduDecryptorService>.Instance;
     }
@@ -65,7 +65,9 @@ public sealed class TraceApduDecryptorService
             // Initialize session state
             var initialStateResult = CreateInitialSessionState(sessionKeys, securityLevel, protocolVersion);
             if (initialStateResult.IsFailure)
+            {
                 return Result.Failure<DecryptedTrace, SmartCardError>(initialStateResult.Error);
+            }
 
             var sessionState = initialStateResult.Value;
             var decryptedExchanges = new List<DecryptedExchange>();
@@ -234,7 +236,9 @@ public sealed class TraceApduDecryptorService
             // Parse the secured command structure
             var parseResult = ApduParser.ParseSecuredCommand(securedCommand);
             if (parseResult.IsFailure)
+            {
                 return Result.Failure<(byte[], SecureChannelState), SmartCardError>(parseResult.Error);
+            }
 
             var parsedCommand = parseResult.Value;
             
@@ -246,7 +250,9 @@ public sealed class TraceApduDecryptorService
             {
                 var macVerificationResult = VerifyCommandMac(parsedCommand, sessionState);
                 if (macVerificationResult.IsFailure)
+                {
                     return Result.Failure<(byte[], SecureChannelState), SmartCardError>(macVerificationResult.Error);
+                }
             }
 
             // Decrypt data if present
@@ -257,7 +263,9 @@ public sealed class TraceApduDecryptorService
             {
                 var decryptionResult = DecryptCommandData(parsedCommand.Data, sessionState);
                 if (decryptionResult.IsFailure)
+                {
                     return Result.Failure<(byte[], SecureChannelState), SmartCardError>(decryptionResult.Error);
+                }
 
                 originalData = decryptionResult.Value;
                 newEncryptionCounter = sessionState.ProtocolVersion == ProtocolIdentifiers.Scp03 
@@ -278,7 +286,9 @@ public sealed class TraceApduDecryptorService
 
             var newStateResult = UpdateSessionState(sessionState, newEncryptionCounter, newMacChaining);
             if (newStateResult.IsFailure)
+            {
                 return Result.Failure<(byte[], SecureChannelState), SmartCardError>(newStateResult.Error);
+            }
 
             return Result.Success<(byte[], SecureChannelState), SmartCardError>((originalCommand, newStateResult.Value));
         }
@@ -293,7 +303,9 @@ public sealed class TraceApduDecryptorService
     private Result<bool, SmartCardError> VerifyCommandMac(ParsedSecuredCommand parsedCommand, SecureChannelState sessionState)
     {
         if (parsedCommand.Mac == null)
+        {
             return Result.Success<bool, SmartCardError>(true); // No MAC to verify
+        }
 
         // Reconstruct the command data that was used for MAC calculation
         var macInput = ApduParser.BuildMacInput(parsedCommand, sessionState.ProtocolVersion);
@@ -385,7 +397,9 @@ public sealed class TraceApduDecryptorService
     private static bool IsSecureMessaging(byte[] apduBytes, ApduDirection direction)
     {
         if (apduBytes.Length < 4)
+        {
             return false;
+        }
 
         if (direction == ApduDirection.Command)
         {
@@ -398,8 +412,10 @@ public sealed class TraceApduDecryptorService
             // In secure messaging, response data often contains TLV structures with specific tags
             // For now, be conservative and only detect SM when we have clear indicators
             if (apduBytes.Length <= 2)
+            {
                 return false; // Only status word
-            
+            }
+
             // Look for common secure messaging tags in response data
             // Tag 0x87 (encrypted data), 0x8E (MAC), etc.
             // This is a simplified check - real implementation would be more sophisticated
@@ -407,7 +423,9 @@ public sealed class TraceApduDecryptorService
             {
                 var tag = apduBytes[i];
                 if (tag == 0x87 || tag == 0x8E || tag == 0x99)
+                {
                     return true;
+                }
             }
             
             return false; // No secure messaging indicators found
@@ -459,16 +477,28 @@ public record DecryptedApdu(
     /// <summary>
     /// Gets the decrypted APDU bytes. Returns original bytes if decryption failed or not needed.
     /// </summary>
-    public byte[] DecryptedBytes => Status == DecryptionStatus.Decrypted 
-        ? OriginalBytes // For now, return original - will be updated when decryption logic is complete
-        : OriginalBytes;
+    public byte[] DecryptedBytes
+    {
+        get
+        {
+            return Status == DecryptionStatus.Decrypted
+                ? OriginalBytes // For now, return original - will be updated when decryption logic is complete
+                : OriginalBytes;
+        }
+    }
 
     /// <summary>
     /// Gets a human-readable description of the APDU including status word if it's a response.
     /// </summary>
-    public string Description => Direction == ApduDirection.Response && OriginalBytes.Length >= 2
-        ? $"Response: {new StatusWord((ushort)((OriginalBytes[^2] << 8) | OriginalBytes[^1])).ToDescriptiveString()}"
-        : $"{Direction} APDU ({OriginalBytes.Length} bytes)";
+    public string Description
+    {
+        get
+        {
+            return Direction == ApduDirection.Response && OriginalBytes.Length >= 2
+                ? $"Response: {new StatusWord((ushort)((OriginalBytes[^2] << 8) | OriginalBytes[^1])).ToDescriptiveString()}"
+                : $"{Direction} APDU ({OriginalBytes.Length} bytes)";
+        }
+    }
 };
 
 /// <summary>

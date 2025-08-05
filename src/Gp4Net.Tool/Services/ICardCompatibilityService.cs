@@ -136,7 +136,7 @@ public class CardTypeInfo
     /// <summary>
     /// Gets the specific card model if detected.
     /// </summary>
-    public string? Model { get; }
+    public string Model { get; }
 
     /// <summary>
     /// Gets whether this is a production card.
@@ -164,7 +164,7 @@ public class CardTypeInfo
     public CardTypeInfo(
         string manufacturer,
         string family,
-        string? model,
+        string model,
         bool isProduction,
         int? maxAuthenticationAttempts,
         string[] supportedProtocols,
@@ -183,7 +183,13 @@ public class CardTypeInfo
     /// <summary>
     /// Gets a descriptive name for this card type.
     /// </summary>
-    public string DisplayName => Model != null ? $"{Manufacturer} {Family} {Model}" : $"{Manufacturer} {Family}";
+    public string DisplayName
+    {
+        get
+        {
+            return Model != null ? $"{Manufacturer} {Family} {Model}" : $"{Manufacturer} {Family}";
+        }
+    }
 }
 
 /// <summary>
