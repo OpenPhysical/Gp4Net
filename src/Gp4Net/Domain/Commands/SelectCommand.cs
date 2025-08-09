@@ -123,14 +123,14 @@ public class SelectCommand : BaseApduCommand
         if (aid == null)
         {
             return Result.Failure<SelectCommand, SmartCardError>(
-                SmartCardError.InvalidData("AID cannot be null")
+                new InvalidDataError("AID", "cannot be null")
             );
         }
 
         if (aid.Length > 16)
         {
             return Result.Failure<SelectCommand, SmartCardError>(
-                SmartCardError.InvalidData("AID must be 16 bytes or less")
+                new InvalidLengthError("AID", 16, aid.Length)
             );
         }
 
@@ -155,22 +155,6 @@ public class SelectCommand : BaseApduCommand
         return Create([], SelectMode.First);
     }
 
-    /// <summary>
-    /// Creates a SELECT command with empty AID for auto-detection.
-    /// </summary>
-    /// <param name="controlInfo">The file control information.</param>
-    /// <returns>A new SelectCommand instance with empty AID.</returns>
-    [Obsolete("Use CreateForIssuerSecurityDomain() instead")]
-    public static SelectCommand CreateEmptySelect(
-        FileControlInfo controlInfo = FileControlInfo.ReturnFci
-    )
-    {
-        return new SelectCommand(
-            [],
-            SelectionControl.SelectByName,
-            controlInfo
-        );
-    }
 
     /// <inheritdoc />
     public override byte Cla
@@ -362,7 +346,7 @@ public class SelectResponse
         if (response == null)
         {
             return Result.Failure<SelectResponse, SmartCardError>(
-                SmartCardError.InvalidData("Response data cannot be null")
+                new InvalidDataError("Response", "cannot be null")
             );
         }
 

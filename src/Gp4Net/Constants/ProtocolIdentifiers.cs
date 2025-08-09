@@ -13,10 +13,6 @@ namespace Gp4Net.Constants;
 [PublicAPI]
 public static class ProtocolIdentifiers
 {
-    /// <summary>
-    /// SCP01 protocol identifier (deprecated).
-    /// </summary>
-    public const byte Scp01 = 0x01;
 
     /// <summary>
     /// SCP02 protocol identifier.

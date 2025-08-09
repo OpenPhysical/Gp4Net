@@ -20,10 +20,10 @@ public class LifecycleCommand : BaseCommand<LifecycleCommand.Settings>
     /// </summary>
     public LifecycleCommand(
         ICardService cardService,
-        Gp4Net.Services.IGlobalPlatformService globalPlatformService,
+        IDomainServiceFactory domainServiceFactory,
         IKeysetResolver keysetResolver
     )
-        : base(cardService, globalPlatformService, keysetResolver) { }
+        : base(cardService, domainServiceFactory, keysetResolver) { }
 
     /// <summary>
     /// Executes the lifecycle command to change an application's lifecycle state.

@@ -1,5 +1,6 @@
 using System;
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using NUnit.Framework;
@@ -33,7 +34,7 @@ public class StoreDataCommandTests
 
         // Assert
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
     }
 
     [Test]

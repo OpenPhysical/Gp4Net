@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Immutable;
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
@@ -153,7 +154,8 @@ public class Scp03SecurityProcessorTests
         );
         
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
+        result.Error.Message.Should().Contain("MAC chaining value cannot be empty");
     }
 
     private InitializeUpdateResponse CreateTestInitializeUpdateResponse()
@@ -190,6 +192,9 @@ public class Scp03SecurityProcessorTests
         responseData[offset++] = 0x01;
         responseData[offset++] = 0x23;
         
-        return InitializeUpdateResponse.Parse(responseData);
+        var parseResult = InitializeUpdateResponse.Parse(responseData);
+        if (!parseResult.IsSuccess)
+            throw new InvalidOperationException($"Failed to create test INITIALIZE UPDATE response: {parseResult.Error}");
+        return parseResult.Value;
     }
 }

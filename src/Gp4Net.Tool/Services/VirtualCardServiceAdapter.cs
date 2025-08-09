@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -98,24 +99,79 @@ public class VirtualCardServiceAdapter : ISmartCardService
     }
 
     /// <inheritdoc />
-    public ISmartCardService WithContext(IPipelineContext context)
+    public Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context)
     {
-        ArgumentNullException.ThrowIfNull(context);
-            
-        return new VirtualCardServiceAdapter(_virtualCardService, _logger)
+        // No null check - context parameter should never be null per NO NULLS rule
+        return Result.Success<ISmartCardService, SmartCardError>(new VirtualCardServiceAdapter(_virtualCardService, _logger)
         {
             _context = context
-        };
+        });
     }
 
     /// <inheritdoc />
-    public ISmartCardService WithContextValue<T>(string key, T value)
+    public Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value)
     {
-        ArgumentNullException.ThrowIfNull(key);
-            
+        // No null check - key parameter should never be null per NO NULLS rule
         var newContext = _context.With(key, value);
         return WithContext(newContext);
     }
+
+    /// <summary>
+    /// Gets the list of virtual readers available.
+    /// </summary>
+    /// <returns>The list of virtual reader names.</returns>
+    public IReadOnlyList<string> GetVirtualReaders()
+    {
+        return _virtualCardService.GetReaders();
+    }
+
+    /// <summary>
+    /// Connects to a virtual reader.
+    /// </summary>
+    /// <param name="readerName">The virtual reader name.</param>
+    /// <returns>True if connection succeeded, false otherwise.</returns>
+    public bool Connect(string readerName)
+    {
+        return _virtualCardService.Connect(readerName);
+    }
+
+    /// <summary>
+    /// Disconnects from the virtual reader.
+    /// </summary>
+    public void Disconnect()
+    {
+        _virtualCardService.Disconnect();
+    }
+
+    /// <summary>
+    /// Gets whether the virtual card service is connected.
+    /// </summary>
+    public bool IsConnected => _virtualCardService.IsConnected;
+
+    /// <summary>
+    /// Gets the ATR from the virtual card.
+    /// </summary>
+    /// <returns>The ATR bytes or null if not connected.</returns>
+    public byte[] GetAtr()
+    {
+        return _virtualCardService.GetAtr();
+    }
+
+    /// <summary>
+    /// Establishes a secure channel with the virtual card.
+    /// </summary>
+    /// <param name="keySet">The key set bytes.</param>
+    /// <param name="securityLevel">The security level.</param>
+    /// <returns>True if successful, false otherwise.</returns>
+    public bool EstablishSecureChannel(byte[] keySet, byte securityLevel)
+    {
+        return _virtualCardService.EstablishSecureChannel(keySet, securityLevel);
+    }
+
+    /// <summary>
+    /// Gets whether a secure channel is established.
+    /// </summary>
+    public bool IsSecureChannelEstablished => _virtualCardService.IsSecureChannelEstablished;
 
     /// <inheritdoc />
     public void Dispose()

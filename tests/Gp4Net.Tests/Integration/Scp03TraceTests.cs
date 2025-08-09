@@ -51,7 +51,9 @@ public class Scp03TraceTests : TraceBasedTestBase
         Assert.That(initUpdateResponse.Data, Is.EqualTo(expectedResponseData));
 
         // Parse the response
-        var parsedResponse = InitializeUpdateResponse.Parse(initUpdateResponse.Data);
+        var parsedResponseResult = InitializeUpdateResponse.Parse(initUpdateResponse.Data);
+        Assert.That(parsedResponseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
+        var parsedResponse = parsedResponseResult.Value;
         Assert.That(parsedResponse, Is.Not.Null);
         Assert.Multiple(() =>
         {

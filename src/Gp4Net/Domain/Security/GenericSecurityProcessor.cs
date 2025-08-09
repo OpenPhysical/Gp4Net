@@ -36,7 +36,7 @@ public static class GenericSecurityProcessor<TProtocol> where TProtocol : IScpPr
     {
         return SecurityValidation.ValidateCommandInputs(command, sessionKeys, macChainingValue)
             .Bind(_ => macChainingValue.Length != TProtocol.ChainingValueSize
-                ? SmartCardError.InvalidArgument($"MAC chaining value must be {TProtocol.ChainingValueSize} bytes for {typeof(TProtocol).Name}")
+                ? new InvalidLengthError("macChainingValue", TProtocol.ChainingValueSize, macChainingValue.Length)
                 : Result.Success<IApduCommand, SmartCardError>(command))
             .Bind(_ => BuildCommandApdu(command))
             .Bind(commandBytes => ScpProtocolOperations.ApplyCommandSecurity<TProtocol>(
@@ -66,7 +66,7 @@ public static class GenericSecurityProcessor<TProtocol> where TProtocol : IScpPr
     {
         return SecurityValidation.ValidateResponseInputs(response, sessionKeys, macChainingValue)
             .Bind(_ => macChainingValue.Length != TProtocol.ChainingValueSize
-                ? SmartCardError.InvalidArgument($"MAC chaining value must be {TProtocol.ChainingValueSize} bytes for {typeof(TProtocol).Name}")
+                ? new InvalidLengthError("macChainingValue", TProtocol.ChainingValueSize, macChainingValue.Length)
                 : Result.Success<byte[], SmartCardError>(response))
             .Bind(_ => ScpProtocolOperations.ApplyResponseSecurity<TProtocol>(
                 response,

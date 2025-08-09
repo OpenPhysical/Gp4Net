@@ -148,14 +148,12 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
 
             // Extract R-MAC (8 bytes before status word)
             var rmacOffset = response.Length - 10;
-            var receivedRMac = new byte[8];
-            Array.Copy(response, rmacOffset, receivedRMac, 0, 8);
+            var receivedRMac = response.Skip(rmacOffset).Take(8).ToArray();
 
             // Extract data without R-MAC for verification
-            var dataLength = rmacOffset;
-            var dataForMac = new byte[dataLength + 2]; // Data + status word
-            Array.Copy(response, 0, dataForMac, 0, dataLength); // Copy data
-            Array.Copy(response, response.Length - 2, dataForMac, dataLength, 2); // Copy status word
+            var dataBeforeRMac = response.Take(rmacOffset).ToArray();
+            var statusWord = response.TakeLast(2).ToArray();
+            var dataForMac = dataBeforeRMac.Concat(statusWord).ToArray();
 
             // Calculate expected R-MAC
             var expectedRMacResult = CalculateRMac(dataForMac, sessionKeys, macChainingValue, protocolVersion);
@@ -217,8 +215,7 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
         {
             // Extract encrypted response data (without status word)
             var statusOffset = response.Length - 2;
-            var encryptedData = new byte[statusOffset];
-            Array.Copy(response, 0, encryptedData, 0, statusOffset);
+            var encryptedData = response.Take(statusOffset).ToArray();
 
             // Build ICV for SCP03 R-ENC: counter with MSB set to 0x80
             var icv = new byte[16];
@@ -253,9 +250,8 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
             }
 
             // Combine decrypted data with original status word
-            var result = new byte[unpaddedResult.Value.Length + 2];
-            Array.Copy(unpaddedResult.Value, 0, result, 0, unpaddedResult.Value.Length);
-            Array.Copy(response, statusOffset, result, unpaddedResult.Value.Length, 2);
+            var statusWord = response.TakeLast(2).ToArray();
+            var result = unpaddedResult.Value.Concat(statusWord).ToArray();
 
             return Result.Success<byte[], SmartCardError>(result);
         }
@@ -309,9 +305,7 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
         try
         {
             // Build MAC input: MAC chaining value || response data (including status word)
-            var macInput = new byte[macChainingValue.Length + response.Length];
-            macChainingValue.CopyTo(macInput, 0);
-            Array.Copy(response, 0, macInput, macChainingValue.Length, response.Length);
+            var macInput = macChainingValue.ToArray().Concat(response).ToArray();
 
             // Calculate AES-CMAC
             var cmac = new CMac(new AesEngine(), 128);

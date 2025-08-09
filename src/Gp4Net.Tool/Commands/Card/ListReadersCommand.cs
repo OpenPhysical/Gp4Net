@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
@@ -25,7 +26,14 @@ public class ListReadersCommand : IPipelineCommand<ListReadersCommand.Settings>
                 {
                     var readers = ctx.CardService.GetReaders();
 
-                    if (readers.Count == 0)
+                    // Build semantic rows using pure functional composition
+                    var semanticRows = ReaderTableBuilder.BuildReaderRows(
+                        readers,
+                        showSummary: true
+                    ).ToList();
+
+                    // Check if we have any readers to display
+                    if (!semanticRows.OfType<ReaderTableBuilder.ReaderDataRow>().Any())
                     {
                         ctx.Display.Warning("No card readers found");
                         return 0;
@@ -33,14 +41,10 @@ public class ListReadersCommand : IPipelineCommand<ListReadersCommand.Settings>
 
                     ctx.Display.Success($"Found {readers.Count} card reader(s):");
 
-                    var table = new Table().AddColumn("Index").AddColumn("Reader Name");
-
-                    for (var i = 0; i < readers.Count; i++)
-                    {
-                        _ = table.AddRow(i.ToString(), readers[i]);
-                    }
-
-                    AnsiConsole.Write(table);
+                    // Render using semantic table renderer
+                    ReaderTableRenderer.RenderToTable(semanticRows);
+                    ReaderTableRenderer.RenderPostTableRows(semanticRows);
+                    
                     return 0;
                 });
         }

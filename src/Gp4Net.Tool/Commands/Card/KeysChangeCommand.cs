@@ -20,10 +20,10 @@ public class KeysChangeCommand : BaseCommand<KeysChangeCommand.Settings>
     /// </summary>
     public KeysChangeCommand(
         ICardService cardService,
-        Gp4Net.Services.IGlobalPlatformService globalPlatformService,
+        IDomainServiceFactory domainServiceFactory,
         IKeysetResolver keysetResolver
     )
-        : base(cardService, globalPlatformService, keysetResolver) { }
+        : base(cardService, domainServiceFactory, keysetResolver) { }
 
     /// <summary>
     /// Executes the keys change command to update the cryptographic keys on the card.
@@ -50,7 +50,7 @@ public class KeysChangeCommand : BaseCommand<KeysChangeCommand.Settings>
         }
 
         // Auto-detect secure channel parameters and establish connection
-        if (!EnsureSecureChannel(settings))
+        if (!await EnsureSecureChannel(settings))
         {
             AnsiConsole.MarkupLine(
                 "[red]Failed to establish secure channel with current keys[/]"

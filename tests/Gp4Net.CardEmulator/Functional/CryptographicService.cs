@@ -1,13 +1,12 @@
 using System;
 using System.Linq;
-using System.Security.Cryptography;
+using Org.BouncyCastle.Security;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Constants;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Security;
-using Gp4Net.Utils;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Org.BouncyCastle.Crypto.Engines;
@@ -54,8 +53,8 @@ public class CryptographicService : ICryptographicService
         try
         {
             var challenge = new byte[length];
-            using var rng = RandomNumberGenerator.Create();
-            rng.GetBytes(challenge);
+            var rng = new SecureRandom();
+            rng.NextBytes(challenge);
             return Result.Success<byte[], SmartCardError>(challenge);
         }
         catch (Exception ex)

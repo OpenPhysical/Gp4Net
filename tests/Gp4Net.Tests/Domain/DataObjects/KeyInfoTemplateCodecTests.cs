@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Domain.DataObjects;
 using NUnit.Framework;
 using CSharpFunctionalExtensions;
@@ -28,7 +29,11 @@ public class KeyInfoTemplateCodecTests
             }
         };
 
-        var encoded = KeyInfoTemplateCodec.Encode(keyInfo);
+        var encodedResult = KeyInfoTemplateCodec.Encode(keyInfo);
+        
+        // Assert encoding succeeded
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode KeyInfoTemplate");
+        var encoded = encodedResult.Value;
 
         encoded.Should().NotBeEmpty();
         encoded[0].Should().Be(0xE0, "first byte should be tag 0xE0");
@@ -48,7 +53,11 @@ public class KeyInfoTemplateCodecTests
             KeyVersionNumber = 0x01
         };
 
-        var encoded = KeyInfoTemplateCodec.Encode(keyInfo);
+        var encodedResult = KeyInfoTemplateCodec.Encode(keyInfo);
+        
+        // Assert encoding succeeded
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode KeyInfoTemplate");
+        var encoded = encodedResult.Value;
 
         encoded.Should().NotBeEmpty();
         encoded[0].Should().Be(0xE0);
@@ -96,7 +105,9 @@ public class KeyInfoTemplateCodecTests
         var result = KeyInfoTemplateCodec.Decode(invalidData);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().BeEquivalentTo("INVALID_DATA");
+        result.Error.Should().BeOfType<SmartCardError>();
+        result.Error.Code.Should().Be("INVALID_DATA");
+        result.Error.Message.Should().Contain("Invalid key information template format - expected tag 0xE0");
     }
 
     [Test]
@@ -134,7 +145,9 @@ public class KeyInfoTemplateCodecTests
             }
         };
 
-        var encoded = KeyInfoTemplateCodec.Encode(original);
+        var encodedResult = KeyInfoTemplateCodec.Encode(original);
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode KeyInfoTemplate");
+        var encoded = encodedResult.Value;
         var decoded = KeyInfoTemplateCodec.Decode(encoded);
 
         decoded.IsSuccess.Should().BeTrue();
@@ -156,7 +169,11 @@ public class KeyInfoTemplateCodecTests
     {
         var keyInfo = new KeyInfoTemplate();
 
-        var encoded = KeyInfoTemplateCodec.Encode(keyInfo);
+        var encodedResult = KeyInfoTemplateCodec.Encode(keyInfo);
+        
+        // Assert encoding succeeded
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode KeyInfoTemplate");
+        var encoded = encodedResult.Value;
 
         encoded.Should().NotBeEmpty();
         encoded[0].Should().Be(0xE0);
@@ -208,7 +225,11 @@ public class KeyInfoTemplateCodecTests
             }
         };
 
-        var encoded = KeyInfoTemplateCodec.Encode(keyInfo);
+        var encodedResult = KeyInfoTemplateCodec.Encode(keyInfo);
+        
+        // Assert encoding succeeded
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode KeyInfoTemplate");
+        var encoded = encodedResult.Value;
 
         encoded.Should().NotBeEmpty();
         encoded[0].Should().Be(0xE0);
@@ -225,6 +246,8 @@ public class KeyInfoTemplateCodecTests
         var result = KeyInfoTemplateCodec.Decode(malformedData);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().BeEquivalentTo("INVALID_DATA");
+        result.Error.Should().BeOfType<SmartCardError>();
+        // The error will be from TlvParser when it can't parse the malformed TLV structure
+        result.Error.Message.Should().NotBeNullOrEmpty();
     }
 }

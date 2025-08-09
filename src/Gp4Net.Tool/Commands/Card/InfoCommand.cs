@@ -336,7 +336,8 @@ public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
                         if (cardData.HasValue)
                         {
                             // Prefer OID-based version (matches GP Pro behavior)
-                            var gpVersion = cardData.Value.GlobalPlatformVersionFromOid ?? cardData.Value.GlobalPlatformVersion?.ToString();
+                            var gpVersion = cardData.Value.GlobalPlatformVersionFromOid.GetValueOrDefault() ?? 
+                                          cardData.Value.GlobalPlatformVersion.Map(v => v.ToString()).GetValueOrDefault();
                             if (!string.IsNullOrEmpty(gpVersion))
                             {
                                 _ = table.AddRow("GlobalPlatform Version", gpVersion);
@@ -480,24 +481,22 @@ public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
     /// </summary>
     private static string GetImplementationDescription(ScpImplementation implementation)
     {
+        // For SCP02, use the bitmap-based description system from extension methods
+        if (implementation.IsScp02())
+        {
+            return implementation.GetDescription();
+        }
+        
+        // For SCP03 and other protocols, use explicit descriptions
         return implementation switch
         {
-            ScpImplementation.Scp02NoDerivation => "3 Secure Channel Keys (no derivation)",
-            ScpImplementation.Scp02OneKey => "1 Secure Channel base key",
-            ScpImplementation.Scp02ThreeKeys => "3 Secure Channel base keys",
-            ScpImplementation.Scp02OneKeyStaticMac => "1 base key with static MAC",
-            ScpImplementation.Scp02StaticMac => "3 keys with static MAC",
-            ScpImplementation.Scp02AesKeys => "3 keys with AES encryption",
-            ScpImplementation.Scp02ThreeKeysRMac => "3 keys with R-MAC support",
-            ScpImplementation.Scp02PseudoRandom => "Pseudo-random card challenge",
-            ScpImplementation.Scp02PseudoRandomRMac => "Pseudo-random with R-MAC support",
             ScpImplementation.Scp03Aes128 => "AES-128",
             ScpImplementation.Scp03Aes192 => "AES-192", 
             ScpImplementation.Scp03Aes256 => "AES-256",
             ScpImplementation.Scp03NoResponseMac => "AES-128 (no R-MAC)",
             ScpImplementation.Scp03RandomChallenge => "Random card challenge",
             ScpImplementation.Scp03PseudoRandom => "Pseudo-random card challenge",
-            _ => $"Implementation 0x{implementation:X2}"
+            _ => $"Implementation 0x{((byte)implementation):X2}"
         };
     }
 

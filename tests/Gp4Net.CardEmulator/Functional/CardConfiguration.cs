@@ -170,17 +170,29 @@ public record CardConfiguration(
             LifeCycleData = Convert.FromHexString("03")
         };
 
+        var cardCapabilitiesResult = CardCapabilitiesCodec.Encode(cardCapabilities);
+        if (cardCapabilitiesResult.IsFailure)
+            throw new InvalidOperationException($"Failed to encode card capabilities: {cardCapabilitiesResult.Error.Message}");
+            
+        var keyInfoTemplateResult = KeyInfoTemplateCodec.Encode(keyInfoTemplate);
+        if (keyInfoTemplateResult.IsFailure)
+            throw new InvalidOperationException($"Failed to encode key info template: {keyInfoTemplateResult.Error.Message}");
+            
+        var securityDomainInfoResult = SecurityDomainInfoCodec.Encode(securityDomainInfo);
+        if (securityDomainInfoResult.IsFailure)
+            throw new InvalidOperationException($"Failed to encode security domain info: {securityDomainInfoResult.Error.Message}");
+
         return ImmutableDictionary.Create<ushort, byte[]>()
             // CPLC Data (Card Production Life Cycle)
             .Add(0x9F7F, Convert.FromHexString("4790D3214700000000002345558919204839000000000000000018649535383931390000000000000000"))
             // Card Capabilities - legacy format for 0x67
             .Add(0x0067, Convert.FromHexString("6728A00D800103810500102060708201078103E5BEC082031E030083010284010285017B86010C87017B"))
             // Card Capabilities - using codec for 0x66
-            .Add(0x0066, CardCapabilitiesCodec.Encode(cardCapabilities))
+            .Add(0x0066, cardCapabilitiesResult.Value)
             // Key Information Template - using codec
-            .Add(0x00E0, KeyInfoTemplateCodec.Encode(keyInfoTemplate))
+            .Add(0x00E0, keyInfoTemplateResult.Value)
             // Security Domain Info - using codec
-            .Add(0x00C1, SecurityDomainInfoCodec.Encode(securityDomainInfo))
+            .Add(0x00C1, securityDomainInfoResult.Value)
             // Key Diversification Data
             .Add(0x00CF, Convert.FromHexString("CF0A03700000000000000000"));
     }
@@ -316,13 +328,25 @@ public record CardConfiguration(
             LifeCycleData = Convert.FromHexString("03")
         };
 
+        var cardCapabilitiesResult = CardCapabilitiesCodec.Encode(cardCapabilities);
+        if (cardCapabilitiesResult.IsFailure)
+            throw new InvalidOperationException($"Failed to encode card capabilities: {cardCapabilitiesResult.Error.Message}");
+            
+        var keyInfoTemplateResult = KeyInfoTemplateCodec.Encode(keyInfoTemplate);
+        if (keyInfoTemplateResult.IsFailure)
+            throw new InvalidOperationException($"Failed to encode key info template: {keyInfoTemplateResult.Error.Message}");
+            
+        var securityDomainInfoResult = SecurityDomainInfoCodec.Encode(securityDomainInfo);
+        if (securityDomainInfoResult.IsFailure)
+            throw new InvalidOperationException($"Failed to encode security domain info: {securityDomainInfoResult.Error.Message}");
+
         return ImmutableDictionary.Create<ushort, byte[]>()
             // Card capabilities using codec
-            .Add(0x0066, CardCapabilitiesCodec.Encode(cardCapabilities))
+            .Add(0x0066, cardCapabilitiesResult.Value)
             // Key info template using codec
-            .Add(0x00E0, KeyInfoTemplateCodec.Encode(keyInfoTemplate))
+            .Add(0x00E0, keyInfoTemplateResult.Value)
             // Security domain data using codec
-            .Add(0x00C1, SecurityDomainInfoCodec.Encode(securityDomainInfo));
+            .Add(0x00C1, securityDomainInfoResult.Value);
     }
 
     /// <summary>
@@ -380,12 +404,24 @@ public record CardConfiguration(
             LifeCycleData = Convert.FromHexString("03")
         };
 
+        var cardCapabilitiesResult = CardCapabilitiesCodec.Encode(cardCapabilities);
+        if (cardCapabilitiesResult.IsFailure)
+            throw new InvalidOperationException($"Failed to encode card capabilities: {cardCapabilitiesResult.Error.Message}");
+            
+        var keyInfoTemplateResult = KeyInfoTemplateCodec.Encode(keyInfoTemplate);
+        if (keyInfoTemplateResult.IsFailure)
+            throw new InvalidOperationException($"Failed to encode key info template: {keyInfoTemplateResult.Error.Message}");
+            
+        var securityDomainInfoResult = SecurityDomainInfoCodec.Encode(securityDomainInfo);
+        if (securityDomainInfoResult.IsFailure)
+            throw new InvalidOperationException($"Failed to encode security domain info: {securityDomainInfoResult.Error.Message}");
+
         return ImmutableDictionary.Create<ushort, byte[]>()
             // Card capabilities using codec
-            .Add(0x0066, CardCapabilitiesCodec.Encode(cardCapabilities))
+            .Add(0x0066, cardCapabilitiesResult.Value)
             // Key info template using codec
-            .Add(0x00E0, KeyInfoTemplateCodec.Encode(keyInfoTemplate))
+            .Add(0x00E0, keyInfoTemplateResult.Value)
             // Security domain data using codec
-            .Add(0x00C1, SecurityDomainInfoCodec.Encode(securityDomainInfo));
+            .Add(0x00C1, securityDomainInfoResult.Value);
     }
 }

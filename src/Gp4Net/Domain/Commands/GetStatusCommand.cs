@@ -200,9 +200,15 @@ public class GetStatusCommand : IApduCommand
         }
 
         // Validate search criteria if provided
-        if (searchCriteria != null && (searchCriteria.Length < 5 || searchCriteria.Length > 16))
+        // Note: Search criteria can be a TLV structure (e.g., 4F00 for empty search)
+        // or an AID (5-16 bytes). We allow both.
+        if (searchCriteria != null && searchCriteria.Length > 0)
         {
-            return SmartCardError.InvalidArgument("Search criteria AID must be between 5 and 16 bytes.");
+            // If it looks like a raw AID (not TLV), validate length
+            if (searchCriteria[0] != 0x4F && (searchCriteria.Length < 5 || searchCriteria.Length > 16))
+            {
+                return SmartCardError.InvalidArgument("Search criteria AID must be between 5 and 16 bytes.");
+            }
         }
 
         return new GetStatusCommand(subset, format, searchCriteria);

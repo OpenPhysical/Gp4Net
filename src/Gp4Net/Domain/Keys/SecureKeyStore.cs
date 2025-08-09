@@ -1,6 +1,14 @@
 using System;
 using System.Collections.Immutable;
-using System.Security.Cryptography;
+using System.Linq;
+using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Engines;
+using Org.BouncyCastle.Crypto.Generators;
+using Org.BouncyCastle.Crypto.Modes;
+using Org.BouncyCastle.Crypto.Paddings;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Security;
+using Org.BouncyCastle.Utilities;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 
@@ -41,11 +49,9 @@ public sealed class SecureKeyStore
             var masterKey = new byte[32]; // 256-bit key
             var salt = new byte[16];      // 128-bit salt
                 
-            using (var rng = RandomNumberGenerator.Create())
-            {
-                rng.GetBytes(masterKey);
-                rng.GetBytes(salt);
-            }
+            var random = new SecureRandom();
+            random.NextBytes(masterKey);
+            random.NextBytes(salt);
 
             return Result.Success<SecureKeyStore, SmartCardError>(
                 new SecureKeyStore(
@@ -235,58 +241,75 @@ public sealed class SecureKeyStore
 
     private EncryptedKey EncryptKey(string keyId, byte[] keyData)
     {
-        using (var aes = Aes.Create())
+        // Derive a key-specific encryption key from master key
+        var keySpecificKey = DeriveKeySpecificKey(keyId);
+        
+        // Generate IV
+        var iv = new byte[16];
+        var random = new SecureRandom();
+        random.NextBytes(iv);
+        
+        // Setup AES-CBC cipher
+        var cipher = new PaddedBufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
+        var keyParam = new KeyParameter(keySpecificKey);
+        var keyParamWithIv = new ParametersWithIV(keyParam, iv);
+        
+        cipher.Init(true, keyParamWithIv);
+        
+        // Encrypt
+        var outputSize = cipher.GetOutputSize(keyData.Length);
+        var encrypted = new byte[outputSize];
+        var processedBytes = cipher.ProcessBytes(keyData, 0, keyData.Length, encrypted, 0);
+        var finalBytes = cipher.DoFinal(encrypted, processedBytes);
+        
+        // Resize array if needed
+        if (processedBytes + finalBytes < encrypted.Length)
         {
-            // Derive a key-specific encryption key from master key
-            var keySpecificKey = DeriveKeySpecificKey(keyId);
-                
-            aes.Key = keySpecificKey;
-            aes.GenerateIV();
-
-            using (var encryptor = aes.CreateEncryptor())
-            {
-                var encrypted = encryptor.TransformFinalBlock(keyData, 0, keyData.Length);
-                return new EncryptedKey(encrypted, aes.IV);
-            }
+            encrypted = encrypted.Take(processedBytes + finalBytes).ToArray();
         }
+        
+        return new EncryptedKey(encrypted, iv);
     }
 
     private byte[] DecryptKey(string keyId, EncryptedKey encryptedKey)
     {
-        using (var aes = Aes.Create())
+        var keySpecificKey = DeriveKeySpecificKey(keyId);
+        
+        // Setup AES-CBC cipher for decryption
+        var cipher = new PaddedBufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
+        var keyParam = new KeyParameter(keySpecificKey);
+        var keyParamWithIv = new ParametersWithIV(keyParam, encryptedKey.Iv);
+        
+        cipher.Init(false, keyParamWithIv); // false for decryption
+        
+        // Decrypt
+        var outputSize = cipher.GetOutputSize(encryptedKey.Data.Length);
+        var decrypted = new byte[outputSize];
+        var processedBytes = cipher.ProcessBytes(encryptedKey.Data, 0, encryptedKey.Data.Length, decrypted, 0);
+        var finalBytes = cipher.DoFinal(decrypted, processedBytes);
+        
+        // Resize array if needed
+        if (processedBytes + finalBytes < decrypted.Length)
         {
-            var keySpecificKey = DeriveKeySpecificKey(keyId);
-                
-            aes.Key = keySpecificKey;
-            aes.IV = encryptedKey.Iv;
-
-            using (var decryptor = aes.CreateDecryptor())
-            {
-                return decryptor.TransformFinalBlock(encryptedKey.Data, 0, encryptedKey.Data.Length);
-            }
+            decrypted = decrypted.Take(processedBytes + finalBytes).ToArray();
         }
+        
+        return decrypted;
     }
 
     private byte[] DeriveKeySpecificKey(string keyId)
     {
         // Use PBKDF2 to derive a key-specific encryption key
-        using (var pbkdf2 = new Rfc2898DeriveBytes(
-                   _masterKey,
-                   CombineBytes(_salt, System.Text.Encoding.UTF8.GetBytes(keyId)),
-                   10000,
-                   HashAlgorithmName.SHA256))
-        {
-            return pbkdf2.GetBytes(32); // 256-bit key
-        }
+        var keyIdBytes = System.Text.Encoding.UTF8.GetBytes(keyId);
+        var combinedSalt = _salt.Concat(keyIdBytes).ToArray();
+        
+        var generator = new Pkcs5S2ParametersGenerator(new Org.BouncyCastle.Crypto.Digests.Sha256Digest());
+        generator.Init(_masterKey, combinedSalt, 10000);
+        
+        var keyParam = (KeyParameter)generator.GenerateDerivedParameters("AES", 256); // 256 bits
+        return keyParam.GetKey();
     }
 
-    private static byte[] CombineBytes(byte[] a, byte[] b)
-    {
-        var result = new byte[a.Length + b.Length];
-        Array.Copy(a, 0, result, 0, a.Length);
-        Array.Copy(b, 0, result, a.Length, b.Length);
-        return result;
-    }
 
     /// <summary>
     /// Encrypted key data with initialization vector.

@@ -23,10 +23,12 @@ public static class SecurityDomainInfoCodec
     /// Encodes security domain information into binary format.
     /// </summary>
     /// <param name="sdInfo">The security domain information to encode.</param>
-    /// <returns>The encoded security domain data.</returns>
-    public static byte[] Encode(SecurityDomainInfo sdInfo)
+    /// <returns>A Result containing the encoded security domain data, or an error if sdInfo is null.</returns>
+    public static Result<byte[], SmartCardError> Encode(SecurityDomainInfo sdInfo)
     {
-        ArgumentNullException.ThrowIfNull(sdInfo);
+        if (sdInfo is null)
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidArgument("Security domain info cannot be null"));
             
         using var stream = new MemoryStream();
             
@@ -74,23 +76,26 @@ public static class SecurityDomainInfoCodec
         }
         else
         {
-            throw new InvalidOperationException("Security domain information too large for encoding");
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidData("Security domain information too large for encoding"));
         }
             
         // Write content
         stream.Write(content, 0, content.Length);
             
-        return stream.ToArray();
+        return Result.Success<byte[], SmartCardError>(stream.ToArray());
     }
         
     /// <summary>
     /// Decodes security domain information from binary format.
     /// </summary>
     /// <param name="data">The encoded security domain data.</param>
-    /// <returns>The decoded security domain information.</returns>
+    /// <returns>A Result containing the decoded security domain information, or an error if data is invalid.</returns>
     public static Result<SecurityDomainInfo, SmartCardError> Decode(byte[] data)
     {
-        ArgumentNullException.ThrowIfNull(data);
+        if (data is null)
+            return Result.Failure<SecurityDomainInfo, SmartCardError>(
+                SmartCardError.InvalidArgument("Data cannot be null"));
             
         // Parse the outer TLV structure
         var outerTlvMaybe = TlvParser.ParseSingle(data);

@@ -14,6 +14,7 @@ using Gp4Net.Transport;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
 using Gp4Net.Pipeline;
+using Gp4Net.Domain.Modules;
 using Microsoft.Extensions.Logging;
 using StatusSubset = Gp4Net.Domain.Commands.GetStatusCommand.StatusSubset;
 
@@ -29,6 +30,9 @@ public class GlobalPlatformService : IGlobalPlatformService
     private readonly ISecureChannelManager _secureChannelManager;
     private readonly ILogger<GlobalPlatformService> _logger;
 
+    /// <inheritdoc/>
+    public ISmartCardService CardService => _cardService;
+
     /// <summary>
     /// Initializes a new instance of the GlobalPlatformService class.
     /// </summary>
@@ -37,9 +41,9 @@ public class GlobalPlatformService : IGlobalPlatformService
         ISecureChannelManager secureChannelManager,
         ILogger<GlobalPlatformService> logger)
     {
-        _cardService = cardService ?? throw new ArgumentNullException(nameof(cardService));
-        _secureChannelManager = secureChannelManager ?? throw new ArgumentNullException(nameof(secureChannelManager));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _cardService = cardService;
+        _secureChannelManager = secureChannelManager;
+        _logger = logger;
     }
 
     /// <inheritdoc/>
@@ -48,21 +52,10 @@ public class GlobalPlatformService : IGlobalPlatformService
     {
         _logger.LogInformation("Selecting Issuer Security Domain with auto-detection");
 
-        // Pure function approach: create command
-        var selectResult = CreateSelectIsdCommand();
-        if (selectResult.IsFailure)
-        {
-            return Result.Failure<SelectResponse, SmartCardError>(selectResult.Error);
-        }
-
-        // Execute command
-        var response = await _cardService.ExecuteCommandAsync(selectResult.Value, cancellationToken);
-            
-        // Process response with pure function
-        return await response.Bind(r => ProcessSelectResponse(r))
-            .Match(
-                onSuccess: async selectResp => await Task.FromResult(Result.Success<SelectResponse, SmartCardError>(selectResp)),
-                onFailure: async _ => await TryKnownIsdAids(cancellationToken));
+        // Use the CardDiscovery module
+        return await CardDiscovery.DetectAndSelectIsdAsync(
+            async (cmd, ct) => await _cardService.ExecuteCommandAsync(cmd, ct),
+            cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -73,25 +66,15 @@ public class GlobalPlatformService : IGlobalPlatformService
     {
         _logger.LogInformation("Establishing secure channel with security level: {SecurityLevel}", securityLevel);
 
-        // Generate host challenge
-        var hostChallenge = GenerateHostChallenge();
-            
-        // Create INITIALIZE UPDATE command
-        var initUpdateResult = CreateInitializeUpdateCommand(keySet.KeyVersion, keySet.KeyId, hostChallenge);
-        if (initUpdateResult.IsFailure)
-        {
-            return Result.Failure<Domain.Security.SecureChannelState, SmartCardError>(initUpdateResult.Error);
-        }
+        // Use the SecureChannelEstablishment module
+        var result = await SecureChannelEstablishment.EstablishAsync(
+            keySet,
+            securityLevel,
+            async (cmd, ct) => await _cardService.ExecuteCommandAsync(cmd, ct),
+            cancellationToken);
 
-        // Execute command
-        var response = await _cardService.ExecuteCommandAsync(initUpdateResult.Value, cancellationToken);
-        if (response.IsFailure)
-        {
-            return Result.Failure<Domain.Security.SecureChannelState, SmartCardError>(response.Error);
-        }
-
-        // Process response and establish secure channel
-        return await EstablishSecureChannelFromResponse(response.Value, keySet, securityLevel, hostChallenge);
+        // The secure channel state will be managed by the SecureChannelManager
+        return result;
     }
 
     /// <inheritdoc/>
@@ -101,15 +84,12 @@ public class GlobalPlatformService : IGlobalPlatformService
     {
         _logger.LogInformation("Getting status for subset: {Subset}", subset);
 
-        var commandResult = CreateGetStatusCommand(subset);
-        if (commandResult.IsFailure)
-        {
-            return Result.Failure<ImmutableList<ApplicationInfo>, SmartCardError>(commandResult.Error);
-        }
-
-        var result = await _cardService.ExecuteCommandAsync(commandResult.Value, cancellationToken);
-
-        return result.Bind(response => ProcessGetStatusResponse(response));
+        // Convert between enums and use CardStatusRetriever module
+        var domainSubset = (GetStatusCommand.StatusSubset)(byte)subset;
+        return await CardStatusRetriever.GetStatusAsync(
+            domainSubset,
+            async (cmd, ct) => await _cardService.ExecuteCommandAsync(cmd, ct),
+            cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -125,7 +105,7 @@ public class GlobalPlatformService : IGlobalPlatformService
         if (!session.HasValue)
         {
             return Result.Failure<InstallationResult, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied());
+                SmartCardError.SecurityError("Security status not satisfied"));
         }
 
         // Basic CAP file validation
@@ -149,14 +129,12 @@ public class GlobalPlatformService : IGlobalPlatformService
     {
         _logger.LogInformation("Deleting application with AID: {AID}", Convert.ToHexString(aid));
 
-        var commandResult = CreateDeleteCommand(aid, deleteRelated);
-        if (commandResult.IsFailure)
-        {
-            return Result.Failure<bool, SmartCardError>(commandResult.Error);
-        }
-
-        var response = await _cardService.ExecuteCommandAsync(commandResult.Value, cancellationToken);
-        return response.Map(_ => true);
+        // Use CardLifecycleManager module
+        return await CardLifecycleManager.DeleteApplicationAsync(
+            aid,
+            deleteRelated,
+            async (cmd, ct) => await _cardService.ExecuteCommandAsync(cmd, ct),
+            cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -172,7 +150,7 @@ public class GlobalPlatformService : IGlobalPlatformService
         if (!session.HasValue)
         {
             return Result.Failure<bool, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied());
+                SmartCardError.SecurityError("Security status not satisfied"));
         }
 
         // Validate key set
@@ -204,7 +182,7 @@ public class GlobalPlatformService : IGlobalPlatformService
     {
         _logger.LogInformation("Getting CPLC data");
 
-        var commandResult = CreateGetDataCommand(GetDataCommand.DataObjects.CardProductionLifeCycle);
+        var commandResult = CommandFactory.CreateGetDataCommand(GetDataCommand.DataObjects.CardProductionLifeCycle);
         if (commandResult.IsFailure)
         {
             return Result.Failure<CplcData, SmartCardError>(commandResult.Error);
@@ -212,7 +190,7 @@ public class GlobalPlatformService : IGlobalPlatformService
 
         var response = await _cardService.ExecuteCommandAsync(commandResult.Value, cancellationToken);
             
-        return response.Bind(r => ProcessCplcResponse(r));
+        return response.Bind(r => ResponseParser.ParseCplcResponse(r));
     }
 
     /// <inheritdoc/>
@@ -222,7 +200,7 @@ public class GlobalPlatformService : IGlobalPlatformService
     {
         _logger.LogInformation("Getting data for tag: {Tag:X4}", tag);
 
-        var commandResult = CreateGetDataCommand(tag);
+        var commandResult = CommandFactory.CreateGetDataCommand(tag);
         if (commandResult.IsFailure)
         {
             return Result.Failure<byte[], SmartCardError>(commandResult.Error);
@@ -230,7 +208,7 @@ public class GlobalPlatformService : IGlobalPlatformService
 
         var response = await _cardService.ExecuteCommandAsync(commandResult.Value, cancellationToken);
             
-        return response.Map(r => r.Data);
+        return response.Bind(r => ResponseParser.ParseGetDataResponse(r));
     }
 
     /// <inheritdoc/>
@@ -247,379 +225,15 @@ public class GlobalPlatformService : IGlobalPlatformService
         if (!session.HasValue)
         {
             return Result.Failure<bool, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied());
+                SmartCardError.SecurityError("Security status not satisfied"));
         }
 
-        // Map lifecycle state to P1 value for SET STATUS command
-        var p1 = state switch
-        {
-            LifecycleState.Installed => (byte)0x07,     // Make selectable
-            LifecycleState.Selectable => (byte)0x07,    // Already selectable
-            LifecycleState.Personalized => (byte)0x0F,  // Personalize
-            LifecycleState.Locked => (byte)0x80,        // Lock
-            LifecycleState.Terminated => (byte)0x00,    // Terminate
-            _ => (byte)0x00
-        };
-
-        // Create SET STATUS command (0x80 0xF0 P1 P2 Lc AID)
-        var command = new byte[5 + aid.Length];
-        command[0] = 0x80; // CLA
-        command[1] = 0xF0; // INS (SET STATUS)
-        command[2] = p1;   // P1 (lifecycle state)
-        command[3] = 0x00; // P2
-        command[4] = (byte)aid.Length; // Lc
-        Array.Copy(aid, 0, command, 5, aid.Length);
-
-        // Execute command using raw command data
-        // Since SET STATUS command is not yet implemented, return unsupported for now
-        return await Task.FromResult(Result.Failure<bool, SmartCardError>(
-            SmartCardError.Unsupported("SET STATUS command implementation not available")));
+        // Use CardLifecycleManager module
+        return await CardLifecycleManager.SetLifecycleStateAsync(
+            aid,
+            state,
+            async (cmd, ct) => await _cardService.ExecuteCommandAsync(cmd, ct),
+            cancellationToken);
     }
 
-    // Pure function implementations
-
-    private static Result<SelectCommand, SmartCardError> CreateSelectIsdCommand()
-    {
-        return SelectCommand.CreateForIssuerSecurityDomain();
-    }
-
-    private static Result<SelectCommand, SmartCardError> CreateSelectCommand(byte[] aid)
-    {
-        return SelectCommand.Create(aid);
-    }
-
-    private static Result<SelectResponse, SmartCardError> ProcessSelectResponse(CommandResponse response)
-    {
-        if (!response.IsSuccess)
-        {
-            return Result.Failure<SelectResponse, SmartCardError>(
-                SmartCardError.FromStatusWord(response.StatusWord));
-        }
-
-        return SelectResponse.Parse(response.Data);
-    }
-
-    private static byte[] GenerateHostChallenge()
-    {
-        var challenge = new byte[8];
-        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
-        rng.GetBytes(challenge);
-        return challenge;
-    }
-
-    private static Result<InitializeUpdateCommand, SmartCardError> CreateInitializeUpdateCommand(
-        byte keyVersion, byte keyId, byte[] hostChallenge)
-    {
-        return InitializeUpdateCommand.Create(keyVersion, keyId, hostChallenge);
-    }
-
-    private async Task<Result<Domain.Security.SecureChannelState, SmartCardError>> EstablishSecureChannelFromResponse(
-        CommandResponse response,
-        KeySet keySet,
-        SecurityLevel securityLevel,
-        byte[] hostChallenge)
-    {
-        try
-        {
-            // Parse INITIALIZE UPDATE response
-            InitializeUpdateResponse initUpdateResponse;
-            try
-            {
-                initUpdateResponse = InitializeUpdateResponse.Parse(response.Data);
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure<Domain.Security.SecureChannelState, SmartCardError>(
-                    SmartCardError.InvalidData($"Failed to parse INITIALIZE UPDATE response: {ex.Message}"));
-            }
-
-            // Get card channel and transport from context
-            var channel = _cardService.Context.Get<ICardChannel>("CardChannel");
-            var transport = _cardService.Context.Get<IApduTransport>("ApduTransport");
-                
-            if (!channel.HasValue || !transport.HasValue)
-            {
-                return Result.Failure<Domain.Security.SecureChannelState, SmartCardError>(
-                    SmartCardError.SecurityError("Missing card channel or transport for secure channel establishment"));
-            }
-
-            // Use the secure channel manager to establish the session
-            var sessionResult = await _secureChannelManager.EstablishAsync(
-                channel.Value, 
-                transport.Value, 
-                keySet, 
-                securityLevel);
-
-            if (sessionResult.IsFailure)
-            {
-                return sessionResult.Error;
-            }
-
-            var session = sessionResult.Value;
-
-            // Update service context with secure channel session
-            var newService = _cardService.WithContextValue(ContextKeys.SecureChannelSession, session);
-
-            return sessionResult;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to establish secure channel");
-            return Result.Failure<Domain.Security.SecureChannelState, SmartCardError>(
-                SmartCardError.SecurityError("Failed to establish secure channel", (ushort)response.StatusWord));
-        }
-    }
-
-    private static Result<GetStatusCommand, SmartCardError> CreateGetStatusCommand(StatusSubset subset)
-    {
-        // Convert between enums
-        var domainSubset = (GetStatusCommand.StatusSubset)(byte)subset;
-        return GetStatusCommand.Create(domainSubset);
-    }
-
-    private static Result<ImmutableList<ApplicationInfo>, SmartCardError> ProcessGetStatusResponse(
-        CommandResponse response)
-    {
-        if (!response.IsSuccess)
-        {
-            return Result.Failure<ImmutableList<ApplicationInfo>, SmartCardError>(
-                SmartCardError.FromStatusWord(response.StatusWord));
-        }
-
-        var parseResult = GetStatusResponse.Parse(response.Data);
-        return parseResult.Map(parsed => ConvertToApplicationInfos(parsed));
-    }
-
-    private static ImmutableList<ApplicationInfo> ConvertToApplicationInfos(GetStatusResponse response)
-    {
-        var applications = ImmutableList.CreateBuilder<ApplicationInfo>();
-            
-        foreach (var entry in response.Applications)
-        {
-            // Map lifecycle state from GetStatusResponse to domain model
-            var lcState = entry.State switch
-            {
-                ApplicationStatusEntry.LifecycleState.Installed => LifecycleState.Installed,
-                ApplicationStatusEntry.LifecycleState.Selectable => LifecycleState.Selectable,
-                ApplicationStatusEntry.LifecycleState.Personalized => LifecycleState.Personalized,
-                ApplicationStatusEntry.LifecycleState.Blocked => LifecycleState.Locked,
-                ApplicationStatusEntry.LifecycleState.Locked => LifecycleState.Locked,
-                _ => LifecycleState.Unknown
-            };
-                
-            // Parse privileges from the first byte of privileges array
-            var privList = ImmutableList.CreateBuilder<Privilege>();
-            if (entry.Privileges.Length > 0)
-            {
-                var privileges = entry.Privileges[0];
-                if ((privileges & 0x80) != 0)
-                {
-                    privList.Add(Privilege.SecurityDomain);
-                }
-
-                if ((privileges & 0x40) != 0)
-                {
-                    privList.Add(Privilege.DapVerification);
-                }
-
-                if ((privileges & 0x20) != 0)
-                {
-                    privList.Add(Privilege.DelegatedManagement);
-                }
-
-                if ((privileges & 0x10) != 0)
-                {
-                    privList.Add(Privilege.CardLock);
-                }
-
-                if ((privileges & 0x08) != 0)
-                {
-                    privList.Add(Privilege.CardTerminate);
-                }
-
-                if ((privileges & 0x04) != 0)
-                {
-                    privList.Add(Privilege.CardReset);
-                }
-
-                if ((privileges & 0x02) != 0)
-                {
-                    privList.Add(Privilege.CvmManagement);
-                }
-
-                if ((privileges & 0x01) != 0)
-                {
-                    privList.Add(Privilege.MandatedDapVerification);
-                }
-            }
-                
-            // Determine application type based on privileges
-            var appType = privList.Contains(Privilege.SecurityDomain) 
-                ? ApplicationType.IssuerSecurityDomain 
-                : ApplicationType.Application;
-                
-            applications.Add(new ApplicationInfo(
-                entry.Aid,
-                lcState,
-                privList.ToImmutable(),
-                appType));
-        }
-            
-        return applications.ToImmutable();
-    }
-
-    private static Result<DeleteCommand, SmartCardError> CreateDeleteCommand(byte[] aid, bool deleteRelated)
-    {
-        return DeleteCommand.CreateForApplication(aid, deleteRelated);
-    }
-
-    private static Result<GetDataCommand, SmartCardError> CreateGetDataCommand(ushort tag)
-    {
-        return GetDataCommand.Create(tag);
-    }
-
-    private static Result<CplcData, SmartCardError> ProcessCplcResponse(CommandResponse response)
-    {
-        if (!response.IsSuccess)
-        {
-            return Result.Failure<CplcData, SmartCardError>(
-                SmartCardError.FromStatusWord(response.StatusWord));
-        }
-
-        // Extract the TLV value from the response
-        var cplcBytes = ExtractTlvValue(response.Data, GetDataCommand.DataObjects.CardProductionLifeCycle);
-        if (cplcBytes == null || cplcBytes.Length == 0)
-        {
-            return Result.Failure<CplcData, SmartCardError>(
-                SmartCardError.InvalidData("CPLC data not found in response"));
-        }
-            
-        return CplcData.TryParse(cplcBytes);
-    }
-
-    private async Task<Result<SelectResponse, SmartCardError>> TryKnownIsdAids(
-        CancellationToken cancellationToken)
-    {
-        var knownIsdAids = new[]
-        {
-            "A000000003000000", // Standard GP ISD
-            "A000000151000000", // Common alternative ISD
-            "A000000018434D00", // Another common ISD variant
-        };
-
-        foreach (var aidHex in knownIsdAids)
-        {
-            var aid = Convert.FromHexString(aidHex);
-            var selectResult = CreateSelectCommand(aid);
-                
-            if (selectResult.IsFailure)
-            {
-                continue;
-            }
-                
-            var response = await _cardService.ExecuteCommandAsync(selectResult.Value, cancellationToken);
-
-            if (response.IsSuccess)
-            {
-                _logger.LogInformation("Successfully selected ISD with AID: {AID}", aidHex);
-                    
-                // Update context with ISD AID
-                var newService = _cardService.WithContextValue(ContextKeys.IssuerSecurityDomainAid, aid);
-                    
-                return ProcessSelectResponse(response.Value);
-            }
-        }
-
-        return Result.Failure<SelectResponse, SmartCardError>(
-            SmartCardError.CardError("No ISD found on card"));
-    }
-
-    private static byte[] ExtractTlvValue(byte[] data, ushort expectedTag)
-    {
-        if (data == null || data.Length < 2)
-        {
-            return Array.Empty<byte>();
-        }
-
-        // For two-byte tags like 9F7F, we need to handle them specially
-        if (expectedTag > 0xFF && data.Length >= 3)
-        {
-            var firstByte = (byte)(expectedTag >> 8);
-            var secondByte = (byte)(expectedTag & 0xFF);
-                
-            if (data[0] == firstByte && data[1] == secondByte)
-            {
-                // This is a two-byte tag
-                var offset = 2;
-                var length = ParseLength(data, ref offset);
-                    
-                if (length >= 0 && offset + length <= data.Length)
-                {
-                    var content = new byte[length];
-                    Array.Copy(data, offset, content, 0, length);
-                    return content;
-                }
-            }
-        }
-
-        // Try single-byte tag parsing
-        var elements = TlvParser.ParseAll(data).ToList();
-        if (elements.Count == 0)
-        {
-            return data; // Not TLV format, return as-is
-        }
-
-        // Look for the expected tag (only works for single-byte tags)
-        if (expectedTag <= 0xFF)
-        {
-            var element = elements.FirstOrDefault(e => e.TagNumber == expectedTag);
-            if (element != null)
-            {
-                return element.Value;
-            }
-        }
-
-        // If we have a single TLV element and no specific tag match,
-        // return its content (common for GET DATA responses)
-        if (elements.Count == 1)
-        {
-            return elements[0].Value;
-        }
-
-        return Array.Empty<byte>();
-    }
-
-    private static int ParseLength(byte[] data, ref int offset)
-    {
-        if (offset >= data.Length)
-        {
-            return -1;
-        }
-
-        var lenByte = data[offset++];
-
-        if ((lenByte & 0x80) == 0)
-        {
-            // Short form
-            return lenByte;
-        }
-        else
-        {
-            // Long form
-            var lenLength = lenByte & 0x7F;
-
-            if (lenLength == 0 || lenLength > 4 || offset + lenLength > data.Length)
-            {
-                return -1; // invalid or unsupported
-            }
-
-            var contentLength = 0;
-            for (var i = 0; i < lenLength; i++)
-            {
-                contentLength = (contentLength << 8) | data[offset++];
-            }
-
-            return contentLength;
-        }
-    }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using NUnit.Framework;
 
@@ -64,7 +65,7 @@ public class PutKeyCommandTests
         var result = PutKeyCommand.Create(0x01, null!);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("Key data blocks cannot be null");
     }
 
@@ -76,7 +77,7 @@ public class PutKeyCommandTests
         var result = PutKeyCommand.Create(0x01, keyDataBlocks);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("At least one key data block is required");
     }
 
@@ -163,7 +164,7 @@ public class PutKeyCommandTests
         var result = KeyDataBlock.CreateDesKey(null!);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("DES key value cannot be null");
     }
 
@@ -179,7 +180,7 @@ public class PutKeyCommandTests
         var result = KeyDataBlock.CreateDesKey(keyValue);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain($"DES key must be 8 bytes, got {length} bytes");
     }
 
@@ -194,7 +195,7 @@ public class PutKeyCommandTests
         var result = KeyDataBlock.CreateDesKey(ValidDesKey, keyCheckValue);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain($"Key check value must be 3 bytes, got {length} bytes");
     }
 
@@ -230,7 +231,7 @@ public class PutKeyCommandTests
         var result = KeyDataBlock.CreateTripleDes2Key(null!);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("3DES double-length key value cannot be null");
     }
 
@@ -246,7 +247,7 @@ public class PutKeyCommandTests
         var result = KeyDataBlock.CreateTripleDes2Key(keyValue);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain($"3DES double-length key must be 16 bytes, got {length} bytes");
     }
 
@@ -282,7 +283,7 @@ public class PutKeyCommandTests
         var result = KeyDataBlock.CreateTripleDes3Key(null!);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("3DES triple-length key value cannot be null");
     }
 
@@ -298,7 +299,7 @@ public class PutKeyCommandTests
         var result = KeyDataBlock.CreateTripleDes3Key(keyValue);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain($"3DES triple-length key must be 24 bytes, got {length} bytes");
     }
 
@@ -334,7 +335,7 @@ public class PutKeyCommandTests
         var result = KeyDataBlock.CreateAes128Key(null!);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("AES-128 key value cannot be null");
     }
 
@@ -350,7 +351,7 @@ public class PutKeyCommandTests
         var result = KeyDataBlock.CreateAes128Key(keyValue);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain($"AES-128 key must be 16 bytes, got {length} bytes");
     }
 
@@ -386,7 +387,7 @@ public class PutKeyCommandTests
         var result = KeyDataBlock.CreateAes192Key(null!);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("AES-192 key value cannot be null");
     }
 
@@ -402,7 +403,7 @@ public class PutKeyCommandTests
         var result = KeyDataBlock.CreateAes192Key(keyValue);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain($"AES-192 key must be 24 bytes, got {length} bytes");
     }
 
@@ -438,7 +439,7 @@ public class PutKeyCommandTests
         var result = KeyDataBlock.CreateAes256Key(null!);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("AES-256 key value cannot be null");
     }
 
@@ -454,7 +455,7 @@ public class PutKeyCommandTests
         var result = KeyDataBlock.CreateAes256Key(keyValue);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain($"AES-256 key must be 32 bytes, got {length} bytes");
     }
 
@@ -845,7 +846,7 @@ public class PutKeyCommandTests
         var result = PutKeyResponse.Parse(null!);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("Response data cannot be null");
     }
 
@@ -861,7 +862,7 @@ public class PutKeyCommandTests
         var result = PutKeyResponse.Parse(responseData);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_RESPONSE");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain($"Invalid response length {length}, expected multiple of 3 bytes");
     }
 

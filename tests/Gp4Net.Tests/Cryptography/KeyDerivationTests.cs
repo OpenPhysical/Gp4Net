@@ -5,6 +5,7 @@
 
 using System;
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
 using NUnit.Framework;
@@ -141,7 +142,10 @@ public class KeyDerivationTests
 
         // Assert
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_DATA");
-        result.Error.Message.Should().Contain("Host challenge must be 8 bytes");
+        result.Error.Should().BeOfType<InvalidLengthError>();
+        var lengthError = (InvalidLengthError)result.Error;
+        lengthError.Field.Should().Be("hostChallenge");
+        lengthError.Expected.Should().Be(8);
+        lengthError.Actual.Should().Be(5);
     }
 }

@@ -35,7 +35,11 @@ public class AppletDeletionTraceTests
     public void GpProTrace_InitializeUpdate_ParsedCorrectly()
     {
         // Arrange & Act
-        var response = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        
+        // Assert that parsing succeeded
+        Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
+        var response = responseResult.Value;
 
         Assert.Multiple(() =>
         {
@@ -92,7 +96,9 @@ public class AppletDeletionTraceTests
         // Arrange
         var keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1);
         var protocol = new Scp03Protocol(keySet, _keyDerivationServiceMock.Object, 0x70);
-        var response = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
+        var response = responseResult.Value;
         var cardChallenge = Convert.FromHexString("81E02F9C4061653A");
             
         // Derive session keys
@@ -157,7 +163,9 @@ public class AppletDeletionTraceTests
             });
             
         var protocol = new Scp03Protocol(keySet, _keyDerivationServiceMock.Object, 0x70);
-        var response = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
+        var response = responseResult.Value;
         var context = protocol.ProcessInitializeUpdateResponse(response, _hostChallenge);
 
         // Expected from GP Pro trace line 28: 84820100 10 A1883C4B93BE2B01FFC7CC05DCC39D2E

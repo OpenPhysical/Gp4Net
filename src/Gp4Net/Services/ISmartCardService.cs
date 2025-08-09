@@ -44,8 +44,8 @@ public interface ISmartCardService : IDisposable
     /// Creates a new service instance with an updated context.
     /// </summary>
     /// <param name="context">The new context.</param>
-    /// <returns>A new service instance with the updated context.</returns>
-    ISmartCardService WithContext(IPipelineContext context);
+    /// <returns>A Result containing a new service instance with the updated context, or an error if the context is null.</returns>
+    Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context);
 
     /// <summary>
     /// Creates a new service instance with a context value added.
@@ -53,30 +53,8 @@ public interface ISmartCardService : IDisposable
     /// <typeparam name="T">The type of the value.</typeparam>
     /// <param name="key">The context key.</param>
     /// <param name="value">The context value.</param>
-    /// <returns>A new service instance with the updated context.</returns>
-    ISmartCardService WithContextValue<T>(string key, T value);
-}
-
-/// <summary>
-/// Factory for creating smart card service instances.
-/// </summary>
-public interface ISmartCardServiceFactory
-{
-    /// <summary>
-    /// Creates a smart card service for the specified reader.
-    /// </summary>
-    /// <param name="readerName">The reader name.</param>
-    /// <param name="options">Service configuration options.</param>
-    /// <returns>A smart card service instance.</returns>
-    Task<Result<ISmartCardService, SmartCardError>> CreateAsync(
-        string readerName,
-        SmartCardServiceOptions options);
-
-    /// <summary>
-    /// Lists available smart card readers.
-    /// </summary>
-    /// <returns>The list of available readers.</returns>
-    Task<Result<string[], SmartCardError>> ListReadersAsync();
+    /// <returns>A Result containing a new service instance with the updated context, or an error if the context is invalid.</returns>
+    Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value);
 }
 
 /// <summary>
@@ -99,10 +77,7 @@ public record SmartCardServiceOptions
     /// </summary>
     public bool EnableStateCapture { get; init; } = true;
 
-    /// <summary>
-    /// Custom middleware to add to the pipeline.
-    /// </summary>
-    public ICommandMiddleware[] CustomMiddleware { get; init; } = Array.Empty<ICommandMiddleware>();
+    // CustomMiddleware removed - using functional composition instead
 
     /// <summary>
     /// Initial context values.

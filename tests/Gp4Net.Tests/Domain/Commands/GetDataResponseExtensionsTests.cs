@@ -51,7 +51,7 @@ public class GetDataResponseExtensionsTests
     public void ParseAsCardData_WithNullData_ReturnsNone()
     {
         // Arrange
-        byte[] data = null;
+        byte[]? data = null;
 
         // Act
         var result = data.ParseAsCardData();
@@ -104,7 +104,7 @@ public class GetDataResponseExtensionsTests
     public void ParseAsCardCapabilities_WithNullData_ReturnsNone()
     {
         // Arrange
-        byte[] data = null;
+        byte[]? data = null;
 
         // Act
         var result = data.ParseAsCardCapabilities();
@@ -157,7 +157,7 @@ public class GetDataResponseExtensionsTests
     public void ParseAsKeyInformation_WithNullData_ReturnsNone()
     {
         // Arrange
-        byte[] data = null;
+        byte[]? data = null;
 
         // Act
         var result = data.ParseAsKeyInformation();
@@ -214,7 +214,7 @@ public class GetDataResponseExtensionsTests
     public void ParseAsCplc_WithNullData_ReturnsNone()
     {
         // Arrange
-        byte[] data = null;
+        byte[]? data = null;
 
         // Act
         var result = data.ParseAsCplc();

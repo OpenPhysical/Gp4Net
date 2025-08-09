@@ -1,0 +1,69 @@
+{
+  "metadata": {
+    "source": {
+      "file": "scp02_MAC.log",
+      "type": "gp_pro",
+      "generated": "2025-08-06T10:05:00Z"
+    },
+    "card": {
+      "atr": "3BD518FF8191FE1FC38073C821100A",
+      "isd_aid": "A000000151000000"
+    },
+    "hints": {
+      "static_keys": "404142434445464748494A4B4C4D4E4F",
+      "expected_session_keys": {
+        "s_enc": "CB4ED15E982DB16EB630FE9F3E04D665",
+        "s_mac": "89D93B2D2D7E7AB95B61F82EDE3975B7",
+        "s_rmac": "9E73AA58712520FCC53800F90C2471E1"
+      }
+    }
+  },
+  "test_hints": {
+    "testable_operations": [
+      {
+        "name": "select",
+        "exchange_index": 0,
+        "verify": ["aid"]
+      },
+      {
+        "name": "initialize_update",
+        "exchange_index": 1,
+        "verify": ["key_derivation", "card_cryptogram"]
+      },
+      {
+        "name": "external_authenticate",
+        "exchange_index": 2,
+        "verify": ["secure_channel"]
+      }
+    ],
+    "scp_version": 2
+  },
+  "exchanges": [
+    {
+      "command": "00A4040000",
+      "response": "6F108408A000000151000000A5049F6501FF9000",
+      "description": "SELECT ISD"
+    },
+    {
+      "command": "8050000008BD76C16D1D2E2D7600",
+      "response": "00002345558083204839010200123E6DB216F8D58177E15BAA128DF99000",
+      "description": "INITIALIZE UPDATE - SCP02 i=00 MAC mode"
+    },
+    {
+      "command": "848201001095A78968A09DB5D9A3077662BA8EA35B00",
+      "response": "9000",
+      "description": "EXTERNAL AUTHENTICATE - MAC mode"
+    }
+  ],
+  "sessions": {
+    "session_1": {
+      "scp_version": 2,
+      "host_challenge": "BD76C16D1D2E2D76",
+      "card_challenge": "3E6DB216F8D5",
+      "sequence_counter": "0012",
+      "key_diversification_data": "00002345558083204839",
+      "card_cryptogram": "8177E15BAA128DF9",
+      "host_cryptogram": "95A78968A09DB5D9"
+    }
+  }
+}

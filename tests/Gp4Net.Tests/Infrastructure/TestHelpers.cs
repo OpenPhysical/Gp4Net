@@ -9,59 +9,68 @@ using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
 using Gp4Net.Pipeline;
 using Gp4Net.Transport;
+using static Gp4Net.Pipeline.CommandProcessing;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Gp4Net.Tests.Infrastructure;
 
 /// <summary>
-/// Test implementation of command pipeline for functional testing.
+/// Test helpers for functional command processing.
 /// </summary>
-public class TestCommandPipeline : ICommandPipeline
+public static class TestCommandProcessing
 {
-    public async Task<Result<CommandResponse, SmartCardError>> ExecuteAsync(
-        IApduCommand command,
-        IPipelineContext context,
-        CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Creates a test command processor that directly executes commands.
+    /// </summary>
+    public static CommandProcessor CreateTestProcessor()
     {
-        // Basic test implementation - just execute the command
-        var transportMaybe = context.Get<IApduTransport>("ApduTransport");
-        var channelMaybe = context.Get<ICardChannel>("CardChannel");
-            
-        if (transportMaybe.HasNoValue || channelMaybe.HasNoValue)
+        return async (command, environment, cancellationToken) =>
         {
-            return Result.Failure<CommandResponse, SmartCardError>(
-                SmartCardError.CommunicationError("Transport or channel not available in context"));
-        }
-            
-        var transport = transportMaybe.Value;
-        var channel = channelMaybe.Value;
-            
-        var response = await transport.TransmitAsync(command, channel, cancellationToken);
-            
-        return Result.Success<CommandResponse, SmartCardError>(
-            new CommandResponse(response.Data, response.StatusWord, context, new Dictionary<string, object>()));
+            try
+            {
+                // Basic test implementation - just execute the command
+                var response = await environment.Transport.TransmitAsync(
+                    command, 
+                    environment.Channel, 
+                    cancellationToken);
+                    
+                // Build APDU bytes for metadata
+                var commandBytes = ApduBuilder.BuildApdu(command);
+                var responseBytes = new byte[response.Data.Length + 2];
+                Array.Copy(response.Data, 0, responseBytes, 0, response.Data.Length);
+                responseBytes[responseBytes.Length - 2] = (byte)(response.StatusWord >> 8);
+                responseBytes[responseBytes.Length - 1] = (byte)(response.StatusWord & 0xFF);
+                
+                return Result.Success<CommandResult, SmartCardError>(new CommandResult(
+                    response.Data,
+                    response.StatusWord,
+                    environment,
+                    new CommandMetadata(
+                        ExecutionTime: TimeSpan.Zero,
+                        TransmittedBytes: commandBytes,
+                        ReceivedBytes: responseBytes
+                    )));
+            }
+            catch (Exception ex)
+            {
+                return Result.Failure<CommandResult, SmartCardError>(
+                    SmartCardError.CommunicationError("Test execution failed", Maybe<Exception>.From(ex)));
+            }
+        };
     }
-
-    public async Task<Result<CommandResponse, SmartCardError>> ExecuteAsync(
-        CommandRequest request,
-        CancellationToken cancellationToken = default)
+    
+    /// <summary>
+    /// Creates a test command environment.
+    /// </summary>
+    public static CommandEnvironment CreateTestEnvironment(
+        ICardChannel channel,
+        IApduTransport transport)
     {
-        // Basic test implementation - execute the command from the request
-        var transportMaybe = request.Context.Get<IApduTransport>("ApduTransport");
-        var channelMaybe = request.Context.Get<ICardChannel>("CardChannel");
-            
-        if (transportMaybe.HasNoValue || channelMaybe.HasNoValue)
-        {
-            return Result.Failure<CommandResponse, SmartCardError>(
-                SmartCardError.CommunicationError("Transport or channel not available in context"));
-        }
-            
-        var transport = transportMaybe.Value;
-        var channel = channelMaybe.Value;
-            
-        var response = await transport.TransmitAsync(request.Command, channel, cancellationToken);
-            
-        return Result.Success<CommandResponse, SmartCardError>(
-            new CommandResponse(response.Data, response.StatusWord, request.Context, new Dictionary<string, object>()));
+        return new CommandEnvironment(
+            channel,
+            transport,
+            Maybe<Gp4Net.Domain.Security.SecureChannelState>.None,
+            NullLogger.Instance);
     }
 }
 

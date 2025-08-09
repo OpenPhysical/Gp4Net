@@ -5,6 +5,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
@@ -21,6 +23,7 @@ public class HybridCardService : ICardService
     private readonly ICardService _realCardService;
     private readonly VirtualCardServiceAdapter _virtualCardService;
     private readonly ILogger<HybridCardService> _logger;
+    private string _currentReaderName;
 
     /// <summary>
     /// Initializes a new instance of the HybridCardService class.
@@ -46,16 +49,15 @@ public class HybridCardService : ICardService
         try
         {
             var realReaders = _realCardService.GetReaders();
-            // Virtual card service adapter doesn't have ListReaders directly
-            // It provides a single virtual reader
-            var virtualReaders = new[] { "Virtual Card Emulator" };
+            // Get virtual readers from the virtual card service
+            var virtualReaders = _virtualCardService.GetVirtualReaders();
                 
             var allReaders = new List<string>();
             allReaders.AddRange(realReaders);
             allReaders.AddRange(virtualReaders);
                 
             _logger.LogDebug("Found {RealCount} real readers and {VirtualCount} virtual readers", 
-                realReaders.Count, virtualReaders.Length);
+                realReaders.Count, virtualReaders.Count);
                 
             return allReaders.AsReadOnly();
         }
@@ -77,16 +79,22 @@ public class HybridCardService : ICardService
         if (IsVirtualReader(readerName))
         {
             _logger.LogDebug("Routing to virtual card service");
-            // For virtual cards, we need to connect to the underlying virtual card service
-            // Since VirtualCardServiceAdapter implements ISmartCardService, not ICardService,
-            // we'll need to handle this differently
-            _logger.LogDebug("Virtual card connection requested but not fully implemented");
-            return false; // TODO: Implement virtual card connection through adapter
+            var success = _virtualCardService.Connect(readerName);
+            if (success)
+            {
+                _currentReaderName = readerName;
+            }
+            return success;
         }
         else
         {
             _logger.LogDebug("Routing to real card service");
-            return _realCardService.Connect(readerName);
+            var success = _realCardService.Connect(readerName);
+            if (success)
+            {
+                _currentReaderName = readerName;
+            }
+            return success;
         }
     }
 
@@ -104,8 +112,16 @@ public class HybridCardService : ICardService
             _logger.LogWarning(ex, "Error disconnecting from real card service");
         }
             
-        // Virtual cards don't maintain persistent connections in the same way
-        // The adapter handles connection lifecycle internally
+        try
+        {
+            _virtualCardService.Disconnect();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error disconnecting from virtual card service");
+        }
+            
+        _currentReaderName = null;
     }
 
     /// <inheritdoc />
@@ -113,9 +129,7 @@ public class HybridCardService : ICardService
     {
         get
         {
-            return _realCardService.IsConnected;
-
-            // Virtual connections are always "connected" when available
+            return _realCardService.IsConnected || _virtualCardService.IsConnected;
         }
     }
 
@@ -124,9 +138,14 @@ public class HybridCardService : ICardService
     {
         _logger.LogDebug("Getting ATR from current connection");
             
-        // For now, delegate to real card service
-        // Virtual card ATR would need context about which virtual reader is active
-        return _realCardService.GetAtr();
+        if (!string.IsNullOrEmpty(_currentReaderName) && IsVirtualReader(_currentReaderName))
+        {
+            return _virtualCardService.GetAtr();
+        }
+        else
+        {
+            return _realCardService.GetAtr();
+        }
     }
 
     /// <inheritdoc />
@@ -136,9 +155,26 @@ public class HybridCardService : ICardService
             
         _logger.LogDebug("Sending command with {Length} bytes", command.Length);
             
-        // For now, delegate to real card service
-        // Virtual card routing would need connection state tracking
-        return _realCardService.SendCommand(command);
+        if (!string.IsNullOrEmpty(_currentReaderName) && IsVirtualReader(_currentReaderName))
+        {
+            // Convert byte array to basic APDU command for virtual card
+            var apduCommand = CreateApduCommandFromBytes(command);
+            var response = _virtualCardService.ExecuteCommandAsync(apduCommand).GetAwaiter().GetResult();
+            if (response.IsSuccess)
+            {
+                var cmdResponse = response.Value;
+                return new CardResponse(cmdResponse.Data, cmdResponse.StatusWord);
+            }
+            else
+            {
+                // Return error as failed card response
+                return new CardResponse(Array.Empty<byte>(), 0x6F00); // General error
+            }
+        }
+        else
+        {
+            return _realCardService.SendCommand(command);
+        }
     }
 
     /// <inheritdoc />
@@ -148,9 +184,24 @@ public class HybridCardService : ICardService
             
         _logger.LogDebug("Sending APDU command: INS={Ins:X2}", command.Ins);
             
-        // For now, delegate to real card service
-        // Virtual card routing would need connection state tracking
-        return _realCardService.SendCommand(command);
+        if (!string.IsNullOrEmpty(_currentReaderName) && IsVirtualReader(_currentReaderName))
+        {
+            var response = _virtualCardService.ExecuteCommandAsync(command).GetAwaiter().GetResult();
+            if (response.IsSuccess)
+            {
+                var cmdResponse = response.Value;
+                return new CardResponse(cmdResponse.Data, cmdResponse.StatusWord);
+            }
+            else
+            {
+                // Return error as failed card response
+                return new CardResponse(Array.Empty<byte>(), 0x6F00); // General error
+            }
+        }
+        else
+        {
+            return _realCardService.SendCommand(command);
+        }
     }
 
     /// <inheritdoc />
@@ -160,9 +211,15 @@ public class HybridCardService : ICardService
             
         _logger.LogDebug("Establishing secure channel with security level {SecurityLevel:X2}", securityLevel);
             
-        // For now, delegate to real card service
-        // Virtual card routing would need connection state tracking
-        return _realCardService.EstablishSecureChannel(keySet, securityLevel);
+        if (!string.IsNullOrEmpty(_currentReaderName) && IsVirtualReader(_currentReaderName))
+        {
+            // Virtual cards use their own secure channel logic
+            return _virtualCardService.EstablishSecureChannel(keySet, securityLevel);
+        }
+        else
+        {
+            return _realCardService.EstablishSecureChannel(keySet, securityLevel);
+        }
     }
 
     /// <inheritdoc />
@@ -170,7 +227,14 @@ public class HybridCardService : ICardService
     {
         get
         {
-            return _realCardService.IsSecureChannelEstablished;
+            if (!string.IsNullOrEmpty(_currentReaderName) && IsVirtualReader(_currentReaderName))
+            {
+                return _virtualCardService.IsSecureChannelEstablished;
+            }
+            else
+            {
+                return _realCardService.IsSecureChannelEstablished;
+            }
         }
     }
 
@@ -192,6 +256,54 @@ public class HybridCardService : ICardService
                normalized.Contains("simulator");
     }
 
+    /// <summary>
+    /// Creates a basic APDU command from raw bytes.
+    /// </summary>
+    /// <param name="command">The command bytes.</param>
+    /// <returns>A basic APDU command.</returns>
+    private static IApduCommand CreateApduCommandFromBytes(byte[] command)
+    {
+        if (command.Length < 4)
+        {
+            throw new ArgumentException("Command must be at least 4 bytes (CLA INS P1 P2)");
+        }
+
+        var cla = command[0];
+        var ins = command[1];
+        var p1 = command[2];
+        var p2 = command[3];
+
+        byte[] data = null;
+        int? expectedLength = null;
+
+        if (command.Length > 4)
+        {
+            // Simple parsing - assumes standard case 1-4 APDU structure
+            if (command.Length == 5)
+            {
+                // Case 2s: CLA INS P1 P2 Le
+                expectedLength = command[4] == 0 ? 256 : command[4];
+            }
+            else if (command.Length > 5)
+            {
+                // Case 3s or 4s: CLA INS P1 P2 Lc Data [Le]
+                var lc = command[4];
+                if (command.Length >= 5 + lc)
+                {
+                    data = command.Skip(5).Take(lc).ToArray();
+                    if (command.Length == 5 + lc + 1)
+                    {
+                        // Case 4s: has Le
+                        var le = command[5 + lc];
+                        expectedLength = le == 0 ? 256 : le;
+                    }
+                }
+            }
+        }
+
+        return new BasicApduCommand(cla, ins, p1, p2, data, expectedLength);
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
@@ -204,6 +316,39 @@ public class HybridCardService : ICardService
             _logger.LogWarning(ex, "Error disposing real card service");
         }
             
-        // VirtualCardServiceAdapter doesn't implement IDisposable
+        try
+        {
+            _virtualCardService?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error disposing virtual card service");
+        }
+    }
+}
+
+/// <summary>
+/// Basic APDU command implementation for byte array conversion.
+/// </summary>
+internal class BasicApduCommand : IApduCommand
+{
+    public byte Cla { get; }
+    public byte Ins { get; }
+    public byte P1 { get; }
+    public byte P2 { get; }
+    public byte[] Data { get; }
+    public Maybe<int> ExpectedResponseLength { get; }
+    public bool IsExtendedLength => false;
+
+    public BasicApduCommand(byte cla, byte ins, byte p1, byte p2, byte[] data, int? expectedResponseLength)
+    {
+        Cla = cla;
+        Ins = ins;
+        P1 = p1;
+        P2 = p2;
+        Data = data;
+        ExpectedResponseLength = expectedResponseLength.HasValue 
+            ? Maybe<int>.From(expectedResponseLength.Value) 
+            : Maybe<int>.None;
     }
 }

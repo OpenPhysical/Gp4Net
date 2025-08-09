@@ -159,8 +159,8 @@ public class MacContext : IMacContext
     )
     {
         Algorithm = algorithm;
-        Key = key ?? throw new System.ArgumentNullException(nameof(key));
-        Data = data ?? throw new System.ArgumentNullException(nameof(data));
+        Key = key;
+        Data = data;
         InitializationVector = initializationVector;
         Parameters = parameters;
     }

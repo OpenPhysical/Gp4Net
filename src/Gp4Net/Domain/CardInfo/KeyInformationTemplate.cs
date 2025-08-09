@@ -17,9 +17,9 @@ namespace Gp4Net.Domain.CardInfo;
 public class KeyInformationTemplate
 {
     /// <summary>
-    /// Gets the raw data.
+    /// Gets the key information template data from GET DATA(0x00E0) response.
     /// </summary>
-    public byte[] RawData { get; }
+    public byte[] Data { get; }
 
     /// <summary>
     /// Gets the list of key entries.
@@ -29,7 +29,7 @@ public class KeyInformationTemplate
     private KeyInformationTemplate(byte[] rawData)
     {
         // rawData is guaranteed to be non-null by static factory methods
-        RawData = rawData;
+        Data = rawData;
     }
 
     /// <summary>

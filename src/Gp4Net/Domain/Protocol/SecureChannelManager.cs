@@ -35,9 +35,6 @@ public class SecureChannelManager : ISecureChannelManager
         ILogger<SecureChannelManager> logger
     )
     {
-        ArgumentNullException.ThrowIfNull(protocolFactory);
-        ArgumentNullException.ThrowIfNull(challengeGenerator);
-        ArgumentNullException.ThrowIfNull(logger);
         _protocolFactory = protocolFactory;
         _challengeGenerator = challengeGenerator;
         _logger = logger;
@@ -52,9 +49,17 @@ public class SecureChannelManager : ISecureChannelManager
         CancellationToken cancellationToken = default
     )
     {
-        ArgumentNullException.ThrowIfNull(channel);
-        ArgumentNullException.ThrowIfNull(transport);
-        ArgumentNullException.ThrowIfNull(keySet);
+        if (channel is null)
+            return Result.Failure<Security.SecureChannelState, SmartCardError>(
+                SmartCardError.InvalidArgument("Channel cannot be null"));
+        
+        if (transport is null)
+            return Result.Failure<Security.SecureChannelState, SmartCardError>(
+                SmartCardError.InvalidArgument("Transport cannot be null"));
+        
+        if (keySet is null)
+            return Result.Failure<Security.SecureChannelState, SmartCardError>(
+                SmartCardError.InvalidArgument("Key set cannot be null"));
 
         _logger.LogInformation(
             "Establishing secure channel with security level {SecurityLevel}",
@@ -103,7 +108,14 @@ public class SecureChannelManager : ISecureChannelManager
             }
 
             // Parse response
-            var parsedResponse = InitializeUpdateResponse.Parse(initUpdateResponse.Data);
+            var parseResult = InitializeUpdateResponse.Parse(initUpdateResponse.Data);
+            if (parseResult.IsFailure)
+            {
+                _logger.LogError("Failed to parse INITIALIZE UPDATE response: {Error}", parseResult.Error.Message);
+                return parseResult.Error;
+            }
+            
+            var parsedResponse = parseResult.Value;
 
             _logger.LogDebug(
                 "Received INITIALIZE UPDATE response for protocol {Protocol:X2}",
@@ -186,9 +198,17 @@ public class SecureChannelManager : ISecureChannelManager
         CancellationToken cancellationToken = default
     )
     {
-        ArgumentNullException.ThrowIfNull(channel);
-        ArgumentNullException.ThrowIfNull(transport);
-        ArgumentNullException.ThrowIfNull(keySet);
+        if (channel is null)
+            return Result.Failure<Security.SecureChannelState, SmartCardError>(
+                SmartCardError.InvalidArgument("Channel cannot be null"));
+        
+        if (transport is null)
+            return Result.Failure<Security.SecureChannelState, SmartCardError>(
+                SmartCardError.InvalidArgument("Transport cannot be null"));
+        
+        if (keySet is null)
+            return Result.Failure<Security.SecureChannelState, SmartCardError>(
+                SmartCardError.InvalidArgument("Key set cannot be null"));
 
         _logger.LogInformation("Auto-detecting secure channel protocol");
 
@@ -241,7 +261,13 @@ public class SecureChannelManager : ISecureChannelManager
             }
 
             // Parse response to detect protocol
-            var parsedResponse = InitializeUpdateResponse.Parse(initUpdateResponse.Data);
+            var parseResult = InitializeUpdateResponse.Parse(initUpdateResponse.Data);
+            if (parseResult.IsFailure)
+            {
+                return SmartCardError.CommunicationError($"Failed to parse INITIALIZE UPDATE response: {parseResult.Error.Message}");
+            }
+            
+            var parsedResponse = parseResult.Value;
             var detectedProtocol = _protocolFactory.DetectProtocolVersion(parsedResponse);
 
             _logger.LogInformation("Detected protocol: {Protocol:X2}", detectedProtocol);

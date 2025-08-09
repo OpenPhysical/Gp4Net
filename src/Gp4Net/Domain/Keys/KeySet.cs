@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 
 using System;
-using System.Security.Cryptography;
+using Org.BouncyCastle.Utilities;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 
@@ -95,9 +95,9 @@ public abstract class KeySet : IKeySet
     /// </summary>
     public virtual void Clear()
     {
-        CryptographicOperations.ZeroMemory(EncKey);
-        CryptographicOperations.ZeroMemory(MacKey);
-        CryptographicOperations.ZeroMemory(DekKey);
+        Arrays.Fill(EncKey, 0);
+        Arrays.Fill(MacKey, 0);
+        Arrays.Fill(DekKey, 0);
     }
 
     /// <summary>

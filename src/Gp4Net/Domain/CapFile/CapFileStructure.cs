@@ -156,12 +156,12 @@ public class CapFileStructure
     /// Parses a CAP file from byte array (ZIP/JAR format only).
     /// </summary>
     /// <param name="capFileData">The CAP file data.</param>
-    /// <returns>The parsed CAP file structure.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when capFileData is null.</exception>
-    /// <exception cref="InvalidDataException">Thrown when the CAP file format is invalid.</exception>
-    public static CapFileStructure Parse(byte[] capFileData)
+    /// <returns>A Result containing the parsed CAP file structure, or an error if the data is invalid.</returns>
+    public static Result<CapFileStructure, SmartCardError> Parse(byte[] capFileData)
     {
-        ArgumentNullException.ThrowIfNull(capFileData);
+        if (capFileData is null)
+            return Result.Failure<CapFileStructure, SmartCardError>(
+                SmartCardError.InvalidArgument("CAP file data cannot be null"));
 
         // Only support ZIP/JAR format CAP files
         if (

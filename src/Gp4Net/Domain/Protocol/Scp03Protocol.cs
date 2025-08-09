@@ -228,7 +228,9 @@ public class Scp03Protocol : SecureChannelProtocolBase
         SecureChannelContext context,
         SecurityLevel securityLevel)
     {
-        ArgumentNullException.ThrowIfNull(context);
+        if (context is null)
+            return Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
+                SmartCardError.InvalidArgument("Context cannot be null"));
 
         // Calculate host cryptogram
         var hostCryptogram = CalculateHostCryptogram(

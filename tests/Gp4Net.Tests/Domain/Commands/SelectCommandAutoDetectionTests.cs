@@ -1,5 +1,6 @@
 using System;
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using NUnit.Framework;
@@ -157,8 +158,11 @@ public class SelectCommandAutoDetectionTests
 
         // Assert
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().BeEquivalentTo("INVALID_DATA");
-        result.Error.Message.Should().Contain("AID cannot be null");
+        result.Error.Should().BeOfType<InvalidDataError>();
+        var error = result.Error as InvalidDataError;
+        error.Should().NotBeNull();
+        error!.Field.Should().Be("AID");
+        error.Message.Should().Contain("cannot be null");
     }
 
     [Test]
@@ -172,8 +176,12 @@ public class SelectCommandAutoDetectionTests
 
         // Assert
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().BeEquivalentTo("INVALID_DATA");
-        result.Error.Message.Should().Contain("AID must be 16 bytes or less");
+        result.Error.Should().BeOfType<InvalidLengthError>();
+        var error = result.Error as InvalidLengthError;
+        error.Should().NotBeNull();
+        error!.Field.Should().Be("AID");
+        error.Expected.Should().Be(16);
+        error.Actual.Should().Be(17);
     }
 
     [Test]
@@ -216,8 +224,11 @@ public class SelectCommandAutoDetectionTests
 
         // Assert
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().BeEquivalentTo("INVALID_DATA");
-        result.Error.Message.Should().Contain("Response data cannot be null");
+        result.Error.Should().BeOfType<InvalidDataError>();
+        var error = result.Error as InvalidDataError;
+        error.Should().NotBeNull();
+        error!.Field.Should().Be("Response");
+        error.Message.Should().Contain("cannot be null");
     }
 
     [Test]

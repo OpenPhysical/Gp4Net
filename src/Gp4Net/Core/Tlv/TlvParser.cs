@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
+using Gp4Net.Core;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Core.Tlv;
@@ -315,10 +316,27 @@ public class TlvObject
     /// <param name="value">The value bytes.</param>
     public TlvObject(byte[] tag, byte[] value)
     {
-        ArgumentNullException.ThrowIfNull(tag);
-        ArgumentNullException.ThrowIfNull(value);
         Tag = tag;
         Value = value;
+    }
+
+    /// <summary>
+    /// Creates a new TlvObject with functional error handling.
+    /// </summary>
+    /// <param name="tag">The tag bytes.</param>
+    /// <param name="value">The value bytes.</param>
+    /// <returns>A Result containing the TlvObject or an error if parameters are invalid.</returns>
+    public static Result<TlvObject, SmartCardError> Create(byte[] tag, byte[] value)
+    {
+        if (tag is null)
+            return Result.Failure<TlvObject, SmartCardError>(
+                new NullParameterError("tag"));
+        
+        if (value is null)
+            return Result.Failure<TlvObject, SmartCardError>(
+                new NullParameterError("value"));
+        
+        return Result.Success<TlvObject, SmartCardError>(new TlvObject(tag, value));
     }
 
     /// <summary>

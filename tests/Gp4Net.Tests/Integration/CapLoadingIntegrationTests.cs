@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using AwesomeAssertions;
 using Gp4Net.Domain;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Domain.Commands;
@@ -45,7 +46,9 @@ public class CapLoadingIntegrationTests
         Assert.That(capFileData.Length, Is.GreaterThan(0), "CAP file should not be empty");
 
         // Parse and check structure
-        var capFile = CapFileStructure.Parse(capFileData);
+        var capFileResult = CapFileStructure.Parse(capFileData);
+        Assert.That(capFileResult.IsSuccess, Is.True, "Failed to parse CAP file");
+        var capFile = capFileResult.Value;
     }
 
     [Test]
@@ -55,7 +58,9 @@ public class CapLoadingIntegrationTests
         var capFileData = File.ReadAllBytes(_capFilePath);
 
         // Parse CAP file structure
-        var capFile = CapFileStructure.Parse(capFileData);
+        var capFileResult = CapFileStructure.Parse(capFileData);
+        Assert.That(capFileResult.IsSuccess, Is.True, "Failed to parse CAP file");
+        var capFile = capFileResult.Value;
 
         // Verify we have the expected package from the trace (OpenFIPS201 package)
         var expectedPackageAid = Convert.FromHexString("A00000030800001000");
@@ -129,7 +134,7 @@ public class CapLoadingIntegrationTests
             .ToList();
 
         // Assert - Verify wrapped APDUs have correct format
-        Assert.That(wrappedApdus.Count, Is.GreaterThan(0), "Should have generated wrapped APDUs");
+        Assert.That(wrappedApdus.Count > 0, "Should have generated wrapped APDUs");
         foreach (var wrappedApdu in wrappedApdus)
         {
             // Wrapped commands should have CLA = 0x84 (secure messaging)
@@ -159,7 +164,9 @@ public class CapLoadingIntegrationTests
 
         // Act - Load CAP file and generate commands
         var capFileData = File.ReadAllBytes(_capFilePath);
-        var capFile = CapFileStructure.Parse(capFileData);
+        var capFileResult = CapFileStructure.Parse(capFileData);
+        Assert.That(capFileResult.IsSuccess, Is.True, "Failed to parse CAP file");
+        var capFile = capFileResult.Value;
 
         // Generate INSTALL [for load] command
         var installForLoadResult = InstallCommandBuilder.CreateForLoad(

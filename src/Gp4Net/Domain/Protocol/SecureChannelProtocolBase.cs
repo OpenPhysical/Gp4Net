@@ -36,10 +36,6 @@ public abstract class SecureChannelProtocolBase : ISecureChannelProtocol
         IKeyDerivationService keyDerivationService,
         ILogger logger)
     {
-        ArgumentNullException.ThrowIfNull(keySet);
-        ArgumentNullException.ThrowIfNull(keyDerivationService);
-        ArgumentNullException.ThrowIfNull(logger);
-            
         _keySet = keySet;
         _keyDerivationService = keyDerivationService;
         _logger = logger;
@@ -63,7 +59,9 @@ public abstract class SecureChannelProtocolBase : ISecureChannelProtocol
         InitializeUpdateResponse response,
         byte[] hostChallenge)
     {
-        ArgumentNullException.ThrowIfNull(response);
+        if (response is null)
+            return Result.Failure<SecureChannelContext, SmartCardError>(
+                SmartCardError.InvalidArgument("Response cannot be null"));
             
         var hostValidation = ProtocolValidation.ValidateHostChallenge(hostChallenge);
         if (hostValidation.IsFailure)
@@ -87,7 +85,9 @@ public abstract class SecureChannelProtocolBase : ISecureChannelProtocol
         SecureChannelContext context,
         SecurityLevel securityLevel)
     {
-        ArgumentNullException.ThrowIfNull(context);
+        if (context is null)
+            return Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
+                SmartCardError.InvalidArgument("Context cannot be null"));
             
         return CreateExternalAuthenticateCommandImpl(context, securityLevel);
     }

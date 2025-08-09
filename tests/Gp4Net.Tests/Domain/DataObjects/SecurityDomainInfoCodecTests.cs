@@ -5,6 +5,7 @@
 
 using System;
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Domain.DataObjects;
 using NUnit.Framework;
 
@@ -24,7 +25,11 @@ public class SecurityDomainInfoCodecTests
             LifeCycleData = Convert.FromHexString("07")
         };
 
-        var encoded = SecurityDomainInfoCodec.Encode(sdInfo);
+        var encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
+        
+        // Assert encoding succeeded
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
+        var encoded = encodedResult.Value;
 
         encoded.Should().NotBeEmpty();
         encoded[0].Should().Be(0xC1, "first byte should be tag 0xC1");
@@ -49,7 +54,11 @@ public class SecurityDomainInfoCodecTests
             Oid = Convert.FromHexString("A000000151")
         };
 
-        var encoded = SecurityDomainInfoCodec.Encode(sdInfo);
+        var encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
+        
+        // Assert encoding succeeded
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
+        var encoded = encodedResult.Value;
 
         encoded.Should().NotBeEmpty();
         encoded[0].Should().Be(0xC1);
@@ -109,7 +118,9 @@ public class SecurityDomainInfoCodecTests
         var result = SecurityDomainInfoCodec.Decode(invalidData);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().BeEquivalentTo("INVALID_DATA");
+        result.Error.Should().BeOfType<SmartCardError>();
+        result.Error.Code.Should().Be("INVALID_DATA");
+        result.Error.Message.Should().Contain("Invalid security domain information format - expected tag 0xC1");
     }
 
     [Test]
@@ -139,7 +150,9 @@ public class SecurityDomainInfoCodecTests
             LifeCycleData = Convert.FromHexString("0F")
         };
 
-        var encoded = SecurityDomainInfoCodec.Encode(original);
+        var encodedResult = SecurityDomainInfoCodec.Encode(original);
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
+        var encoded = encodedResult.Value;
         var decoded = SecurityDomainInfoCodec.Decode(encoded);
 
         decoded.IsSuccess.Should().BeTrue();
@@ -156,7 +169,11 @@ public class SecurityDomainInfoCodecTests
     {
         var sdInfo = new SecurityDomainInfo();
 
-        var encoded = SecurityDomainInfoCodec.Encode(sdInfo);
+        var encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
+        
+        // Assert encoding succeeded
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
+        var encoded = encodedResult.Value;
 
         encoded.Should().NotBeEmpty();
         encoded[0].Should().Be(0xC1);
@@ -223,7 +240,11 @@ public class SecurityDomainInfoCodecTests
             ImageData = Convert.FromHexString("ABCDEF")
         };
 
-        var encoded = SecurityDomainInfoCodec.Encode(sdInfo);
+        var encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
+        
+        // Assert encoding succeeded
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
+        var encoded = encodedResult.Value;
 
         encoded.Should().NotBeEmpty();
         encoded[0].Should().Be(0xC1);

@@ -67,7 +67,7 @@ public class SecureSessionKeysTests
                 this._testSEnc,
                 this._testSMac,
                 this._testSrMac,
-                null
+                dek: null
             )
         )
         {
@@ -93,7 +93,7 @@ public class SecureSessionKeysTests
         )
         {
             var executed = false;
-            byte[] receivedKey = null;
+            byte[]? receivedKey = null;
 
             // Act
             sessionKeys.UseSEnc(key =>
@@ -150,7 +150,7 @@ public class SecureSessionKeysTests
         )
         {
             var executed = false;
-            byte[] receivedKey = null;
+            byte[]? receivedKey = null;
 
             // Act
             sessionKeys.UseDek(key =>
@@ -240,7 +240,7 @@ public class SecureSessionKeysTests
                 originalSEnc,
                 originalSMac,
                 originalSrMac,
-                null
+                dek: null
             )
         )
         {

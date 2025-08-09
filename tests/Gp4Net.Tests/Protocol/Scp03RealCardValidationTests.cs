@@ -45,7 +45,11 @@ public class Scp03RealCardValidationTests
         Console.WriteLine($"Expected SCP Version: 0x{vector.ScpVersion:X2}");
         Console.WriteLine($"Expected Implementation Option: 0x{vector.ImplementationOption:X2}");
         
-        var response = InitializeUpdateResponse.Parse(responseData);
+        var responseResult = InitializeUpdateResponse.Parse(responseData);
+        
+        // Assert parsing succeeded
+        responseResult.IsSuccess.Should().BeTrue($"Failed to parse INITIALIZE UPDATE response for {vector.Name}");
+        var response = responseResult.Value;
         
         Console.WriteLine($"Parsed KDD: {Convert.ToHexString(response.KeyDiversificationData)}");
         Console.WriteLine($"Parsed ScpId: 0x{response.ScpId:X2}");

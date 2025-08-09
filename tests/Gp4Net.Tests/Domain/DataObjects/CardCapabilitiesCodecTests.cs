@@ -6,6 +6,7 @@
 using System;
 using System.Linq;
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Domain.DataObjects;
 using NUnit.Framework;
 
@@ -95,7 +96,11 @@ public class CardCapabilitiesCodecTests
             }
         };
 
-        var encoded = CardCapabilitiesCodec.Encode(capabilities);
+        var encodedResult = CardCapabilitiesCodec.Encode(capabilities);
+        
+        // Assert encoding succeeded
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode CardCapabilities");
+        var encoded = encodedResult.Value;
 
         encoded.Should().NotBeEmpty();
         encoded[0].Should().Be(0x66, "first byte should be tag 0x66");
@@ -139,7 +144,11 @@ public class CardCapabilitiesCodecTests
             }
         };
 
-        var encoded = CardCapabilitiesCodec.Encode(capabilities);
+        var encodedResult = CardCapabilitiesCodec.Encode(capabilities);
+        
+        // Assert encoding succeeded
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode CardCapabilities");
+        var encoded = encodedResult.Value;
 
         encoded.Should().NotBeEmpty();
         encoded[0].Should().Be(0x66);
@@ -189,7 +198,9 @@ public class CardCapabilitiesCodecTests
         var result = CardCapabilitiesCodec.Decode(invalidData);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().BeEquivalentTo("INVALID_DATA");
+        result.Error.Should().BeOfType<SmartCardError>();
+        result.Error.Code.Should().Be("INVALID_DATA");
+        result.Error.Message.Should().Contain("Invalid card capabilities data format - expected tag 0x66");
     }
 
     [Test]
@@ -234,7 +245,9 @@ public class CardCapabilitiesCodecTests
             }
         };
 
-        var encoded = CardCapabilitiesCodec.Encode(original);
+        var encodedResult = CardCapabilitiesCodec.Encode(original);
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode CardCapabilities");
+        var encoded = encodedResult.Value;
         var decoded = CardCapabilitiesCodec.Decode(encoded);
 
         decoded.IsSuccess.Should().BeTrue();
@@ -263,7 +276,11 @@ public class CardCapabilitiesCodecTests
     {
         var capabilities = new CardCapabilities();
 
-        var encoded = CardCapabilitiesCodec.Encode(capabilities);
+        var encodedResult = CardCapabilitiesCodec.Encode(capabilities);
+        
+        // Assert encoding succeeded
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode CardCapabilities");
+        var encoded = encodedResult.Value;
 
         encoded.Should().NotBeEmpty();
         encoded[0].Should().Be(0x66);
@@ -297,7 +314,11 @@ public class CardCapabilitiesCodecTests
             CardIdentificationScheme = 0x00
         };
 
-        var encoded = CardCapabilitiesCodec.Encode(capabilities);
+        var encodedResult = CardCapabilitiesCodec.Encode(capabilities);
+        
+        // Assert encoding succeeded
+        encodedResult.IsSuccess.Should().BeTrue("Failed to encode CardCapabilities");
+        var encoded = encodedResult.Value;
 
         encoded.Should().NotBeEmpty();
         encoded[0].Should().Be(0x66);

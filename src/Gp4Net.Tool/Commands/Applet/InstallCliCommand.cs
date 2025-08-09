@@ -24,10 +24,10 @@ public class InstallCliCommand : BaseCommand<InstallCliCommand.Settings>
     /// </summary>
     public InstallCliCommand(
         ICardService cardService,
-        Gp4Net.Services.IGlobalPlatformService globalPlatformService,
+        IDomainServiceFactory domainServiceFactory,
         IKeysetResolver keysetResolver
     )
-        : base(cardService, globalPlatformService, keysetResolver) { }
+        : base(cardService, domainServiceFactory, keysetResolver) { }
 
     /// <summary>
     /// Executes the install command to load and install a CAP file on the card.
@@ -46,7 +46,7 @@ public class InstallCliCommand : BaseCommand<InstallCliCommand.Settings>
         }
 
         // Establish secure channel for installation
-        if (!EnsureSecureChannel(settings))
+        if (!await EnsureSecureChannel(settings))
         {
             return 1;
         }

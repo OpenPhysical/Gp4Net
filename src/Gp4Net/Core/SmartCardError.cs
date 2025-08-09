@@ -231,3 +231,123 @@ public static class ErrorCodes
     public const string InstallationFailed = "INSTALLATION_FAILED";
     public const string DeletionFailed = "DELETION_FAILED";
 }
+
+/// <summary>
+/// Strongly typed error for null parameter violations.
+/// </summary>
+public record NullParameterError(string ParameterName) : SmartCardError(
+    "NULL_PARAMETER",
+    $"Parameter '{ParameterName}' cannot be null",
+    Maybe<ushort>.None,
+    Maybe<Exception>.None,
+    Maybe<IReadOnlyDictionary<string, object>>.None);
+
+/// <summary>
+/// Strongly typed error for invalid length violations.
+/// </summary>
+public record InvalidLengthError(string Field, int Expected, int Actual) : SmartCardError(
+    "INVALID_LENGTH",
+    $"Field '{Field}' must be {Expected} bytes, got {Actual}",
+    Maybe<ushort>.None,
+    Maybe<Exception>.None,
+    Maybe<IReadOnlyDictionary<string, object>>.None);
+
+/// <summary>
+/// Strongly typed error for invalid format violations.
+/// </summary>
+public record InvalidFormatError(string Field, string ExpectedFormat) : SmartCardError(
+    "INVALID_FORMAT",
+    $"Field '{Field}' has invalid format, expected {ExpectedFormat}",
+    Maybe<ushort>.None,
+    Maybe<Exception>.None,
+    Maybe<IReadOnlyDictionary<string, object>>.None);
+
+/// <summary>
+/// Strongly typed error for cryptographic operation failures.
+/// </summary>
+public record CryptographicError(string Operation, string Details) : SmartCardError(
+    "CRYPTOGRAPHIC_ERROR",
+    $"Cryptographic operation '{Operation}' failed: {Details}",
+    Maybe<ushort>.None,
+    Maybe<Exception>.None,
+    Maybe<IReadOnlyDictionary<string, object>>.None);
+
+/// <summary>
+/// Strongly typed error for authentication failures.
+/// </summary>
+public record AuthenticationFailedError(string Reason) : SmartCardError(
+    "AUTHENTICATION_FAILED",
+    $"Authentication failed: {Reason}",
+    Maybe<ushort>.From((ushort)0x6300),
+    Maybe<Exception>.None,
+    Maybe<IReadOnlyDictionary<string, object>>.None);
+
+/// <summary>
+/// Strongly typed error for cryptogram verification failures.
+/// </summary>
+public record CryptogramVerificationError(string Details) : SmartCardError(
+    "CRYPTOGRAM_VERIFICATION_FAILED",
+    $"Cryptogram verification failed: {Details}",
+    Maybe<ushort>.None,
+    Maybe<Exception>.None,
+    Maybe<IReadOnlyDictionary<string, object>>.None);
+
+/// <summary>
+/// Strongly typed error for unsupported protocol operations.
+/// </summary>
+public record UnsupportedProtocolError(string Protocol) : SmartCardError(
+    "UNSUPPORTED_PROTOCOL",
+    $"Protocol '{Protocol}' is not supported",
+    Maybe<ushort>.None,
+    Maybe<Exception>.None,
+    Maybe<IReadOnlyDictionary<string, object>>.None);
+
+/// <summary>
+/// Strongly typed error for unsupported implementation features.
+/// </summary>
+public record UnsupportedImplementationError(string Implementation) : SmartCardError(
+    "UNSUPPORTED_IMPLEMENTATION",
+    $"Implementation '{Implementation}' is not supported",
+    Maybe<ushort>.None,
+    Maybe<Exception>.None,
+    Maybe<IReadOnlyDictionary<string, object>>.None);
+
+/// <summary>
+/// Strongly typed error for invalid key operations.
+/// </summary>
+public record InvalidKeyError(string KeyType, string Reason) : SmartCardError(
+    "INVALID_KEY",
+    $"Invalid {KeyType} key: {Reason}",
+    Maybe<ushort>.None,
+    Maybe<Exception>.None,
+    Maybe<IReadOnlyDictionary<string, object>>.None);
+
+/// <summary>
+/// Strongly typed error for missing required data.
+/// </summary>
+public record MissingDataError(string DataType) : SmartCardError(
+    "MISSING_DATA",
+    $"Required data '{DataType}' is missing",
+    Maybe<ushort>.None,
+    Maybe<Exception>.None,
+    Maybe<IReadOnlyDictionary<string, object>>.None);
+
+/// <summary>
+/// Strongly typed error for empty data violations.
+/// </summary>
+public record EmptyDataError(string FieldName) : SmartCardError(
+    "EMPTY_DATA",
+    $"Field '{FieldName}' cannot be empty",
+    Maybe<ushort>.None,
+    Maybe<Exception>.None,
+    Maybe<IReadOnlyDictionary<string, object>>.None);
+
+/// <summary>
+/// Strongly typed error for invalid data violations.
+/// </summary>
+public record InvalidDataError(string Field, string Reason) : SmartCardError(
+    "INVALID_DATA",
+    $"Field '{Field}': {Reason}",
+    Maybe<ushort>.None,
+    Maybe<Exception>.None,
+    Maybe<IReadOnlyDictionary<string, object>>.None);

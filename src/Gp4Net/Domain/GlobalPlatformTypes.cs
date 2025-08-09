@@ -44,55 +44,103 @@ public enum LifecycleState : byte
 }
 
 /// <summary>
-/// GlobalPlatform privileges.
+/// GlobalPlatform privileges per GP Card Specification v2.3.1.
 /// </summary>
 [Flags]
-public enum Privilege : byte
+public enum Privilege : uint
 {
     /// <summary>
     /// No privileges.
     /// </summary>
-    None = 0x00,
+    None = 0x000000,
+
+    // First byte privileges (bits 7-0)
+    /// <summary>
+    /// Security domain privilege (bit 7).
+    /// </summary>
+    SecurityDomain = 0x800000,
 
     /// <summary>
-    /// Security domain privilege.
+    /// DAP verification privilege (bit 6).
     /// </summary>
-    SecurityDomain = 0x80,
+    DapVerification = 0x400000,
 
     /// <summary>
-    /// DAP verification privilege.
+    /// Delegated management privilege (bit 5).
     /// </summary>
-    DapVerification = 0x40,
+    DelegatedManagement = 0x200000,
 
     /// <summary>
-    /// Delegated management privilege.
+    /// Card lock privilege (bit 4).
     /// </summary>
-    DelegatedManagement = 0x20,
+    CardLock = 0x100000,
 
     /// <summary>
-    /// Card lock privilege.
+    /// Card terminate privilege (bit 3).
     /// </summary>
-    CardLock = 0x10,
+    CardTerminate = 0x080000,
 
     /// <summary>
-    /// Card terminate privilege.
+    /// Card reset privilege (bit 2).
     /// </summary>
-    CardTerminate = 0x08,
+    CardReset = 0x040000,
 
     /// <summary>
-    /// Card reset privilege.
+    /// CVM management privilege (bit 1).
     /// </summary>
-    CardReset = 0x04,
+    CvmManagement = 0x020000,
 
     /// <summary>
-    /// CVM management privilege.
+    /// Trusted path privilege (bit 0).
     /// </summary>
-    CvmManagement = 0x02,
+    TrustedPath = 0x010000,
 
+    // Second byte privileges (bits 15-8)
+    /// <summary>
+    /// Authorized management privilege (bit 15).
+    /// </summary>
+    AuthorizedManagement = 0x008000,
+
+    /// <summary>
+    /// Token verification privilege (bit 14).
+    /// </summary>
+    TokenVerification = 0x004000,
+
+    /// <summary>
+    /// Global delete privilege (bit 13).
+    /// </summary>
+    GlobalDelete = 0x002000,
+
+    /// <summary>
+    /// Global lock privilege (bit 12).
+    /// </summary>
+    GlobalLock = 0x001000,
+
+    /// <summary>
+    /// Global registry privilege (bit 11).
+    /// </summary>
+    GlobalRegistry = 0x000800,
+
+    /// <summary>
+    /// Final application privilege (bit 10).
+    /// </summary>
+    FinalApplication = 0x000400,
+
+    /// <summary>
+    /// Global service privilege (bit 9).
+    /// </summary>
+    GlobalService = 0x000200,
+
+    /// <summary>
+    /// Receipt generation privilege (bit 8).
+    /// </summary>
+    ReceiptGeneration = 0x000100,
+
+    // Third byte privileges (bits 23-16) - reserved for application-specific
     /// <summary>
     /// Mandated DAP verification privilege.
     /// </summary>
-    MandatedDapVerification = 0x01
+    MandatedDapVerification = 0x000001
 }
 
 

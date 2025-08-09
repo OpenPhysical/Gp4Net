@@ -35,7 +35,7 @@ public static class CommandSecurityProcessor
         byte protocolVersion)
     {
         return SecurityValidation.ValidateCommandInputs(command, sessionKeys, macChainingValue)
-            .Map(_ => BuildCommandData(command))
+            .Bind(_ => BuildCommandData(command))
             .Bind(commandData => ProcessCommand(
                 commandData,
                 command,
@@ -429,9 +429,9 @@ public static class CommandSecurityProcessor
     }
 
 
-    private static byte[] BuildCommandData(IApduCommand command)
+    private static Result<byte[], SmartCardError> BuildCommandData(IApduCommand command)
     {
         // Use ApduBuilder to get the exact command structure including Le byte if present
-        return ApduBuilder.BuildApdu(command);
+        return Result.Success<byte[], SmartCardError>(ApduBuilder.BuildApdu(command));
     }
 }

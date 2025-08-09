@@ -167,17 +167,30 @@ public class ReaderNameTypeConverter : TypeConverter
     /// <returns>The selected reader.</returns>
     private static Reader HandleAutoDetection(IReadOnlyList<string> readers)
     {
-        if (readers.Count == 1)
+        // Filter out virtual readers for auto-detection
+        var physicalReaders = readers
+            .Where(r => !r.StartsWith("Virtual", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        
+        if (physicalReaders.Count == 0)
         {
-            var selectedReader = readers[0];
+            throw new ArgumentException(
+                "No physical card readers found for auto-detection. Virtual readers must be explicitly specified (e.g., --reader virtual-scp03)."
+            );
+        }
+        
+        if (physicalReaders.Count == 1)
+        {
+            var selectedReader = physicalReaders[0];
             AnsiConsole.MarkupLine($"[green]Auto-detected reader:[/] {selectedReader}");
             return new Reader(selectedReader, isAutoDetected: true);
         }
 
-        // Multiple readers found - prompt user to choose
-        AnsiConsole.MarkupLine("[yellow]Multiple card readers detected:[/]");
-        var selected = PromptUserToSelectReader(readers);
-        return new Reader(selected, isAutoDetected: true);
+        // Multiple physical readers found - prompt user to choose
+        AnsiConsole.MarkupLine("[yellow]Multiple physical card readers detected:[/]");
+        var selected = PromptUserToSelectReader(physicalReaders);
+        // NOT auto-detected if user had to select from multiple options
+        return new Reader(selected, isPartialMatch: false, isAutoDetected: false);
     }
 
     /// <summary>

@@ -1,12 +1,15 @@
 using System;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core.ServiceLifetime;
 using Gp4Net.Domain.Protocol;
+using Gp4Net.Domain.Security;
 using Gp4Net.Pipeline;
 using Gp4Net.Services;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using static Gp4Net.Pipeline.CommandProcessing;
 
 namespace Gp4Net.Tool.Services;
 
@@ -29,16 +32,22 @@ public interface IDomainServiceFactory
     /// <param name="cardService">The card service to use for communication.</param>
     /// <returns>A configured GlobalPlatform service with proper pipeline context.</returns>
     IGlobalPlatformService CreateGlobalPlatformService(ICardService cardService);
+
+    /// <summary>
+    /// Creates a card content retriever for comprehensive card listing functionality.
+    /// </summary>
+    /// <param name="cardService">The card service to use for communication.</param>
+    /// <returns>A configured card content retriever with auto-detection capabilities.</returns>
+    CardContentRetriever CreateCardContentRetriever(ICardService cardService);
 }
 
 /// <summary>
 /// Factory implementation that creates domain services with proper functional context.
-/// Ensures proper pipeline configuration and context flow.
+/// Ensures proper functional composition and explicit dependencies.
 /// </summary>
 [PublicAPI]
 public class DomainServiceFactory : IDomainServiceFactory, ISingletonService
 {
-    private readonly ICommandPipeline _pipeline;
     private readonly IApduTransportFactory _transportFactory;
     private readonly ISecureChannelManager _secureChannelManager;
     private readonly ILogger<DomainServiceFactory> _logger;
@@ -47,15 +56,13 @@ public class DomainServiceFactory : IDomainServiceFactory, ISingletonService
     /// Initializes a new instance of the DomainServiceFactory.
     /// </summary>
     public DomainServiceFactory(
-        ICommandPipeline pipeline,
         IApduTransportFactory transportFactory,
         ISecureChannelManager secureChannelManager,
-        ILogger<DomainServiceFactory> logger = null)
+        ILogger<DomainServiceFactory> logger)
     {
-        ArgumentNullException.ThrowIfNull(pipeline);
         ArgumentNullException.ThrowIfNull(transportFactory);
         ArgumentNullException.ThrowIfNull(secureChannelManager);
-        _pipeline = pipeline;
+        ArgumentNullException.ThrowIfNull(logger);
         _transportFactory = transportFactory;
         _secureChannelManager = secureChannelManager;
         _logger = logger;
@@ -66,7 +73,7 @@ public class DomainServiceFactory : IDomainServiceFactory, ISingletonService
     {
         ArgumentNullException.ThrowIfNull(cardService);
 
-        _logger?.LogDebug("Creating SmartCardService for card service");
+        _logger.LogDebug("Creating SmartCardService for card service");
 
         // Create the channel adapter that bridges ICardService to ICardChannel
         var channel = new CardServiceChannelAdapter(cardService, TransportProtocol.T0);
@@ -74,18 +81,20 @@ public class DomainServiceFactory : IDomainServiceFactory, ISingletonService
         // Create the appropriate transport
         var transport = _transportFactory.CreateTransport(TransportProtocol.T0);
             
-        // Build immutable domain context with all required dependencies
-        var context = new Gp4Net.Pipeline.ImmutablePipelineContext()
-            .With("CardChannel", channel)
-            .With("ApduTransport", transport)
-            .With("TransportProtocol", TransportProtocol.T0);
-
-        // Create the smart card service with pipeline, context, and transport
-        var logger = _logger != null 
-            ? new LoggerWrapper<SmartCardService>(_logger) 
-            : null;
+        // Create the command environment with all explicit dependencies
+        var logger = new LoggerWrapper<SmartCardService>(_logger);
+        var environment = new CommandEnvironment(
+            channel,
+            transport,
+            Maybe<SecureChannelState>.None,
+            logger);
+            
+        // Create the command processor pipeline using pure function composition
+        var processor = CommandProcessors.CreatePipeline(
+            enableLogging: true,
+            enableSecureChannel: true);
                 
-        return new SmartCardService(_pipeline, context, transport, logger);
+        return new SmartCardService(environment, processor, logger);
     }
 
     /// <inheritdoc/>
@@ -93,20 +102,37 @@ public class DomainServiceFactory : IDomainServiceFactory, ISingletonService
     {
         ArgumentNullException.ThrowIfNull(cardService);
 
-        _logger?.LogDebug("Creating GlobalPlatformService for card service");
+        _logger.LogDebug("Creating GlobalPlatformService for card service");
 
-        // First create the smart card service with proper context
+        // First create the smart card service with proper functional context
         var smartCardService = CreateSmartCardService(cardService);
 
         // Then wrap it with GlobalPlatform functionality
-        ILogger<GlobalPlatformService> logger = _logger != null 
-            ? new LoggerWrapper<GlobalPlatformService>(_logger) 
-            : NullLogger<GlobalPlatformService>.Instance;
+        var logger = new LoggerWrapper<GlobalPlatformService>(_logger);
 
         return new GlobalPlatformService(
             smartCardService, 
             _secureChannelManager,
             logger);
+    }
+
+    /// <inheritdoc/>
+    public CardContentRetriever CreateCardContentRetriever(ICardService cardService)
+    {
+        ArgumentNullException.ThrowIfNull(cardService);
+
+        _logger.LogDebug("Creating CardContentRetriever for card service");
+
+        // Create smart card service with proper functional context
+        var smartCardService = CreateSmartCardService(cardService);
+        
+        // Create GlobalPlatform service for secure channel operations
+        var globalPlatformService = CreateGlobalPlatformService(cardService);
+
+        // Create logger for the retriever
+        var logger = new LoggerWrapper<CardContentRetriever>(_logger);
+
+        return new CardContentRetriever(smartCardService, globalPlatformService, logger);
     }
 }
 

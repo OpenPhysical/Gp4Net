@@ -232,11 +232,6 @@
             Secure Channel Protocol identifiers as defined in GlobalPlatform specifications.
             </summary>
         </member>
-        <member name="F:Gp4Net.Constants.ProtocolIdentifiers.Scp01">
-            <summary>
-            SCP01 protocol identifier (deprecated).
-            </summary>
-        </member>
         <member name="F:Gp4Net.Constants.ProtocolIdentifiers.Scp02">
             <summary>
             SCP02 protocol identifier.
@@ -261,11 +256,6 @@
             <summary>
             Secure Channel Protocol versions for type-safe protocol handling.
             Per GlobalPlatform Card Specification v2.3.1 Section 7.1.
-            </summary>
-        </member>
-        <member name="F:Gp4Net.Constants.ScpVersion.Scp01">
-            <summary>
-            SCP01 protocol (deprecated but included for completeness).
             </summary>
         </member>
         <member name="F:Gp4Net.Constants.ScpVersion.Scp02">
@@ -585,6 +575,145 @@
             </summary>
             <returns>A read-only collection of all known OIDs.</returns>
         </member>
+        <member name="T:Gp4Net.Core.Functional.FunctionalCombinators">
+            <summary>
+            Functional combinators for common patterns in card operations.
+            Provides pure functional alternatives to loops and imperative patterns.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.FunctionalCombinators.FirstSuccess``2(System.Collections.Generic.IEnumerable{System.Func{System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{``0,``1}}}})">
+            <summary>
+            Tries multiple operations sequentially until one succeeds.
+            Returns the first successful result or the last failure.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.FunctionalCombinators.FirstSuccessParallel``2(System.Collections.Generic.IEnumerable{System.Func{System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{``0,``1}}}})">
+            <summary>
+            Tries multiple operations in parallel and returns the first successful result.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.FunctionalCombinators.MapSuccessful``3(System.Collections.Generic.IEnumerable{``0},System.Func{``0,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{``1,``2}}})">
+            <summary>
+            Maps a function over a sequence, collecting successful results.
+            Continues even if some operations fail.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.FunctionalCombinators.TraverseResult``3(System.Collections.Generic.IEnumerable{``0},System.Func{``0,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{``1,``2}}})">
+            <summary>
+            Maps a function over a sequence, failing fast on first error.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.FunctionalCombinators.SequenceResult``2(System.Collections.Generic.IEnumerable{CSharpFunctionalExtensions.Result{``0,``1}})">
+            <summary>
+            Sequences a list of Results into a Result of a list.
+            Fails fast on first error.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.FunctionalCombinators.FoldResult``3(System.Collections.Generic.IEnumerable{``0},``1,System.Func{``1,``0,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{``1,``2}}})">
+            <summary>
+            Folds a sequence of values into a single result using an accumulator function.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.FunctionalCombinators.RetryWithBackoff``2(System.Func{System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{``0,``1}}},System.Int32,System.Nullable{System.TimeSpan},System.Func{CSharpFunctionalExtensions.Result{``0,``1},System.Boolean})">
+            <summary>
+            Retries an operation with exponential backoff.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.FunctionalCombinators.FirstOrDefaultAsync``1(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task{``0}},System.Func{System.Threading.Tasks.Task{``0},System.Threading.Tasks.Task{System.Boolean}})">
+            <summary>
+            Helper to get first matching result from async sequence.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.FunctionalCombinators.Map``2(System.Threading.Tasks.Task{``0},System.Func{``0,``1})">
+            <summary>
+            Maps a value in a task.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.FunctionalCombinators.Partition``2(System.Collections.Generic.IEnumerable{CSharpFunctionalExtensions.Result{``0,``1}})">
+            <summary>
+            Partitions a sequence of Results into successes and failures.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.FunctionalCombinators.Unfold``2(``1,System.Func{``1,CSharpFunctionalExtensions.Maybe{System.ValueTuple{``0,``1}}})">
+            <summary>
+            Unfolds a value into a sequence by repeatedly applying a function.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.FunctionalCombinators.UnfoldAsync``2(``1,System.Func{``1,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Maybe{System.ValueTuple{``0,``1}}}})">
+            <summary>
+            Creates a sequence by repeatedly applying a function until it returns None.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Core.Functional.ResultExtensions">
+            <summary>
+            Extension methods to enable LINQ query syntax with Result monads.
+            Provides functional composition patterns for railway-oriented programming.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.ResultExtensions.Select``3(CSharpFunctionalExtensions.Result{``0,``2},System.Func{``0,``1})">
+            <summary>
+            Enables LINQ Select for Result monad (functor map).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.ResultExtensions.SelectMany``3(CSharpFunctionalExtensions.Result{``0,``2},System.Func{``0,CSharpFunctionalExtensions.Result{``1,``2}})">
+            <summary>
+            Enables LINQ SelectMany for Result monad (monadic bind).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.ResultExtensions.SelectMany``4(CSharpFunctionalExtensions.Result{``0,``3},System.Func{``0,CSharpFunctionalExtensions.Result{``1,``3}},System.Func{``0,``1,``2})">
+            <summary>
+            Enables LINQ SelectMany with projection for Result monad.
+            Required for multiple 'from' clauses in LINQ queries.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.ResultExtensions.Select``3(System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{``0,``2}},System.Func{``0,``1})">
+            <summary>
+            Async version of Select for Task&lt;Result&lt;T, E&gt;&gt;.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.ResultExtensions.SelectMany``3(System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{``0,``2}},System.Func{``0,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{``1,``2}}})">
+            <summary>
+            Async version of SelectMany for Task&lt;Result&lt;T, E&gt;&gt;.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.ResultExtensions.SelectMany``4(System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{``0,``3}},System.Func{``0,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{``1,``3}}},System.Func{``0,``1,``2})">
+            <summary>
+            Async version of SelectMany with projection for Task&lt;Result&lt;T, E&gt;&gt;.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.ResultExtensions.TryAsync``2(System.Func{System.Threading.Tasks.Task{``0}},System.Func{System.Exception,``1})">
+            <summary>
+            Wraps an operation that might throw in a Result.
+            Converts exceptions to Result failures.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.ResultExtensions.Try``2(System.Func{``0},System.Func{System.Exception,``1})">
+            <summary>
+            Synchronous version of Try for operations that might throw.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.ResultExtensions.Combine``3(CSharpFunctionalExtensions.Result{``0,``2},CSharpFunctionalExtensions.Result{``1,``2})">
+            <summary>
+            Combines multiple Results into a single Result containing a tuple.
+            Fails fast on first error.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.ResultExtensions.Combine``4(CSharpFunctionalExtensions.Result{``0,``3},CSharpFunctionalExtensions.Result{``1,``3},CSharpFunctionalExtensions.Result{``2,``3})">
+            <summary>
+            Combines multiple Results into a single Result containing a tuple.
+            Fails fast on first error.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.ResultExtensions.ToResult``2(CSharpFunctionalExtensions.Maybe{``0},``1)">
+            <summary>
+            Converts Maybe&lt;T&gt; to Result&lt;T, E&gt; with specified error for None case.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.Functional.ResultExtensions.ToMaybe``2(CSharpFunctionalExtensions.Result{``0,``1})">
+            <summary>
+            Converts Result&lt;T, E&gt; to Maybe&lt;T&gt;, discarding error information.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Core.ServiceLifetime.IScopedService">
             <summary>
             Marker interface for services that should be registered as scoped.
@@ -736,6 +865,126 @@
         <member name="T:Gp4Net.Core.ErrorCodes">
             <summary>
             Common error codes for smart card operations.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Core.NullParameterError">
+            <summary>
+            Strongly typed error for null parameter violations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.NullParameterError.#ctor(System.String)">
+            <summary>
+            Strongly typed error for null parameter violations.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Core.InvalidLengthError">
+            <summary>
+            Strongly typed error for invalid length violations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.InvalidLengthError.#ctor(System.String,System.Int32,System.Int32)">
+            <summary>
+            Strongly typed error for invalid length violations.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Core.InvalidFormatError">
+            <summary>
+            Strongly typed error for invalid format violations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.InvalidFormatError.#ctor(System.String,System.String)">
+            <summary>
+            Strongly typed error for invalid format violations.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Core.CryptographicError">
+            <summary>
+            Strongly typed error for cryptographic operation failures.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.CryptographicError.#ctor(System.String,System.String)">
+            <summary>
+            Strongly typed error for cryptographic operation failures.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Core.AuthenticationFailedError">
+            <summary>
+            Strongly typed error for authentication failures.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.AuthenticationFailedError.#ctor(System.String)">
+            <summary>
+            Strongly typed error for authentication failures.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Core.CryptogramVerificationError">
+            <summary>
+            Strongly typed error for cryptogram verification failures.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.CryptogramVerificationError.#ctor(System.String)">
+            <summary>
+            Strongly typed error for cryptogram verification failures.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Core.UnsupportedProtocolError">
+            <summary>
+            Strongly typed error for unsupported protocol operations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.UnsupportedProtocolError.#ctor(System.String)">
+            <summary>
+            Strongly typed error for unsupported protocol operations.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Core.UnsupportedImplementationError">
+            <summary>
+            Strongly typed error for unsupported implementation features.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.UnsupportedImplementationError.#ctor(System.String)">
+            <summary>
+            Strongly typed error for unsupported implementation features.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Core.InvalidKeyError">
+            <summary>
+            Strongly typed error for invalid key operations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.InvalidKeyError.#ctor(System.String,System.String)">
+            <summary>
+            Strongly typed error for invalid key operations.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Core.MissingDataError">
+            <summary>
+            Strongly typed error for missing required data.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.MissingDataError.#ctor(System.String)">
+            <summary>
+            Strongly typed error for missing required data.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Core.EmptyDataError">
+            <summary>
+            Strongly typed error for empty data violations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.EmptyDataError.#ctor(System.String)">
+            <summary>
+            Strongly typed error for empty data violations.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Core.InvalidDataError">
+            <summary>
+            Strongly typed error for invalid data violations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.InvalidDataError.#ctor(System.String,System.String)">
+            <summary>
+            Strongly typed error for invalid data violations.
             </summary>
         </member>
         <member name="T:Gp4Net.Core.StatusWord">
@@ -945,6 +1194,14 @@
             </summary>
             <param name="tag">The tag bytes.</param>
             <param name="value">The value bytes.</param>
+        </member>
+        <member name="M:Gp4Net.Core.Tlv.TlvObject.Create(System.Byte[],System.Byte[])">
+            <summary>
+            Creates a new TlvObject with functional error handling.
+            </summary>
+            <param name="tag">The tag bytes.</param>
+            <param name="value">The value bytes.</param>
+            <returns>A Result containing the TlvObject or an error if parameters are invalid.</returns>
         </member>
         <member name="M:Gp4Net.Core.Tlv.TlvObject.GetValueAsHexString">
             <summary>
@@ -1788,9 +2045,7 @@
             Parses a CAP file from byte array (ZIP/JAR format only).
             </summary>
             <param name="capFileData">The CAP file data.</param>
-            <returns>The parsed CAP file structure.</returns>
-            <exception cref="T:System.ArgumentNullException">Thrown when capFileData is null.</exception>
-            <exception cref="T:System.IO.InvalidDataException">Thrown when the CAP file format is invalid.</exception>
+            <returns>A Result containing the parsed CAP file structure, or an error if the data is invalid.</returns>
         </member>
         <member name="M:Gp4Net.Domain.CapFile.CapFileStructure.TryParse(System.Byte[])">
             <summary>
@@ -2022,15 +2277,127 @@
             <param name="aid">The package AID.</param>
             <param name="version">The package version.</param>
         </member>
+        <member name="T:Gp4Net.Domain.CardContent">
+            <summary>
+            Represents the complete content of a GlobalPlatform card.
+            Aggregates all entities retrieved from multiple GET STATUS commands.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardContent.#ctor(CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.ApplicationInfo},System.Collections.Immutable.ImmutableList{Gp4Net.Domain.ApplicationInfo},System.Collections.Immutable.ImmutableList{Gp4Net.Domain.ApplicationInfo},System.Collections.Immutable.ImmutableList{Gp4Net.Domain.ExecutableLoadFile})">
+            <summary>
+            Represents the complete content of a GlobalPlatform card.
+            Aggregates all entities retrieved from multiple GET STATUS commands.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardContent.AllApplications">
+            <summary>
+            Gets all applications and security domains combined.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardContent.AllEntities">
+            <summary>
+            Gets all entities (ISD, apps, SSDs, load files) as a unified collection for display.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardContent.Summary">
+            <summary>
+            Gets summary counts for each entity type.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardContent.GetApplicationsByType(Gp4Net.Domain.ApplicationType)">
+            <summary>
+            Gets applications by their type.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardContent.GetApplicationsByState(Gp4Net.Domain.LifecycleState)">
+            <summary>
+            Gets applications by their lifecycle state.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardContent.GetLoadFilesByState(Gp4Net.Domain.LifecycleState)">
+            <summary>
+            Gets executable load files by their lifecycle state.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardContent.HasSelectableApplications">
+            <summary>
+            Checks if the card has any selectable applications.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardContent.Empty">
+            <summary>
+            Creates an empty CardContent instance.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardContentSummary">
+            <summary>
+            Summary information about card content.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardContentSummary.#ctor(System.Boolean,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Summary information about card content.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardContentSummary.TotalEntityCount">
+            <summary>
+            Gets the total number of entities on the card.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardEntity">
+            <summary>
+            Discriminated union representing different types of card entities for unified processing.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardEntity.IssuerSecurityDomainEntity">
+            <summary>
+            Represents an Issuer Security Domain entity.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardEntity.IssuerSecurityDomainEntity.#ctor(Gp4Net.Domain.ApplicationInfo)">
+            <summary>
+            Represents an Issuer Security Domain entity.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardEntity.SecurityDomainEntity">
+            <summary>
+            Represents a Security Domain entity.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardEntity.SecurityDomainEntity.#ctor(Gp4Net.Domain.ApplicationInfo)">
+            <summary>
+            Represents a Security Domain entity.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardEntity.ApplicationEntity">
+            <summary>
+            Represents an Application entity.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardEntity.ApplicationEntity.#ctor(Gp4Net.Domain.ApplicationInfo)">
+            <summary>
+            Represents an Application entity.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardEntity.LoadFileEntity">
+            <summary>
+            Represents an Executable Load File entity.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardEntity.LoadFileEntity.#ctor(Gp4Net.Domain.ExecutableLoadFile)">
+            <summary>
+            Represents an Executable Load File entity.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Domain.CardInfo.CardCapabilities">
             <summary>
             Card capabilities parser for GlobalPlatform tag 0x67.
             Provides detailed parsing of SCP options, privileges, algorithms, and cipher suites.
             </summary>
         </member>
-        <member name="P:Gp4Net.Domain.CardInfo.CardCapabilities.RawData">
+        <member name="P:Gp4Net.Domain.CardInfo.CardCapabilities.Data">
             <summary>
-            Gets the raw capabilities data.
+            Gets the card capabilities data from GET DATA(0x0067) response.
             </summary>
         </member>
         <member name="P:Gp4Net.Domain.CardInfo.CardCapabilities.ScpOptions">
@@ -2152,123 +2519,242 @@
         </member>
         <member name="T:Gp4Net.Domain.CardInfo.CardDataInfo">
             <summary>
-            Represents detailed information retrieved from a card, such as raw data,
-            tags, and various configuration details.
+            Immutable record representing card data information from GET DATA responses.
+            Contains OID-based platform identification and version information.
+            Per GP Card Specification v2.3.1 Section E.2.1.1 - Card Data Object.
             </summary>
+            <param name="Data">TLV-encoded card data bytes from GET DATA(0x0066) response</param>
+            <param name="Tags">Parsed TLV tags and their associated data</param>
+            <param name="GlobalPlatformVersion">GP version extracted from TLV structure</param>
+            <param name="SecureChannelProtocolInfo">SCP protocol data from card OIDs</param>
+            <param name="CardConfigurationDetails">Card configuration information</param>
+            <param name="CardChipDetails">Chip-specific details</param>
+            <param name="Oids">Object identifiers found in card data</param>
+            <param name="GlobalPlatformVersionFromOid">GP version string from OID parsing</param>
         </member>
-        <member name="P:Gp4Net.Domain.CardInfo.CardDataInfo.RawData">
+        <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.#ctor(System.Byte[],System.Collections.Generic.IReadOnlyDictionary{System.UInt16,System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Version},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},System.Collections.Generic.IReadOnlyList{System.String},CSharpFunctionalExtensions.Maybe{System.String})">
             <summary>
-            Gets or sets the raw binary data associated with the card.
+            Immutable record representing card data information from GET DATA responses.
+            Contains OID-based platform identification and version information.
+            Per GP Card Specification v2.3.1 Section E.2.1.1 - Card Data Object.
             </summary>
-            <remarks>
-            The <c>RawData</c> property represents the unprocessed byte array
-            containing all the data extracted from the card. This data forms the
-            base for parsing and extracting specific details, such as tags,
-            OIDs, and configuration settings.
-            </remarks>
+            <param name="Data">TLV-encoded card data bytes from GET DATA(0x0066) response</param>
+            <param name="Tags">Parsed TLV tags and their associated data</param>
+            <param name="GlobalPlatformVersion">GP version extracted from TLV structure</param>
+            <param name="SecureChannelProtocolInfo">SCP protocol data from card OIDs</param>
+            <param name="CardConfigurationDetails">Card configuration information</param>
+            <param name="CardChipDetails">Chip-specific details</param>
+            <param name="Oids">Object identifiers found in card data</param>
+            <param name="GlobalPlatformVersionFromOid">GP version string from OID parsing</param>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardDataInfo.Data">
+            <summary>TLV-encoded card data bytes from GET DATA(0x0066) response</summary>
         </member>
         <member name="P:Gp4Net.Domain.CardInfo.CardDataInfo.Tags">
-            <summary>
-            Represents a collection of tags and their associated data extracted from the card.
-            </summary>
-            <remarks>
-            Each tag is identified by a unique 16-bit identifier (ushort) and is associated with a corresponding byte array
-            containing the tag's data. This property is populated during the parsing of card-related data.
-            </remarks>
+            <summary>Parsed TLV tags and their associated data</summary>
         </member>
         <member name="P:Gp4Net.Domain.CardInfo.CardDataInfo.GlobalPlatformVersion">
-            <summary>
-            Represents the GlobalPlatform version of the card.
-            The GlobalPlatform version is extracted from the card data
-            during parsing and indicates the supported GlobalPlatform specification.
-            This property is read-only and may be null if the version information
-            is not available in the provided data.
-            </summary>
+            <summary>GP version extracted from TLV structure</summary>
         </member>
         <member name="P:Gp4Net.Domain.CardInfo.CardDataInfo.SecureChannelProtocolInfo">
-            <summary>
-            Gets the secure channel protocol information extracted from the card data.
-            This property represents a portion of the card's tag data that contains
-            information about the secure communication protocol supported by the card.
-            The value is extracted from the card data and corresponds to the tag
-            associated with secure channel protocol information, if available.
-            </summary>
+            <summary>SCP protocol data from card OIDs</summary>
         </member>
         <member name="P:Gp4Net.Domain.CardInfo.CardDataInfo.CardConfigurationDetails">
-            <summary>
-            Represents the card configuration details as a byte array, which may
-            include information such as available features or settings on the card.
-            This property is populated during the parsing of the raw card data.
-            </summary>
+            <summary>Card configuration information</summary>
         </member>
         <member name="P:Gp4Net.Domain.CardInfo.CardDataInfo.CardChipDetails">
-            <summary>
-            Represents the details associated with the card chip as retrieved from the parsed data tags.
-            </summary>
-            <remarks>
-            This property is populated from the data tag with identifier 0x66 during the parsing process.
-            It may contain chip-specific information in a byte array format, or be null if the tag is not found in the input data.
-            </remarks>
+            <summary>Chip-specific details</summary>
         </member>
         <member name="P:Gp4Net.Domain.CardInfo.CardDataInfo.Oids">
-            <summary>
-            Represents a collection of Object Identifiers (OIDs)
-            extracted from card data information.
-            </summary>
-            <remarks>
-            - The OIDs provide identifiers that can be used for
-            identifying protocols, features, or specific data structures.
-            - This property contains a list of OIDs parsed from raw
-            card data using predefined parsing logic.
-            </remarks>
-            <value>
-            A list of strings where each string represents an
-            extracted OID in the standard dot-separated notation.
-            </value>
+            <summary>Object identifiers found in card data</summary>
         </member>
         <member name="P:Gp4Net.Domain.CardInfo.CardDataInfo.GlobalPlatformVersionFromOid">
+            <summary>GP version string from OID parsing</summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardDataInfo.Empty">
             <summary>
-            Gets the GlobalPlatform version extracted from the corresponding OID
-            (Object Identifier) found during the parsing of card data. This property
-            represents the version information for GlobalPlatform formatted as a string,
-            typically derived from a specific OID pattern in the data.
+            Creates an empty CardDataInfo for cases where no card data is available.
             </summary>
-            <remarks>
-            If no valid GlobalPlatform version OID is found during parsing, this
-            property will return <c>null</c>.
-            </remarks>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardDataInfo.HasData">
+            <summary>
+            Indicates whether this card data contains any meaningful information.
+            </summary>
         </member>
         <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.Parse(System.Byte[])">
-            Parses the given byte array to extract card information and populate a CardDataInfo object.
-            <param name="data">The byte array containing card data to be parsed.</param>
-            <returns>Result containing a CardDataInfo object populated with the extracted card information.</returns>
+            <summary>
+            Parses card data bytes into structured CardDataInfo using functional composition.
+            Per GP Card Specification v2.3.1 Section E.2.1.1, parses TLV-encoded data object.
+            </summary>
+            <param name="data">TLV-encoded card data from GET DATA(0x0066) response</param>
+            <returns>Result containing parsed CardDataInfo or SmartCardError</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.ParseCardDataElements(System.Byte[])">
+            <summary>
+            Pure function to parse card data elements into structured information.
+            Uses functional composition to avoid mutations and side effects.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.ParseTlvTags(System.Byte[])">
+            <summary>
+            Pure function to parse TLV tags from card data.
+            Returns immutable dictionary of tags to byte arrays.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.ExtractOids(System.Byte[])">
+            <summary>
+            Pure function to extract OIDs from card data recursively.
+            Per ASN.1 encoding rules, OIDs use tag 0x06.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.ExtractOidsRecursive(System.Byte[],System.Collections.Generic.List{System.String})">
+            <summary>
+            Recursively extracts OIDs from TLV structures.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.ParseOid(System.Byte[])">
+            <summary>
+            Pure function to parse a single OID from bytes using BouncyCastle.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.ExtractGpVersionFromOids(System.Collections.Generic.IReadOnlyList{System.String})">
+            <summary>
+            Pure function to extract GlobalPlatform version from OIDs.
+            Per GP Card Specification, GP version OIDs follow pattern 1.2.840.114283.2.x.y.z
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.ExtractGpVersionFromTags(System.Collections.Generic.IReadOnlyDictionary{System.UInt16,System.Byte[]})">
+            <summary>
+            Pure function to extract GlobalPlatform version from TLV tags.
+            Version information is typically stored in tag 0x73 in BCD format.
+            </summary>
         </member>
         <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.ParseGlobalPlatformVersion(System.Byte[])">
-            Parses the GlobalPlatform version from the provided byte array.
-            GlobalPlatform versions are typically encoded in BCD (Binary Coded Decimal) format.
-            <param name="data">The byte array containing the GlobalPlatform version information.</param>
-            <return>
-            A <see cref="T:System.Version"/> object representing the parsed GlobalPlatform version,
-            or null if the data length is insufficient to determine a valid version.
-            </return>
+            <summary>
+            Pure function to parse GlobalPlatform version from BCD-encoded bytes.
+            Per GP specification, versions are encoded in Binary Coded Decimal format.
+            </summary>
         </member>
         <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.BcdToByte(System.Byte)">
             <summary>
-            Converts a BCD (Binary Coded Decimal) byte to its decimal equivalent.
+            Pure function to convert BCD byte to decimal.
+            Each BCD byte contains two decimal digits: high nibble * 10 + low nibble.
             </summary>
-            <param name="bcd">The BCD byte to convert.</param>
-            <returns>The decimal equivalent.</returns>
         </member>
         <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.ToString">
             <summary>
-            Converts the current state of the CardDataInfo instance, including parsed OIDs,
-            GlobalPlatform version, secure channel protocol information, card configuration details,
-            card chip details, and all tag data, into a readable string format.
+            Custom string representation showing parsed card information including OID details.
             </summary>
-            <returns>
-            A string representation of the CardDataInfo instance, providing detailed information
-            about its parsed contents and metadata.
-            </returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.CardDataInfo.GetOidDescription(System.String)">
+            <summary>
+            Gets human-readable description for common GlobalPlatform and JavaCard OIDs per official specifications.
+            Based on GlobalPlatform Card Specification v2.3.1 Section H.1.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CardInfo.CardInformation">
+            <summary>
+            Immutable record representing all information gathered from a smart card.
+            Replaces mutable classes with functional composition using Maybe types to eliminate nulls.
+            Per GP Card Specification v2.3.1 Section 11, contains card production life cycle,
+            capabilities, security domain information, and cryptographic key details.
+            </summary>
+            <param name="Atr">Answer to Reset bytes identifying card characteristics</param>
+            <param name="Cplc">Card Production Life Cycle data including manufacturing details</param>
+            <param name="Capabilities">Card capabilities including SCP protocol support and privileges</param>
+            <param name="KeyInfo">Key information template showing available cryptographic keys</param>
+            <param name="CardData">Card data object with OID-based version and platform identification</param>
+            <param name="ScpInfo">Structured SCP protocol and implementation option details</param>
+            <param name="SecurityStatus">Security domain management data and status information</param>
+            <param name="DiversificationData">Key diversification data for SCP key derivation</param>
+            <param name="IsdInfo">Issuer Security Domain information from SELECT response</param>
+            <param name="ChipDetails">Chip identification and hardware platform information</param>
+        </member>
+        <member name="M:Gp4Net.Domain.CardInfo.CardInformation.#ctor(CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CardInfo.CplcData},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CardInfo.CardCapabilities},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CardInfo.KeyInformationTemplate},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CardInfo.CardDataInfo},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CardInfo.ScpInformation},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CardInfo.SecurityDomainStatus},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Commands.SelectResponse},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CardInfo.ChipInfo})">
+            <summary>
+            Immutable record representing all information gathered from a smart card.
+            Replaces mutable classes with functional composition using Maybe types to eliminate nulls.
+            Per GP Card Specification v2.3.1 Section 11, contains card production life cycle,
+            capabilities, security domain information, and cryptographic key details.
+            </summary>
+            <param name="Atr">Answer to Reset bytes identifying card characteristics</param>
+            <param name="Cplc">Card Production Life Cycle data including manufacturing details</param>
+            <param name="Capabilities">Card capabilities including SCP protocol support and privileges</param>
+            <param name="KeyInfo">Key information template showing available cryptographic keys</param>
+            <param name="CardData">Card data object with OID-based version and platform identification</param>
+            <param name="ScpInfo">Structured SCP protocol and implementation option details</param>
+            <param name="SecurityStatus">Security domain management data and status information</param>
+            <param name="DiversificationData">Key diversification data for SCP key derivation</param>
+            <param name="IsdInfo">Issuer Security Domain information from SELECT response</param>
+            <param name="ChipDetails">Chip identification and hardware platform information</param>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.Atr">
+            <summary>Answer to Reset bytes identifying card characteristics</summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.Cplc">
+            <summary>Card Production Life Cycle data including manufacturing details</summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.Capabilities">
+            <summary>Card capabilities including SCP protocol support and privileges</summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.KeyInfo">
+            <summary>Key information template showing available cryptographic keys</summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.CardData">
+            <summary>Card data object with OID-based version and platform identification</summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.ScpInfo">
+            <summary>Structured SCP protocol and implementation option details</summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.SecurityStatus">
+            <summary>Security domain management data and status information</summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.DiversificationData">
+            <summary>Key diversification data for SCP key derivation</summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.IsdInfo">
+            <summary>Issuer Security Domain information from SELECT response</summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.ChipDetails">
+            <summary>Chip identification and hardware platform information</summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.Empty">
+            <summary>
+            Creates an empty CardInformation with all fields set to None.
+            Used as the starting point for functional composition.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.HasAnyData">
+            <summary>
+            Indicates whether the card has any meaningful data populated.
+            Used to validate that card information gathering was successful.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.HasSecureChannelCapabilities">
+            <summary>
+            Indicates whether secure channel capabilities are available.
+            Per GP Card Specification, SCP support can be determined from either
+            Card Capabilities or Diversification Data.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.ManufacturingDetails">
+            <summary>
+            Gets a summary of manufacturing information for display purposes.
+            Combines CPLC data with chip identification details.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.GlobalPlatformVersion">
+            <summary>
+            Gets the GlobalPlatform version from available sources.
+            Prefers OID-based version from Card Data over numeric version.
+            Per GP Card Specification v2.3.1 Section E.2.1.1.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.CardInfo.CardInformation.JavaCardVersion">
+            <summary>
+            Gets the Java Card version if available from Card Data OIDs.
+            Per Java Card Specification, identified by specific OID patterns.
+            </summary>
         </member>
         <member name="T:Gp4Net.Domain.CardInfo.IcFabricator">
             <summary>
@@ -2705,9 +3191,9 @@
             Gets or sets the IC personalization equipment ID (4 bytes).
             </summary>
         </member>
-        <member name="P:Gp4Net.Domain.CardInfo.CplcData.RawData">
+        <member name="P:Gp4Net.Domain.CardInfo.CplcData.Data">
             <summary>
-            Gets the raw CPLC data bytes.
+            Gets the CPLC data bytes from GET DATA(0x9F7F) response.
             </summary>
         </member>
         <member name="M:Gp4Net.Domain.CardInfo.CplcData.Parse(System.Byte[])">
@@ -3288,9 +3774,9 @@
             Based on GlobalPlatform Card Specification section 9.3.3.1.
             </summary>
         </member>
-        <member name="P:Gp4Net.Domain.CardInfo.KeyInformationTemplate.RawData">
+        <member name="P:Gp4Net.Domain.CardInfo.KeyInformationTemplate.Data">
             <summary>
-            Gets the raw data.
+            Gets the key information template data from GET DATA(0x00E0) response.
             </summary>
         </member>
         <member name="P:Gp4Net.Domain.CardInfo.KeyInformationTemplate.Keys">
@@ -3435,11 +3921,6 @@
         <member name="M:Gp4Net.Domain.CardInfo.ScpProtocolInfo.GetImplementationDescription(Gp4Net.Domain.Protocol.ScpImplementation)">
             <summary>
             Gets a human-readable description for an SCP implementation option.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Domain.CardInfo.ScpProtocolInfo.GetDetailedImplementationFeatures(Gp4Net.Domain.Protocol.ScpImplementation)">
-            <summary>
-            Gets detailed features for an implementation option based on its bits.
             </summary>
         </member>
         <member name="M:Gp4Net.Domain.CardInfo.ScpProtocolInfo.FormatScpVersion(System.Byte)">
@@ -4869,7 +5350,7 @@
             Parses an INITIALIZE UPDATE response.
             </summary>
             <param name="response">The response data (excluding status word).</param>
-            <returns>The parsed response.</returns>
+            <returns>A Result containing the parsed response, or an error if the response data is invalid.</returns>
         </member>
         <member name="T:Gp4Net.Domain.Commands.InstallCommand">
             <summary>
@@ -4976,12 +5457,6 @@
         </member>
         <member name="P:Gp4Net.Domain.Commands.InstallCommand.InstallForLoadCommand.Data">
             <inheritdoc/>
-        </member>
-        <member name="M:Gp4Net.Domain.Commands.InstallCommand.InstallForLoadCommand.ToApdu">
-            <summary>
-            Converts this command to an APDU byte array (backward compatibility method).
-            </summary>
-            <returns>The APDU command bytes.</returns>
         </member>
         <member name="M:Gp4Net.Domain.Commands.InstallCommand.InstallForLoadCommand.ToString">
             <summary>
@@ -5955,13 +6430,6 @@
             </summary>
             <returns>A Result containing the SelectCommand or an error.</returns>
         </member>
-        <member name="M:Gp4Net.Domain.Commands.SelectCommand.CreateEmptySelect(Gp4Net.Domain.Commands.SelectCommand.FileControlInfo)">
-            <summary>
-            Creates a SELECT command with empty AID for auto-detection.
-            </summary>
-            <param name="controlInfo">The file control information.</param>
-            <returns>A new SelectCommand instance with empty AID.</returns>
-        </member>
         <member name="P:Gp4Net.Domain.Commands.SelectCommand.Cla">
             <inheritdoc />
         </member>
@@ -6097,6 +6565,63 @@
             <summary>
             Parses the proprietary template within FCI.
             </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Commands.SetStatusCommand">
+            <summary>
+            Represents a SET STATUS command for changing lifecycle states.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Commands.SetStatusCommand.Cla">
+            <inheritdoc/>
+        </member>
+        <member name="P:Gp4Net.Domain.Commands.SetStatusCommand.Ins">
+            <inheritdoc/>
+        </member>
+        <member name="P:Gp4Net.Domain.Commands.SetStatusCommand.P1">
+            <inheritdoc/>
+        </member>
+        <member name="P:Gp4Net.Domain.Commands.SetStatusCommand.P2">
+            <inheritdoc/>
+        </member>
+        <member name="P:Gp4Net.Domain.Commands.SetStatusCommand.Data">
+            <inheritdoc/>
+        </member>
+        <member name="P:Gp4Net.Domain.Commands.SetStatusCommand.ExpectedResponseLength">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.SetStatusCommand.Create(System.Byte[],System.Byte)">
+            <summary>
+            Creates a SET STATUS command.
+            </summary>
+            <param name="aid">The AID of the target (empty for card-level operations).</param>
+            <param name="p1">The P1 parameter (lifecycle state transition).</param>
+            <returns>The command or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.SetStatusCommand.CreateForMakeSelectable(System.Byte[])">
+            <summary>
+            Creates a SET STATUS command for making an application selectable.
+            </summary>
+            <param name="aid">The application AID.</param>
+            <returns>The command or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.SetStatusCommand.CreateForLock(System.Byte[])">
+            <summary>
+            Creates a SET STATUS command for locking an application.
+            </summary>
+            <param name="aid">The application AID.</param>
+            <returns>The command or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.SetStatusCommand.CreateForCardLock">
+            <summary>
+            Creates a SET STATUS command for card lock.
+            </summary>
+            <returns>The command or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.SetStatusCommand.CreateForCardTerminate">
+            <summary>
+            Creates a SET STATUS command for card termination.
+            </summary>
+            <returns>The command or an error.</returns>
         </member>
         <member name="T:Gp4Net.Domain.Commands.StoreDataCommand">
             <summary>
@@ -6285,14 +6810,14 @@
             Encodes card capabilities into the binary format expected by GET DATA 0x0066.
             </summary>
             <param name="capabilities">The capabilities to encode.</param>
-            <returns>The encoded capabilities data.</returns>
+            <returns>A Result containing the encoded capabilities data, or an error if capabilities is null.</returns>
         </member>
         <member name="M:Gp4Net.Domain.DataObjects.CardCapabilitiesCodec.Decode(System.Byte[])">
             <summary>
             Decodes card capabilities from the binary format returned by GET DATA 0x0066.
             </summary>
             <param name="data">The encoded capabilities data.</param>
-            <returns>The decoded capabilities.</returns>
+            <returns>A Result containing the decoded card capabilities, or an error if data is invalid.</returns>
         </member>
         <member name="T:Gp4Net.Domain.DataObjects.CardCapabilities">
             <summary>
@@ -6360,6 +6885,57 @@
             Supported key types for this implementation.
             </summary>
         </member>
+        <member name="T:Gp4Net.Domain.DataObjects.GetStatusTlvParser">
+            <summary>
+            Provides TLV parsing functionality for GET STATUS command responses.
+            Implements parsing according to GP Card Specification v2.3.1 Tables 11-36 and 11-37.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.DataObjects.GetStatusTlvParser.ParseApplicationsResponse(System.Byte[])">
+            <summary>
+            Parses TLV-formatted GET STATUS response data for Applications and Security Domains.
+            </summary>
+            <param name="responseData">The TLV response data from GET STATUS command.</param>
+            <returns>A Result containing the parsed applications or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.DataObjects.GetStatusTlvParser.ParseLoadFilesResponse(System.Byte[])">
+            <summary>
+            Parses TLV-formatted GET STATUS response data for Executable Load Files.
+            </summary>
+            <param name="responseData">The TLV response data from GET STATUS command.</param>
+            <returns>A Result containing the parsed load files or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.DataObjects.GetStatusTlvParser.ParseApplicationFromRegistryData(Gp4Net.Core.Tlv.TlvObject)">
+            <summary>
+            Parses an application from GP Registry Data TLV (0xE3).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.DataObjects.GetStatusTlvParser.ParseLoadFileFromRegistryData(Gp4Net.Core.Tlv.TlvObject)">
+            <summary>
+            Parses an executable load file from GP Registry Data TLV (0xE3).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.DataObjects.GetStatusTlvParser.ParseLifecycleState(System.Byte[])">
+            <summary>
+            Parses lifecycle state from TLV value bytes.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.DataObjects.GetStatusTlvParser.ParsePrivileges(System.Byte[])">
+            <summary>
+            Parses application privileges from TLV value bytes.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.DataObjects.GetStatusTlvParser.DetermineApplicationType(System.Collections.Immutable.ImmutableList{Gp4Net.Domain.Privilege})">
+            <summary>
+            Determines application type from privileges.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.DataObjects.GetStatusTlvParser.ParseVersionString(System.Byte[])">
+            <summary>
+            Parses version string from version TLV value bytes.
+            For Java Card CAP files, this is major.minor format.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Domain.DataObjects.KeyInfoTemplateCodec">
             <summary>
             Codec for GlobalPlatform Key Information Template (GET DATA tag 0x00E0).
@@ -6371,14 +6947,14 @@
             Encodes key information template into binary format.
             </summary>
             <param name="keyInfo">The key information to encode.</param>
-            <returns>The encoded key information data.</returns>
+            <returns>A Result containing the encoded key information data, or an error if keyInfo is null.</returns>
         </member>
         <member name="M:Gp4Net.Domain.DataObjects.KeyInfoTemplateCodec.Decode(System.Byte[])">
             <summary>
             Decodes key information template from binary format.
             </summary>
             <param name="data">The encoded key information data.</param>
-            <returns>The decoded key information.</returns>
+            <returns>A Result containing the decoded key information template, or an error if data is invalid.</returns>
         </member>
         <member name="T:Gp4Net.Domain.DataObjects.KeyInfoTemplate">
             <summary>
@@ -6426,14 +7002,14 @@
             Encodes security domain information into binary format.
             </summary>
             <param name="sdInfo">The security domain information to encode.</param>
-            <returns>The encoded security domain data.</returns>
+            <returns>A Result containing the encoded security domain data, or an error if sdInfo is null.</returns>
         </member>
         <member name="M:Gp4Net.Domain.DataObjects.SecurityDomainInfoCodec.Decode(System.Byte[])">
             <summary>
             Decodes security domain information from binary format.
             </summary>
             <param name="data">The encoded security domain data.</param>
-            <returns>The decoded security domain information.</returns>
+            <returns>A Result containing the decoded security domain information, or an error if data is invalid.</returns>
         </member>
         <member name="T:Gp4Net.Domain.DataObjects.SecurityDomainInfo">
             <summary>
@@ -6458,6 +7034,95 @@
         <member name="P:Gp4Net.Domain.DataObjects.SecurityDomainInfo.LifeCycleData">
             <summary>
             Application production life cycle data.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.ExecutableLoadFile">
+            <summary>
+            Represents an Executable Load File on a GlobalPlatform card.
+            Per GP Card Specification v2.3.1 Section 11.4.3.1 Table 11-37.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ExecutableLoadFile.#ctor(System.Byte[],Gp4Net.Domain.LifecycleState,CSharpFunctionalExtensions.Maybe{System.String},System.Collections.Immutable.ImmutableList{Gp4Net.Domain.ExecutableModule},CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+            <summary>
+            Represents an Executable Load File on a GlobalPlatform card.
+            Per GP Card Specification v2.3.1 Section 11.4.3.1 Table 11-37.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ExecutableLoadFile.AidHex">
+            <summary>
+            Gets the AID as a hexadecimal string.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ExecutableLoadFile.LifecycleStateString">
+            <summary>
+            Gets the lifecycle state as a string.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ExecutableLoadFile.VersionString">
+            <summary>
+            Gets the version string or "Unknown" if not available.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ExecutableLoadFile.ModuleCount">
+            <summary>
+            Gets the number of executable modules in this load file.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ExecutableLoadFile.HasModules">
+            <summary>
+            Checks if this load file has any executable modules.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ExecutableLoadFile.AssociatedSecurityDomainAidHex">
+            <summary>
+            Gets the associated security domain AID as hex string if available.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.ExecutableModule">
+            <summary>
+            Represents an Executable Module within an Executable Load File.
+            Per GP Card Specification v2.3.1 Section 11.4.3.1 Table 11-37.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.ExecutableModule.#ctor(System.Byte[],CSharpFunctionalExtensions.Maybe{System.String},CSharpFunctionalExtensions.Maybe{System.String})">
+            <summary>
+            Represents an Executable Module within an Executable Load File.
+            Per GP Card Specification v2.3.1 Section 11.4.3.1 Table 11-37.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ExecutableModule.AidHex">
+            <summary>
+            Gets the AID as a hexadecimal string.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ExecutableModule.DisplayName">
+            <summary>
+            Gets the module name or AID hex if name is not available.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.ExecutableModule.VersionString">
+            <summary>
+            Gets the version string or "Unknown" if not available.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.ExecutableLoadFileState">
+            <summary>
+            Lifecycle states for Executable Load Files per GlobalPlatform specification.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.ExecutableLoadFileState.Loaded">
+            <summary>
+            Load file is loaded but not available for execution.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.ExecutableLoadFileState.Available">
+            <summary>
+            Load file is available for execution and instantiation.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.ExecutableLoadFileState.LogicallyDeleted">
+            <summary>
+            Load file is logically deleted.
             </summary>
         </member>
         <member name="T:Gp4Net.Domain.LifecycleState">
@@ -6502,7 +7167,7 @@
         </member>
         <member name="T:Gp4Net.Domain.Privilege">
             <summary>
-            GlobalPlatform privileges.
+            GlobalPlatform privileges per GP Card Specification v2.3.1.
             </summary>
         </member>
         <member name="F:Gp4Net.Domain.Privilege.None">
@@ -6512,37 +7177,82 @@
         </member>
         <member name="F:Gp4Net.Domain.Privilege.SecurityDomain">
             <summary>
-            Security domain privilege.
+            Security domain privilege (bit 7).
             </summary>
         </member>
         <member name="F:Gp4Net.Domain.Privilege.DapVerification">
             <summary>
-            DAP verification privilege.
+            DAP verification privilege (bit 6).
             </summary>
         </member>
         <member name="F:Gp4Net.Domain.Privilege.DelegatedManagement">
             <summary>
-            Delegated management privilege.
+            Delegated management privilege (bit 5).
             </summary>
         </member>
         <member name="F:Gp4Net.Domain.Privilege.CardLock">
             <summary>
-            Card lock privilege.
+            Card lock privilege (bit 4).
             </summary>
         </member>
         <member name="F:Gp4Net.Domain.Privilege.CardTerminate">
             <summary>
-            Card terminate privilege.
+            Card terminate privilege (bit 3).
             </summary>
         </member>
         <member name="F:Gp4Net.Domain.Privilege.CardReset">
             <summary>
-            Card reset privilege.
+            Card reset privilege (bit 2).
             </summary>
         </member>
         <member name="F:Gp4Net.Domain.Privilege.CvmManagement">
             <summary>
-            CVM management privilege.
+            CVM management privilege (bit 1).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Privilege.TrustedPath">
+            <summary>
+            Trusted path privilege (bit 0).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Privilege.AuthorizedManagement">
+            <summary>
+            Authorized management privilege (bit 15).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Privilege.TokenVerification">
+            <summary>
+            Token verification privilege (bit 14).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Privilege.GlobalDelete">
+            <summary>
+            Global delete privilege (bit 13).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Privilege.GlobalLock">
+            <summary>
+            Global lock privilege (bit 12).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Privilege.GlobalRegistry">
+            <summary>
+            Global registry privilege (bit 11).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Privilege.FinalApplication">
+            <summary>
+            Final application privilege (bit 10).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Privilege.GlobalService">
+            <summary>
+            Global service privilege (bit 9).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Privilege.ReceiptGeneration">
+            <summary>
+            Receipt generation privilege (bit 8).
             </summary>
         </member>
         <member name="F:Gp4Net.Domain.Privilege.MandatedDapVerification">
@@ -6584,6 +7294,55 @@
         </member>
         <member name="P:Gp4Net.Domain.Keys.CryptogramContext.Type">
             <summary>The cryptogram type.</summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.GpTestKeyProvider">
+            <summary>
+            Provides GlobalPlatform test keys with card-specific diversification support.
+            Implements the same diversification logic as the gp_test_keys.lua script but in pure C#.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.GpTestKeyProvider.Scp02KeyTypeConstants">
+            <summary>
+            Key type constants for SCP02 key diversification.
+            These constants are appended to the sequence counter to form the derivation data.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.GpTestKeyProvider.GetDiversifiedTestKeys(Gp4Net.Domain.Commands.InitializeUpdateResponse)">
+            <summary>
+            Gets the diversified GP test key set for the given card response.
+            If no diversification data is available, returns the static test keys.
+            </summary>
+            <param name="cardResponse">The INITIALIZE UPDATE response containing diversification data.</param>
+            <returns>The diversified key set or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.GpTestKeyProvider.DiversifyScp02Keys(Gp4Net.Domain.Commands.InitializeUpdateResponse)">
+            <summary>
+            Diversifies GP test keys using SCP02 algorithm.
+            Uses the card's diversification data and sequence counter.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.GpTestKeyProvider.DeriveScp02Key(System.Byte[],System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+            Derives a single SCP02 key using 3DES-ECB encryption.
+            This implements the card-specific key diversification (different from session key derivation).
+            </summary>
+            <param name="baseKey">The base GP test key.</param>
+            <param name="divData">The card's diversification data.</param>
+            <param name="sequenceCounter">The sequence counter (2 bytes).</param>
+            <param name="keyType">The key type constant.</param>
+            <returns>The derived key (16 bytes).</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.GpTestKeyProvider.DiversifyScp03Keys(Gp4Net.Domain.Commands.InitializeUpdateResponse)">
+            <summary>
+            Diversifies GP test keys using SCP03 algorithm.
+            Uses SP 800-108 KDF with the card's diversification data.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.GpTestKeyProvider.ApplyIso7816Padding(System.Byte[])">
+            <summary>
+            Applies ISO/IEC 7816-4 padding to data.
+            Adds 0x80 followed by zeros to reach the next 8-byte boundary.
+            </summary>
         </member>
         <member name="T:Gp4Net.Domain.Keys.GpTestKeys">
             <summary>
@@ -6676,6 +7435,14 @@
             <param name="keyVersion">The key version (default: 0x00).</param>
             <returns>The test key set.</returns>
         </member>
+        <member name="M:Gp4Net.Domain.Keys.GpTestKeys.GetDiversifiedTestKeySet(Gp4Net.Domain.Commands.InitializeUpdateResponse)">
+            <summary>
+            Gets the diversified GP test key set based on the card's INITIALIZE UPDATE response.
+            This replaces the Lua-based key diversification logic.
+            </summary>
+            <param name="cardResponse">The INITIALIZE UPDATE response containing diversification data.</param>
+            <returns>The diversified key set or an error.</returns>
+        </member>
         <member name="T:Gp4Net.Domain.Keys.GpTestKeys.CommonKeyVersions">
             <summary>
             Common key versions used in testing and development.
@@ -6724,6 +7491,120 @@
         <member name="F:Gp4Net.Domain.Keys.GpTestKeys.TestAids.OpenFips201PackageAid">
             <summary>
             OpenFIPS201 package AID.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.IseImporter">
+            <summary>
+            Imports ISE (Issuer Security Domain Extension) key files into the secure key store.
+            Supports various ISE formats including standard GP test keys and custom key sets.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.IseImporter.IseKeyEntry">
+            <summary>
+            Represents an ISE key entry.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.IseImporter.IseKeyEntry.#ctor(System.String,System.Byte[],Gp4Net.Domain.Keys.IseImporter.KeyType,System.Byte,System.String)">
+            <summary>
+            Represents an ISE key entry.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.IseImporter.KeyType">
+            <summary>
+            Key types supported in ISE files.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Keys.IseImporter.KeyType.Enc">
+            <summary>
+            Encryption key (ENC).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Keys.IseImporter.KeyType.Mac">
+            <summary>
+            Message Authentication Code key (MAC).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Keys.IseImporter.KeyType.Dek">
+            <summary>
+            Data Encryption Key (DEK/KEK).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Keys.IseImporter.KeyType.Kek">
+            <summary>
+            Key Encryption Key (KEK).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.IseImporter.ImportFromFile(Gp4Net.Domain.Keys.SecureKeyStore,System.String)">
+            <summary>
+            Imports an ISE file into the secure key store.
+            </summary>
+            <param name="store">The secure key store to import into.</param>
+            <param name="filePath">The path to the ISE file.</param>
+            <returns>A Result containing the updated store with imported keys or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.IseImporter.ImportFromString(Gp4Net.Domain.Keys.SecureKeyStore,System.String)">
+            <summary>
+            Imports ISE content from a string into the secure key store.
+            </summary>
+            <param name="store">The secure key store to import into.</param>
+            <param name="content">The ISE content as a string.</param>
+            <returns>A Result containing the updated store with imported keys or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.IseImporter.ImportGpTestKeys(Gp4Net.Domain.Keys.SecureKeyStore,System.String,System.Byte,System.Boolean)">
+            <summary>
+            Imports a standard GP test key set into the secure key store.
+            </summary>
+            <param name="store">The secure key store to import into.</param>
+            <param name="keySetName">The name for this key set.</param>
+            <param name="keyVersion">The key version.</param>
+            <param name="isScp03">Whether this is for SCP03 (true) or SCP02 (false).</param>
+            <returns>A Result containing the updated store or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.IseImporter.CreateKeySetFromImported(Gp4Net.Domain.Keys.SecureKeyStore,System.String,System.Byte,System.Boolean)">
+            <summary>
+            Creates a key set from imported ISE keys in the store.
+            </summary>
+            <param name="store">The secure key store containing the keys.</param>
+            <param name="keySetName">The name of the key set.</param>
+            <param name="keyVersion">The key version.</param>
+            <param name="isScp03">Whether this is for SCP03 (true) or SCP02 (false).</param>
+            <returns>A Result containing the key set or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.IseImporter.ParseIseContent(System.String)">
+            <summary>
+            Parses ISE content into key entries.
+            Supports multiple ISE formats including hex strings and structured formats.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.IseImporter.ParseKeyValueFormat(System.Collections.Generic.List{System.String})">
+            <summary>
+            Parses key-value format ISE content.
+            Format: KEY_TYPE=HEX_VALUE
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.IseImporter.ParseThreeLineFormat(System.Collections.Generic.List{System.String})">
+            <summary>
+            Parses three-line format ISE content (ENC, MAC, DEK).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.IseImporter.ParseSingleLineFormat(System.String)">
+            <summary>
+            Parses single-line format ISE content (same key for all types).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.IseImporter.GenerateKeyId(Gp4Net.Domain.Keys.IseImporter.IseKeyEntry)">
+            <summary>
+            Generates a unique key ID for storage.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.IseImporter.ParseKeyType(System.String)">
+            <summary>
+            Parses a key type from a string.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.IseImporter.IsHexString(System.String)">
+            <summary>
+            Checks if a string is a valid hex string.
             </summary>
         </member>
         <member name="T:Gp4Net.Domain.Keys.KeyDerivationContext">
@@ -6872,11 +7753,26 @@
             <param name="outputLengthBits">The desired output length in bits.</param>
             <returns>The derived data or an error.</returns>
         </member>
+        <member name="T:Gp4Net.Domain.Keys.KeyDerivationService.Scp02KeyDerivationParams">
+            <summary>
+            SCP02 key derivation parameters.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.KeyDerivationService.Scp02KeyDerivationParams.#ctor(Gp4Net.Domain.Keys.Scp02KeySet,System.Byte[],Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            SCP02 key derivation parameters.
+            </summary>
+        </member>
         <member name="M:Gp4Net.Domain.Keys.KeyDerivationService.DeriveScp02SessionKeys(Gp4Net.Cryptography.IKeyDerivationContext)">
             <summary>
             Derives SCP02 session keys.
             Per GlobalPlatform Card Specification v2.3.1 Section E.4.1 "SCP02 - Session Key Derivation".
             Uses 3DES ECB encryption of derivation data.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.KeyDerivationService.DeriveAllScp02Keys(Gp4Net.Domain.Keys.KeyDerivationService.Scp02KeyDerivationParams)">
+            <summary>
+            Derives all SCP02 session keys using functional composition.
             </summary>
         </member>
         <member name="M:Gp4Net.Domain.Keys.KeyDerivationService.DeriveScp02Key(System.Byte[],System.Byte[],System.Byte[])">
@@ -6905,6 +7801,35 @@
             </summary>
             <param name="context">The cryptogram calculation context.</param>
             <returns>The calculated cryptogram or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.KeyDerivationService.UsesDerivedMacKeys(Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Determines whether an SCP02 implementation uses derived MAC keys or static MAC keys.
+            Based on GlobalPlatform test vectors and real-world implementations.
+            </summary>
+            <param name="implementation">The SCP02 implementation</param>
+            <returns>True if MAC keys should be derived, false if they should remain static</returns>
+        </member>
+        <member name="T:Gp4Net.Domain.Keys.KeyDerivationExtensions">
+            <summary>
+            Extension methods for functional composition in key derivation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.KeyDerivationExtensions.AsScp02KeySet(Gp4Net.Domain.Keys.IKeySet)">
+            <summary>
+            Safely casts a generic IKeySet to a specific Scp02KeySet.
+            </summary>
+            <param name="keySet">The generic key set</param>
+            <returns>A Result containing the cast key set or an error</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Keys.KeyDerivationExtensions.ToResult``1(CSharpFunctionalExtensions.Maybe{``0},System.String)">
+            <summary>
+            Converts a Maybe to a Result with a custom error message.
+            </summary>
+            <typeparam name="T">The type contained in the Maybe</typeparam>
+            <param name="maybe">The Maybe value</param>
+            <param name="errorMessage">Error message if Maybe has no value</param>
+            <returns>A Result containing the value or an error</returns>
         </member>
         <member name="T:Gp4Net.Domain.Keys.KeyManagementConfiguration">
             <summary>
@@ -7505,6 +8430,511 @@
         <member name="M:Gp4Net.Domain.Keys.SessionKeys.Dispose">
             <summary>
             Disposes of the session keys, clearing sensitive data from memory.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Modules.CardDiscovery">
+            <summary>
+            Pure functional module for card discovery operations.
+            Handles ISD detection and application selection.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Modules.CardDiscovery.WellKnownIsdAids">
+            <summary>
+            Well-known Issuer Security Domain AIDs per GlobalPlatform specification.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardDiscovery.DetectAndSelectIsdAsync(System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Attempts to detect and select the Issuer Security Domain.
+            First tries a direct SELECT with empty AID, then tries known ISD AIDs.
+            </summary>
+            <param name="executeCommand">Function to execute APDU commands.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>The SelectResponse from the ISD or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardDiscovery.TryKnownIsdAidsAsync(System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Tries to select ISD using known AID values.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardDiscovery.TryAidsRecursively(System.Collections.Immutable.ImmutableList{System.Byte[]},System.Int32,System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Recursively tries AIDs until one succeeds.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardDiscovery.SelectApplicationAsync(System.Byte[],System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Selects a specific application by AID.
+            </summary>
+            <param name="aid">The application identifier.</param>
+            <param name="executeCommand">Function to execute APDU commands.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>The SelectResponse or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardDiscovery.DiscoverKeySetAsync(System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Collections.Immutable.ImmutableList{Gp4Net.Domain.Keys.IKeySet},System.Threading.CancellationToken)">
+            <summary>
+            Attempts to determine the correct key set for a card through trial.
+            Useful for cards where the key set is unknown.
+            </summary>
+            <param name="executeCommand">Function to execute APDU commands.</param>
+            <param name="possibleKeySets">List of key sets to try.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>The first working key set and protocol version, or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardDiscovery.TryKeySetsRecursively(System.Collections.Immutable.ImmutableList{Gp4Net.Domain.Keys.IKeySet},System.Int32,System.Byte[],System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Recursively tries key sets until one succeeds.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Modules.CardLifecycleManager">
+            <summary>
+            Pure functional module for managing card and application lifecycle states.
+            Handles operations like SET STATUS, DELETE, and lifecycle transitions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardLifecycleManager.SetLifecycleStateAsync(System.Byte[],Gp4Net.Domain.LifecycleState,System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Changes the lifecycle state of an application or security domain.
+            </summary>
+            <param name="aid">The application identifier.</param>
+            <param name="targetState">The target lifecycle state.</param>
+            <param name="executeCommand">Function to execute APDU commands.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Success or error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardLifecycleManager.DeleteApplicationAsync(System.Byte[],System.Boolean,System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Deletes an application or package from the card.
+            </summary>
+            <param name="aid">The application identifier to delete.</param>
+            <param name="deleteRelated">Whether to delete related objects.</param>
+            <param name="executeCommand">Function to execute APDU commands.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Success or error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardLifecycleManager.LockCardAsync(System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Locks the card, preventing further modifications.
+            </summary>
+            <param name="executeCommand">Function to execute APDU commands.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Success or error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardLifecycleManager.TerminateCardAsync(System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Terminates the card, making it permanently unusable.
+            </summary>
+            <param name="executeCommand">Function to execute APDU commands.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Success or error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardLifecycleManager.SetCardLifecycleStateAsync(Gp4Net.Domain.Modules.CardLifecycleManager.CardLifecycleState,System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Sets the card lifecycle state through the ISD.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardLifecycleManager.MapLifecycleStateToP1(Gp4Net.Domain.LifecycleState)">
+            <summary>
+            Maps application lifecycle state to SET STATUS P1 parameter.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardLifecycleManager.InstallForInstallAsync(System.Byte[],System.Byte[],System.Byte[],System.Byte,System.Byte[],System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Installs an application for installation.
+            </summary>
+            <param name="packageAid">The package AID.</param>
+            <param name="moduleAid">The module AID.</param>
+            <param name="applicationAid">The application AID.</param>
+            <param name="privileges">The privileges to grant.</param>
+            <param name="installParameters">Optional install parameters.</param>
+            <param name="executeCommand">Function to execute APDU commands.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Success or error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardLifecycleManager.MakeSelectableAsync(System.Byte[],System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Makes an installed application selectable.
+            </summary>
+            <param name="applicationAid">The application AID.</param>
+            <param name="executeCommand">Function to execute APDU commands.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Success or error.</returns>
+        </member>
+        <member name="T:Gp4Net.Domain.Modules.CardLifecycleManager.CardLifecycleState">
+            <summary>
+            Card lifecycle states per GlobalPlatform specification.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Modules.CardStatusRetriever">
+            <summary>
+            Pure functional module for retrieving card status information.
+            Handles GET STATUS operations for different entity types.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardStatusRetriever.RetrieveCompleteCardContentAsync(System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Retrieves complete card content including ISD, applications, and load files.
+            </summary>
+            <param name="executeCommand">Function to execute APDU commands.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>The complete card content or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardStatusRetriever.GetIssuerSecurityDomainAsync(System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Retrieves the Issuer Security Domain information.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardStatusRetriever.GetApplicationsAndSecurityDomainsAsync(System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Retrieves applications and supplementary security domains.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardStatusRetriever.GetExecutableLoadFilesAsync(System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Retrieves executable load files.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardStatusRetriever.GetExecutableLoadFilesWithModulesAsync(System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Retrieves executable load files and their modules.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardStatusRetriever.GetStatusAsync(Gp4Net.Domain.Commands.GetStatusCommand.StatusSubset,System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Retrieves status for a specific subset.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardStatusRetriever.CombineIntoCardContent(System.Collections.Immutable.ImmutableList{Gp4Net.Domain.ApplicationInfo},System.Collections.Immutable.ImmutableList{Gp4Net.Domain.ApplicationInfo},System.Collections.Immutable.ImmutableList{Gp4Net.Domain.ExecutableLoadFile},System.Collections.Immutable.ImmutableList{Gp4Net.Domain.ExecutableLoadFile})">
+            <summary>
+            Combines entity lists into a CardContent structure.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CardStatusRetriever.ParseLoadFileResponse(Gp4Net.Pipeline.CommandResponse)">
+            <summary>
+            Parses a GET STATUS response for executable load files.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Modules.CommandFactory">
+            <summary>
+            Pure functional module for creating GlobalPlatform commands.
+            All functions are static and side-effect free.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreateSelectIsdCommand">
+            <summary>
+            Creates a SELECT command for the Issuer Security Domain (empty AID).
+            Per GlobalPlatform specification, SELECT with empty AID selects the ISD.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreateSelectCommand(System.Byte[])">
+            <summary>
+            Creates a SELECT command for a specific AID.
+            </summary>
+            <param name="aid">The application identifier to select.</param>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreateInitializeUpdateCommand(System.Byte,System.Byte,System.Byte[])">
+            <summary>
+            Creates an INITIALIZE UPDATE command for secure channel establishment.
+            </summary>
+            <param name="keyVersion">The key version to use.</param>
+            <param name="keyId">The key identifier.</param>
+            <param name="hostChallenge">The 8-byte host challenge.</param>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreateExternalAuthenticateCommand(Gp4Net.Domain.SecurityLevel,System.Byte[],System.Byte[])">
+            <summary>
+            Creates an EXTERNAL AUTHENTICATE command.
+            </summary>
+            <param name="securityLevel">The security level for the session.</param>
+            <param name="hostCryptogram">The host cryptogram.</param>
+            <param name="mac">The MAC value (optional for some security levels).</param>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreateGetStatusCommand(Gp4Net.Domain.Commands.GetStatusCommand.StatusSubset,System.Byte[])">
+            <summary>
+            Creates a GET STATUS command.
+            </summary>
+            <param name="subset">The subset of entities to query.</param>
+            <param name="searchCriteria">Optional search criteria.</param>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreateDeleteCommand(System.Byte[],System.Boolean)">
+            <summary>
+            Creates a DELETE command for an application.
+            </summary>
+            <param name="aid">The AID of the application to delete.</param>
+            <param name="deleteRelated">Whether to delete related objects.</param>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreateGetDataCommand(System.UInt16)">
+            <summary>
+            Creates a GET DATA command.
+            </summary>
+            <param name="tag">The data object tag to retrieve.</param>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreatePutKeyCommand(System.Byte,Gp4Net.Domain.Commands.KeyDataBlock[])">
+            <summary>
+            Creates a PUT KEY command.
+            </summary>
+            <param name="keyVersion">The key version number.</param>
+            <param name="keyDataBlocks">The key data blocks to install.</param>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreateSetStatusCommand(System.Byte[],System.Byte)">
+            <summary>
+            Creates a SET STATUS command for lifecycle state changes.
+            </summary>
+            <param name="aid">The AID of the target application (empty for card-level).</param>
+            <param name="p1">The P1 parameter value.</param>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreateLoadCommand(System.Byte,System.Boolean,System.Byte[])">
+            <summary>
+            Creates a LOAD command for CAP file installation.
+            </summary>
+            <param name="blockNumber">The block number (starting from 0).</param>
+            <param name="isLastBlock">Whether this is the last block.</param>
+            <param name="blockData">The block data to load.</param>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreateInstallCommand(Gp4Net.Domain.Commands.InstallType,System.Byte[],System.Byte[],System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+            Creates an INSTALL command.
+            </summary>
+            <param name="installType">The type of installation.</param>
+            <param name="packageAid">The package AID.</param>
+            <param name="appletAid">The applet AID (for INSTALL for INSTALL).</param>
+            <param name="instanceAid">The instance AID (for INSTALL for INSTALL).</param>
+            <param name="privileges">The privileges to grant.</param>
+            <param name="installParameters">Installation parameters.</param>
+        </member>
+        <member name="T:Gp4Net.Domain.Modules.CryptographyHelpers">
+            <summary>
+            Pure functional cryptographic helper functions.
+            All functions are static and side-effect free.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CryptographyHelpers.GenerateRandomBytes(System.Int32)">
+            <summary>
+            Generates cryptographically secure random bytes.
+            </summary>
+            <param name="length">Number of bytes to generate.</param>
+            <returns>Array of random bytes or error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CryptographyHelpers.GenerateHostChallenge">
+            <summary>
+            Generates an 8-byte host challenge for secure channel establishment.
+            </summary>
+            <returns>8-byte host challenge.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CryptographyHelpers.GenerateSequenceCounter">
+            <summary>
+            Generates a 16-byte sequence counter for SCP03.
+            </summary>
+            <returns>16-byte sequence counter.</returns>
+        </member>
+        <member name="T:Gp4Net.Domain.Modules.ResponseParser">
+            <summary>
+            Pure functional module for parsing GlobalPlatform command responses.
+            All functions are static and side-effect free.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.ResponseParser.ParseSelectResponse(Gp4Net.Pipeline.CommandResponse)">
+            <summary>
+            Parses a SELECT command response.
+            </summary>
+            <param name="response">The command response to parse.</param>
+            <returns>The parsed SelectResponse or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.ResponseParser.ParseInitializeUpdateResponse(Gp4Net.Pipeline.CommandResponse)">
+            <summary>
+            Parses an INITIALIZE UPDATE command response.
+            </summary>
+            <param name="response">The command response to parse.</param>
+            <returns>The parsed InitializeUpdateResponse or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.ResponseParser.ParseGetStatusResponse(Gp4Net.Pipeline.CommandResponse)">
+            <summary>
+            Parses a GET STATUS command response into ApplicationInfo objects.
+            </summary>
+            <param name="response">The command response to parse.</param>
+            <returns>The list of applications or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.ResponseParser.ParseCplcResponse(Gp4Net.Pipeline.CommandResponse)">
+            <summary>
+            Parses a GET DATA command response for CPLC data.
+            </summary>
+            <param name="response">The command response to parse.</param>
+            <returns>The parsed CPLC data or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.ResponseParser.ParseGetDataResponse(Gp4Net.Pipeline.CommandResponse)">
+            <summary>
+            Parses a generic GET DATA command response.
+            </summary>
+            <param name="response">The command response to parse.</param>
+            <returns>The raw data bytes or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.ResponseParser.ParsePutKeyResponse(Gp4Net.Pipeline.CommandResponse)">
+            <summary>
+            Parses a PUT KEY command response.
+            </summary>
+            <param name="response">The command response to parse.</param>
+            <returns>The parsed PutKeyResponse or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.ResponseParser.ParseDeleteResponse(Gp4Net.Pipeline.CommandResponse)">
+            <summary>
+            Parses a DELETE command response.
+            </summary>
+            <param name="response">The command response to parse.</param>
+            <returns>Success if the deletion was successful, failure otherwise.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.ResponseParser.ConvertToApplicationInfos(Gp4Net.Domain.Commands.GetStatusResponse)">
+            <summary>
+            Converts GetStatusResponse entries to domain ApplicationInfo objects.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.ResponseParser.ParsePrivileges(System.Byte)">
+            <summary>
+            Parses privilege byte into individual privilege flags.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.ResponseParser.ExtractTlvValue(System.Byte[],System.UInt16)">
+            <summary>
+            Extracts a TLV value from a data buffer.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.ResponseParser.ParseLength(System.Byte[],System.Int32@)">
+            <summary>
+            Parses the length field of a TLV structure.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Modules.SecureChannelEstablishment">
+            <summary>
+            Pure functional module for establishing GlobalPlatform secure channels.
+            Handles SCP02 and SCP03 protocol flows.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.SecureChannelEstablishment.EstablishAsync(Gp4Net.Domain.Keys.IKeySet,Gp4Net.Domain.SecurityLevel,System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Establishes a secure channel with the card.
+            </summary>
+            <param name="keySet">The key set to use for authentication.</param>
+            <param name="securityLevel">The desired security level.</param>
+            <param name="executeCommand">Function to execute APDU commands.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>The established secure channel state or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.SecureChannelEstablishment.SendInitializeUpdateAsync(Gp4Net.Domain.Keys.IKeySet,System.Byte[],System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Sends INITIALIZE UPDATE command and parses the response.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.SecureChannelEstablishment.CreateProtocol(System.Byte,Gp4Net.Domain.Keys.IKeySet)">
+            <summary>
+            Creates the appropriate secure channel protocol handler.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.SecureChannelEstablishment.SendExternalAuthenticateAsync(Gp4Net.Domain.Protocol.ISecureChannelProtocol,Gp4Net.Domain.Protocol.SecureChannelContext,Gp4Net.Domain.SecurityLevel,System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Sends EXTERNAL AUTHENTICATE command.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.SecureChannelEstablishment.CreateSecureChannelState(Gp4Net.Domain.Protocol.ISecureChannelProtocol,Gp4Net.Domain.Protocol.SecureChannelContext,Gp4Net.Domain.SecurityLevel)">
+            <summary>
+            Creates the secure channel state after successful authentication.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.SecureChannelEstablishment.EstablishWithAutoDiscoveryAsync(Gp4Net.Domain.SecurityLevel,System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+            <summary>
+            Attempts to establish a secure channel with automatic key discovery.
+            Useful when the correct key set is unknown.
+            </summary>
+            <param name="securityLevel">The desired security level.</param>
+            <param name="executeCommand">Function to execute APDU commands.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>The established secure channel state or an error.</returns>
+        </member>
+        <member name="T:Gp4Net.Domain.Modules.TlvProcessor">
+            <summary>
+            Pure functional module for TLV (Tag-Length-Value) processing.
+            Handles parsing and construction of TLV structures used in GlobalPlatform.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.TlvProcessor.ParseTlvData(System.Byte[])">
+            <summary>
+            Parses TLV data into structured elements.
+            </summary>
+            <param name="data">The raw TLV data bytes.</param>
+            <returns>The parsed TLV elements or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.TlvProcessor.FindElementValue(System.Collections.Immutable.ImmutableList{Gp4Net.Core.Tlv.TlvObject},System.Int32)">
+            <summary>
+            Finds a specific TLV element by tag.
+            </summary>
+            <param name="elements">The list of TLV elements to search.</param>
+            <param name="tag">The tag to find.</param>
+            <returns>The element value or None if not found.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.TlvProcessor.ConstructTlv(System.Byte,System.Byte[])">
+            <summary>
+            Constructs TLV data from tag and value.
+            </summary>
+            <param name="tag">The TLV tag.</param>
+            <param name="value">The value bytes.</param>
+            <returns>The complete TLV structure.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.TlvProcessor.ConstructTlv(System.UInt16,System.Byte[])">
+            <summary>
+            Constructs TLV data from a two-byte tag and value.
+            </summary>
+            <param name="tag">The two-byte TLV tag.</param>
+            <param name="value">The value bytes.</param>
+            <returns>The complete TLV structure.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.TlvProcessor.EncodeLength(System.Int32)">
+            <summary>
+            Encodes the length field according to TLV rules.
+            </summary>
+            <param name="length">The length to encode.</param>
+            <returns>The encoded length bytes.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.TlvProcessor.ParseFciTemplate(System.Byte[])">
+            <summary>
+            Parses FCI (File Control Information) template commonly returned by SELECT.
+            </summary>
+            <param name="fciData">The FCI template data.</param>
+            <returns>Parsed FCI elements or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.TlvProcessor.ConstructStatusTemplate(System.Byte)">
+            <summary>
+            Constructs a status template for GET STATUS response.
+            </summary>
+            <param name="subset">The status subset indicator.</param>
+            <returns>The status template TLV structure.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.TlvProcessor.ParseKeyInformation(System.Byte[])">
+            <summary>
+            Parses key information template used in PUT KEY.
+            </summary>
+            <param name="keyData">The key information data.</param>
+            <returns>Parsed key components or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.TlvProcessor.CombineArrays(System.Byte[][])">
+            <summary>
+            Combines multiple byte arrays into one.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Modules.TlvProcessor.FciTemplate">
+            <summary>
+            Represents a parsed FCI template.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.TlvProcessor.FciTemplate.#ctor(CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},System.Collections.Immutable.ImmutableList{Gp4Net.Core.Tlv.TlvObject})">
+            <summary>
+            Represents a parsed FCI template.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Modules.TlvProcessor.KeyComponents">
+            <summary>
+            Represents parsed key components.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.TlvProcessor.KeyComponents.#ctor(System.Byte[],CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+            <summary>
+            Represents parsed key components.
             </summary>
         </member>
         <member name="T:Gp4Net.Domain.OpenPhysical.OpenPhysicalId">
@@ -8559,6 +9989,72 @@
             Tracks authentication attempts for a specific card.
             </summary>
         </member>
+        <member name="T:Gp4Net.Domain.Protocol.Scp02Cryptography">
+            <summary>
+            Pure functional SCP02 cryptographic operations.
+            All functions are stateless and deterministic for testing with known values.
+            Per GlobalPlatform Card Specification v2.3.1 Appendix E.4 "SCP02".
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02Cryptography.DeriveScp02SessionKey(System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+            Derives a SCP02 session key using 3DES-CBC encryption.
+            Per GP Card Spec v2.3.1 Section E.4.1 and Figure E-2.
+            </summary>
+            <param name="baseKey">The static base key (16 bytes).</param>
+            <param name="derivationConstant">The derivation constant (2 bytes).</param>
+            <param name="sequenceCounter">The sequence counter (2 bytes).</param>
+            <returns>The derived session key (16 bytes).</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02Cryptography.BuildScp02CardCryptogramData(System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+            Builds SCP02 card cryptogram data.
+            Per GP Card Spec v2.3.1 Section E.4.2.1.
+            </summary>
+            <param name="hostChallenge">The host challenge (8 bytes).</param>
+            <param name="sequenceCounter">The sequence counter (2 bytes).</param>
+            <param name="cardChallenge">The card challenge (6 bytes for SCP02).</param>
+            <returns>The card cryptogram data with ISO padding (24 bytes).</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02Cryptography.BuildScp02HostCryptogramData(System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+            Builds SCP02 host cryptogram data.
+            Per GP Card Spec v2.3.1 Section E.4.2.2.
+            </summary>
+            <param name="sequenceCounter">The sequence counter (2 bytes).</param>
+            <param name="cardChallenge">The card challenge (6 bytes for SCP02).</param>
+            <param name="hostChallenge">The host challenge (8 bytes).</param>
+            <returns>The host cryptogram data with ISO padding (24 bytes).</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02Cryptography.CalculateScp02Cryptogram(System.Byte[],System.Byte[])">
+            <summary>
+            Calculates Full 3DES MAC for SCP02 cryptograms.
+            Per GP Card Spec v2.3.1 Section B.1.2.1 "Full Triple DES".
+            Used only for card/host cryptogram calculation with S-ENC key.
+            </summary>
+            <param name="key">The S-ENC session key (16 bytes).</param>
+            <param name="data">The cryptogram data (24 bytes, already includes padding).</param>
+            <returns>The cryptogram value (8 bytes).</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02Cryptography.CalculateScp02Mac(System.Byte[],System.Byte[])">
+            <summary>
+            Calculates Retail MAC (Single DES + Final Triple DES) for SCP02.
+            Per GP Card Spec v2.3.1 Section B.1.2.2 "Single DES Plus Final Triple DES".
+            Used for C-MAC and R-MAC calculation.
+            </summary>
+            <param name="key">The MAC key (16 bytes).</param>
+            <param name="data">The data to MAC (will be padded internally).</param>
+            <returns>The MAC value (8 bytes).</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02Cryptography.ApplyIso7816Padding(System.Byte[],System.Int32)">
+            <summary>
+            Applies ISO 7816-4 padding to data.
+            Adds 0x80 followed by zeros to reach the target block size.
+            </summary>
+            <param name="data">The data to pad.</param>
+            <param name="blockSize">The block size (typically 8 for 3DES).</param>
+            <returns>The padded data.</returns>
+        </member>
         <member name="T:Gp4Net.Domain.Protocol.Scp02Protocol">
             <summary>
             Implements the SCP02 secure channel protocol.
@@ -8602,6 +10098,25 @@
         <member name="M:Gp4Net.Domain.Protocol.Scp02Protocol.BuildHostCryptogramData(Gp4Net.Domain.Commands.InitializeUpdateResponse,System.Byte[])">
             <inheritdoc />
         </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02Protocol.GetScp02Implementation(System.Byte)">
+            <summary>
+            Converts implementation parameter byte to ScpImplementation enum value.
+            Per GP Card Specification v2.3.1 Table E-1, all SCP02 i= parameters follow bitmap structure.
+            Fails hard if the implementation parameter is not recognized - no defaults allowed.
+            </summary>
+            <param name="implementationParameter">The i= parameter from INITIALIZE UPDATE response</param>
+            <returns>The corresponding ScpImplementation enum value</returns>
+            <exception cref="T:System.ArgumentException">Thrown when implementation parameter is not a valid SCP02 implementation</exception>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02Protocol.AdjustSecurityLevelForScp02Capabilities(Gp4Net.Domain.SecurityLevel,Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Adjusts the requested security level based on SCP02 implementation capabilities.
+            Per GP Card Specification v2.3.1 Table E-1, some features may not be available.
+            </summary>
+            <param name="requestedLevel">The security level requested by the caller</param>
+            <param name="implementation">The SCP02 implementation from the card</param>
+            <returns>The adjusted security level that respects card capabilities</returns>
+        </member>
         <member name="T:Gp4Net.Domain.Protocol.Scp02ProtocolImpl">
             <summary>
             SCP02 protocol implementation using the minimal functional interface.
@@ -8617,6 +10132,13 @@
         </member>
         <member name="P:Gp4Net.Domain.Protocol.Scp02ProtocolImpl.MacSize">
             <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ProtocolImpl.IsValidScp02Implementation(System.Byte)">
+            <summary>
+            Checks if the given implementation parameter is a valid SCP02 implementation.
+            </summary>
+            <param name="implementationParameter">The implementation parameter to check.</param>
+            <returns>True if valid, false otherwise.</returns>
         </member>
         <member name="P:Gp4Net.Domain.Protocol.Scp02ProtocolImpl.ChainingValueSize">
             <inheritdoc />
@@ -9061,98 +10583,177 @@
         </member>
         <member name="T:Gp4Net.Domain.Protocol.ScpImplementation">
             <summary>
-            SCP implementation parameters as defined in GlobalPlatform Card Specification.
-            These flags control various protocol behaviors for SCP02 and SCP03.
+            SCP implementation parameters as defined in GlobalPlatform Card Specification v2.3.1.
+            For SCP02, the "i" parameter is a bitmap on one byte according to Table E-1.
+            For SCP03, implementation options are defined separately.
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02NoDerivation">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I00">
             <summary>
-            SCP02: 3 Secure Channel Keys (no derivation)
+            SCP02 i=00: Implicit mode, modified APDU, zero ICV, no ICV encryption, 1 base key, unspecified challenge, no R-MAC
+            Bitmap: 00000000 (b1=0, b2=0, b3=0, b4=0, b5=0, b6=0, b7=0)
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02ThreeKeys">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I02">
             <summary>
-            SCP02: 3 Secure Channel base keys (ENC/MAC/DEK)
-            Session keys derived from base keys
+            SCP02 i=02: Implicit mode, unmodified APDU, zero ICV, no ICV encryption, 1 base key, unspecified challenge, no R-MAC
+            Bitmap: 00000010 (b1=0, b2=1, b3=0, b4=0, b5=0, b6=0, b7=0)
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02OneKey">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I04">
             <summary>
-            SCP02: 1 Secure Channel base key (ENC=MAC=DEK)
-            Session keys derived from single base key
+            SCP02 i=04: Explicit mode, modified APDU, zero ICV, no ICV encryption, 1 base key, unspecified challenge, no R-MAC
+            Bitmap: 00000100 (b1=0, b2=0, b3=1, b4=0, b5=0, b6=0, b7=0)
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I05">
             <summary>
-            SCP02: 3 Secure Channel Keys with static MAC
-            S-MAC session key replaced by static MAC key
+            SCP02 i=05: Explicit mode, modified APDU, zero ICV, no ICV encryption, 3 keys, unspecified challenge, no R-MAC
+            Bitmap: 00000101 (b1=1, b2=0, b3=1, b4=0, b5=0, b6=0, b7=0)
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02OneKeyStaticMac">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I0A">
             <summary>
-            SCP02: 1 Secure Channel base key with static MAC
-            S-MAC session key replaced by static MAC key from single base key
+            SCP02 i=0A: Implicit mode, unmodified APDU, MAC over AID, no ICV encryption, 1 base key, unspecified challenge, no R-MAC
+            Bitmap: 00001010 (b1=0, b2=1, b3=0, b4=1, b5=0, b6=0, b7=0)
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02AesKeys">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I14">
             <summary>
-            SCP02: 3 Secure Channel Keys with AES
-            Uses AES instead of 3DES (vendor extension)
+            SCP02 i=14: Explicit mode, modified APDU, zero ICV, ICV encryption, 1 base key, unspecified challenge, no R-MAC
+            Bitmap: 00010100 (b1=0, b2=0, b3=1, b4=0, b5=1, b6=0, b7=0)
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02ThreeKeysRMac">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15">
             <summary>
-            SCP02: 3 Secure Channel Keys with R-MAC support (35)
-            Initiation mode explicit, C-MAC on modified APDU, ICV set to zero,
-            ICV encryption for C-MAC session, R-MAC support
+            SCP02 i=15: Explicit mode, modified APDU, zero ICV, ICV encryption, 3 keys, unspecified challenge, no R-MAC
+            Bitmap: 00010101 (b1=1, b2=0, b3=1, b4=0, b5=1, b6=0, b7=0)
+            Most common SCP02 implementation (CLR mode)
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02PseudoRandom">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I1A">
             <summary>
-            SCP02: Well-known pseudo-random algorithm (55)
-            Uses specific PRF for key derivation
+            SCP02 i=1A: Implicit mode, unmodified APDU, MAC over AID, ICV encryption, 1 base key, unspecified challenge, no R-MAC
+            Bitmap: 00011010 (b1=0, b2=1, b3=0, b4=1, b5=1, b6=0, b7=0)
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02CmacMult">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I24">
             <summary>
-            SCP02: CMAC with multiplication (55)
-            Per GlobalPlatform Card Specification v2.3.1 Section E.4.2
-            Alias for Scp02PseudoRandom - same implementation value
+            SCP02 i=24: Explicit mode, modified APDU, zero ICV, no ICV encryption, 1 base key, unspecified challenge, R-MAC support
+            Bitmap: 00100100 (b1=0, b2=0, b3=1, b4=0, b5=0, b6=1, b7=0)
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02CmacXor">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I25">
             <summary>
-            SCP02: CMAC with XOR (1A)
-            Per GlobalPlatform Card Specification v2.3.1 Section E.4.2
-            Alias for Scp02AesKeys - same implementation value
+            SCP02 i=25: Explicit mode, modified APDU, zero ICV, no ICV encryption, 3 keys, unspecified challenge, R-MAC support
+            Bitmap: 00100101 (b1=1, b2=0, b3=1, b4=0, b5=0, b6=1, b7=0)
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02ExplicitInitVector">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I2A">
             <summary>
-            SCP02: Explicit initialization vector (04)
-            Per GlobalPlatform Card Specification v2.3.1 Section E.4.2
-            Alias for Scp02OneKey - same implementation value
+            SCP02 i=2A: Implicit mode, unmodified APDU, MAC over AID, no ICV encryption, 1 base key, unspecified challenge, R-MAC support
+            Bitmap: 00101010 (b1=0, b2=1, b3=0, b4=1, b5=0, b6=1, b7=0)
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02ImplicitInitVector">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I34">
             <summary>
-            SCP02: Implicit initialization vector (05)
-            Per GlobalPlatform Card Specification v2.3.1 Section E.4.2
-            Alias for Scp02ThreeKeys - same implementation value
+            SCP02 i=34: Explicit mode, modified APDU, zero ICV, ICV encryption, 1 base key, unspecified challenge, R-MAC support
+            Bitmap: 00110100 (b1=0, b2=0, b3=1, b4=0, b5=1, b6=1, b7=0)
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02PseudoRandomRMac">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I35">
             <summary>
-            SCP02: 3 Secure Channel Keys with pseudo-random and R-MAC support (75)
-            Initiation mode explicit, C-MAC on modified APDU, ICV set to zero,
-            ICV encryption for C-MAC session, well-known pseudo-random algorithm,
-            R-MAC support
+            SCP02 i=35: Explicit mode, modified APDU, zero ICV, ICV encryption, 3 keys, unspecified challenge, R-MAC support
+            Bitmap: 00110101 (b1=1, b2=0, b3=1, b4=0, b5=1, b6=1, b7=0)
+            CLR mode with R-MAC support (MAC mode)
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I3A">
+            <summary>
+            SCP02 i=3A: Implicit mode, unmodified APDU, MAC over AID, ICV encryption, 1 base key, unspecified challenge, R-MAC support
+            Bitmap: 00111010 (b1=0, b2=1, b3=0, b4=1, b5=1, b6=1, b7=0)
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I44">
+            <summary>
+            SCP02 i=44: Explicit mode, modified APDU, zero ICV, no ICV encryption, 1 base key, well-known challenge, no R-MAC
+            Bitmap: 01000100 (b1=0, b2=0, b3=1, b4=0, b5=0, b6=0, b7=1)
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I45">
+            <summary>
+            SCP02 i=45: Explicit mode, modified APDU, zero ICV, no ICV encryption, 3 keys, well-known challenge, no R-MAC
+            Bitmap: 01000101 (b1=1, b2=0, b3=1, b4=0, b5=0, b6=0, b7=1)
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I4A">
+            <summary>
+            SCP02 i=4A: Implicit mode, unmodified APDU, MAC over AID, no ICV encryption, 1 base key, well-known challenge, no R-MAC
+            Bitmap: 01001010 (b1=0, b2=1, b3=0, b4=1, b5=0, b6=0, b7=1)
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I54">
+            <summary>
+            SCP02 i=54: Explicit mode, modified APDU, zero ICV, ICV encryption, 1 base key, well-known challenge, no R-MAC
+            Bitmap: 01010100 (b1=0, b2=0, b3=1, b4=0, b5=1, b6=0, b7=1)
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I55">
+            <summary>
+            SCP02 i=55: Explicit mode, modified APDU, zero ICV, ICV encryption, 3 keys, well-known challenge, no R-MAC
+            Bitmap: 01010101 (b1=1, b2=0, b3=1, b4=0, b5=1, b6=0, b7=1)
+            CLR mode with well-known challenge (ENC mode)
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I64">
+            <summary>
+            SCP02 i=64: Explicit mode, modified APDU, zero ICV, no ICV encryption, 1 base key, well-known challenge, R-MAC support
+            Bitmap: 01100100 (b1=0, b2=0, b3=1, b4=0, b5=0, b6=1, b7=1)
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I65">
+            <summary>
+            SCP02 i=65: Explicit mode, modified APDU, zero ICV, no ICV encryption, 3 keys, well-known challenge, R-MAC support
+            Bitmap: 01100101 (b1=1, b2=0, b3=1, b4=0, b5=0, b6=1, b7=1)
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I6A">
+            <summary>
+            SCP02 i=6A: Implicit mode, unmodified APDU, MAC over AID, no ICV encryption, 1 base key, well-known challenge, R-MAC support
+            Bitmap: 01101010 (b1=0, b2=1, b3=0, b4=1, b5=0, b6=1, b7=1)
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I74">
+            <summary>
+            SCP02 i=74: Explicit mode, modified APDU, zero ICV, ICV encryption, 1 base key, well-known challenge, R-MAC support
+            Bitmap: 01110100 (b1=0, b2=0, b3=1, b4=0, b5=1, b6=1, b7=1)
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I75">
+            <summary>
+            SCP02 i=75: Explicit mode, modified APDU, zero ICV, ICV encryption, 3 keys, well-known challenge, R-MAC support
+            Bitmap: 01110101 (b1=1, b2=0, b3=1, b4=0, b5=1, b6=1, b7=1)
+            Full security mode (RENC mode) - CLR + well-known challenge + R-MAC
+            GP Pro has bugs with this mode, but our implementation is correct
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02I7A">
+            <summary>
+            SCP02 i=7A: Implicit mode, unmodified APDU, MAC over AID, ICV encryption, 1 base key, well-known challenge, R-MAC support
+            Bitmap: 01111010 (b1=0, b2=1, b3=0, b4=1, b5=1, b6=1, b7=1)
             </summary>
         </member>
         <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03Aes128">
             <summary>
             SCP03: AES with 128-bit keys
             Standard SCP03 implementation
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03NoResponseMac">
+            <summary>
+            SCP03: No response MAC (11)
+            Per GlobalPlatform SCP03 v1.1.1 Section 6.2.5
+            Response MAC calculation and verification is disabled
             </summary>
         </member>
         <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03Aes192">
@@ -9165,12 +10766,6 @@
             SCP03: AES with 256-bit keys
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom">
-            <summary>
-            SCP03: Pseudo-random card challenge
-            Card challenge derived using KDF instead of random
-            </summary>
-        </member>
         <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03RandomChallenge">
             <summary>
             SCP03: Random card challenge (60)
@@ -9178,79 +10773,151 @@
             Card generates truly random challenge instead of pseudo-random
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03NoResponseMac">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom">
             <summary>
-            SCP03: No response MAC (11)
-            Per GlobalPlatform SCP03 v1.1.1 Section 6.2.5
-            Response MAC calculation and verification is disabled
+            SCP03: Pseudo-random card challenge
+            Card challenge derived using KDF instead of random
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.StaticMacFlag">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac">
             <summary>
-            Flag: Use static MAC key (bit 4)
-            When set, S-MAC session key is replaced by static MAC key
+            Legacy alias for Scp02I15 - most common SCP02 implementation
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.AesFlag">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02CmacMult">
             <summary>
-            Flag: Use AES encryption (bit 4 in different context)
-            Vendor-specific extension for SCP02
+            Legacy alias for Scp02I55 - SCP02 with well-known challenge
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.PseudoRandomFlag">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02CmacXor">
             <summary>
-            Flag: Use pseudo-random generation (bit 6)
+            Legacy alias for Scp02I1A - SCP02 implicit mode
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03KeyLengthMask">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02ExplicitInitVector">
             <summary>
-            Mask for key length in SCP03 (bits 4-5)
+            Legacy alias for Scp02I04 - SCP02 with 1 base key
             </summary>
         </member>
-        <member name="T:Gp4Net.Domain.Protocol.ScpImplementationExtensions">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02ImplicitInitVector">
             <summary>
-            Extension methods for ScpImplementation enum.
+            Legacy alias for Scp02I05 - SCP02 without ICV encryption
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.Protocol.ScpImplementationExtensions.UsesStaticMac(Gp4Net.Domain.Protocol.ScpImplementation)">
+        <member name="T:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures">
             <summary>
-            Determines if this implementation uses static MAC key.
+            Extension methods for ScpImplementation enum based on bitmap analysis per GP Card Spec v2.3.1 Table E-1.
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.Protocol.ScpImplementationExtensions.UsesSingleKey(Gp4Net.Domain.Protocol.ScpImplementation)">
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.HasRMacSupport(Gp4Net.Domain.Protocol.ScpImplementation)">
             <summary>
-            Determines if this implementation uses single base key.
+            Determines if this implementation has R-MAC support.
+            Per GP Card Spec Table E-1, bit b6 (0x20) indicates R-MAC support.
             </summary>
+            <param name="impl">The SCP implementation to check</param>
+            <returns>True if R-MAC is supported, false otherwise</returns>
         </member>
-        <member name="M:Gp4Net.Domain.Protocol.ScpImplementationExtensions.UsesAes(Gp4Net.Domain.Protocol.ScpImplementation)">
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.Uses3Keys(Gp4Net.Domain.Protocol.ScpImplementation)">
             <summary>
-            Determines if this implementation uses AES encryption.
+            Determines if this implementation uses 3 separate keys (ENC/MAC/DEK).
+            Per GP Card Spec Table E-1, bit b1 (0x01) indicates 3 Secure Channel Keys vs 1 base key.
             </summary>
+            <param name="impl">The SCP implementation to check</param>
+            <returns>True if 3 keys are used, false if 1 base key is used</returns>
         </member>
-        <member name="M:Gp4Net.Domain.Protocol.ScpImplementationExtensions.UsesPseudoRandom(Gp4Net.Domain.Protocol.ScpImplementation)">
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.IsExplicitMode(Gp4Net.Domain.Protocol.ScpImplementation)">
             <summary>
-            Determines if this implementation uses pseudo-random challenge generation.
+            Determines if this implementation uses explicit initiation mode.
+            Per GP Card Spec Table E-1, bit b3 (0x08) indicates initiation mode.
             </summary>
+            <param name="impl">The SCP implementation to check</param>
+            <returns>True for explicit mode, false for implicit mode</returns>
         </member>
-        <member name="M:Gp4Net.Domain.Protocol.ScpImplementationExtensions.SupportsRMac(Gp4Net.Domain.Protocol.ScpImplementation)">
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.HasIcvEncryption(Gp4Net.Domain.Protocol.ScpImplementation)">
             <summary>
-            Determines if this implementation supports R-MAC (Response MAC).
+            Determines if this implementation has ICV encryption for C-MAC session.
+            Per GP Card Spec Table E-1, bit b5 (0x04) indicates ICV encryption.
             </summary>
+            <param name="impl">The SCP implementation to check</param>
+            <returns>True if ICV encryption is enabled, false otherwise</returns>
         </member>
-        <member name="M:Gp4Net.Domain.Protocol.ScpImplementationExtensions.GetAesKeyLength(Gp4Net.Domain.Protocol.ScpImplementation)">
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.UsesWellKnownChallenge(Gp4Net.Domain.Protocol.ScpImplementation)">
             <summary>
-            Gets the AES key length in bits for SCP03 implementations.
+            Determines if this implementation uses well-known pseudo-random algorithm for card challenge.
+            Per GP Card Spec Table E-1, bit b7 (0x40) indicates challenge generation method.
             </summary>
+            <param name="impl">The SCP implementation to check</param>
+            <returns>True for well-known algorithm, false for unspecified method</returns>
         </member>
-        <member name="M:Gp4Net.Domain.Protocol.ScpImplementationExtensions.IsScp02(Gp4Net.Domain.Protocol.ScpImplementation)">
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.HasMacOverAid(Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Determines if this implementation has ICV set to MAC over AID.
+            Per GP Card Spec Table E-1, bit b4 (0x10) indicates ICV initialization.
+            </summary>
+            <param name="impl">The SCP implementation to check</param>
+            <returns>True for MAC over AID, false for zero ICV</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.UsesModifiedApdu(Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Determines if this implementation uses C-MAC on modified APDU.
+            Per GP Card Spec Table E-1, bit b2 (0x02) indicates APDU modification.
+            </summary>
+            <param name="impl">The SCP implementation to check</param>
+            <returns>True for modified APDU, false for unmodified APDU</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.GetDescription(Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Gets a human-readable description of the implementation features.
+            </summary>
+            <param name="impl">The SCP implementation to describe</param>
+            <returns>A detailed description string</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.GetAlias(Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Gets the specific alias for common implementations.
+            </summary>
+            <param name="impl">The SCP implementation</param>
+            <returns>The alias string if available, otherwise the hex representation</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.IsScp02(Gp4Net.Domain.Protocol.ScpImplementation)">
             <summary>
             Determines if this is an SCP02 implementation.
+            Only returns true for explicitly defined SCP02 implementations in the enum.
+            Per GP Card Specification v2.3.1 Table E-1, SCP02 implementations follow specific bitmap patterns.
             </summary>
+            <param name="impl">The SCP implementation to check</param>
+            <returns>True if this is an SCP02 implementation, false otherwise</returns>
         </member>
-        <member name="M:Gp4Net.Domain.Protocol.ScpImplementationExtensions.IsScp03(Gp4Net.Domain.Protocol.ScpImplementation)">
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.IsScp03(Gp4Net.Domain.Protocol.ScpImplementation)">
             <summary>
             Determines if this is an SCP03 implementation.
             </summary>
+            <param name="impl">The SCP implementation to check</param>
+            <returns>True if this is an SCP03 implementation, false otherwise</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.GetAesKeyLength(Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Gets the AES key length in bits for SCP03 implementations.
+            </summary>
+            <param name="impl">The SCP implementation to check</param>
+            <returns>Key length in bits, or 0 if not SCP03</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.UsesPseudoRandom(Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Legacy method for checking pseudo-random challenge support.
+            For backward compatibility with existing code.
+            </summary>
+            <param name="impl">The SCP implementation to check</param>
+            <returns>True if pseudo-random challenge is used</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.UsesStaticMac(Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Legacy method for checking static MAC usage.
+            For backward compatibility with existing code.
+            Maps to ICV encryption feature for SCP02.
+            </summary>
+            <param name="impl">The SCP implementation to check</param>
+            <returns>True if static MAC behavior is used</returns>
         </member>
         <member name="T:Gp4Net.Domain.Protocol.ScpProtocolOperations">
             <summary>
@@ -10176,6 +11843,170 @@
             <param name="protocol">The secure channel protocol version.</param>
             <returns>Success (true) if MAC is valid, failure with error otherwise.</returns>
         </member>
+        <member name="T:Gp4Net.Domain.Security.ResponseSecurityProcessor">
+            <summary>
+            Functional processor for applying security to APDU responses.
+            All methods are pure functions with no side effects.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.ResponseSecurityProcessor.ApplyResponseSecurity(System.Byte[],Gp4Net.Domain.SecurityLevel,Gp4Net.Domain.Keys.SessionKeys,System.Collections.Immutable.ImmutableArray{System.Byte},System.UInt32,System.Byte)">
+            <summary>
+            Applies response security processing (R-MAC verification and/or R-DECRYPTION) to a response.
+            Returns the processed response and updated secure channel state.
+            This is the main entry point for response security processing.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.ResponseSecurityProcessor.GenerateScp03EncryptionIcv(System.Byte[],System.UInt32)">
+            <summary>
+            Generates the encryption ICV for SCP03.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Security.SecureChannelPhase">
+            <summary>
+            Represents the lifecycle phases of a secure channel.
+            Follows GlobalPlatform specification state transitions.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Security.SecureChannelPhase.NotInitiated">
+            <summary>
+            No secure channel initiated.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Security.SecureChannelPhase.Initiated">
+            <summary>
+            After INITIALIZE UPDATE command.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Security.SecureChannelPhase.Authenticated">
+            <summary>
+            After successful EXTERNAL AUTHENTICATE command.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Security.SecureChannelPhase.Aborted">
+            <summary>
+            After a security error occurred.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Security.SecureChannelPhase.Terminated">
+            <summary>
+            After explicit termination or session end.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Security.InitializeUpdateData">
+            <summary>
+            Data captured during INITIALIZE UPDATE command.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.InitializeUpdateData.#ctor(System.Byte[],System.Byte[],System.UInt16,System.Byte[],Gp4Net.Constants.ScpVersion)">
+            <summary>
+            Data captured during INITIALIZE UPDATE command.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.InitializeUpdateData.Validate">
+            <summary>
+            Validates the initialize update data.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Security.AuthenticatedState">
+            <summary>
+            State after successful authentication.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.AuthenticatedState.#ctor(Gp4Net.Domain.Keys.SessionKeys,Gp4Net.Domain.SecurityLevel,System.Byte[],Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            State after successful authentication.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.AuthenticatedState.Validate">
+            <summary>
+            Validates the authenticated state.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Security.TerminationReason">
+            <summary>
+            Reason for secure channel termination.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.TerminationReason.#ctor(System.String,CSharpFunctionalExtensions.Maybe{System.UInt16})">
+            <summary>
+            Reason for secure channel termination.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Security.SecureChannelLifecycle">
+            <summary>
+            Immutable representation of secure channel lifecycle state.
+            Tracks the complete state transitions per GlobalPlatform specification.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.SecureChannelLifecycle.#ctor(Gp4Net.Domain.Security.SecureChannelPhase,CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Security.InitializeUpdateData},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Security.AuthenticatedState},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Security.TerminationReason})">
+            <summary>
+            Immutable representation of secure channel lifecycle state.
+            Tracks the complete state transitions per GlobalPlatform specification.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Security.SecureChannelLifecycle.NotInitiated">
+            <summary>
+            Creates an initial state with no secure channel.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Security.SecureChannelLifecycle.IsAuthenticated">
+            <summary>
+            Checks if the secure channel is in a usable state for secure messaging.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Security.SecureChannelLifecycle.CanInitiate">
+            <summary>
+            Checks if the secure channel can be initiated.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Security.SecureChannelLifecycle.CanAuthenticate">
+            <summary>
+            Checks if the secure channel can be authenticated.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Security.SecureChannelLifecycle.CurrentSecurityLevel">
+            <summary>
+            Gets the current security level if authenticated.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Security.SecureChannelLifecycle.SessionKeys">
+            <summary>
+            Gets the session keys if authenticated.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Security.SecureChannelLifecycleTransitions">
+            <summary>
+            State transition functions for secure channel lifecycle.
+            All functions return new instances, maintaining immutability.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.SecureChannelLifecycleTransitions.InitiateChannel(Gp4Net.Domain.Security.SecureChannelLifecycle,Gp4Net.Domain.Security.InitializeUpdateData)">
+            <summary>
+            Transitions to initiated state after INITIALIZE UPDATE.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.SecureChannelLifecycleTransitions.AuthenticateChannel(Gp4Net.Domain.Security.SecureChannelLifecycle,Gp4Net.Domain.Keys.SessionKeys,Gp4Net.Domain.SecurityLevel,System.Byte[],Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Transitions to authenticated state after EXTERNAL AUTHENTICATE.
+            Per GP spec E.3.2: The MAC from EXTERNAL AUTHENTICATE becomes the initial chaining value.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.SecureChannelLifecycleTransitions.AbortChannel(Gp4Net.Domain.Security.SecureChannelLifecycle,System.String,CSharpFunctionalExtensions.Maybe{System.UInt16})">
+            <summary>
+            Transitions to aborted state after a security error.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.SecureChannelLifecycleTransitions.TerminateChannel(Gp4Net.Domain.Security.SecureChannelLifecycle,System.String)">
+            <summary>
+            Transitions to terminated state.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.SecureChannelLifecycleTransitions.ToSecureChannelState(Gp4Net.Domain.Security.SecureChannelLifecycle)">
+            <summary>
+            Creates a new SecureChannelState from authenticated lifecycle.
+            This bridges to the existing SecureChannelState for compatibility.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Domain.Security.SecureChannelService">
             <summary>
             Pure functional implementation of secure channel service.
@@ -10596,67 +12427,119 @@
             <param name="sessionKeys">The derived session keys.</param>
             <returns>The host cryptogram.</returns>
         </member>
-        <member name="T:Gp4Net.Pipeline.CommandPipeline">
+        <member name="T:Gp4Net.Pipeline.CommandProcessing">
             <summary>
-            Default implementation of the command pipeline.
+            Functional command processing infrastructure using pure function composition.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandPipeline.#ctor(Gp4Net.Pipeline.CommandDelegate,Microsoft.Extensions.Logging.ILogger{Gp4Net.Pipeline.CommandPipeline})">
+        <member name="T:Gp4Net.Pipeline.CommandProcessing.CommandProcessor">
             <summary>
-            Initializes a new instance of CommandPipeline.
+            Represents a pure function that processes a command given an environment.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandPipeline.ExecuteAsync(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.IPipelineContext,System.Threading.CancellationToken)">
-            <inheritdoc/>
-        </member>
-        <member name="M:Gp4Net.Pipeline.CommandPipeline.ExecuteAsync(Gp4Net.Pipeline.CommandRequest,System.Threading.CancellationToken)">
-            <inheritdoc/>
-        </member>
-        <member name="T:Gp4Net.Pipeline.CommandPipelineBuilder">
+        <member name="T:Gp4Net.Pipeline.CommandProcessing.CommandEnvironment">
             <summary>
-            Builder for constructing command pipelines.
+            Immutable environment containing all dependencies for command processing.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandPipelineBuilder.#ctor(System.IServiceProvider)">
+        <member name="M:Gp4Net.Pipeline.CommandProcessing.CommandEnvironment.#ctor(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Security.SecureChannelState},Microsoft.Extensions.Logging.ILogger,Gp4Net.Pipeline.CommandOptions)">
             <summary>
-            Initializes a new instance of CommandPipelineBuilder.
+            Immutable environment containing all dependencies for command processing.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandPipelineBuilder.Use``1">
-            <inheritdoc/>
-        </member>
-        <member name="M:Gp4Net.Pipeline.CommandPipelineBuilder.Use(Gp4Net.Pipeline.ICommandMiddleware)">
-            <inheritdoc/>
-        </member>
-        <member name="M:Gp4Net.Pipeline.CommandPipelineBuilder.Use(Gp4Net.Pipeline.MiddlewareDelegate)">
-            <inheritdoc/>
-        </member>
-        <member name="M:Gp4Net.Pipeline.CommandPipelineBuilder.Build">
-            <inheritdoc/>
-        </member>
-        <member name="M:Gp4Net.Pipeline.CommandPipelineBuilder.Create(System.IServiceProvider)">
+        <member name="M:Gp4Net.Pipeline.CommandProcessing.CommandEnvironment.WithSecureChannel(Gp4Net.Domain.Security.SecureChannelState)">
             <summary>
-            Creates a new pipeline builder.
+            Creates a new environment with updated secure channel state.
             </summary>
         </member>
-        <member name="T:Gp4Net.Pipeline.PipelineBuilderExtensions">
+        <member name="M:Gp4Net.Pipeline.CommandProcessing.CommandEnvironment.WithoutSecureChannel">
             <summary>
-            Extension methods for pipeline building.
+            Creates a new environment without secure channel.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.PipelineBuilderExtensions.UseWhen(Gp4Net.Pipeline.ICommandPipelineBuilder,System.Func{Gp4Net.Pipeline.CommandRequest,System.Boolean},Gp4Net.Pipeline.ICommandMiddleware)">
+        <member name="P:Gp4Net.Pipeline.CommandProcessing.CommandEnvironment.EffectiveOptions">
             <summary>
-            Adds a conditional middleware to the pipeline.
+            Gets the effective options, using defaults if not specified.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.PipelineBuilderExtensions.Use(Gp4Net.Pipeline.ICommandPipelineBuilder,System.Func{Gp4Net.Pipeline.CommandRequest,Gp4Net.Pipeline.CommandDelegate,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}})">
+        <member name="T:Gp4Net.Pipeline.CommandProcessing.CommandResult">
             <summary>
-            Adds an inline middleware using a lambda.
+            Represents the result of command processing.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.PipelineBuilderExtensions.Branch(Gp4Net.Pipeline.ICommandPipelineBuilder,System.Func{Gp4Net.Pipeline.CommandRequest,System.Boolean},System.Action{Gp4Net.Pipeline.ICommandPipelineBuilder})">
+        <member name="M:Gp4Net.Pipeline.CommandProcessing.CommandResult.#ctor(System.Byte[],Gp4Net.Core.StatusWord,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment,Gp4Net.Pipeline.CommandProcessing.CommandMetadata)">
             <summary>
-            Branches the pipeline based on a condition.
+            Represents the result of command processing.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.CommandProcessing.CommandResult.Success(System.Byte[],Gp4Net.Core.StatusWord,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment,Gp4Net.Pipeline.CommandProcessing.CommandMetadata)">
+            <summary>
+            Creates a successful result.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Pipeline.CommandProcessing.CommandResult.IsSuccess">
+            <summary>
+            Checks if the command was successful.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Pipeline.CommandProcessing.CommandMetadata">
+            <summary>
+            Metadata collected during command processing.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.CommandProcessing.CommandMetadata.#ctor(System.Nullable{System.TimeSpan},System.Byte[],System.Byte[],System.Boolean,System.Boolean,System.Boolean,System.Int32)">
+            <summary>
+            Metadata collected during command processing.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Pipeline.CommandProcessors">
+            <summary>
+            Pure functions for command processing.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Pipeline.CommandProcessors.LogCommand">
+            <summary>
+            Logs command execution details.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Pipeline.CommandProcessors.WrapSecureChannel">
+            <summary>
+            Wraps command with secure channel if available and required.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Pipeline.CommandProcessors.ExecuteTransport">
+            <summary>
+            Executes the command via transport.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Pipeline.CommandProcessors.UnwrapSecureChannel">
+            <summary>
+            Unwraps secure channel response if needed.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Pipeline.CommandProcessors.LogResponse">
+            <summary>
+            Logs response details.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.CommandProcessors.CreatePipeline(System.Boolean,System.Boolean)">
+            <summary>
+            Creates a processor that executes the complete command pipeline.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.CommandProcessors.RequiresSecureChannel(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+            <summary>
+            Determines if a command requires secure channel wrapping.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.CommandProcessors.GetCommandBytes(Gp4Net.Transport.IApduCommand)">
+            <summary>
+            Gets the byte representation of a command.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.CommandProcessors.CombineResponseBytes(System.Byte[],System.UInt16)">
+            <summary>
+            Combines response data and status word into a single byte array.
             </summary>
         </member>
         <member name="T:Gp4Net.Pipeline.CommandRequest">
@@ -10884,100 +12767,50 @@
             The selected AID (alias for SelectedApplicationAid).
             </summary>
         </member>
-        <member name="T:Gp4Net.Pipeline.ICommandMiddleware">
+        <member name="T:Gp4Net.Pipeline.FunctionComposition">
             <summary>
-            Represents a middleware component in the command pipeline.
+            Functional composition utilities for command processors.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.ICommandMiddleware.InvokeAsync(Gp4Net.Pipeline.CommandRequest,Gp4Net.Pipeline.CommandDelegate,System.Threading.CancellationToken)">
+        <member name="M:Gp4Net.Pipeline.FunctionComposition.Compose(Gp4Net.Pipeline.CommandProcessing.CommandProcessor,Gp4Net.Pipeline.CommandProcessing.CommandProcessor)">
             <summary>
-            Processes a command request, potentially modifying it before passing to the next middleware.
-            </summary>
-            <param name="request">The command request to process.</param>
-            <param name="next">The next middleware in the pipeline.</param>
-            <param name="cancellationToken">Cancellation token.</param>
-            <returns>The result of the command execution.</returns>
-        </member>
-        <member name="T:Gp4Net.Pipeline.CommandDelegate">
-            <summary>
-            Delegate representing the next middleware in the pipeline.
+            Composes two command processors sequentially.
+            The environment from the first processor is passed to the second.
             </summary>
         </member>
-        <member name="T:Gp4Net.Pipeline.CommandMiddlewareBase">
+        <member name="M:Gp4Net.Pipeline.FunctionComposition.ComposeMany(Gp4Net.Pipeline.CommandProcessing.CommandProcessor[])">
             <summary>
-            Base class for middleware that provides common functionality.
+            Composes multiple command processors sequentially.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandMiddlewareBase.InvokeAsync(Gp4Net.Pipeline.CommandRequest,Gp4Net.Pipeline.CommandDelegate,System.Threading.CancellationToken)">
-            <inheritdoc/>
-        </member>
-        <member name="M:Gp4Net.Pipeline.CommandMiddlewareBase.UpdateContext(CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError},Gp4Net.Pipeline.IPipelineContext)">
+        <member name="M:Gp4Net.Pipeline.FunctionComposition.When(System.Func{Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment,System.Boolean},Gp4Net.Pipeline.CommandProcessing.CommandProcessor)">
             <summary>
-            Helper method to update the context in a response.
+            Applies a processor conditionally based on a predicate.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandMiddlewareBase.AddMetadata(CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError},System.String,System.Object)">
+        <member name="M:Gp4Net.Pipeline.FunctionComposition.WithRetry(Gp4Net.Pipeline.CommandProcessing.CommandProcessor,System.Int32,System.Func{Gp4Net.Pipeline.CommandProcessing.CommandResult,System.Boolean})">
             <summary>
-            Helper method to add metadata to a response.
+            Adds retry logic to a processor.
             </summary>
         </member>
-        <member name="T:Gp4Net.Pipeline.ICommandPipeline">
+        <member name="M:Gp4Net.Pipeline.FunctionComposition.WithTimeout(Gp4Net.Pipeline.CommandProcessing.CommandProcessor,System.Nullable{System.TimeSpan})">
             <summary>
-            Represents a pipeline for executing APDU commands with middleware processing.
+            Adds timeout handling to a processor.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.ICommandPipeline.ExecuteAsync(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.IPipelineContext,System.Threading.CancellationToken)">
+        <member name="F:Gp4Net.Pipeline.FunctionComposition.Identity">
             <summary>
-            Executes a command through the pipeline.
-            </summary>
-            <param name="command">The APDU command to execute.</param>
-            <param name="context">The command context.</param>
-            <param name="cancellationToken">Cancellation token.</param>
-            <returns>The result of the command execution.</returns>
-        </member>
-        <member name="M:Gp4Net.Pipeline.ICommandPipeline.ExecuteAsync(Gp4Net.Pipeline.CommandRequest,System.Threading.CancellationToken)">
-            <summary>
-            Executes a command request through the pipeline.
-            </summary>
-            <param name="request">The command request.</param>
-            <param name="cancellationToken">Cancellation token.</param>
-            <returns>The result of the command execution.</returns>
-        </member>
-        <member name="T:Gp4Net.Pipeline.ICommandPipelineBuilder">
-            <summary>
-            Builder interface for constructing command pipelines.
+            The identity processor - returns the command result unchanged.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.ICommandPipelineBuilder.Use``1">
+        <member name="M:Gp4Net.Pipeline.FunctionComposition.MergeMetadata(Gp4Net.Pipeline.CommandProcessing.CommandMetadata,Gp4Net.Pipeline.CommandProcessing.CommandMetadata)">
             <summary>
-            Adds a middleware to the pipeline.
+            Merges two metadata instances, preferring values from the second if both present.
             </summary>
-            <typeparam name="TMiddleware">The type of middleware to add.</typeparam>
-            <returns>The builder for chaining.</returns>
         </member>
-        <member name="M:Gp4Net.Pipeline.ICommandPipelineBuilder.Use(Gp4Net.Pipeline.ICommandMiddleware)">
+        <member name="M:Gp4Net.Pipeline.FunctionComposition.IsRetriableError(Gp4Net.Core.StatusWord)">
             <summary>
-            Adds a middleware instance to the pipeline.
-            </summary>
-            <param name="middleware">The middleware instance.</param>
-            <returns>The builder for chaining.</returns>
-        </member>
-        <member name="M:Gp4Net.Pipeline.ICommandPipelineBuilder.Use(Gp4Net.Pipeline.MiddlewareDelegate)">
-            <summary>
-            Adds a middleware delegate to the pipeline.
-            </summary>
-            <param name="middleware">The middleware delegate.</param>
-            <returns>The builder for chaining.</returns>
-        </member>
-        <member name="M:Gp4Net.Pipeline.ICommandPipelineBuilder.Build">
-            <summary>
-            Builds the pipeline.
-            </summary>
-            <returns>The constructed pipeline.</returns>
-        </member>
-        <member name="T:Gp4Net.Pipeline.MiddlewareDelegate">
-            <summary>
-            Delegate for inline middleware definitions.
+            Determines if an error is retriable based on status word.
             </summary>
         </member>
         <member name="T:Gp4Net.Pipeline.ImmutablePipelineContext">
@@ -11106,138 +12939,99 @@
             Gets the underlying dictionary for functional operations.
             </summary>
         </member>
-        <member name="T:Gp4Net.Pipeline.Middleware.LoggingMiddleware">
+        <member name="T:Gp4Net.Pipeline.WrappedApduCommand">
             <summary>
-            Middleware that logs command execution details.
+            Represents an APDU command that has been wrapped with secure channel security.
+            Preserves the original command while carrying the secured bytes.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.Middleware.LoggingMiddleware.#ctor(Microsoft.Extensions.Logging.ILogger{Gp4Net.Pipeline.Middleware.LoggingMiddleware},Gp4Net.Pipeline.Middleware.LoggingOptions)">
+        <member name="P:Gp4Net.Pipeline.WrappedApduCommand.OriginalCommand">
             <summary>
-            Initializes a new instance of LoggingMiddleware.
+            The original unwrapped command.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.Middleware.LoggingMiddleware.InvokeAsync(Gp4Net.Pipeline.CommandRequest,Gp4Net.Pipeline.CommandDelegate,System.Threading.CancellationToken)">
-            <inheritdoc/>
-        </member>
-        <member name="T:Gp4Net.Pipeline.Middleware.LoggingOptions">
+        <member name="P:Gp4Net.Pipeline.WrappedApduCommand.WrappedBytes">
             <summary>
-            Options for logging middleware.
+            The complete wrapped command bytes including security.
             </summary>
         </member>
-        <member name="P:Gp4Net.Pipeline.Middleware.LoggingOptions.LogCommandDetails">
+        <member name="M:Gp4Net.Pipeline.WrappedApduCommand.#ctor(Gp4Net.Transport.IApduCommand,System.Byte[])">
             <summary>
-            Whether to log command details (CLA, INS, P1, P2).
+            Initializes a new instance of WrappedApduCommand.
+            </summary>
+            <param name="originalCommand">The original command before wrapping.</param>
+            <param name="wrappedBytes">The secured command bytes.</param>
+        </member>
+        <member name="P:Gp4Net.Pipeline.WrappedApduCommand.Cla">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Pipeline.WrappedApduCommand.Ins">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Pipeline.WrappedApduCommand.P1">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Pipeline.WrappedApduCommand.P2">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Pipeline.WrappedApduCommand.Data">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Pipeline.WrappedApduCommand.ExpectedResponseLength">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Pipeline.WrappedApduCommand.IsExtendedLength">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Pipeline.WrappedApduCommand.GetCompleteApdu">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Services.CardContentRetriever">
+            <summary>
+            Provides pure functional composition for retrieving complete card content.
+            Implements the full GlobalPlatform applet listing flow with auto-detection.
             </summary>
         </member>
-        <member name="P:Gp4Net.Pipeline.Middleware.LoggingOptions.LogCommandData">
+        <member name="M:Gp4Net.Services.CardContentRetriever.#ctor(Gp4Net.Services.ISmartCardService,Gp4Net.Services.IGlobalPlatformService,Microsoft.Extensions.Logging.ILogger{Gp4Net.Services.CardContentRetriever})">
             <summary>
-            Whether to log command data.
+            Initializes a new instance of the CardContentRetriever class.
+            </summary>
+            <param name="cardService">The smart card service for command execution.</param>
+            <param name="gpService">The GlobalPlatform service for high-level operations.</param>
+            <param name="logger">The logger for diagnostic output.</param>
+        </member>
+        <member name="M:Gp4Net.Services.CardContentRetriever.RetrieveCardContentAsync(Gp4Net.Domain.Keys.IKeySet,System.Threading.CancellationToken)">
+            <summary>
+            Retrieves complete card content using functional composition.
+            Performs ISD selection, secure channel establishment, and comprehensive GET STATUS queries.
+            </summary>
+            <param name="keySet">The key set to use (defaults to GP test keys if null).</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>Complete card content or error.</returns>
+        </member>
+        <member name="M:Gp4Net.Services.CardContentRetriever.EstablishSecureChannelWithAutoDetection(Gp4Net.Domain.Keys.IKeySet)">
+            <summary>
+            Establishes secure channel with SCP auto-detection and default key handling.
             </summary>
         </member>
-        <member name="P:Gp4Net.Pipeline.Middleware.LoggingOptions.LogResponseData">
+        <member name="M:Gp4Net.Services.CardContentRetriever.CreateDefaultTestKeySet">
             <summary>
-            Whether to log response data.
+            Creates a default SCP02 test key set for auto-detection scenarios.
             </summary>
         </member>
-        <member name="P:Gp4Net.Pipeline.Middleware.LoggingOptions.LogContext">
+        <member name="M:Gp4Net.Services.CardContentRetriever.ConvertToKeySet(Gp4Net.Domain.Keys.IKeySet)">
             <summary>
-            Whether to log context information.
+            Converts IKeySet to KeySet for GlobalPlatformService compatibility.
             </summary>
-        </member>
-        <member name="P:Gp4Net.Pipeline.Middleware.LoggingOptions.LogMetadata">
-            <summary>
-            Whether to log response metadata.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Pipeline.Middleware.LoggingOptions.LogErrorContext">
-            <summary>
-            Whether to log error context details.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Pipeline.Middleware.LoggingOptions.MaxDataLogLength">
-            <summary>
-            Maximum length of data to log (bytes will be truncated).
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Pipeline.Middleware.Scp03DiagnosticMiddleware">
-            <summary>
-            Middleware for detailed SCP03 protocol diagnostics and tracing.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Pipeline.Middleware.Scp03DiagnosticMiddleware.#ctor(Microsoft.Extensions.Logging.ILogger{Gp4Net.Pipeline.Middleware.Scp03DiagnosticMiddleware},System.Boolean,System.Boolean,System.Boolean)">
-            <summary>
-            Initializes a new instance of the Scp03DiagnosticMiddleware class.
-            </summary>
-            <param name="logger">The logger instance.</param>
-            <param name="dumpHex">Whether to dump hex data.</param>
-            <param name="traceCrypto">Whether to trace cryptographic operations.</param>
-            <param name="analyzeProtocol">Whether to analyze protocol flow.</param>
-        </member>
-        <member name="M:Gp4Net.Pipeline.Middleware.Scp03DiagnosticMiddleware.InvokeAsync(Gp4Net.Pipeline.CommandRequest,Gp4Net.Pipeline.CommandDelegate,System.Threading.CancellationToken)">
-            <summary>
-            Processes a command request with diagnostic logging.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Pipeline.Middleware.SecureChannelMiddleware">
-            <summary>
-            Middleware that handles secure channel wrapping and unwrapping of commands.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Pipeline.Middleware.SecureChannelMiddleware.#ctor(Microsoft.Extensions.Logging.ILogger{Gp4Net.Pipeline.Middleware.SecureChannelMiddleware})">
-            <summary>
-            Initializes a new instance of SecureChannelMiddleware.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Pipeline.Middleware.SecureChannelMiddleware.InvokeAsync(Gp4Net.Pipeline.CommandRequest,Gp4Net.Pipeline.CommandDelegate,System.Threading.CancellationToken)">
-            <inheritdoc/>
-        </member>
-        <member name="T:Gp4Net.Pipeline.Middleware.SecureChannelMiddleware.WrappedCommand">
-            <summary>
-            Internal command wrapper that represents a complete wrapped APDU.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Pipeline.Middleware.SecureChannelMiddleware.WrappedCommand.#ctor(System.Byte[],CSharpFunctionalExtensions.Maybe{System.Int32})">
-            <summary>
-            Internal command wrapper that represents a complete wrapped APDU.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Pipeline.Middleware.SecureChannelMiddleware.WrappedCommand.GetCompleteApdu">
-            <summary>
-            Gets the complete wrapped APDU bytes.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Pipeline.Middleware.StateCapturingMiddleware">
-            <summary>
-            Middleware that captures state information from command responses.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Pipeline.Middleware.StateCapturingMiddleware.#ctor(Microsoft.Extensions.Logging.ILogger{Gp4Net.Pipeline.Middleware.StateCapturingMiddleware})">
-            <summary>
-            Initializes a new instance of StateCapturingMiddleware.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Pipeline.Middleware.StateCapturingMiddleware.InvokeAsync(Gp4Net.Pipeline.CommandRequest,Gp4Net.Pipeline.CommandDelegate,System.Threading.CancellationToken)">
-            <inheritdoc/>
-        </member>
-        <member name="T:Gp4Net.Pipeline.Middleware.TransportMiddleware">
-            <summary>
-            Terminal middleware that sends commands to the card via transport layer.
-            This should be the last middleware in the pipeline.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Pipeline.Middleware.TransportMiddleware.#ctor(Gp4Net.Transport.IApduTransport,Microsoft.Extensions.Logging.ILogger{Gp4Net.Pipeline.Middleware.TransportMiddleware})">
-            <summary>
-            Initializes a new instance of TransportMiddleware.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Pipeline.Middleware.TransportMiddleware.InvokeAsync(Gp4Net.Pipeline.CommandRequest,Gp4Net.Pipeline.CommandDelegate,System.Threading.CancellationToken)">
-            <inheritdoc/>
         </member>
         <member name="T:Gp4Net.Services.GlobalPlatformService">
             <summary>
             Functional implementation of IGlobalPlatformService using pure functions.
             Built alongside the existing service for gradual migration.
             </summary>
+        </member>
+        <member name="P:Gp4Net.Services.GlobalPlatformService.CardService">
+            <inheritdoc/>
         </member>
         <member name="M:Gp4Net.Services.GlobalPlatformService.#ctor(Gp4Net.Services.ISmartCardService,Gp4Net.Domain.Protocol.ISecureChannelManager,Microsoft.Extensions.Logging.ILogger{Gp4Net.Services.GlobalPlatformService})">
             <summary>
@@ -11274,6 +13068,11 @@
         <member name="T:Gp4Net.Services.IGlobalPlatformService">
             <summary>
             Functional interface for GlobalPlatform operations.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Services.IGlobalPlatformService.CardService">
+            <summary>
+            Gets the current smart card service with proper secure channel context.
             </summary>
         </member>
         <member name="M:Gp4Net.Services.IGlobalPlatformService.SelectIsdAsync(System.Threading.CancellationToken)">
@@ -11393,7 +13192,7 @@
             Creates a new service instance with an updated context.
             </summary>
             <param name="context">The new context.</param>
-            <returns>A new service instance with the updated context.</returns>
+            <returns>A Result containing a new service instance with the updated context, or an error if the context is null.</returns>
         </member>
         <member name="M:Gp4Net.Services.ISmartCardService.WithContextValue``1(System.String,``0)">
             <summary>
@@ -11402,26 +13201,7 @@
             <typeparam name="T">The type of the value.</typeparam>
             <param name="key">The context key.</param>
             <param name="value">The context value.</param>
-            <returns>A new service instance with the updated context.</returns>
-        </member>
-        <member name="T:Gp4Net.Services.ISmartCardServiceFactory">
-            <summary>
-            Factory for creating smart card service instances.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Services.ISmartCardServiceFactory.CreateAsync(System.String,Gp4Net.Services.SmartCardServiceOptions)">
-            <summary>
-            Creates a smart card service for the specified reader.
-            </summary>
-            <param name="readerName">The reader name.</param>
-            <param name="options">Service configuration options.</param>
-            <returns>A smart card service instance.</returns>
-        </member>
-        <member name="M:Gp4Net.Services.ISmartCardServiceFactory.ListReadersAsync">
-            <summary>
-            Lists available smart card readers.
-            </summary>
-            <returns>The list of available readers.</returns>
+            <returns>A Result containing a new service instance with the updated context, or an error if the context is invalid.</returns>
         </member>
         <member name="T:Gp4Net.Services.SmartCardServiceOptions">
             <summary>
@@ -11441,11 +13221,6 @@
         <member name="P:Gp4Net.Services.SmartCardServiceOptions.EnableStateCapture">
             <summary>
             Whether to enable state capturing.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Services.SmartCardServiceOptions.CustomMiddleware">
-            <summary>
-            Custom middleware to add to the pipeline.
             </summary>
         </member>
         <member name="P:Gp4Net.Services.SmartCardServiceOptions.InitialContext">
@@ -11604,21 +13379,14 @@
             <param name="secureChannelManager">The secure channel manager for cryptographic operations.</param>
             <returns>A fully configured functional GlobalPlatform service.</returns>
         </member>
-        <member name="M:Gp4Net.Services.ServiceFactory.CreateSmartCardService(Gp4Net.Transport.IApduTransport)">
+        <member name="M:Gp4Net.Services.ServiceFactory.CreateSmartCardService(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport)">
             <summary>
             Creates a smart card service with functional pipeline composition.
             Demonstrates how to build services with explicit dependency management.
             </summary>
+            <param name="channel">The card channel for communication.</param>
             <param name="transport">The APDU transport for card communication.</param>
             <returns>A configured smart card service with functional pipeline.</returns>
-        </member>
-        <member name="M:Gp4Net.Services.ServiceFactory.CreateCommandPipeline(Gp4Net.Transport.IApduTransport)">
-            <summary>
-            Creates a command pipeline with functional middleware composition.
-            Uses builder pattern but with functional error handling.
-            </summary>
-            <param name="transport">The APDU transport for the terminal middleware.</param>
-            <returns>A configured command pipeline or configuration error.</returns>
         </member>
         <member name="M:Gp4Net.Services.ServiceFactory.CreatePipelineContext">
             <summary>
@@ -11627,12 +13395,13 @@
             </summary>
             <returns>An immutable pipeline context.</returns>
         </member>
-        <member name="M:Gp4Net.Services.ServiceFactory.CreateServiceConfiguration(Gp4Net.Transport.IApduTransport,Gp4Net.Domain.Protocol.ISecureChannelManager)">
+        <member name="M:Gp4Net.Services.ServiceFactory.CreateServiceConfiguration(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,Gp4Net.Domain.Protocol.ISecureChannelManager)">
             <summary>
             Creates a complete service graph for GlobalPlatform operations.
             This is the main factory method that demonstrates functional composition
             of the entire service dependency graph.
             </summary>
+            <param name="channel">The card channel for communication.</param>
             <param name="transport">The APDU transport for card communication.</param>
             <param name="secureChannelManager">The secure channel manager for cryptographic operations.</param>
             <returns>A complete service configuration or error.</returns>
@@ -11655,24 +13424,12 @@
             </summary>
             <returns>A pipeline context populated with service dependencies.</returns>
         </member>
-        <member name="T:Gp4Net.Services.ServiceConfigurationError">
-            <summary>
-            Represents errors that can occur during service configuration.
-            Uses functional error handling instead of exceptions.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Services.ServiceConfigurationError.#ctor(System.String,System.String)">
-            <summary>
-            Represents errors that can occur during service configuration.
-            Uses functional error handling instead of exceptions.
-            </summary>
-        </member>
         <member name="T:Gp4Net.Services.SmartCardService">
             <summary>
-            Smart card service implementation using pipeline architecture.
+            Smart card service implementation using functional command processing.
             </summary>
         </member>
-        <member name="M:Gp4Net.Services.SmartCardService.#ctor(Gp4Net.Pipeline.ICommandPipeline,Gp4Net.Pipeline.IPipelineContext,Gp4Net.Transport.IApduTransport,Microsoft.Extensions.Logging.ILogger{Gp4Net.Services.SmartCardService})">
+        <member name="M:Gp4Net.Services.SmartCardService.#ctor(Gp4Net.Pipeline.CommandProcessing.CommandEnvironment,Gp4Net.Pipeline.CommandProcessing.CommandProcessor,Microsoft.Extensions.Logging.ILogger{Gp4Net.Services.SmartCardService})">
             <summary>
             Initializes a new instance of SmartCardService.
             </summary>
@@ -11693,22 +13450,6 @@
             <inheritdoc/>
         </member>
         <member name="M:Gp4Net.Services.SmartCardService.Dispose">
-            <inheritdoc/>
-        </member>
-        <member name="T:Gp4Net.Services.SmartCardServiceFactory">
-            <summary>
-            Factory implementation for creating smart card services.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Services.SmartCardServiceFactory.#ctor(Microsoft.Extensions.Logging.ILoggerFactory,System.IServiceProvider)">
-            <summary>
-            Initializes a new instance of SmartCardServiceFactory.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Services.SmartCardServiceFactory.CreateAsync(System.String,Gp4Net.Services.SmartCardServiceOptions)">
-            <inheritdoc/>
-        </member>
-        <member name="M:Gp4Net.Services.SmartCardServiceFactory.ListReadersAsync">
             <inheritdoc/>
         </member>
         <member name="T:Gp4Net.Services.SmartCardServiceExtensions">
@@ -11738,7 +13479,6 @@
             </summary>
             <param name="command">The command to convert to APDU bytes.</param>
             <returns>The APDU byte array.</returns>
-            <exception cref="T:System.ArgumentNullException">Thrown when command is null.</exception>
         </member>
         <member name="M:Gp4Net.Transport.ApduBuilder.BuildApdu(System.Byte,System.Byte,System.Byte,System.Byte,System.Byte[],CSharpFunctionalExtensions.Maybe{System.Int32})">
             <summary>
@@ -11748,8 +13488,8 @@
             <param name="ins">Instruction byte.</param>
             <param name="p1">Parameter 1.</param>
             <param name="p2">Parameter 2.</param>
-            <param name="data">Optional data.</param>
-            <param name="le">Optional expected response length.</param>
+            <param name="data">Command data.</param>
+            <param name="le">Expected response length.</param>
             <returns>The APDU byte array.</returns>
         </member>
         <member name="T:Gp4Net.Transport.ApduBuilder.SimpleApduCommand">
@@ -11794,6 +13534,39 @@
         </member>
         <member name="P:Gp4Net.Transport.BaseApduCommand.IsExtendedLength">
             <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Transport.ClApduTransport">
+            <summary>
+            Implements T=CL contactless transport protocol.
+            Based on T=1 but with contactless-specific restrictions.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Transport.ClApduTransport.Protocol">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Transport.ClApduTransport.MaxCommandDataLength">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Transport.ClApduTransport.MaxResponseDataLength">
+            <inheritdoc />
+        </member>
+        <member name="P:Gp4Net.Transport.ClApduTransport.SupportsExtendedLength">
+            <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Transport.ClApduTransport.#ctor(Microsoft.Extensions.Logging.ILogger{Gp4Net.Transport.ClApduTransport},Microsoft.Extensions.Logging.ILogger{Gp4Net.Transport.T1ApduTransport})">
+            <summary>
+            Initializes a new instance of ClApduTransport.
+            </summary>
+            <param name="logger">The logger.</param>
+            <param name="t1Logger">Logger for the underlying T=1 transport.</param>
+        </member>
+        <member name="M:Gp4Net.Transport.ClApduTransport.TransmitAsync(Gp4Net.Transport.IApduCommand,Gp4Net.Transport.ICardChannel,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Transport.ClApduTransport.ContactlessCommandWrapper">
+            <summary>
+            Wrapper to ensure contactless-specific behavior.
+            </summary>
         </member>
         <member name="T:Gp4Net.Transport.IApduTransport">
             <summary>
@@ -11878,7 +13651,7 @@
         </member>
         <member name="P:Gp4Net.Transport.IApduCommand.Data">
             <summary>
-            Gets the command data (may be null or empty).
+            Gets the command data (never null, may be empty).
             </summary>
         </member>
         <member name="P:Gp4Net.Transport.IApduCommand.ExpectedResponseLength">
@@ -12145,90 +13918,6 @@
         </member>
         <member name="M:Gp4Net.Transport.T1ApduTransport.TransmitAsync(Gp4Net.Transport.IApduCommand,Gp4Net.Transport.ICardChannel,System.Threading.CancellationToken)">
             <inheritdoc />
-        </member>
-        <member name="T:Gp4Net.Transport.ClApduTransport">
-            <summary>
-            Implements T=CL contactless transport protocol.
-            Based on T=1 but with contactless-specific restrictions.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Transport.ClApduTransport.Protocol">
-            <inheritdoc />
-        </member>
-        <member name="P:Gp4Net.Transport.ClApduTransport.MaxCommandDataLength">
-            <inheritdoc />
-        </member>
-        <member name="P:Gp4Net.Transport.ClApduTransport.MaxResponseDataLength">
-            <inheritdoc />
-        </member>
-        <member name="P:Gp4Net.Transport.ClApduTransport.SupportsExtendedLength">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Transport.ClApduTransport.#ctor(Microsoft.Extensions.Logging.ILogger{Gp4Net.Transport.ClApduTransport},Microsoft.Extensions.Logging.ILogger{Gp4Net.Transport.T1ApduTransport})">
-            <summary>
-            Initializes a new instance of TClApduTransport.
-            </summary>
-            <param name="logger">The logger.</param>
-            <param name="t1Logger">Logger for the underlying T=1 transport.</param>
-        </member>
-        <member name="M:Gp4Net.Transport.ClApduTransport.TransmitAsync(Gp4Net.Transport.IApduCommand,Gp4Net.Transport.ICardChannel,System.Threading.CancellationToken)">
-            <inheritdoc />
-        </member>
-        <member name="T:Gp4Net.Transport.ClApduTransport.ContactlessCommandWrapper">
-            <summary>
-            Wrapper to ensure contactless-specific behavior.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Utils.ByteArrayExtensions">
-            <summary>
-            Extension methods for byte arrays.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Utils.ByteArrayExtensions.ToHexString(System.Byte[])">
-            <summary>
-            Converts a byte array to a hexadecimal string.
-            </summary>
-            <param name="data">The byte array to convert.</param>
-            <returns>The hexadecimal string representation.</returns>
-        </member>
-        <member name="M:Gp4Net.Utils.ByteArrayExtensions.ToHexStringWithSpaces(System.Byte[])">
-            <summary>
-            Converts a byte array to a hexadecimal string with spaces.
-            </summary>
-            <param name="data">The byte array to convert.</param>
-            <returns>The hexadecimal string representation with spaces.</returns>
-        </member>
-        <member name="M:Gp4Net.Utils.ByteArrayExtensions.Slice(System.Byte[],System.Int32,System.Int32)">
-            <summary>
-            Creates a copy of a portion of a byte array.
-            </summary>
-            <param name="data">The source array.</param>
-            <param name="offset">The starting offset.</param>
-            <param name="length">The number of bytes to copy.</param>
-            <returns>A new array containing the specified portion.</returns>
-        </member>
-        <member name="M:Gp4Net.Utils.ByteArrayExtensions.Concat(System.Byte[][])">
-            <summary>
-            Concatenates multiple byte arrays.
-            </summary>
-            <param name="arrays">The arrays to concatenate.</param>
-            <returns>A new array containing all the input arrays.</returns>
-        </member>
-        <member name="M:Gp4Net.Utils.ByteArrayExtensions.SequenceEqual(System.Byte[],System.Byte[])">
-            <summary>
-            Compares two byte arrays for equality.
-            </summary>
-            <param name="a">The first array.</param>
-            <param name="b">The second array.</param>
-            <returns>True if the arrays are equal; otherwise, false.</returns>
-        </member>
-        <member name="M:Gp4Net.Utils.ByteArrayExtensions.Xor(System.Byte[],System.Byte[])">
-            <summary>
-            XORs two byte arrays.
-            </summary>
-            <param name="a">The first array.</param>
-            <param name="b">The second array.</param>
-            <returns>A new array containing the XOR result.</returns>
         </member>
     </members>
 </doc>

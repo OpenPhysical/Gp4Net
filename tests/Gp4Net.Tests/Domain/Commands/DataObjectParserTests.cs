@@ -108,7 +108,7 @@ public class DataObjectParserTests
     public void ParseRawDataObject_WithNullInput_ReturnsFailure()
     {
         // Testing null input by passing null directly - this is a test boundary
-        string dataObject = null;
+        string? dataObject = null;
         
         // Act
         var result = DataObjectParser.ParseRawDataObject(dataObject);
@@ -200,7 +200,7 @@ public class DataObjectParserTests
     {
         // Arrange
         ushort tag = 0x9F70;
-        byte[] data = null;
+        byte[]? data = null;
 
         // Act
         var isValid = DataObjectParser.ValidateDataObject(tag, data);

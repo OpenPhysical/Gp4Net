@@ -27,11 +27,11 @@ public class ValidateCommand : BaseCommand<ValidateCommand.Settings>
     /// </summary>
     public ValidateCommand(
         ICardService cardService,
-        Gp4Net.Services.IGlobalPlatformService globalPlatformService,
+        IDomainServiceFactory domainServiceFactory,
         PackageRegistry packageRegistry,
         IKeysetResolver keysetResolver
     )
-        : base(cardService, globalPlatformService, keysetResolver)
+        : base(cardService, domainServiceFactory, keysetResolver)
     {
         _packageRegistry = packageRegistry;
     }

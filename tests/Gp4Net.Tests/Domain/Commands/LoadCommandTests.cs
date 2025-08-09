@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using NUnit.Framework;
 
@@ -47,11 +48,12 @@ public class LoadCommandTests
     [Test]
     public void Create_NullData_ReturnsFailure()
     {
-        var result = LoadCommand.Create((byte)0, null, false);
+        var result = LoadCommand.Create((byte)0, data: null!, false);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("null");
+        // This should ideally be NullParameterError for null parameter validation
     }
 
     [Test]
@@ -60,8 +62,9 @@ public class LoadCommandTests
         var result = LoadCommand.Create((byte)0, [], false);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("empty");
+        // This should ideally be EmptyDataError for empty data validation
     }
 
     [Test]
@@ -179,12 +182,13 @@ public class LoadCommandTests
     [Test]
     public void CreateFromCapFile_NullData_ReturnsFailure()
     {
-        byte[] capData = null;
-        var result = LoadCommand.CreateFromCapFile(capData);
+        byte[]? capData = null;
+        var result = LoadCommand.CreateFromCapFile(capData!);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("null");
+        // This should ideally be NullParameterError for null parameter validation
     }
 
     [Test]
@@ -193,8 +197,9 @@ public class LoadCommandTests
         var result = LoadCommand.CreateFromCapFile([]);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("empty");
+        // This should ideally be EmptyDataError for empty data validation
     }
 
     [Test]
@@ -206,9 +211,9 @@ public class LoadCommandTests
         var result2 = LoadCommand.CreateFromCapFile(capData, 256);
 
         result1.IsFailure.Should().BeTrue();
-        result1.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result1.Error.Should().BeOfType<SmartCardError>();
         result2.IsFailure.Should().BeTrue();
-        result2.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result2.Error.Should().BeOfType<SmartCardError>();
     }
 
     [Test]

@@ -2,6 +2,7 @@ using System;
 using CSharpFunctionalExtensions;
 using JetBrains.Annotations;
 using Gp4Net.Core;
+using Gp4Net.Domain.Commands;
 
 namespace Gp4Net.Domain.Keys;
 
@@ -221,6 +222,17 @@ public static class GpTestKeys
             ).Map(ks => (IKeySet)ks),
             _ => SmartCardError.InvalidArgument($"Unsupported protocol version: {protocolVersion:X2}")
         };
+    }
+
+    /// <summary>
+    /// Gets the diversified GP test key set based on the card's INITIALIZE UPDATE response.
+    /// This replaces the Lua-based key diversification logic.
+    /// </summary>
+    /// <param name="cardResponse">The INITIALIZE UPDATE response containing diversification data.</param>
+    /// <returns>The diversified key set or an error.</returns>
+    public static Result<IKeySet, SmartCardError> GetDiversifiedTestKeySet(InitializeUpdateResponse cardResponse)
+    {
+        return GpTestKeyProvider.GetDiversifiedTestKeys(cardResponse);
     }
 
     /// <summary>

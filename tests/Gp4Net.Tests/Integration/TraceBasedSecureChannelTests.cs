@@ -38,7 +38,9 @@ public class TraceBasedSecureChannelTests
         );
 
         // Act
-        var response = InitializeUpdateResponse.Parse(responseBytes);
+        var responseResult = InitializeUpdateResponse.Parse(responseBytes);
+        Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
+        var response = responseResult.Value;
 
         Assert.Multiple(() =>
         {
@@ -63,7 +65,9 @@ public class TraceBasedSecureChannelTests
         );
 
         // Act
-        var response = InitializeUpdateResponse.Parse(responseBytes);
+        var responseResult = InitializeUpdateResponse.Parse(responseBytes);
+        Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
+        var response = responseResult.Value;
 
         Assert.Multiple(() =>
         {
@@ -87,7 +91,9 @@ public class TraceBasedSecureChannelTests
         var responseBytes = Convert.FromHexString(
             "000023455580832048390102000303D2C0BAFBF0D31B42E57648A0C5"
         );
-        var response = InitializeUpdateResponse.Parse(responseBytes);
+        var responseResult = InitializeUpdateResponse.Parse(responseBytes);
+        Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
+        var response = responseResult.Value;
 
         // Act
         var parameters = SecureChannelParameterDetector.DetectParameters(response);
@@ -114,7 +120,9 @@ public class TraceBasedSecureChannelTests
         var responseBytes = Convert.FromHexString(
             "00002345558083204839FF020003A33DFDBFFADF57EB6A4A52CFB3E9"
         );
-        var response = InitializeUpdateResponse.Parse(responseBytes);
+        var responseResult = InitializeUpdateResponse.Parse(responseBytes);
+        Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
+        var response = responseResult.Value;
 
         // Act
         var parameters = SecureChannelParameterDetector.DetectParameters(response);
@@ -143,7 +151,9 @@ public class TraceBasedSecureChannelTests
         var responseBytes = Convert.FromHexString(
             "000023455580832048390102000303D2C0BAFBF0D31B42E57648A0C5"
         );
-        var cardResponse = InitializeUpdateResponse.Parse(responseBytes);
+        var cardResponseResult = InitializeUpdateResponse.Parse(responseBytes);
+        Assert.That(cardResponseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
+        var cardResponse = cardResponseResult.Value;
 
         // Expected diversified keys from trace (line 34 in gp_pro_lock.txt)
         var expectedKeys = new
@@ -211,24 +221,26 @@ public class TraceBasedSecureChannelTests
     }
 
     [Test]
-    public void Can_Resolve_GP_Test_Keys_Without_Diversification()
+    public void Can_Resolve_Custom_Keyset_From_Script()
     {
         // Arrange
-        var keysetSpec = "gp_test_keys";
+        var keysetSpec = "test_custom_keys"; // Use a custom keyset that goes through script path
 
         var responseBytes = Convert.FromHexString(
             "00002345558083204839FF020003A33DFDBFFADF57EB6A4A52CFB3E9"
         );
-        var cardResponse = InitializeUpdateResponse.Parse(responseBytes);
+        var cardResponseResult = InitializeUpdateResponse.Parse(responseBytes);
+        Assert.That(cardResponseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
+        var cardResponse = cardResponseResult.Value;
 
-        // GP test keys - static
+        // Custom test keys
         var testKey = Convert.FromHexString("404142434445464748494A4B4C4D4E4F");
         var scriptResult = CreateMockLuaResult(testKey, testKey, testKey, 0xFF);
 
         _ = _scriptManagerMock
             .Setup(x =>
                 x.ExecuteScriptFunction(
-                    "kdf/gp_test_keys",
+                    "kdf/test_custom_keys",
                     "main",
                     Array.Empty<string>(),
                     It.IsAny<Dictionary<string, object>>()
@@ -257,6 +269,17 @@ public class TraceBasedSecureChannelTests
             Assert.That(scp02Keyset.DekKey, Is.EqualTo(testKey));
             Assert.That(scp02Keyset.KeyVersion, Is.EqualTo(0xFF));
         });
+
+        // Verify the script was called
+        _scriptManagerMock.Verify(
+            x => x.ExecuteScriptFunction(
+                "kdf/test_custom_keys",
+                "main",
+                Array.Empty<string>(),
+                It.IsAny<Dictionary<string, object>>()
+            ),
+            Times.Once
+        );
     }
 
     [Test]
@@ -339,14 +362,12 @@ public static class SecureChannelParameterDetector
         // The actual diversification method should come from user configuration/parameters
         var diversificationMethod = KeyDiversificationMethod.Unknown;
 
-        return new SecureChannelParameters
-        {
-            Protocol = protocol,
-            KeyVersion = response.KeyVersion,
-            DiversificationMethod = diversificationMethod,
-            RequiresDiversification = false, // Do not assume diversification is required
-            DiversificationData = response.KeyDiversificationData,
-        };
+        return new SecureChannelParameters(
+            Protocol: protocol,
+            KeyVersion: response.KeyVersion,
+            DiversificationMethod: diversificationMethod,
+            RequiresDiversification: false, // Do not assume diversification is required
+            DiversificationData: response.KeyDiversificationData);
     }
 }
 
@@ -379,12 +400,10 @@ public static class Scp02SessionKeyDerivation
         var sessionMacKey = Derive3DesSessionKey(diversifiedKeys.MacKey, derivationBase, 0x02);
         var sessionRMacKey = Derive3DesSessionKey(diversifiedKeys.MacKey, derivationBase, 0x02); // RMAC uses MAC key
 
-        return new Scp02SessionKeys
-        {
-            EncryptionKey = sessionEncKey,
-            MacKey = sessionMacKey,
-            ReceiptMacKey = sessionRMacKey,
-        };
+        return new Scp02SessionKeys(
+            EncryptionKey: sessionEncKey,
+            MacKey: sessionMacKey,
+            ReceiptMacKey: sessionRMacKey);
     }
 
     private static byte[] Derive3DesSessionKey(
@@ -429,14 +448,12 @@ public static class Scp02SessionKeyDerivation
 }
 
 // Supporting types
-public class SecureChannelParameters
-{
-    public SecureChannelProtocol Protocol { get; set; }
-    public byte KeyVersion { get; set; }
-    public KeyDiversificationMethod DiversificationMethod { get; set; }
-    public bool RequiresDiversification { get; set; }
-    public byte[] DiversificationData { get; set; } = [];
-}
+public record SecureChannelParameters(
+    SecureChannelProtocol Protocol,
+    byte KeyVersion,
+    KeyDiversificationMethod DiversificationMethod,
+    bool RequiresDiversification,
+    byte[] DiversificationData);
 
 public enum SecureChannelProtocol
 {
@@ -451,9 +468,7 @@ public enum KeyDiversificationMethod
     Unknown,
 }
 
-public class Scp02SessionKeys
-{
-    public byte[] EncryptionKey { get; set; } = [];
-    public byte[] MacKey { get; set; } = [];
-    public byte[] ReceiptMacKey { get; set; } = [];
-}
+public record Scp02SessionKeys(
+    byte[] EncryptionKey,
+    byte[] MacKey,
+    byte[] ReceiptMacKey);

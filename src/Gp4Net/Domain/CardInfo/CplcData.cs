@@ -102,9 +102,9 @@ public class CplcData
     public uint IcPersonalizationEquipmentId { get; set; }
 
     /// <summary>
-    /// Gets the raw CPLC data bytes.
+    /// Gets the CPLC data bytes from GET DATA(0x9F7F) response.
     /// </summary>
-    public byte[] RawData { get; private set; } = [];
+    public byte[] Data { get; private set; } = [];
 
     /// <summary>
     /// Parses CPLC data from a byte array.
@@ -125,8 +125,8 @@ public class CplcData
             );
         }
 
-        var cplc = new CplcData { RawData = new byte[data.Length] };
-        Array.Copy(data, cplc.RawData, data.Length);
+        var cplc = new CplcData { Data = new byte[data.Length] };
+        Array.Copy(data, cplc.Data, data.Length);
 
         // Parse according to CPLC structure
         var offset = 0;

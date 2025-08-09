@@ -32,24 +32,21 @@ public record MacChainingState(
     {
         if (initialValue == null)
         {
-            return SmartCardError.InvalidArgument("Initial chaining value cannot be null");
+            return new NullParameterError(nameof(initialValue));
         }
 
         // Validate protocol version
         if (protocolVersion != ProtocolIdentifiers.Scp02 && 
             protocolVersion != ProtocolIdentifiers.Scp03)
         {
-            return SmartCardError.InvalidArgument(
-                $"Invalid protocol version: 0x{protocolVersion:X2}. Must be SCP02 (0x02) or SCP03 (0x03)");
+            return new InvalidFormatError("ProtocolVersion", "SCP02 (0x02) or SCP03 (0x03)");
         }
 
         // Validate chaining value size based on protocol
         var expectedSize = protocolVersion == ProtocolIdentifiers.Scp03 ? 16 : 8;
         if (initialValue.Length != expectedSize)
         {
-            return SmartCardError.InvalidArgument(
-                $"Invalid chaining value size for SCP{protocolVersion:X2}: " +
-                $"expected {expectedSize} bytes, got {initialValue.Length}");
+            return new InvalidLengthError($"SCP{protocolVersion:X2} chaining value", expectedSize, initialValue.Length);
         }
 
         return Result.Success<MacChainingState, SmartCardError>(

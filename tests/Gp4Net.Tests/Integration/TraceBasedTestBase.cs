@@ -74,11 +74,11 @@ public abstract class TraceBasedTestBase : IDisposable
     protected virtual IDomainServiceFactory CreateTestServiceFactory()
     {
         // Create minimal functional dependencies for testing
-        var pipeline = new TestCommandPipeline();
         var transportFactory = new TestApduTransportFactory();
         var secureChannelManager = new TestSecureChannelManager();
+        var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<DomainServiceFactory>.Instance;
             
-        return new DomainServiceFactory(pipeline, transportFactory, secureChannelManager);
+        return new DomainServiceFactory(transportFactory, secureChannelManager, logger);
     }
 
     /// <summary>

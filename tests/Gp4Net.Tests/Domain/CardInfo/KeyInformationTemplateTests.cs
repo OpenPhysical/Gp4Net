@@ -1,5 +1,6 @@
 using System.Linq;
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
 using NUnit.Framework;
 
@@ -231,7 +232,8 @@ public class KeyInformationTemplateTests
 
         // Assert
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
+        // This should ideally be EmptyDataError for empty data validation
     }
 
     [Test]

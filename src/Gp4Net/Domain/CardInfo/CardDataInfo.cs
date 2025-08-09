@@ -1,323 +1,335 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Core.Asn1;
 using Gp4Net.Core.Tlv;
 using Org.BouncyCastle.Asn1;
 
 namespace Gp4Net.Domain.CardInfo;
 
 /// <summary>
-/// Represents detailed information retrieved from a card, such as raw data,
-/// tags, and various configuration details.
+/// Immutable record representing card data information from GET DATA responses.
+/// Contains OID-based platform identification and version information.
+/// Per GP Card Specification v2.3.1 Section E.2.1.1 - Card Data Object.
 /// </summary>
-public class CardDataInfo
+/// <param name="Data">TLV-encoded card data bytes from GET DATA(0x0066) response</param>
+/// <param name="Tags">Parsed TLV tags and their associated data</param>
+/// <param name="GlobalPlatformVersion">GP version extracted from TLV structure</param>
+/// <param name="SecureChannelProtocolInfo">SCP protocol data from card OIDs</param>
+/// <param name="CardConfigurationDetails">Card configuration information</param>
+/// <param name="CardChipDetails">Chip-specific details</param>
+/// <param name="Oids">Object identifiers found in card data</param>
+/// <param name="GlobalPlatformVersionFromOid">GP version string from OID parsing</param>
+public record CardDataInfo(
+    byte[] Data,
+    IReadOnlyDictionary<ushort, byte[]> Tags,
+    Maybe<Version> GlobalPlatformVersion,
+    Maybe<byte[]> SecureChannelProtocolInfo,
+    Maybe<byte[]> CardConfigurationDetails,
+    Maybe<byte[]> CardChipDetails,
+    IReadOnlyList<string> Oids,
+    Maybe<string> GlobalPlatformVersionFromOid
+)
 {
     /// <summary>
-    /// Gets or sets the raw binary data associated with the card.
+    /// Creates an empty CardDataInfo for cases where no card data is available.
     /// </summary>
-    /// <remarks>
-    /// The <c>RawData</c> property represents the unprocessed byte array
-    /// containing all the data extracted from the card. This data forms the
-    /// base for parsing and extracting specific details, such as tags,
-    /// OIDs, and configuration settings.
-    /// </remarks>
-    public byte[] RawData { get; set; } = [];
+    public static CardDataInfo Empty => new(
+        [],
+        new Dictionary<ushort, byte[]>(),
+        Maybe<Version>.None,
+        Maybe<byte[]>.None,
+        Maybe<byte[]>.None,
+        Maybe<byte[]>.None,
+        [],
+        Maybe<string>.None
+    );
 
     /// <summary>
-    /// Represents a collection of tags and their associated data extracted from the card.
+    /// Indicates whether this card data contains any meaningful information.
     /// </summary>
-    /// <remarks>
-    /// Each tag is identified by a unique 16-bit identifier (ushort) and is associated with a corresponding byte array
-    /// containing the tag's data. This property is populated during the parsing of card-related data.
-    /// </remarks>
-    public Dictionary<ushort, byte[]> Tags { get; } = [];
+    public bool HasData => Data.Length > 0 || Tags.Count > 0 || Oids.Count > 0;
 
     /// <summary>
-    /// Represents the GlobalPlatform version of the card.
-    /// The GlobalPlatform version is extracted from the card data
-    /// during parsing and indicates the supported GlobalPlatform specification.
-    /// This property is read-only and may be null if the version information
-    /// is not available in the provided data.
+    /// Parses card data bytes into structured CardDataInfo using functional composition.
+    /// Per GP Card Specification v2.3.1 Section E.2.1.1, parses TLV-encoded data object.
     /// </summary>
-    public Version GlobalPlatformVersion { get; private set; }
-
-    /// <summary>
-    /// Gets the secure channel protocol information extracted from the card data.
-    /// This property represents a portion of the card's tag data that contains
-    /// information about the secure communication protocol supported by the card.
-    /// The value is extracted from the card data and corresponds to the tag
-    /// associated with secure channel protocol information, if available.
-    /// </summary>
-    public byte[] SecureChannelProtocolInfo { get; private set; }
-
-    /// <summary>
-    /// Represents the card configuration details as a byte array, which may
-    /// include information such as available features or settings on the card.
-    /// This property is populated during the parsing of the raw card data.
-    /// </summary>
-    public byte[] CardConfigurationDetails { get; private set; }
-
-    /// <summary>
-    /// Represents the details associated with the card chip as retrieved from the parsed data tags.
-    /// </summary>
-    /// <remarks>
-    /// This property is populated from the data tag with identifier 0x66 during the parsing process.
-    /// It may contain chip-specific information in a byte array format, or be null if the tag is not found in the input data.
-    /// </remarks>
-    public byte[] CardChipDetails { get; private set; }
-
-    /// <summary>
-    /// Represents a collection of Object Identifiers (OIDs)
-    /// extracted from card data information.
-    /// </summary>
-    /// <remarks>
-    /// - The OIDs provide identifiers that can be used for
-    /// identifying protocols, features, or specific data structures.
-    /// - This property contains a list of OIDs parsed from raw
-    /// card data using predefined parsing logic.
-    /// </remarks>
-    /// <value>
-    /// A list of strings where each string represents an
-    /// extracted OID in the standard dot-separated notation.
-    /// </value>
-    public List<string> Oids { get; } = [];
-
-    /// <summary>
-    /// Gets the GlobalPlatform version extracted from the corresponding OID
-    /// (Object Identifier) found during the parsing of card data. This property
-    /// represents the version information for GlobalPlatform formatted as a string,
-    /// typically derived from a specific OID pattern in the data.
-    /// </summary>
-    /// <remarks>
-    /// If no valid GlobalPlatform version OID is found during parsing, this
-    /// property will return <c>null</c>.
-    /// </remarks>
-    public string GlobalPlatformVersionFromOid { get; private set; }
-
-    /// Parses the given byte array to extract card information and populate a CardDataInfo object.
-    /// <param name="data">The byte array containing card data to be parsed.</param>
-    /// <returns>Result containing a CardDataInfo object populated with the extracted card information.</returns>
+    /// <param name="data">TLV-encoded card data from GET DATA(0x0066) response</param>
+    /// <returns>Result containing parsed CardDataInfo or SmartCardError</returns>
     public static Result<CardDataInfo, SmartCardError> Parse(byte[] data)
     {
-        if (data == null)
-        {
-            return SmartCardError.InvalidArgument("Card data cannot be null");
-        }
-
-        var cardData = new CardDataInfo { RawData = [.. data] };
-
-        // Parse all DER elements from the data recursively
-        ParseDerElements(data, cardData, isTopLevel: true);
-
-        // Extract GlobalPlatform version from OIDs (matching GP Pro behavior)
-        foreach (var oid in cardData.Oids)
-        {
-            if (!oid.StartsWith("1.2.840.114283.2.") || oid == "1.2.840.114283.2")
-            {
-                continue;
-            }
-
-            var parts = oid.Split('.');
-            if (parts.Length < 7)
-            {
-                continue;
-            }
-
-            // Extract version components after the standard GP prefix (1.2.840.114283)
-            var versionParts = parts.Skip(4);
-            cardData.GlobalPlatformVersionFromOid = string.Join(".", versionParts);
-        }
-
-        if (cardData.Tags.TryGetValue(0x73, out var gpVersionData))
-        {
-            cardData.GlobalPlatformVersion = ParseGlobalPlatformVersion(gpVersionData);
-        }
-
-        _ = cardData.Tags.TryGetValue(0x64, out var cardDataSecureChannelProtocolInfo);
-        _ = cardData.Tags.TryGetValue(0x65, out var cardConfigurationDetails);
-        _ = cardData.Tags.TryGetValue(0x66, out var cardChipDetails);
-        cardData.SecureChannelProtocolInfo = cardDataSecureChannelProtocolInfo;
-        cardData.CardConfigurationDetails = cardConfigurationDetails;
-        cardData.CardChipDetails = cardChipDetails;
-
-        return Result.Success<CardDataInfo, SmartCardError>(cardData);
+        // Eliminate null by requiring non-null data at system boundary
+        return data.Length == 0 
+            ? Result.Success<CardDataInfo, SmartCardError>(Empty)
+            : ParseCardDataElements(data);
     }
 
-    private static void ParseDerElements(
-        byte[] data,
-        CardDataInfo cardData,
-        bool isTopLevel = false
-    )
+    /// <summary>
+    /// Pure function to parse card data elements into structured information.
+    /// Uses functional composition to avoid mutations and side effects.
+    /// </summary>
+    private static Result<CardDataInfo, SmartCardError> ParseCardDataElements(byte[] data)
+    {
+        try
+        {
+            var tags = ParseTlvTags(data);
+            var oids = ExtractOids(data);
+            var gpVersionFromOid = ExtractGpVersionFromOids(oids);
+            var gpVersion = ExtractGpVersionFromTags(tags);
+            
+            return Result.Success<CardDataInfo, SmartCardError>(new CardDataInfo(
+                data,
+                tags,
+                gpVersion,
+                tags.TryGetValue(0x64, out var scpInfo) ? Maybe<byte[]>.From(scpInfo) : Maybe<byte[]>.None,
+                tags.TryGetValue(0x65, out var configDetails) ? Maybe<byte[]>.From(configDetails) : Maybe<byte[]>.None,
+                tags.TryGetValue(0x66, out var chipDetails) ? Maybe<byte[]>.From(chipDetails) : Maybe<byte[]>.None,
+                oids,
+                gpVersionFromOid
+            ));
+        }
+        catch (Exception ex)
+        {
+            return SmartCardError.InvalidData($"Failed to parse card data: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Pure function to parse TLV tags from card data.
+    /// Returns immutable dictionary of tags to byte arrays.
+    /// </summary>
+    private static IReadOnlyDictionary<ushort, byte[]> ParseTlvTags(byte[] data)
+    {
+        var tags = new Dictionary<ushort, byte[]>();
+        
+        foreach (var element in TlvParser.ParseAll(data))
+        {
+            tags[(ushort)element.TagNumber] = element.Value;
+        }
+        
+        return tags;
+    }
+
+    /// <summary>
+    /// Pure function to extract OIDs from card data recursively.
+    /// Per ASN.1 encoding rules, OIDs use tag 0x06.
+    /// </summary>
+    private static IReadOnlyList<string> ExtractOids(byte[] data)
+    {
+        var oids = new List<string>();
+        ExtractOidsRecursive(data, oids);
+        return oids;
+    }
+
+    /// <summary>
+    /// Recursively extracts OIDs from TLV structures.
+    /// </summary>
+    private static void ExtractOidsRecursive(byte[] data, List<string> oids)
     {
         foreach (var element in TlvParser.ParseAll(data))
         {
-            // Only store top-level tags in the Tags dictionary
-            if (isTopLevel)
-            {
-                cardData.Tags[(ushort)element.TagNumber] = element.Value;
-            }
-
-            // Special handling for OIDs (tag 0x06)
             if (element.TagNumber == 0x06)
             {
-                // Parse OID using BouncyCastle
-                try
-                {
-                    // Create DER-encoded OID from content
-                    var derBytes = new byte[element.Value.Length + 2];
-                    derBytes[0] = 0x06; // OID tag
-                    derBytes[1] = (byte)element.Value.Length;
-                    Buffer.BlockCopy(element.Value, 0, derBytes, 2, element.Value.Length);
-
-                    var asn1Object = Asn1Object.FromByteArray(derBytes);
-                    if (asn1Object is DerObjectIdentifier oidObj)
-                    {
-                        var oidString = oidObj.Id;
-                        if (!cardData.Oids.Contains(oidString))
-                        {
-                            cardData.Oids.Add(oidString);
-                        }
-                    }
-                }
-                catch
-                {
-                    // Skip invalid OIDs
-                }
+                // Parse OID using BouncyCastle ASN.1 parser
+                ParseOid(element.Value).Match(
+                    Some: oid => { if (!oids.Contains(oid)) oids.Add(oid); },
+                    None: () => { /* Skip invalid OIDs */ }
+                );
             }
             else if (element.Value.Length >= 2)
             {
-                // Try to parse as DER to see if it contains nested structures
-                // Only recurse if we find at least one complete DER element
+                // Recursively parse nested structures
                 var nestedElements = TlvParser.ParseAll(element.Value).ToList();
                 if (nestedElements.Any())
                 {
-                    // Additional check: ensure we consumed all the content
-                    // This helps avoid false positives where random data looks like DER
-                    // For now, skip this check as TlvObject doesn't track total length
-                    // TODO: Consider adding total length tracking to TlvObject
-                    // Recursively parse nested structures
-                    ParseDerElements(element.Value, cardData, isTopLevel: false);
+                    ExtractOidsRecursive(element.Value, oids);
                 }
             }
         }
     }
 
-    /// Parses the GlobalPlatform version from the provided byte array.
-    /// GlobalPlatform versions are typically encoded in BCD (Binary Coded Decimal) format.
-    /// <param name="data">The byte array containing the GlobalPlatform version information.</param>
-    /// <return>
-    /// A <see cref="System.Version"/> object representing the parsed GlobalPlatform version,
-    /// or null if the data length is insufficient to determine a valid version.
-    /// </return>
-    private static Version ParseGlobalPlatformVersion(byte[] data)
+    /// <summary>
+    /// Pure function to parse a single OID from bytes using BouncyCastle.
+    /// </summary>
+    private static Maybe<string> ParseOid(byte[] oidBytes)
     {
-        if (data == null || data.Length == 0)
+        try
         {
-            return null;
+            // Create DER-encoded OID from content
+            var derBytes = new byte[oidBytes.Length + 2];
+            derBytes[0] = 0x06; // OID tag
+            derBytes[1] = (byte)oidBytes.Length;
+            Buffer.BlockCopy(oidBytes, 0, derBytes, 2, oidBytes.Length);
+
+            var asn1Object = Asn1Object.FromByteArray(derBytes);
+            return asn1Object is DerObjectIdentifier oidObj ? Maybe<string>.From(oidObj.Id) : Maybe<string>.None;
         }
+        catch
+        {
+            return Maybe<string>.None;
+        }
+    }
+
+    /// <summary>
+    /// Pure function to extract GlobalPlatform version from OIDs.
+    /// Per GP Card Specification, GP version OIDs follow pattern 1.2.840.114283.2.x.y.z
+    /// </summary>
+    private static Maybe<string> ExtractGpVersionFromOids(IReadOnlyList<string> oids)
+    {
+        var result = oids
+            .Where(oid => oid.StartsWith("1.2.840.114283.2.") && oid != "1.2.840.114283.2")
+            .Select(oid => oid.Split('.'))
+            .Where(parts => parts.Length >= 7)
+            .Select(parts => string.Join(".", parts.Skip(4)))
+            .FirstOrDefault();
+        return string.IsNullOrEmpty(result) ? Maybe<string>.None : Maybe<string>.From(result);
+    }
+
+    /// <summary>
+    /// Pure function to extract GlobalPlatform version from TLV tags.
+    /// Version information is typically stored in tag 0x73 in BCD format.
+    /// </summary>
+    private static Maybe<Version> ExtractGpVersionFromTags(IReadOnlyDictionary<ushort, byte[]> tags)
+    {
+        return tags.TryGetValue(0x73, out var gpVersionData) 
+            ? ParseGlobalPlatformVersion(gpVersionData)
+            : Maybe<Version>.None;
+    }
+
+    /// <summary>
+    /// Pure function to parse GlobalPlatform version from BCD-encoded bytes.
+    /// Per GP specification, versions are encoded in Binary Coded Decimal format.
+    /// </summary>
+    private static Maybe<Version> ParseGlobalPlatformVersion(byte[] data)
+    {
+        if (data.Length == 0) return Maybe<Version>.None;
 
         try
         {
             // Parse as BCD (Binary Coded Decimal) format
-            // Each byte represents two decimal digits in BCD format
             return data.Length switch
             {
-                >= 3 => new Version(BcdToByte(data[0]), BcdToByte(data[1]), BcdToByte(data[2])),
-                2 => new Version(BcdToByte(data[0]), BcdToByte(data[1])),
-                1 => new Version(BcdToByte(data[0]), 0),
-                _ => null
+                >= 3 => Maybe<Version>.From(new Version(BcdToByte(data[0]), BcdToByte(data[1]), BcdToByte(data[2]))),
+                2 => Maybe<Version>.From(new Version(BcdToByte(data[0]), BcdToByte(data[1]))),
+                1 => Maybe<Version>.From(new Version(BcdToByte(data[0]), 0)),
+                _ => Maybe<Version>.None
             };
         }
         catch
         {
             // Fallback to raw binary interpretation if BCD parsing fails
-            return data.Length switch
+            try
             {
-                >= 3 => new Version(data[0], data[1], data[2]),
-                2 => new Version(data[0], data[1]),
-                1 => new Version(data[0], 0),
-                _ => null
-            };
+                return data.Length switch
+                {
+                    >= 3 => Maybe<Version>.From(new Version(data[0], data[1], data[2])),
+                    2 => Maybe<Version>.From(new Version(data[0], data[1])),
+                    1 => Maybe<Version>.From(new Version(data[0], 0)),
+                    _ => Maybe<Version>.None
+                };
+            }
+            catch
+            {
+                return Maybe<Version>.None;
+            }
         }
     }
 
     /// <summary>
-    /// Converts a BCD (Binary Coded Decimal) byte to its decimal equivalent.
+    /// Pure function to convert BCD byte to decimal.
+    /// Each BCD byte contains two decimal digits: high nibble * 10 + low nibble.
     /// </summary>
-    /// <param name="bcd">The BCD byte to convert.</param>
-    /// <returns>The decimal equivalent.</returns>
-    private static int BcdToByte(byte bcd)
-    {
-        return ((bcd >> 4) * 10) + (bcd & 0x0F);
-    }
+    private static int BcdToByte(byte bcd) => ((bcd >> 4) * 10) + (bcd & 0x0F);
 
     /// <summary>
-    /// Converts the current state of the CardDataInfo instance, including parsed OIDs,
-    /// GlobalPlatform version, secure channel protocol information, card configuration details,
-    /// card chip details, and all tag data, into a readable string format.
+    /// Custom string representation showing parsed card information including OID details.
     /// </summary>
-    /// <returns>
-    /// A string representation of the CardDataInfo instance, providing detailed information
-    /// about its parsed contents and metadata.
-    /// </returns>
     public override string ToString()
     {
-        var sb = new StringBuilder();
-        _ = sb.AppendLine("Card Data:");
+        var parts = new List<string>
+        {
+            $"Data = {(Data.Length > 0 ? $"System.Byte[{Data.Length}]" : "System.Byte[]")}",
+            $"Tags = System.Collections.Generic.Dictionary`2[System.UInt16,System.Byte[]]",
+            $"GlobalPlatformVersion = {(GlobalPlatformVersion.HasValue ? GlobalPlatformVersion.Value.ToString() : "No value")}",
+            $"SecureChannelProtocolInfo = {(SecureChannelProtocolInfo.HasValue ? "System.Byte[]" : "No value")}",
+            $"CardConfigurationDetails = {(CardConfigurationDetails.HasValue ? "System.Byte[]" : "No value")}",
+            $"CardChipDetails = {(CardChipDetails.HasValue ? "System.Byte[]" : "No value")}",
+            $"Oids = System.Collections.Generic.List`1[System.String]"
+        };
 
+        if (GlobalPlatformVersionFromOid.HasValue)
+        {
+            parts.Add($"GlobalPlatformVersionFromOid = {GlobalPlatformVersionFromOid.Value}");
+        }
+        else
+        {
+            parts.Add("GlobalPlatformVersionFromOid = No value");
+        }
+
+        parts.Add($"HasData = {HasData}");
+
+        var result = $"CardDataInfo {{ {string.Join(", ", parts)} }}";
+
+        // Add parsed OIDs section if we have OIDs
         if (Oids.Count > 0)
         {
-            _ = sb.AppendLine("  Parsed OIDs:");
+            result += "\n\nParsed OIDs:\n";
             foreach (var oid in Oids)
             {
-                var description = KnownOids.GetDescription(oid);
-                _ = sb.AppendLine($"    Tag 6: {oid}");
-                if (description.HasValue)
+                var description = GetOidDescription(oid);
+                result += $"{oid}\n-> {description}\n";
+                
+                // Add GP version info for version OIDs
+                if (oid.StartsWith("1.2.840.114283.2.") && oid != "1.2.840.114283.2")
                 {
-                    _ = sb.AppendLine($"    -> {description.Value}");
+                    var versionParts = oid.Split('.').Skip(4);
+                    result += $"-> GP Version: {string.Join(".", versionParts)}\n";
                 }
             }
         }
 
-        if (!string.IsNullOrEmpty(GlobalPlatformVersionFromOid))
+        // Add Secure Channel Protocol Info section if available
+        if (SecureChannelProtocolInfo.HasValue)
         {
-            _ = sb.AppendLine($"  -> GP Version: {GlobalPlatformVersionFromOid}");
+            result += "\nSecure Channel Protocol Info:\n";
+            var scpData = SecureChannelProtocolInfo.Value;
+            result += $"Raw data: {Convert.ToHexString(scpData)}\n";
+            
+            // Parse SCP info according to GP specification
+            if (scpData.Length >= 2)
+            {
+                var scpId = scpData[0];
+                var implOptions = scpData[1];
+                result += $"SCP ID: {scpId:X2}, Implementation Options: {implOptions:X2}\n";
+            }
         }
 
-        if (GlobalPlatformVersion != null)
-        {
-            _ = sb.AppendLine($"  GlobalPlatform Version (from tag 73): {GlobalPlatformVersion}");
-        }
+        return result;
+    }
 
-        if (SecureChannelProtocolInfo != null)
+    /// <summary>
+    /// Gets human-readable description for common GlobalPlatform and JavaCard OIDs per official specifications.
+    /// Based on GlobalPlatform Card Specification v2.3.1 Section H.1.
+    /// </summary>
+    private static string GetOidDescription(string oid)
+    {
+        return oid switch
         {
-            _ = sb.AppendLine(
-                $"  Secure Channel Protocol Info: {Convert.ToHexString(SecureChannelProtocolInfo)}"
-            );
-        }
-
-        if (CardConfigurationDetails != null)
-        {
-            _ = sb.AppendLine(
-                $"  Card Configuration Details: {Convert.ToHexString(CardConfigurationDetails)}"
-            );
-        }
-
-        if (CardChipDetails != null)
-        {
-            _ = sb.AppendLine($"  Card/Chip Details: {Convert.ToHexString(CardChipDetails)}");
-        }
-
-        _ = sb.AppendLine("  All Tags:");
-        foreach (var tag in Tags.OrderBy(static t => t.Key))
-        {
-            _ = sb.AppendLine($"    Tag {tag.Key:X2}: {Convert.ToHexString(tag.Value)}");
-        }
-
-        return sb.ToString();
+            // GlobalPlatform OIDs per GP Card Specification v2.3.1 Section H.1
+            "1.2.840.114283.1" => "Card Recognition Data, also identifies GlobalPlatform as the Tag Allocation Authority",
+            "1.2.840.114283.2" => "Card Management Type and Version", 
+            "1.2.840.114283.3" => "Card Identification Scheme - card uniquely identified by IIN and CIN",
+            
+            // JavaCard OIDs (Oracle/Sun Microsystems enterprise OID space)
+            "1.3.6.1.4.1.42.2.110.1.3" => "JavaCard Runtime Environment version 3.x",
+            
+            // Pattern matching for versioned OIDs
+            var v when v.StartsWith("1.2.840.114283.2.") => "Card Management Type and Version",
+            var v when v.StartsWith("1.2.840.114283.4.") => "Secure Channel Protocol of Security Domain and implementation options",
+            var v when v.StartsWith("1.3.6.1.4.1.42.2.110.") => "JavaCard Runtime Environment",
+            
+            _ => "Unknown OID"
+        };
     }
 }

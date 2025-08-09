@@ -4,6 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Gp4Net.Core;
 using Gp4Net.Domain;
+using Gp4Net.Domain.Keys;
+using Gp4Net.Services;
+using Gp4Net.Tool.Commands;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
@@ -18,9 +21,6 @@ namespace Gp4Net.Tool.Commands.Applet;
 /// </summary>
 [PublicAPI]
 [CliCommand("list", "List applications on the card", "applet")]
-/// <summary>
-/// Command to list applications installed on a GlobalPlatform card.
-/// </summary>
 [Description("List applications on the card")]
 public class ListCliCommand : BaseCommand<ListCliCommand.Settings>
 {
@@ -29,10 +29,10 @@ public class ListCliCommand : BaseCommand<ListCliCommand.Settings>
     /// </summary>
     public ListCliCommand(
         ICardService cardService,
-        Gp4Net.Services.IGlobalPlatformService globalPlatformService,
+        IDomainServiceFactory domainServiceFactory,
         IKeysetResolver keysetResolver
     )
-        : base(cardService, globalPlatformService, keysetResolver) { }
+        : base(cardService, domainServiceFactory, keysetResolver) { }
 
     /// <summary>
     /// Executes the list command to enumerate applications on the card.
@@ -47,66 +47,96 @@ public class ListCliCommand : BaseCommand<ListCliCommand.Settings>
             return 1;
         }
 
-        // Optionally establish secure channel for more detailed information
-        if (settings.RequiresSecureChannel && !EnsureSecureChannel(settings))
-        {
-            return 1;
-        }
-
         if (!settings.NoCardInfo)
         {
             DisplayCardInfo();
         }
 
-        var statusResult = await GlobalPlatformService.GetStatusAsync(
-            StatusSubset.ApplicationsAndSupplementaryDomains);
+        // Use functional card content retriever for complete listing
+        var contentRetriever = DomainServiceFactory.CreateCardContentRetriever(CardService);
+        
+        // Determine key set to use (default to GP test keys)
+        var keySet = ResolveKeySetForRetrieval(settings);
+        
+        AnsiConsole.MarkupLine("[yellow]Retrieving complete card content...[/]");
+        var contentResult = await contentRetriever.RetrieveCardContentAsync(keySet);
 
-        if (statusResult.IsSuccess)
+        if (contentResult.IsSuccess)
         {
-            return await ProcessApplications(statusResult.Value, settings);
+            return await ProcessCardContent(contentResult.Value, settings);
         }
         else
         {
-            return HandleError(statusResult.Error, settings);
+            return HandleError(contentResult.Error, settings);
         }
+    }
+
+    /// <summary>
+    /// Resolves the key set to use for card content retrieval.
+    /// </summary>
+    private IKeySet ResolveKeySetForRetrieval(Settings settings)
+    {
+        // If specific keys are provided, use them
+        if (settings.KeyEnc != null || settings.KeyMac != null || settings.KeyDek != null)
+        {
+            return KeysetResolver.ResolveKeyset(
+                settings.Keyset,
+                settings.KeysetParams,
+                settings.KeyEnc,
+                settings.KeyMac,
+                settings.KeyDek,
+                settings.KeyVersion,
+                null);
+        }
+
+        // Use GP test keys by default
+        return null; // CardContentRetriever will default to GP test keys
+    }
+
+    /// <summary>
+    /// Processes the complete card content for display.
+    /// </summary>
+    private Task<int> ProcessCardContent(CardContent cardContent, Settings settings)
+    {
+        // Convert CardContent to legacy ApplicationInfo list for compatibility
+        var allApplications = cardContent.AllApplications;
+        
+        // Add ISD to the list if present
+        var applicationsWithIsd = cardContent.IssuerSecurityDomain.HasValue
+            ? allApplications.Add(cardContent.IssuerSecurityDomain.Value)
+            : allApplications;
+
+        return ProcessApplications(applicationsWithIsd, settings);
     }
 
     private Task<int> ProcessApplications(IReadOnlyList<ApplicationInfo> applications, Settings settings)
     {
-        // Apply filter
-        var filteredApps = applications;
-        if (!string.IsNullOrEmpty(settings.Filter) && settings.Filter != "all")
-        {
-            filteredApps = FilterApplications(filteredApps, settings.Filter);
-        }
+        // Build semantic rows using pure functional composition
+        var semanticRows = ApplicationTableBuilder.BuildApplicationRows(
+            applications,
+            showExtended: settings.ShowExtended,
+            showSummary: settings.ShowSummary,
+            filter: settings.Filter
+        ).ToList();
 
-        if (filteredApps.Count == 0)
-        {
-            AnsiConsole.MarkupLine("[yellow]No applications found[/]");
-            return Task.FromResult(0);
-        }
-
-        // Display based on format
+        // Display based on format using pure functions
         switch (settings.Format.ToLowerInvariant())
         {
             case "json":
-                DisplayJson(filteredApps);
+                var json = ApplicationTableBuilder.ToJson(applications);
+                AnsiConsole.WriteLine(json);
                 break;
 
             case "csv":
-                DisplayCsv(filteredApps);
+                var csv = ApplicationTableBuilder.ToCsv(applications);
+                AnsiConsole.WriteLine(csv);
                 break;
 
             case "table":
             default:
-                DisplayTable(filteredApps, settings.ShowExtended);
+                ApplicationTableRenderer.RenderToTable(semanticRows, settings.ShowExtended);
+                ApplicationTableRenderer.RenderPostTableRows(semanticRows);
                 break;
-        }
-
-        if (settings.ShowSummary)
-        {
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine($"[dim]Total: {filteredApps.Count} application(s)[/]");
         }
 
         return Task.FromResult(0);
@@ -122,30 +152,6 @@ public class ListCliCommand : BaseCommand<ListCliCommand.Settings>
         return 1;
     }
 
-    private static IReadOnlyList<ApplicationInfo> FilterApplications(
-        IReadOnlyList<ApplicationInfo> applications,
-        string filter
-    )
-    {
-        return ApplicationDisplayService.FilterApplications(applications, filter);
-    }
-
-    private static void DisplayTable(IReadOnlyList<ApplicationInfo> applications, bool extended)
-    {
-        ApplicationDisplayService.DisplayApplicationTable(applications, extended);
-    }
-
-    private static void DisplayJson(IReadOnlyList<ApplicationInfo> applications)
-    {
-        ApplicationDisplayService.DisplayApplicationsJson(applications);
-    }
-
-    private static void DisplayCsv(IReadOnlyList<ApplicationInfo> applications)
-    {
-        ApplicationDisplayService.DisplayApplicationsCsv(applications);
-    }
-
-    // Display methods now delegate to ApplicationDisplayService
 
     /// <summary>
     /// Settings for the list command.
@@ -205,7 +211,7 @@ public class ListCliCommand : BaseCommand<ListCliCommand.Settings>
         {
             get
             {
-                return UseSecureChannel;
+                return true; // Always require secure channel for listing applets
             }
         }
 

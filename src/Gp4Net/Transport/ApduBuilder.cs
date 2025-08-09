@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Transport;
@@ -17,20 +18,23 @@ public static class ApduBuilder
     /// </summary>
     /// <param name="command">The command to convert to APDU bytes.</param>
     /// <returns>The APDU byte array.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when command is null.</exception>
     public static byte[] BuildApdu(IApduCommand command)
     {
-        ArgumentNullException.ThrowIfNull(command);
+        // If the command provides complete APDU bytes, use them directly
+        if (command is ICompleteApduCommand completeCommand)
+        {
+            return completeCommand.GetCompleteApdu();
+        }
 
         var apduBytes = new List<byte> { command.Cla, command.Ins, command.P1, command.P2 };
 
-        var hasData = command.Data is { Length: > 0 };
+        var hasData = command.Data.Length > 0;
         var hasExpectedLength = command.ExpectedResponseLength.HasValue;
 
         if (hasData)
         {
             // Add Lc (data length)
-            if (command.IsExtendedLength && command.Data!.Length > 255)
+            if (command.IsExtendedLength && command.Data.Length > 255)
             {
                 // Extended length format
                 apduBytes.Add(0x00);
@@ -40,7 +44,7 @@ public static class ApduBuilder
             else
             {
                 // Short length format
-                apduBytes.Add((byte)command.Data!.Length);
+                apduBytes.Add((byte)command.Data.Length);
             }
             
             // Add data
@@ -81,8 +85,8 @@ public static class ApduBuilder
     /// <param name="ins">Instruction byte.</param>
     /// <param name="p1">Parameter 1.</param>
     /// <param name="p2">Parameter 2.</param>
-    /// <param name="data">Optional data.</param>
-    /// <param name="le">Optional expected response length.</param>
+    /// <param name="data">Command data.</param>
+    /// <param name="le">Expected response length.</param>
     /// <returns>The APDU byte array.</returns>
     public static byte[] BuildApdu(byte cla, byte ins, byte p1, byte p2, byte[] data = null, Maybe<int> le = default)
     {
@@ -105,7 +109,7 @@ public static class ApduBuilder
         {
             get
             {
-                return Data is { Length: > 255 } || ExpectedResponseLength.Map(len => len > 255).GetValueOrDefault(false);
+                return Data.Length > 255 || ExpectedResponseLength.Map(len => len > 255).GetValueOrDefault(false);
             }
         }
 

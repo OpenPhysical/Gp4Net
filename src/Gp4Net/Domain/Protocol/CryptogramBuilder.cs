@@ -38,31 +38,37 @@ public static class CryptogramBuilder
         IKeyDerivationService keyDerivationService,
         byte protocolVersion)
     {
-        ArgumentNullException.ThrowIfNull(response);
-        ArgumentNullException.ThrowIfNull(hostChallenge);
-        ArgumentNullException.ThrowIfNull(sessionKeys);
-        ArgumentNullException.ThrowIfNull(buildCryptogramData);
-        ArgumentNullException.ThrowIfNull(keyDerivationService);
+        if (response is null)
+            return Result.Failure<bool, SmartCardError>(new NullParameterError("response"));
+        
+        if (hostChallenge is null)
+            return Result.Failure<bool, SmartCardError>(new NullParameterError("hostChallenge"));
+        
+        if (sessionKeys is null)
+            return Result.Failure<bool, SmartCardError>(new NullParameterError("sessionKeys"));
+        
+        if (buildCryptogramData is null)
+            return Result.Failure<bool, SmartCardError>(new NullParameterError("buildCryptogramData"));
+        
+        if (keyDerivationService is null)
+            return Result.Failure<bool, SmartCardError>(new NullParameterError("keyDerivationService"));
 
         return buildCryptogramData(response, hostChallenge)
             .Bind(cryptogramData =>
             {
+                // SCP02 uses S-ENC for cryptograms, SCP03 uses S-MAC
+                var cryptogramKey = protocolVersion == 0x02 ? sessionKeys.SEnc : sessionKeys.SMac;
+                
                 var cryptogramContext = new CryptogramContext(
                     protocolVersion,
-                    sessionKeys.SMac, // Use S-MAC key for cryptograms per GP SCP03 specification
+                    cryptogramKey,
                     cryptogramData,
                     CryptogramType.CardCryptogram
                 );
 
                 return keyDerivationService.CalculateCryptogram(cryptogramContext)
                     .Map(expectedCryptogram => 
-                    {
-                        Console.WriteLine($"DEBUG: Expected cryptogram: {Convert.ToHexString(expectedCryptogram)}");
-                        Console.WriteLine($"DEBUG: Actual cryptogram:   {Convert.ToHexString(response.CardCryptogram)}");
-                        var result = CryptographicOperations.CompareBytes(expectedCryptogram, response.CardCryptogram);
-                        Console.WriteLine($"DEBUG: Cryptogram match: {result}");
-                        return result;
-                    });
+                        CryptographicOperations.CompareBytes(expectedCryptogram, response.CardCryptogram));
             });
     }
 
@@ -84,18 +90,30 @@ public static class CryptogramBuilder
         IKeyDerivationService keyDerivationService,
         byte protocolVersion)
     {
-        ArgumentNullException.ThrowIfNull(response);
-        ArgumentNullException.ThrowIfNull(hostChallenge);
-        ArgumentNullException.ThrowIfNull(sessionKeys);
-        ArgumentNullException.ThrowIfNull(buildCryptogramData);
-        ArgumentNullException.ThrowIfNull(keyDerivationService);
+        if (response is null)
+            return Result.Failure<byte[], SmartCardError>(new NullParameterError("response"));
+        
+        if (hostChallenge is null)
+            return Result.Failure<byte[], SmartCardError>(new NullParameterError("hostChallenge"));
+        
+        if (sessionKeys is null)
+            return Result.Failure<byte[], SmartCardError>(new NullParameterError("sessionKeys"));
+        
+        if (buildCryptogramData is null)
+            return Result.Failure<byte[], SmartCardError>(new NullParameterError("buildCryptogramData"));
+        
+        if (keyDerivationService is null)
+            return Result.Failure<byte[], SmartCardError>(new NullParameterError("keyDerivationService"));
 
         return buildCryptogramData(response, hostChallenge)
             .Bind(cryptogramData =>
             {
+                // SCP02 uses S-ENC for cryptograms, SCP03 uses S-MAC
+                var cryptogramKey = protocolVersion == 0x02 ? sessionKeys.SEnc : sessionKeys.SMac;
+                
                 var cryptogramContext = new CryptogramContext(
                     protocolVersion,
-                    sessionKeys.SMac, // Use S-MAC key for cryptograms per GP SCP03 specification
+                    cryptogramKey,
                     cryptogramData,
                     CryptogramType.HostCryptogram
                 );
@@ -119,27 +137,24 @@ public static class CryptogramBuilder
         var hostValidation = ProtocolValidation.ValidateHostChallenge(hostChallenge);
         if (hostValidation.IsFailure)
         {
-            return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidData(hostValidation.Error));
+            return Result.Failure<byte[], SmartCardError>(new InvalidFormatError("hostCryptogram", hostValidation.Error));
         }
 
         var cardValidation = ProtocolValidation.ValidateCardChallenge(response.CardChallenge, 6);
         if (cardValidation.IsFailure)
         {
-            return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidResponse(cardValidation.Error));
+            return Result.Failure<byte[], SmartCardError>(new InvalidFormatError("cardCryptogram", cardValidation.Error));
         }
 
         return ExtractScp02SequenceCounter(response)
-            .Map(sequenceCounter =>
+            .Bind(sequenceCounter =>
             {
-                // SCP02 card cryptogram data: Host Challenge (8) || Sequence Counter (2) || Card Challenge (6)
-                var hostBytes = hostChallenge;
+                // Use pure functional implementation
                 var seqCounterBytes = sequenceCounter[..2]; // First 2 bytes
-                var cardBytes = response.CardChallenge; // Already 6 bytes for SCP02
-                    
-                var data = CryptographicOperations.ConcatenateArrays(hostBytes, seqCounterBytes, cardBytes);
-                    
-                // Apply ISO 7816-4 padding to make 24 bytes total
-                return CryptographicOperations.PadToLength(data, 24).Value;
+                return Scp02Cryptography.BuildScp02CardCryptogramData(
+                    hostChallenge,
+                    seqCounterBytes,
+                    response.CardChallenge);
             });
     }
 
@@ -158,27 +173,24 @@ public static class CryptogramBuilder
         var hostValidation = ProtocolValidation.ValidateHostChallenge(hostChallenge);
         if (hostValidation.IsFailure)
         {
-            return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidData(hostValidation.Error));
+            return Result.Failure<byte[], SmartCardError>(new InvalidFormatError("hostCryptogram", hostValidation.Error));
         }
 
         var cardValidation = ProtocolValidation.ValidateCardChallenge(response.CardChallenge, 6);
         if (cardValidation.IsFailure)
         {
-            return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidResponse(cardValidation.Error));
+            return Result.Failure<byte[], SmartCardError>(new InvalidFormatError("cardCryptogram", cardValidation.Error));
         }
 
         return ExtractScp02SequenceCounter(response)
-            .Map(sequenceCounter =>
+            .Bind(sequenceCounter =>
             {
-                // SCP02 host cryptogram data: Sequence Counter (2) || Card Challenge (6) || Host Challenge (8)
+                // Use pure functional implementation
                 var seqCounterBytes = sequenceCounter[..2]; // First 2 bytes
-                var cardBytes = response.CardChallenge; // Already 6 bytes for SCP02
-                var hostBytes = hostChallenge;
-                    
-                var data = CryptographicOperations.ConcatenateArrays(seqCounterBytes, cardBytes, hostBytes);
-                    
-                // Apply ISO 7816-4 padding to make 24 bytes total
-                return CryptographicOperations.PadToLength(data, 24).Value;
+                return Scp02Cryptography.BuildScp02HostCryptogramData(
+                    seqCounterBytes,
+                    response.CardChallenge,
+                    hostChallenge);
             });
     }
 
@@ -196,13 +208,13 @@ public static class CryptogramBuilder
         var hostValidation = ProtocolValidation.ValidateHostChallenge(hostChallenge);
         if (hostValidation.IsFailure)
         {
-            return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidData(hostValidation.Error));
+            return Result.Failure<byte[], SmartCardError>(new InvalidFormatError("hostCryptogram", hostValidation.Error));
         }
 
         var cardValidation = ProtocolValidation.ValidateCardChallenge(response.CardChallenge, 8);
         if (cardValidation.IsFailure)
         {
-            return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidResponse(cardValidation.Error));
+            return Result.Failure<byte[], SmartCardError>(new InvalidFormatError("cardCryptogram", cardValidation.Error));
         }
 
         // SCP03 card cryptogram data: Host Challenge (8) || Card Challenge (8)
@@ -224,13 +236,13 @@ public static class CryptogramBuilder
         var hostValidation = ProtocolValidation.ValidateHostChallenge(hostChallenge);
         if (hostValidation.IsFailure)
         {
-            return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidData(hostValidation.Error));
+            return Result.Failure<byte[], SmartCardError>(new InvalidFormatError("hostCryptogram", hostValidation.Error));
         }
 
         var cardValidation = ProtocolValidation.ValidateCardChallenge(response.CardChallenge, 8);
         if (cardValidation.IsFailure)
         {
-            return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidResponse(cardValidation.Error));
+            return Result.Failure<byte[], SmartCardError>(new InvalidFormatError("cardCryptogram", cardValidation.Error));
         }
 
         // SCP03 host cryptogram data: Card Challenge (8) || Host Challenge (8)
@@ -247,8 +259,8 @@ public static class CryptogramBuilder
     {
         return response.SequenceCounter switch
         {
-            null => Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidResponse("SCP02 requires sequence counter in INITIALIZE UPDATE response")),
-            { Length: < 2 } => Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidResponse($"SCP02 sequence counter must be at least 2 bytes, got {response.SequenceCounter.Length}")),
+            null => Result.Failure<byte[], SmartCardError>(new MissingDataError("SequenceCounter")),
+            { Length: < 2 } => Result.Failure<byte[], SmartCardError>(new InvalidLengthError("SequenceCounter", 2, response.SequenceCounter.Length)),
             _ => Result.Success<byte[], SmartCardError>(response.SequenceCounter)
         };
     }

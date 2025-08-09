@@ -58,13 +58,12 @@ public class ClApduTransport : IApduTransport
     }
 
     /// <summary>
-    /// Initializes a new instance of TClApduTransport.
+    /// Initializes a new instance of ClApduTransport.
     /// </summary>
     /// <param name="logger">The logger.</param>
     /// <param name="t1Logger">Logger for the underlying T=1 transport.</param>
     public ClApduTransport(ILogger<ClApduTransport> logger, ILogger<T1ApduTransport> t1Logger)
     {
-        ArgumentNullException.ThrowIfNull(logger);
         _logger = logger;
         _t1Transport = new T1ApduTransport(t1Logger, supportsExtendedLength: false);
     }
@@ -76,9 +75,6 @@ public class ClApduTransport : IApduTransport
         CancellationToken cancellationToken = default
     )
     {
-        ArgumentNullException.ThrowIfNull(command);
-
-        ArgumentNullException.ThrowIfNull(channel);
 
         // Validate contactless-specific restrictions
         ValidateContactlessCommand(command);

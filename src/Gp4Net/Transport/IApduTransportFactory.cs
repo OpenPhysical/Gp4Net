@@ -35,8 +35,7 @@ public class ApduTransportFactory : IApduTransportFactory
     /// <param name="loggerFactory">The logger factory.</param>
     public ApduTransportFactory(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory)
     {
-        _loggerFactory =
-            loggerFactory ?? throw new System.ArgumentNullException(nameof(loggerFactory));
+        _loggerFactory = loggerFactory;
     }
 
     /// <inheritdoc />

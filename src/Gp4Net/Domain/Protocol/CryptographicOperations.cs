@@ -49,8 +49,6 @@ public static class CryptographicOperations
     /// <returns>The expanded 24-byte key.</returns>
     public static byte[] ExpandTripleDesKey(byte[] key)
     {
-        ArgumentNullException.ThrowIfNull(key);
-        
         return key.Length switch
         {
             16 => ConcatenateArrays(key, key[..8]), // K3 = K1
@@ -705,8 +703,6 @@ public static class CryptographicOperations
     /// <returns>The concatenated array.</returns>
     public static byte[] ConcatenateArrays(params byte[][] arrays)
     {
-        ArgumentNullException.ThrowIfNull(arrays);
-        
         var totalLength = arrays.Sum(a => a?.Length ?? 0);
         var result = new byte[totalLength];
         var offset = 0;

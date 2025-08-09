@@ -147,7 +147,7 @@ public class T0ApduTransportTests
     {
         // Arrange
         var command = new TestCommand { ExpectedResponseLength = Maybe<int>.None };
-        byte[] capturedCommand = null;
+        byte[]? capturedCommand = null;
 
         _ = _mockChannel
             .Setup(c => c.TransmitAsync(It.IsAny<byte[]>(), default))

@@ -58,7 +58,6 @@ public class T0ApduTransport : IApduTransport
     /// </summary>
     public T0ApduTransport(ILogger<T0ApduTransport> logger)
     {
-        ArgumentNullException.ThrowIfNull(logger);
         _logger = logger;
     }
 
@@ -69,8 +68,6 @@ public class T0ApduTransport : IApduTransport
         CancellationToken cancellationToken = default
     )
     {
-        ArgumentNullException.ThrowIfNull(command);
-        ArgumentNullException.ThrowIfNull(channel);
 
         if (command.IsExtendedLength)
         {
@@ -78,7 +75,7 @@ public class T0ApduTransport : IApduTransport
         }
 
         // Build APDU according to T=0 rules
-        var apdu = BuildApdu(command);
+        var apdu = ApduBuilder.BuildApdu(command);
 
         _logger.LogDebug("T=0 Transmit: {Apdu}", BitConverter.ToString(apdu));
 
@@ -92,35 +89,6 @@ public class T0ApduTransport : IApduTransport
             .ConfigureAwait(false);
     }
 
-    private static byte[] BuildApdu(IApduCommand command)
-    {
-        var apduList = new List<byte> { command.Cla, command.Ins, command.P1, command.P2 };
-
-        var hasData = command.Data is { Length: > 0 };
-        var expectsResponse = command.ExpectedResponseLength.HasValue;
-
-        if (hasData && expectsResponse)
-        {
-            // Case 4: Lc + Data + Le
-            apduList.Add((byte)command.Data!.Length);
-            apduList.AddRange(command.Data);
-            apduList.Add(GetLeByte(command.ExpectedResponseLength.Value));
-        }
-        else if (hasData)
-        {
-            // Case 3: Lc + Data (no Le for T=0)
-            apduList.Add((byte)command.Data!.Length);
-            apduList.AddRange(command.Data);
-        }
-        else if (expectsResponse)
-        {
-            // Case 2: Le only
-            apduList.Add(GetLeByte(command.ExpectedResponseLength.Value));
-        }
-        // Case 1: No Lc, no Le
-
-        return [.. apduList];
-    }
 
     private static byte GetLeByte(int expectedLength)
     {

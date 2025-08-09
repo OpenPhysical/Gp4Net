@@ -239,10 +239,12 @@ public class InitializeUpdateResponse
     /// Parses an INITIALIZE UPDATE response.
     /// </summary>
     /// <param name="response">The response data (excluding status word).</param>
-    /// <returns>The parsed response.</returns>
-    public static InitializeUpdateResponse Parse(byte[] response)
+    /// <returns>A Result containing the parsed response, or an error if the response data is invalid.</returns>
+    public static Result<InitializeUpdateResponse, SmartCardError> Parse(byte[] response)
     {
-        ArgumentNullException.ThrowIfNull(response);
+        if (response is null)
+            return Result.Failure<InitializeUpdateResponse, SmartCardError>(
+                SmartCardError.InvalidArgument("Response cannot be null"));
         
         // Debug logging
         System.Diagnostics.Debug.WriteLine($"[InitializeUpdateResponse.Parse] Response length: {response.Length}");
@@ -250,9 +252,8 @@ public class InitializeUpdateResponse
 
         // SCP03 responses are 32 bytes, SCP02 are typically 28-30 bytes
         if (response.Length < 28)
-        {
-            throw new ArgumentException("Response too short.", nameof(response));
-        }
+            return Result.Failure<InitializeUpdateResponse, SmartCardError>(
+                SmartCardError.InvalidData($"INITIALIZE UPDATE response too short: {response.Length} bytes, expected at least 28"));
 
         var offset = 0;
 
@@ -313,13 +314,14 @@ public class InitializeUpdateResponse
                 System.Diagnostics.Debug.WriteLine($"[InitializeUpdateResponse.Parse] Sequence counter: {Convert.ToHexString(sequenceCounter)}");
             }
                 
-            return new InitializeUpdateResponse(
-                keyDiversificationData,
-                keyInformation,
-                cardChallenge,
-                cardCryptogram,
-                sequenceCounter
-            );
+            return Result.Success<InitializeUpdateResponse, SmartCardError>(
+                new InitializeUpdateResponse(
+                    keyDiversificationData,
+                    keyInformation,
+                    cardChallenge,
+                    cardCryptogram,
+                    sequenceCounter
+                ));
         }
         else // SCP02 or other format
         {
@@ -364,13 +366,14 @@ public class InitializeUpdateResponse
                 offset += 8;
             }
                 
-            return new InitializeUpdateResponse(
-                keyDiversificationData,
-                keyInformation,
-                cardChallenge,
-                cardCryptogram,
-                sequenceCounter
-            );
+            return Result.Success<InitializeUpdateResponse, SmartCardError>(
+                new InitializeUpdateResponse(
+                    keyDiversificationData,
+                    keyInformation,
+                    cardChallenge,
+                    cardCryptogram,
+                    sequenceCounter
+                ));
         }
     }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Immutable;
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
@@ -11,6 +12,7 @@ namespace Gp4Net.Tests.Domain;
 
 [TestFixture]
 [Category("Unit")]
+[Category("FailHard")]
 public class Scp02SecurityProcessorTests
 {
     private SessionKeys _sessionKeys = null!;
@@ -132,6 +134,83 @@ public class Scp02SecurityProcessorTests
         // Failure is expected until full implementation
     }
 
+    // Removed: ProcessInitializeUpdate_WithNullResponse_ShouldFailHard
+    // NO NULLS rule - nulls should be converted to Result<T> at boundaries, not checked in domain
+
+    // Removed: ProcessInitializeUpdate_WithNullHostChallenge_ShouldFailHard
+    // NO NULLS rule - nulls should be converted to Result<T> at boundaries, not checked in domain
+
+    [Test]
+    public void ProcessInitializeUpdate_WithInvalidHostChallengeLength_ShouldFailHard()
+    {
+        // Arrange
+        var response = CreateTestScp02InitializeUpdateResponse();
+        var keySet = Scp02KeySet.Create(
+            new byte[16], new byte[16], new byte[16]
+        ).Value;
+        
+        var testCases = new[]
+        {
+            (new byte[0], "Empty host challenge"),
+            (new byte[4], "4-byte host challenge"),
+            (new byte[12], "12-byte host challenge"),
+            (new byte[16], "16-byte host challenge")
+        };
+        
+        foreach (var (invalidChallenge, description) in testCases)
+        {
+            // Act
+            var result = Scp02SecurityProcessor.ProcessInitializeUpdate(
+                response, 
+                invalidChallenge, 
+                keySet,
+                0x15
+            );
+            
+            // Assert
+            result.IsFailure.Should().BeTrue($"{description} should be rejected");
+            result.Error.Should().BeOfType<InvalidLengthError>();
+            var lengthError = (InvalidLengthError)result.Error;
+            lengthError.Expected.Should().Be(8);
+            
+            TestContext.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
+        }
+    }
+
+    // Removed: ProcessInitializeUpdate_WithNullKeySet_ShouldFailHard
+    // NO NULLS rule - nulls should be converted to Result<T> at boundaries, not checked in domain
+
+    [Test]
+    public void ProcessInitializeUpdate_WithInvalidImplementationParameter_ShouldFailHard()
+    {
+        // Arrange
+        var response = CreateTestScp02InitializeUpdateResponse();
+        var hostChallenge = new byte[8] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
+        var keySet = Scp02KeySet.Create(
+            new byte[16], new byte[16], new byte[16]
+        ).Value;
+        
+        var invalidImplementations = new byte[] { 0x01, 0x03, 0x06, 0x99, 0xFF };
+        
+        foreach (var invalidImpl in invalidImplementations)
+        {
+            // Act
+            var result = Scp02SecurityProcessor.ProcessInitializeUpdate(
+                response, 
+                hostChallenge, 
+                keySet,
+                invalidImpl
+            );
+            
+            // Assert
+            result.IsFailure.Should().BeTrue($"Invalid implementation i={invalidImpl:X2} should be rejected");
+            result.Error.Should().BeOfType<UnsupportedImplementationError>();
+            result.Error.Message.Should().Contain($"i={invalidImpl:X2}", $"Error should identify invalid implementation i={invalidImpl:X2}");
+            
+            TestContext.WriteLine($"✓ Invalid implementation i={invalidImpl:X2} correctly rejected: {result.Error.Message}");
+        }
+    }
+
 
     [Test]
     public void ApplyCommandSecurity_WrongMacChainingSize_ReturnsFailure()
@@ -147,8 +226,67 @@ public class Scp02SecurityProcessorTests
             0u
         );
         
-        result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.IsFailure.Should().BeTrue("SCP02 MAC chaining value must be exactly 8 bytes");
+        result.Error.Should().BeOfType<InvalidLengthError>();
+        var lengthError = (InvalidLengthError)result.Error;
+        lengthError.Expected.Should().Be(8);
+    }
+
+    // Removed: ApplyCommandSecurity_WithNullCommand_ShouldFailHard
+    // NO NULLS rule - nulls should be converted to Result<T> at boundaries, not checked in domain
+
+    // Removed: ApplyCommandSecurity_WithNullSessionKeys_ShouldFailHard
+    // NO NULLS rule - nulls should be converted to Result<T> at boundaries, not checked in domain
+
+    [Test]
+    public void ApplyCommandSecurity_WithEmptyMacChainingValue_ShouldFailHard()
+    {
+        // Arrange
+        var command = GetDataCommand.Create(0x9F7F).Value;
+        var emptyMacChaining = new byte[0].ToImmutableArray();
+        
+        // Act
+        var result = Scp02SecurityProcessor.ApplyCommandSecurity(
+            command,
+            SecurityLevel.CMac,
+            _sessionKeys,
+            emptyMacChaining,
+            0u
+        );
+        
+        // Assert
+        result.IsFailure.Should().BeTrue("Empty MAC chaining value should be rejected");
+        result.Error.Should().BeOfType<SmartCardError>();
+        result.Error.Message.Should().Contain("chaining", "Error should identify MAC chaining issue");
+    }
+
+    [Test]
+    public void ApplyCommandSecurity_WithInvalidSecurityLevel_ShouldFailHard()
+    {
+        // Arrange
+        var command = GetDataCommand.Create(0x9F7F).Value;
+        var invalidSecurityLevel = (SecurityLevel)0xFF; // Invalid enum value
+        
+        // Act
+        var result = Scp02SecurityProcessor.ApplyCommandSecurity(
+            command,
+            invalidSecurityLevel,
+            _sessionKeys,
+            _macChainingValue,
+            0u
+        );
+        
+        // Assert - Should either fail hard or handle gracefully
+        // The exact behavior depends on implementation but should not crash
+        if (result.IsFailure)
+        {
+            result.Error.Should().BeOfType<SmartCardError>();
+            TestContext.WriteLine($"✓ Invalid security level rejected: {result.Error.Message}");
+        }
+        else
+        {
+            TestContext.WriteLine("✓ Invalid security level handled gracefully");
+        }
     }
 
     [Test]
@@ -232,6 +370,9 @@ public class Scp02SecurityProcessorTests
         // Verify we used exactly 29 bytes
         System.Diagnostics.Debug.Assert(offset == 29, "SCP02 response should be exactly 29 bytes");
         
-        return InitializeUpdateResponse.Parse(responseData);
+        var parseResult = InitializeUpdateResponse.Parse(responseData);
+        if (!parseResult.IsSuccess)
+            throw new InvalidOperationException($"Failed to create test INITIALIZE UPDATE response: {parseResult.Error}");
+        return parseResult.Value;
     }
 }

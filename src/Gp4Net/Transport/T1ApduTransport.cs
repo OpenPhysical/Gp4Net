@@ -60,7 +60,6 @@ public class T1ApduTransport : IApduTransport
     /// <param name="supportsExtendedLength">Whether extended length is supported.</param>
     public T1ApduTransport(ILogger<T1ApduTransport> logger, bool supportsExtendedLength = true)
     {
-        ArgumentNullException.ThrowIfNull(logger);
         _logger = logger;
         _supportsExtendedLength = supportsExtendedLength;
     }
@@ -72,8 +71,6 @@ public class T1ApduTransport : IApduTransport
         CancellationToken cancellationToken = default
     )
     {
-        ArgumentNullException.ThrowIfNull(command);
-        ArgumentNullException.ThrowIfNull(channel);
 
         if (command.IsExtendedLength && !_supportsExtendedLength)
         {
@@ -81,7 +78,7 @@ public class T1ApduTransport : IApduTransport
         }
 
         // Build APDU according to T=1 rules
-        var apdu = BuildApdu(command);
+        var apdu = ApduBuilder.BuildApdu(command);
 
         _logger.LogDebug("T=1 Transmit: {Apdu}", BitConverter.ToString(apdu));
 
@@ -93,88 +90,6 @@ public class T1ApduTransport : IApduTransport
         return ProcessResponse(response);
     }
 
-    private static byte[] BuildApdu(IApduCommand command)
-    {
-        var apduList = new List<byte> { command.Cla, command.Ins, command.P1, command.P2 };
-
-        var hasData = command.Data is { Length: > 0 };
-        var expectsResponse = command.ExpectedResponseLength.HasValue;
-
-        if (command.IsExtendedLength)
-        {
-            // Extended length encoding
-            if (hasData && expectsResponse)
-            {
-                // Case 4E
-                apduList.Add(0x00); // Extended length marker
-                apduList.Add((byte)(command.Data!.Length >> 8));
-                apduList.Add((byte)(command.Data.Length & 0xFF));
-                apduList.AddRange(command.Data);
-
-                var le = command.ExpectedResponseLength!.Value;
-                if (le == 65536)
-                {
-                    apduList.Add(0x00);
-                    apduList.Add(0x00);
-                }
-                else
-                {
-                    apduList.Add((byte)(le >> 8));
-                    apduList.Add((byte)(le & 0xFF));
-                }
-            }
-            else if (hasData)
-            {
-                // Case 3E
-                apduList.Add(0x00);
-                apduList.Add((byte)(command.Data!.Length >> 8));
-                apduList.Add((byte)(command.Data.Length & 0xFF));
-                apduList.AddRange(command.Data);
-            }
-            else if (expectsResponse)
-            {
-                // Case 2E
-                apduList.Add(0x00);
-
-                var le = command.ExpectedResponseLength!.Value;
-                if (le == 65536)
-                {
-                    apduList.Add(0x00);
-                    apduList.Add(0x00);
-                }
-                else
-                {
-                    apduList.Add((byte)(le >> 8));
-                    apduList.Add((byte)(le & 0xFF));
-                }
-            }
-        }
-        else
-        {
-            // Short length encoding
-            if (hasData && expectsResponse)
-            {
-                // Case 4S
-                apduList.Add((byte)command.Data!.Length);
-                apduList.AddRange(command.Data);
-                apduList.Add(GetLeByte(command.ExpectedResponseLength!.Value));
-            }
-            else if (hasData)
-            {
-                // Case 3S
-                apduList.Add((byte)command.Data!.Length);
-                apduList.AddRange(command.Data);
-            }
-            else if (expectsResponse)
-            {
-                // Case 2S
-                apduList.Add(GetLeByte(command.ExpectedResponseLength!.Value));
-            }
-            // Case 1: No Lc, no Le
-        }
-
-        return [.. apduList];
-    }
 
     private static byte GetLeByte(int expectedLength)
     {

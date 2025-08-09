@@ -27,10 +27,10 @@ public class LoadCommand : BaseCommand<LoadCommand.Settings>
     /// </summary>
     public LoadCommand(
         ICardService cardService,
-        Gp4Net.Services.IGlobalPlatformService globalPlatformService,
+        IDomainServiceFactory domainServiceFactory,
         IKeysetResolver keysetResolver
     )
-        : base(cardService, globalPlatformService, keysetResolver) { }
+        : base(cardService, domainServiceFactory, keysetResolver) { }
 
     /// <summary>
     /// Executes the load command to upload a CAP file package to the card.
@@ -49,7 +49,7 @@ public class LoadCommand : BaseCommand<LoadCommand.Settings>
         }
 
         // Establish secure channel for loading
-        if (!EnsureSecureChannel(settings))
+        if (!await EnsureSecureChannel(settings))
         {
             return 1;
         }

@@ -46,6 +46,22 @@ public sealed class Scp02ProtocolImpl : IScpProtocol<Scp02ProtocolImpl>
         }
     }
 
+    /// <summary>
+    /// Checks if the given implementation parameter is a valid SCP02 implementation.
+    /// </summary>
+    /// <param name="implementationParameter">The implementation parameter to check.</param>
+    /// <returns>True if valid, false otherwise.</returns>
+    private static bool IsValidScp02Implementation(byte implementationParameter)
+    {
+        return implementationParameter switch
+        {
+            0x00 or 0x02 or 0x04 or 0x05 or 0x0A or 0x14 or 0x15 or 0x1A or
+            0x24 or 0x25 or 0x2A or 0x34 or 0x35 or 0x3A or 0x44 or 0x45 or
+            0x4A or 0x54 or 0x55 or 0x64 or 0x65 or 0x6A or 0x74 or 0x75 or 0x7A => true,
+            _ => false
+        };
+    }
+
     /// <inheritdoc />
     public static int ChainingValueSize
     {
@@ -131,27 +147,37 @@ public sealed class Scp02ProtocolImpl : IScpProtocol<Scp02ProtocolImpl>
         byte implementationParameter)
     {
         // Per GlobalPlatform Card Specification v2.3.1 Section E.4.1 - Session Key Derivation
-        // Validate inputs
-        if (keySet == null)
+        // Validate inputs per NO NULLS rule - nulls should be converted at boundaries
+        // Validate host challenge length (8 bytes)
+        if (hostChallenge?.Length != 8)
         {
-            return SmartCardError.InvalidArgument("KeySet cannot be null");
+            return Result.Failure<SessionKeys, SmartCardError>(
+                new InvalidLengthError("hostChallenge", 8, hostChallenge?.Length ?? 0));
+        }
+        
+        // Validate card challenge length (6 bytes for SCP02)
+        if (cardChallenge?.Length != 6)
+        {
+            return Result.Failure<SessionKeys, SmartCardError>(
+                new InvalidLengthError("cardChallenge", 6, cardChallenge?.Length ?? 0));
+        }
+        
+        // Validate sequence counter (exactly 2 bytes for SCP02)
+        if (sequenceCounter?.Length != 2)
+        {
+            return Result.Failure<SessionKeys, SmartCardError>(
+                new InvalidLengthError("sequenceCounter", 2, sequenceCounter?.Length ?? 0));
         }
 
-        if (sequenceCounter == null)
+        // Check if implementation parameter is valid before mapping
+        if (!IsValidScp02Implementation(implementationParameter))
         {
-            return SmartCardError.InvalidArgument("Sequence counter is required for SCP02");
+            return Result.Failure<SessionKeys, SmartCardError>(
+                new UnsupportedImplementationError($"SCP02 i={implementationParameter:X2} (valid: 00, 02, 04, 05, 0A, 14, 15, 1A, 24, 25, 2A, 34, 35, 3A, 44, 45, 4A, 54, 55, 64, 65, 6A, 74, 75, 7A)"));
         }
 
         // Map implementation parameter to ScpImplementation enum
-        var implementation = implementationParameter switch
-        {
-            0x15 => ScpImplementation.Scp02StaticMac,
-            0x55 => ScpImplementation.Scp02CmacMult,
-            0x1A => ScpImplementation.Scp02CmacXor,
-            0x04 => ScpImplementation.Scp02ExplicitInitVector,
-            0x05 => ScpImplementation.Scp02ImplicitInitVector,
-            _ => ScpImplementation.Scp02StaticMac
-        };
+        var implementation = (ScpImplementation)implementationParameter;
             
         // Create key derivation context using the new centralized approach
         var contextResult = KeyDerivationContext.CreateForScp02(

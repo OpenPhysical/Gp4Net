@@ -129,24 +129,25 @@ public sealed class Scp02ProtocolService : IScpProtocolService<Scp02ProtocolServ
         }
 
         // Build the EXTERNAL AUTHENTICATE APDU for MAC calculation
-        // This must match exactly what the client calculates MAC over
+        // Per GP Card Specification v2.3.1 Section E.4.2, MAC is calculated over:
+        // CLA || INS || P1 || P2 || Lc || Host_Cryptogram
+        // The CLA byte must have secure messaging bit set (0x04)
         var apdu = new byte[5 + command.HostCryptogram.Length];
-        apdu[0] = (byte)(command.Cla | 0x04); // CLA with secure messaging bit
-        apdu[1] = command.Ins; // 0x82
+        apdu[0] = (byte)(command.Cla | 0x04); // CLA with secure messaging bit (0x84)
+        apdu[1] = command.Ins; // INS = 0x82
         apdu[2] = (byte)command.SecurityLevel; // P1 = security level
-        apdu[3] = 0x00; // P2
-        apdu[4] = (byte)(command.HostCryptogram.Length + MacSize); // Lc = 8 host cryptogram + 8 MAC
+        apdu[3] = 0x00; // P2 = 0x00
+        apdu[4] = (byte)(command.HostCryptogram.Length + MacSize); // Lc = 16 (8 host cryptogram + 8 MAC)
         Array.Copy(command.HostCryptogram, 0, apdu, 5, command.HostCryptogram.Length);
 
-        // Calculate 3DES-MAC over (zero_chaining_value || apdu)
-        // For EXTERNAL AUTHENTICATE in SCP02, the initial chaining value is zeros
-        var zeroChaining = new byte[ChainingValueSize];
-        var macInput = new byte[zeroChaining.Length + apdu.Length];
-        Array.Copy(zeroChaining, 0, macInput, 0, zeroChaining.Length);
-        Array.Copy(apdu, 0, macInput, zeroChaining.Length, apdu.Length);
-
-        // Return the full 8-byte MAC for use as chaining value
-        return CryptographicOperations.CalculateRetailMac(macKey, macInput);
+        // For SCP02 EXTERNAL AUTHENTICATE, the ICV is conceptually zero but NOT included in MAC input
+        // Per GP Card Specification v2.3.1 Section E.3.2: "For the EXTERNAL AUTHENTICATE command MAC 
+        // verification, the ICV is set to zero." This means the ICV state is zero, not that zeros 
+        // are prepended to the data.
+        // MAC is calculated directly over the APDU structure (header + host cryptogram)
+        
+        // Return the full 8-byte MAC which becomes the ICV for subsequent commands
+        return CryptographicOperations.CalculateRetailMac(macKey, apdu);
     }
 
     /// <inheritdoc />

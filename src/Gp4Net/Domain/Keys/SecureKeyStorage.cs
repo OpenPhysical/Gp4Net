@@ -6,7 +6,7 @@
 namespace Gp4Net.Domain.Keys;
 
 using System;
-using System.Security.Cryptography;
+using Org.BouncyCastle.Utilities;
 
 /// <summary>
 /// Provides secure storage for cryptographic keys with automatic memory cleanup.
@@ -33,10 +33,8 @@ public sealed class SecureKeyStorage : IDisposable
     /// <param name="key">The key data to store securely.</param>
     public SecureKeyStorage(byte[] key)
     {
-        ArgumentNullException.ThrowIfNull(key);
-
         this._keyData = new byte[key.Length];
-        Array.Copy(key, this._keyData, key.Length);
+        key.CopyTo(this._keyData, 0);
     }
 
     /// <summary>
@@ -53,7 +51,7 @@ public sealed class SecureKeyStorage : IDisposable
         }
 
         var copy = new byte[this._keyData.Length];
-        Array.Copy(this._keyData, copy, this._keyData.Length);
+        this._keyData.CopyTo(copy, 0);
         return copy;
     }
 
@@ -69,8 +67,6 @@ public sealed class SecureKeyStorage : IDisposable
         {
             throw new InvalidOperationException("Key data is not available.");
         }
-
-        ArgumentNullException.ThrowIfNull(action);
 
         action(this._keyData);
     }
@@ -90,8 +86,6 @@ public sealed class SecureKeyStorage : IDisposable
             throw new InvalidOperationException("Key data is not available.");
         }
 
-        ArgumentNullException.ThrowIfNull(func);
-
         return func(this._keyData);
     }
 
@@ -102,7 +96,7 @@ public sealed class SecureKeyStorage : IDisposable
     {
         if (this._keyData != null)
         {
-            CryptographicOperations.ZeroMemory(this._keyData);
+            Arrays.Fill(this._keyData, 0);
             this._keyData = null;
         }
     }

@@ -96,7 +96,7 @@ public interface IApduCommand
     byte P2 { get; }
 
     /// <summary>
-    /// Gets the command data (may be null or empty).
+    /// Gets the command data (never null, may be empty).
     /// </summary>
     byte[] Data { get; }
 

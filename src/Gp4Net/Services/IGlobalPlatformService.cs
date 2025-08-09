@@ -18,6 +18,11 @@ namespace Gp4Net.Services;
 public interface IGlobalPlatformService
 {
     /// <summary>
+    /// Gets the current smart card service with proper secure channel context.
+    /// </summary>
+    ISmartCardService CardService { get; }
+    
+    /// <summary>
     /// Selects the Issuer Security Domain (ISD).
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>

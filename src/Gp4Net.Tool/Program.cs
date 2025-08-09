@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -59,6 +59,15 @@ public class Program
 
             // Build service provider to initialize CardServiceProvider
             var serviceProvider = services.BuildServiceProvider();
+            
+            // Validate critical service registrations
+            var validationResult = ValidateServiceRegistrations(serviceProvider);
+            if (validationResult.IsFailure)
+            {
+                AnsiConsole.MarkupLine($"[red]Startup Error: {validationResult.Error}[/]");
+                return 1;
+            }
+            
             var cardService = serviceProvider.GetRequiredService<Tool.Services.ICardService>();
             CardServiceProvider.SetCardService(cardService);
 
@@ -260,6 +269,11 @@ public class Program
         // Register domain service factory
         _ = services.AddSingleton<IDomainServiceFactory, DomainServiceFactory>();
         _ = services.AddSingleton<PackageRegistry>();
+        
+        // SmartCardService is now created by DomainServiceFactory with functional composition
+        
+        // GlobalPlatformService is now created by DomainServiceFactory with functional composition
+        // No need to register it in DI since it's created per-connection
 
         // Register pipeline services
         _ = services.AddSingleton<IDisplayService>(provider => new DisplayService(false));
@@ -274,21 +288,7 @@ public class Program
             return new Pipeline.CliContext(display, cardService, domainServiceFactory, keysetResolver, logger);
         });
             
-        // Build the command pipeline
-        _ = services.AddSingleton<ICommandPipeline>(provider =>
-        {
-            var transportFactory = provider.GetRequiredService<IApduTransportFactory>();
-            var transport = transportFactory.CreateTransport(TransportProtocol.T0);
-            var transportLogger = provider.GetService<ILogger<Gp4Net.Pipeline.Middleware.TransportMiddleware>>();
-            var secureChannelLogger = provider.GetService<ILogger<Gp4Net.Pipeline.Middleware.SecureChannelMiddleware>>();
-            var loggingLogger = provider.GetService<ILogger<Gp4Net.Pipeline.Middleware.LoggingMiddleware>>();
-                
-            return new CommandPipelineBuilder()
-                .Use(new Gp4Net.Pipeline.Middleware.TransportMiddleware(transport, transportLogger))
-                .Use(new Gp4Net.Pipeline.Middleware.SecureChannelMiddleware(secureChannelLogger))
-                .Use(new Gp4Net.Pipeline.Middleware.LoggingMiddleware(loggingLogger!))
-                .Build();
-        });
+        // Command pipeline is now implemented as pure function composition
 
         // Register new pipeline commands automatically
         services.RegisterCommandHandlers(Assembly.GetExecutingAssembly());
@@ -308,5 +308,53 @@ public class Program
             .WithTransientLifetime());
 
         Logger.Debug("Services configured");
+    }
+    
+    /// <summary>
+    /// Validates that all critical services are properly registered in the DI container.
+    /// </summary>
+    /// <param name="provider">The service provider to validate.</param>
+    /// <returns>Success if all services are registered, or an error message.</returns>
+    private static CSharpFunctionalExtensions.Result<bool> ValidateServiceRegistrations(ServiceProvider provider)
+    {
+        var criticalServices = new[]
+        {
+            // IGlobalPlatformService is created by DomainServiceFactory, not DI
+            typeof(Tool.Services.ICardService),
+            typeof(IKeysetResolver),
+            typeof(ISecureChannelManager),
+            typeof(IApduTransportFactory),
+            typeof(ISecureChannelProtocolFactory),
+            typeof(IDomainServiceFactory)
+        };
+        
+        var missingServices = new System.Collections.Generic.List<string>();
+        
+        foreach (var serviceType in criticalServices)
+        {
+            try
+            {
+                var service = provider.GetService(serviceType);
+                if (service == null)
+                {
+                    missingServices.Add(serviceType.Name);
+                }
+            }
+            catch (Exception ex)
+            {
+                missingServices.Add($"{serviceType.Name} (Error: {ex.Message})");
+            }
+        }
+        
+        if (missingServices.Count > 0)
+        {
+            var errorMessage = $"Missing critical service registrations: {string.Join(", ", missingServices)}. " +
+                              "Check Program.cs ConfigureServices method.";
+            Logger.Error(errorMessage);
+            return CSharpFunctionalExtensions.Result.Failure<bool>(errorMessage);
+        }
+        
+        Logger.Debug("All critical services validated successfully");
+        return CSharpFunctionalExtensions.Result.Success(true);
     }
 }

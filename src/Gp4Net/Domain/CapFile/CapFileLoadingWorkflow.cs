@@ -91,10 +91,18 @@ public class CapFileLoadingWorkflow
         int maxLoadBlockSize = 245
     )
     {
-        ArgumentNullException.ThrowIfNull(capFileData);
+        if (capFileData is null)
+            return Result.Failure<IList<IApduCommand>, SmartCardError>(
+                SmartCardError.InvalidArgument("CAP file data cannot be null"));
 
         // Parse the CAP file to extract package and applet information
-        var capFile = CapFileStructure.Parse(capFileData);
+        var capFileResult = CapFileStructure.Parse(capFileData);
+        if (capFileResult.IsFailure)
+        {
+            return Result.Failure<IList<IApduCommand>, SmartCardError>(capFileResult.Error);
+        }
+        
+        var capFile = capFileResult.Value;
         var commands = new List<IApduCommand>();
 
         try
@@ -177,7 +185,16 @@ public class CapFileLoadingWorkflow
 
         try
         {
-            var capFile = CapFileStructure.Parse(capFileData);
+            var capFileResult = CapFileStructure.Parse(capFileData);
+            if (capFileResult.IsFailure)
+            {
+                return new CapFileValidationResult(
+                    false,
+                    Maybe<string>.From($"Failed to parse CAP file: {capFileResult.Error.Message}")
+                );
+            }
+            
+            var capFile = capFileResult.Value;
 
             var validationErrors = new List<string>();
 
@@ -276,9 +293,14 @@ public class CapFileLoadingWorkflow
     /// <returns>The estimated memory requirements in bytes.</returns>
     public static MemoryRequirements EstimateMemoryRequirements(byte[] capFileData)
     {
-        ArgumentNullException.ThrowIfNull(capFileData);
-
-        var capFile = CapFileStructure.Parse(capFileData);
+        var capFileResult = CapFileStructure.Parse(capFileData);
+        if (capFileResult.IsFailure)
+        {
+            // Return default requirements on parse failure
+            return new MemoryRequirements(0, 0, capFileData.Length);
+        }
+        
+        var capFile = capFileResult.Value;
 
         // Basic estimation - in practice this would be more sophisticated
         var codeSize = capFile

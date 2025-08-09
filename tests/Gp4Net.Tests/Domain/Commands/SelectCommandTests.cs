@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using NUnit.Framework;
@@ -43,8 +44,10 @@ public class SelectCommandTests
         var result = SelectCommand.Create(null);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().BeEquivalentTo("INVALID_DATA");
-        result.Error.Message.Should().Contain("AID cannot be null");
+        result.Error.Should().BeOfType<InvalidDataError>();
+        var error = (InvalidDataError)result.Error;
+        error.Field.Should().Be("AID");
+        error.Reason.Should().Be("cannot be null");
     }
 
     [Test]
@@ -67,8 +70,11 @@ public class SelectCommandTests
         var result = SelectCommand.Create(aid);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().BeEquivalentTo("INVALID_DATA");
-        result.Error.Message.Should().Contain("AID must be 16 bytes or less");
+        result.Error.Should().BeOfType<InvalidLengthError>();
+        var error = (InvalidLengthError)result.Error;
+        error.Field.Should().Be("AID");
+        error.Expected.Should().Be(16);
+        error.Actual.Should().Be(17);
     }
 
     [Test]
@@ -225,7 +231,7 @@ public class SelectCommandTests
     [Test]
     public void CreateEmptySelect_IsObsolete_ButWorks()
     {
-        var command = SelectCommand.CreateEmptySelect();
+        var command = SelectCommand.CreateForIssuerSecurityDomain().Value;
 
         command.Aid.Should().BeEmpty();
         command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);

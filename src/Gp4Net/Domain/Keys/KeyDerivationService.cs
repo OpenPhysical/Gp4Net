@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
@@ -49,7 +50,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
             ScpVersion.Scp02 => DeriveScp02SessionKeys(context),
             ScpVersion.Scp03 => DeriveScp03SessionKeys(context),
             _ => Result.Failure<SessionKeys, SmartCardError>(
-                SmartCardError.InvalidArgument($"Unsupported protocol: {context.Protocol}"))
+                new UnsupportedProtocolError(context.Protocol.ToString()))
         };
     }
 
@@ -63,7 +64,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
         if (context.KeySet is not Scp03KeySet scp03KeySet)
         {
             return Result.Failure<SessionKeys, SmartCardError>(
-                SmartCardError.InvalidArgument("SCP03 requires Scp03KeySet"));
+                new InvalidKeyError("KeySet", "SCP03 requires Scp03KeySet"));
         }
 
         try
@@ -73,9 +74,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
 
             // Context is concatenation of host challenge and card challenge
             // Per GP SCP03 v1.1.1, some implementations may modify the context based on i parameter
-            var derivationContext = new byte[16];
-            Array.Copy(context.HostChallenge, 0, derivationContext, 0, 8);
-            Array.Copy(context.CardChallenge, 0, derivationContext, 8, 8);
+            var derivationContext = context.HostChallenge.Concat(context.CardChallenge).ToArray();
 
             _logger.LogDebug("SCP03 key derivation with i parameter: 0x{IParameter:X2}", iParameter);
 
@@ -124,7 +123,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
         {
             _logger.LogError(ex, "SCP03 key derivation failed");
             return Result.Failure<SessionKeys, SmartCardError>(
-                SmartCardError.CryptographicError($"SCP03 key derivation failed: {ex.Message}"));
+                new CryptographicError("SCP03 key derivation", ex.Message));
         }
     }
 
@@ -152,7 +151,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
             var offset = 0;
 
             // Label (11 bytes of 0x00)
-            Array.Copy(DerivationConstants.Scp03Label, 0, dataBeforeCounter, offset, 11);
+            DerivationConstants.Scp03Label.CopyTo(dataBeforeCounter, offset);
             offset += 11;
 
             // Derivation constant (1 byte)
@@ -167,7 +166,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
 
             // Build fixed input data after counter
             var dataAfterCounter = new byte[16]; // Context
-            Array.Copy(context, 0, dataAfterCounter, 0, 16);
+            context.CopyTo(dataAfterCounter, 0);
 
             // Determine PRF type based on key length
             var prfType = kdk.Length switch
@@ -199,7 +198,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
         catch (Exception ex)
         {
             return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CryptographicError($"SCP03 key derivation failed: {ex.Message}"));
+                new CryptographicError("SCP03 key derivation", ex.Message));
         }
     }
 
@@ -225,19 +224,19 @@ public sealed class KeyDerivationService : IKeyDerivationService
             if (key == null || key.Length == 0)
             {
                 return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("Key cannot be null or empty"));
+                    new NullParameterError("key"));
             }
 
             if (context == null || context.Length == 0)
             {
                 return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("Context cannot be null or empty"));
+                    new NullParameterError("context"));
             }
 
             if (outputLengthBits % 8 != 0 || outputLengthBits <= 0 || outputLengthBits > 256)
             {
                 return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("Output length must be a positive multiple of 8 bits, up to 256"));
+                    new InvalidLengthError("outputLengthBits", 8, outputLengthBits));
             }
 
             _logger.LogDebug("Deriving SCP03 data with constant 0x{Constant:X2}, output length {Length} bits",
@@ -250,9 +249,17 @@ public sealed class KeyDerivationService : IKeyDerivationService
         {
             _logger.LogError(ex, "SCP03 data derivation failed");
             return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CryptographicError($"SCP03 data derivation failed: {ex.Message}"));
+                new CryptographicError("SCP03 data derivation", ex.Message));
         }
     }
+
+    /// <summary>
+    /// SCP02 key derivation parameters.
+    /// </summary>
+    private record Scp02KeyDerivationParams(
+        Scp02KeySet KeySet,
+        byte[] SequenceCounter,
+        ScpImplementation Implementation);
 
     /// <summary>
     /// Derives SCP02 session keys.
@@ -261,94 +268,51 @@ public sealed class KeyDerivationService : IKeyDerivationService
     /// </summary>
     private Result<SessionKeys, SmartCardError> DeriveScp02SessionKeys(IKeyDerivationContext context)
     {
-        if (context.KeySet is not Scp02KeySet scp02KeySet)
+        // Build derivation parameters
+        var buildParams = context.KeySet.AsScp02KeySet()
+            .Bind(keySet => context.SequenceCounter.ToResult("SCP02 requires sequence counter")
+                .Map(seqCounter => new Scp02KeyDerivationParams(
+                    keySet, 
+                    seqCounter, 
+                    context.Implementation.GetValueOrDefault(ScpImplementation.Scp02I15))));
+
+        // Compose key derivations functionally
+        return buildParams.Bind(derivationParams =>
         {
-            return Result.Failure<SessionKeys, SmartCardError>(
-                SmartCardError.InvalidArgument("SCP02 requires Scp02KeySet"));
-        }
+            _logger.LogDebug("SCP02 key derivation with implementation i={Implementation:X2}", (byte)derivationParams.Implementation);
+            
+            return DeriveAllScp02Keys(derivationParams);
+        });
+    }
 
-        if (context.SequenceCounter.HasNoValue)
-        {
-            return Result.Failure<SessionKeys, SmartCardError>(
-                SmartCardError.InvalidArgument("SCP02 requires sequence counter"));
-        }
+    /// <summary>
+    /// Derives all SCP02 session keys using functional composition.
+    /// </summary>
+    private Result<SessionKeys, SmartCardError> DeriveAllScp02Keys(Scp02KeyDerivationParams parameters)
+    {
+        _logger.LogDebug("SCP02 key derivation starting with implementation i={Implementation:X2}", (byte)parameters.Implementation);
+        _logger.LogTrace("ENC key: {EncKey}", Convert.ToHexString(parameters.KeySet.EncKey));
+        _logger.LogTrace("MAC key: {MacKey}", Convert.ToHexString(parameters.KeySet.MacKey));
+        _logger.LogTrace("DEK key: {DekKey}", Convert.ToHexString(parameters.KeySet.DekKey));
+        _logger.LogTrace("Sequence counter: {SequenceCounter}", Convert.ToHexString(parameters.SequenceCounter));
+        _logger.LogDebug("Uses derived MAC keys: {UsesDerivedMacKeys}", UsesDerivedMacKeys(parameters.Implementation));
+        
+        var deriveMacKey = UsesDerivedMacKeys(parameters.Implementation)
+            ? DeriveScp02Key(parameters.KeySet.MacKey, DerivationConstants.Scp02.CMac, parameters.SequenceCounter)
+            : Result.Success<byte[], SmartCardError>(parameters.KeySet.MacKey);
 
-        var sequenceCounter = context.SequenceCounter.Value;
-
-        try
-        {
-            // Derive session encryption key using SCP02 constant 0x0182
-            var sEncResult = DeriveScp02Key(
-                scp02KeySet.EncKey,
-                DerivationConstants.Scp02.SecureChannelEncryption,
-                sequenceCounter);
-
-            if (sEncResult.IsFailure)
-            {
-                return Result.Failure<SessionKeys, SmartCardError>(sEncResult.Error);
-            }
-
-            // For basic SCP02, MAC keys are often not derived (depends on implementation)
-            var implementation = context.Implementation.GetValueOrDefault(ScpImplementation.Scp02StaticMac);
-
-            byte[] sMac;
-            byte[] sRMac;
-
-            if (implementation == ScpImplementation.Scp02StaticMac)
-            {
-                // Static MAC - use base keys directly
-                sMac = scp02KeySet.MacKey;
-                sRMac = scp02KeySet.MacKey;
-            }
-            else
-            {
-                // Derive C-MAC key using SCP02 constant 0x0101
-                var sMacResult = DeriveScp02Key(
-                    scp02KeySet.MacKey,
-                    DerivationConstants.Scp02.CMac,
-                    sequenceCounter);
-
-                if (sMacResult.IsFailure)
+        return DeriveScp02Key(parameters.KeySet.EncKey, DerivationConstants.Scp02.SecureChannelEncryption, parameters.SequenceCounter)
+            .Bind(sEnc => deriveMacKey
+                .Bind(sMac => 
                 {
-                    return Result.Failure<SessionKeys, SmartCardError>(sMacResult.Error);
-                }
-
-                // Derive R-MAC key separately using SCP02 constant 0x0102
-                var sRMacResult = DeriveScp02Key(
-                    scp02KeySet.MacKey,
-                    DerivationConstants.Scp02.RMac,
-                    sequenceCounter);
-
-                if (sRMacResult.IsFailure)
-                {
-                    return Result.Failure<SessionKeys, SmartCardError>(sRMacResult.Error);
-                }
-
-                sMac = sMacResult.Value;
-                sRMac = sRMacResult.Value;
-            }
-
-            // Derive DEK session key using SCP02 constant 0x0181
-            var sDekResult = DeriveScp02Key(
-                scp02KeySet.DekKey,
-                DerivationConstants.Scp02.DataEncryptionKey,
-                sequenceCounter);
-
-            if (sDekResult.IsFailure)
-            {
-                return Result.Failure<SessionKeys, SmartCardError>(sDekResult.Error);
-            }
-
-            _logger.LogInformation("Successfully derived SCP02 session keys");
-            return Result.Success<SessionKeys, SmartCardError>(
-                new SessionKeys(sEncResult.Value, sMac, sRMac, sDekResult.Value));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "SCP02 key derivation failed");
-            return Result.Failure<SessionKeys, SmartCardError>(
-                SmartCardError.CryptographicError($"SCP02 key derivation failed: {ex.Message}"));
-        }
+                    // Always derive R-MAC session key, regardless of implementation support
+                    // GP Pro behavior shows distinct R-MAC keys are derived even for i=00
+                    var deriveRMac = DeriveScp02Key(parameters.KeySet.MacKey, DerivationConstants.Scp02.RMac, parameters.SequenceCounter);
+                    
+                    return deriveRMac.Bind(sRMac =>
+                        DeriveScp02Key(parameters.KeySet.DekKey, DerivationConstants.Scp02.DataEncryptionKey, parameters.SequenceCounter)
+                            .Map(sDek => new SessionKeys(sEnc, sMac, sRMac, sDek)));
+                }));
     }
 
     /// <summary>
@@ -362,54 +326,8 @@ public sealed class KeyDerivationService : IKeyDerivationService
         byte[] derivationConstant,
         byte[] sequenceCounter)
     {
-        try
-        {
-            // Validate inputs - per GP Card Spec v2.3.1 Tables E-2 and E-3, all SCP02 keys are 16 bytes
-            if (baseKey.Length != 16)
-            {
-                return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("SCP02 base key must be 16 bytes per GP specification"));
-            }
-
-            if (derivationConstant == null || derivationConstant.Length != 2)
-            {
-                return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("SCP02 derivation constant must be 2 bytes"));
-            }
-
-            if (sequenceCounter == null || sequenceCounter.Length != 2)
-            {
-                return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("SCP02 sequence counter must be 2 bytes"));
-            }
-
-            // SCP02 key derivation data construction per GP Card Spec v2.3.1 Figure E-2:
-            // Derivation data (16 bytes): Constant (2 bytes) || Sequence Counter (2 bytes) || '00' Padding (12 bytes)
-            var derivationData = new byte[16];
-            Array.Copy(derivationConstant, 0, derivationData, 0, 2);
-            Array.Copy(sequenceCounter, 0, derivationData, 2, 2);
-            // Remaining 12 bytes are already 0x00 from array initialization
-
-            // Encrypt the derivation data using 3DES-CBC with zero IV per GP Card Spec v2.3.1 Section E.4.1
-            var zeroIv = new byte[8]; // Zero IV for CBC mode
-            var parametersWithIv = new ParametersWithIV(new KeyParameter(baseKey), zeroIv);
-            var cipher = new BufferedBlockCipher(new CbcBlockCipher(new DesEdeEngine()));
-            cipher.Init(true, parametersWithIv);
-
-            var output = new byte[cipher.GetOutputSize(derivationData.Length)];
-            var len = cipher.ProcessBytes(derivationData, 0, derivationData.Length, output, 0);
-            cipher.DoFinal(output, len);
-
-            // Per GP Card Spec v2.3.1 Figure E-2: Session Key is 16 bytes
-            // The 3DES-CBC encryption of 16-byte derivation data produces exactly 16 bytes
-            // Return the entire output as the session key
-            return Result.Success<byte[], SmartCardError>(output);
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CryptographicError($"SCP02 key derivation failed: {ex.Message}"));
-        }
+        // Delegate to pure functional implementation
+        return Scp02Cryptography.DeriveScp02SessionKey(baseKey, derivationConstant, sequenceCounter);
     }
 
     /// <summary>
@@ -456,7 +374,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
             if (context.Data.Length != 16)
             {
                 return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("SCP03 cryptogram context must be 16 bytes (host challenge || card challenge)"));
+                    new InvalidLengthError("cryptogramContext", 16, context.Data.Length));
             }
 
             // Determine derivation constant based on cryptogram type
@@ -475,30 +393,34 @@ public sealed class KeyDerivationService : IKeyDerivationService
                 64); // 64 bits = 8 bytes output
         }
 
-        // For other cases, delegate to CryptogramService
-        var cryptogramService = new Gp4Net.Domain.Security.CryptogramService();
-
-        return context.Type switch
+        // For SCP02, the data is already properly formatted by CryptogramBuilder
+        // It includes the sequence counter and proper padding, so we should not decompose it
+        if (context.ProtocolVersion == 0x02)
         {
-            CryptogramType.CardCryptogram => cryptogramService.CalculateCardCryptogram(
-                context.Key,
-                context.Data.Length >= 8 ? context.Data[..8] : context.Data, // host challenge
-                context.Data.Length >= 16 ? context.Data[8..16] : new byte[8], // card challenge
-                Maybe<byte[]>.None, // sequence counter - would need to be in context
-                GetProtocolFromContext(context)),
-
-            CryptogramType.HostCryptogram => cryptogramService.CalculateHostCryptogram(
-                context.Key,
-                context.Data.Length >= 8 ? context.Data[..8] : context.Data, // host challenge
-                context.Data.Length >= 16 ? context.Data[8..16] : new byte[8], // card challenge
-                Maybe<byte[]>.None, // sequence counter - would need to be in context
-                GetProtocolFromContext(context)),
-
-            _ => cryptogramService.CalculateCryptogram(
-                context.Key,
-                context.Data,
-                GetProtocolFromContext(context))
-        };
+            // For SCP02, use the appropriate MAC algorithm based on cryptogram type
+            return context.Type switch
+            {
+                CryptogramType.CardCryptogram or CryptogramType.HostCryptogram => 
+                    // SCP02 uses Full 3DES MAC for cryptograms
+                    CryptographicOperations.CalculateFull3DesMac(context.Key, context.Data),
+                    
+                CryptogramType.CommandMac or CryptogramType.ResponseMac => 
+                    // SCP02 uses Retail MAC for C-MAC and R-MAC
+                    CryptographicOperations.CalculateRetailMac(context.Key, context.Data),
+                    
+                _ => Result.Failure<byte[], SmartCardError>(
+                    new UnsupportedImplementationError($"SCP02 cryptogram type: {context.Type}"))
+            };
+        }
+        
+        // For other protocols, delegate to CryptogramService
+        var cryptogramService = new Gp4Net.Domain.Security.CryptogramService();
+        
+        // For non-SCP02 protocols, use the existing logic
+        return cryptogramService.CalculateCryptogram(
+            context.Key,
+            context.Data,
+            GetProtocolFromContext(context));
     }
 
     private static ScpVersion GetProtocolFromContext(ICryptogramContext context)
@@ -511,4 +433,55 @@ public sealed class KeyDerivationService : IKeyDerivationService
             _ => ScpVersion.Scp03 // Default to SCP03
         };
     }
+
+    /// <summary>
+    /// Determines whether an SCP02 implementation uses derived MAC keys or static MAC keys.
+    /// Based on GlobalPlatform test vectors and real-world implementations.
+    /// </summary>
+    /// <param name="implementation">The SCP02 implementation</param>
+    /// <returns>True if MAC keys should be derived, false if they should remain static</returns>
+    private static bool UsesDerivedMacKeys(ScpImplementation implementation)
+    {
+        // Based on comprehensive analysis of test vectors and real card behavior:
+        // Per GP Card Spec v2.3.1 Section E.4.1, MAC keys are derived using constant 0x0101
+        // Only specific implementations use static MAC keys
+        return implementation switch
+        {
+            // Only this specific implementation uses static MAC keys
+            ScpImplementation.Scp02I15 => false,  // Test vector confirms: uses static MAC
+            
+            // All other implementations use derived MAC keys
+            // This includes i=00 as confirmed by GP Pro traces
+            _ => true  // Default: derive MAC keys per specification
+        };
+    }
+}
+
+/// <summary>
+/// Extension methods for functional composition in key derivation.
+/// </summary>
+internal static class KeyDerivationExtensions
+{
+    /// <summary>
+    /// Safely casts a generic IKeySet to a specific Scp02KeySet.
+    /// </summary>
+    /// <param name="keySet">The generic key set</param>
+    /// <returns>A Result containing the cast key set or an error</returns>
+    internal static Result<Scp02KeySet, SmartCardError> AsScp02KeySet(this IKeySet keySet) =>
+        keySet is Scp02KeySet scp02KeySet
+            ? Result.Success<Scp02KeySet, SmartCardError>(scp02KeySet)
+            : Result.Failure<Scp02KeySet, SmartCardError>(
+                new InvalidKeyError("KeySet", "SCP02 requires Scp02KeySet"));
+
+    /// <summary>
+    /// Converts a Maybe to a Result with a custom error message.
+    /// </summary>
+    /// <typeparam name="T">The type contained in the Maybe</typeparam>
+    /// <param name="maybe">The Maybe value</param>
+    /// <param name="errorMessage">Error message if Maybe has no value</param>
+    /// <returns>A Result containing the value or an error</returns>
+    internal static Result<T, SmartCardError> ToResult<T>(this Maybe<T> maybe, string errorMessage) =>
+        maybe.HasValue
+            ? Result.Success<T, SmartCardError>(maybe.Value)
+            : Result.Failure<T, SmartCardError>(new InvalidFormatError("parameter", errorMessage));
 }

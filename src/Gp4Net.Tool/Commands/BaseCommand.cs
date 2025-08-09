@@ -2,7 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
+using Gp4Net.Domain;
+using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
+using Gp4Net.Domain.Protocol;
 using Gp4Net.Services;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Services;
@@ -25,22 +30,23 @@ public abstract class BaseCommand<TSettings> : AsyncCommand<TSettings>
     );
 
     protected readonly ICardService CardService;
-    protected readonly IGlobalPlatformService GlobalPlatformService;
+    protected readonly IDomainServiceFactory DomainServiceFactory;
     protected readonly IKeysetResolver KeysetResolver;
+    protected IGlobalPlatformService GlobalPlatformService;
 
     /// <summary>
     /// Initializes a new instance of the BaseCommand class.
     /// </summary>
     protected BaseCommand(
         ICardService cardService,
-        IGlobalPlatformService globalPlatformService,
+        IDomainServiceFactory domainServiceFactory,
         IKeysetResolver keysetResolver
     )
     {
         CardService = cardService ?? throw new ArgumentNullException(nameof(cardService));
-        GlobalPlatformService =
-            globalPlatformService
-            ?? throw new ArgumentNullException(nameof(globalPlatformService));
+        DomainServiceFactory =
+            domainServiceFactory
+            ?? throw new ArgumentNullException(nameof(domainServiceFactory));
         KeysetResolver =
             keysetResolver ?? throw new ArgumentNullException(nameof(keysetResolver));
     }
@@ -126,6 +132,9 @@ public abstract class BaseCommand<TSettings> : AsyncCommand<TSettings>
                 AnsiConsole.MarkupLine($"[green]Connected to reader:[/] {readerName}");
             }
 
+            // Create GlobalPlatformService now that we're connected
+            GlobalPlatformService = DomainServiceFactory.CreateGlobalPlatformService(CardService);
+
             return true;
         }
         catch (Exception ex)
@@ -138,7 +147,7 @@ public abstract class BaseCommand<TSettings> : AsyncCommand<TSettings>
     /// <summary>
     /// Ensures a secure channel is established if required.
     /// </summary>
-    protected bool EnsureSecureChannel(TSettings settings)
+    protected async Task<bool> EnsureSecureChannel(TSettings settings)
     {
         if (!settings.RequiresSecureChannel)
         {
@@ -154,7 +163,36 @@ public abstract class BaseCommand<TSettings> : AsyncCommand<TSettings>
         {
             AnsiConsole.MarkupLine("[yellow]Establishing secure channel...[/]");
 
-            // Resolve keyset
+            // Step 1: Execute INITIALIZE UPDATE to get card response for key diversification
+            var hostChallenge = GenerateHostChallenge();
+            var initUpdateCmd = InitializeUpdateCommand.Create(
+                settings.KeyVersion, 
+                0x00, // Key ID (always 0x00 for now)
+                hostChallenge);
+            
+            if (initUpdateCmd.IsFailure)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ Failed to create INITIALIZE UPDATE command: {initUpdateCmd.Error.Message}[/]");
+                return false;
+            }
+
+            // Execute INITIALIZE UPDATE command
+            var initUpdateResponse = CardService.SendCommand(initUpdateCmd.Value);
+            if (!initUpdateResponse.IsSuccessful)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ INITIALIZE UPDATE failed: SW={initUpdateResponse.StatusWord:X4}[/]");
+                return false;
+            }
+
+            // Parse the response
+            var parsedResponse = InitializeUpdateResponse.Parse(initUpdateResponse.Data);
+            if (parsedResponse.IsFailure)
+            {
+                AnsiConsole.MarkupLine($"[red]✗ Failed to parse INITIALIZE UPDATE response: {parsedResponse.Error.Message}[/]");
+                return false;
+            }
+
+            // Step 2: Resolve keyset with card response for proper key diversification
             var keySet = KeysetResolver.ResolveKeyset(
                 settings.Keyset,
                 settings.KeysetParams,
@@ -162,27 +200,23 @@ public abstract class BaseCommand<TSettings> : AsyncCommand<TSettings>
                 settings.KeyMac,
                 settings.KeyDek,
                 settings.KeyVersion,
-                null // TODO: Get card response for diversification
+                parsedResponse.Value // Now passing the actual card response!
             );
 
-            var securityLevel = settings.SecurityLevel;
+            // Step 3: Establish secure channel with properly diversified keys
+            var securityLevel = (SecurityLevel)(byte)settings.SecurityLevel;
+            var secureChannelResult = await GlobalPlatformService.EstablishSecureChannelAsync(
+                (KeySet)keySet, 
+                securityLevel);
 
-            // For now, use first key as static key
-            // TODO: Update CardService to accept IKeySet
-            var keyBytes =
-                settings.KeyEnc
-                ?? settings.KeyMac
-                ?? settings.KeyDek
-                ?? GpTestKeys.StandardTestKey;
-
-            if (CardService.EstablishSecureChannel(keyBytes, securityLevel))
+            if (secureChannelResult.IsSuccess)
             {
-                AnsiConsole.MarkupLine("[green]✓ Secure channel established[/]");
+                AnsiConsole.MarkupLine("[green]✓ Secure channel established with proper key diversification[/]");
                 return true;
             }
             else
             {
-                AnsiConsole.MarkupLine("[red]✗ Failed to establish secure channel[/]");
+                AnsiConsole.MarkupLine($"[red]✗ Failed to establish secure channel: {secureChannelResult.Error.Message}[/]");
                 return false;
             }
         }
@@ -212,6 +246,17 @@ public abstract class BaseCommand<TSettings> : AsyncCommand<TSettings>
         {
             AnsiConsole.MarkupLine($"[green]Card ATR:[/] {Convert.ToHexString(atr)}");
         }
+    }
+
+    /// <summary>
+    /// Generates a random 8-byte host challenge for INITIALIZE UPDATE.
+    /// </summary>
+    private static byte[] GenerateHostChallenge()
+    {
+        var challenge = new byte[8];
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        rng.GetBytes(challenge);
+        return challenge;
     }
 }
 
@@ -326,6 +371,15 @@ public class BaseCommandSettings : CommandSettings
     [Description("Key version (default: 0x00 for auto-detection).")]
     [TypeConverter(typeof(ByteTypeConverter))]
     public byte KeyVersion { get; set; } = 0x00;
+
+    /// <summary>
+    /// Gets or sets the SCP implementation parameter.
+    /// Controls various protocol behaviors for SCP02 secure channel.
+    /// </summary>
+    [CommandOption("--scp-implementation")]
+    [Description("SCP implementation: hex (15,35,55,75) or alias (CLR,MAC,ENC,RENC). Default: CLR")]
+    [TypeConverter(typeof(Scp02ImplementationConverter))]
+    public ScpImplementation ScpImplementation { get; set; } = ScpImplementation.Scp02I15;
 
     /// <summary>
     /// Gets whether this command requires a secure channel.

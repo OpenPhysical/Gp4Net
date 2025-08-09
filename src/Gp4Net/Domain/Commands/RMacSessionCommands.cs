@@ -57,7 +57,7 @@ public class BeginRMacSessionCommand
     {
         Cla = cla;
         P1 = p1;
-        Data = data != null ? (byte[])data.Clone() : null;
+        Data = data != null ? (byte[])data.Clone() : Array.Empty<byte>();
         Mac = mac != null ? (byte[])mac.Clone() : null;
     }
 
@@ -79,7 +79,7 @@ public class BeginRMacSessionCommand
         var offset = 5;
 
         // Copy data if present
-        if (Data != null)
+        if (Data.Length > 0)
         {
             Array.Copy(Data, 0, apdu, offset, Data.Length);
             offset += Data.Length;

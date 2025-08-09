@@ -30,7 +30,6 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     /// <inheritdoc/>
     public Maybe<T> Get<T>(string key)
     {
-        ArgumentNullException.ThrowIfNull(key);
         if (_values.TryGetValue(key, out var value) && value is T typedValue)
         {
             return Maybe<T>.From(typedValue);
@@ -41,17 +40,12 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     /// <inheritdoc/>
     public IPipelineContext With<T>(string key, T value)
     {
-        ArgumentNullException.ThrowIfNull(key);
-        ArgumentNullException.ThrowIfNull(value);
-
         return new ImmutablePipelineContext(_values.SetItem(key, value));
     }
 
     /// <inheritdoc/>
     public IPipelineContext Without(string key)
     {
-        ArgumentNullException.ThrowIfNull(key);
-            
         return _values.ContainsKey(key)
             ? new ImmutablePipelineContext(_values.Remove(key))
             : this;
@@ -69,8 +63,6 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     /// <inheritdoc/>
     public IPipelineContext WithMany(ImmutableDictionary<string, object> values)
     {
-        ArgumentNullException.ThrowIfNull(values);
-            
         if (values.IsEmpty)
         {
             return this;

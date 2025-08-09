@@ -86,7 +86,9 @@ public class InstallationFlowIntegrationTests
         // Test INITIALIZE UPDATE response parsing
         var responseData = OpenFips201InstallationTrace.InitializeUpdateResponse.Take(
             OpenFips201InstallationTrace.InitializeUpdateResponse.Length - 2).ToArray(); // Remove SW1SW2
-        var parsedResponse = InitializeUpdateResponse.Parse(responseData);
+        var parsedResponseResult = InitializeUpdateResponse.Parse(responseData);
+        parsedResponseResult.IsSuccess.Should().BeTrue("Failed to parse INITIALIZE UPDATE response");
+        var parsedResponse = parsedResponseResult.Value;
         
         parsedResponse.CardChallenge.Should().BeEquivalentTo(
             OpenFips201InstallationTrace.CardChallenge,

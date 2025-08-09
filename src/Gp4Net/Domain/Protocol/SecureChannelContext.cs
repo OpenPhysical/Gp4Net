@@ -62,12 +62,9 @@ public class SecureChannelContext
         }
 
         HostChallenge = (byte[])hostChallenge.Clone();
-        ArgumentNullException.ThrowIfNull(initializeUpdateResponse);
-        ArgumentNullException.ThrowIfNull(sessionKeys);
         InitializeUpdateResponse = initializeUpdateResponse;
         SessionKeys = sessionKeys;
         ProtocolVersion = protocolVersion;
-        ArgumentNullException.ThrowIfNull(keySet);
         KeySet = keySet;
     }
 }

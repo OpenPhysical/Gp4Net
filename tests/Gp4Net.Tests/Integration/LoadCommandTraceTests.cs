@@ -233,7 +233,9 @@ public class LoadCommandTraceTests : TraceBasedTestBase
         var capFileData = File.ReadAllBytes(_capFilePath);
             
         // Act & Assert
-        var capFile = CapFileStructure.Parse(capFileData);
+        var capFileResult = CapFileStructure.Parse(capFileData);
+        Assert.That(capFileResult.IsSuccess, Is.True, "Failed to parse CAP file");
+        var capFile = capFileResult.Value;
         Assert.Multiple(() =>
         {
             Assert.That(capFile, Is.Not.Null);

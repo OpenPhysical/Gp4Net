@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Tests.Domain.Commands.TestHelpers;
 using NUnit.Framework;
@@ -17,8 +18,10 @@ public class SelectResponseTests
         var result = SelectResponse.Parse(null);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().BeEquivalentTo("INVALID_DATA");
-        result.Error.Message.Should().Contain("Response data cannot be null");
+        result.Error.Should().BeOfType<InvalidDataError>();
+        var error = (InvalidDataError)result.Error;
+        error.Field.Should().Be("Response");
+        error.Reason.Should().Be("cannot be null");
     }
 
     [Test]

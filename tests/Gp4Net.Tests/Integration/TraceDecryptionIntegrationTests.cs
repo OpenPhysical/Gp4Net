@@ -32,13 +32,9 @@ public class TraceDecryptionIntegrationTests
     [Test]
     public void DecryptTrace_WithConfigureGpshellTrace_ShouldProcessSuccessfully()
     {
-        // Skip if trace file not available
+        // Trace file must be available for test to run
         var tracePath = Path.Combine(TraceDataPath, "Mixed", "configure_gpshell_log.json");
-        if (!File.Exists(tracePath))
-        {
-            // Use Skip instead of Assert.Skip for better test reporting
-            return;
-        }
+        File.Exists(tracePath).Should().BeTrue($"Test requires trace file at: {tracePath}");
 
         var traceData = LoadTraceFile(tracePath);
         var exchanges = ExtractExchangesFromTrace(traceData);
@@ -171,19 +167,12 @@ public class TraceDecryptionIntegrationTests
     public void DecryptTrace_WithRealTraceFiles_ShouldProcessWhenAvailable(string relativeTracePath)
     {
         var tracePath = Path.Combine(TraceDataPath, relativeTracePath);
-        if (!File.Exists(tracePath))
-        {
-            // Skip test if trace file not available
-            return;
-        }
+        File.Exists(tracePath).Should().BeTrue($"Test requires trace file at: {tracePath}");
 
         var traceData = LoadTraceFile(tracePath);
         var exchanges = ExtractExchangesFromTrace(traceData);
         
-        if (!exchanges.Any())
-        {
-            return; // Skip if no exchanges to test
-        }
+        exchanges.Should().NotBeEmpty($"Trace file {tracePath} must contain exchanges to test");
 
         var sessionKeys = CreateTestSessionKeys();
         var securityLevel = SecurityLevel.None;

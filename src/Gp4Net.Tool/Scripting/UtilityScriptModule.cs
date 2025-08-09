@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
+using Org.BouncyCastle.Security;
 using JetBrains.Annotations;
 using MoonSharp.Interpreter;
 using MoonSharp.Interpreter.Interop;
@@ -182,10 +182,8 @@ public class UtilityScriptModule
     public static byte[] RandomBytes(int length)
     {
         var bytes = new byte[length];
-        using (var rng = RandomNumberGenerator.Create())
-        {
-            rng.GetBytes(bytes);
-        }
+        var random = new SecureRandom();
+        random.NextBytes(bytes);
         return bytes;
     }
 

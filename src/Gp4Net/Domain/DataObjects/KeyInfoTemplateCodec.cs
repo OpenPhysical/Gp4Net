@@ -24,10 +24,12 @@ public static class KeyInfoTemplateCodec
     /// Encodes key information template into binary format.
     /// </summary>
     /// <param name="keyInfo">The key information to encode.</param>
-    /// <returns>The encoded key information data.</returns>
-    public static byte[] Encode(KeyInfoTemplate keyInfo)
+    /// <returns>A Result containing the encoded key information data, or an error if keyInfo is null.</returns>
+    public static Result<byte[], SmartCardError> Encode(KeyInfoTemplate keyInfo)
     {
-        ArgumentNullException.ThrowIfNull(keyInfo);
+        if (keyInfo is null)
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidArgument("KeyInfo cannot be null"));
             
         using var stream = new MemoryStream();
             
@@ -76,23 +78,26 @@ public static class KeyInfoTemplateCodec
         }
         else
         {
-            throw new InvalidOperationException("Key information template too large for encoding");
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidData("Key information template too large for encoding"));
         }
             
         // Write content
         stream.Write(content, 0, content.Length);
             
-        return stream.ToArray();
+        return Result.Success<byte[], SmartCardError>(stream.ToArray());
     }
         
     /// <summary>
     /// Decodes key information template from binary format.
     /// </summary>
     /// <param name="data">The encoded key information data.</param>
-    /// <returns>The decoded key information.</returns>
+    /// <returns>A Result containing the decoded key information template, or an error if data is invalid.</returns>
     public static Result<KeyInfoTemplate, SmartCardError> Decode(byte[] data)
     {
-        ArgumentNullException.ThrowIfNull(data);
+        if (data is null)
+            return Result.Failure<KeyInfoTemplate, SmartCardError>(
+                SmartCardError.InvalidArgument("Data cannot be null"));
             
         // Parse the outer TLV structure
         var outerTlvMaybe = TlvParser.ParseSingle(data);

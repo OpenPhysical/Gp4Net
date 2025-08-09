@@ -40,9 +40,6 @@ public class SafeAuthenticationManager : ISafeAuthenticationManager
         int maxAttempts = DefaultMaxAttempts
     )
     {
-        ArgumentNullException.ThrowIfNull(innerManager);
-        ArgumentNullException.ThrowIfNull(logger);
-            
         if (maxAttempts < 1)
         {
             throw new ArgumentException("Maximum attempts must be at least 1", nameof(maxAttempts));
@@ -62,9 +59,17 @@ public class SafeAuthenticationManager : ISafeAuthenticationManager
         CancellationToken cancellationToken = default
     )
     {
-        ArgumentNullException.ThrowIfNull(channel);
-        ArgumentNullException.ThrowIfNull(transport);
-        ArgumentNullException.ThrowIfNull(keySet);
+        if (channel is null)
+            return Result.Failure<Security.SecureChannelState, SmartCardError>(
+                SmartCardError.InvalidArgument("Channel cannot be null"));
+        
+        if (transport is null)
+            return Result.Failure<Security.SecureChannelState, SmartCardError>(
+                SmartCardError.InvalidArgument("Transport cannot be null"));
+        
+        if (keySet is null)
+            return Result.Failure<Security.SecureChannelState, SmartCardError>(
+                SmartCardError.InvalidArgument("Key set cannot be null"));
 
         // Generate a card identifier for attempt tracking
         var cardId = await GetCardIdentifierAsync(channel, transport, cancellationToken);
@@ -185,9 +190,17 @@ public class SafeAuthenticationManager : ISafeAuthenticationManager
         CancellationToken cancellationToken = default
     )
     {
-        ArgumentNullException.ThrowIfNull(channel);
-        ArgumentNullException.ThrowIfNull(transport);
-        ArgumentNullException.ThrowIfNull(keySet);
+        if (channel is null)
+            return Result.Failure<Security.SecureChannelState, SmartCardError>(
+                SmartCardError.InvalidArgument("Channel cannot be null"));
+        
+        if (transport is null)
+            return Result.Failure<Security.SecureChannelState, SmartCardError>(
+                SmartCardError.InvalidArgument("Transport cannot be null"));
+        
+        if (keySet is null)
+            return Result.Failure<Security.SecureChannelState, SmartCardError>(
+                SmartCardError.InvalidArgument("Key set cannot be null"));
 
         var cardId = await GetCardIdentifierAsync(channel, transport, cancellationToken);
         var tracker = _attemptTrackers.GetOrAdd(cardId, _ => new AttemptTracker());

@@ -28,8 +28,6 @@ public class SecureChannelProtocolFactory : ISecureChannelProtocolFactory
         ILogger<SecureChannelProtocolFactory> logger
     )
     {
-        ArgumentNullException.ThrowIfNull(serviceProvider);
-        ArgumentNullException.ThrowIfNull(logger);
         _serviceProvider = serviceProvider;
         _logger = logger;
     }
@@ -37,7 +35,6 @@ public class SecureChannelProtocolFactory : ISecureChannelProtocolFactory
     /// <inheritdoc />
     public ISecureChannelProtocol CreateProtocol(byte protocolVersion, IKeySet keySet)
     {
-        ArgumentNullException.ThrowIfNull(keySet);
 
         var protocol = protocolVersion & ProtocolIdentifiers.ProtocolMask;
 
@@ -60,7 +57,6 @@ public class SecureChannelProtocolFactory : ISecureChannelProtocolFactory
     /// <inheritdoc />
     public byte DetectProtocolVersion(InitializeUpdateResponse response)
     {
-        ArgumentNullException.ThrowIfNull(response);
 
         var protocol = response.ScpId & ProtocolIdentifiers.ProtocolMask;
 

@@ -14,10 +14,6 @@ namespace Gp4Net.Constants;
 [PublicAPI]
 public enum ScpVersion : byte
 {
-    /// <summary>
-    /// SCP01 protocol (deprecated but included for completeness).
-    /// </summary>
-    Scp01 = 0x01,
 
     /// <summary>
     /// SCP02 protocol per GlobalPlatform Card Specification v2.3.1 Appendix E.4.

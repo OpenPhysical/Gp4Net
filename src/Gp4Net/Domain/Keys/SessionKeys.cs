@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 
 using System;
-using System.Security.Cryptography;
+using Org.BouncyCastle.Utilities;
 
 namespace Gp4Net.Domain.Keys;
 
@@ -44,9 +44,6 @@ public class SessionKeys : IDisposable
     /// <param name="dek">The data encryption key (optional).</param>
     public SessionKeys(byte[] sEnc, byte[] sMac, byte[] sRMac, byte[] dek = null)
     {
-        ArgumentNullException.ThrowIfNull(sEnc);
-        ArgumentNullException.ThrowIfNull(sMac);
-        ArgumentNullException.ThrowIfNull(sRMac);
         SEnc = sEnc;
         SMac = sMac;
         SrMac = sRMac;
@@ -58,12 +55,12 @@ public class SessionKeys : IDisposable
     /// </summary>
     public void Clear()
     {
-        CryptographicOperations.ZeroMemory(SEnc);
-        CryptographicOperations.ZeroMemory(SMac);
-        CryptographicOperations.ZeroMemory(SrMac);
+        Arrays.Fill(SEnc, 0);
+        Arrays.Fill(SMac, 0);
+        Arrays.Fill(SrMac, 0);
         if (Dek != null)
         {
-            CryptographicOperations.ZeroMemory(Dek);
+            Arrays.Fill(Dek, 0);
         }
     }
 

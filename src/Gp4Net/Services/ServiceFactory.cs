@@ -1,10 +1,13 @@
 using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.Domain.Protocol;
+using Gp4Net.Domain.Security;
 using Gp4Net.Pipeline;
-using Gp4Net.Pipeline.Middleware;
+// using Gp4Net.Pipeline.Middleware; - removed with old pipeline
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging.Abstractions;
+using static Gp4Net.Pipeline.CommandProcessing;
+using Gp4Net.Core;
 
 namespace Gp4Net.Services;
 
@@ -38,23 +41,12 @@ public static class ServiceFactory
     /// <param name="cardService">The card service for smart card communication.</param>
     /// <param name="secureChannelManager">The secure channel manager for cryptographic operations.</param>
     /// <returns>A fully configured functional GlobalPlatform service.</returns>
-    public static Result<IGlobalPlatformService, ServiceConfigurationError> CreateGlobalPlatformService(
+    public static Result<IGlobalPlatformService, SmartCardError> CreateGlobalPlatformService(
         ISmartCardService cardService,
         ISecureChannelManager secureChannelManager)
     {
-        if (cardService == null)
-        {
-            return Result.Failure<IGlobalPlatformService, ServiceConfigurationError>(
-                ServiceConfigurationError.MissingDependency(nameof(cardService)));
-        }
-
-        if (secureChannelManager == null)
-        {
-            return Result.Failure<IGlobalPlatformService, ServiceConfigurationError>(
-                ServiceConfigurationError.MissingDependency(nameof(secureChannelManager)));
-        }
-
-        return Result.Success<IGlobalPlatformService, ServiceConfigurationError>(
+        // No null checks - nulls should be converted to Result<T> at the boundary
+        return Result.Success<IGlobalPlatformService, SmartCardError>(
             new GlobalPlatformService(cardService, secureChannelManager, NullLogger<GlobalPlatformService>.Instance));
     }
 
@@ -62,54 +54,42 @@ public static class ServiceFactory
     /// Creates a smart card service with functional pipeline composition.
     /// Demonstrates how to build services with explicit dependency management.
     /// </summary>
+    /// <param name="channel">The card channel for communication.</param>
     /// <param name="transport">The APDU transport for card communication.</param>
     /// <returns>A configured smart card service with functional pipeline.</returns>
-    public static Result<ISmartCardService, ServiceConfigurationError> CreateSmartCardService(
+    public static Result<ISmartCardService, SmartCardError> CreateSmartCardService(
+        ICardChannel channel,
         IApduTransport transport)
     {
-        if (transport == null)
-        {
-            return Result.Failure<ISmartCardService, ServiceConfigurationError>(
-                ServiceConfigurationError.MissingDependency(nameof(transport)));
-        }
-
-        return CreateCommandPipeline(transport)
-            .Bind(commandPipeline => CreatePipelineContext()
-                .Map(context => (ISmartCardService)new SmartCardService(commandPipeline, context, transport)));
+        // No null checks - nulls should be converted to Result<T> at the boundary
+        
+        // Create a logger (can be NullLogger if not provided)
+        var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<SmartCardService>.Instance;
+        
+        // Create command environment
+        var environment = new CommandEnvironment(
+            channel,
+            transport,
+            Maybe<SecureChannelState>.None,
+            logger);
+            
+        // Create command processor
+        var processor = CommandProcessors.CreatePipeline(enableLogging: true, enableSecureChannel: true);
+        
+        return Result.Success<ISmartCardService, SmartCardError>(
+            new SmartCardService(environment, processor, logger));
     }
 
-    /// <summary>
-    /// Creates a command pipeline with functional middleware composition.
-    /// Uses builder pattern but with functional error handling.
-    /// </summary>
-    /// <param name="transport">The APDU transport for the terminal middleware.</param>
-    /// <returns>A configured command pipeline or configuration error.</returns>
-    public static Result<ICommandPipeline, ServiceConfigurationError> CreateCommandPipeline(IApduTransport transport)
-    {
-        try
-        {
-            // Create a basic pipeline with essential middleware
-            var pipeline = CommandPipelineBuilder.Create()
-                .Use(new TransportMiddleware(transport))  // Terminal middleware for actual transport
-                .Build();
-
-            return Result.Success<ICommandPipeline, ServiceConfigurationError>(pipeline);
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<ICommandPipeline, ServiceConfigurationError>(
-                ServiceConfigurationError.ConfigurationFailure("Failed to create command pipeline", ex.Message));
-        }
-    }
+    // CreateCommandPipeline method removed - using functional composition instead
 
     /// <summary>
     /// Creates an immutable pipeline context for command execution.
     /// Demonstrates functional context creation with proper immutability.
     /// </summary>
     /// <returns>An immutable pipeline context.</returns>
-    public static Result<IPipelineContext, ServiceConfigurationError> CreatePipelineContext()
+    public static Result<IPipelineContext, SmartCardError> CreatePipelineContext()
     {
-        return Result.Success<IPipelineContext, ServiceConfigurationError>(
+        return Result.Success<IPipelineContext, SmartCardError>(
             ImmutablePipelineContext.Empty);
     }
 
@@ -118,17 +98,23 @@ public static class ServiceFactory
     /// This is the main factory method that demonstrates functional composition
     /// of the entire service dependency graph.
     /// </summary>
+    /// <param name="channel">The card channel for communication.</param>
     /// <param name="transport">The APDU transport for card communication.</param>
     /// <param name="secureChannelManager">The secure channel manager for cryptographic operations.</param>
     /// <returns>A complete service configuration or error.</returns>
-    public static Result<ServiceConfiguration, ServiceConfigurationError> CreateServiceConfiguration(
+    public static Result<ServiceConfiguration, SmartCardError> CreateServiceConfiguration(
+        ICardChannel channel,
         IApduTransport transport,
         ISecureChannelManager secureChannelManager)
     {
-        return CreateSmartCardService(transport)
+        // Create the smart card service first
+        return CreateSmartCardService(channel, transport)
             .Bind(cardService => 
+                // Then create the GlobalPlatform service
                 CreateGlobalPlatformService(cardService, secureChannelManager)
-                    .Map(gpService => new ServiceConfiguration(cardService, gpService)));
+                    .Map(gpService => 
+                        // Return the complete service configuration
+                        new ServiceConfiguration(cardService, gpService)));
     }
 }
 
@@ -155,20 +141,4 @@ public record ServiceConfiguration(
     }
 }
 
-/// <summary>
-/// Represents errors that can occur during service configuration.
-/// Uses functional error handling instead of exceptions.
-/// </summary>
-public record ServiceConfigurationError(string Message, string Details = null)
-{
-    public static ServiceConfigurationError MissingDependency(string dependencyName) =>
-        new($"Missing required dependency: {dependencyName}");
-
-    public static ServiceConfigurationError ConfigurationFailure(string reason, string details = null) =>
-        new($"Service configuration failed: {reason}", details);
-
-    public static ServiceConfigurationError InvalidConfiguration(string reason) =>
-        new($"Invalid service configuration: {reason}");
-
-    public override string ToString() => Details != null ? $"{Message} - {Details}" : Message;
-}
+// ServiceConfigurationError class removed - using Gp4Net.Core.SmartCardError instead

@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using NUnit.Framework;
@@ -195,7 +196,7 @@ public class GetDataCommandTests
 
         // Assert
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("cannot be null");
     }
 
@@ -211,7 +212,7 @@ public class GetDataCommandTests
 
         // Assert
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("must be exactly 3 bytes");
     }
 
@@ -239,7 +240,7 @@ public class GetDataCommandTests
 
         // Assert
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("cannot be null");
     }
 }

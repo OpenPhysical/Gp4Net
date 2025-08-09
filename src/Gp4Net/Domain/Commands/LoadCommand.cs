@@ -563,7 +563,13 @@ public static class CapFileLoader
         try
         {
             // Try to parse the CAP file structure
-            var capFile = CapFile.CapFileStructure.Parse(capFileData);
+            var capFileResult = CapFile.CapFileStructure.Parse(capFileData);
+            if (capFileResult.IsFailure)
+            {
+                return false;
+            }
+            
+            var capFile = capFileResult.Value;
 
             // Basic validation checks
             return capFile.PackageAid.Length > 0

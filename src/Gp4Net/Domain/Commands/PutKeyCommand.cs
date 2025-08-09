@@ -578,8 +578,7 @@ public class PutKeyResponse
         // Each key check value is 3 bytes
         for (var i = 0; i + 2 < response.Length; i += 3)
         {
-            var kcv = new byte[3];
-            Array.Copy(response, i, kcv, 0, 3);
+            var kcv = response.Skip(i).Take(3).ToArray();
             keyCheckValues.Add(kcv);
         }
 

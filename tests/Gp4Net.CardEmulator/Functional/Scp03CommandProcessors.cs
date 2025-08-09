@@ -10,7 +10,6 @@ using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
 using Gp4Net.Domain.Security;
-using Gp4Net.Utils;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 
@@ -34,11 +33,36 @@ public static class Scp03CommandProcessors
         ILogger? logger = null)
     {
         logger?.LogDebug("Processing SCP03 INITIALIZE UPDATE command");
-        return ParseInitializeUpdateCommand(command)
-            .Bind(request => ValidateScp03Preconditions(request, state, config))
-            .Bind(request => GenerateScp03CardChallenge(request, state, config, crypto))
-            .Bind(data => CalculateScp03CardCryptogram(data, state, config, crypto))
-            .Map(result => CreateScp03InitializeUpdateResponse(result, state, config));
+        Console.WriteLine("DEBUG: ProcessScp03InitializeUpdate called");
+        
+        var result = ParseInitializeUpdateCommand(command)
+            .Bind(request => 
+            {
+                Console.WriteLine("DEBUG: ParseInitializeUpdateCommand succeeded");
+                return ValidateScp03Preconditions(request, state, config);
+            })
+            .Bind(request => 
+            {
+                Console.WriteLine("DEBUG: ValidateScp03Preconditions succeeded");
+                return GenerateScp03CardChallenge(request, state, config, crypto);
+            })
+            .Bind(data => 
+            {
+                Console.WriteLine("DEBUG: GenerateScp03CardChallenge succeeded");
+                return CalculateScp03CardCryptogram(data, state, config, crypto);
+            })
+            .Map(result => 
+            {
+                Console.WriteLine("DEBUG: CalculateScp03CardCryptogram succeeded, creating response");
+                return CreateScp03InitializeUpdateResponse(result, state, config);
+            });
+            
+        if (result.IsFailure)
+        {
+            Console.WriteLine($"DEBUG: ProcessScp03InitializeUpdate failed: {result.Error.Message}");
+        }
+        
+        return result;
     }
 
     /// <summary>
@@ -104,18 +128,30 @@ public static class Scp03CommandProcessors
         CardState state,
         CardConfiguration config)
     {
+        Console.WriteLine($"DEBUG: SCP03 validation - IsSelected: {state.IsSelected}, ScpVersion: 0x{(byte)state.ScpVersion:X2}, ScpImpl: 0x{(byte)state.ScpImplementation:X2}");
+        
         if (!state.IsSelected)
+        {
+            Console.WriteLine("DEBUG: SCP03 validation failed - card not selected");
             return SmartCardError.ConditionsNotSatisfied();
+        }
 
         // Verify SCP03 is configured
         if (state.ScpVersion != 0x03)
+        {
+            Console.WriteLine($"DEBUG: SCP03 validation failed - wrong SCP version: 0x{(byte)state.ScpVersion:X2}");
             return SmartCardError.InvalidArgument("Card is not configured for SCP03");
+        }
 
         // Validate implementation parameter
         var validImplementations = new byte[] { 0x00, 0x10, 0x20, 0x60, 0x70 };
         if (!validImplementations.Any(v => v == (byte)state.ScpImplementation))
+        {
+            Console.WriteLine($"DEBUG: SCP03 validation failed - invalid implementation: 0x{(byte)state.ScpImplementation:X2}");
             return SmartCardError.InvalidArgument($"Invalid SCP03 implementation: {state.ScpImplementation:X2}");
+        }
 
+        Console.WriteLine("DEBUG: SCP03 validation passed");
         return Result.Success<InitializeUpdateRequest, SmartCardError>(request);
     }
 
@@ -125,15 +161,30 @@ public static class Scp03CommandProcessors
         CardConfiguration config,
         ICryptographicService crypto)
     {
+        Console.WriteLine($"DEBUG: GenerateScp03CardChallenge - requested key version: 0x{request.KeyVersion:X2}");
+        Console.WriteLine($"DEBUG: Available key versions: {string.Join(", ", config.StaticKeys.Keys.Select(k => $"0x{k:X2}"))}");
+        
         // Check if pseudo-random challenge generation is required (i=70)
         if (state.ScpImplementation.UsesPseudoRandom())
         {
+            Console.WriteLine("DEBUG: Using pseudo-random challenge generation (i=70)");
+            
             // Get the key set for pseudo-random generation
             if (!TryGetKeySet(request.KeyVersion, state, config, out var keySet) || keySet == null)
+            {
+                Console.WriteLine($"DEBUG: Key set not found for version 0x{request.KeyVersion:X2}");
                 return SmartCardError.ReferencedDataNotFound();
+            }
 
+            Console.WriteLine($"DEBUG: Found key set type: {keySet.GetType().Name}");
+            
             if (keySet is not Scp03KeySet scp03Keys)
+            {
+                Console.WriteLine($"DEBUG: Key set is not SCP03KeySet, it's {keySet.GetType().Name}");
                 return SmartCardError.InvalidArgument("SCP03 requires SCP03 key set");
+            }
+
+            Console.WriteLine("DEBUG: SCP03 key set validated successfully");
 
             // Get sequence counter
             var sequenceCounter = state.GetSequenceCounter(request.KeyVersion);
@@ -148,6 +199,7 @@ public static class Scp03CommandProcessors
         }
         else
         {
+            Console.WriteLine("DEBUG: Using standard random challenge generation");
             // Standard random challenge generation
             return crypto.GenerateChallenge(8)
                 .Map(challenge => new Scp03ChallengeData(request, challenge));
@@ -160,20 +212,40 @@ public static class Scp03CommandProcessors
         CardConfiguration config,
         ICryptographicService crypto)
     {
+        Console.WriteLine($"DEBUG: CalculateScp03CardCryptogram - requested key version: 0x{data.Request.KeyVersion:X2}");
+        Console.WriteLine($"DEBUG: state.DefaultKeyVersion: 0x{state.DefaultKeyVersion:X2}");
+        
         // Determine effective key version
         var effectiveKeyVersion = data.Request.KeyVersion;
         if (effectiveKeyVersion == 0x00)
         {
+            Console.WriteLine("DEBUG: Key version is 0x00, using state.DefaultKeyVersion");
             effectiveKeyVersion = state.DefaultKeyVersion;
             if (effectiveKeyVersion == 0xFF)
             {
-                effectiveKeyVersion = config.StaticKeys.Keys.FirstOrDefault();
+                Console.WriteLine("DEBUG: DefaultKeyVersion is 0xFF, finding SCP03 key");
+                // For SCP03 context, prefer SCP03 key versions
+                var scp03Key = config.StaticKeys.FirstOrDefault(kvp => kvp.Value is Scp03KeySet);
+                effectiveKeyVersion = scp03Key.Key != 0 ? scp03Key.Key : config.StaticKeys.Keys.FirstOrDefault();
             }
         }
 
+        Console.WriteLine($"DEBUG: Effective key version: 0x{effectiveKeyVersion:X2}");
+
         // Get the appropriate keys
         if (!TryGetKeySet(effectiveKeyVersion, state, config, out var keys) || keys == null)
+        {
+            Console.WriteLine($"DEBUG: TryGetKeySet failed for key version 0x{effectiveKeyVersion:X2}");
             return SmartCardError.ReferencedDataNotFound();
+        }
+        
+        Console.WriteLine($"DEBUG: Found key set type: {keys.GetType().Name} for version 0x{effectiveKeyVersion:X2}");
+        
+        if (keys is not Scp03KeySet)
+        {
+            Console.WriteLine($"DEBUG: Key set is not SCP03KeySet, it's {keys.GetType().Name}");
+            return SmartCardError.InvalidArgument("SCP03 requires SCP03 key set");
+        }
 
         // Get sequence counter
         var sequenceCounter = state.GetSequenceCounter(effectiveKeyVersion);
@@ -236,6 +308,9 @@ public static class Scp03CommandProcessors
             newState = newState.WithIncrementedSequenceCounter(data.KeyVersion);
         }
 
+        Console.WriteLine($"DEBUG: SCP03 INITIALIZE UPDATE response created - {response.Length} bytes, SW=9000");
+        Console.WriteLine($"DEBUG: SCP03 response data: {Convert.ToHexString(response)}");
+        
         return (new ApduResponse(response, StatusWords.Success), newState);
     }
 
@@ -501,7 +576,9 @@ public static class Scp03CommandProcessors
         // If key version is 0x00 or 0xFF, try to find any available key
         if (keyVersion == 0x00 || keyVersion == 0xFF)
         {
-            keySet = config.StaticKeys.Values.FirstOrDefault();
+            // For SCP03 context, prefer SCP03 key sets
+            keySet = config.StaticKeys.Values.OfType<Scp03KeySet>().FirstOrDefault() 
+                     ?? config.StaticKeys.Values.FirstOrDefault();
             return keySet != null;
         }
 

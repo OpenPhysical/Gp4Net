@@ -18,9 +18,9 @@ namespace Gp4Net.Domain.CardInfo;
 public class CardCapabilities
 {
     /// <summary>
-    /// Gets the raw capabilities data.
+    /// Gets the card capabilities data from GET DATA(0x0067) response.
     /// </summary>
-    public byte[] RawData { get; }
+    public byte[] Data { get; }
 
     /// <summary>
     /// Gets the supported SCP options.
@@ -76,7 +76,7 @@ public class CardCapabilities
 
     private CardCapabilities(byte[] rawData)
     {
-        RawData = rawData; // Validation done in TryParse
+        Data = rawData; // Validation done in TryParse
     }
 
     /// <summary>

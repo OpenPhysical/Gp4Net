@@ -69,8 +69,13 @@ public sealed class MacService
         byte[] data,
         int macLength = 8)
     {
-        ArgumentNullException.ThrowIfNull(key);
-        ArgumentNullException.ThrowIfNull(data);
+        if (key is null)
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidArgument("Key cannot be null"));
+        
+        if (data is null)
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidArgument("Data cannot be null"));
 
         if (key.Length == 0)
         {
@@ -142,8 +147,13 @@ public sealed class MacService
         byte[] data,
         int macLength = 8)
     {
-        ArgumentNullException.ThrowIfNull(key);
-        ArgumentNullException.ThrowIfNull(data);
+        if (key is null)
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidArgument("Key cannot be null"));
+        
+        if (data is null)
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidArgument("Data cannot be null"));
 
         if (key.Length == 0)
         {

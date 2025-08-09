@@ -24,9 +24,8 @@ public class KeysetResolver : IKeysetResolver
     /// </summary>
     public KeysetResolver(ILogger<KeysetResolver> logger, IScriptManager scriptManager)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _scriptManager =
-            scriptManager ?? throw new ArgumentNullException(nameof(scriptManager));
+        _logger = logger;
+        _scriptManager = scriptManager;
     }
 
     /// <summary>
@@ -48,15 +47,15 @@ public class KeysetResolver : IKeysetResolver
             return CreateKeysetFromIndividualKeys(encKey, macKey, dekKey, keyVersion);
         }
 
-        // Priority 2: Keyset from script
-        if (!string.IsNullOrEmpty(keysetSpec))
+        // Priority 2: Check for GP test keys (use C# implementation)
+        if (string.IsNullOrEmpty(keysetSpec) || keysetSpec == "gp_test_keys")
         {
-            return ResolveFromScript(keysetSpec, keysetParams, cardResponse);
+            _logger.LogDebug("Using C# GP test keys implementation");
+            return ResolveGpTestKeys(cardResponse);
         }
 
-        // Priority 3: Default to GP test keys
-        _logger.LogDebug("Using default GP test keys");
-        return ResolveFromScript("gp_test_keys", keysetParams, cardResponse);
+        // Priority 3: Keyset from script
+        return ResolveFromScript(keysetSpec, keysetParams, cardResponse);
     }
 
     private IKeySet ResolveFromScript(
@@ -238,6 +237,29 @@ public class KeysetResolver : IKeysetResolver
         }
 
         throw new InvalidOperationException($"Invalid type for key '{key}': expected number");
+    }
+
+    private IKeySet ResolveGpTestKeys(InitializeUpdateResponse cardResponse)
+    {
+        // Always use the GetDiversifiedTestKeySet method which handles null cardResponse
+        var result = GpTestKeys.GetDiversifiedTestKeySet(cardResponse);
+        
+        if (result.IsSuccess)
+        {
+            if (cardResponse != null)
+            {
+                _logger.LogDebug("Using diversified GP test keys based on card response");
+            }
+            else
+            {
+                _logger.LogDebug("Using static GP test keys (no card response available)");
+            }
+            return result.Value;
+        }
+        else
+        {
+            throw new InvalidOperationException($"Failed to resolve GP test keys: {result.Error.Message}");
+        }
     }
 
     private static IKeySet CreateKeysetFromIndividualKeys(

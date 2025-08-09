@@ -8,7 +8,6 @@ using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
 using Gp4Net.Domain.Security;
-using Gp4Net.Utils;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 
@@ -425,8 +424,53 @@ public static class Scp02CommandProcessors
                 if (!request.HostCryptogram.SequenceEqual(expectedCryptogram))
                     return SmartCardError.SecurityStatusNotSatisfied();
 
-                // TODO: Also verify the MAC on the EXTERNAL AUTHENTICATE command itself
+                // Verify the MAC on the EXTERNAL AUTHENTICATE command if security level requires it
+                if (request.SecurityLevel != 0x00)
+                {
+                    // For SCP02 with C-MAC, we need to verify the command MAC
+                    // The MAC should be calculated over the command header + data
+                    // Command structure: CLA=84 INS=82 P1=SecurityLevel P2=00 LC=10 Data=HostCryptogram
+                    return VerifyScp02CommandMac(request, state, crypto);
+                }
+                
                 return Result.Success<ExternalAuthenticateRequest, SmartCardError>(request);
+            });
+    }
+
+    private static Result<ExternalAuthenticateRequest, SmartCardError> VerifyScp02CommandMac(
+        ExternalAuthenticateRequest request,
+        CardState state,
+        ICryptographicService crypto)
+    {
+        // Derive session keys first to get the MAC key
+        return DeriveScp02SessionKeys(request, state, crypto)
+            .Bind(sessionKeys =>
+            {
+                // Construct the command data that was MACed
+                // CLA=84 INS=82 P1=SecurityLevel P2=00 LC=10 Data=HostCryptogram
+                byte[] commandHeader = { 0x84, 0x82, request.SecurityLevel, 0x00, 0x10 };
+                byte[] macInput = commandHeader.Concat(request.HostCryptogram).ToArray();
+                
+                // Calculate expected MAC using the session C-MAC key
+                return crypto.CalculateMac(
+                    macInput,
+                    sessionKeys.CMacKey,
+                    Array.Empty<byte>(), // No chaining value for first command
+                    0x02, // SCP02
+                    (byte)state.ScpImplementation)
+                    .Bind(expectedMac =>
+                    {
+                        // For SCP02, MAC is typically 8 bytes
+                        byte[] truncatedExpectedMac = expectedMac.Take(8).ToArray();
+                        
+                        if (!request.HostMac.SequenceEqual(truncatedExpectedMac))
+                        {
+                            return Result.Failure<ExternalAuthenticateRequest, SmartCardError>(
+                                SmartCardError.SecurityStatusNotSatisfied());
+                        }
+                        
+                        return Result.Success<ExternalAuthenticateRequest, SmartCardError>(request);
+                    });
             });
     }
 

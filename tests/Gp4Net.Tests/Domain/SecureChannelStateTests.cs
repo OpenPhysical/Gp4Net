@@ -6,6 +6,7 @@
 using System;
 using AwesomeAssertions;
 using Gp4Net.Constants;
+using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Security;
@@ -64,20 +65,8 @@ public class SecureChannelStateTests
         state.SessionId.Length.Should().Be(8);
     }
 
-    [Test]
-    public void Create_NullSessionKeys_ReturnsFailure()
-    {
-        var result = SecureChannelState.Create(
-            null!,
-            SecurityLevel.CMac,
-            ProtocolIdentifiers.Scp03,
-            _macChainingValue,
-            0x00 // implementation parameter
-        );
-
-        result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
-    }
+    // Removed: Create_NullSessionKeys_ReturnsFailure
+    // NO NULLS rule - nulls should be converted to Result<T> at boundaries, not checked in domain
 
     [Test]
     public void Create_EmptyMacChaining_ReturnsFailure()
@@ -91,7 +80,9 @@ public class SecureChannelStateTests
         );
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<InvalidLengthError>();
+        var lengthError = (InvalidLengthError)result.Error;
+        lengthError.Expected.Should().Be(16); // SCP03 expects 16 bytes
     }
 
     [Test]
@@ -163,7 +154,9 @@ public class SecureChannelStateTests
         var updateResult = state.UpdateMacChaining(null!);
 
         updateResult.IsFailure.Should().BeTrue();
-        updateResult.Error.Code.Should().Be("INVALID_ARGUMENT");
+        updateResult.Error.Should().BeOfType<SmartCardError>();
+        updateResult.Error.Message.Should().Contain("cannot be null");
+        // This should ideally be NullParameterError for null parameter validation
     }
 
     [Test]

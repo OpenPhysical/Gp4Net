@@ -138,7 +138,8 @@ public class TraceBasedCardService : ICardService
 
     public CardResponse SendCommand(IApduCommand command)
     {
-        return SendCommand(ApduBuilder.BuildApdu(command));
+        var apdu = ApduBuilder.BuildApdu(command);
+        return SendCommand(apdu);
     }
 
     public bool EstablishSecureChannel(byte[] keySet, byte securityLevel)

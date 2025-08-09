@@ -130,9 +130,6 @@ public static class ScpCommonOperations
     /// <returns>The concatenated MAC input.</returns>
     public static byte[] BuildMacInput(byte[] chainingValue, byte[] data)
     {
-        ArgumentNullException.ThrowIfNull(chainingValue);
-        ArgumentNullException.ThrowIfNull(data);
-        
         var macInput = new byte[chainingValue.Length + data.Length];
         Array.Copy(chainingValue, 0, macInput, 0, chainingValue.Length);
         Array.Copy(data, 0, macInput, chainingValue.Length, data.Length);

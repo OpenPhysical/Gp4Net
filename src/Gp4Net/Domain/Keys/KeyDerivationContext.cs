@@ -42,7 +42,7 @@ public sealed record KeyDerivationContext(
         byte[] hostChallenge,
         byte[] cardChallenge,
         byte[] sequenceCounter,
-        Gp4Net.Domain.Protocol.ScpImplementation implementation = Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac)
+        Gp4Net.Domain.Protocol.ScpImplementation implementation = Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15)
     {
         // Validate key set type
         if (keySet is not Scp02KeySet)
@@ -52,25 +52,24 @@ public sealed record KeyDerivationContext(
         }
 
         // Validate host challenge (8 bytes for all protocols)
-        var hostValidation = ProtocolValidation.ValidateHostChallenge(hostChallenge);
-        if (hostValidation.IsFailure)
+        if (hostChallenge?.Length != 8)
         {
             return Result.Failure<KeyDerivationContext, SmartCardError>(
-                SmartCardError.InvalidData(hostValidation.Error));
+                new InvalidLengthError("hostChallenge", 8, hostChallenge?.Length ?? 0));
         }
 
         // Validate card challenge (6 bytes for SCP02)
         if (cardChallenge.Length != 6)
         {
             return Result.Failure<KeyDerivationContext, SmartCardError>(
-                SmartCardError.InvalidData($"SCP02 card challenge must be 6 bytes, got {cardChallenge.Length}"));
+                new InvalidLengthError("cardChallenge", 6, cardChallenge.Length));
         }
 
-        // Validate sequence counter (required for SCP02, at least 2 bytes)
-        if (sequenceCounter.Length < 2)
+        // Validate sequence counter (required for SCP02, must be exactly 2 bytes)
+        if (sequenceCounter.Length != 2)
         {
             return Result.Failure<KeyDerivationContext, SmartCardError>(
-                SmartCardError.InvalidData($"SCP02 sequence counter must be at least 2 bytes, got {sequenceCounter.Length}"));
+                new InvalidLengthError("sequenceCounter", 2, sequenceCounter.Length));
         }
 
         // Validate implementation is SCP02
@@ -113,11 +112,10 @@ public sealed record KeyDerivationContext(
         }
 
         // Validate host challenge (8 bytes for all protocols)
-        var hostValidation = ProtocolValidation.ValidateHostChallenge(hostChallenge);
-        if (hostValidation.IsFailure)
+        if (hostChallenge?.Length != 8)
         {
             return Result.Failure<KeyDerivationContext, SmartCardError>(
-                SmartCardError.InvalidData(hostValidation.Error));
+                new InvalidLengthError("hostChallenge", 8, hostChallenge?.Length ?? 0));
         }
 
         // Validate card challenge (8 bytes for SCP03)
@@ -173,7 +171,7 @@ public sealed record KeyDerivationContext(
                     hostChallenge, 
                     cardChallenge, 
                     sequenceCounter.Value,
-                    implementation.GetValueOrDefault(Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac))
+                    implementation.GetValueOrDefault(Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15))
                 : Result.Failure<KeyDerivationContext, SmartCardError>(
                     SmartCardError.InvalidArgument("SCP02 requires sequence counter")),
                     
@@ -194,21 +192,11 @@ public sealed record KeyDerivationContext(
     /// <returns>The implementation parameter byte value.</returns>
     public byte GetImplementationParameter()
     {
-        return Implementation.GetValueOrDefault(
+        // For the new bitmap-based enum, the byte value IS the implementation parameter
+        return (byte)Implementation.GetValueOrDefault(
             Protocol == ScpVersion.Scp02 
-                ? Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac 
-                : Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom) switch
-        {
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac => 0x15,
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp02CmacMult => 0x55,
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp02CmacXor => 0x1A,
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp02ExplicitInitVector => 0x04,
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp02ImplicitInitVector => 0x05,
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom => 0x70,
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp03RandomChallenge => 0x60,
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp03NoResponseMac => 0x11,
-            _ => 0x00  // Should never happen with proper validation
-        };
+                ? Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15 
+                : Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom);
     }
 
     /// <summary>
@@ -216,12 +204,8 @@ public sealed record KeyDerivationContext(
     /// </summary>
     private static bool IsValidScp02Implementation(Gp4Net.Domain.Protocol.ScpImplementation implementation)
     {
-        return implementation is 
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac or
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp02CmacMult or
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp02CmacXor or
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp02ExplicitInitVector or
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp02ImplicitInitVector;
+        // Use the extension method that properly validates SCP02 implementations
+        return implementation.IsScp02();
     }
 
     /// <summary>
@@ -229,10 +213,8 @@ public sealed record KeyDerivationContext(
     /// </summary>
     private static bool IsValidScp03Implementation(Gp4Net.Domain.Protocol.ScpImplementation implementation)
     {
-        return implementation is 
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom or
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp03RandomChallenge or
-            Gp4Net.Domain.Protocol.ScpImplementation.Scp03NoResponseMac;
+        // Use the extension method that properly validates SCP03 implementations
+        return implementation.IsScp03();
     }
 
     /// <summary>

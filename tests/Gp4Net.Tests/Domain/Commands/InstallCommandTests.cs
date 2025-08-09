@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using AwesomeAssertions;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using NUnit.Framework;
@@ -79,7 +80,7 @@ public class InstallCommandTests
         var result = InstallCommand.InstallForLoadCommand.Create(null!);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("Package AID cannot be null");
     }
 
@@ -89,7 +90,7 @@ public class InstallCommandTests
         var result = InstallCommand.InstallForLoadCommand.Create([]);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("Package AID cannot be empty");
     }
 
@@ -243,7 +244,7 @@ public class InstallCommandTests
             _validPrivileges);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("Package AID cannot be null");
     }
 
@@ -257,7 +258,7 @@ public class InstallCommandTests
             _validPrivileges);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("Module AID cannot be null or empty");
     }
 
@@ -271,7 +272,7 @@ public class InstallCommandTests
             _validPrivileges);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("Module AID cannot be null or empty");
     }
 
@@ -285,7 +286,7 @@ public class InstallCommandTests
             _validPrivileges);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("Application AID cannot be null or empty");
     }
 
@@ -299,7 +300,7 @@ public class InstallCommandTests
             _validPrivileges);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("Application AID cannot be null or empty");
     }
 
@@ -313,7 +314,7 @@ public class InstallCommandTests
             null!);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        result.Error.Should().BeOfType<SmartCardError>();
         result.Error.Message.Should().Contain("Privileges cannot be null");
     }
 

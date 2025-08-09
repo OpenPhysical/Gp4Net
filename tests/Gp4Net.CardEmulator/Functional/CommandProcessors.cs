@@ -29,10 +29,28 @@ public static class CommandProcessors
         ILogger? logger = null)
     {
         logger?.LogDebug("Processing SELECT command");
-        return ParseSelectCommand(command)
-            .Bind(aid => ValidateSelectAid(aid, config))
+        Console.WriteLine($"DEBUG: Virtual card processing SELECT, current IsSelected: {state.IsSelected}");
+        
+        var result = ParseSelectCommand(command)
+            .Bind(aid => 
+            {
+                Console.WriteLine($"DEBUG: Virtual card SELECT parsed AID: {Convert.ToHexString(aid)}");
+                return ValidateSelectAid(aid, config);
+            })
             .Map(aid => CreateSelectResponse(aid, config))
-            .Map(response => (response, state.WithSelected(true)));
+            .Map(response => 
+            {
+                var newState = state.WithSelected(true);
+                Console.WriteLine($"DEBUG: Virtual card SELECT success, setting IsSelected to true");
+                return (response, newState);
+            });
+            
+        if (result.IsFailure)
+        {
+            Console.WriteLine($"DEBUG: Virtual card SELECT failed: {result.Error.Message}");
+        }
+        
+        return result;
     }
 
     /// <summary>
@@ -136,24 +154,47 @@ public static class CommandProcessors
 
     private static Result<byte[], SmartCardError> ParseSelectCommand(byte[] command)
     {
+        Console.WriteLine($"DEBUG: ParseSelectCommand received: {Convert.ToHexString(command)} (Length: {command.Length})");
+        
         if (command.Length < 4)
+        {
+            Console.WriteLine("DEBUG: ParseSelectCommand failed - command too short");
             return Result.Failure<byte[], SmartCardError>(SmartCardError.WrongLength());
+        }
 
+        Console.WriteLine($"DEBUG: ParseSelectCommand - CLA: 0x{command[0]:X2}, INS: 0x{command[1]:X2}");
+        
         if (command[0] != 0x00 || command[1] != 0xA4)
+        {
+            Console.WriteLine($"DEBUG: ParseSelectCommand failed - expected CLA=0x00, INS=0xA4 but got CLA=0x{command[0]:X2}, INS=0x{command[1]:X2}");
             return Result.Failure<byte[], SmartCardError>(SmartCardError.InstructionNotSupported());
+        }
 
         // Handle SELECT with no data (select by default)
         if (command.Length == 4)
+        {
+            Console.WriteLine("DEBUG: ParseSelectCommand - empty SELECT (default)");
             return Result.Success<byte[], SmartCardError>(Array.Empty<byte>());
+        }
 
         if (command.Length < 5)
+        {
+            Console.WriteLine("DEBUG: ParseSelectCommand failed - missing Lc byte");
             return Result.Failure<byte[], SmartCardError>(SmartCardError.WrongLength());
+        }
 
         var lc = command[4];
-        if (command.Length != 5 + lc)
+        Console.WriteLine($"DEBUG: ParseSelectCommand - Lc: {lc}");
+        
+        // Command can be 5+Lc (no Le) or 5+Lc+1 (with Le)
+        if (command.Length != 5 + lc && command.Length != 5 + lc + 1)
+        {
+            Console.WriteLine($"DEBUG: ParseSelectCommand failed - wrong length, got {command.Length}, expected {5 + lc} or {5 + lc + 1}");
             return Result.Failure<byte[], SmartCardError>(SmartCardError.WrongLength());
+        }
 
         var aid = command.Skip(5).Take(lc).ToArray();
+        Console.WriteLine($"DEBUG: ParseSelectCommand success - extracted AID: {Convert.ToHexString(aid)}");
         return Result.Success<byte[], SmartCardError>(aid);
     }
 
@@ -161,13 +202,38 @@ public static class CommandProcessors
     {
         // Empty AID means select default (ISD)
         if (aid.Length == 0)
+        {
+            Console.WriteLine("DEBUG: ValidateSelectAid - empty AID, selecting default ISD");
             return Result.Success<byte[], SmartCardError>(config.IsdAid);
+        }
 
-        // Check if it's the ISD AID
+        Console.WriteLine($"DEBUG: ValidateSelectAid - checking AID {Convert.ToHexString(aid)} against config ISD {Convert.ToHexString(config.IsdAid)}");
+
+        // Check if it's the configured ISD AID
         if (aid.SequenceEqual(config.IsdAid))
+        {
+            Console.WriteLine("DEBUG: ValidateSelectAid - exact match with configured ISD");
             return Result.Success<byte[], SmartCardError>(aid);
+        }
 
-        // For now, only support ISD selection
+        // Also accept standard GlobalPlatform ISD AIDs for compatibility
+        var standardIsdAids = new[]
+        {
+            Convert.FromHexString("A000000003000000"),  // Standard GP ISD
+            Convert.FromHexString("A000000151000000"),  // Common alternative
+            Convert.FromHexString("A000000018434D00")   // Another common variant
+        };
+
+        foreach (var standardAid in standardIsdAids)
+        {
+            if (aid.SequenceEqual(standardAid))
+            {
+                Console.WriteLine($"DEBUG: ValidateSelectAid - matched standard ISD AID {Convert.ToHexString(standardAid)}");
+                return Result.Success<byte[], SmartCardError>(aid);
+            }
+        }
+
+        Console.WriteLine("DEBUG: ValidateSelectAid - AID not found");
         return Result.Failure<byte[], SmartCardError>(SmartCardError.FileNotFound());
     }
 

@@ -277,27 +277,6 @@ public abstract record InstallCommand : IApduCommand
             return builder.ToArray();
         }
 
-        /// <summary>
-        /// Converts this command to an APDU byte array (backward compatibility method).
-        /// </summary>
-        /// <returns>The APDU command bytes.</returns>
-        [Obsolete("Use IApduTransport.TransmitAsync instead of manual APDU building")]
-        public byte[] ToApdu()
-        {
-            var data = Data;
-            var apdu = new byte[5 + data.Length + 1]; // +1 for LE byte
-            apdu[0] = Cla;
-            apdu[1] = Ins;
-            apdu[2] = P1;
-            apdu[3] = P2;
-            apdu[4] = (byte)data.Length;
-            Array.Copy(data, 0, apdu, 5, data.Length);
-                
-            // Add LE byte (0x00 = maximum response length)
-            apdu[5 + data.Length] = 0x00;
-                
-            return apdu;
-        }
 
         /// <summary>
         /// Returns a string representation of this command.

@@ -187,8 +187,8 @@ public class EncryptionContext : IEncryptionContext
     )
     {
         Algorithm = algorithm;
-        Key = key ?? throw new System.ArgumentNullException(nameof(key));
-        Data = data ?? throw new System.ArgumentNullException(nameof(data));
+        Key = key;
+        Data = data;
         Mode = mode;
         Padding = padding;
         InitializationVector = initializationVector;

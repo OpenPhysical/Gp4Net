@@ -4,6 +4,149 @@
         <name>Gp4Net.Tool</name>
     </assembly>
     <members>
+        <member name="T:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder">
+            <summary>
+            Pure functional table builder for application information display.
+            Uses semantic row types and functional composition per CLAUDE.md patterns.
+            Eliminates imperative table building and ensures consistent formatting.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.ApplicationRow">
+            <summary>
+            Base type for all application display rows, enabling type-safe UI composition.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.ApplicationDataRow">
+            <summary>
+            Row displaying application information with standard columns.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.ApplicationDataRow.#ctor(System.String,System.String,System.String,System.String,CSharpFunctionalExtensions.Maybe{System.String},CSharpFunctionalExtensions.Maybe{System.String})">
+            <summary>
+            Row displaying application information with standard columns.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.SectionHeaderRow">
+            <summary>
+            Header row indicating the start of a section.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.SectionHeaderRow.#ctor(System.String)">
+            <summary>
+            Header row indicating the start of a section.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.SummaryRow">
+            <summary>
+            Summary information row.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.SummaryRow.#ctor(System.String)">
+            <summary>
+            Summary information row.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.InfoRow">
+            <summary>
+            Warning or informational message row.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.InfoRow.#ctor(System.String,System.String)">
+            <summary>
+            Warning or informational message row.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.BuildApplicationRows(System.Collections.Generic.IReadOnlyList{Gp4Net.Domain.ApplicationInfo},System.Boolean,System.Boolean,System.String)">
+            <summary>
+            Main entry point to build all application information rows using functional composition.
+            Returns semantic row types that can be rendered by any UI framework.
+            </summary>
+            <param name="applications">List of applications to display</param>
+            <param name="showExtended">Whether to include extended columns</param>
+            <param name="showSummary">Whether to include summary information</param>
+            <param name="filter">Optional filter string applied to applications</param>
+            <returns>Sequence of semantic application rows</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.BuildApplicationDataRow(Gp4Net.Domain.ApplicationInfo,System.Boolean)">
+            <summary>
+            Builds a single application data row with appropriate formatting.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.ToJson(System.Collections.Generic.IReadOnlyList{Gp4Net.Domain.ApplicationInfo})">
+            <summary>
+            Exports applications to JSON format using pure functions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.ToCsv(System.Collections.Generic.IReadOnlyList{Gp4Net.Domain.ApplicationInfo})">
+            <summary>
+            Exports applications to CSV format using pure functions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.FilterApplications(System.Collections.Generic.IReadOnlyList{Gp4Net.Domain.ApplicationInfo},System.String)">
+            <summary>
+            Filters applications based on filter criteria using pure functions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.GetTypeDisplayName(Gp4Net.Domain.ApplicationType)">
+            <summary>
+            Gets the display name for an application type.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.GetTypeDisplay(Gp4Net.Domain.ApplicationType)">
+            <summary>
+            Gets the colored display string for an application type.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.GetStateDisplay(Gp4Net.Domain.LifecycleState)">
+            <summary>
+            Gets the colored display string for a lifecycle state.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.GetPrivilegesDisplay(System.Collections.Generic.IReadOnlyList{Gp4Net.Domain.Privilege},System.Int32)">
+            <summary>
+            Gets the display string for privileges.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.GetTypePriority(Gp4Net.Domain.ApplicationType)">
+            <summary>
+            Gets the priority for ordering application types.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Applet.ApplicationTableRenderer">
+            <summary>
+            Pure functional renderer for semantic application rows.
+            Transforms semantic row types into Spectre.Console table display.
+            Follows the same pattern as CardInfoTableBuilder renderer.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableRenderer.RenderToTable(System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.ApplicationRow},System.Boolean)">
+            <summary>
+            Renders semantic application rows to a Spectre.Console table.
+            </summary>
+            <param name="rows">Sequence of semantic application rows</param>
+            <param name="showExtended">Whether to include extended columns</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableRenderer.RenderToConsole(System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.ApplicationRow})">
+            <summary>
+            Renders semantic application rows directly to console using pattern matching.
+            </summary>
+            <param name="rows">Sequence of semantic application rows</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableRenderer.CreateTable(System.Boolean)">
+            <summary>
+            Creates a properly configured table based on display options.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableRenderer.RenderSemanticRow(Spectre.Console.Table,Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.ApplicationRow,System.Boolean)">
+            <summary>
+            Renders a single semantic row using pattern matching.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ApplicationTableRenderer.RenderPostTableRows(System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Applet.ApplicationTableBuilder.ApplicationRow})">
+            <summary>
+            Renders only summary and info rows that should appear after the main table.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Tool.Commands.Applet.DeleteCommand">
             <summary>
             Command to delete applications or packages from a GlobalPlatform smart card using the functional pipeline pattern.
@@ -260,7 +403,7 @@
             CLI command to install a CAP file on the card.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Applet.InstallCliCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Services.IKeysetResolver)">
+        <member name="M:Gp4Net.Tool.Commands.Applet.InstallCliCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Tool.Services.IDomainServiceFactory,Gp4Net.Tool.Services.IKeysetResolver)">
             <summary>
             Initializes a new instance of the InstallCliCommand class.
             </summary>
@@ -317,7 +460,7 @@
             Command to manage application lifecycle states.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Applet.LifecycleCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Services.IKeysetResolver)">
+        <member name="M:Gp4Net.Tool.Commands.Applet.LifecycleCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Tool.Services.IDomainServiceFactory,Gp4Net.Tool.Services.IKeysetResolver)">
             <summary>
             Initializes a new instance of the LifecycleCommand class.
             </summary>
@@ -361,7 +504,7 @@
             Command to list applications on the card.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Services.IKeysetResolver)">
+        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Tool.Services.IDomainServiceFactory,Gp4Net.Tool.Services.IKeysetResolver)">
             <summary>
             Initializes a new instance of the ListCliCommand class.
             </summary>
@@ -373,6 +516,16 @@
             <param name="context">The command context.</param>
             <param name="settings">The command settings.</param>
             <returns>0 if successful, 1 if failed.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.ResolveKeySetForRetrieval(Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings)">
+            <summary>
+            Resolves the key set to use for card content retrieval.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.ProcessCardContent(Gp4Net.Domain.CardContent,Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings)">
+            <summary>
+            Processes the complete card content for display.
+            </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings">
             <summary>
@@ -423,7 +576,7 @@
             Command to load a CAP file package onto the card without installing applets.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Applet.LoadCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Services.IKeysetResolver)">
+        <member name="M:Gp4Net.Tool.Commands.Applet.LoadCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Tool.Services.IDomainServiceFactory,Gp4Net.Tool.Services.IKeysetResolver)">
             <summary>
             Initializes a new instance of the LoadCommand class.
             </summary>
@@ -480,7 +633,7 @@
             Command to get the status of applets on the card.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Applet.StatusCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Services.IKeysetResolver)">
+        <member name="M:Gp4Net.Tool.Commands.Applet.StatusCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Tool.Services.IDomainServiceFactory,Gp4Net.Tool.Services.IKeysetResolver)">
             <summary>
             Initializes a new instance of the StatusCommand class.
             </summary>
@@ -492,6 +645,11 @@
             <param name="context">The command context.</param>
             <param name="settings">The command settings.</param>
             <returns>0 if successful, 1 if failed.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.StatusCommand.DisplayDetailedApplicationInfo(System.Collections.Generic.IReadOnlyList{Gp4Net.Domain.ApplicationInfo})">
+            <summary>
+            Displays detailed information for each application.
+            </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Applet.StatusCommand.Settings">
             <summary>
@@ -508,7 +666,7 @@
             Command to validate a CAP file without installing it.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Applet.ValidateCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Services.PackageRegistry,Gp4Net.Tool.Services.IKeysetResolver)">
+        <member name="M:Gp4Net.Tool.Commands.Applet.ValidateCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Tool.Services.IDomainServiceFactory,Gp4Net.Services.PackageRegistry,Gp4Net.Tool.Services.IKeysetResolver)">
             <summary>
             Initializes a new instance of the ValidateCommand class.
             </summary>
@@ -552,7 +710,7 @@
             Base class for all GP4Net commands.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.BaseCommand`1.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Services.IKeysetResolver)">
+        <member name="M:Gp4Net.Tool.Commands.BaseCommand`1.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Tool.Services.IDomainServiceFactory,Gp4Net.Tool.Services.IKeysetResolver)">
             <summary>
             Initializes a new instance of the BaseCommand class.
             </summary>
@@ -583,6 +741,11 @@
         <member name="M:Gp4Net.Tool.Commands.BaseCommand`1.DisplayCardInfo">
             <summary>
             Displays card information.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.BaseCommand`1.GenerateHostChallenge">
+            <summary>
+            Generates a random 8-byte host challenge for INITIALIZE UPDATE.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.BaseCommandSettings">
@@ -645,10 +808,239 @@
             Gets or sets the key version.
             </summary>
         </member>
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.ScpImplementation">
+            <summary>
+            Gets or sets the SCP implementation parameter.
+            Controls various protocol behaviors for SCP02 secure channel.
+            </summary>
+        </member>
         <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.RequiresSecureChannel">
             <summary>
             Gets whether this command requires a secure channel.
             Override in derived settings to change default behavior.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.CardInformationGatherer">
+            <summary>
+            Pure functional pipeline to gather and parse card information from multiple GET DATA commands.
+            Eliminates imperative data gathering with functional composition and Result types.
+            Per GP Card Specification v2.3.1, gathers data from standard data objects.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.GatherCardInformationAsync(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService)">
+            <summary>
+            Main entry point to gather all available card information using functional composition.
+            Transforms imperative try/catch patterns into Result-based error handling.
+            </summary>
+            <param name="cardService">Card service for APDU communication</param>
+            <param name="gpService">GlobalPlatform service for high-level operations</param>
+            <returns>Result containing complete CardInformation or SmartCardError</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.GatherBasicCardDataAsync(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService)">
+            <summary>
+            Gathers basic card information that doesn't require secure channel.
+            Uses functional composition to combine multiple GET DATA operations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.ParseAndEnrichCardInformation(Gp4Net.Tool.Commands.Card.CardInformationGatherer.BasicCardData)">
+            <summary>
+            Parses raw card data into structured CardInformation using pure functions.
+            Eliminates mutations and exceptions with functional error handling.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.ParseCardDataSafely(CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+            <summary>
+            Pure function to parse card data bytes with error handling.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.ParseCapabilitiesSafely(CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+            <summary>
+            Pure function to parse capabilities with error handling.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.ParseKeyInfoSafely(CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+            <summary>
+            Pure function to parse key information with error handling.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.ParseSecurityStatusSafely(CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+            <summary>
+            Pure function to parse security status with error handling.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.ExtractScpInfoSafely(CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+            <summary>
+            Pure function to extract SCP information from capabilities and diversification data.
+            Per GP Card Specification v2.3.1 Section 6.3.1, SCP info can come from either source.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.ExtractChipInfoSafely(CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CardInfo.CplcData})">
+            <summary>
+            Pure function to extract chip information from CPLC data.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.CardInformationGatherer.BasicCardData">
+            <summary>
+            Immutable record to hold basic card data before parsing.
+            Intermediate structure for functional composition.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.BasicCardData.#ctor(CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Commands.SelectResponse},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CardInfo.CplcData},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+            <summary>
+            Immutable record to hold basic card data before parsing.
+            Intermediate structure for functional composition.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder">
+            <summary>
+            Pure functional table builder for card information display.
+            Uses semantic row types and functional composition per CLAUDE.md patterns.
+            Eliminates all mutations, nulls, and imperative table building.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.TableRow">
+            <summary>
+            Base type for all table rows, enabling type-safe UI composition.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.PropertyRow">
+            <summary>
+            Row displaying a property name and value.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.PropertyRow.#ctor(System.String,System.String)">
+            <summary>
+            Row displaying a property name and value.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.SectionHeader">
+            <summary>
+            Section header for visual grouping.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.SectionHeader.#ctor(System.String)">
+            <summary>
+            Section header for visual grouping.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.StatusRow">
+            <summary>
+            Status indicator with optional details.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.StatusRow.#ctor(System.String,System.Boolean,System.String)">
+            <summary>
+            Status indicator with optional details.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.ErrorRow">
+            <summary>
+            Error information display.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.ErrorRow.#ctor(System.String,System.String)">
+            <summary>
+            Error information display.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.InfoRow">
+            <summary>
+            Informational message row.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.InfoRow.#ctor(System.String)">
+            <summary>
+            Informational message row.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildCardInfoRows(Gp4Net.Domain.CardInfo.CardInformation,System.Boolean)">
+            <summary>
+            Main entry point to build all card information rows using functional composition.
+            Returns semantic row types that can be rendered by any UI framework.
+            </summary>
+            <param name="cardInfo">Parsed card information from gatherer</param>
+            <param name="isSecureChannelEstablished">Whether secure channel is active</param>
+            <returns>Sequence of semantic table rows</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildConnectionStatus(System.Boolean)">
+            <summary>
+            Builds connection status rows - always present.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildCardIdentification(Gp4Net.Domain.CardInfo.CardInformation)">
+            <summary>
+            Builds card identification rows including ATR and ISD information.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildIsdDetails(Gp4Net.Domain.Commands.SelectResponse)">
+            <summary>
+            Builds ISD details from SELECT response.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildManufacturingInfo(Gp4Net.Domain.CardInfo.CardInformation)">
+            <summary>
+            Builds manufacturing information from CPLC and chip data.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildCplcDetails(Gp4Net.Domain.CardInfo.CplcData,CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CardInfo.ChipInfo})">
+            <summary>
+            Builds detailed CPLC information with optional chip enhancements.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildPlatformInfo(Gp4Net.Domain.CardInfo.CardInformation)">
+            <summary>
+            Builds platform and version information rows.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildSecurityCapabilities(Gp4Net.Domain.CardInfo.CardInformation)">
+            <summary>
+            Builds security capabilities including SCP support and algorithms.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildScpSupport(Gp4Net.Domain.CardInfo.CardInformation)">
+            <summary>
+            Builds SCP protocol support information.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildDetailedScpRows(Gp4Net.Domain.CardInfo.ScpInformation)">
+            <summary>
+            Builds detailed SCP rows with implementation options.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildBasicScpRows(Gp4Net.Domain.CardInfo.CardCapabilities)">
+            <summary>
+            Builds basic SCP rows from capabilities.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildKeyInformation(Gp4Net.Domain.CardInfo.CardInformation)">
+            <summary>
+            Builds cryptographic key information rows.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildKeyRows(Gp4Net.Domain.CardInfo.KeyInformationTemplate)">
+            <summary>
+            Builds key information rows with semantic naming.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildDateRow(System.String,System.UInt16)">
+            <summary>
+            Pure function to build date field with validity checking.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.GetKeyName(System.Byte)">
+            <summary>
+            Gets semantic key name based on key ID.
+            Per GP specification, standard key IDs have specific purposes.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.GetImplementationDescription(Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Gets human-readable description for SCP implementation option.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.ExtractOidSection(System.String)">
+            <summary>
+            Extracts the OID section from CardDataInfo.ToString() output.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Card.ConnectCommand">
@@ -669,6 +1061,62 @@
         <member name="T:Gp4Net.Tool.Commands.Card.ConnectCommand.Settings">
             <summary>
             Settings for the connect command.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand">
+            <summary>
+            Functional implementation of card info command using pure functions and Result types.
+            Replaces 500+ lines of imperative code with ~50 lines of functional composition.
+            Eliminates all mutations, exceptions, and null checks per CLAUDE.md rules.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.Settings)">
+            <summary>
+            Pure functional execution pipeline for card information display.
+            Transforms imperative try/catch patterns into Result-based composition.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.BuildExecutionContext(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.Settings)">
+            <summary>
+            Pure function to build execution context with card connection.
+            Eliminates imperative context building from original InfoCommand.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.GatherCardInformation(Gp4Net.Tool.Pipeline.ICliExecutionContext)">
+            <summary>
+            Pure function to gather all card information using functional pipeline.
+            Replaces 200+ lines of imperative data gathering with single composition.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.FormatAndDisplayCardInfo(Gp4Net.Domain.CardInfo.CardInformation,Gp4Net.Tool.Pipeline.ICliExecutionContext)">
+            <summary>
+            Pure function to format and display card information.
+            Eliminates the 54 table.AddRow calls with functional table building.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.DisplayKeysetSuggestions(System.Boolean)">
+            <summary>
+            Pure function to display keyset suggestions when secure channel is not established.
+            Improves user experience by suggesting available keysets.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.RenderSemanticRows(Spectre.Console.Table,System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.TableRow})">
+            <summary>
+            Pure function to render semantic rows to Spectre.Console table.
+            Uses pattern matching to apply appropriate formatting per row type.
+            Implements the Functional UI Composition Pattern from CLAUDE.md.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.HandleError(Gp4Net.Core.SmartCardError,Gp4Net.Tool.Pipeline.ICliExecutionContext)">
+            <summary>
+            Pure function to handle errors with consistent formatting.
+            Eliminates scattered error handling patterns.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.Settings">
+            <summary>
+            Settings for the functional info command.
+            Inherits from CardCommandSettings for consistency.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Card.GetIsdDataCommand">
@@ -737,7 +1185,7 @@
             Command to change keys on a smart card.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.KeysChangeCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Services.IKeysetResolver)">
+        <member name="M:Gp4Net.Tool.Commands.Card.KeysChangeCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Tool.Services.IDomainServiceFactory,Gp4Net.Tool.Services.IKeysetResolver)">
             <summary>
             Initializes a new instance of the KeysChangeCommand class.
             </summary>
@@ -831,6 +1279,111 @@
             </summary>
             <returns>Success if valid, or an error message if validation fails.</returns>
         </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.ReaderTableBuilder">
+            <summary>
+            Pure functional table builder for card reader information display.
+            Uses semantic row types and functional composition per CLAUDE.md patterns.
+            Eliminates imperative table building and ensures consistent formatting.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.ReaderTableBuilder.ReaderRow">
+            <summary>
+            Base type for all reader display rows, enabling type-safe UI composition.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.ReaderTableBuilder.ReaderDataRow">
+            <summary>
+            Row displaying reader information with standard columns.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ReaderTableBuilder.ReaderDataRow.#ctor(System.String,System.String,System.String)">
+            <summary>
+            Row displaying reader information with standard columns.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.ReaderTableBuilder.SectionHeaderRow">
+            <summary>
+            Header row indicating the start of a section.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ReaderTableBuilder.SectionHeaderRow.#ctor(System.String)">
+            <summary>
+            Header row indicating the start of a section.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.ReaderTableBuilder.SummaryRow">
+            <summary>
+            Summary information row.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ReaderTableBuilder.SummaryRow.#ctor(System.String)">
+            <summary>
+            Summary information row.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.ReaderTableBuilder.InfoRow">
+            <summary>
+            Warning or informational message row.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ReaderTableBuilder.InfoRow.#ctor(System.String,System.String)">
+            <summary>
+            Warning or informational message row.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ReaderTableBuilder.BuildReaderRows(System.Collections.Generic.IReadOnlyList{System.String},System.Boolean)">
+            <summary>
+            Main entry point to build all reader information rows using functional composition.
+            Returns semantic row types that can be rendered by any UI framework.
+            </summary>
+            <param name="readers">List of reader names to display</param>
+            <param name="showSummary">Whether to include summary information</param>
+            <returns>Sequence of semantic reader rows</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ReaderTableBuilder.ToJson(System.Collections.Generic.IReadOnlyList{System.String})">
+            <summary>
+            Exports readers to JSON format using pure functions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ReaderTableBuilder.ToCsv(System.Collections.Generic.IReadOnlyList{System.String})">
+            <summary>
+            Exports readers to CSV format using pure functions.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Card.ReaderTableRenderer">
+            <summary>
+            Pure functional renderer for semantic reader rows.
+            Transforms semantic row types into Spectre.Console table display.
+            Follows the same pattern as ApplicationTableRenderer.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ReaderTableRenderer.RenderToTable(System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Card.ReaderTableBuilder.ReaderRow})">
+            <summary>
+            Renders semantic reader rows to a Spectre.Console table.
+            </summary>
+            <param name="rows">Sequence of semantic reader rows</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ReaderTableRenderer.RenderToConsole(System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Card.ReaderTableBuilder.ReaderRow})">
+            <summary>
+            Renders semantic reader rows directly to console using pattern matching.
+            </summary>
+            <param name="rows">Sequence of semantic reader rows</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ReaderTableRenderer.CreateTable">
+            <summary>
+            Creates a properly configured table for reader display.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ReaderTableRenderer.RenderSemanticRow(Spectre.Console.Table,Gp4Net.Tool.Commands.Card.ReaderTableBuilder.ReaderRow)">
+            <summary>
+            Renders a single semantic row using pattern matching.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.ReaderTableRenderer.RenderPostTableRows(System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Card.ReaderTableBuilder.ReaderRow})">
+            <summary>
+            Renders only summary and info rows that should appear after the main table.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Tool.Commands.Card.TestSecureChannelCommand">
             <summary>
             Test command for establishing a secure channel with GP test keys.
@@ -854,6 +1407,166 @@
             <param name="settings">The command settings.</param>
             <returns>0 if successful, 1 if failed.</returns>
         </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder">
+            <summary>
+            Pure functional table builder for ASN.1 parsing display.
+            Uses semantic row types and functional composition per CLAUDE.md patterns.
+            Handles hierarchical ASN.1 structure display.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.Asn1Row">
+            <summary>
+            Base type for all ASN.1 display rows, enabling type-safe UI composition.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.Asn1DataRow">
+            <summary>
+            Row displaying ASN.1 object information.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.Asn1DataRow.#ctor(System.Int32,System.String,System.String,CSharpFunctionalExtensions.Maybe{System.String},CSharpFunctionalExtensions.Maybe{System.String})">
+            <summary>
+            Row displaying ASN.1 object information.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.ContainerHeaderRow">
+            <summary>
+            Row indicating the start of a container (sequence, set, etc).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.ContainerHeaderRow.#ctor(System.Int32,System.String,System.Int32)">
+            <summary>
+            Row indicating the start of a container (sequence, set, etc).
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.ElementHeaderRow">
+            <summary>
+            Row indicating an element within a container.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.ElementHeaderRow.#ctor(System.Int32,System.Int32,System.String)">
+            <summary>
+            Row indicating an element within a container.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.NestedAsn1HeaderRow">
+            <summary>
+            Row for nested ASN.1 detection.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.NestedAsn1HeaderRow.#ctor(System.Int32,System.String)">
+            <summary>
+            Row for nested ASN.1 detection.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.SummaryRow">
+            <summary>
+            Summary information row.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.SummaryRow.#ctor(System.String)">
+            <summary>
+            Summary information row.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.InfoRow">
+            <summary>
+            Warning or informational message row.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.InfoRow.#ctor(System.String,System.String)">
+            <summary>
+            Warning or informational message row.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.BuildAsn1Rows(System.Byte[],System.Boolean,System.Boolean)">
+            <summary>
+            Main entry point to build ASN.1 parsing rows using functional composition.
+            Returns semantic row types that can be rendered by any UI framework.
+            </summary>
+            <param name="data">Raw ASN.1 data bytes</param>
+            <param name="showBytes">Whether to include raw byte values</param>
+            <param name="showOffsets">Whether to include byte offsets</param>
+            <returns>Sequence of semantic ASN.1 rows</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.BuildAsn1ObjectRows(Org.BouncyCastle.Asn1.Asn1Object,System.Int32,System.Int32,System.Boolean,System.Boolean)">
+            <summary>
+            Recursively builds rows for an ASN.1 object and its children.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.GetAsn1ChildRows(Org.BouncyCastle.Asn1.Asn1Object,System.Int32,System.Int32,System.Boolean,System.Boolean)">
+            <summary>
+            Gets child rows for container ASN.1 types.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.GetAsn1Value(Org.BouncyCastle.Asn1.Asn1Object)">
+            <summary>
+            Gets the display value for an ASN.1 object.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.ToJson(System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.Asn1Row})">
+            <summary>
+            Exports ASN.1 structure to JSON format using pure functions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.TryParseAsn1(System.Byte[])">
+            <summary>
+            Safely tries to parse ASN.1 data without throwing exceptions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.GetAsn1TypeInfo(Org.BouncyCastle.Asn1.Asn1Object)">
+            <summary>
+            Gets type information for an ASN.1 object.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.GetLengthInfo(System.Byte[])">
+            <summary>
+            Gets length information from encoded ASN.1 data.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.GetHeaderLength(Org.BouncyCastle.Asn1.Asn1Object)">
+            <summary>
+            Gets the header length of an ASN.1 object.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.IsLikelyAsn1(System.Byte[])">
+            <summary>
+            Checks if data looks like ASN.1.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.Asn1TableRenderer">
+            <summary>
+            Pure functional renderer for semantic ASN.1 rows.
+            Transforms semantic row types into console display with proper indentation.
+            Preserves hierarchical structure while using functional composition.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableRenderer.RenderToConsole(System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.Asn1Row})">
+            <summary>
+            Renders semantic ASN.1 rows to console with hierarchical formatting.
+            </summary>
+            <param name="rows">Sequence of semantic ASN.1 rows</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableRenderer.RenderSemanticRow(Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.Asn1Row)">
+            <summary>
+            Renders a single semantic row using pattern matching.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableRenderer.FormatTypeInfo(System.String)">
+            <summary>
+            Formats type information with appropriate colors and structure.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableRenderer.RenderToTable(System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Debug.Asn1TableBuilder.Asn1Row})">
+            <summary>
+            Renders ASN.1 rows in table format (simplified view).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.Asn1TableRenderer.StripMarkup(System.String)">
+            <summary>
+            Strips markup from text for table display.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Tool.Commands.Debug.ParseAsn1Command">
             <summary>
             CLI command to parse and display ASN.1 data in a human-readable format.
@@ -864,6 +1577,177 @@
             <summary>
             CLI command to parse and display TLV data in a human-readable format.
             Helps with debugging and validation of GlobalPlatform TLV structures.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.TlvTableBuilder">
+            <summary>
+            Pure functional table builder for TLV parsing display.
+            Uses semantic row types and functional composition per CLAUDE.md patterns.
+            Handles hierarchical TLV structure display.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.TlvRow">
+            <summary>
+            Base type for all TLV display rows, enabling type-safe UI composition.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.TlvDataRow">
+            <summary>
+            Row displaying TLV element information.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.TlvDataRow.#ctor(System.Int32,System.Int32,System.String,System.String,CSharpFunctionalExtensions.Maybe{System.String},CSharpFunctionalExtensions.Maybe{System.String},CSharpFunctionalExtensions.Maybe{System.String})">
+            <summary>
+            Row displaying TLV element information.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.NestedTlvHeaderRow">
+            <summary>
+            Row for nested TLV detection.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.NestedTlvHeaderRow.#ctor(System.Int32,System.String)">
+            <summary>
+            Row for nested TLV detection.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.TagInterpretationRow">
+            <summary>
+            Row for known tag interpretations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.TagInterpretationRow.#ctor(System.Int32,System.String)">
+            <summary>
+            Row for known tag interpretations.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.SummaryRow">
+            <summary>
+            Summary information row.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.SummaryRow.#ctor(System.String)">
+            <summary>
+            Summary information row.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.InfoRow">
+            <summary>
+            Warning or informational message row.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.InfoRow.#ctor(System.String,System.String)">
+            <summary>
+            Warning or informational message row.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.BuildTlvRows(System.Byte[],System.Boolean,System.Boolean,System.Boolean)">
+            <summary>
+            Main entry point to build TLV parsing rows using functional composition.
+            Returns semantic row types that can be rendered by any UI framework.
+            </summary>
+            <param name="data">Raw TLV data bytes</param>
+            <param name="showBytes">Whether to include raw byte values</param>
+            <param name="showOffsets">Whether to include byte offsets</param>
+            <param name="recursive">Whether to parse nested TLV structures</param>
+            <returns>Sequence of semantic TLV rows</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.BuildTlvElementRows(Gp4Net.Core.Tlv.TlvObject,System.Int32,System.Int32,System.Boolean,System.Boolean)">
+            <summary>
+            Recursively builds rows for a TLV element and its children.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.ToJson(System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Debug.TlvTableBuilder.TlvRow})">
+            <summary>
+            Exports TLV structure to JSON format using pure functions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.TryParseTlv(System.Byte[])">
+            <summary>
+            Safely tries to parse TLV data without throwing exceptions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetTagInfo(Gp4Net.Core.Tlv.TlvObject)">
+            <summary>
+            Gets tag information for a TLV element.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetKnownTagName(System.UInt32)">
+            <summary>
+            Gets known tag name for common GlobalPlatform/GP tags.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetTagClass(System.Byte)">
+            <summary>
+            Gets tag class description.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetLengthInfo(Gp4Net.Core.Tlv.TlvObject)">
+            <summary>
+            Gets length information string.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetTlvContent(Gp4Net.Core.Tlv.TlvObject)">
+            <summary>
+            Gets content display for TLV element.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetAsciiContent(Gp4Net.Core.Tlv.TlvObject)">
+            <summary>
+            Gets ASCII content if printable.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetKnownTagInterpretation(Gp4Net.Core.Tlv.TlvObject)">
+            <summary>
+            Gets known tag interpretation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetLifeCycleStateName(System.Byte)">
+            <summary>
+            Gets life cycle state name.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetFullElementBytes(Gp4Net.Core.Tlv.TlvObject)">
+            <summary>
+            Reconstructs the full TLV element bytes.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.IsLikelyTlv(System.Byte[])">
+            <summary>
+            Checks if data looks like TLV.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.IsPrintableAscii(System.Byte[])">
+            <summary>
+            Checks if data contains printable ASCII characters.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Commands.Debug.TlvTableRenderer">
+            <summary>
+            Pure functional renderer for semantic TLV rows.
+            Transforms semantic row types into console display with proper indentation.
+            Preserves hierarchical structure while using functional composition.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableRenderer.RenderToConsole(System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Debug.TlvTableBuilder.TlvRow})">
+            <summary>
+            Renders semantic TLV rows to console with hierarchical formatting.
+            </summary>
+            <param name="rows">Sequence of semantic TLV rows</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableRenderer.RenderSemanticRow(Gp4Net.Tool.Commands.Debug.TlvTableBuilder.TlvRow)">
+            <summary>
+            Renders a single semantic row using pattern matching.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableRenderer.RenderToTable(System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Debug.TlvTableBuilder.TlvRow})">
+            <summary>
+            Renders TLV rows in table format (simplified view).
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableRenderer.StripMarkup(System.String)">
+            <summary>
+            Strips markup from text for table display.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Packages.AnalyzeExpCommand">
@@ -1345,6 +2229,68 @@
             <param name="context">The type descriptor context.</param>
             <returns>The card service if available.</returns>
         </member>
+        <member name="T:Gp4Net.Tool.Infrastructure.Scp02ImplementationConverter">
+            <summary>
+            Type converter for SCP02 implementation parameter parsing.
+            Supports both hex values (15, 35, 75) and specific aliases (CLR, MAC, ENC, RENC).
+            Based on GlobalPlatform Card Specification v2.3.1 Table E-1 bitmap structure.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Infrastructure.Scp02ImplementationConverter._validValues">
+            <summary>
+            Dictionary mapping user input strings to ScpImplementation enum values.
+            Includes all hex values and specific aliases for common modes.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.Scp02ImplementationConverter.CanConvertFrom(System.ComponentModel.ITypeDescriptorContext,System.Type)">
+            <summary>
+            Determines whether this converter can convert from the given source type.
+            </summary>
+            <param name="context">Type descriptor context</param>
+            <param name="sourceType">The type to convert from</param>
+            <returns>True if conversion is supported</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.Scp02ImplementationConverter.ConvertFrom(System.ComponentModel.ITypeDescriptorContext,System.Globalization.CultureInfo,System.Object)">
+            <summary>
+            Converts the given value to an ScpImplementation enum value.
+            Supports hex formats (15, 35, 75) and specific aliases (CLR, MAC, ENC, RENC).
+            </summary>
+            <param name="context">Type descriptor context</param>
+            <param name="culture">Culture information</param>
+            <param name="value">The value to convert</param>
+            <returns>The converted ScpImplementation enum value</returns>
+            <exception cref="T:System.NotSupportedException">Thrown when the value is not supported</exception>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.Scp02ImplementationConverter.CanConvertTo(System.ComponentModel.ITypeDescriptorContext,System.Type)">
+            <summary>
+            Determines whether this converter can convert to the given destination type.
+            </summary>
+            <param name="context">Type descriptor context</param>
+            <param name="destinationType">The type to convert to</param>
+            <returns>True if conversion is supported</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.Scp02ImplementationConverter.ConvertTo(System.ComponentModel.ITypeDescriptorContext,System.Globalization.CultureInfo,System.Object,System.Type)">
+            <summary>
+            Converts the given ScpImplementation value to a string representation.
+            </summary>
+            <param name="context">Type descriptor context</param>
+            <param name="culture">Culture information</param>
+            <param name="value">The value to convert</param>
+            <param name="destinationType">The destination type</param>
+            <returns>String representation of the implementation</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.Scp02ImplementationConverter.GetSupportedValues">
+            <summary>
+            Gets all supported implementation values for help text generation.
+            </summary>
+            <returns>Dictionary of supported values</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Infrastructure.Scp02ImplementationConverter.GetCommonOptions">
+            <summary>
+            Gets a list of common implementation options for user guidance.
+            </summary>
+            <returns>List of common options with descriptions</returns>
+        </member>
         <member name="T:Gp4Net.Tool.Infrastructure.TypeRegistrar">
             <summary>
             Type registrar for integrating Microsoft.Extensions.DependencyInjection with Spectre.Console.Cli.
@@ -1793,6 +2739,13 @@
             Configures dependency injection services.
             </summary>
             <param name="services">The service collection.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Program.ValidateServiceRegistrations(Microsoft.Extensions.DependencyInjection.ServiceProvider)">
+            <summary>
+            Validates that all critical services are properly registered in the DI container.
+            </summary>
+            <param name="provider">The service provider to validate.</param>
+            <returns>Success if all services are registered, or an error message.</returns>
         </member>
         <member name="T:Gp4Net.Tool.Scripting.CryptoScriptModule">
             <summary>
@@ -2562,13 +3515,20 @@
             <param name="cardService">The card service to use for communication.</param>
             <returns>A configured GlobalPlatform service with proper pipeline context.</returns>
         </member>
+        <member name="M:Gp4Net.Tool.Services.IDomainServiceFactory.CreateCardContentRetriever(Gp4Net.Tool.Services.ICardService)">
+            <summary>
+            Creates a card content retriever for comprehensive card listing functionality.
+            </summary>
+            <param name="cardService">The card service to use for communication.</param>
+            <returns>A configured card content retriever with auto-detection capabilities.</returns>
+        </member>
         <member name="T:Gp4Net.Tool.Services.DomainServiceFactory">
             <summary>
             Factory implementation that creates domain services with proper functional context.
-            Ensures proper pipeline configuration and context flow.
+            Ensures proper functional composition and explicit dependencies.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Services.DomainServiceFactory.#ctor(Gp4Net.Pipeline.ICommandPipeline,Gp4Net.Transport.IApduTransportFactory,Gp4Net.Domain.Protocol.ISecureChannelManager,Microsoft.Extensions.Logging.ILogger{Gp4Net.Tool.Services.DomainServiceFactory})">
+        <member name="M:Gp4Net.Tool.Services.DomainServiceFactory.#ctor(Gp4Net.Transport.IApduTransportFactory,Gp4Net.Domain.Protocol.ISecureChannelManager,Microsoft.Extensions.Logging.ILogger{Gp4Net.Tool.Services.DomainServiceFactory})">
             <summary>
             Initializes a new instance of the DomainServiceFactory.
             </summary>
@@ -2577,6 +3537,9 @@
             <inheritdoc/>
         </member>
         <member name="M:Gp4Net.Tool.Services.DomainServiceFactory.CreateGlobalPlatformService(Gp4Net.Tool.Services.ICardService)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.DomainServiceFactory.CreateCardContentRetriever(Gp4Net.Tool.Services.ICardService)">
             <inheritdoc/>
         </member>
         <member name="T:Gp4Net.Tool.Services.LoggerWrapper`1">
@@ -2666,8 +3629,20 @@
             <param name="readerName">The reader name to check.</param>
             <returns>True if the reader is virtual, false otherwise.</returns>
         </member>
+        <member name="M:Gp4Net.Tool.Services.HybridCardService.CreateApduCommandFromBytes(System.Byte[])">
+            <summary>
+            Creates a basic APDU command from raw bytes.
+            </summary>
+            <param name="command">The command bytes.</param>
+            <returns>A basic APDU command.</returns>
+        </member>
         <member name="M:Gp4Net.Tool.Services.HybridCardService.Dispose">
             <inheritdoc />
+        </member>
+        <member name="T:Gp4Net.Tool.Services.BasicApduCommand">
+            <summary>
+            Basic APDU command implementation for byte array conversion.
+            </summary>
         </member>
         <member name="T:Gp4Net.Tool.Services.ICardCompatibilityService">
             <summary>
@@ -3287,6 +4262,48 @@
         </member>
         <member name="M:Gp4Net.Tool.Services.VirtualCardServiceAdapter.WithContextValue``1(System.String,``0)">
             <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.VirtualCardServiceAdapter.GetVirtualReaders">
+            <summary>
+            Gets the list of virtual readers available.
+            </summary>
+            <returns>The list of virtual reader names.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.VirtualCardServiceAdapter.Connect(System.String)">
+            <summary>
+            Connects to a virtual reader.
+            </summary>
+            <param name="readerName">The virtual reader name.</param>
+            <returns>True if connection succeeded, false otherwise.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.VirtualCardServiceAdapter.Disconnect">
+            <summary>
+            Disconnects from the virtual reader.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.VirtualCardServiceAdapter.IsConnected">
+            <summary>
+            Gets whether the virtual card service is connected.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.VirtualCardServiceAdapter.GetAtr">
+            <summary>
+            Gets the ATR from the virtual card.
+            </summary>
+            <returns>The ATR bytes or null if not connected.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.VirtualCardServiceAdapter.EstablishSecureChannel(System.Byte[],System.Byte)">
+            <summary>
+            Establishes a secure channel with the virtual card.
+            </summary>
+            <param name="keySet">The key set bytes.</param>
+            <param name="securityLevel">The security level.</param>
+            <returns>True if successful, false otherwise.</returns>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.VirtualCardServiceAdapter.IsSecureChannelEstablished">
+            <summary>
+            Gets whether a secure channel is established.
+            </summary>
         </member>
         <member name="M:Gp4Net.Tool.Services.VirtualCardServiceAdapter.Dispose">
             <inheritdoc />

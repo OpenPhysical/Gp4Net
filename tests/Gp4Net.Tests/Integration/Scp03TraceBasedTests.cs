@@ -93,7 +93,9 @@ public class Scp03TraceBasedTests
         var protocol = new Scp03Protocol(keySet, _keyDerivationServiceMock.Object, 0x70); // i=70 from trace
 
         // Act - Parse the real INITIALIZE UPDATE response
-        var response = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
+        var response = responseResult.Value;
         var context = protocol.ProcessInitializeUpdateResponse(response, _hostChallenge);
 
         Assert.Multiple(() =>
@@ -148,7 +150,9 @@ public class Scp03TraceBasedTests
         
         var protocol = new Scp03Protocol(keySet, _keyDerivationServiceMock.Object, 0x70);
             
-        var response = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
+        var response = responseResult.Value;
         var context = protocol.ProcessInitializeUpdateResponse(response, _hostChallenge);
 
         // Act - Create EXTERNAL AUTHENTICATE command
@@ -252,7 +256,9 @@ public class Scp03TraceBasedTests
     public void InitializeUpdateResponse_ParseRealTrace_ExtractsCorrectData()
     {
         // Act
-        var response = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
+        var response = responseResult.Value;
 
         Assert.Multiple(() =>
         {

@@ -49,8 +49,6 @@ public class OpenPhysicalId
     /// <param name="format">The format indicator.</param>
     private OpenPhysicalId(string iin, string cin, OpidFormat format)
     {
-        ArgumentNullException.ThrowIfNull(iin);
-        ArgumentNullException.ThrowIfNull(cin);
         Iin = iin;
         Cin = cin;
         Format = format;

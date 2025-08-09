@@ -31,32 +31,35 @@ public static class ScpProtocolOperations
         byte implementationParameter)
         where TProtocol : IScpProtocol<TProtocol>
     {
-        // Validate inputs
-        if (response == null)
+        // NO NULLS rule - nulls should be converted to Result<T> at boundaries
+        // Validate host challenge length (8 bytes for all protocols)
+        if (hostChallenge?.Length != 8)
         {
-            return SmartCardError.InvalidArgument("Response cannot be null");
+            return Result.Failure<SecureChannelContext, SmartCardError>(
+                new InvalidLengthError("hostChallenge", 8, hostChallenge?.Length ?? 0));
         }
-
-        if (hostChallenge == null)
+        
+        // Validate implementation parameter for SCP02 early
+        if (TProtocol.ProtocolVersion == 0x02)
         {
-            return SmartCardError.InvalidArgument("Host challenge cannot be null");
-        }
-
-        if (keySet == null)
-        {
-            return SmartCardError.InvalidArgument("Key set cannot be null");
+            var validParams = new byte[] { 0x00, 0x02, 0x04, 0x05, 0x0A, 0x14, 0x15, 0x1A, 0x24, 0x25, 0x2A, 0x34, 0x35, 0x3A, 0x44, 0x45, 0x4A, 0x54, 0x55, 0x64, 0x65, 0x6A, 0x74, 0x75, 0x7A };
+            if (!validParams.Contains(implementationParameter))
+            {
+                return Result.Failure<SecureChannelContext, SmartCardError>(
+                    new UnsupportedImplementationError($"SCP02 i={implementationParameter:X2}"));
+            }
         }
 
         var responseValidation = TProtocol.ValidateInitializeUpdateResponse(response);
         if (responseValidation.IsFailure)
         {
-            return SmartCardError.InvalidData(responseValidation.Error);
+            return new InvalidFormatError("response", responseValidation.Error);
         }
 
         var keySetValidation = TProtocol.ValidateKeySet(keySet);
         if (keySetValidation.IsFailure)
         {
-            return SmartCardError.InvalidArgument(keySetValidation.Error);
+            return new InvalidFormatError("keySet", keySetValidation.Error);
         }
 
         return DeriveAndVerifySessionKeys()
@@ -68,7 +71,7 @@ public static class ScpProtocolOperations
                 .Bind(sessionKeys => VerifyCardCryptogram<TProtocol>(response, hostChallenge, sessionKeys)
                     .Bind(isValid => isValid
                         ? Result.Success<SessionKeys, SmartCardError>(sessionKeys)
-                        : SmartCardError.SecurityError("Card cryptogram verification failed")));
+                        : Result.Failure<SessionKeys, SmartCardError>(new CryptogramVerificationError("Card cryptogram verification failed"))));
         }
         
         SecureChannelContext CreateSecureChannelContext(SessionKeys sessionKeys)
@@ -96,7 +99,7 @@ public static class ScpProtocolOperations
     {
         if (context == null)
         {
-            return SmartCardError.InvalidArgument("Context cannot be null");
+            return new NullParameterError("context");
         }
 
         return CalculateHostCryptogram<TProtocol>(context)
@@ -140,22 +143,22 @@ public static class ScpProtocolOperations
     {
         if (command == null)
         {
-            return SmartCardError.InvalidArgument("Command cannot be null");
+            return new NullParameterError("command");
         }
 
         if (sessionKeys == null)
         {
-            return SmartCardError.InvalidArgument("Session keys cannot be null");
+            return new NullParameterError("sessionKeys");
         }
 
         if (chainingValue == null)
         {
-            return SmartCardError.InvalidArgument("Chaining value cannot be null");
+            return new NullParameterError("chainingValue");
         }
 
         if (chainingValue.Length != TProtocol.ChainingValueSize)
         {
-            return SmartCardError.InvalidArgument($"Chaining value must be {TProtocol.ChainingValueSize} bytes");
+            return new InvalidLengthError("chainingValue", TProtocol.ChainingValueSize, chainingValue.Length);
         }
 
         var processedCommand = command;
@@ -207,22 +210,22 @@ public static class ScpProtocolOperations
     {
         if (response == null)
         {
-            return SmartCardError.InvalidArgument("Response cannot be null");
+            return new NullParameterError("response");
         }
 
         if (response.Length < 2)
         {
-            return SmartCardError.InvalidArgument("Response must contain at least status word");
+            return new InvalidLengthError("response", 2, response.Length);
         }
 
         if (sessionKeys == null)
         {
-            return SmartCardError.InvalidArgument("Session keys cannot be null");
+            return new NullParameterError("sessionKeys");
         }
 
         if (chainingValue == null)
         {
-            return SmartCardError.InvalidArgument("Chaining value cannot be null");
+            return new NullParameterError("chainingValue");
         }
 
         return ScpCommonOperations.ExtractStatusWord(response)
@@ -288,12 +291,12 @@ public static class ScpProtocolOperations
                 // Debug: Check the S-ENC key size (per GP spec E.4.2)
                 if (sessionKeys.SEnc == null)
                 {
-                    return SmartCardError.InvalidArgument("Session S-ENC key is null");
+                    return new NullParameterError("S-ENC key");
                 }
 
                 if (sessionKeys.SEnc.Length == 0)
                 {
-                    return SmartCardError.InvalidArgument("Session S-ENC key is empty");
+                    return new InvalidLengthError("S-ENC key", 16, sessionKeys.SEnc.Length);
                 }
 
                 return TProtocol.CalculateCryptogramMac(sessionKeys.SEnc, cryptogramData);

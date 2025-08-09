@@ -45,8 +45,6 @@ public sealed class SecureKeySet : IDisposable
     /// <returns>A new secure key set.</returns>
     public static SecureKeySet FromKeySet(IKeySet keySet)
     {
-        ArgumentNullException.ThrowIfNull(keySet);
-
         return new SecureKeySet(keySet.KeyVersion, keySet.EncKey, keySet.MacKey, keySet.DekKey);
     }
 

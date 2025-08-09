@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 
 using System;
-using System.Security.Cryptography;
+using Org.BouncyCastle.Security;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 
@@ -24,7 +24,6 @@ public class DefaultChallengeGenerator : IChallengeGenerator
     /// <param name="logger">The logger.</param>
     public DefaultChallengeGenerator(ILogger<DefaultChallengeGenerator> logger)
     {
-        ArgumentNullException.ThrowIfNull(logger);
         _logger = logger;
     }
 
@@ -37,8 +36,8 @@ public class DefaultChallengeGenerator : IChallengeGenerator
         }
 
         var challenge = new byte[length];
-        using var rng = RandomNumberGenerator.Create();
-        rng.GetBytes(challenge);
+        var rng = new SecureRandom();
+        rng.NextBytes(challenge);
 
         _logger.LogDebug(
             "Generated {Length}-byte challenge: {Challenge}",

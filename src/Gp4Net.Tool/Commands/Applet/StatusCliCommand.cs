@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Gp4Net.Core;
 using Gp4Net.Domain;
+using Gp4Net.Tool.Commands;
 using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
 using Spectre.Console;
@@ -24,10 +26,10 @@ public class StatusCommand : BaseCommand<StatusCommand.Settings>
     /// </summary>
     public StatusCommand(
         ICardService cardService,
-        Gp4Net.Services.IGlobalPlatformService globalPlatformService,
+        IDomainServiceFactory domainServiceFactory,
         IKeysetResolver keysetResolver
     )
-        : base(cardService, globalPlatformService, keysetResolver) { }
+        : base(cardService, domainServiceFactory, keysetResolver) { }
 
     /// <summary>
     /// Executes the status command to display the status of applications on the card.
@@ -43,7 +45,7 @@ public class StatusCommand : BaseCommand<StatusCommand.Settings>
         }
 
         // Optionally establish secure channel for better status information
-        if (settings.RequiresSecureChannel && !EnsureSecureChannel(settings))
+        if (settings.RequiresSecureChannel && !await EnsureSecureChannel(settings))
         {
             return 1;
         }
@@ -68,7 +70,16 @@ public class StatusCommand : BaseCommand<StatusCommand.Settings>
 
     private static Task<int> DisplayApplications(ImmutableList<ApplicationInfo> applications, Settings settings)
     {
-        if (applications.Count == 0)
+        // Build semantic rows using pure functional composition
+        var semanticRows = ApplicationTableBuilder.BuildApplicationRows(
+            applications,
+            showExtended: false,
+            showSummary: true,
+            filter: null
+        ).ToList();
+
+        // Check if we have any applications to display
+        if (!semanticRows.OfType<ApplicationTableBuilder.ApplicationDataRow>().Any())
         {
             AnsiConsole.MarkupLine("[yellow]No applets found on card[/]");
             return Task.FromResult(0);
@@ -76,34 +87,39 @@ public class StatusCommand : BaseCommand<StatusCommand.Settings>
 
         AnsiConsole.MarkupLine($"[green]Found {applications.Count} applet(s) on card:[/]");
 
-        var table = ApplicationDisplayService.CreateApplicationTable(false);
-        table.Columns[2].Header("Lifecycle State");
-
-        foreach (var app in applications
-                     .OrderBy(a => a.Type)
-                     .ThenBy(a => Convert.ToHexString(a.Aid)))
-        {
-            var typeColor = ApplicationDisplayService.GetTypeColor(app.Type);
-            var stateColor = ApplicationDisplayService.GetStateColor(app.LifecycleState);
-            var privilegesText = ApplicationDisplayService.GetPrivilegesDisplaySimple(app.Privileges);
-
-            table.AddRow(
-                $"[{typeColor}]{ApplicationDisplayService.GetTypeDisplayName(app.Type)}[/]",
-                $"[dim]{app.AidHex}[/]",
-                $"[{stateColor}]{app.LifecycleState}[/]",
-                privilegesText
-            );
-        }
-
-        AnsiConsole.Write(table);
+        // Render using semantic table renderer
+        ApplicationTableRenderer.RenderToTable(semanticRows, showExtended: false);
+        ApplicationTableRenderer.RenderPostTableRows(semanticRows);
 
         if (settings.Detailed)
         {
             AnsiConsole.WriteLine();
-            ApplicationDisplayService.DisplayDetailedInformation(applications);
+            DisplayDetailedApplicationInfo(applications);
         }
 
         return Task.FromResult(0);
+    }
+
+    /// <summary>
+    /// Displays detailed information for each application.
+    /// </summary>
+    private static void DisplayDetailedApplicationInfo(IReadOnlyList<ApplicationInfo> applications)
+    {
+        foreach (var app in applications)
+        {
+            AnsiConsole.MarkupLine($"[bold]{app.Type}:[/] [cyan]{Convert.ToHexString(app.Aid)}[/]");
+            AnsiConsole.MarkupLine($"  State: {app.LifecycleState}");
+            AnsiConsole.MarkupLine($"  Privileges: {string.Join(", ", app.Privileges.Select(p => p.ToString()))}");
+            if (!string.IsNullOrEmpty(app.Version.GetValueOrDefault()))
+            {
+                AnsiConsole.MarkupLine($"  Version: {app.Version.Value}");
+            }
+            if (app.AssociatedSecurityDomain.HasValue)
+            {
+                AnsiConsole.MarkupLine($"  Associated SD: {Convert.ToHexString(app.AssociatedSecurityDomain.Value)}");
+            }
+            AnsiConsole.WriteLine();
+        }
     }
 
     private static int HandleError(SmartCardError error)
@@ -111,8 +127,6 @@ public class StatusCommand : BaseCommand<StatusCommand.Settings>
         AnsiConsole.MarkupLine($"[red]Error getting applet status: {error.Message}[/]");
         return 1;
     }
-
-    // Display methods now delegate to ApplicationDisplayService
 
     /// <summary>
     /// Settings for the status command.

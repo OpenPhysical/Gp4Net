@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
@@ -111,7 +112,8 @@ public sealed class CryptogramService
 
         return protocol switch
         {
-            ScpVersion.Scp02 => Calculate3DesCbcMac(key, data),
+            // For SCP02, use Full 3DES MAC directly (data should already be properly padded)
+            ScpVersion.Scp02 => CryptographicOperations.CalculateFull3DesMac(key, data),
             ScpVersion.Scp03 => CalculateAesCmac(key, data).Map(mac => mac[..8]), // Return first 8 bytes - for C-MAC/R-MAC only
             _ => Result.Failure<byte[], SmartCardError>(
                 SmartCardError.InvalidArgument($"Unsupported protocol: {protocol}"))
@@ -191,13 +193,12 @@ public sealed class CryptogramService
         }
 
         // Build cryptogram data: Sequence Counter (2) || Card Challenge (6) || Host Challenge (8) || Padding
-        var cryptogramData = new byte[24]; // Padded to 3DES block size
-        Array.Copy(seqCounter, 0, cryptogramData, 0, 2);
-        Array.Copy(cardChallenge, 0, cryptogramData, 2, 6);
-        Array.Copy(hostChallenge, 0, cryptogramData, 8, 8);
-        // Apply ISO 7816-4 padding
-        cryptogramData[16] = 0x80;
-        // Rest is already zeros
+        var cryptogramData = seqCounter
+            .Concat(cardChallenge)
+            .Concat(hostChallenge)
+            .Concat(new byte[] { 0x80 }) // ISO 7816-4 padding
+            .Concat(new byte[7]) // Pad to 24 bytes (3DES block size)
+            .ToArray();
 
         return Calculate3DesCbcMac(key, cryptogramData);
     }
@@ -227,9 +228,7 @@ public sealed class CryptogramService
         }
 
         // Build context: Host Challenge (8) || Card Challenge (8)
-        var context = new byte[16];
-        Array.Copy(hostChallenge, 0, context, 0, 8);
-        Array.Copy(cardChallenge, 0, context, 8, 8);
+        var context = hostChallenge.Concat(cardChallenge).ToArray();
 
         // Use data derivation scheme per GP SCP03 v1.1.1 Section 4.1.5
         // Derivation constant 0x00 for card cryptogram (Table 4-1)
@@ -266,9 +265,7 @@ public sealed class CryptogramService
 
         // Build context: Host Challenge (8) || Card Challenge (8)
         // Note: Same format as card cryptogram per GP specification
-        var context = new byte[16];
-        Array.Copy(hostChallenge, 0, context, 0, 8);
-        Array.Copy(cardChallenge, 0, context, 8, 8);
+        var context = hostChallenge.Concat(cardChallenge).ToArray();
 
         // Use data derivation scheme per GP SCP03 v1.1.1 Section 4.1.5
         // Derivation constant 0x01 for host cryptogram (Table 4-1)
@@ -311,17 +308,9 @@ public sealed class CryptogramService
     /// </summary>
     private Result<byte[], SmartCardError> Calculate3DesCbcMac(byte[] key, byte[] data)
     {
-        try
-        {
-            // Delegate to CryptographicOperations which implements Full 3DES MAC correctly
-            return CryptographicOperations.CalculateFull3DesMac(key, data);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "3DES-CBC-MAC calculation failed");
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CryptographicError($"3DES-CBC-MAC failed: {ex.Message}"));
-        }
+        // Use Full 3DES MAC for SCP02 cryptograms (not Retail MAC)
+        // Per GP Card Spec v2.3.1 Section E.4.2: "Full Triple DES MAC"
+        return Scp02Cryptography.CalculateScp02Cryptogram(key, data);
     }
 
 }
