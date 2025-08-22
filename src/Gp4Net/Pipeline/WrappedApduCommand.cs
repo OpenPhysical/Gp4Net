@@ -55,38 +55,41 @@ public sealed record WrappedApduCommand : ICompleteApduCommand
     {
         get
         {
-            if (WrappedBytes.Length <= 4)
+            switch (WrappedBytes.Length)
             {
-                return Array.Empty<byte>();
-            }
+                case <= 4:
+                    return [];
 
-            // Just Le byte
-            if (WrappedBytes.Length == 5)
-            {
-                return Array.Empty<byte>();
+                // Just Le byte
+                case 5:
+                    return [];
             }
 
             var lc = WrappedBytes[4];
-            if (lc == 0 && WrappedBytes.Length > 6)
+            switch (lc)
             {
-                // Extended length
-                var extendedLc = (WrappedBytes[5] << 8) | WrappedBytes[6];
-                if (WrappedBytes.Length >= 7 + extendedLc)
+                case 0 when WrappedBytes.Length > 6:
                 {
-                    var data = new byte[extendedLc];
-                    Array.Copy(WrappedBytes, 7, data, 0, extendedLc);
+                    // Extended length
+                    var extendedLc = (WrappedBytes[5] << 8) | WrappedBytes[6];
+                    if (WrappedBytes.Length >= 7 + extendedLc)
+                    {
+                        var data = new byte[extendedLc];
+                        Array.Copy(WrappedBytes, 7, data, 0, extendedLc);
+                        return data;
+                    }
+                    break;
+                }
+                case > 0 when WrappedBytes.Length >= 5 + lc:
+                {
+                    // Standard length
+                    var data = new byte[lc];
+                    Array.Copy(WrappedBytes, 5, data, 0, lc);
                     return data;
                 }
             }
-            else if (lc > 0 && WrappedBytes.Length >= 5 + lc)
-            {
-                // Standard length
-                var data = new byte[lc];
-                Array.Copy(WrappedBytes, 5, data, 0, lc);
-                return data;
-            }
 
-            return Array.Empty<byte>();
+            return [];
         }
     }
 
@@ -119,7 +122,10 @@ public sealed record WrappedApduCommand : ICompleteApduCommand
 
     /// <inheritdoc />
     public bool IsExtendedLength => WrappedBytes.Length > 4 && WrappedBytes[4] == 0;
-    
+
     /// <inheritdoc />
-    public byte[] GetCompleteApdu() => WrappedBytes;
+    public byte[] GetCompleteApdu()
+    {
+        return WrappedBytes;
+    }
 }

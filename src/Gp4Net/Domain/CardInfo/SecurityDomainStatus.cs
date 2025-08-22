@@ -122,18 +122,20 @@ public class SecurityDomainStatus
     {
         return AdditionalData.Bind(data =>
         {
-            if (data.Length == 1)
+            switch (data.Length)
             {
-                // Single byte counter
-                return Maybe<ushort>.From(data[0]);
+                case 1:
+                    // Single byte counter
+                    return Maybe<ushort>.From(data[0]);
+                case >= 2:
+                {
+                    // Two byte counter (big-endian)
+                    var counter = (ushort)((data[data.Length - 2] << 8) | data[data.Length - 1]);
+                    return Maybe<ushort>.From(counter);
+                }
+                default:
+                    return Maybe<ushort>.None;
             }
-            else if (data.Length >= 2)
-            {
-                // Two byte counter (big-endian)
-                var counter = (ushort)((data[data.Length - 2] << 8) | data[data.Length - 1]);
-                return Maybe<ushort>.From(counter);
-            }
-            return Maybe<ushort>.None;
         });
     }
     

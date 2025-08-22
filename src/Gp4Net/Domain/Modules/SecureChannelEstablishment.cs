@@ -195,19 +195,25 @@ public static class SecureChannelEstablishment
         SecureChannelContext context,
         SecurityLevel securityLevel)
     {
-        // Create initial MAC chaining state
-        Result<MacChainingState, SmartCardError> macChainingResult = MacChainingState.Create(
-            initialValue: new byte[8], // Initial MAC chaining value
+        // Determine implementation parameter (SCP02 specific; 0 for SCP03)
+        byte implementationParameter = context.ProtocolVersion == 0x02
+            ? context.InitializeUpdateResponse.ScpParameter
+            : (byte)0x00;
+
+        // Create zero-initialized MAC chaining state sized per protocol (8 for SCP02, 16 for SCP03)
+        Result<MacChainingState, SmartCardError> macChainingResult = MacChainingState.CreateZeroInitialized(
             protocolVersion: context.ProtocolVersion,
-            implementationParameter: 0); // Default implementation parameter
+            implementationParameter: implementationParameter);
         
         if (macChainingResult.IsFailure)
         {
             return Result.Failure<SecureChannelState, SmartCardError>(macChainingResult.Error);
         }
 
-        // Generate session ID
-        byte[] sessionIdBytes = Guid.NewGuid().ToByteArray();
+        // Generate 8-byte session ID
+        var sessionIdBytes = new byte[8];
+        var secureRandom = new Org.BouncyCastle.Security.SecureRandom();
+        secureRandom.NextBytes(sessionIdBytes);
 
         return Result.Success<SecureChannelState, SmartCardError>(
             new SecureChannelState(
@@ -215,8 +221,8 @@ public static class SecureChannelEstablishment
                 SecurityLevel: securityLevel,
                 ProtocolVersion: context.ProtocolVersion,
                 MacChaining: macChainingResult.Value,
-                EncryptionCounter: 1,
-                SessionId: sessionIdBytes.ToImmutableArray()));
+                EncryptionCounter: 0,
+                SessionId: [..sessionIdBytes]));
     }
 
     /// <summary>

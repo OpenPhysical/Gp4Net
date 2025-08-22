@@ -65,7 +65,7 @@ public class HybridCardService : ICardService
         {
             _logger.LogError(ex, "Error getting hybrid reader list");
             // Return empty list rather than throwing to prevent CLI crashes
-            return Array.Empty<string>();
+            return [];
         }
     }
 
@@ -168,7 +168,7 @@ public class HybridCardService : ICardService
             else
             {
                 // Return error as failed card response
-                return new CardResponse(Array.Empty<byte>(), 0x6F00); // General error
+                return new CardResponse([], 0x6F00); // General error
             }
         }
         else
@@ -195,7 +195,7 @@ public class HybridCardService : ICardService
             else
             {
                 // Return error as failed card response
-                return new CardResponse(Array.Empty<byte>(), 0x6F00); // General error
+                return new CardResponse([], 0x6F00); // General error
             }
         }
         else
@@ -278,25 +278,28 @@ public class HybridCardService : ICardService
 
         if (command.Length > 4)
         {
-            // Simple parsing - assumes standard case 1-4 APDU structure
-            if (command.Length == 5)
+            switch (command.Length)
             {
-                // Case 2s: CLA INS P1 P2 Le
-                expectedLength = command[4] == 0 ? 256 : command[4];
-            }
-            else if (command.Length > 5)
-            {
-                // Case 3s or 4s: CLA INS P1 P2 Lc Data [Le]
-                var lc = command[4];
-                if (command.Length >= 5 + lc)
+                // Simple parsing - assumes standard case 1-4 APDU structure
+                case 5:
+                    // Case 2s: CLA INS P1 P2 Le
+                    expectedLength = command[4] == 0 ? 256 : command[4];
+                    break;
+                case > 5:
                 {
-                    data = command.Skip(5).Take(lc).ToArray();
-                    if (command.Length == 5 + lc + 1)
+                    // Case 3s or 4s: CLA INS P1 P2 Lc Data [Le]
+                    var lc = command[4];
+                    if (command.Length >= 5 + lc)
                     {
-                        // Case 4s: has Le
-                        var le = command[5 + lc];
-                        expectedLength = le == 0 ? 256 : le;
+                        data = command.Skip(5).Take(lc).ToArray();
+                        if (command.Length == 5 + lc + 1)
+                        {
+                            // Case 4s: has Le
+                            var le = command[5 + lc];
+                            expectedLength = le == 0 ? 256 : le;
+                        }
                     }
+                    break;
                 }
             }
         }

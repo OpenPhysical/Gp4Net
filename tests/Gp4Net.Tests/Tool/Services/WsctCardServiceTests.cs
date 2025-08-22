@@ -69,7 +69,7 @@ public class WsctCardServiceTests
             _mockSecureChannelManager.Object,
             _mockTransportFactory.Object
         );
-        act.Should().ThrowExactly<ArgumentNullException>();
+        _ = act.Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Test]
@@ -85,7 +85,7 @@ public class WsctCardServiceTests
             _mockTransportFactory.Object
         );
         var ex = act.Should().ThrowExactly<InvalidOperationException>().And;
-        ex.Message.Should().Contain("Failed to establish card context");
+        _ = ex.Message.Should().Contain("Failed to establish card context");
     }
 
     [Test]
@@ -96,7 +96,7 @@ public class WsctCardServiceTests
             _mockSecureChannelManager.Object,
             _mockTransportFactory.Object
         );
-        act.Should().NotThrow();
+        _ = act.Should().NotThrow();
     }
 
     [Test]
@@ -116,7 +116,7 @@ public class WsctCardServiceTests
         var readers = _service.GetReaders();
 
         // Assert
-        readers.Should().BeEquivalentTo(expectedReaders);
+        _ = readers.Should().BeEquivalentTo(expectedReaders);
         _mockContext.Verify(c => c.ListReaders(""), Times.Once);
     }
 
@@ -135,7 +135,7 @@ public class WsctCardServiceTests
         var readers = _service.GetReaders();
 
         // Assert
-        readers.Should().BeEmpty();
+        _ = readers.Should().BeEmpty();
     }
 
     [Test]
@@ -153,7 +153,7 @@ public class WsctCardServiceTests
         var readers = _service.GetReaders();
 
         // Assert
-        readers.Should().BeEmpty();
+        _ = readers.Should().BeEmpty();
     }
 
     [Test]
@@ -177,7 +177,7 @@ public class WsctCardServiceTests
         var result = _service.Connect(readerName);
 
         // Assert
-        result.Should().BeTrue();
+        _ = result.Should().BeTrue();
         _mockContext.Verify(c => c.CreateCardChannel(readerName), Times.Once);
         _mockChannel.Verify(ch => ch.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.Any), Times.Once);
     }
@@ -194,7 +194,7 @@ public class WsctCardServiceTests
 
         // Act & Assert
         Action act = () => _service.Connect(null!);
-        act.Should().ThrowExactly<ArgumentException>();
+        _ = act.Should().ThrowExactly<ArgumentException>();
     }
 
     [Test]
@@ -209,7 +209,7 @@ public class WsctCardServiceTests
 
         // Act & Assert
         Action act = () => _service.Connect(string.Empty);
-        act.Should().ThrowExactly<ArgumentException>();
+        _ = act.Should().ThrowExactly<ArgumentException>();
     }
 
     [Test]
@@ -233,7 +233,7 @@ public class WsctCardServiceTests
         var result = _service.Connect(readerName);
 
         // Assert
-        result.Should().BeFalse();
+        _ = result.Should().BeFalse();
         _mockChannel.Verify(ch => ch.Dispose(), Times.Once);
     }
 
@@ -261,7 +261,7 @@ public class WsctCardServiceTests
         var result = _service.Connect(readerName);
 
         // Assert
-        result.Should().BeTrue();
+        _ = result.Should().BeTrue();
         _mockChannel.Verify(ch => ch.Disconnect(Disposition.UnpowerCard), Times.Once);
     }
 
@@ -303,7 +303,7 @@ public class WsctCardServiceTests
 
         // Act & Assert - Should not throw
         Action act = () => _service.Disconnect();
-        act.Should().NotThrow();
+        _ = act.Should().NotThrow();
     }
 
     [Test]
@@ -356,7 +356,7 @@ public class WsctCardServiceTests
         var result = _service.IsConnected;
 
         // Assert
-        result.Should().BeTrue();
+        _ = result.Should().BeTrue();
     }
 
     [Test]
@@ -381,7 +381,7 @@ public class WsctCardServiceTests
         var result = _service.IsConnected;
 
         // Assert
-        result.Should().BeTrue();
+        _ = result.Should().BeTrue();
     }
 
     [Test]
@@ -406,7 +406,7 @@ public class WsctCardServiceTests
         var result = _service.IsConnected;
 
         // Assert
-        result.Should().BeTrue();
+        _ = result.Should().BeTrue();
     }
 
     [Test]
@@ -423,7 +423,7 @@ public class WsctCardServiceTests
         var result = _service.IsConnected;
 
         // Assert
-        result.Should().BeFalse();
+        _ = result.Should().BeFalse();
     }
 
     [Test]
@@ -448,7 +448,7 @@ public class WsctCardServiceTests
         var result = _service.IsConnected;
 
         // Assert
-        result.Should().BeTrue();
+        _ = result.Should().BeTrue();
     }
 
     [Test]
@@ -456,7 +456,7 @@ public class WsctCardServiceTests
     {
         // Arrange
         const string readerName = "TestReader";
-        byte[] expectedAtr = { 0x3B, 0x65, 0x01, 0x02, 0x20, 0x56, 0x34, 0x47, 0x54 }; // Avoid zeros in middle
+        byte[] expectedAtr = [0x3B, 0x65, 0x01, 0x02, 0x20, 0x56, 0x34, 0x47, 0x54]; // Avoid zeros in middle
 
         _ = _mockContext
             .Setup(c => c.CreateCardChannel(readerName))
@@ -483,8 +483,8 @@ public class WsctCardServiceTests
         var result = _service.GetAtr();
 
         // Assert
-        result.Should().NotBeNull();
-        result.Should().BeEquivalentTo(expectedAtr);
+        _ = result.Should().NotBeNull();
+        _ = result.Should().BeEquivalentTo(expectedAtr);
     }
 
     [Test]
@@ -501,7 +501,7 @@ public class WsctCardServiceTests
         var result = _service.GetAtr();
 
         // Assert
-        result.Should().BeNull();
+        _ = result.Should().BeNull();
     }
 
     [Test]
@@ -530,7 +530,7 @@ public class WsctCardServiceTests
         var result = _service.GetAtr();
 
         // Assert
-        result.Should().BeNull();
+        _ = result.Should().BeNull();
     }
 
     [Test]
@@ -538,7 +538,7 @@ public class WsctCardServiceTests
     {
         // Arrange
         const string readerName = "TestReader";
-        byte[] command = { 0x00, 0xA4, 0x04, 0x00 };
+        byte[] command = [0x00, 0xA4, 0x04, 0x00];
         // Expected values are documented but not used in this test
         // byte[] expectedData = { 0x6F, 0x10 };
         // ushort expectedSw = 0x9000;
@@ -585,7 +585,7 @@ public class WsctCardServiceTests
         var result = _service.SendCommand(command);
 
         // Assert
-        result.Should().NotBeNull();
+        _ = result.Should().NotBeNull();
         // Note: We can't easily mock the ResponseAPDU properties since they're sealed
         // In a real scenario, the WSCT library would populate these values
         // This test verifies the method executes without throwing exceptions
@@ -603,14 +603,14 @@ public class WsctCardServiceTests
 
         // Act & Assert
         Action act = () => _service.SendCommand((byte[])null!);
-        act.Should().ThrowExactly<ArgumentNullException>();
+        _ = act.Should().ThrowExactly<ArgumentNullException>();
     }
 
     [Test]
     public void SendCommand_NotConnected_ThrowsInvalidOperationException()
     {
         // Arrange
-        byte[] command = { 0x00, 0xA4, 0x04, 0x00 };
+        byte[] command = [0x00, 0xA4, 0x04, 0x00];
         _service = new WsctCardService(
             _mockFactory.Object,
             _mockSecureChannelManager.Object,
@@ -620,7 +620,7 @@ public class WsctCardServiceTests
         // Act & Assert
         Action act = () => _service.SendCommand(command);
         var ex = act.Should().ThrowExactly<InvalidOperationException>().And;
-        ex.Message.Should().Contain("Card is not connected");
+        _ = ex.Message.Should().Contain("Card is not connected");
     }
 
     [Test]
@@ -628,7 +628,7 @@ public class WsctCardServiceTests
     {
         // Arrange
         const string readerName = "TestReader";
-        byte[] command = { 0x00, 0xA4, 0x04, 0x00 };
+        byte[] command = [0x00, 0xA4, 0x04, 0x00];
 
         var mockCommand = new Mock<ICardCommand>();
         var mockResponse = new Mock<ICardResponse>();
@@ -656,7 +656,7 @@ public class WsctCardServiceTests
         // Act & Assert
         Action act = () => _service.SendCommand(command);
         var ex = act.Should().ThrowExactly<InvalidOperationException>().And;
-        ex.Message.Should().Contain("Transmit failed");
+        _ = ex.Message.Should().Contain("Transmit failed");
     }
 
     [Test]
@@ -664,7 +664,7 @@ public class WsctCardServiceTests
     {
         // Arrange
         const string readerName = "TestReader";
-        byte[] command = { 0x00, 0xA4, 0x04, 0x00 };
+        byte[] command = [0x00, 0xA4, 0x04, 0x00];
 
         var mockCommand = new Mock<ICardCommand>();
         var mockResponse = new Mock<ICardResponse>(); // Not a ResponseAPDU
@@ -692,7 +692,7 @@ public class WsctCardServiceTests
         // Act & Assert
         Action act = () => _service.SendCommand(command);
         var ex = act.Should().ThrowExactly<InvalidOperationException>().And;
-        ex.Message.Should().Contain("Invalid response type received");
+        _ = ex.Message.Should().Contain("Invalid response type received");
     }
 
 
@@ -710,7 +710,7 @@ public class WsctCardServiceTests
         var result = _service.IsSecureChannelEstablished;
 
         // Assert
-        result.Should().BeFalse();
+        _ = result.Should().BeFalse();
     }
 
     [Test]

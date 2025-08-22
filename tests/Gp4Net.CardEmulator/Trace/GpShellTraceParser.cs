@@ -83,7 +83,7 @@ public class GpShellTraceParser
         var trace = new ApduTrace { Metadata = { Source = "gpshell" } };
 
         var lines = traceContent.Split(
-            new[] { '\r', '\n' },
+            ['\r', '\n'],
             StringSplitOptions.RemoveEmptyEntries
         );
         var state = new ParserState();
@@ -192,7 +192,7 @@ public class GpShellTraceParser
                 {
                     // Just SW, no data
                     var sw = Convert.ToUInt16(hexData.Replace(" ", ""), 16);
-                    response = new ApduResponse(Array.Empty<byte>(), sw);
+                    response = new ApduResponse([], sw);
                 }
                 else
                 {

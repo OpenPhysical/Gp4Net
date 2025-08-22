@@ -86,8 +86,8 @@ public class SmartCardService : ISmartCardService
                 new System.Collections.Generic.Dictionary<string, object>
                 {
                     [ResponseMetadata.ExecutionTime] = cmdResult.Metadata?.ExecutionTime ?? TimeSpan.Zero,
-                    [ResponseMetadata.TransmittedBytes] = cmdResult.Metadata?.TransmittedBytes ?? Array.Empty<byte>(),
-                    [ResponseMetadata.ReceivedBytes] = cmdResult.Metadata?.ReceivedBytes ?? Array.Empty<byte>(),
+                    [ResponseMetadata.TransmittedBytes] = cmdResult.Metadata?.TransmittedBytes ?? [],
+                    [ResponseMetadata.ReceivedBytes] = cmdResult.Metadata?.ReceivedBytes ?? [],
                     [ResponseMetadata.SecureChannelWrapped] = cmdResult.Metadata?.SecureChannelWrapped ?? false,
                     [ResponseMetadata.RetryCount] = cmdResult.Metadata?.RetryCount ?? 0
                 }));

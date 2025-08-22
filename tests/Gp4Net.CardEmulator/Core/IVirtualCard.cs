@@ -83,7 +83,7 @@ public class ApduResponse
     /// <returns>A successful APDU response.</returns>
     public static ApduResponse Success(byte[]? data = null)
     {
-        return new ApduResponse(data ?? Array.Empty<byte>(), new StatusWord(0x9000));
+        return new ApduResponse(data ?? [], new StatusWord(0x9000));
     }
 
     /// <summary>
@@ -93,7 +93,7 @@ public class ApduResponse
     /// <returns>An error APDU response.</returns>
     public static ApduResponse Error(ushort statusWord)
     {
-        return new ApduResponse(Array.Empty<byte>(), statusWord);
+        return new ApduResponse([], statusWord);
     }
 
     /// <summary>

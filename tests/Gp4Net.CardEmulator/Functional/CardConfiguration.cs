@@ -132,7 +132,7 @@ public record CardConfiguration(
         var cardCapabilities = new CardCapabilities
         {
             CardRecognitionData = Convert.FromHexString("42"),
-            CardManagementTypeAndVersion = new byte[] { 0x02, 0x00 },
+            CardManagementTypeAndVersion = [0x02, 0x00],
             CardIdentificationScheme = 0x00,
             SecureChannelProtocols =
             {
@@ -232,9 +232,9 @@ public record CardConfiguration(
     {
         return ImmutableDictionary.Create<ushort, byte[]>()
             // Basic card data
-            .Add(0x0066, new byte[] { 0x66, 0x04, 0x01, 0x00, 0x00, 0x00 })
+            .Add(0x0066, [0x66, 0x04, 0x01, 0x00, 0x00, 0x00])
             // Basic capabilities
-            .Add(0x0067, new byte[] { 0x67, 0x04, 0x81, 0x01, 0x00, 0x01 });
+            .Add(0x0067, [0x67, 0x04, 0x81, 0x01, 0x00, 0x01]);
     }
 
     private static ImmutableList<byte> CreateStandardGpInstructions()
@@ -282,7 +282,7 @@ public record CardConfiguration(
         var cardCapabilities = new CardCapabilities
         {
             CardRecognitionData = Convert.FromHexString("42"),
-            CardManagementTypeAndVersion = new byte[] { 0x02, 0x00 },
+            CardManagementTypeAndVersion = [0x02, 0x00],
             CardIdentificationScheme = 0x00,
             SecureChannelProtocols =
             {
@@ -358,7 +358,7 @@ public record CardConfiguration(
         var cardCapabilities = new CardCapabilities
         {
             CardRecognitionData = Convert.FromHexString("42"),
-            CardManagementTypeAndVersion = new byte[] { 0x02, 0x00 },
+            CardManagementTypeAndVersion = [0x02, 0x00],
             CardIdentificationScheme = 0x00,
             SecureChannelProtocols =
             {

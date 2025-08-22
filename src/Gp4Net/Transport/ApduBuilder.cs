@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using JetBrains.Annotations;
 
@@ -33,18 +34,43 @@ public static class ApduBuilder
 
         if (hasData)
         {
-            // Add Lc (data length)
-            if (command.IsExtendedLength && command.Data.Length > 255)
+            // Security check: Validate data length against APDU limits
+            var dataLength = command.Data.Length;
+            if (dataLength > ApduConstants.MaxApduDataLength)
             {
+                throw new ArgumentException(
+                    $"Data length ({dataLength}) exceeds maximum APDU data length ({ApduConstants.MaxApduDataLength})",
+                    nameof(command));
+            }
+
+            // Add Lc (data length)
+            if (command.IsExtendedLength && dataLength > 255)
+            {
+                // Security check: Ensure length fits in 16 bits for extended format
+                if (dataLength > 65535)
+                {
+                    throw new ArgumentException(
+                        $"Extended APDU data length ({dataLength}) exceeds 16-bit limit (65535)",
+                        nameof(command));
+                }
+
                 // Extended length format
                 apduBytes.Add(0x00);
-                apduBytes.Add((byte)(command.Data.Length >> 8));
-                apduBytes.Add((byte)(command.Data.Length & 0xFF));
+                apduBytes.Add((byte)(dataLength >> 8));
+                apduBytes.Add((byte)(dataLength & 0xFF));
             }
             else
             {
+                // Security check: Ensure length fits in byte for short format
+                if (dataLength > 255)
+                {
+                    throw new ArgumentException(
+                        $"Short APDU data length ({dataLength}) exceeds byte limit (255)",
+                        nameof(command));
+                }
+
                 // Short length format
-                apduBytes.Add((byte)command.Data.Length);
+                apduBytes.Add((byte)dataLength);
             }
             
             // Add data
@@ -55,8 +81,24 @@ public static class ApduBuilder
         {
             var expectedLength = command.ExpectedResponseLength.Value;
             
+            // Security check: Validate expected response length
+            if (expectedLength > ApduConstants.MaxExtendedLength)
+            {
+                throw new ArgumentException(
+                    $"Expected response length ({expectedLength}) exceeds maximum ({ApduConstants.MaxExtendedLength})",
+                    nameof(command));
+            }
+            
             if (command.IsExtendedLength && expectedLength > 255)
             {
+                // Security check: Ensure length fits in 16 bits for extended format
+                if (expectedLength > 65535)
+                {
+                    throw new ArgumentException(
+                        $"Extended APDU expected length ({expectedLength}) exceeds 16-bit limit (65535)",
+                        nameof(command));
+                }
+
                 // Extended length format
                 if (!hasData)
                 {
@@ -69,9 +111,17 @@ public static class ApduBuilder
             }
             else
             {
+                // Security check: Ensure length fits in short format
+                if (expectedLength > 256)
+                {
+                    throw new ArgumentException(
+                        $"Short APDU expected length ({expectedLength}) exceeds limit (256)",
+                        nameof(command));
+                }
+
                 // Short length format
                 // 0 means maximum response (256 bytes)
-                apduBytes.Add(expectedLength == 0 || expectedLength == 256 ? (byte)0x00 : (byte)expectedLength);
+                apduBytes.Add(expectedLength is 0 or 256 ? (byte)0x00 : (byte)expectedLength);
             }
         }
 
@@ -119,7 +169,7 @@ public static class ApduBuilder
             Ins = ins;
             P1 = p1;
             P2 = p2;
-            Data = data ?? Array.Empty<byte>();
+            Data = data ?? [];
             ExpectedResponseLength = le;
         }
     }

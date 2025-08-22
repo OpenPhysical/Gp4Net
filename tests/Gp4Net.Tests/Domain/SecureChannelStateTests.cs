@@ -44,7 +44,7 @@ public class SecureChannelStateTests
     public void Create_ValidParameters_CreatesState()
     {
         var macChainingState = MacChainingState.Create(_macChainingValue, ProtocolIdentifiers.Scp03, 0x00);
-        macChainingState.IsSuccess.Should().BeTrue();
+        _ = macChainingState.IsSuccess.Should().BeTrue();
 
         var result = SecureChannelState.Create(
             _sessionKeys,
@@ -54,15 +54,15 @@ public class SecureChannelStateTests
             0x00 // implementation parameter
         );
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var state = result.Value;
-        
-        state.SecurityLevel.Should().Be(SecurityLevel.CMac);
-        state.ProtocolVersion.Should().Be(ProtocolIdentifiers.Scp03);
-        state.SessionKeys.Should().Be(_sessionKeys);
-        state.EncryptionCounter.Should().Be(0);
-        state.SessionId.Should().NotBeEmpty();
-        state.SessionId.Length.Should().Be(8);
+
+        _ = state.SecurityLevel.Should().Be(SecurityLevel.CMac);
+        _ = state.ProtocolVersion.Should().Be(ProtocolIdentifiers.Scp03);
+        _ = state.SessionKeys.Should().Be(_sessionKeys);
+        _ = state.EncryptionCounter.Should().Be(0);
+        _ = state.SessionId.Should().NotBeEmpty();
+        _ = state.SessionId.Length.Should().Be(8);
     }
 
     // Removed: Create_NullSessionKeys_ReturnsFailure
@@ -79,10 +79,10 @@ public class SecureChannelStateTests
             0x00 // implementation parameter
         );
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<InvalidLengthError>();
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<InvalidLengthError>();
         var lengthError = (InvalidLengthError)result.Error;
-        lengthError.Expected.Should().Be(16); // SCP03 expects 16 bytes
+        _ = lengthError.Expected.Should().Be(16); // SCP03 expects 16 bytes
     }
 
     [Test]
@@ -95,17 +95,17 @@ public class SecureChannelStateTests
             _macChainingValue,
             0x00 // implementation parameter
         );
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var state = result.Value;
 
         var newState = state.IncrementEncryptionCounter();
 
-        newState.EncryptionCounter.Should().Be(1);
-        newState.SessionKeys.Should().Be(_sessionKeys);
-        newState.SecurityLevel.Should().Be(SecurityLevel.CMac);
-        
+        _ = newState.EncryptionCounter.Should().Be(1);
+        _ = newState.SessionKeys.Should().Be(_sessionKeys);
+        _ = newState.SecurityLevel.Should().Be(SecurityLevel.CMac);
+
         // Original state should be unchanged
-        state.EncryptionCounter.Should().Be(0);
+        _ = state.EncryptionCounter.Should().Be(0);
     }
 
     [Test]
@@ -118,24 +118,24 @@ public class SecureChannelStateTests
             _macChainingValue,
             0x00 // implementation parameter
         );
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var state = result.Value;
 
         var newMacChaining = new byte[16];
         Array.Fill(newMacChaining, (byte)0xFF);
         var newMacState = MacChainingState.Create(newMacChaining, ProtocolIdentifiers.Scp03, 0x00);
-        newMacState.IsSuccess.Should().BeTrue();
+        _ = newMacState.IsSuccess.Should().BeTrue();
 
         var updateResult = state.UpdateMacChaining(newMacState.Value);
 
-        updateResult.IsSuccess.Should().BeTrue();
+        _ = updateResult.IsSuccess.Should().BeTrue();
         var newState = updateResult.Value;
-        
-        newState.MacChaining.Value.Should().Equal(newMacChaining);
-        newState.SessionKeys.Should().Be(_sessionKeys);
-        
+
+        _ = newState.MacChaining.Value.Should().Equal(newMacChaining);
+        _ = newState.SessionKeys.Should().Be(_sessionKeys);
+
         // Original state should be unchanged
-        state.MacChaining.Value.Should().Equal(_macChainingValue);
+        _ = state.MacChaining.Value.Should().Equal(_macChainingValue);
     }
 
     [Test]
@@ -148,14 +148,14 @@ public class SecureChannelStateTests
             _macChainingValue,
             0x00 // implementation parameter
         );
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var state = result.Value;
 
         var updateResult = state.UpdateMacChaining(null!);
 
-        updateResult.IsFailure.Should().BeTrue();
-        updateResult.Error.Should().BeOfType<SmartCardError>();
-        updateResult.Error.Message.Should().Contain("cannot be null");
+        _ = updateResult.IsFailure.Should().BeTrue();
+        _ = updateResult.Error.Should().BeOfType<SmartCardError>();
+        _ = updateResult.Error.Message.Should().Contain("cannot be null");
         // This should ideally be NullParameterError for null parameter validation
     }
 
@@ -169,28 +169,28 @@ public class SecureChannelStateTests
             _macChainingValue,
             0x00 // implementation parameter
         );
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var state = result.Value;
 
         var newMacChaining = new byte[16];
         Array.Fill(newMacChaining, (byte)0xAA);
         var newMacState = MacChainingState.Create(newMacChaining, ProtocolIdentifiers.Scp03, 0x00);
-        newMacState.IsSuccess.Should().BeTrue();
+        _ = newMacState.IsSuccess.Should().BeTrue();
         
         var newCounter = 42u;
 
         var updateResult = state.UpdateCounterAndMac(newCounter, newMacState.Value);
 
-        updateResult.IsSuccess.Should().BeTrue();
+        _ = updateResult.IsSuccess.Should().BeTrue();
         var newState = updateResult.Value;
-        
-        newState.EncryptionCounter.Should().Be(newCounter);
-        newState.MacChaining.Value.Should().Equal(newMacChaining);
-        newState.SessionKeys.Should().Be(_sessionKeys);
-        
+
+        _ = newState.EncryptionCounter.Should().Be(newCounter);
+        _ = newState.MacChaining.Value.Should().Equal(newMacChaining);
+        _ = newState.SessionKeys.Should().Be(_sessionKeys);
+
         // Original state should be unchanged
-        state.EncryptionCounter.Should().Be(0);
-        state.MacChaining.Value.Should().Equal(_macChainingValue);
+        _ = state.EncryptionCounter.Should().Be(0);
+        _ = state.MacChaining.Value.Should().Equal(_macChainingValue);
     }
 
     [Test]
@@ -203,21 +203,21 @@ public class SecureChannelStateTests
             _macChainingValue,
             0x00 // implementation parameter
         );
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var originalState = result.Value;
 
         // Perform multiple operations
         var state1 = originalState.IncrementEncryptionCounter();
         var state2 = state1.IncrementEncryptionCounter();
-        
+
         // Verify each state is independent
-        originalState.EncryptionCounter.Should().Be(0);
-        state1.EncryptionCounter.Should().Be(1);
-        state2.EncryptionCounter.Should().Be(2);
-        
+        _ = originalState.EncryptionCounter.Should().Be(0);
+        _ = state1.EncryptionCounter.Should().Be(1);
+        _ = state2.EncryptionCounter.Should().Be(2);
+
         // All should have same session keys reference (immutable)
-        originalState.SessionKeys.Should().Be(_sessionKeys);
-        state1.SessionKeys.Should().Be(_sessionKeys);
-        state2.SessionKeys.Should().Be(_sessionKeys);
+        _ = originalState.SessionKeys.Should().Be(_sessionKeys);
+        _ = state1.SessionKeys.Should().Be(_sessionKeys);
+        _ = state2.SessionKeys.Should().Be(_sessionKeys);
     }
 }

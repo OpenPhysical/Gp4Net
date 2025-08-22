@@ -614,19 +614,22 @@ public class CryptographicService : ICryptographicService
 
     private byte[] Expand3DesKey(byte[] key)
     {
-        if (key.Length == 24)
-            return key;
-        
-        if (key.Length == 16)
+        switch (key.Length)
         {
-            // Expand to 24 bytes: K1 || K2 || K1
-            var expanded = new byte[24];
-            Array.Copy(key, 0, expanded, 0, 16);
-            Array.Copy(key, 0, expanded, 16, 8);
-            return expanded;
+            case 24:
+                return key;
+            case 16:
+            {
+                // Expand to 24 bytes: K1 || K2 || K1
+                var expanded = new byte[24];
+                Array.Copy(key, 0, expanded, 0, 16);
+                Array.Copy(key, 0, expanded, 16, 8);
+                return expanded;
+            }
+            default:
+                throw new ArgumentException($"Invalid 3DES key length: {key.Length}");
         }
-        
-        throw new ArgumentException($"Invalid 3DES key length: {key.Length}");
+
     }
 
     /// <summary>
@@ -805,7 +808,7 @@ public class CryptographicService : ICryptographicService
                 responseData,
                 domainSecurityLevel,
                 sessionKeys,
-                System.Collections.Immutable.ImmutableArray.Create(macChainingValue),
+                [..macChainingValue],
                 encryptionCounter,
                 scpVersion
             );

@@ -8,7 +8,7 @@ namespace Gp4Net.Tests.TestBuilders;
 /// </summary>
 public class CardResponseBuilder
 {
-    private byte[] _data = new byte[0];
+    private byte[] _data = [];
     private ushort _statusWord = 0x9000;
 
     /// <summary>

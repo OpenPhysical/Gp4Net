@@ -244,20 +244,17 @@ public static class IseImporter
             // Key-value format: KEY_TYPE=HEX_VALUE
             return ParseKeyValueFormat(lines);
         }
-        else if (lines.Count == 3 && lines.All(line => IsHexString(line)))
+        else switch (lines.Count)
         {
-            // Three hex lines format (ENC, MAC, DEK)
-            return ParseThreeLineFormat(lines);
-        }
-        else if (lines.Count == 1 && IsHexString(lines[0]))
-        {
-            // Single hex line (use same key for all)
-            return ParseSingleLineFormat(lines[0]);
-        }
-        else
-        {
-            return Result.Failure<List<IseKeyEntry>, SmartCardError>(
-                SmartCardError.InvalidArgument("Unrecognized ISE format"));
+            case 3 when lines.All(line => IsHexString(line)):
+                // Three hex lines format (ENC, MAC, DEK)
+                return ParseThreeLineFormat(lines);
+            case 1 when IsHexString(lines[0]):
+                // Single hex line (use same key for all)
+                return ParseSingleLineFormat(lines[0]);
+            default:
+                return Result.Failure<List<IseKeyEntry>, SmartCardError>(
+                    SmartCardError.InvalidArgument("Unrecognized ISE format"));
         }
     }
 

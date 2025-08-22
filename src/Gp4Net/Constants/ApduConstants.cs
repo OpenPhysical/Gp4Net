@@ -63,4 +63,16 @@ public static class ApduConstants
     /// Threshold for switching from short to extended APDU format.
     /// </summary>
     public const int ExtendedLengthThreshold = 256;
+
+    /// <summary>
+    /// Maximum number of GET RESPONSE chains to prevent infinite loops.
+    /// Protects against malicious cards sending continuous 0x61XX responses.
+    /// </summary>
+    public const int MaxResponseChainLength = 128;
+
+    /// <summary>
+    /// Maximum total accumulated response size across all chains.
+    /// Prevents memory exhaustion from excessive response data accumulation.
+    /// </summary>
+    public const int MaxTotalResponseSize = 1048576; // 1MB
 }

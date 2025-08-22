@@ -57,13 +57,13 @@ public class Scp02SequenceCounterFlowTests
         if (parseResult.IsSuccess)
         {
             var result = _protocol.ProcessInitializeUpdateResponse(parseResult.Value, hostChallenge);
-            result.IsFailure.Should().BeTrue();
-            result.Error.Message.Should().Contain("sequence counter");
+            _ = result.IsFailure.Should().BeTrue();
+            _ = result.Error.Message.Should().Contain("sequence counter");
         }
         else
         {
             // Parsing should fail for malformed response
-            parseResult.IsFailure.Should().BeTrue();
+            _ = parseResult.IsFailure.Should().BeTrue();
         }
     }
 
@@ -83,17 +83,17 @@ public class Scp02SequenceCounterFlowTests
         Array.Copy(new byte[8], 0, responseData, 20, 8); // Card cryptogram
         
         var parseResult = InitializeUpdateResponse.Parse(responseData);
-        parseResult.IsSuccess.Should().BeTrue();
+        _ = parseResult.IsSuccess.Should().BeTrue();
         
         // Act
         var result = _protocol.ProcessInitializeUpdateResponse(parseResult.Value, hostChallenge);
 
         // Assert - With zero sequence counter, the cryptogram won't match
         // This is expected behavior - the test verifies that SCP02 processing requires proper sequence counter
-        result.IsFailure.Should().BeTrue();
+        _ = result.IsFailure.Should().BeTrue();
         // The error will be about cryptogram verification failing, which is correct
         // because without proper sequence counter, the cryptogram calculation will be wrong
-        result.Error.Message.Should().Contain("cryptogram");
+        _ = result.Error.Message.Should().Contain("cryptogram");
     }
 
     [Test]
@@ -122,8 +122,8 @@ public class Scp02SequenceCounterFlowTests
             // This test verifies CryptogramBuilder validates sequence counter
             if (parseResult.Value.SequenceCounter == null)
             {
-                result.IsFailure.Should().BeTrue();
-                result.Error.Message.Should().Contain("SCP02 requires sequence counter");
+                _ = result.IsFailure.Should().BeTrue();
+                _ = result.Error.Message.Should().Contain("SCP02 requires sequence counter");
             }
         }
     }
@@ -152,8 +152,8 @@ public class Scp02SequenceCounterFlowTests
             // Assert
             if (parseResult.Value.SequenceCounter == null)
             {
-                result.IsFailure.Should().BeTrue();
-                result.Error.Message.Should().Contain("SCP02 requires sequence counter");
+                _ = result.IsFailure.Should().BeTrue();
+                _ = result.Error.Message.Should().Contain("SCP02 requires sequence counter");
             }
         }
     }
@@ -174,7 +174,7 @@ public class Scp02SequenceCounterFlowTests
         Array.Copy(new byte[8], 0, responseData, 20, 8); // Card cryptogram
         
         var parseResult = InitializeUpdateResponse.Parse(responseData);
-        parseResult.IsSuccess.Should().BeTrue();
+        _ = parseResult.IsSuccess.Should().BeTrue();
         var response = parseResult.Value;
 
         // Act - Process response (skip cryptogram validation for this test)
@@ -187,9 +187,9 @@ public class Scp02SequenceCounterFlowTests
         );
 
         // Assert
-        contextResult.IsSuccess.Should().BeTrue();
+        _ = contextResult.IsSuccess.Should().BeTrue();
         var context = contextResult.Value;
-        context.SequenceCounter.HasValue.Should().BeTrue();
-        context.SequenceCounter.Value.Should().Equal(new byte[] { 0x00, 0x01 });
+        _ = context.SequenceCounter.HasValue.Should().BeTrue();
+        _ = context.SequenceCounter.Value.Should().Equal(new byte[] { 0x00, 0x01 });
     }
 }

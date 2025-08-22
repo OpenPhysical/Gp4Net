@@ -54,33 +54,33 @@ public class Scp02RealCardTraceTests
         
         // Act - Parse the response
         var parseResult = InitializeUpdateResponse.Parse(realResponse);
-        
+
         // Assert - Parsing should succeed
-        parseResult.IsSuccess.Should().BeTrue("Real GP Pro CLR response should parse successfully");
+        _ = parseResult.IsSuccess.Should().BeTrue("Real GP Pro CLR response should parse successfully");
         var response = parseResult.Value;
-        
+
         // Verify parsed fields match expected values from trace
-        response.KeyDiversificationData.Should().Equal(Convert.FromHexString("00002345558083204839"), 
+        _ = response.KeyDiversificationData.Should().Equal(Convert.FromHexString("00002345558083204839"),
             "KDD should match GP Pro trace");
-        response.KeyVersion.Should().Be(0x01, "Key version should be 1");
-        response.ScpId.Should().Be(0x02, "SCP ID should be 2");
-        response.ScpParameter.Should().Be(0x00, "SCP parameter should be 0x00 (i=00)");
-        response.SequenceCounter.Should().Equal(Convert.FromHexString("0011"), 
+        _ = response.KeyVersion.Should().Be(0x01, "Key version should be 1");
+        _ = response.ScpId.Should().Be(0x02, "SCP ID should be 2");
+        _ = response.ScpParameter.Should().Be(0x00, "SCP parameter should be 0x00 (i=00)");
+        _ = response.SequenceCounter.Should().Equal(Convert.FromHexString("0011"),
             "Sequence counter should match GP Pro trace");
-        response.CardChallenge.Should().Equal(Convert.FromHexString("C284EC19415D"), 
+        _ = response.CardChallenge.Should().Equal(Convert.FromHexString("C284EC19415D"),
             "Card challenge should match GP Pro trace");
-        response.CardCryptogram.Should().Equal(Convert.FromHexString("17F4198ADCD5102D"),
+        _ = response.CardCryptogram.Should().Equal(Convert.FromHexString("17F4198ADCD5102D"),
             "Card cryptogram should match GP Pro trace");
             
         // Verify implementation detection
         var detectedImplResult = Scp02Protocol.GetScp02Implementation(response.ScpParameter);
-        detectedImplResult.IsSuccess.Should().BeTrue("Implementation detection should succeed");
-        detectedImplResult.Value.Should().Be(ScpImplementation.Scp02I00, "Should detect i=00 implementation");
+        _ = detectedImplResult.IsSuccess.Should().BeTrue("Implementation detection should succeed");
+        _ = detectedImplResult.Value.Should().Be(ScpImplementation.Scp02I00, "Should detect i=00 implementation");
         
-        TestContext.WriteLine("✓ Real GP Pro CLR trace correctly parsed and implementation detected");
-        TestContext.WriteLine($"KDD: {Convert.ToHexString(response.KeyDiversificationData)}");
-        TestContext.WriteLine($"SCP Parameter: 0x{response.ScpParameter:X2} → {detectedImplResult.Value}");
-        TestContext.WriteLine($"Sequence Counter: {Convert.ToHexString(response.SequenceCounter)}");
+        TestContext.Out.WriteLine("✓ Real GP Pro CLR trace correctly parsed and implementation detected");
+        TestContext.Out.WriteLine($"KDD: {Convert.ToHexString(response.KeyDiversificationData)}");
+        TestContext.Out.WriteLine($"SCP Parameter: 0x{response.ScpParameter:X2} → {detectedImplResult.Value}");
+        TestContext.Out.WriteLine($"Sequence Counter: {Convert.ToHexString(response.SequenceCounter)}");
     }
 
     [Test]
@@ -93,33 +93,33 @@ public class Scp02RealCardTraceTests
         
         // Act - Parse the response
         var parseResult = InitializeUpdateResponse.Parse(realResponse);
-        
+
         // Assert - Parsing should succeed
-        parseResult.IsSuccess.Should().BeTrue("Real GP Pro MAC response should parse successfully");
+        _ = parseResult.IsSuccess.Should().BeTrue("Real GP Pro MAC response should parse successfully");
         var response = parseResult.Value;
-        
+
         // Verify parsed fields match expected values from trace
-        response.KeyDiversificationData.Should().Equal(Convert.FromHexString("00002345558083204839"), 
+        _ = response.KeyDiversificationData.Should().Equal(Convert.FromHexString("00002345558083204839"),
             "KDD should match GP Pro trace");
-        response.KeyVersion.Should().Be(0x01, "Key version should be 1");
-        response.ScpId.Should().Be(0x02, "SCP ID should be 2");
-        response.ScpParameter.Should().Be(0x00, "SCP parameter should be 0x00 (i=00)");
-        response.SequenceCounter.Should().Equal(Convert.FromHexString("0012"), 
+        _ = response.KeyVersion.Should().Be(0x01, "Key version should be 1");
+        _ = response.ScpId.Should().Be(0x02, "SCP ID should be 2");
+        _ = response.ScpParameter.Should().Be(0x00, "SCP parameter should be 0x00 (i=00)");
+        _ = response.SequenceCounter.Should().Equal(Convert.FromHexString("0012"),
             "Sequence counter should match GP Pro trace");
-        response.CardChallenge.Should().Equal(Convert.FromHexString("3E6DB216F8D5"), 
+        _ = response.CardChallenge.Should().Equal(Convert.FromHexString("3E6DB216F8D5"),
             "Card challenge should match GP Pro trace (6 bytes only)");
-        response.CardCryptogram.Should().Equal(Convert.FromHexString("8177E15BAA128DF9"),
+        _ = response.CardCryptogram.Should().Equal(Convert.FromHexString("8177E15BAA128DF9"),
             "Card cryptogram should match GP Pro trace");
             
         // Verify implementation detection
         var detectedImplResult = Scp02Protocol.GetScp02Implementation(response.ScpParameter);
-        detectedImplResult.IsSuccess.Should().BeTrue("Implementation detection should succeed");
-        detectedImplResult.Value.Should().Be(ScpImplementation.Scp02I00, "Should detect i=00 implementation");
+        _ = detectedImplResult.IsSuccess.Should().BeTrue("Implementation detection should succeed");
+        _ = detectedImplResult.Value.Should().Be(ScpImplementation.Scp02I00, "Should detect i=00 implementation");
         
-        TestContext.WriteLine("✓ Real GP Pro MAC trace correctly parsed and implementation detected");
-        TestContext.WriteLine($"KDD: {Convert.ToHexString(response.KeyDiversificationData)}");
-        TestContext.WriteLine($"SCP Parameter: 0x{response.ScpParameter:X2} → {detectedImplResult.Value}");
-        TestContext.WriteLine($"Sequence Counter: {Convert.ToHexString(response.SequenceCounter)}");
+        TestContext.Out.WriteLine("✓ Real GP Pro MAC trace correctly parsed and implementation detected");
+        TestContext.Out.WriteLine($"KDD: {Convert.ToHexString(response.KeyDiversificationData)}");
+        TestContext.Out.WriteLine($"SCP Parameter: 0x{response.ScpParameter:X2} → {detectedImplResult.Value}");
+        TestContext.Out.WriteLine($"Sequence Counter: {Convert.ToHexString(response.SequenceCounter)}");
     }
 
     [Test]
@@ -138,7 +138,7 @@ public class Scp02RealCardTraceTests
         
         // Create key set with static keys
         var keySetResult = Scp02KeySet.Create(staticKeys, staticKeys, staticKeys, 0x01);
-        keySetResult.IsSuccess.Should().BeTrue();
+        _ = keySetResult.IsSuccess.Should().BeTrue();
         
         // Act - Derive session keys for i=00 (uses derived MAC keys)
         var sessionKeysResult = _keyDerivationService.DeriveSessionKeys(
@@ -147,19 +147,19 @@ public class Scp02RealCardTraceTests
             cardChallenge,
             Maybe<byte[]>.From(sequenceCounter),
             Maybe<ScpImplementation>.From(ScpImplementation.Scp02I00));
-        
+
         // Assert
-        sessionKeysResult.IsSuccess.Should().BeTrue("Session key derivation should succeed");
+        _ = sessionKeysResult.IsSuccess.Should().BeTrue("Session key derivation should succeed");
         var sessionKeys = sessionKeysResult.Value;
+
+        _ = sessionKeys.SEnc.Should().Equal(expectedSEnc, "S-ENC should match GP Pro trace");
+        _ = sessionKeys.SMac.Should().Equal(expectedSMac, "S-MAC should match GP Pro trace");
+        _ = sessionKeys.SrMac.Should().Equal(expectedSrMac, "S-RMAC should match GP Pro trace");
         
-        sessionKeys.SEnc.Should().Equal(expectedSEnc, "S-ENC should match GP Pro trace");
-        sessionKeys.SMac.Should().Equal(expectedSMac, "S-MAC should match GP Pro trace");
-        sessionKeys.SrMac.Should().Equal(expectedSrMac, "S-RMAC should match GP Pro trace");
-        
-        TestContext.WriteLine("✓ Real GP Pro CLR session keys match expected values");
-        TestContext.WriteLine($"S-ENC:  {Convert.ToHexString(sessionKeys.SEnc)}");
-        TestContext.WriteLine($"S-MAC:  {Convert.ToHexString(sessionKeys.SMac)}");
-        TestContext.WriteLine($"S-RMAC: {Convert.ToHexString(sessionKeys.SrMac)}");
+        TestContext.Out.WriteLine("✓ Real GP Pro CLR session keys match expected values");
+        TestContext.Out.WriteLine($"S-ENC:  {Convert.ToHexString(sessionKeys.SEnc)}");
+        TestContext.Out.WriteLine($"S-MAC:  {Convert.ToHexString(sessionKeys.SMac)}");
+        TestContext.Out.WriteLine($"S-RMAC: {Convert.ToHexString(sessionKeys.SrMac)}");
     }
 
     [Test]
@@ -178,7 +178,7 @@ public class Scp02RealCardTraceTests
         
         // Create key set with static keys
         var keySetResult = Scp02KeySet.Create(staticKeys, staticKeys, staticKeys, 0x01);
-        keySetResult.IsSuccess.Should().BeTrue();
+        _ = keySetResult.IsSuccess.Should().BeTrue();
         
         // Act - Derive session keys for i=00 (uses derived MAC keys)
         var sessionKeysResult = _keyDerivationService.DeriveSessionKeys(
@@ -187,19 +187,19 @@ public class Scp02RealCardTraceTests
             cardChallenge,
             Maybe<byte[]>.From(sequenceCounter),
             Maybe<ScpImplementation>.From(ScpImplementation.Scp02I00));
-        
+
         // Assert
-        sessionKeysResult.IsSuccess.Should().BeTrue("Session key derivation should succeed");
+        _ = sessionKeysResult.IsSuccess.Should().BeTrue("Session key derivation should succeed");
         var sessionKeys = sessionKeysResult.Value;
+
+        _ = sessionKeys.SEnc.Should().Equal(expectedSEnc, "S-ENC should match GP Pro trace");
+        _ = sessionKeys.SMac.Should().Equal(expectedSMac, "S-MAC should match GP Pro trace");
+        _ = sessionKeys.SrMac.Should().Equal(expectedSrMac, "S-RMAC should match GP Pro trace");
         
-        sessionKeys.SEnc.Should().Equal(expectedSEnc, "S-ENC should match GP Pro trace");
-        sessionKeys.SMac.Should().Equal(expectedSMac, "S-MAC should match GP Pro trace");
-        sessionKeys.SrMac.Should().Equal(expectedSrMac, "S-RMAC should match GP Pro trace");
-        
-        TestContext.WriteLine("✓ Real GP Pro MAC session keys match expected values");
-        TestContext.WriteLine($"S-ENC:  {Convert.ToHexString(sessionKeys.SEnc)}");
-        TestContext.WriteLine($"S-MAC:  {Convert.ToHexString(sessionKeys.SMac)}");
-        TestContext.WriteLine($"S-RMAC: {Convert.ToHexString(sessionKeys.SrMac)}");
+        TestContext.Out.WriteLine("✓ Real GP Pro MAC session keys match expected values");
+        TestContext.Out.WriteLine($"S-ENC:  {Convert.ToHexString(sessionKeys.SEnc)}");
+        TestContext.Out.WriteLine($"S-MAC:  {Convert.ToHexString(sessionKeys.SMac)}");
+        TestContext.Out.WriteLine($"S-RMAC: {Convert.ToHexString(sessionKeys.SrMac)}");
     }
 
     [Test]
@@ -226,13 +226,13 @@ public class Scp02RealCardTraceTests
         macInput[3] = 0x00; // P2
         macInput[4] = 0x10; // Lc=16 (indicates final command will have 8 byte cryptogram + 8 byte MAC)
         Array.Copy(hostCryptogram, 0, macInput, 5, hostCryptogram.Length);
-        
+
         // Verify MAC input matches trace
-        macInput.Should().Equal(expectedMacInput, "MAC input should match GP Pro trace");
+        _ = macInput.Should().Equal(expectedMacInput, "MAC input should match GP Pro trace");
         
-        TestContext.WriteLine("✓ Real GP Pro CLR EXTERNAL AUTHENTICATE MAC input construction verified");
-        TestContext.WriteLine($"MAC Input: {Convert.ToHexString(macInput)}");
-        TestContext.WriteLine($"Expected:  {Convert.ToHexString(expectedMacInput)}");
+        TestContext.Out.WriteLine("✓ Real GP Pro CLR EXTERNAL AUTHENTICATE MAC input construction verified");
+        TestContext.Out.WriteLine($"MAC Input: {Convert.ToHexString(macInput)}");
+        TestContext.Out.WriteLine($"Expected:  {Convert.ToHexString(expectedMacInput)}");
     }
 
     [Test]
@@ -259,13 +259,13 @@ public class Scp02RealCardTraceTests
         macInput[3] = 0x00; // P2
         macInput[4] = 0x10; // Lc=16 (indicates final command will have 8 byte cryptogram + 8 byte MAC)
         Array.Copy(hostCryptogram, 0, macInput, 5, hostCryptogram.Length);
-        
+
         // Verify MAC input matches trace
-        macInput.Should().Equal(expectedMacInput, "MAC input should match GP Pro trace");
+        _ = macInput.Should().Equal(expectedMacInput, "MAC input should match GP Pro trace");
         
-        TestContext.WriteLine("✓ Real GP Pro MAC EXTERNAL AUTHENTICATE MAC input construction verified");
-        TestContext.WriteLine($"MAC Input: {Convert.ToHexString(macInput)}");
-        TestContext.WriteLine($"Expected:  {Convert.ToHexString(expectedMacInput)}");
+        TestContext.Out.WriteLine("✓ Real GP Pro MAC EXTERNAL AUTHENTICATE MAC input construction verified");
+        TestContext.Out.WriteLine($"MAC Input: {Convert.ToHexString(macInput)}");
+        TestContext.Out.WriteLine($"Expected:  {Convert.ToHexString(expectedMacInput)}");
     }
 
     [Test]
@@ -281,15 +281,15 @@ public class Scp02RealCardTraceTests
         
         // Act - Try to get implementation for unknown parameter
         var implementationResult = Scp02Protocol.GetScp02Implementation(unknownParameter);
-        
+
         // Assert - Should fail with clear error message
-        implementationResult.IsFailure.Should().BeTrue("Unknown implementation should fail");
-        implementationResult.Error.Should().BeOfType<UnsupportedImplementationError>();
-        implementationResult.Error.Message.Should().Contain("i=FF");
-        implementationResult.Error.Message.Should().Contain("00, 02, 04, 05, 15, 35, 55, 75");
+        _ = implementationResult.IsFailure.Should().BeTrue("Unknown implementation should fail");
+        _ = implementationResult.Error.Should().BeOfType<UnsupportedImplementationError>();
+        _ = implementationResult.Error.Message.Should().Contain("i=FF");
+        _ = implementationResult.Error.Message.Should().Contain("00, 02, 04, 05, 15, 35, 55, 75");
         
-        TestContext.WriteLine("✓ Unknown SCP parameter correctly rejected with helpful error message");
-        TestContext.WriteLine($"Invalid parameter 0xFF correctly failed: {implementationResult.Error.Message}");
+        TestContext.Out.WriteLine("✓ Unknown SCP parameter correctly rejected with helpful error message");
+        TestContext.Out.WriteLine($"Invalid parameter 0xFF correctly failed: {implementationResult.Error.Message}");
     }
 
     [Test] 
@@ -301,13 +301,13 @@ public class Scp02RealCardTraceTests
         
         // Act - Parse response
         var parseResult = InitializeUpdateResponse.Parse(realResponse);
-        parseResult.IsSuccess.Should().BeTrue();
+        _ = parseResult.IsSuccess.Should().BeTrue();
         var response = parseResult.Value;
         
         // Detect implementation (should not default)
         var implementationResult = Scp02Protocol.GetScp02Implementation(response.ScpParameter);
-        implementationResult.IsSuccess.Should().BeTrue("Implementation detection should succeed");
-        implementationResult.Value.Should().Be(ScpImplementation.Scp02I00, "Should detect specific implementation, not default");
+        _ = implementationResult.IsSuccess.Should().BeTrue("Implementation detection should succeed");
+        _ = implementationResult.Value.Should().Be(ScpImplementation.Scp02I00, "Should detect specific implementation, not default");
         
         // Create key derivation context
         var contextResult = KeyDerivationContext.CreateForScp02(
@@ -317,22 +317,22 @@ public class Scp02RealCardTraceTests
             response.SequenceCounter,
             implementationResult.Value
         );
-        contextResult.IsSuccess.Should().BeTrue("Key derivation context should be created successfully");
+        _ = contextResult.IsSuccess.Should().BeTrue("Key derivation context should be created successfully");
         
         // Derive session keys
         var sessionKeysResult = _keyDerivationService.DeriveSessionKeys(contextResult.Value);
-        sessionKeysResult.IsSuccess.Should().BeTrue("Session key derivation should succeed");
+        _ = sessionKeysResult.IsSuccess.Should().BeTrue("Session key derivation should succeed");
         
         var sessionKeys = sessionKeysResult.Value;
         
         // Should match expected CLR trace values (derived MAC keys, not static)
         var expectedSMac = Convert.FromHexString("0D446132B168F75CD6F0A780693A4DD3");
-        sessionKeys.SMac.Should().Equal(expectedSMac, "Should derive MAC keys, not use static");
-        sessionKeys.SMac.Should().NotEqual(_keySet.MacKey, "MAC key should be derived, not static");
+        _ = sessionKeys.SMac.Should().Equal(expectedSMac, "Should derive MAC keys, not use static");
+        _ = sessionKeys.SMac.Should().NotEqual(_keySet.MacKey, "MAC key should be derived, not static");
         
-        TestContext.WriteLine("✓ End-to-end processing with real trace succeeds without defaults");
-        TestContext.WriteLine($"Implementation: {implementationResult.Value}");
-        TestContext.WriteLine($"Derived S-MAC: {Convert.ToHexString(sessionKeys.SMac)} (derived)");
-        TestContext.WriteLine($"Static MAC:    {Convert.ToHexString(_keySet.MacKey)} (not used)");
+        TestContext.Out.WriteLine("✓ End-to-end processing with real trace succeeds without defaults");
+        TestContext.Out.WriteLine($"Implementation: {implementationResult.Value}");
+        TestContext.Out.WriteLine($"Derived S-MAC: {Convert.ToHexString(sessionKeys.SMac)} (derived)");
+        TestContext.Out.WriteLine($"Static MAC:    {Convert.ToHexString(_keySet.MacKey)} (not used)");
     }
 }

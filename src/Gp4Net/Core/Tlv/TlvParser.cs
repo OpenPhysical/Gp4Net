@@ -63,11 +63,17 @@ public static class TlvParser
                 return Maybe<TlvObject>.None;
             }
 
-            // Extract value
-            var value = new byte[lengthMaybe.Value];
-            if (lengthMaybe.Value > 0)
+            // Extract value - additional safety check before array allocation
+            var length = lengthMaybe.Value;
+            if (length < 0 || length > TlvConstants.MaxTlvValueSize)
             {
-                Array.Copy(data, offset, value, 0, lengthMaybe.Value);
+                return Maybe<TlvObject>.None;
+            }
+
+            var value = new byte[length];
+            if (length > 0)
+            {
+                Array.Copy(data, offset, value, 0, length);
             }
 
             bytesConsumed = (offset - startOffset) + lengthMaybe.Value;
@@ -135,7 +141,7 @@ public static class TlvParser
     /// <returns>The first TLV object with the specified tag, or None if not found.</returns>
     public static Maybe<TlvObject> FindByTag(byte[] data, byte tag)
     {
-        return FindByTag(data, new[] { tag });
+        return FindByTag(data, [tag]);
     }
 
     /// <summary>
@@ -146,7 +152,7 @@ public static class TlvParser
     /// <returns>The first TLV object with the specified tag, or None if not found.</returns>
     public static Maybe<TlvObject> FindByTag(byte[] data, ushort tag)
     {
-        return FindByTag(data, new[] { (byte)(tag >> 8), (byte)(tag & 0xFF) });
+        return FindByTag(data, [(byte)(tag >> 8), (byte)(tag & 0xFF)]);
     }
 
     /// <summary>
@@ -192,6 +198,15 @@ public static class TlvParser
 
         var firstByte = data[offset++];
 
+        // GP Card Specification v2.3.1: GP-specific extension where 0x80 alone means length 128
+        // References: Install Token, Make Selectable Token, Extradition Token, Registry Update Token sections
+        // "The length field for [tokens] is as defined for ASN.1 BER-TLV (see [ISO 8825-1]) 
+        // except that the length 128 may also be coded on one byte as '80'."
+        if (firstByte == 0x80)
+        {
+            return Maybe<int>.From(128);
+        }
+
         // Short form
         if ((firstByte & TlvConstants.LongFormLengthMask) == 0)
         {
@@ -205,10 +220,27 @@ public static class TlvParser
             return Maybe<int>.None;
         }
 
+        // Security check: Prevent integer overflow attacks with excessive length bytes
+        if (lengthBytes > TlvConstants.MaxReasonableLengthBytes)
+        {
+            return Maybe<int>.None;
+        }
+
         var length = 0;
         for (var i = 0; i < lengthBytes; i++)
         {
+            // Security check: Detect integer overflow before it happens
+            if (length > (int.MaxValue >> 8))
+            {
+                return Maybe<int>.None;
+            }
             length = (length << 8) | data[offset++];
+        }
+
+        // Security check: Validate length against maximum allowed TLV value size
+        if (length > TlvConstants.MaxTlvValueSize)
+        {
+            return Maybe<int>.None;
         }
 
         return Maybe<int>.From(length);
@@ -241,33 +273,29 @@ public static class TlvParser
     /// <returns>The tag as a byte array.</returns>
     public static byte[] NumberToTag(uint tagValue)
     {
-        if (tagValue <= 0xFF)
+        switch (tagValue)
         {
-            return new[] { (byte)tagValue };
+            case <= 0xFF:
+                return [(byte)tagValue];
+            case <= 0xFFFF:
+                return [(byte)(tagValue >> 8), (byte)(tagValue & 0xFF)];
+            case <= 0xFFFFFF:
+                return
+                [
+                    (byte)(tagValue >> 16),
+                    (byte)(tagValue >> 8),
+                    (byte)(tagValue & 0xFF)
+                ];
+            default:
+                return
+                [
+                    (byte)(tagValue >> 24),
+                    (byte)(tagValue >> 16),
+                    (byte)(tagValue >> 8),
+                    (byte)(tagValue & 0xFF)
+                ];
         }
 
-        if (tagValue <= 0xFFFF)
-        {
-            return new[] { (byte)(tagValue >> 8), (byte)(tagValue & 0xFF) };
-        }
-
-        if (tagValue <= 0xFFFFFF)
-        {
-            return new[]
-            {
-                (byte)(tagValue >> 16),
-                (byte)(tagValue >> 8),
-                (byte)(tagValue & 0xFF),
-            };
-        }
-
-        return new[]
-        {
-            (byte)(tagValue >> 24),
-            (byte)(tagValue >> 16),
-            (byte)(tagValue >> 8),
-            (byte)(tagValue & 0xFF),
-        };
     }
 }
 
@@ -363,7 +391,7 @@ public class TlvObject
     /// <returns>The numeric value or None if not applicable.</returns>
     public Maybe<uint> GetValueAsNumber()
     {
-        if (Value.Length == 0 || Value.Length > 4)
+        if (Value.Length is 0 or > 4)
         {
             return Maybe<uint>.None;
         }

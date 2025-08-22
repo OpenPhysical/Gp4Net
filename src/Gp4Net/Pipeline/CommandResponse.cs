@@ -31,12 +31,14 @@ public record CommandResponse(
     public static CommandResponse Success(
         byte[] data = null,
         IPipelineContext context = null,
-        IReadOnlyDictionary<string, object> metadata = null) =>
-        new(
+        IReadOnlyDictionary<string, object> metadata = null)
+    {
+        return new(
             data ?? [],
             StatusWords.Success,
             context ?? ImmutablePipelineContext.Empty,
             metadata ?? new Dictionary<string, object>());
+    }
 
     /// <summary>
     /// Creates a failed response.
@@ -44,21 +46,25 @@ public record CommandResponse(
     public static CommandResponse Failure(
         StatusWord statusWord,
         IPipelineContext context = null,
-        IReadOnlyDictionary<string, object> metadata = null) =>
-        new(
+        IReadOnlyDictionary<string, object> metadata = null)
+    {
+        return new(
             [],
             statusWord,
             context ?? ImmutablePipelineContext.Empty,
             metadata ?? new Dictionary<string, object>());
+    }
 
     /// <summary>
     /// Converts this response to a Result type.
     /// </summary>
-    public Result<CommandResponse, SmartCardError> ToResult() =>
-        IsSuccess
+    public Result<CommandResponse, SmartCardError> ToResult()
+    {
+        return IsSuccess
             ? Result.Success<CommandResponse, SmartCardError>(this)
             : Result.Failure<CommandResponse, SmartCardError>(
                 SmartCardError.FromStatusWord(StatusWord));
+    }
 
     /// <summary>
     /// Creates a new response with additional metadata.
@@ -75,14 +81,18 @@ public record CommandResponse(
     /// <summary>
     /// Creates a new response with updated context.
     /// </summary>
-    public CommandResponse WithContext(IPipelineContext context) =>
-        this with { UpdatedContext = context };
+    public CommandResponse WithContext(IPipelineContext context)
+    {
+        return this with { UpdatedContext = context };
+    }
 
     /// <summary>
     /// Creates a new response with a context value added.
     /// </summary>
-    public CommandResponse WithContextValue<T>(string key, T value) where T : class =>
-        this with { UpdatedContext = UpdatedContext.With(key, value) };
+    public CommandResponse WithContextValue<T>(string key, T value) where T : class
+    {
+        return this with { UpdatedContext = UpdatedContext.With(key, value) };
+    }
 }
 
 /// <summary>

@@ -43,7 +43,7 @@ public static class FunctionalCommandExtensions
 
         try
         {
-            await context.RequireCardConnection(readerName);
+            _ = await context.RequireCardConnection(readerName);
             return Result.Success<ICliExecutionContext, string>(context);
         }
         catch (Exception ex)
@@ -62,7 +62,7 @@ public static class FunctionalCommandExtensions
     {
         try
         {
-            await context.RequireSecureChannel(securityLevel, keyset);
+            _ = await context.RequireSecureChannel(securityLevel, keyset);
             return Result.Success<ICliExecutionContext, string>(context);
         }
         catch (Exception ex)
@@ -83,7 +83,7 @@ public static class FunctionalCommandExtensions
             .RequireCardConnectionFunctional(settings.Reader?.Name)
             .Bind(async ctx =>
             {
-                ctx.DisplayCardInfo(settings);
+                _ = ctx.DisplayCardInfo(settings);
                 return settings.RequiresSecureChannel
                     ? await ctx.RequireSecureChannelFunctional(settings.SecurityLevel, settings.Keyset)
                     : Result.Success<ICliExecutionContext, string>(ctx);

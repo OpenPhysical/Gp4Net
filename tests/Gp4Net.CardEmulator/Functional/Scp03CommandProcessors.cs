@@ -492,7 +492,7 @@ public static class Scp03CommandProcessors
         if (secureChannelStateResult.IsFailure)
         {
             logger?.LogError("Failed to create secure channel state: {Error}", secureChannelStateResult.Error);
-            return (new ApduResponse(Array.Empty<byte>(), StatusWords.AuthenticationMethodBlocked), state);
+            return (new ApduResponse([], StatusWords.AuthenticationMethodBlocked), state);
         }
 
         var secureChannelState = secureChannelStateResult.Value;
@@ -503,7 +503,7 @@ public static class Scp03CommandProcessors
         logger?.LogDebug("SCP03 EXTERNAL AUTHENTICATE: Secure channel established with security level 0x{SecurityLevel:X2}", securityLevelByte);
 
         // SCP03 EXTERNAL AUTHENTICATE response is typically empty on success
-        return (new ApduResponse(Array.Empty<byte>(), StatusWords.Success), newState);
+        return (new ApduResponse([], StatusWords.Success), newState);
     }
 
     /// <summary>
@@ -520,7 +520,7 @@ public static class Scp03CommandProcessors
             // Fallback to padded version if we can't calculate properly
             var fallbackMac = new byte[16];
             Array.Copy(request.HostMac, 0, fallbackMac, 0, 8);
-            return ImmutableArray.Create(fallbackMac);
+            return [..fallbackMac];
         }
 
         // Create EXTERNAL AUTHENTICATE command for MAC calculation
@@ -534,7 +534,7 @@ public static class Scp03CommandProcessors
             // Fallback to padded version on error
             var fallbackMac = new byte[16];
             Array.Copy(request.HostMac, 0, fallbackMac, 0, 8);
-            return ImmutableArray.Create(fallbackMac);
+            return [..fallbackMac];
         }
 
         var externalAuthCommand = externalAuthCommandResult.Value;
@@ -542,7 +542,7 @@ public static class Scp03CommandProcessors
         // Use the new static protocol service to calculate the initial MAC chaining value
         return Scp03ProtocolService.CalculateInitialMacChainingValue(externalAuthCommand, state.CurrentKeys.MacKey)
             .Match(
-                mac => ImmutableArray.Create(mac),
+                mac => [..mac],
                 error =>
                 {
                     // Fallback to padded version on error
@@ -574,7 +574,7 @@ public static class Scp03CommandProcessors
         }
 
         // If key version is 0x00 or 0xFF, try to find any available key
-        if (keyVersion == 0x00 || keyVersion == 0xFF)
+        if (keyVersion is 0x00 or 0xFF)
         {
             // For SCP03 context, prefer SCP03 key sets
             keySet = config.StaticKeys.Values.OfType<Scp03KeySet>().FirstOrDefault() 

@@ -240,7 +240,10 @@ public record CardDataInfo(
     /// Pure function to convert BCD byte to decimal.
     /// Each BCD byte contains two decimal digits: high nibble * 10 + low nibble.
     /// </summary>
-    private static int BcdToByte(byte bcd) => ((bcd >> 4) * 10) + (bcd & 0x0F);
+    private static int BcdToByte(byte bcd)
+    {
+        return ((bcd >> 4) * 10) + (bcd & 0x0F);
+    }
 
     /// <summary>
     /// Custom string representation showing parsed card information including OID details.
@@ -325,9 +328,9 @@ public record CardDataInfo(
             "1.3.6.1.4.1.42.2.110.1.3" => "JavaCard Runtime Environment version 3.x",
             
             // Pattern matching for versioned OIDs
-            var v when v.StartsWith("1.2.840.114283.2.") => "Card Management Type and Version",
-            var v when v.StartsWith("1.2.840.114283.4.") => "Secure Channel Protocol of Security Domain and implementation options",
-            var v when v.StartsWith("1.3.6.1.4.1.42.2.110.") => "JavaCard Runtime Environment",
+            _ when oid.StartsWith("1.2.840.114283.2.") => "Card Management Type and Version",
+            _ when oid.StartsWith("1.2.840.114283.4.") => "Secure Channel Protocol of Security Domain and implementation options",
+            _ when oid.StartsWith("1.3.6.1.4.1.42.2.110.") => "JavaCard Runtime Environment",
             
             _ => "Unknown OID"
         };

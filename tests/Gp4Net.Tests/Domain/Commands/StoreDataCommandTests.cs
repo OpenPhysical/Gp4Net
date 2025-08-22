@@ -19,11 +19,11 @@ public class StoreDataCommandTests
         var result = StoreDataCommand.Create(data);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        command.StructureFormat.Should().Be(StoreDataCommand.DataStructureFormat.Plain);
-        command.Block.Should().Be(StoreDataCommand.BlockFormat.FirstOrOnly);
-        command.StoreData.Should().BeEquivalentTo(data);
+        _ = command.StructureFormat.Should().Be(StoreDataCommand.DataStructureFormat.Plain);
+        _ = command.Block.Should().Be(StoreDataCommand.BlockFormat.FirstOrOnly);
+        _ = command.StoreData.Should().BeEquivalentTo(data);
     }
 
     [Test]
@@ -33,8 +33,8 @@ public class StoreDataCommandTests
         var result = StoreDataCommand.Create(null!);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<SmartCardError>();
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<SmartCardError>();
     }
 
     [Test]
@@ -43,14 +43,14 @@ public class StoreDataCommandTests
         // Arrange
         var data = new byte[] { 0x01, 0x02, 0x03 };
         var result = StoreDataCommand.Create(data);
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
 
         // Act
         var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
-        apdu.Should().BeEquivalentTo(new byte[] { 0x80, 0xE2, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03 });
+        _ = apdu.Should().BeEquivalentTo(new byte[] { 0x80, 0xE2, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03 });
     }
 
     [Test]
@@ -58,19 +58,19 @@ public class StoreDataCommandTests
     {
         // Arrange - Use CreateDefaultKeyVersionCommand which creates DGI format
         var result = StoreDataCommand.CreateDefaultKeyVersionCommand(0x01);
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
 
         // Act
         var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
-        apdu[0].Should().Be(0x80); // CLA
-        apdu[1].Should().Be(0xE2); // INS
-        apdu[2].Should().Be(0x80); // P1 (DGI format)
-        apdu[3].Should().Be(0x00); // P2 (First or only block)
-        apdu[4].Should().Be(0x04); // LC
-        apdu[5..].Should().BeEquivalentTo(new byte[] { 0x7F, 0x0D, 0x01, 0x01 }); // Data
+        _ = apdu[0].Should().Be(0x80); // CLA
+        _ = apdu[1].Should().Be(0xE2); // INS
+        _ = apdu[2].Should().Be(0x80); // P1 (DGI format)
+        _ = apdu[3].Should().Be(0x00); // P2 (First or only block)
+        _ = apdu[4].Should().Be(0x04); // LC
+        _ = apdu[5..].Should().BeEquivalentTo(new byte[] { 0x7F, 0x0D, 0x01, 0x01 }); // Data
     }
 
 
@@ -84,13 +84,13 @@ public class StoreDataCommandTests
         var result = StoreDataCommand.CreateDefaultKeyVersionCommand(keyVersion);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        command.StructureFormat.Should().Be(StoreDataCommand.DataStructureFormat.Dgi);
-        command.Block.Should().Be(StoreDataCommand.BlockFormat.FirstOrOnly);
+        _ = command.StructureFormat.Should().Be(StoreDataCommand.DataStructureFormat.Dgi);
+        _ = command.Block.Should().Be(StoreDataCommand.BlockFormat.FirstOrOnly);
 
         var data = command.StoreData;
-        data.Should().BeEquivalentTo(new byte[] { 0x7F, 0x0D, 0x01, 0x01 });
+        _ = data.Should().BeEquivalentTo(new byte[] { 0x7F, 0x0D, 0x01, 0x01 });
     }
 
     [Test]
@@ -100,36 +100,36 @@ public class StoreDataCommandTests
         var result = StoreDataCommand.CreateWithFormat(
             StoreDataCommand.DataStructureFormat.BerTlv,
             StoreDataCommand.BlockFormat.MoreBlocks,
-            new byte[] { 0x01 }
+            [0x01]
         );
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
         var iapdu = (IApduCommand)command;
 
         // Assert
-        iapdu.Cla.Should().Be(0x80);
-        iapdu.Ins.Should().Be(0xE2);
-        iapdu.P1.Should().Be(0x60); // BER-TLV format
-        iapdu.P2.Should().Be(0x01); // More blocks
-        iapdu.Data.Should().NotBeNull();
-        iapdu.Data.Should().BeEquivalentTo(new byte[] { 0x01 });
-        iapdu.ExpectedResponseLength.HasNoValue.Should().BeTrue();
-        iapdu.IsExtendedLength.Should().BeFalse();
+        _ = iapdu.Cla.Should().Be(0x80);
+        _ = iapdu.Ins.Should().Be(0xE2);
+        _ = iapdu.P1.Should().Be(0x60); // BER-TLV format
+        _ = iapdu.P2.Should().Be(0x01); // More blocks
+        _ = iapdu.Data.Should().NotBeNull();
+        _ = iapdu.Data.Should().BeEquivalentTo(new byte[] { 0x01 });
+        _ = iapdu.ExpectedResponseLength.HasNoValue.Should().BeTrue();
+        _ = iapdu.IsExtendedLength.Should().BeFalse();
     }
 
     [Test]
     public void ToString_ReturnsStoreData()
     {
         // Arrange
-        var result = StoreDataCommand.Create(new byte[] { 0x01 });
-        result.IsSuccess.Should().BeTrue();
+        var result = StoreDataCommand.Create([0x01]);
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
 
         // Act
         var str = command.ToString();
 
         // Assert
-        str.Should().BeEquivalentTo("STORE DATA");
+        _ = str.Should().BeEquivalentTo("STORE DATA");
     }
 
     [Test]
@@ -142,6 +142,6 @@ public class StoreDataCommandTests
         var response = StoreDataResponse.Parse(responseData);
 
         // Assert
-        response.Success.Should().BeTrue();
+        _ = response.Success.Should().BeTrue();
     }
 }

@@ -67,27 +67,27 @@ public class Scp03TraceBasedTests
         
         Assert.That(sessionKeysResult.IsSuccess, Is.True, "Session key derivation should succeed");
         var sessionKeys = sessionKeysResult.Value;
-        
+
         // Set up mock to return the derived session keys
-        _keyDerivationServiceMock
+        _ = _keyDerivationServiceMock
             .Setup(x => x.DeriveSessionKeys(It.IsAny<IKeyDerivationContext>()))
             .Returns(sessionKeys);
-            
+
         // Mock the cryptogram calculation to return the expected card cryptogram from trace
-        _keyDerivationServiceMock
+        _ = _keyDerivationServiceMock
             .Setup(x => x.CalculateCryptogram(It.IsAny<ICryptogramContext>()))
-            .Returns<ICryptogramContext>(ctx => 
+            .Returns<ICryptogramContext>(ctx =>
             {
-                if (ctx.Type == CryptogramType.CardCryptogram)
+                switch (ctx.Type)
                 {
-                    return Convert.FromHexString("148C0CAF84B0E110"); // From trace
-                }
-                else if (ctx.Type == CryptogramType.HostCryptogram)
-                {
-                    return Convert.FromHexString("7B54E3B21E27DA5F"); // From trace
+                    case CryptogramType.CardCryptogram:
+                        return Convert.FromHexString("148C0CAF84B0E110"); // From trace
+                    case CryptogramType.HostCryptogram:
+                        return Convert.FromHexString("7B54E3B21E27DA5F"); // From trace
+                    default:
+                        return new byte[8];
                 }
 
-                return new byte[8];
             });
         
         var protocol = new Scp03Protocol(keySet, _keyDerivationServiceMock.Object, 0x70); // i=70 from trace
@@ -125,27 +125,27 @@ public class Scp03TraceBasedTests
         
         Assert.That(sessionKeysResult.IsSuccess, Is.True, "Session key derivation should succeed");
         var sessionKeys = sessionKeysResult.Value;
-        
+
         // Set up mock to return the derived session keys
-        _keyDerivationServiceMock
+        _ = _keyDerivationServiceMock
             .Setup(x => x.DeriveSessionKeys(It.IsAny<IKeyDerivationContext>()))
             .Returns(sessionKeys);
-            
+
         // Mock the cryptogram calculation to return the expected values from trace
-        _keyDerivationServiceMock
+        _ = _keyDerivationServiceMock
             .Setup(x => x.CalculateCryptogram(It.IsAny<ICryptogramContext>()))
-            .Returns<ICryptogramContext>(ctx => 
+            .Returns<ICryptogramContext>(ctx =>
             {
-                if (ctx.Type == CryptogramType.CardCryptogram)
+                switch (ctx.Type)
                 {
-                    return Convert.FromHexString("148C0CAF84B0E110"); // From trace
-                }
-                else if (ctx.Type == CryptogramType.HostCryptogram)
-                {
-                    return Convert.FromHexString("7B54E3B21E27DA5F"); // From trace
+                    case CryptogramType.CardCryptogram:
+                        return Convert.FromHexString("148C0CAF84B0E110"); // From trace
+                    case CryptogramType.HostCryptogram:
+                        return Convert.FromHexString("7B54E3B21E27DA5F"); // From trace
+                    default:
+                        return new byte[8];
                 }
 
-                return new byte[8];
             });
         
         var protocol = new Scp03Protocol(keySet, _keyDerivationServiceMock.Object, 0x70);
@@ -183,20 +183,20 @@ public class Scp03TraceBasedTests
             
         // Mock the challenge generator to return the exact challenge from the trace
         var mockChallengeGenerator = new Mock<IChallengeGenerator>();
-        mockChallengeGenerator
+        _ = mockChallengeGenerator
             .Setup(g => g.GenerateChallenge(8))
             .Returns(_hostChallenge);
-            
+
         // Setup INITIALIZE UPDATE response (from trace line 85)
-        mockTransport
+        _ = mockTransport
             .Setup(t => t.TransmitAsync(
                 It.Is<IApduCommand>(cmd => cmd.Ins == 0x50), // INITIALIZE UPDATE
                 It.IsAny<ICardChannel>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ApduResponse(_initUpdateResponse, StatusWords.Success));
-            
+
         // Setup EXTERNAL AUTHENTICATE response (from trace line 96)
-        mockTransport
+        _ = mockTransport
             .Setup(t => t.TransmitAsync(
                 It.Is<IApduCommand>(cmd => cmd.Ins == 0x82), // EXTERNAL AUTHENTICATE
                 It.IsAny<ICardChannel>(),
@@ -205,8 +205,8 @@ public class Scp03TraceBasedTests
 
         // Setup minimal service provider for SecureChannelProtocolFactory
         var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddSingleton<IKeyDerivationService, KeyDerivationService>();
+        _ = services.AddLogging();
+        _ = services.AddSingleton<IKeyDerivationService, KeyDerivationService>();
         var serviceProvider = services.BuildServiceProvider();
             
         var factoryLogger = new Mock<ILogger<SecureChannelProtocolFactory>>();

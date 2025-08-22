@@ -13,12 +13,9 @@ using Spectre.Console.Cli;
 namespace Gp4Net.Tool.Commands.Applet;
 
 /// <summary>
-/// Command to load a CAP file package onto the card without installing applets.
-/// </summary>
-[PublicAPI]
-/// <summary>
 /// Command to load a CAP file package onto a GlobalPlatform card without installing applets.
 /// </summary>
+[PublicAPI]
 [Description("Load a CAP file package onto the card (without installing applets)")]
 public class LoadCommand : BaseCommand<LoadCommand.Settings>
 {
@@ -209,7 +206,7 @@ public class LoadCommand : BaseCommand<LoadCommand.Settings>
                 return ValidationResult.Error("CAP file path is required");
             }
 
-            if (MaxBlockSize < 1 || MaxBlockSize > 255)
+            if (MaxBlockSize is < 1 or > 255)
             {
                 return ValidationResult.Error("Max block size must be between 1 and 255");
             }

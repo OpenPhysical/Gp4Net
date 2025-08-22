@@ -19,10 +19,10 @@ public class InitializeUpdateCommandTests
 
         var result = InitializeUpdateCommand.Create(keyVersion, keyId, hostChallenge);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.KeyVersion.Should().Be(keyVersion);
-        result.Value.KeyIdentifier.Should().Be(keyId);
-        result.Value.HostChallenge.Should().BeEquivalentTo(hostChallenge);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.KeyVersion.Should().Be(keyVersion);
+        _ = result.Value.KeyIdentifier.Should().Be(keyId);
+        _ = result.Value.HostChallenge.Should().BeEquivalentTo(hostChallenge);
     }
 
     [Test]
@@ -36,9 +36,9 @@ public class InitializeUpdateCommandTests
 
         var result = InitializeUpdateCommand.Create(0x01, 0x00, hostChallenge);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Host challenge must be 8 bytes");
-        result.Error.Message.Should().Contain($"got {length}");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("Host challenge must be 8 bytes");
+        _ = result.Error.Message.Should().Contain($"got {length}");
     }
 
     [Test]
@@ -52,13 +52,13 @@ public class InitializeUpdateCommandTests
 
         var apdu = ApduBuilder.BuildApdu(command);
 
-        apdu[0].Should().Be(0x80); // CLA - GlobalPlatform
-        apdu[1].Should().Be(0x50); // INS - INITIALIZE UPDATE
-        apdu[2].Should().Be(keyVersion); // P1 - Key Version
-        apdu[3].Should().Be(keyId); // P2 - Key Identifier
-        apdu[4].Should().Be(0x08); // Lc - Data length
-        apdu[5..13].Should().BeEquivalentTo(hostChallenge); // Data - Host Challenge
-        apdu[13].Should().Be(28); // Le - Expected response length
+        _ = apdu[0].Should().Be(0x80); // CLA - GlobalPlatform
+        _ = apdu[1].Should().Be(0x50); // INS - INITIALIZE UPDATE
+        _ = apdu[2].Should().Be(keyVersion); // P1 - Key Version
+        _ = apdu[3].Should().Be(keyId); // P2 - Key Identifier
+        _ = apdu[4].Should().Be(0x08); // Lc - Data length
+        _ = apdu[5..13].Should().BeEquivalentTo(hostChallenge); // Data - Host Challenge
+        _ = apdu[13].Should().Be(28); // Le - Expected response length
     }
 
     [Test]
@@ -73,7 +73,7 @@ public class InitializeUpdateCommandTests
             var command = result.Value;
             var apdu = ApduBuilder.BuildApdu(command);
 
-            apdu[2].Should().Be(keyVersion); // P1
+            _ = apdu[2].Should().Be(keyVersion); // P1
         }
     }
 
@@ -89,7 +89,7 @@ public class InitializeUpdateCommandTests
             var command = result.Value;
             var apdu = ApduBuilder.BuildApdu(command);
 
-            apdu[3].Should().Be(keyId); // P2
+            _ = apdu[3].Should().Be(keyId); // P2
         }
     }
 
@@ -103,7 +103,7 @@ public class InitializeUpdateCommandTests
 
         var apdu = ApduBuilder.BuildApdu(command);
 
-        apdu[3].Should().Be(0x00); // P2 must be 0x00 for SCP03
+        _ = apdu[3].Should().Be(0x00); // P2 must be 0x00 for SCP03
     }
 
     [Test]
@@ -115,8 +115,8 @@ public class InitializeUpdateCommandTests
         var apdu1 = ApduBuilder.BuildApdu(command);
         var apdu2 = ApduBuilder.BuildApdu(command);
 
-        apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
-        apdu2.Should().BeEquivalentTo(apdu1); // But with same content
+        _ = apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
+        _ = apdu2.Should().BeEquivalentTo(apdu1); // But with same content
     }
 
     [Test]
@@ -128,7 +128,7 @@ public class InitializeUpdateCommandTests
 
         var resultString = command.ToString();
 
-        resultString.Should().Be("INITIALIZE UPDATE");
+        _ = resultString.Should().Be("INITIALIZE UPDATE");
     }
 
     [Test]
@@ -148,11 +148,11 @@ public class InitializeUpdateCommandTests
         var command = result.Value;
         var apdu = ApduBuilder.BuildApdu(command);
 
-        apdu.Length.Should().Be(14); // 5 header + 8 data + 1 Le
-        apdu[0].Should().Be(0x80); // CLA
-        apdu[1].Should().Be(0x50); // INS
-        apdu[4].Should().Be(0x08); // Lc
-        apdu[13].Should().Be(28); // Le (28 bytes expected)
+        _ = apdu.Length.Should().Be(14); // 5 header + 8 data + 1 Le
+        _ = apdu[0].Should().Be(0x80); // CLA
+        _ = apdu[1].Should().Be(0x50); // INS
+        _ = apdu[4].Should().Be(0x08); // Lc
+        _ = apdu[13].Should().Be(28); // Le (28 bytes expected)
     }
 
     [Test]
@@ -161,10 +161,10 @@ public class InitializeUpdateCommandTests
         var result = InitializeUpdateCommand.Create(0x01, 0x00, new byte[8]);
         var command = result.Value;
 
-        command.Cla.Should().Be(InitializeUpdateCommand.ClassByte);
-        command.Ins.Should().Be(InitializeUpdateCommand.InstructionByte);
-        InitializeUpdateCommand.ClassByte.Should().Be(0x80);
-        InitializeUpdateCommand.InstructionByte.Should().Be(0x50);
+        _ = command.Cla.Should().Be(InitializeUpdateCommand.ClassByte);
+        _ = command.Ins.Should().Be(InitializeUpdateCommand.InstructionByte);
+        _ = InitializeUpdateCommand.ClassByte.Should().Be(0x80);
+        _ = InitializeUpdateCommand.InstructionByte.Should().Be(0x50);
     }
 
     [Test]
@@ -174,8 +174,8 @@ public class InitializeUpdateCommandTests
         var result = InitializeUpdateCommand.Create(0x01, 0x00, originalChallenge);
         var command = result.Value;
 
-        command.HostChallenge.Should().NotBeNull();
-        command.HostChallenge.Length.Should().Be(8);
+        _ = command.HostChallenge.Should().NotBeNull();
+        _ = command.HostChallenge.Length.Should().Be(8);
     }
 
     [Test]
@@ -189,6 +189,6 @@ public class InitializeUpdateCommandTests
         originalChallenge[0] = 0xFF;
 
         // Command's host challenge should not be affected
-        command.HostChallenge[0].Should().Be(0x01);
+        _ = command.HostChallenge[0].Should().Be(0x01);
     }
 }

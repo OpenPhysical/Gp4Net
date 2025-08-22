@@ -77,14 +77,17 @@ public static class SecurityDomainDataParser
         return result.Count > 0 ? string.Join(", ", result) : Convert.ToHexString(data);
     }
 
-    private static string ParseLifecycleState(byte state) => state switch
+    private static string ParseLifecycleState(byte state)
     {
-        0x01 => "Loaded",
-        0x03 => "Installed",
-        0x07 => "Selectable",
-        0x0F => "Personalized",
-        0x83 => "Blocked",
-        0x87 => "Locked",
-        _ => $"0x{state:X2}"
-    };
+        return state switch
+        {
+            0x01 => "Loaded",
+            0x03 => "Installed",
+            0x07 => "Selectable",
+            0x0F => "Personalized",
+            0x83 => "Blocked",
+            0x87 => "Locked",
+            _ => $"0x{state:X2}"
+        };
+    }
 }

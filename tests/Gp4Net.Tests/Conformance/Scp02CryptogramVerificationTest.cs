@@ -29,7 +29,7 @@ public class Scp02CryptogramVerificationTest
 
         // Create key set
         var keySetResult = Scp02KeySet.Create(staticEncKey, staticMacKey, staticDekKey, 0x01);
-        keySetResult.IsSuccess.Should().BeTrue();
+        _ = keySetResult.IsSuccess.Should().BeTrue();
         var keySet = keySetResult.Value;
 
         // Build card cryptogram data exactly as in test vectors (32 bytes total)
@@ -40,7 +40,7 @@ public class Scp02CryptogramVerificationTest
         Console.WriteLine("=== Test 1: Direct Full 3DES MAC with S-ENC ===");
         var correctSEncKey = Convert.FromHexString("25C9794A1205FF244F5FA0378D2F8D59");
         var full3DesResult = CryptographicOperations.CalculateFull3DesMac(correctSEncKey, cardCryptogramData);
-        full3DesResult.IsSuccess.Should().BeTrue();
+        _ = full3DesResult.IsSuccess.Should().BeTrue();
         Console.WriteLine($"Full 3DES MAC with S-ENC key: {Convert.ToHexString(full3DesResult.Value)}");
         Console.WriteLine($"Expected:                     {Convert.ToHexString(expectedCardCryptogram)}");
         
@@ -53,30 +53,30 @@ public class Scp02CryptogramVerificationTest
             sequenceCounter,
             implementationParameter
         );
-        
-        sessionKeysResult.IsSuccess.Should().BeTrue();
+
+        _ = sessionKeysResult.IsSuccess.Should().BeTrue();
         var sessionKeys = sessionKeysResult.Value;
         var expectedSEncKey = Convert.FromHexString("25C9794A1205FF244F5FA0378D2F8D59");
         
         Console.WriteLine($"Session S-ENC: {Convert.ToHexString(sessionKeys.SEnc)}");
         Console.WriteLine($"Expected:      {Convert.ToHexString(expectedSEncKey)}");
-        sessionKeys.SEnc.SequenceEqual(expectedSEncKey).Should().BeTrue("Session S-ENC key mismatch");
+        _ = sessionKeys.SEnc.SequenceEqual(expectedSEncKey).Should().BeTrue("Session S-ENC key mismatch");
         
         // For i=15, S-MAC should be static
         Console.WriteLine($"Session S-MAC: {Convert.ToHexString(sessionKeys.SMac)}");
         Console.WriteLine($"Expected:      {Convert.ToHexString(staticMacKey)}");
-        sessionKeys.SMac.SequenceEqual(staticMacKey).Should().BeTrue("Session S-MAC key should be static for i=15");
+        _ = sessionKeys.SMac.SequenceEqual(staticMacKey).Should().BeTrue("Session S-MAC key should be static for i=15");
         
         // Test 3: Calculate cryptogram using protocol implementation with S-ENC key
         Console.WriteLine("\n=== Test 3: Cryptogram Calculation ===");
         var cryptogramResult = Scp02ProtocolImpl.CalculateCryptogramMac(sessionKeys.SEnc, cardCryptogramData);
-        cryptogramResult.IsSuccess.Should().BeTrue();
+        _ = cryptogramResult.IsSuccess.Should().BeTrue();
         
         Console.WriteLine($"Cryptogram with S-ENC: {Convert.ToHexString(cryptogramResult.Value)}");
         Console.WriteLine($"Expected:              {Convert.ToHexString(expectedCardCryptogram)}");
-        
+
         // This is the actual assertion that matters
-        cryptogramResult.Value.SequenceEqual(expectedCardCryptogram).Should().BeTrue("Card cryptogram mismatch");
+        _ = cryptogramResult.Value.SequenceEqual(expectedCardCryptogram).Should().BeTrue("Card cryptogram mismatch");
     }
     
     [Test]
@@ -88,19 +88,19 @@ public class Scp02CryptogramVerificationTest
         
         var full3DesResult = CryptographicOperations.CalculateFull3DesMac(testKey, testData);
         var retailMacResult = CryptographicOperations.CalculateRetailMac(testKey, testData);
-        
-        full3DesResult.IsSuccess.Should().BeTrue();
-        retailMacResult.IsSuccess.Should().BeTrue();
+
+        _ = full3DesResult.IsSuccess.Should().BeTrue();
+        _ = retailMacResult.IsSuccess.Should().BeTrue();
         
         Console.WriteLine($"Full 3DES MAC:  {Convert.ToHexString(full3DesResult.Value)}");
         Console.WriteLine($"Retail MAC:     {Convert.ToHexString(retailMacResult.Value)}");
-        
+
         // They should be different!
-        full3DesResult.Value.SequenceEqual(retailMacResult.Value).Should().BeFalse("Full 3DES and Retail MAC should produce different results");
+        _ = full3DesResult.Value.SequenceEqual(retailMacResult.Value).Should().BeFalse("Full 3DES and Retail MAC should produce different results");
         
         // And Scp02ProtocolImpl should use Full 3DES
         var protocolResult = Scp02ProtocolImpl.CalculateCryptogramMac(testKey, testData);
-        protocolResult.IsSuccess.Should().BeTrue();
-        protocolResult.Value.SequenceEqual(full3DesResult.Value).Should().BeTrue("Scp02ProtocolImpl should use Full 3DES MAC for cryptograms");
+        _ = protocolResult.IsSuccess.Should().BeTrue();
+        _ = protocolResult.Value.SequenceEqual(full3DesResult.Value).Should().BeTrue("Scp02ProtocolImpl should use Full 3DES MAC for cryptograms");
     }
 }

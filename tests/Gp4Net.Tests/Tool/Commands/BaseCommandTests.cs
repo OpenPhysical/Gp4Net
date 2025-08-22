@@ -35,7 +35,7 @@ public class BaseCommandTests
         _console = new TestConsole();
 
         // Setup the factory to return our mock service
-        _mockDomainServiceFactory
+        _ = _mockDomainServiceFactory
             .Setup(f => f.CreateGlobalPlatformService(It.IsAny<ICardService>()))
             .Returns(_mockGlobalPlatformService.Object);
 
@@ -64,7 +64,7 @@ public class BaseCommandTests
         var result = await _cliContext.RequireCardConnection("TestReader");
 
         // Assert
-        result.Should().BeEquivalentTo(_cliContext);
+        _ = result.Should().BeEquivalentTo(_cliContext);
         _mockCardService.Verify(s => s.Connect(It.IsAny<string>()), Times.Never);
     }
 
@@ -79,7 +79,7 @@ public class BaseCommandTests
         var result = await _cliContext.RequireCardConnection("TestReader");
 
         // Assert
-        result.Should().BeEquivalentTo(_cliContext);
+        _ = result.Should().BeEquivalentTo(_cliContext);
         _mockCardService.Verify(s => s.Connect("TestReader"), Times.Once);
     }
 
@@ -88,14 +88,14 @@ public class BaseCommandTests
     {
         // Arrange
         _ = _mockCardService.Setup(s => s.IsSecureChannelEstablished).Returns(false);
-        _ = _mockCardService.Setup(s => s.GetReaders()).Returns(new[] { "Reader1", "Reader2" });
+        _ = _mockCardService.Setup(s => s.GetReaders()).Returns(["Reader1", "Reader2"]);
         _ = _mockCardService.Setup(s => s.Connect("Reader1")).Returns(true);
 
         // Act
         var result = await _cliContext.RequireCardConnection("auto");
 
         // Assert
-        result.Should().BeEquivalentTo(_cliContext);
+        _ = result.Should().BeEquivalentTo(_cliContext);
         _mockCardService.Verify(s => s.Connect("Reader1"), Times.Once);
     }
 
@@ -104,11 +104,11 @@ public class BaseCommandTests
     {
         // Arrange
         _ = _mockCardService.Setup(s => s.IsSecureChannelEstablished).Returns(false);
-        _ = _mockCardService.Setup(s => s.GetReaders()).Returns(Array.Empty<string>());
+        _ = _mockCardService.Setup(s => s.GetReaders()).Returns([]);
 
         // Act & Assert
-        Action act = () => { var _ = _cliContext.RequireCardConnection("auto").GetAwaiter().GetResult(); };
-        act.Should().ThrowExactly<InvalidOperationException>();
+        Action act = () => { _ = _cliContext.RequireCardConnection("auto").GetAwaiter().GetResult(); };
+        _ = act.Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Test]
@@ -119,8 +119,8 @@ public class BaseCommandTests
         _ = _mockCardService.Setup(s => s.Connect(It.IsAny<string>())).Returns(false);
 
         // Act & Assert
-        Action act = () => { var _ = _cliContext.RequireCardConnection("TestReader").GetAwaiter().GetResult(); };
-        act.Should().ThrowExactly<InvalidOperationException>();
+        Action act = () => { _ = _cliContext.RequireCardConnection("TestReader").GetAwaiter().GetResult(); };
+        _ = act.Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Test]
@@ -133,7 +133,7 @@ public class BaseCommandTests
         var result = await _cliContext.RequireSecureChannel();
 
         // Assert
-        result.Should().BeEquivalentTo(_cliContext);
+        _ = result.Should().BeEquivalentTo(_cliContext);
         _mockCardService.Verify(
             s => s.EstablishSecureChannel(It.IsAny<byte[]>(), It.IsAny<byte>()),
             Times.Never
@@ -153,7 +153,7 @@ public class BaseCommandTests
         var result = await _cliContext.RequireSecureChannel(1);
 
         // Assert
-        result.Should().BeEquivalentTo(_cliContext);
+        _ = result.Should().BeEquivalentTo(_cliContext);
         _mockCardService.Verify(
             s => s.EstablishSecureChannel(It.IsAny<byte[]>(), (byte)1),
             Times.Once
@@ -170,8 +170,8 @@ public class BaseCommandTests
             .Returns(false);
 
         // Act & Assert
-        Action act = () => { var _ = _cliContext.RequireSecureChannel().GetAwaiter().GetResult(); };
-        act.Should().ThrowExactly<InvalidOperationException>();
+        Action act = () => { _ = _cliContext.RequireSecureChannel().GetAwaiter().GetResult(); };
+        _ = act.Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Test]
@@ -189,8 +189,8 @@ public class BaseCommandTests
         });
 
         // Assert
-        result.Should().Be(42);
-        executed.Should().BeTrue();
+        _ = result.Should().Be(42);
+        _ = executed.Should().BeTrue();
     }
 
     [Test]
@@ -207,8 +207,8 @@ public class BaseCommandTests
         });
 
         // Assert
-        result.Should().Be(42);
-        executed.Should().BeTrue();
+        _ = result.Should().Be(42);
+        _ = executed.Should().BeTrue();
     }
 
     [Test]
@@ -221,7 +221,7 @@ public class BaseCommandTests
             }));
 
         // Assert
-        result.Should().Be(1);
+        _ = result.Should().Be(1);
         _mockDisplayService.Verify(d => d.Exception(It.IsAny<Exception>()), Times.Once);
     }
 

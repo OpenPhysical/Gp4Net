@@ -39,7 +39,7 @@ public class ReaderNameTypeConverterTests
         var result = _converter.CanConvertFrom(null, typeof(string));
 
         // Assert
-        result.Should().BeTrue();
+        _ = result.Should().BeTrue();
     }
 
     [Test]
@@ -49,7 +49,7 @@ public class ReaderNameTypeConverterTests
         var result = _converter.CanConvertFrom(null, typeof(int));
 
         // Assert
-        result.Should().BeFalse();
+        _ = result.Should().BeFalse();
     }
 
     [Test]
@@ -63,10 +63,10 @@ public class ReaderNameTypeConverterTests
         var result = _converter.ConvertFrom(null, null, "auto") as Reader;
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Name.Should().Be("Test Reader 1");
-        result.IsAutoDetected.Should().BeTrue();
-        result.IsPartialMatch.Should().BeFalse();
+        _ = result.Should().NotBeNull();
+        _ = result!.Name.Should().Be("Test Reader 1");
+        _ = result.IsAutoDetected.Should().BeTrue();
+        _ = result.IsPartialMatch.Should().BeFalse();
     }
 
     [Test]
@@ -78,7 +78,7 @@ public class ReaderNameTypeConverterTests
         // Act & Assert
         Action act = () => _converter.ConvertFrom(null, null, "auto");
         var ex = act.Should().ThrowExactly<ArgumentException>().And;
-        ex.Message.Should().Contain("No card readers found");
+        _ = ex.Message.Should().Contain("No card readers found");
     }
 
     [Test]
@@ -104,10 +104,10 @@ public class ReaderNameTypeConverterTests
         var result = _converter.ConvertFrom(null, null, "Test Reader 1") as Reader;
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Name.Should().Be("Test Reader 1");
-        result.IsAutoDetected.Should().BeFalse();
-        result.IsPartialMatch.Should().BeFalse();
+        _ = result.Should().NotBeNull();
+        _ = result!.Name.Should().Be("Test Reader 1");
+        _ = result.IsAutoDetected.Should().BeFalse();
+        _ = result.IsPartialMatch.Should().BeFalse();
     }
 
     [Test]
@@ -121,10 +121,10 @@ public class ReaderNameTypeConverterTests
         var result = _converter.ConvertFrom(null, null, "test READER 1") as Reader;
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Name.Should().Be("Test Reader 1");
-        result.IsAutoDetected.Should().BeFalse();
-        result.IsPartialMatch.Should().BeFalse();
+        _ = result.Should().NotBeNull();
+        _ = result!.Name.Should().Be("Test Reader 1");
+        _ = result.IsAutoDetected.Should().BeFalse();
+        _ = result.IsPartialMatch.Should().BeFalse();
     }
 
     [Test]
@@ -138,10 +138,10 @@ public class ReaderNameTypeConverterTests
         var result = _converter.ConvertFrom(null, null, "SCR3500") as Reader;
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Name.Should().Be("Identiv SCR3500 Contact Reader");
-        result.IsAutoDetected.Should().BeFalse();
-        result.IsPartialMatch.Should().BeTrue();
+        _ = result.Should().NotBeNull();
+        _ = result!.Name.Should().Be("Identiv SCR3500 Contact Reader");
+        _ = result.IsAutoDetected.Should().BeFalse();
+        _ = result.IsPartialMatch.Should().BeTrue();
     }
 
     [Test]
@@ -155,10 +155,10 @@ public class ReaderNameTypeConverterTests
         var result = _converter.ConvertFrom(null, null, "scr3500") as Reader;
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Name.Should().Be("Identiv SCR3500 Contact Reader");
-        result.IsAutoDetected.Should().BeFalse();
-        result.IsPartialMatch.Should().BeTrue();
+        _ = result.Should().NotBeNull();
+        _ = result!.Name.Should().Be("Identiv SCR3500 Contact Reader");
+        _ = result.IsAutoDetected.Should().BeFalse();
+        _ = result.IsPartialMatch.Should().BeTrue();
     }
 
     [Test]
@@ -181,7 +181,7 @@ public class ReaderNameTypeConverterTests
         // Act & Assert
         Action act = () => _converter.ConvertFrom(null, null, "NonExistent");
         var ex = act.Should().ThrowExactly<ArgumentException>().And;
-        ex.Message.Should().Contain("Reader 'NonExistent' not found");
+        _ = ex.Message.Should().Contain("Reader 'NonExistent' not found");
     }
 
     [Test]
@@ -195,9 +195,9 @@ public class ReaderNameTypeConverterTests
         var result = _converter.ConvertFrom(null, null, null) as Reader;
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Name.Should().Be("Test Reader");
-        result.IsAutoDetected.Should().BeTrue();
+        _ = result.Should().NotBeNull();
+        _ = result!.Name.Should().Be("Test Reader");
+        _ = result.IsAutoDetected.Should().BeTrue();
     }
 
     [Test]
@@ -211,9 +211,9 @@ public class ReaderNameTypeConverterTests
         var result = _converter.ConvertFrom(null, null, "") as Reader;
 
         // Assert
-        result.Should().NotBeNull();
-        result!.Name.Should().Be("Test Reader");
-        result.IsAutoDetected.Should().BeTrue();
+        _ = result.Should().NotBeNull();
+        _ = result!.Name.Should().Be("Test Reader");
+        _ = result.IsAutoDetected.Should().BeTrue();
     }
 
     [Test]
@@ -221,7 +221,7 @@ public class ReaderNameTypeConverterTests
     {
         // Act & Assert
         Action act = () => _converter.ConvertFrom(null, null, 123);
-        act.Should().ThrowExactly<NotSupportedException>();
+        _ = act.Should().ThrowExactly<NotSupportedException>();
     }
 
     [Test]
@@ -236,7 +236,7 @@ public class ReaderNameTypeConverterTests
 
         // Act & Assert
         Action act = () => _converter.ConvertFrom(null, null, "auto");
-        act.Should().ThrowExactly<InvalidOperationException>();
+        _ = act.Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Test]
@@ -259,8 +259,8 @@ public class ReaderNameTypeConverterTests
             readerProperty?.Attributes[typeof(DefaultValueAttribute)] as DefaultValueAttribute;
 
         // Assert
-        defaultValue.Should().NotBeNull();
-        defaultValue!.Value.Should().Be("auto");
+        _ = defaultValue.Should().NotBeNull();
+        _ = defaultValue!.Value.Should().Be("auto");
     }
 
     // Test helper class

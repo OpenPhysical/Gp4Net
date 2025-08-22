@@ -41,7 +41,7 @@ public static class SecurityDomainInfoCodec
         // OID (9F70) - two-byte tag
         if (sdInfo.Oid != null)
         {
-            WriteTlvWithTag(contentStream, new byte[] { 0x9F, 0x70 }, sdInfo.Oid);
+            WriteTlvWithTag(contentStream, [0x9F, 0x70], sdInfo.Oid);
         }
             
         // Security Domain AID (if present)
@@ -63,21 +63,20 @@ public static class SecurityDomainInfoCodec
         }
             
         var content = contentStream.ToArray();
-            
-        // Write length
-        if (content.Length <= 127)
+
+        switch (content.Length)
         {
-            stream.WriteByte((byte)content.Length);
-        }
-        else if (content.Length <= 255)
-        {
-            stream.WriteByte(0x81);
-            stream.WriteByte((byte)content.Length);
-        }
-        else
-        {
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidData("Security domain information too large for encoding"));
+            // Write length
+            case <= 127:
+                stream.WriteByte((byte)content.Length);
+                break;
+            case <= 255:
+                stream.WriteByte(0x81);
+                stream.WriteByte((byte)content.Length);
+                break;
+            default:
+                return Result.Failure<byte[], SmartCardError>(
+                    SmartCardError.InvalidData("Security domain information too large for encoding"));
         }
             
         // Write content
@@ -115,38 +114,41 @@ public static class SecurityDomainInfoCodec
                 
             foreach (var element in elements)
             {
-                // Handle two-byte tags for OID (9F70)
-                if (element.Tag.Length == 2 && element.Tag[0] == 0x9F && element.Tag[1] == 0x70)
+                switch (element.Tag.Length)
                 {
-                    // Only set OID if it has actual content
-                    if (element.Value.Length > 0)
+                    // Handle two-byte tags for OID (9F70)
+                    case 2 when element.Tag[0] == 0x9F && element.Tag[1] == 0x70:
                     {
-                        sdInfo.Oid = element.Value;
+                        // Only set OID if it has actual content
+                        if (element.Value.Length > 0)
+                        {
+                            sdInfo.Oid = element.Value;
+                        }
+                        break;
                     }
-                }
-                else if (element.Tag.Length == 1)
-                {
-                    switch (element.TagNumber)
-                    {
-                        case 0xC5: // Image data
-                            sdInfo.ImageData = element.Value;
-                            break;
+                    case 1:
+                        switch (element.TagNumber)
+                        {
+                            case 0xC5: // Image data
+                                sdInfo.ImageData = element.Value;
+                                break;
                                 
-                        case 0xC4: // Life cycle data
-                            sdInfo.LifeCycleData = element.Value;
-                            break;
+                            case 0xC4: // Life cycle data
+                                sdInfo.LifeCycleData = element.Value;
+                                break;
                                 
-                        default:
-                            // Could be AID data - store as SecurityDomainAid if not yet set
-                            if (sdInfo.SecurityDomainAid == null && element.Length > 0)
-                            {
-                                // Reconstruct TLV format for AID
-                                using var aidStream = new MemoryStream();
-                                WriteTlv(aidStream, (byte)element.TagNumber, element.Value);
-                                sdInfo.SecurityDomainAid = aidStream.ToArray();
-                            }
-                            break;
-                    }
+                            default:
+                                // Could be AID data - store as SecurityDomainAid if not yet set
+                                if (sdInfo.SecurityDomainAid == null && element.Length > 0)
+                                {
+                                    // Reconstruct TLV format for AID
+                                    using var aidStream = new MemoryStream();
+                                    WriteTlv(aidStream, (byte)element.TagNumber, element.Value);
+                                    sdInfo.SecurityDomainAid = aidStream.ToArray();
+                                }
+                                break;
+                        }
+                        break;
                 }
             }
                 
@@ -161,20 +163,19 @@ public static class SecurityDomainInfoCodec
     private static void WriteTlv(Stream stream, byte tag, byte[] value)
     {
         stream.WriteByte(tag);
-        
-        // Write length
-        if (value.Length <= 127)
+
+        switch (value.Length)
         {
-            stream.WriteByte((byte)value.Length);
-        }
-        else if (value.Length <= 255)
-        {
-            stream.WriteByte(0x81);
-            stream.WriteByte((byte)value.Length);
-        }
-        else
-        {
-            throw new ArgumentException($"Value too long for simple TLV encoding: {value.Length} bytes");
+            // Write length
+            case <= 127:
+                stream.WriteByte((byte)value.Length);
+                break;
+            case <= 255:
+                stream.WriteByte(0x81);
+                stream.WriteByte((byte)value.Length);
+                break;
+            default:
+                throw new ArgumentException($"Value too long for simple TLV encoding: {value.Length} bytes");
         }
         
         stream.Write(value, 0, value.Length);
@@ -183,20 +184,19 @@ public static class SecurityDomainInfoCodec
     private static void WriteTlvWithTag(Stream stream, byte[] tag, byte[] value)
     {
         stream.Write(tag, 0, tag.Length);
-        
-        // Write length
-        if (value.Length <= 127)
+
+        switch (value.Length)
         {
-            stream.WriteByte((byte)value.Length);
-        }
-        else if (value.Length <= 255)
-        {
-            stream.WriteByte(0x81);
-            stream.WriteByte((byte)value.Length);
-        }
-        else
-        {
-            throw new ArgumentException($"Value too long for simple TLV encoding: {value.Length} bytes");
+            // Write length
+            case <= 127:
+                stream.WriteByte((byte)value.Length);
+                break;
+            case <= 255:
+                stream.WriteByte(0x81);
+                stream.WriteByte((byte)value.Length);
+                break;
+            default:
+                throw new ArgumentException($"Value too long for simple TLV encoding: {value.Length} bytes");
         }
         
         stream.Write(value, 0, value.Length);

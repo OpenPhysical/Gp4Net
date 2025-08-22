@@ -52,7 +52,7 @@ public class TraceReplayCard : IVirtualCard
         _patternMatches = new Dictionary<string, List<ApduResponse>>(
             StringComparer.OrdinalIgnoreCase
         );
-        _executedExchanges = new List<ApduExchange>();
+        _executedExchanges = [];
         _strictMode = strictMode;
         _exchangeIndex = 0;
 
@@ -72,7 +72,7 @@ public class TraceReplayCard : IVirtualCard
         if (command == null || command.Length < 4)
         {
             var errorResponse = ApduResponse.Error(0x6700); // Wrong length
-            RecordExchange(command ?? Array.Empty<byte>(), errorResponse);
+            RecordExchange(command ?? [], errorResponse);
             return errorResponse;
         }
 
@@ -144,7 +144,7 @@ public class TraceReplayCard : IVirtualCard
             var patternKey = GetPatternKey(exchange.Command);
             if (!_patternMatches.ContainsKey(patternKey))
             {
-                _patternMatches[patternKey] = new List<ApduResponse>();
+                _patternMatches[patternKey] = [];
             }
             _patternMatches[patternKey].Add(exchange.Response);
         }

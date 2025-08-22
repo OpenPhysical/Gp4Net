@@ -166,7 +166,7 @@ public sealed class SecureKeyStore
     /// </summary>
     public ImmutableArray<string> ListKeyIds()
     {
-        return _keys.Keys.ToImmutableArray();
+        return [.._keys.Keys];
     }
 
     /// <summary>

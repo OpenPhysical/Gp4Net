@@ -134,12 +134,15 @@ public class SelectCommand : BaseApduCommand
             );
         }
 
-        var control = mode == SelectMode.First
-            ? SelectionControl.SelectByName
-            : SelectionControl.SelectByName; // Note: mode affects P2, not P1
+        // GP Card Specification v2.3.1 Table 11-80: P1 is always SelectByName (0x04) for AID selection
+        var control = SelectionControl.SelectByName;
+        
+        // GP Card Specification v2.3.1 Table 11-81: P2 parameter for SELECT command
+        // 0x00 = First or only occurrence
+        // 0x02 = Next occurrence
         var controlInfo = mode == SelectMode.First
-            ? FileControlInfo.ReturnFci
-            : (FileControlInfo)((byte)FileControlInfo.ReturnFci | (byte)mode);
+            ? FileControlInfo.ReturnFci      // 0x00 = First occurrence
+            : (FileControlInfo)SelectMode.Next;  // 0x02 = Next occurrence
 
         return Result.Success<SelectCommand, SmartCardError>(
             new SelectCommand(aid, control, controlInfo)
@@ -153,6 +156,35 @@ public class SelectCommand : BaseApduCommand
     public static Result<SelectCommand, SmartCardError> CreateForIssuerSecurityDomain()
     {
         return Create([], SelectMode.First);
+    }
+
+    /// <summary>
+    /// Internal factory to construct a SELECT command with explicit mode and control info.
+    /// </summary>
+    internal static Result<SelectCommand, SmartCardError> CreateWith(
+        byte[] aid,
+        SelectMode mode,
+        FileControlInfo controlInfo)
+    {
+        if (aid == null)
+        {
+            return Result.Failure<SelectCommand, SmartCardError>(
+                new InvalidDataError("AID", "cannot be null")
+            );
+        }
+
+        if (aid.Length > 16)
+        {
+            return Result.Failure<SelectCommand, SmartCardError>(
+                new InvalidLengthError("AID", 16, aid.Length)
+            );
+        }
+
+        var control = SelectionControl.SelectByName;
+
+        return Result.Success<SelectCommand, SmartCardError>(
+            new SelectCommand((byte[])aid.Clone(), control, controlInfo)
+        );
     }
 
 
@@ -215,7 +247,10 @@ public class SelectCommand : BaseApduCommand
     /// Returns a string representation of this command.
     /// </summary>
     /// <returns>The string "SELECT".</returns>
-    public override string ToString() => "SELECT";
+    public override string ToString()
+    {
+        return "SELECT";
+    }
 }
 
 /// <summary>
@@ -418,7 +453,14 @@ public class SelectResponse
                         applicationAid = tlv.Value;
                         break;
                     case 0x50: // Application Label
-                        applicationLabel = System.Text.Encoding.UTF8.GetString(tlv.Value);
+                        // Per ISO 7816-4 and GP specifications, application labels must be ASCII
+                        var labelResult = EncodingUtils.SafeAsciiDecode(tlv.Value);
+                        if (labelResult.IsFailure)
+                        {
+                            // Invalid encoding - skip this label (return null FCI to indicate parsing failure)
+                            return null;
+                        }
+                        applicationLabel = labelResult.Value;
                         break;
                     case 0x87: // Application Priority Indicator
                         if (tlv.Value.Length > 0)
@@ -483,24 +525,26 @@ public class SelectResponse
             switch (tlv.TagNumber)
             {
                 case 0x9F65: // Maximum length of data field in command message
-                    if (tlv.Value.Length == 1)
+                    switch (tlv.Value.Length)
                     {
-                        maxCommandDataLength = tlv.Value[0];
-                    }
-                    else if (tlv.Value.Length == 2)
-                    {
-                        maxCommandDataLength = (ushort)((tlv.Value[0] << 8) | tlv.Value[1]);
+                        case 1:
+                            maxCommandDataLength = tlv.Value[0];
+                            break;
+                        case 2:
+                            maxCommandDataLength = (ushort)((tlv.Value[0] << 8) | tlv.Value[1]);
+                            break;
                     }
 
                     break;
                 case 0x9F66: // Maximum length of data field in response message
-                    if (tlv.Value.Length == 1)
+                    switch (tlv.Value.Length)
                     {
-                        maxResponseDataLength = tlv.Value[0];
-                    }
-                    else if (tlv.Value.Length == 2)
-                    {
-                        maxResponseDataLength = (ushort)((tlv.Value[0] << 8) | tlv.Value[1]);
+                        case 1:
+                            maxResponseDataLength = tlv.Value[0];
+                            break;
+                        case 2:
+                            maxResponseDataLength = (ushort)((tlv.Value[0] << 8) | tlv.Value[1]);
+                            break;
                     }
 
                     break;

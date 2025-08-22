@@ -209,14 +209,20 @@ public class OpidValidationResult
     /// Creates a successful validation result.
     /// </summary>
     /// <returns>A successful validation result.</returns>
-    public static OpidValidationResult Success() => new(true, null);
+    public static OpidValidationResult Success()
+    {
+        return new(true, null);
+    }
 
     /// <summary>
     /// Creates a failed validation result with an error message.
     /// </summary>
     /// <param name="errorMessage">The error message.</param>
     /// <returns>A failed validation result.</returns>
-    public static OpidValidationResult Failure(string errorMessage) => new(false, errorMessage);
+    public static OpidValidationResult Failure(string errorMessage)
+    {
+        return new(false, errorMessage);
+    }
 
     /// <summary>
     /// Returns a string representation of the validation result.

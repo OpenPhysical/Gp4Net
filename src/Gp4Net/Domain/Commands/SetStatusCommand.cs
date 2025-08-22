@@ -18,7 +18,7 @@ public sealed class SetStatusCommand : BaseApduCommand
     {
         _p1 = p1;
         _p2 = p2;
-        _data = data ?? Array.Empty<byte>();
+        _data = data ?? [];
     }
 
     /// <inheritdoc/>
@@ -57,7 +57,7 @@ public sealed class SetStatusCommand : BaseApduCommand
         byte p2 = 0x00;
 
         // For card-level operations (empty AID), we send a zero-length data field
-        byte[] data = aid.Length > 0 ? aid : Array.Empty<byte>();
+        byte[] data = aid.Length > 0 ? aid : [];
 
         return Result.Success<SetStatusCommand, SmartCardError>(
             new SetStatusCommand(p1, p2, data));
@@ -101,13 +101,17 @@ public sealed class SetStatusCommand : BaseApduCommand
     /// Creates a SET STATUS command for card lock.
     /// </summary>
     /// <returns>The command or an error.</returns>
-    public static Result<SetStatusCommand, SmartCardError> CreateForCardLock() =>
-        Create(Array.Empty<byte>(), 0x7F);
+    public static Result<SetStatusCommand, SmartCardError> CreateForCardLock()
+    {
+        return Create([], 0x7F);
+    }
 
     /// <summary>
     /// Creates a SET STATUS command for card termination.
     /// </summary>
     /// <returns>The command or an error.</returns>
-    public static Result<SetStatusCommand, SmartCardError> CreateForCardTerminate() =>
-        Create(Array.Empty<byte>(), 0xFF);
+    public static Result<SetStatusCommand, SmartCardError> CreateForCardTerminate()
+    {
+        return Create([], 0xFF);
+    }
 }

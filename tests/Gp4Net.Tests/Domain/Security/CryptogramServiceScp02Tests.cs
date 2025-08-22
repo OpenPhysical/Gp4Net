@@ -40,8 +40,8 @@ public class CryptogramServiceScp02Tests
             ScpVersion.Scp02);
 
         // Assert - This test MUST fail if SCP02 is not properly supported
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("SCP02 card cryptogram requires sequence counter");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("SCP02 card cryptogram requires sequence counter");
     }
 
     [Test]
@@ -62,8 +62,8 @@ public class CryptogramServiceScp02Tests
             ScpVersion.Scp02);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("SCP02 sequence counter must be 2 bytes");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("SCP02 sequence counter must be 2 bytes");
     }
 
     [Test]
@@ -84,8 +84,8 @@ public class CryptogramServiceScp02Tests
             ScpVersion.Scp02);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().HaveCount(8); // Cryptogram should be 8 bytes
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Should().HaveCount(8); // Cryptogram should be 8 bytes
     }
 
     [Test]
@@ -106,8 +106,8 @@ public class CryptogramServiceScp02Tests
             ScpVersion.Scp02);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("SCP02 host cryptogram requires sequence counter");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("SCP02 host cryptogram requires sequence counter");
     }
 
     [Test]
@@ -128,8 +128,8 @@ public class CryptogramServiceScp02Tests
             ScpVersion.Scp02);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("SCP02 card challenge must be 6 bytes");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("SCP02 card challenge must be 6 bytes");
     }
 
     [Test]
@@ -147,10 +147,10 @@ public class CryptogramServiceScp02Tests
             ScpVersion.Scp02);
 
         // Assert - Generic method should work without sequence counter
-        result.IsSuccess.Should().BeTrue($"Expected success but got error: {(result.IsFailure ? result.Error.Message : "unknown")}");
+        _ = result.IsSuccess.Should().BeTrue($"Expected success but got error: {(result.IsFailure ? result.Error.Message : "unknown")}");
         if (result.IsSuccess)
         {
-            result.Value.Should().HaveCount(8);
+            _ = result.Value.Should().HaveCount(8);
         }
     }
 }

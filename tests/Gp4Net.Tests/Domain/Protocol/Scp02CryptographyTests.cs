@@ -39,16 +39,16 @@ public class Scp02CryptographyTests
         var result = Scp02Cryptography.DeriveScp02SessionKey(_masterKey, encConstant, _sequenceCounter);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var derivedKey = result.Value;
         
-        TestContext.WriteLine($"Master Key:       {Convert.ToHexString(_masterKey)}");
-        TestContext.WriteLine($"Derivation Const: {Convert.ToHexString(encConstant)}");
-        TestContext.WriteLine($"Sequence Counter: {Convert.ToHexString(_sequenceCounter)}");
-        TestContext.WriteLine($"Expected S-ENC:   {Convert.ToHexString(_expectedSessionEnc)}");
-        TestContext.WriteLine($"Actual S-ENC:     {Convert.ToHexString(derivedKey)}");
-        
-        derivedKey.Should().Equal(_expectedSessionEnc);
+        TestContext.Out.WriteLine($"Master Key:       {Convert.ToHexString(_masterKey)}");
+        TestContext.Out.WriteLine($"Derivation Const: {Convert.ToHexString(encConstant)}");
+        TestContext.Out.WriteLine($"Sequence Counter: {Convert.ToHexString(_sequenceCounter)}");
+        TestContext.Out.WriteLine($"Expected S-ENC:   {Convert.ToHexString(_expectedSessionEnc)}");
+        TestContext.Out.WriteLine($"Actual S-ENC:     {Convert.ToHexString(derivedKey)}");
+
+        _ = derivedKey.Should().Equal(_expectedSessionEnc);
     }
 
     [Test]
@@ -61,16 +61,16 @@ public class Scp02CryptographyTests
         var result = Scp02Cryptography.DeriveScp02SessionKey(_masterKey, macConstant, _sequenceCounter);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var derivedKey = result.Value;
         
-        TestContext.WriteLine($"Master Key:       {Convert.ToHexString(_masterKey)}");
-        TestContext.WriteLine($"Derivation Const: {Convert.ToHexString(macConstant)}");
-        TestContext.WriteLine($"Sequence Counter: {Convert.ToHexString(_sequenceCounter)}");
-        TestContext.WriteLine($"Expected S-MAC:   {Convert.ToHexString(_expectedSessionMac)}");
-        TestContext.WriteLine($"Actual S-MAC:     {Convert.ToHexString(derivedKey)}");
-        
-        derivedKey.Should().Equal(_expectedSessionMac);
+        TestContext.Out.WriteLine($"Master Key:       {Convert.ToHexString(_masterKey)}");
+        TestContext.Out.WriteLine($"Derivation Const: {Convert.ToHexString(macConstant)}");
+        TestContext.Out.WriteLine($"Sequence Counter: {Convert.ToHexString(_sequenceCounter)}");
+        TestContext.Out.WriteLine($"Expected S-MAC:   {Convert.ToHexString(_expectedSessionMac)}");
+        TestContext.Out.WriteLine($"Actual S-MAC:     {Convert.ToHexString(derivedKey)}");
+
+        _ = derivedKey.Should().Equal(_expectedSessionMac);
     }
 
     [Test]
@@ -81,20 +81,20 @@ public class Scp02CryptographyTests
             _hostChallenge, _sequenceCounter, _cardChallenge);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var cryptogramData = result.Value;
-        
+
         // Expected: Host Challenge (8) || Sequence Counter (2) || Card Challenge (6) || Padding
-        cryptogramData.Length.Should().Be(24);
-        
+        _ = cryptogramData.Length.Should().Be(24);
+
         // Verify structure
-        cryptogramData[..8].Should().Equal(_hostChallenge);
-        cryptogramData[8..10].Should().Equal(_sequenceCounter);
-        cryptogramData[10..16].Should().Equal(_cardChallenge);
-        cryptogramData[16].Should().Be(0x80); // ISO padding
-        cryptogramData[17..].Should().Equal(new byte[7]); // Zeros
+        _ = cryptogramData[..8].Should().Equal(_hostChallenge);
+        _ = cryptogramData[8..10].Should().Equal(_sequenceCounter);
+        _ = cryptogramData[10..16].Should().Equal(_cardChallenge);
+        _ = cryptogramData[16].Should().Be(0x80); // ISO padding
+        _ = cryptogramData[17..].Should().Equal(new byte[7]); // Zeros
         
-        TestContext.WriteLine($"Card Cryptogram Data: {Convert.ToHexString(cryptogramData)}");
+        TestContext.Out.WriteLine($"Card Cryptogram Data: {Convert.ToHexString(cryptogramData)}");
     }
 
     [Test]
@@ -103,22 +103,22 @@ public class Scp02CryptographyTests
         // Arrange - Build card cryptogram data
         var cryptogramDataResult = Scp02Cryptography.BuildScp02CardCryptogramData(
             _hostChallenge, _sequenceCounter, _cardChallenge);
-        cryptogramDataResult.IsSuccess.Should().BeTrue();
+        _ = cryptogramDataResult.IsSuccess.Should().BeTrue();
         var cryptogramData = cryptogramDataResult.Value;
 
         // Act - Calculate cryptogram using S-ENC key (per SCP02 spec)
         var result = Scp02Cryptography.CalculateScp02Cryptogram(_expectedSessionEnc, cryptogramData);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var mac = result.Value;
         
-        TestContext.WriteLine($"Cryptogram Data:      {Convert.ToHexString(cryptogramData)}");
-        TestContext.WriteLine($"S-ENC Key:            {Convert.ToHexString(_expectedSessionEnc)}");
-        TestContext.WriteLine($"Expected Cryptogram:  {Convert.ToHexString(_expectedCardCryptogram)}");
-        TestContext.WriteLine($"Actual Cryptogram:    {Convert.ToHexString(mac)}");
-        
-        mac.Should().Equal(_expectedCardCryptogram);
+        TestContext.Out.WriteLine($"Cryptogram Data:      {Convert.ToHexString(cryptogramData)}");
+        TestContext.Out.WriteLine($"S-ENC Key:            {Convert.ToHexString(_expectedSessionEnc)}");
+        TestContext.Out.WriteLine($"Expected Cryptogram:  {Convert.ToHexString(_expectedCardCryptogram)}");
+        TestContext.Out.WriteLine($"Actual Cryptogram:    {Convert.ToHexString(mac)}");
+
+        _ = mac.Should().Equal(_expectedCardCryptogram);
     }
 
     [Test]
@@ -129,20 +129,20 @@ public class Scp02CryptographyTests
             _sequenceCounter, _cardChallenge, _hostChallenge);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var cryptogramData = result.Value;
-        
+
         // Expected: Sequence Counter (2) || Card Challenge (6) || Host Challenge (8) || Padding
-        cryptogramData.Length.Should().Be(24);
-        
+        _ = cryptogramData.Length.Should().Be(24);
+
         // Verify structure
-        cryptogramData[..2].Should().Equal(_sequenceCounter);
-        cryptogramData[2..8].Should().Equal(_cardChallenge);
-        cryptogramData[8..16].Should().Equal(_hostChallenge);
-        cryptogramData[16].Should().Be(0x80); // ISO padding
-        cryptogramData[17..].Should().Equal(new byte[7]); // Zeros
+        _ = cryptogramData[..2].Should().Equal(_sequenceCounter);
+        _ = cryptogramData[2..8].Should().Equal(_cardChallenge);
+        _ = cryptogramData[8..16].Should().Equal(_hostChallenge);
+        _ = cryptogramData[16].Should().Be(0x80); // ISO padding
+        _ = cryptogramData[17..].Should().Equal(new byte[7]); // Zeros
         
-        TestContext.WriteLine($"Host Cryptogram Data: {Convert.ToHexString(cryptogramData)}");
+        TestContext.Out.WriteLine($"Host Cryptogram Data: {Convert.ToHexString(cryptogramData)}");
     }
 
     [Test]
@@ -151,22 +151,22 @@ public class Scp02CryptographyTests
         // Arrange - Build host cryptogram data
         var cryptogramDataResult = Scp02Cryptography.BuildScp02HostCryptogramData(
             _sequenceCounter, _cardChallenge, _hostChallenge);
-        cryptogramDataResult.IsSuccess.Should().BeTrue();
+        _ = cryptogramDataResult.IsSuccess.Should().BeTrue();
         var cryptogramData = cryptogramDataResult.Value;
 
         // Act - Calculate cryptogram using S-ENC key (per SCP02 spec)
         var result = Scp02Cryptography.CalculateScp02Cryptogram(_expectedSessionEnc, cryptogramData);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var mac = result.Value;
         
-        TestContext.WriteLine($"Cryptogram Data:      {Convert.ToHexString(cryptogramData)}");
-        TestContext.WriteLine($"S-ENC Key:            {Convert.ToHexString(_expectedSessionEnc)}");
-        TestContext.WriteLine($"Expected Cryptogram:  {Convert.ToHexString(_expectedHostCryptogram)}");
-        TestContext.WriteLine($"Actual Cryptogram:    {Convert.ToHexString(mac)}");
-        
-        mac.Should().Equal(_expectedHostCryptogram);
+        TestContext.Out.WriteLine($"Cryptogram Data:      {Convert.ToHexString(cryptogramData)}");
+        TestContext.Out.WriteLine($"S-ENC Key:            {Convert.ToHexString(_expectedSessionEnc)}");
+        TestContext.Out.WriteLine($"Expected Cryptogram:  {Convert.ToHexString(_expectedHostCryptogram)}");
+        TestContext.Out.WriteLine($"Actual Cryptogram:    {Convert.ToHexString(mac)}");
+
+        _ = mac.Should().Equal(_expectedHostCryptogram);
     }
 
     [Test]
@@ -179,12 +179,12 @@ public class Scp02CryptographyTests
         var paddedResult = Scp02Cryptography.ApplyIso7816Padding(data, 8);
 
         // Assert
-        paddedResult.IsSuccess.Should().BeTrue();
+        _ = paddedResult.IsSuccess.Should().BeTrue();
         var padded = paddedResult.Value;
-        padded.Length.Should().Be(8);
-        padded[0..3].Should().Equal(data);
-        padded[3].Should().Be(0x80);
-        padded[4..].Should().Equal(new byte[4]);
+        _ = padded.Length.Should().Be(8);
+        _ = padded[0..3].Should().Equal(data);
+        _ = padded[3].Should().Be(0x80);
+        _ = padded[4..].Should().Equal(new byte[4]);
     }
 
     // Removed: DeriveScp02SessionKey_WithNullBaseKey_ShouldFailHard
@@ -203,7 +203,7 @@ public class Scp02CryptographyTests
         var encConstant = Convert.FromHexString("0182");
         var testCases = new[]
         {
-            (new byte[0], "Empty key"),
+            ([], "Empty key"),
             (new byte[8], "8-byte key"),
             (new byte[12], "12-byte key"),
             (new byte[24], "24-byte key"),
@@ -214,14 +214,14 @@ public class Scp02CryptographyTests
         {
             // Act
             var result = Scp02Cryptography.DeriveScp02SessionKey(invalidKey, encConstant, _sequenceCounter);
-            
+
             // Assert
-            result.IsFailure.Should().BeTrue($"{description} should be rejected");
-            result.Error.Should().BeOfType<InvalidLengthError>();
+            _ = result.IsFailure.Should().BeTrue($"{description} should be rejected");
+            _ = result.Error.Should().BeOfType<InvalidLengthError>();
             var lengthError = (InvalidLengthError)result.Error;
-            lengthError.Expected.Should().Be(16);
+            _ = lengthError.Expected.Should().Be(16);
             
-            TestContext.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
+            TestContext.Out.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
         }
     }
 
@@ -231,7 +231,7 @@ public class Scp02CryptographyTests
         // Arrange
         var testCases = new[]
         {
-            (new byte[0], "Empty derivation constant"),
+            ([], "Empty derivation constant"),
             (new byte[1], "1-byte derivation constant"),
             (new byte[3], "3-byte derivation constant"),
             (new byte[4], "4-byte derivation constant")
@@ -241,14 +241,14 @@ public class Scp02CryptographyTests
         {
             // Act
             var result = Scp02Cryptography.DeriveScp02SessionKey(_masterKey, invalidConstant, _sequenceCounter);
-            
+
             // Assert
-            result.IsFailure.Should().BeTrue($"{description} should be rejected");
-            result.Error.Should().BeOfType<InvalidLengthError>();
+            _ = result.IsFailure.Should().BeTrue($"{description} should be rejected");
+            _ = result.Error.Should().BeOfType<InvalidLengthError>();
             var lengthError = (InvalidLengthError)result.Error;
-            lengthError.Expected.Should().Be(2);
+            _ = lengthError.Expected.Should().Be(2);
             
-            TestContext.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
+            TestContext.Out.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
         }
     }
 
@@ -259,7 +259,7 @@ public class Scp02CryptographyTests
         var encConstant = Convert.FromHexString("0182");
         var testCases = new[]
         {
-            (new byte[0], "Empty sequence counter"),
+            ([], "Empty sequence counter"),
             (new byte[1], "1-byte sequence counter"),
             (new byte[3], "3-byte sequence counter"),
             (new byte[4], "4-byte sequence counter")
@@ -269,14 +269,14 @@ public class Scp02CryptographyTests
         {
             // Act
             var result = Scp02Cryptography.DeriveScp02SessionKey(_masterKey, encConstant, invalidCounter);
-            
+
             // Assert
-            result.IsFailure.Should().BeTrue($"{description} should be rejected");
-            result.Error.Should().BeOfType<InvalidLengthError>();
+            _ = result.IsFailure.Should().BeTrue($"{description} should be rejected");
+            _ = result.Error.Should().BeOfType<InvalidLengthError>();
             var lengthError = (InvalidLengthError)result.Error;
-            lengthError.Expected.Should().Be(2);
+            _ = lengthError.Expected.Should().Be(2);
             
-            TestContext.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
+            TestContext.Out.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
         }
     }
 
@@ -292,15 +292,15 @@ public class Scp02CryptographyTests
         var result = Scp02Cryptography.CalculateScp02Mac(macKey, commandData);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var mac = result.Value;
         
-        TestContext.WriteLine($"Command Data: {Convert.ToHexString(commandData)}");
-        TestContext.WriteLine($"MAC Key:      {Convert.ToHexString(macKey)}");
-        TestContext.WriteLine($"Expected MAC: {Convert.ToHexString(expectedMac)}");
-        TestContext.WriteLine($"Actual MAC:   {Convert.ToHexString(mac)}");
-        
-        mac.Should().Equal(expectedMac);
+        TestContext.Out.WriteLine($"Command Data: {Convert.ToHexString(commandData)}");
+        TestContext.Out.WriteLine($"MAC Key:      {Convert.ToHexString(macKey)}");
+        TestContext.Out.WriteLine($"Expected MAC: {Convert.ToHexString(expectedMac)}");
+        TestContext.Out.WriteLine($"Actual MAC:   {Convert.ToHexString(mac)}");
+
+        _ = mac.Should().Equal(expectedMac);
     }
 
     // Removed: BuildScp02CardCryptogramData_WithNullInputs_ShouldFailHard
@@ -312,7 +312,7 @@ public class Scp02CryptographyTests
         // Test invalid host challenge lengths
         var invalidHostChallenges = new[]
         {
-            (new byte[0], "Empty host challenge"),
+            ([], "Empty host challenge"),
             (new byte[4], "4-byte host challenge"),
             (new byte[12], "12-byte host challenge")
         };
@@ -321,16 +321,16 @@ public class Scp02CryptographyTests
         {
             var result = Scp02Cryptography.BuildScp02CardCryptogramData(
                 invalidChallenge, _sequenceCounter, _cardChallenge);
-            result.IsFailure.Should().BeTrue($"{description} should be rejected");
-            result.Error.Should().BeOfType<InvalidLengthError>();
-            ((InvalidLengthError)result.Error).Expected.Should().Be(8);
-            TestContext.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
+            _ = result.IsFailure.Should().BeTrue($"{description} should be rejected");
+            _ = result.Error.Should().BeOfType<InvalidLengthError>();
+            _ = ((InvalidLengthError)result.Error).Expected.Should().Be(8);
+            TestContext.Out.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
         }
         
         // Test invalid sequence counter lengths
         var invalidSequenceCounters = new[]
         {
-            (new byte[0], "Empty sequence counter"),
+            ([], "Empty sequence counter"),
             (new byte[1], "1-byte sequence counter"),
             (new byte[4], "4-byte sequence counter")
         };
@@ -339,16 +339,16 @@ public class Scp02CryptographyTests
         {
             var result = Scp02Cryptography.BuildScp02CardCryptogramData(
                 _hostChallenge, invalidCounter, _cardChallenge);
-            result.IsFailure.Should().BeTrue($"{description} should be rejected");
-            result.Error.Should().BeOfType<InvalidLengthError>();
-            ((InvalidLengthError)result.Error).Expected.Should().Be(2);
-            TestContext.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
+            _ = result.IsFailure.Should().BeTrue($"{description} should be rejected");
+            _ = result.Error.Should().BeOfType<InvalidLengthError>();
+            _ = ((InvalidLengthError)result.Error).Expected.Should().Be(2);
+            TestContext.Out.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
         }
         
         // Test invalid card challenge lengths
         var invalidCardChallenges = new[]
         {
-            (new byte[0], "Empty card challenge"),
+            ([], "Empty card challenge"),
             (new byte[4], "4-byte card challenge"),
             (new byte[8], "8-byte card challenge")
         };
@@ -357,10 +357,10 @@ public class Scp02CryptographyTests
         {
             var result = Scp02Cryptography.BuildScp02CardCryptogramData(
                 _hostChallenge, _sequenceCounter, invalidChallenge);
-            result.IsFailure.Should().BeTrue($"{description} should be rejected");
-            result.Error.Should().BeOfType<InvalidLengthError>();
-            ((InvalidLengthError)result.Error).Expected.Should().Be(6);
-            TestContext.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
+            _ = result.IsFailure.Should().BeTrue($"{description} should be rejected");
+            _ = result.Error.Should().BeOfType<InvalidLengthError>();
+            _ = ((InvalidLengthError)result.Error).Expected.Should().Be(6);
+            TestContext.Out.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
         }
     }
 
@@ -374,7 +374,7 @@ public class Scp02CryptographyTests
         var testData = Convert.FromHexString("84820000108E69F9E4D246FF36");
         var testCases = new[]
         {
-            (new byte[0], "Empty key"),
+            ([], "Empty key"),
             (new byte[8], "8-byte key"),
             (new byte[12], "12-byte key"),
             (new byte[24], "24-byte key")
@@ -384,14 +384,14 @@ public class Scp02CryptographyTests
         {
             // Act
             var result = Scp02Cryptography.CalculateScp02Mac(invalidKey, testData);
-            
+
             // Assert
-            result.IsFailure.Should().BeTrue($"{description} should be rejected");
-            result.Error.Should().BeOfType<InvalidLengthError>();
+            _ = result.IsFailure.Should().BeTrue($"{description} should be rejected");
+            _ = result.Error.Should().BeOfType<InvalidLengthError>();
             var lengthError = (InvalidLengthError)result.Error;
-            lengthError.Expected.Should().Be(16);
+            _ = lengthError.Expected.Should().Be(16);
             
-            TestContext.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
+            TestContext.Out.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
         }
     }
 
@@ -403,10 +403,10 @@ public class Scp02CryptographyTests
         
         // Act
         var result = Scp02Cryptography.CalculateScp02Mac(_expectedSessionMac, emptyData);
-        
+
         // Assert
-        result.IsFailure.Should().BeTrue("Empty data should be rejected");
-        result.Error.Should().BeOfType<EmptyDataError>();
-        result.Error.Message.Should().Contain("cannot be empty", "Error should identify empty data");
+        _ = result.IsFailure.Should().BeTrue("Empty data should be rejected");
+        _ = result.Error.Should().BeOfType<EmptyDataError>();
+        _ = result.Error.Message.Should().Contain("cannot be empty", "Error should identify empty data");
     }
 }

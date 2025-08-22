@@ -77,12 +77,12 @@ public static class CardInfoTableBuilder
     /// </summary>
     private static IEnumerable<TableRow> BuildConnectionStatus(bool isSecureChannelEstablished)
     {
-        return new TableRow[]
-        {
+        return
+        [
             new StatusRow("Connection", true, "Connected"),
             new StatusRow("Secure Channel", isSecureChannelEstablished, 
                 isSecureChannelEstablished ? "Active" : "Not established")
-        };
+        ];
     }
 
     /// <summary>
@@ -93,12 +93,12 @@ public static class CardInfoTableBuilder
         // ATR is optional
         var atrRows = cardInfo.Atr
             .Map(atr => new TableRow[] { new PropertyRow("ATR", $"[dim]{Convert.ToHexString(atr)}[/]") })
-            .GetValueOrDefault(Array.Empty<TableRow>());
+            .GetValueOrDefault([]);
 
         // ISD information with nested details
         var isdRows = cardInfo.IsdInfo
             .Map(isd => BuildIsdDetails(isd))
-            .GetValueOrDefault(new TableRow[] { new StatusRow("ISD", false, "Not accessible") });
+            .GetValueOrDefault([new StatusRow("ISD", false, "Not accessible")]);
 
         return atrRows.Concat(isdRows);
     }
@@ -144,7 +144,7 @@ public static class CardInfoTableBuilder
     {
         return cardInfo.Cplc
             .Map(cplc => BuildCplcDetails(cplc, cardInfo.ChipDetails))
-            .GetValueOrDefault(Array.Empty<TableRow>());
+            .GetValueOrDefault([]);
     }
 
     /// <summary>
@@ -161,24 +161,22 @@ public static class CardInfoTableBuilder
         };
 
         // Add date fields with validation
-        rows.AddRange(new[]
-        {
+        rows.AddRange([
             BuildDateRow("OS Release Date", cplc.OperatingSystemReleaseDate),
             BuildDateRow("IC Fabrication Date", cplc.IcFabricationDate),
             new PropertyRow("IC Serial Number", $"0x{cplc.IcSerialNumber:X8} ({cplc.IcSerialNumber})"),
             new PropertyRow("IC Batch ID", $"0x{cplc.IcBatchIdentifier:X4}")
-        });
+        ]);
 
         // Additional CPLC fields if present
-        rows.AddRange(new[]
-        {
+        rows.AddRange([
             BuildDateRow("Module Packaging Date", cplc.IcModulePackagingDate),
             BuildDateRow("Embedding Date", cplc.IcEmbeddingDate),
             new PropertyRow("Pre-Personalizer", $"0x{cplc.IcPrePersonalizer:X4}"),
             BuildDateRow("Pre-Perso Equip Date", cplc.IcPrePersonalizationEquipmentDate),
             new PropertyRow("Pre-Perso Equip ID", $"0x{cplc.IcPrePersonalizationEquipmentId:X8}"),
             BuildDateRow("Personalization Date", cplc.IcPersonalizationDate)
-        });
+        ]);
 
         // Enhanced chip information if available
         chipInfo.Match(
@@ -300,7 +298,7 @@ public static class CardInfoTableBuilder
         var hasAnySecurity = cardInfo.HasSecureChannelCapabilities;
         
         if (!hasAnySecurity)
-            return Array.Empty<TableRow>();
+            return [];
 
         var rows = new List<TableRow> { new SectionHeader("Security Capabilities") };
 
@@ -392,7 +390,7 @@ public static class CardInfoTableBuilder
             .Map(scp => BuildDetailedScpRows(scp))
             .Or(() => cardInfo.Capabilities
                 .Map(cap => BuildBasicScpRows(cap)))
-            .GetValueOrDefault(Array.Empty<TableRow>());
+            .GetValueOrDefault([]);
     }
 
     /// <summary>
@@ -444,7 +442,7 @@ public static class CardInfoTableBuilder
     {
         return cardInfo.KeyInfo
             .Map(keyInfo => BuildKeyRows(keyInfo))
-            .GetValueOrDefault(Array.Empty<TableRow>());
+            .GetValueOrDefault([]);
     }
 
     /// <summary>
@@ -453,7 +451,7 @@ public static class CardInfoTableBuilder
     private static IEnumerable<TableRow> BuildKeyRows(KeyInformationTemplate keyInfo)
     {
         if (keyInfo.Keys.Count == 0)
-            return new TableRow[] { new InfoRow("No key information available") };
+            return [new InfoRow("No key information available")];
 
         var rows = new List<TableRow> { new SectionHeader("Cryptographic Keys") };
 

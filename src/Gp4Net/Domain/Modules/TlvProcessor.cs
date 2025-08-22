@@ -44,12 +44,14 @@ public static class TlvProcessor
     /// <param name="elements">The list of TLV elements to search.</param>
     /// <param name="tag">The tag to find.</param>
     /// <returns>The element value or None if not found.</returns>
-    public static Maybe<byte[]> FindElementValue(ImmutableList<TlvObject> elements, int tag) =>
-        elements
+    public static Maybe<byte[]> FindElementValue(ImmutableList<TlvObject> elements, int tag)
+    {
+        return elements
             .Where(e => e.TagNumber == tag)
             .Select(e => e.Value)
             .FirstOrDefault()
             .AsMaybe();
+    }
 
     /// <summary>
     /// Constructs TLV data from tag and value.
@@ -61,11 +63,11 @@ public static class TlvProcessor
     {
         if (value == null || value.Length == 0)
         {
-            return new[] { tag, (byte)0 };
+            return [tag, (byte)0];
         }
 
         byte[] length = EncodeLength(value.Length);
-        return CombineArrays(new[] { tag }, length, value);
+        return CombineArrays([tag], length, value);
     }
 
     /// <summary>
@@ -76,11 +78,11 @@ public static class TlvProcessor
     /// <returns>The complete TLV structure.</returns>
     public static byte[] ConstructTlv(ushort tag, byte[] value)
     {
-        byte[] tagBytes = new[] { (byte)(tag >> 8), (byte)(tag & 0xFF) };
+        byte[] tagBytes = [(byte)(tag >> 8), (byte)(tag & 0xFF)];
         
         if (value == null || value.Length == 0)
         {
-            return CombineArrays(tagBytes, new byte[] { 0 });
+            return CombineArrays(tagBytes, [0]);
         }
 
         byte[] length = EncodeLength(value.Length);
@@ -94,25 +96,22 @@ public static class TlvProcessor
     /// <returns>The encoded length bytes.</returns>
     public static byte[] EncodeLength(int length)
     {
-        // Short form (0-127)
-        if (length <= 127)
+        switch (length)
         {
-            return new[] { (byte)length };
+            // Short form (0-127)
+            case <= 127:
+                return [(byte)length];
+
+            // Long form
+            case <= 255:
+                return [0x81, (byte)length];
+            case <= 65535:
+                return [0x82, (byte)(length >> 8), (byte)(length & 0xFF)];
+            default:
+                // For larger lengths (unlikely in smart card context)
+                return [0x83, (byte)(length >> 16), (byte)(length >> 8), (byte)(length & 0xFF)];
         }
 
-        // Long form
-        if (length <= 255)
-        {
-            return new byte[] { 0x81, (byte)length };
-        }
-
-        if (length <= 65535)
-        {
-            return new byte[] { 0x82, (byte)(length >> 8), (byte)(length & 0xFF) };
-        }
-
-        // For larger lengths (unlikely in smart card context)
-        return new byte[] { 0x83, (byte)(length >> 16), (byte)(length >> 8), (byte)(length & 0xFF) };
     }
 
     /// <summary>
@@ -168,8 +167,10 @@ public static class TlvProcessor
     /// </summary>
     /// <param name="subset">The status subset indicator.</param>
     /// <returns>The status template TLV structure.</returns>
-    public static byte[] ConstructStatusTemplate(byte subset) =>
-        ConstructTlv(0x4F, new byte[] { subset });
+    public static byte[] ConstructStatusTemplate(byte subset)
+    {
+        return ConstructTlv(0x4F, [subset]);
+    }
 
     /// <summary>
     /// Parses key information template used in PUT KEY.
@@ -212,9 +213,9 @@ public static class TlvProcessor
     {
         int totalLength = arrays.Sum(a => a?.Length ?? 0);
         byte[] result = new byte[totalLength];
-        
+
         // Functional approach using Aggregate
-        arrays.Where(a => a != null && a.Length > 0)
+        _ = arrays.Where(a => a != null && a.Length > 0)
             .Aggregate(0, (offset, array) =>
             {
                 Buffer.BlockCopy(array, 0, result, offset, array.Length);

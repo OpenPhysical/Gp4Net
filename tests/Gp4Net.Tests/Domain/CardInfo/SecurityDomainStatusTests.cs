@@ -19,16 +19,16 @@ public class SecurityDomainStatusTests
         
         // Act
         var result = SecurityDomainStatus.Parse(data);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var status = result.Value;
-        status.StateByte.Should().Be(0x00);
-        status.GetIsdState().Should().Be(IsdState.Unknown);
-        status.IsPersonalized().Should().BeFalse();
-        status.IsLocked().Should().BeFalse();
-        status.GetSequenceCounter().HasValue.Should().BeTrue();
-        status.GetSequenceCounter().Value.Should().Be((ushort)0x04);
+        _ = status.StateByte.Should().Be(0x00);
+        _ = status.GetIsdState().Should().Be(IsdState.Unknown);
+        _ = status.IsPersonalized().Should().BeFalse();
+        _ = status.IsLocked().Should().BeFalse();
+        _ = status.GetSequenceCounter().HasValue.Should().BeTrue();
+        _ = status.GetSequenceCounter().Value.Should().Be((ushort)0x04);
     }
     
     [Test]
@@ -39,16 +39,16 @@ public class SecurityDomainStatusTests
         
         // Act
         var result = SecurityDomainStatus.Parse(data);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var status = result.Value;
-        status.StateByte.Should().Be(0x00);
-        status.GetIsdState().Should().Be(IsdState.Unknown);
-        status.IsPersonalized().Should().BeFalse();
-        status.IsLocked().Should().BeFalse();
-        status.GetSequenceCounter().HasValue.Should().BeTrue();
-        status.GetSequenceCounter().Value.Should().Be((ushort)0x0046);
+        _ = status.StateByte.Should().Be(0x00);
+        _ = status.GetIsdState().Should().Be(IsdState.Unknown);
+        _ = status.IsPersonalized().Should().BeFalse();
+        _ = status.IsLocked().Should().BeFalse();
+        _ = status.GetSequenceCounter().HasValue.Should().BeTrue();
+        _ = status.GetSequenceCounter().Value.Should().Be((ushort)0x0046);
     }
     
     [Test]
@@ -59,13 +59,13 @@ public class SecurityDomainStatusTests
         
         // Act
         var result = SecurityDomainStatus.Parse(data);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var status = result.Value;
-        status.GetIsdState().Should().Be(IsdState.OpReady);
-        status.IsPersonalized().Should().BeFalse();
-        status.IsLocked().Should().BeFalse();
+        _ = status.GetIsdState().Should().Be(IsdState.OpReady);
+        _ = status.IsPersonalized().Should().BeFalse();
+        _ = status.IsLocked().Should().BeFalse();
     }
     
     [Test]
@@ -76,13 +76,13 @@ public class SecurityDomainStatusTests
         
         // Act
         var result = SecurityDomainStatus.Parse(data);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var status = result.Value;
-        status.GetIsdState().Should().Be(IsdState.Initialized);
-        status.IsPersonalized().Should().BeTrue();
-        status.IsLocked().Should().BeFalse();
+        _ = status.GetIsdState().Should().Be(IsdState.Initialized);
+        _ = status.IsPersonalized().Should().BeTrue();
+        _ = status.IsLocked().Should().BeFalse();
     }
     
     [Test]
@@ -93,13 +93,13 @@ public class SecurityDomainStatusTests
         
         // Act
         var result = SecurityDomainStatus.Parse(data);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var status = result.Value;
-        status.GetIsdState().Should().Be(IsdState.OpReady);
-        status.IsPersonalized().Should().BeFalse();
-        status.IsLocked().Should().BeTrue();
+        _ = status.GetIsdState().Should().Be(IsdState.OpReady);
+        _ = status.IsPersonalized().Should().BeFalse();
+        _ = status.IsLocked().Should().BeTrue();
     }
     
     [Test]
@@ -110,11 +110,11 @@ public class SecurityDomainStatusTests
         
         // Act
         var result = SecurityDomainStatus.Parse(data);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var status = result.Value;
-        status.GetIsdState().Should().Be(IsdState.CardLocked);
+        _ = status.GetIsdState().Should().Be(IsdState.CardLocked);
     }
     
     [Test]
@@ -125,11 +125,11 @@ public class SecurityDomainStatusTests
         
         // Act
         var result = SecurityDomainStatus.Parse(data);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var status = result.Value;
-        status.GetIsdState().Should().Be(IsdState.Terminated);
+        _ = status.GetIsdState().Should().Be(IsdState.Terminated);
     }
     
     [Test]
@@ -140,10 +140,10 @@ public class SecurityDomainStatusTests
         
         // Act
         var result = SecurityDomainStatus.Parse(data);
-        
+
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Invalid tag: expected 0xC1, got 0xC2");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("Invalid tag: expected 0xC1, got 0xC2");
     }
     
     [Test]
@@ -154,10 +154,10 @@ public class SecurityDomainStatusTests
         
         // Act
         var result = SecurityDomainStatus.Parse(data);
-        
+
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("too short");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("too short");
     }
     
     [Test]
@@ -165,10 +165,10 @@ public class SecurityDomainStatusTests
     {
         // Act
         var result = SecurityDomainStatus.Parse(Maybe<byte[]>.None);
-        
+
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("cannot be null");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("cannot be null");
     }
     
     [Test]
@@ -180,11 +180,11 @@ public class SecurityDomainStatusTests
         
         // Act
         var description = status.ToString();
-        
+
         // Assert
-        description.Should().Contain("Security Domain Status:");
-        description.Should().Contain("State=Unknown");
-        description.Should().Contain("Sequence=0x0004");
+        _ = description.Should().Contain("Security Domain Status:");
+        _ = description.Should().Contain("State=Unknown");
+        _ = description.Should().Contain("Sequence=0x0004");
     }
     
     [Test]
@@ -196,9 +196,9 @@ public class SecurityDomainStatusTests
         
         // Act
         var description = status.GetShortDescription();
-        
+
         // Assert
-        description.Should().Be("Secured, Personalized, Seq:0x1234");
+        _ = description.Should().Be("Secured, Personalized, Seq:0x1234");
     }
     
     [TestCase("C10100", 0)] // No additional data - length 1, just state byte
@@ -218,12 +218,12 @@ public class SecurityDomainStatusTests
         // Assert
         if (expectedCounter == 0 && hex.Length <= 6)
         {
-            counter.HasValue.Should().BeFalse();
+            _ = counter.HasValue.Should().BeFalse();
         }
         else
         {
-            counter.HasValue.Should().BeTrue();
-            counter.Value.Should().Be((ushort)expectedCounter);
+            _ = counter.HasValue.Should().BeTrue();
+            _ = counter.Value.Should().Be((ushort)expectedCounter);
         }
     }
 }

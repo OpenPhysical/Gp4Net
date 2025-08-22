@@ -27,7 +27,7 @@ public class Scp02SecurityProcessorTests
             new byte[16], // S-RMAC
             new byte[16]  // S-DEK
         );
-        _macChainingValue = new byte[8].ToImmutableArray(); // SCP02 MAC chaining value (8 bytes)
+        _macChainingValue = [..new byte[8]]; // SCP02 MAC chaining value (8 bytes)
     }
 
     [TearDown]
@@ -49,19 +49,19 @@ public class Scp02SecurityProcessorTests
             _macChainingValue,
             0u // encryption counter
         );
-        
-        result.IsSuccess.Should().BeTrue();
+
+        _ = result.IsSuccess.Should().BeTrue();
         var (securedCommand, newState) = result.Value;
-        
+
         // Secured command should include MAC
-        securedCommand.Length.Should().BeGreaterThan(4);
-        
+        _ = securedCommand.Length.Should().BeGreaterThan(4);
+
         // CLA should have secure messaging bit set
-        (securedCommand[0] & 0x04).Should().Be(0x04);
-        
+        _ = (securedCommand[0] & 0x04).Should().Be(0x04);
+
         // New state should be for SCP02
-        newState.Should().NotBeNull();
-        newState.ProtocolVersion.Should().Be(0x02);
+        _ = newState.Should().NotBeNull();
+        _ = newState.ProtocolVersion.Should().Be(0x02);
     }
 
     [Test]
@@ -76,16 +76,16 @@ public class Scp02SecurityProcessorTests
             _macChainingValue,
             1u
         );
-        
-        result.IsSuccess.Should().BeTrue();
+
+        _ = result.IsSuccess.Should().BeTrue();
         var (securedCommand, newState) = result.Value;
-        
+
         // Should be both encrypted and MACed
-        securedCommand.Length.Should().BeGreaterThan(4);
-        (securedCommand[0] & 0x04).Should().Be(0x04);
-        
+        _ = securedCommand.Length.Should().BeGreaterThan(4);
+        _ = (securedCommand[0] & 0x04).Should().Be(0x04);
+
         // SCP02 uses 3DES encryption
-        newState.EncryptionCounter.Should().Be(2u);
+        _ = newState.EncryptionCounter.Should().Be(2u);
     }
 
     [Test]
@@ -100,13 +100,13 @@ public class Scp02SecurityProcessorTests
             _macChainingValue,
             0u
         );
-        
-        result.IsSuccess.Should().BeTrue();
+
+        _ = result.IsSuccess.Should().BeTrue();
         var (processedResponse, newState) = result.Value;
-        
-        processedResponse.Should().NotBeNull();
-        newState.Should().NotBeNull();
-        newState.ProtocolVersion.Should().Be(0x02);
+
+        _ = processedResponse.Should().NotBeNull();
+        _ = newState.Should().NotBeNull();
+        _ = newState.ProtocolVersion.Should().Be(0x02);
     }
 
     [Test]
@@ -129,7 +129,7 @@ public class Scp02SecurityProcessorTests
         
         if (result.IsSuccess)
         {
-            result.Value.ProtocolVersion.Should().Be(0x02);
+            _ = result.Value.ProtocolVersion.Should().Be(0x02);
         }
         // Failure is expected until full implementation
     }
@@ -151,7 +151,7 @@ public class Scp02SecurityProcessorTests
         
         var testCases = new[]
         {
-            (new byte[0], "Empty host challenge"),
+            ([], "Empty host challenge"),
             (new byte[4], "4-byte host challenge"),
             (new byte[12], "12-byte host challenge"),
             (new byte[16], "16-byte host challenge")
@@ -166,14 +166,14 @@ public class Scp02SecurityProcessorTests
                 keySet,
                 0x15
             );
-            
+
             // Assert
-            result.IsFailure.Should().BeTrue($"{description} should be rejected");
-            result.Error.Should().BeOfType<InvalidLengthError>();
+            _ = result.IsFailure.Should().BeTrue($"{description} should be rejected");
+            _ = result.Error.Should().BeOfType<InvalidLengthError>();
             var lengthError = (InvalidLengthError)result.Error;
-            lengthError.Expected.Should().Be(8);
+            _ = lengthError.Expected.Should().Be(8);
             
-            TestContext.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
+            TestContext.Out.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
         }
     }
 
@@ -201,13 +201,13 @@ public class Scp02SecurityProcessorTests
                 keySet,
                 invalidImpl
             );
-            
+
             // Assert
-            result.IsFailure.Should().BeTrue($"Invalid implementation i={invalidImpl:X2} should be rejected");
-            result.Error.Should().BeOfType<UnsupportedImplementationError>();
-            result.Error.Message.Should().Contain($"i={invalidImpl:X2}", $"Error should identify invalid implementation i={invalidImpl:X2}");
+            _ = result.IsFailure.Should().BeTrue($"Invalid implementation i={invalidImpl:X2} should be rejected");
+            _ = result.Error.Should().BeOfType<UnsupportedImplementationError>();
+            _ = result.Error.Message.Should().Contain($"i={invalidImpl:X2}", $"Error should identify invalid implementation i={invalidImpl:X2}");
             
-            TestContext.WriteLine($"✓ Invalid implementation i={invalidImpl:X2} correctly rejected: {result.Error.Message}");
+            TestContext.Out.WriteLine($"✓ Invalid implementation i={invalidImpl:X2} correctly rejected: {result.Error.Message}");
         }
     }
 
@@ -225,11 +225,11 @@ public class Scp02SecurityProcessorTests
             wrongSizeMacChaining,
             0u
         );
-        
-        result.IsFailure.Should().BeTrue("SCP02 MAC chaining value must be exactly 8 bytes");
-        result.Error.Should().BeOfType<InvalidLengthError>();
+
+        _ = result.IsFailure.Should().BeTrue("SCP02 MAC chaining value must be exactly 8 bytes");
+        _ = result.Error.Should().BeOfType<InvalidLengthError>();
         var lengthError = (InvalidLengthError)result.Error;
-        lengthError.Expected.Should().Be(8);
+        _ = lengthError.Expected.Should().Be(8);
     }
 
     // Removed: ApplyCommandSecurity_WithNullCommand_ShouldFailHard
@@ -253,11 +253,11 @@ public class Scp02SecurityProcessorTests
             emptyMacChaining,
             0u
         );
-        
+
         // Assert
-        result.IsFailure.Should().BeTrue("Empty MAC chaining value should be rejected");
-        result.Error.Should().BeOfType<SmartCardError>();
-        result.Error.Message.Should().Contain("chaining", "Error should identify MAC chaining issue");
+        _ = result.IsFailure.Should().BeTrue("Empty MAC chaining value should be rejected");
+        _ = result.Error.Should().BeOfType<SmartCardError>();
+        _ = result.Error.Message.Should().Contain("chaining", "Error should identify MAC chaining issue");
     }
 
     [Test]
@@ -280,12 +280,12 @@ public class Scp02SecurityProcessorTests
         // The exact behavior depends on implementation but should not crash
         if (result.IsFailure)
         {
-            result.Error.Should().BeOfType<SmartCardError>();
-            TestContext.WriteLine($"✓ Invalid security level rejected: {result.Error.Message}");
+            _ = result.Error.Should().BeOfType<SmartCardError>();
+            TestContext.Out.WriteLine($"✓ Invalid security level rejected: {result.Error.Message}");
         }
         else
         {
-            TestContext.WriteLine("✓ Invalid security level handled gracefully");
+            TestContext.Out.WriteLine("✓ Invalid security level handled gracefully");
         }
     }
 
@@ -313,17 +313,17 @@ public class Scp02SecurityProcessorTests
             scp03MacChaining,
             0u
         );
-        
+
         // Both should work with their respective chaining value sizes
-        scp02Result.IsSuccess.Should().BeTrue();
-        scp03Result.IsSuccess.Should().BeTrue();
+        _ = scp02Result.IsSuccess.Should().BeTrue();
+        _ = scp03Result.IsSuccess.Should().BeTrue();
         
         // Results should differ due to different MAC calculations
         var scp02State = scp02Result.Value.newState;
         var scp03State = scp03Result.Value.newState;
-        
-        scp02State.ProtocolVersion.Should().Be(0x02);
-        scp03State.ProtocolVersion.Should().Be(0x03);
+
+        _ = scp02State.ProtocolVersion.Should().Be(0x02);
+        _ = scp03State.ProtocolVersion.Should().Be(0x03);
     }
 
     private InitializeUpdateResponse CreateTestScp02InitializeUpdateResponse()

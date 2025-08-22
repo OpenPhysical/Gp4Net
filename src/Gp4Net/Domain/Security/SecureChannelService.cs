@@ -142,7 +142,7 @@ public class SecureChannelService : ISecureChannelService
             command,
             state.SecurityLevel,
             state.SessionKeys,
-            ImmutableArray.Create(state.MacChaining.ToArray()),
+            [..state.MacChaining.ToArray()],
             state.EncryptionCounter,
             state.ProtocolVersion
         );
@@ -156,7 +156,7 @@ public class SecureChannelService : ISecureChannelService
             response,
             state.SecurityLevel,
             state.SessionKeys,
-            ImmutableArray.Create(state.MacChaining.ToArray()),
+            [..state.MacChaining.ToArray()],
             state.EncryptionCounter,
             state.ProtocolVersion
         );

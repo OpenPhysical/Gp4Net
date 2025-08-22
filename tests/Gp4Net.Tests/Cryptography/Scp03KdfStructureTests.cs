@@ -32,7 +32,7 @@ public class Scp03KdfStructureTests
             BindingFlags.NonPublic | BindingFlags.Instance
         );
 
-        method.Should().NotBeNull("Could not find DeriveScp03Key method");
+        _ = method.Should().NotBeNull("Could not find DeriveScp03Key method");
 
         // Test parameters
         var kdk = new byte[16];
@@ -48,17 +48,17 @@ public class Scp03KdfStructureTests
         // var expectedLength = 11 + 1 + 1 + 1 + 2 + 16; // 32 bytes
 
         // Verify the constants
-        DerivationConstants.Scp03Label.Length.Should()
+        _ = DerivationConstants.Scp03Label.Length.Should()
             .Be(11, "SCP03 label should be 11 bytes");
-        DerivationConstants.Scp03Separator.Should()
+        _ = DerivationConstants.Scp03Separator.Should()
             .Be(0x00, "SCP03 separator should be 0x00");
 
         // Test derivation constants
-        DerivationConstants.SEnc.Should()
+        _ = DerivationConstants.SEnc.Should()
             .Be(0x04, "S-ENC constant should be 0x04");
-        DerivationConstants.SMac.Should()
+        _ = DerivationConstants.SMac.Should()
             .Be(0x06, "S-MAC constant should be 0x06");
-        DerivationConstants.SrMac.Should()
+        _ = DerivationConstants.SrMac.Should()
             .Be(0x07, "S-RMAC constant should be 0x07");
     }
 
@@ -68,11 +68,11 @@ public class Scp03KdfStructureTests
         // Verify that the SCP03 label is 11 bytes of zeros
         var label = DerivationConstants.Scp03Label;
 
-        label.Length.Should().Be(11);
+        _ = label.Length.Should().Be(11);
 
         foreach (var b in label)
         {
-            b.Should().Be(0x00, "All bytes in SCP03 label should be 0x00");
+            _ = b.Should().Be(0x00, "All bytes in SCP03 label should be 0x00");
         }
     }
 
@@ -100,15 +100,15 @@ public class Scp03KdfStructureTests
         );
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var sessionKeys = result.Value;
 
         // All three keys should be different due to different derivation constants
-        sessionKeys.SEnc.Should()
+        _ = sessionKeys.SEnc.Should()
             .NotEqual(sessionKeys.SMac, "S-ENC and S-MAC should be different");
-        sessionKeys.SMac.Should()
+        _ = sessionKeys.SMac.Should()
             .NotEqual(sessionKeys.SrMac, "S-MAC and S-RMAC should be different");
-        sessionKeys.SEnc.Should()
+        _ = sessionKeys.SEnc.Should()
             .NotEqual(sessionKeys.SrMac, "S-ENC and S-RMAC should be different");
     }
 
@@ -140,17 +140,17 @@ public class Scp03KdfStructureTests
         );
 
         // Assert - results should be identical
-        result1.IsSuccess.Should().BeTrue();
-        result2.IsSuccess.Should().BeTrue();
+        _ = result1.IsSuccess.Should().BeTrue();
+        _ = result2.IsSuccess.Should().BeTrue();
 
         var sessionKeys1 = result1.Value;
         var sessionKeys2 = result2.Value;
 
-        sessionKeys1.SEnc.Should()
+        _ = sessionKeys1.SEnc.Should()
             .Equal(sessionKeys2.SEnc, "S-ENC should be deterministic");
-        sessionKeys1.SMac.Should()
+        _ = sessionKeys1.SMac.Should()
             .Equal(sessionKeys2.SMac, "S-MAC should be deterministic");
-        sessionKeys1.SrMac.Should()
+        _ = sessionKeys1.SrMac.Should()
             .Equal(sessionKeys2.SrMac, "S-RMAC should be deterministic");
     }
 }

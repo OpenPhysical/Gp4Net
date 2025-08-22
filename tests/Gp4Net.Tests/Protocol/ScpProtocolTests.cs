@@ -35,7 +35,7 @@ public class ScpProtocolTests
             vector.StaticDekKey,
             0x01
         );
-        keySet.IsSuccess.Should().BeTrue($"Failed to create key set: {vector.Name}");
+        _ = keySet.IsSuccess.Should().BeTrue($"Failed to create key set: {vector.Name}");
 
         var implementationOption = Convert.ToByte(vector.ImplementationOption, 16);
 
@@ -49,12 +49,12 @@ public class ScpProtocolTests
         );
 
         // Assert
-        result.IsSuccess.Should().BeTrue($"Key derivation failed for {vector.Name}: {(result.IsFailure ? result.Error.Message : "N/A")}");
+        _ = result.IsSuccess.Should().BeTrue($"Key derivation failed for {vector.Name}: {(result.IsFailure ? result.Error.Message : "N/A")}");
         
         var sessionKeys = result.Value;
-        sessionKeys.SEnc.Should().BeEquivalentTo(vector.ExpectedSEncKey, $"S-ENC mismatch for {vector.Name}");
-        sessionKeys.SMac.Should().BeEquivalentTo(vector.ExpectedSMacKey, $"S-MAC mismatch for {vector.Name}");
-        sessionKeys.Dek.Should().BeEquivalentTo(vector.ExpectedSDekKey, $"S-DEK mismatch for {vector.Name}");
+        _ = sessionKeys.SEnc.Should().BeEquivalentTo(vector.ExpectedSEncKey, $"S-ENC mismatch for {vector.Name}");
+        _ = sessionKeys.SMac.Should().BeEquivalentTo(vector.ExpectedSMacKey, $"S-MAC mismatch for {vector.Name}");
+        _ = sessionKeys.Dek.Should().BeEquivalentTo(vector.ExpectedSDekKey, $"S-DEK mismatch for {vector.Name}");
     }
 
     [Test]
@@ -79,11 +79,11 @@ public class ScpProtocolTests
         );
 
         // Assert
-        result.IsSuccess.Should().BeTrue($"Key derivation failed for {vector.Name}: {(result.IsFailure ? result.Error.Message : "N/A")}");
+        _ = result.IsSuccess.Should().BeTrue($"Key derivation failed for {vector.Name}: {(result.IsFailure ? result.Error.Message : "N/A")}");
         
         var sessionKeys = result.Value;
-        sessionKeys.SEnc.Should().BeEquivalentTo(vector.ExpectedSEncKey, $"S-ENC mismatch for {vector.Name}");
-        sessionKeys.SMac.Should().BeEquivalentTo(vector.ExpectedSMacKey, $"S-MAC mismatch for {vector.Name}");
+        _ = sessionKeys.SEnc.Should().BeEquivalentTo(vector.ExpectedSEncKey, $"S-ENC mismatch for {vector.Name}");
+        _ = sessionKeys.SMac.Should().BeEquivalentTo(vector.ExpectedSMacKey, $"S-MAC mismatch for {vector.Name}");
         // Note: SessionKeys.SRMac is not directly accessible from SessionKeys structure
         // The SRMac key is derived and stored separately within the protocol implementation
     }
@@ -102,11 +102,11 @@ public class ScpProtocolTests
         var hostCryptogramResult = Scp02ProtocolImpl.CalculateCryptogramMac(sessionEncKey, vector.HostCryptogramData);
 
         // Assert
-        cardCryptogramResult.IsSuccess.Should().BeTrue($"Card cryptogram calculation failed for {vector.Name}");
-        hostCryptogramResult.IsSuccess.Should().BeTrue($"Host cryptogram calculation failed for {vector.Name}");
-        
-        cardCryptogramResult.Value.Should().BeEquivalentTo(vector.ExpectedCardCryptogram, $"Card cryptogram mismatch for {vector.Name}");
-        hostCryptogramResult.Value.Should().BeEquivalentTo(vector.ExpectedHostCryptogram, $"Host cryptogram mismatch for {vector.Name}");
+        _ = cardCryptogramResult.IsSuccess.Should().BeTrue($"Card cryptogram calculation failed for {vector.Name}");
+        _ = hostCryptogramResult.IsSuccess.Should().BeTrue($"Host cryptogram calculation failed for {vector.Name}");
+
+        _ = cardCryptogramResult.Value.Should().BeEquivalentTo(vector.ExpectedCardCryptogram, $"Card cryptogram mismatch for {vector.Name}");
+        _ = hostCryptogramResult.Value.Should().BeEquivalentTo(vector.ExpectedHostCryptogram, $"Host cryptogram mismatch for {vector.Name}");
     }
 
     [Test]
@@ -139,11 +139,11 @@ public class ScpProtocolTests
             ScpVersion.Scp03);
 
         // Assert
-        cardCryptogramResult.IsSuccess.Should().BeTrue($"Card cryptogram calculation failed for {vector.Name}: {(cardCryptogramResult.IsFailure ? cardCryptogramResult.Error.Message : "N/A")}");
-        hostCryptogramResult.IsSuccess.Should().BeTrue($"Host cryptogram calculation failed for {vector.Name}: {(hostCryptogramResult.IsFailure ? hostCryptogramResult.Error.Message : "N/A")}");
-        
-        cardCryptogramResult.Value.Should().BeEquivalentTo(vector.ExpectedCardCryptogram, $"Card cryptogram mismatch for {vector.Name}");
-        hostCryptogramResult.Value.Should().BeEquivalentTo(vector.ExpectedHostCryptogram, $"Host cryptogram mismatch for {vector.Name}");
+        _ = cardCryptogramResult.IsSuccess.Should().BeTrue($"Card cryptogram calculation failed for {vector.Name}: {(cardCryptogramResult.IsFailure ? cardCryptogramResult.Error.Message : "N/A")}");
+        _ = hostCryptogramResult.IsSuccess.Should().BeTrue($"Host cryptogram calculation failed for {vector.Name}: {(hostCryptogramResult.IsFailure ? hostCryptogramResult.Error.Message : "N/A")}");
+
+        _ = cardCryptogramResult.Value.Should().BeEquivalentTo(vector.ExpectedCardCryptogram, $"Card cryptogram mismatch for {vector.Name}");
+        _ = hostCryptogramResult.Value.Should().BeEquivalentTo(vector.ExpectedHostCryptogram, $"Host cryptogram mismatch for {vector.Name}");
     }
 
     [Test]
@@ -154,28 +154,28 @@ public class ScpProtocolTests
         var macResult = Scp02ProtocolImpl.CalculateMac(vector.MacKey, vector.CommandData);
 
         // Assert
-        macResult.IsSuccess.Should().BeTrue($"C-MAC calculation failed for {vector.Name}: {(macResult.IsFailure ? macResult.Error.Message : "N/A")}");
-        macResult.Value.Should().BeEquivalentTo(vector.ExpectedCMac, $"C-MAC mismatch for {vector.Name}");
+        _ = macResult.IsSuccess.Should().BeTrue($"C-MAC calculation failed for {vector.Name}: {(macResult.IsFailure ? macResult.Error.Message : "N/A")}");
+        _ = macResult.Value.Should().BeEquivalentTo(vector.ExpectedCMac, $"C-MAC mismatch for {vector.Name}");
     }
 
     [Test]
     public void Scp02_ProtocolConstants_MatchSpecification()
     {
-        Scp02ProtocolImpl.ProtocolVersion.Should().Be(0x02);
-        Scp02ProtocolImpl.BlockSize.Should().Be(8); // 3DES block size
-        Scp02ProtocolImpl.MacSize.Should().Be(8);
-        Scp02ProtocolImpl.ChainingValueSize.Should().Be(8);
-        Scp02ProtocolImpl.CardChallengeLength.Should().Be(6); // SCP02 uses 6-byte card challenge
+        _ = Scp02ProtocolImpl.ProtocolVersion.Should().Be(0x02);
+        _ = Scp02ProtocolImpl.BlockSize.Should().Be(8); // 3DES block size
+        _ = Scp02ProtocolImpl.MacSize.Should().Be(8);
+        _ = Scp02ProtocolImpl.ChainingValueSize.Should().Be(8);
+        _ = Scp02ProtocolImpl.CardChallengeLength.Should().Be(6); // SCP02 uses 6-byte card challenge
     }
 
     [Test]
     public void Scp03_ProtocolConstants_MatchSpecification()
     {
-        Scp03ProtocolImpl.ProtocolVersion.Should().Be(0x03);
-        Scp03ProtocolImpl.BlockSize.Should().Be(16); // AES block size
-        Scp03ProtocolImpl.MacSize.Should().Be(8); // Truncated for commands/responses
-        Scp03ProtocolImpl.ChainingValueSize.Should().Be(16); // Full AES-CMAC for chaining
-        Scp03ProtocolImpl.CardChallengeLength.Should().Be(8); // SCP03 uses 8-byte card challenge
+        _ = Scp03ProtocolImpl.ProtocolVersion.Should().Be(0x03);
+        _ = Scp03ProtocolImpl.BlockSize.Should().Be(16); // AES block size
+        _ = Scp03ProtocolImpl.MacSize.Should().Be(8); // Truncated for commands/responses
+        _ = Scp03ProtocolImpl.ChainingValueSize.Should().Be(16); // Full AES-CMAC for chaining
+        _ = Scp03ProtocolImpl.CardChallengeLength.Should().Be(8); // SCP03 uses 8-byte card challenge
     }
 
     [Test]
@@ -188,9 +188,9 @@ public class ScpProtocolTests
         
         // Act
         var result = Scp02KeySet.Create(encKey, macKey, dekKey, 0x01);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue("Valid keys should create successful key set");
+        _ = result.IsSuccess.Should().BeTrue("Valid keys should create successful key set");
     }
 
     [Test]
@@ -203,12 +203,12 @@ public class ScpProtocolTests
         
         // Act
         var keySet = new Scp03KeySet(encKey, macKey, dekKey, 0x01);
-        
+
         // Assert
-        keySet.Should().NotBeNull("Valid keys should create successful key set");
-        keySet.EncKey.Should().BeEquivalentTo(encKey);
-        keySet.MacKey.Should().BeEquivalentTo(macKey);
-        keySet.DekKey.Should().BeEquivalentTo(dekKey);
+        _ = keySet.Should().NotBeNull("Valid keys should create successful key set");
+        _ = keySet.EncKey.Should().BeEquivalentTo(encKey);
+        _ = keySet.MacKey.Should().BeEquivalentTo(macKey);
+        _ = keySet.DekKey.Should().BeEquivalentTo(dekKey);
     }
 
     // Test vector sources for parameterized tests

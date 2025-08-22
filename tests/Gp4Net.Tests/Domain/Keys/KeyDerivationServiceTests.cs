@@ -46,7 +46,7 @@ public class KeyDerivationServiceTests
         
         // Create SCP02 key set
         var keySetResult = Scp02KeySet.Create(staticKeys, staticKeys, staticKeys, 0x01);
-        keySetResult.IsSuccess.Should().BeTrue();
+        _ = keySetResult.IsSuccess.Should().BeTrue();
         
         // Derive session keys with i=00 implementation
         var sessionKeysResult = _keyDerivationService.DeriveSessionKeys(
@@ -55,20 +55,20 @@ public class KeyDerivationServiceTests
             cardChallenge,
             Maybe<byte[]>.From(sequenceCounter),
             Maybe<ScpImplementation>.From(ScpImplementation.Scp02I00));
-        
-        sessionKeysResult.IsSuccess.Should().BeTrue();
+
+        _ = sessionKeysResult.IsSuccess.Should().BeTrue();
         var sessionKeys = sessionKeysResult.Value;
-        
+
         // Verify that i=00 uses derived MAC keys, not static MAC keys
-        sessionKeys.SEnc.Should().BeEquivalentTo(expectedSEnc, "S-ENC key should match GP Pro trace");
-        sessionKeys.SMac.Should().BeEquivalentTo(expectedSMac, "S-MAC key should be derived, not static");
-        
+        _ = sessionKeys.SEnc.Should().BeEquivalentTo(expectedSEnc, "S-ENC key should match GP Pro trace");
+        _ = sessionKeys.SMac.Should().BeEquivalentTo(expectedSMac, "S-MAC key should be derived, not static");
+
         // Verify MAC key is derived (different from static key)
-        sessionKeys.SMac.Should().NotBeEquivalentTo(staticKeys, "MAC key should be derived, not static");
+        _ = sessionKeys.SMac.Should().NotBeEquivalentTo(staticKeys, "MAC key should be derived, not static");
         
-        TestContext.WriteLine($"Implementation i=00 correctly uses derived MAC keys");
-        TestContext.WriteLine($"Static MAC: {Convert.ToHexString(staticKeys)}");
-        TestContext.WriteLine($"Derived S-MAC: {Convert.ToHexString(sessionKeys.SMac)}");
+        TestContext.Out.WriteLine($"Implementation i=00 correctly uses derived MAC keys");
+        TestContext.Out.WriteLine($"Static MAC: {Convert.ToHexString(staticKeys)}");
+        TestContext.Out.WriteLine($"Derived S-MAC: {Convert.ToHexString(sessionKeys.SMac)}");
     }
     
     [Test]
@@ -82,7 +82,7 @@ public class KeyDerivationServiceTests
         
         // Create SCP02 key set
         var keySetResult = Scp02KeySet.Create(staticKeys, staticKeys, staticKeys, 0x01);
-        keySetResult.IsSuccess.Should().BeTrue();
+        _ = keySetResult.IsSuccess.Should().BeTrue();
         
         // Derive session keys with i=15 implementation
         var sessionKeysResult = _keyDerivationService.DeriveSessionKeys(
@@ -91,19 +91,19 @@ public class KeyDerivationServiceTests
             cardChallenge,
             Maybe<byte[]>.From(sequenceCounter),
             Maybe<ScpImplementation>.From(ScpImplementation.Scp02I15));
-        
-        sessionKeysResult.IsSuccess.Should().BeTrue();
+
+        _ = sessionKeysResult.IsSuccess.Should().BeTrue();
         var sessionKeys = sessionKeysResult.Value;
-        
+
         // For i=15, MAC key should remain static (same as input)
-        sessionKeys.SMac.Should().BeEquivalentTo(staticKeys, "i=15 should use static MAC keys");
-        
+        _ = sessionKeys.SMac.Should().BeEquivalentTo(staticKeys, "i=15 should use static MAC keys");
+
         // But S-ENC should still be derived
-        sessionKeys.SEnc.Should().NotBeEquivalentTo(staticKeys, "S-ENC should always be derived");
+        _ = sessionKeys.SEnc.Should().NotBeEquivalentTo(staticKeys, "S-ENC should always be derived");
         
-        TestContext.WriteLine($"Implementation i=15 correctly uses static MAC keys");
-        TestContext.WriteLine($"Static MAC: {Convert.ToHexString(staticKeys)}");
-        TestContext.WriteLine($"S-MAC (static): {Convert.ToHexString(sessionKeys.SMac)}");
+        TestContext.Out.WriteLine($"Implementation i=15 correctly uses static MAC keys");
+        TestContext.Out.WriteLine($"Static MAC: {Convert.ToHexString(staticKeys)}");
+        TestContext.Out.WriteLine($"S-MAC (static): {Convert.ToHexString(sessionKeys.SMac)}");
     }
     
     [TestCase(ScpImplementation.Scp02I00, true, "i=00 should derive MAC keys")]
@@ -123,7 +123,7 @@ public class KeyDerivationServiceTests
         var sequenceCounter = Convert.FromHexString("0011");
         
         var keySetResult = Scp02KeySet.Create(staticKeys, staticKeys, staticKeys, 0x01);
-        keySetResult.IsSuccess.Should().BeTrue();
+        _ = keySetResult.IsSuccess.Should().BeTrue();
         
         var sessionKeysResult = _keyDerivationService.DeriveSessionKeys(
             keySetResult.Value,
@@ -131,22 +131,22 @@ public class KeyDerivationServiceTests
             cardChallenge,
             Maybe<byte[]>.From(sequenceCounter),
             Maybe<ScpImplementation>.From(implementation));
-        
-        sessionKeysResult.IsSuccess.Should().BeTrue();
+
+        _ = sessionKeysResult.IsSuccess.Should().BeTrue();
         var sessionKeys = sessionKeysResult.Value;
         
         if (shouldDeriveMac)
         {
-            sessionKeys.SMac.Should().NotBeEquivalentTo(staticKeys, description);
+            _ = sessionKeys.SMac.Should().NotBeEquivalentTo(staticKeys, description);
         }
         else
         {
-            sessionKeys.SMac.Should().BeEquivalentTo(staticKeys, description);
+            _ = sessionKeys.SMac.Should().BeEquivalentTo(staticKeys, description);
         }
-        
+
         // S-ENC should always be derived regardless of implementation
-        sessionKeys.SEnc.Should().NotBeEquivalentTo(staticKeys, "S-ENC should always be derived");
+        _ = sessionKeys.SEnc.Should().NotBeEquivalentTo(staticKeys, "S-ENC should always be derived");
         
-        TestContext.WriteLine($"{implementation} ({(byte)implementation:X2}): MAC derived = {shouldDeriveMac}");
+        TestContext.Out.WriteLine($"{implementation} ({(byte)implementation:X2}): MAC derived = {shouldDeriveMac}");
     }
 }

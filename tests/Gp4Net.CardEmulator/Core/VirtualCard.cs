@@ -101,7 +101,7 @@ public class VirtualCard : IVirtualCard
             {
                 _logger.LogWarning("Command processing failed: {Error} (SW: {StatusWord:X4})", 
                     error.Message, error.StatusWord.GetValueOrDefault((ushort)StatusWords.GenericFailure));
-                return new ApduResponse(Array.Empty<byte>(), new StatusWord(error.StatusWord.GetValueOrDefault((ushort)StatusWords.GenericFailure)));
+                return new ApduResponse([], new StatusWord(error.StatusWord.GetValueOrDefault((ushort)StatusWords.GenericFailure)));
             }
         );
     }
@@ -409,7 +409,7 @@ public class VirtualCard : IVirtualCard
             // GlobalPlatform Card Specification v2.3.1 Table 11-13: INSTALL Response
             // Response contains one byte (00) for success
             return Result.Success<(ApduResponse, CardState), SmartCardError>(
-                (new ApduResponse(new byte[] { 0x00 }, StatusWords.Success), newState));
+                (new ApduResponse([0x00], StatusWords.Success), newState));
         }
         else if (installForInstall)
         {
@@ -437,12 +437,12 @@ public class VirtualCard : IVirtualCard
             
             // GlobalPlatform Card Specification v2.3.1 Table 11-13: INSTALL Response
             return Result.Success<(ApduResponse, CardState), SmartCardError>(
-                (new ApduResponse(new byte[] { 0x00 }, StatusWords.Success), newState));
+                (new ApduResponse([0x00], StatusWords.Success), newState));
         }
         
         // Default response for unhandled install types
         return Result.Success<(ApduResponse, CardState), SmartCardError>(
-            (new ApduResponse(new byte[] { 0x00 }, StatusWords.Success), state));
+            (new ApduResponse([0x00], StatusWords.Success), state));
     }
     
     private static Result<(byte[] loadFileAid, Maybe<byte[]> securityDomainAid), SmartCardError> ParseInstallForLoadData(byte[] data)
@@ -549,7 +549,7 @@ public class VirtualCard : IVirtualCard
     private static Result<(ApduResponse, CardState), SmartCardError> ProcessLoadCommand(
         byte[] command, CardState state, CardConfiguration config) =>
         Result.Success<(ApduResponse, CardState), SmartCardError>(
-            (new ApduResponse(Array.Empty<byte>(), StatusWords.Success), state));
+            (new ApduResponse([], StatusWords.Success), state));
 
     private static Result<(ApduResponse, CardState), SmartCardError> ProcessDeleteCommand(
         byte[] command, CardState state, CardConfiguration config)
@@ -582,42 +582,46 @@ public class VirtualCard : IVirtualCard
         // Process each TLV
         foreach (var tlv in tlvs)
         {
-            // GlobalPlatform Card Specification v2.3.1 Section 11.1.1.1
-            // Tag 0x4F - Application AID or Executable Load File AID
-            if (tlv.TagNumber == 0x4F && tlv.Value != null)
+            switch (tlv.TagNumber)
             {
-                var aid = tlv.Value;
-                var aidHex = Convert.ToHexString(aid);
+                // GlobalPlatform Card Specification v2.3.1 Section 11.1.1.1
+                // Tag 0x4F - Application AID or Executable Load File AID
+                case 0x4F when tlv.Value != null:
+                {
+                    var aid = tlv.Value;
+                    var aidHex = Convert.ToHexString(aid);
                 
-                // Remove matching applications
-                var appsToRemove = newState.Applications
-                    .Where(kvp => kvp.Value.Aid.SequenceEqual(aid))
-                    .Select(kvp => kvp.Key)
-                    .ToList();
+                    // Remove matching applications
+                    var appsToRemove = newState.Applications
+                        .Where(kvp => kvp.Value.Aid.SequenceEqual(aid))
+                        .Select(kvp => kvp.Key)
+                        .ToList();
                     
-                var updatedApps = newState.Applications;
-                foreach (var key in appsToRemove)
-                {
-                    updatedApps = updatedApps.Remove(key);
+                    var updatedApps = newState.Applications;
+                    foreach (var key in appsToRemove)
+                    {
+                        updatedApps = updatedApps.Remove(key);
+                    }
+                
+                    // Remove matching load files
+                    var updatedLoadFiles = newState.LoadFiles
+                        .Where(lf => !lf.Aid.SequenceEqual(aid))
+                        .ToImmutableList();
+                
+                    newState = newState with
+                    {
+                        Applications = updatedApps,
+                        LoadFiles = updatedLoadFiles
+                    };
+                    break;
                 }
-                
-                // Remove matching load files
-                var updatedLoadFiles = newState.LoadFiles
-                    .Where(lf => !lf.Aid.SequenceEqual(aid))
-                    .ToImmutableList();
-                
-                newState = newState with
-                {
-                    Applications = updatedApps,
-                    LoadFiles = updatedLoadFiles
-                };
-            }
-            // GlobalPlatform Card Specification v2.3.1 Section 11.1.1.1  
-            // Tag 0xD3 - Deletion Token (Receipt generation/verification)
-            else if (tlv.TagNumber == 0xD3)
-            {
-                // Simplified: accept any deletion token
-                // In production, would verify the token per GP Card Specification v2.3.1 Section 11.9.1
+
+                // GlobalPlatform Card Specification v2.3.1 Section 11.1.1.1  
+                // Tag 0xD3 - Deletion Token (Receipt generation/verification)
+                case 0xD3:
+                    // Simplified: accept any deletion token
+                    // In production, would verify the token per GP Card Specification v2.3.1 Section 11.9.1
+                    break;
             }
         }
         
@@ -723,13 +727,13 @@ public class VirtualCard : IVirtualCard
                 var newState = state.WithDefaultKeyVersion(newDefaultKeyVersion);
                     
                 return Result.Success<(ApduResponse, CardState), SmartCardError>(
-                    (new ApduResponse(Array.Empty<byte>(), StatusWords.Success), newState));
+                    (new ApduResponse([], StatusWords.Success), newState));
             }
         }
 
         // Default: return success without state change for other STORE DATA commands
         return Result.Success<(ApduResponse, CardState), SmartCardError>(
-            (new ApduResponse(Array.Empty<byte>(), StatusWords.Success), state));
+            (new ApduResponse([], StatusWords.Success), state));
     }
 
     private record ParsedCommand(byte Cla, byte Ins, byte P1, byte P2, byte[] FullCommand);

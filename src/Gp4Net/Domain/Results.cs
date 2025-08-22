@@ -21,14 +21,18 @@ public record DeletionResult(
     /// <summary>
     /// Creates a successful deletion result.
     /// </summary>
-    public static DeletionResult Success(ImmutableList<byte[]> deletedAids = null) =>
-        new(true, null, deletedAids);
+    public static DeletionResult Success(ImmutableList<byte[]> deletedAids = null)
+    {
+        return new(true, null, deletedAids);
+    }
 
     /// <summary>
     /// Creates a failed deletion result.
     /// </summary>
-    public static DeletionResult Failure(string errorMessage) =>
-        new(false, errorMessage);
+    public static DeletionResult Failure(string errorMessage)
+    {
+        return new(false, errorMessage);
+    }
 }
 
 /// <summary>
@@ -42,12 +46,16 @@ public record PutKeyResult(
     /// <summary>
     /// Creates a successful PUT KEY result.
     /// </summary>
-    public static PutKeyResult Success(ImmutableList<byte[]> keyCheckValues = null) =>
-        new(true, null, keyCheckValues);
+    public static PutKeyResult Success(ImmutableList<byte[]> keyCheckValues = null)
+    {
+        return new(true, null, keyCheckValues);
+    }
 
     /// <summary>
     /// Creates a failed PUT KEY result.
     /// </summary>
-    public static PutKeyResult Failure(string errorMessage) =>
-        new(false, errorMessage);
+    public static PutKeyResult Failure(string errorMessage)
+    {
+        return new(false, errorMessage);
+    }
 }

@@ -76,18 +76,18 @@ public static class ApplicationTableRenderer
     private static Table CreateTable(bool showExtended)
     {
         var table = new Table();
-        
+
         // Basic columns
-        table.AddColumn("Type");
-        table.AddColumn("AID");
-        table.AddColumn("State");
-        table.AddColumn("Privileges");
+        _ = table.AddColumn("Type");
+        _ = table.AddColumn("AID");
+        _ = table.AddColumn("State");
+        _ = table.AddColumn("Privileges");
         
         // Extended columns
         if (showExtended)
         {
-            table.AddColumn("Version");
-            table.AddColumn("Assoc. SD");
+            _ = table.AddColumn("Version");
+            _ = table.AddColumn("Assoc. SD");
         }
         
         return table;
@@ -108,8 +108,8 @@ public static class ApplicationTableRenderer
                     columns.Add(version.GetValueOrDefault("-"));
                     columns.Add(associatedSd.GetValueOrDefault("-"));
                 }
-                
-                table.AddRow(columns.ToArray());
+
+                _ = table.AddRow(columns.ToArray());
                 break;
                 
             case ApplicationTableBuilder.SectionHeaderRow(var title):
@@ -117,7 +117,7 @@ public static class ApplicationTableRenderer
                 if (table.Rows.Count > 0)
                 {
                     var emptyCols = Enumerable.Repeat("", table.Columns.Count).ToArray();
-                    table.AddRow(emptyCols);
+                    _ = table.AddRow(emptyCols);
                 }
                 
                 // Add header row with bold formatting
@@ -127,7 +127,7 @@ public static class ApplicationTableRenderer
                 {
                     headerCols[i] = "";
                 }
-                table.AddRow(headerCols);
+                _ = table.AddRow(headerCols);
                 break;
                 
             case ApplicationTableBuilder.SummaryRow(var message):

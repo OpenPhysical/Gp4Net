@@ -65,7 +65,7 @@ public class InfoCommandTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(0);
+        _ = result.Should().Be(0);
         _mockCardService.Verify(s => s.GetAtr(), Times.Once);
     }
 
@@ -82,7 +82,7 @@ public class InfoCommandTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(1);
+        _ = result.Should().Be(1);
     }
 
     [Test]
@@ -111,7 +111,7 @@ public class InfoCommandTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(0); // Should still succeed
+        _ = result.Should().Be(0); // Should still succeed
         _mockCardService.Verify(s => s.GetAtr(), Times.Once); // Should still show basic info
     }
 
@@ -131,7 +131,7 @@ public class InfoCommandTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(0);
+        _ = result.Should().Be(0);
         // Should still try to get other data
         _mockGlobalPlatformService.Verify(
             s => s.GetDataAsync(It.IsAny<ushort>(), It.IsAny<CancellationToken>()),
@@ -155,7 +155,7 @@ public class InfoCommandTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(0);
+        _ = result.Should().Be(0);
     }
 
     [Test]
@@ -171,7 +171,7 @@ public class InfoCommandTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(0);
+        _ = result.Should().Be(0);
         _mockCardService.Verify(s => s.GetAtr(), Times.Once);
     }
 
@@ -189,7 +189,7 @@ public class InfoCommandTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(0);
+        _ = result.Should().Be(0);
         _mockGlobalPlatformService.Verify(s => s.GetCplcAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -205,9 +205,9 @@ public class InfoCommandTests
 
         var apps = new List<ApplicationInfo>
         {
-            new ApplicationInfo(new byte[] { 0xA0, 0x00 }, LifecycleState.Selectable, [], ApplicationType.IssuerSecurityDomain),
-            new ApplicationInfo(new byte[] { 0xA0, 0x01 }, LifecycleState.Selectable, [], ApplicationType.Application),
-            new ApplicationInfo(new byte[] { 0xA0, 0x02 }, LifecycleState.Selectable, [], ApplicationType.Application)
+            new ApplicationInfo([0xA0, 0x00], LifecycleState.Selectable, [], ApplicationType.IssuerSecurityDomain),
+            new ApplicationInfo([0xA0, 0x01], LifecycleState.Selectable, [], ApplicationType.Application),
+            new ApplicationInfo([0xA0, 0x02], LifecycleState.Selectable, [], ApplicationType.Application)
         };
         _ = _mockGlobalPlatformService.Setup(s => s.GetStatusAsync(It.IsAny<StatusSubset>(), It.IsAny<CancellationToken>())).ReturnsAsync(apps.ToImmutableList());
 
@@ -217,19 +217,19 @@ public class InfoCommandTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(0);
+        _ = result.Should().Be(0);
         _mockGlobalPlatformService.Verify(s => s.GetStatusAsync(It.IsAny<StatusSubset>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private void SetupConnectedCard(byte[]? atr = null)
     {
         _ = _mockCardService.Setup(s => s.IsSecureChannelEstablished).Returns(true);
-        _ = _mockCardService.Setup(s => s.GetAtr()).Returns(atr ?? new byte[] { 0x3B, 0x00 });
+        _ = _mockCardService.Setup(s => s.GetAtr()).Returns(atr ?? [0x3B, 0x00]);
     }
 
     private void SetupIsdSelection()
     {
-        var selectResponse = new SelectResponse(new byte[] { 0x6F, 0x00 });
+        var selectResponse = new SelectResponse([0x6F, 0x00]);
         _ = _mockGlobalPlatformService.Setup(s => s.SelectIsdAsync(It.IsAny<CancellationToken>())).ReturnsAsync(selectResponse);
     }
 

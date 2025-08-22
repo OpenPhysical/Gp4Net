@@ -22,14 +22,14 @@ public class LoadCommandTests
 
         var result = LoadCommand.Create((byte)0, data, false);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        command.BlockNumber.Should().Be(0);
-        command.Data.Should().BeEquivalentTo(data);
-        command.Type.Should().Be(LoadCommand.LoadType.Continuation);
-        command.TotalCapSize.Should().Be(4); // Length of data
-        command.IsFirstBlock.Should().BeTrue();
-        command.IsFinalBlock.Should().BeFalse();
+        _ = command.BlockNumber.Should().Be(0);
+        _ = command.Data.Should().BeEquivalentTo(data);
+        _ = command.Type.Should().Be(LoadCommand.LoadType.Continuation);
+        _ = command.TotalCapSize.Should().Be(4); // Length of data
+        _ = command.IsFirstBlock.Should().BeTrue();
+        _ = command.IsFinalBlock.Should().BeFalse();
     }
 
     [Test]
@@ -39,10 +39,10 @@ public class LoadCommandTests
 
         var result = LoadCommand.Create((byte)1, data, true);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        command.Type.Should().Be(LoadCommand.LoadType.Final);
-        command.IsFinalBlock.Should().BeTrue();
+        _ = command.Type.Should().Be(LoadCommand.LoadType.Final);
+        _ = command.IsFinalBlock.Should().BeTrue();
     }
 
     [Test]
@@ -50,9 +50,9 @@ public class LoadCommandTests
     {
         var result = LoadCommand.Create((byte)0, data: null!, false);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<SmartCardError>();
-        result.Error.Message.Should().Contain("null");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<SmartCardError>();
+        _ = result.Error.Message.Should().Contain("null");
         // This should ideally be NullParameterError for null parameter validation
     }
 
@@ -61,9 +61,9 @@ public class LoadCommandTests
     {
         var result = LoadCommand.Create((byte)0, [], false);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<SmartCardError>();
-        result.Error.Message.Should().Contain("empty");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<SmartCardError>();
+        _ = result.Error.Message.Should().Contain("empty");
         // This should ideally be EmptyDataError for empty data validation
     }
 
@@ -74,9 +74,9 @@ public class LoadCommandTests
 
         var result = LoadCommand.Create((byte)0, data, false);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        command.TotalCapSize.Should().Be(4);
+        _ = command.TotalCapSize.Should().Be(4);
     }
 
     [Test]
@@ -86,9 +86,9 @@ public class LoadCommandTests
 
         var result = LoadCommand.Create((byte)1, data, false);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        command.TotalCapSize.Should().BeNull();
+        _ = command.TotalCapSize.Should().BeNull();
     }
 
     [Test]
@@ -98,14 +98,14 @@ public class LoadCommandTests
 
         var result = LoadCommand.CreateFromCapFile(capData, 255);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var commands = result.Value;
-        commands.Should().HaveCount(1);
-        commands[0].BlockNumber.Should().Be(0);
-        commands[0].IsFirstBlock.Should().BeTrue();
-        commands[0].IsFinalBlock.Should().BeTrue();
-        commands[0].TotalCapSize.Should().Be(8);
-        commands[0].Data.Should().BeEquivalentTo(capData);
+        _ = commands.Should().HaveCount(1);
+        _ = commands[0].BlockNumber.Should().Be(0);
+        _ = commands[0].IsFirstBlock.Should().BeTrue();
+        _ = commands[0].IsFinalBlock.Should().BeTrue();
+        _ = commands[0].TotalCapSize.Should().Be(8);
+        _ = commands[0].Data.Should().BeEquivalentTo(capData);
     }
 
     [Test]
@@ -119,30 +119,30 @@ public class LoadCommandTests
 
         var result = LoadCommand.CreateFromCapFile(capData, 200);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var commands = result.Value;
-        commands.Count.Should().BeGreaterThan(1);
+        _ = commands.Count.Should().BeGreaterThan(1);
 
         // Check first block
-        commands[0].BlockNumber.Should().Be(0);
-        commands[0].IsFirstBlock.Should().BeTrue();
-        commands[0].IsFinalBlock.Should().BeFalse();
-        commands[0].TotalCapSize.Should().Be(500);
+        _ = commands[0].BlockNumber.Should().Be(0);
+        _ = commands[0].IsFirstBlock.Should().BeTrue();
+        _ = commands[0].IsFinalBlock.Should().BeFalse();
+        _ = commands[0].TotalCapSize.Should().Be(500);
 
         // Check last block
         var lastCommand = commands[^1];
-        lastCommand.BlockNumber.Should().Be((byte)(commands.Count - 1));
-        lastCommand.IsFirstBlock.Should().BeFalse();
-        lastCommand.IsFinalBlock.Should().BeTrue();
-        lastCommand.TotalCapSize.Should().BeNull();
+        _ = lastCommand.BlockNumber.Should().Be((byte)(commands.Count - 1));
+        _ = lastCommand.IsFirstBlock.Should().BeFalse();
+        _ = lastCommand.IsFinalBlock.Should().BeTrue();
+        _ = lastCommand.TotalCapSize.Should().BeNull();
 
         // Check intermediate blocks
         for (var i = 1; i < commands.Count - 1; i++)
         {
-            commands[i].BlockNumber.Should().Be((byte)i);
-            commands[i].IsFirstBlock.Should().BeFalse();
-            commands[i].IsFinalBlock.Should().BeFalse();
-            commands[i].TotalCapSize.Should().BeNull();
+            _ = commands[i].BlockNumber.Should().Be((byte)i);
+            _ = commands[i].IsFirstBlock.Should().BeFalse();
+            _ = commands[i].IsFinalBlock.Should().BeFalse();
+            _ = commands[i].TotalCapSize.Should().BeNull();
         }
     }
 
@@ -154,11 +154,11 @@ public class LoadCommandTests
 
         var result = LoadCommand.CreateFromCapFile(capData, maxBlockSize);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var commands = result.Value;
         foreach (var command in commands)
         {
-            command.Data.Length.Should().BeLessThanOrEqualTo(maxBlockSize);
+            _ = command.Data.Length.Should().BeLessThanOrEqualTo(maxBlockSize);
         }
     }
 
@@ -173,10 +173,10 @@ public class LoadCommandTests
 
         var result = LoadCommand.CreateFromCapFile(capData, 50);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var commands = result.Value;
         var reconstructed = commands.SelectMany(c => c.Data).ToArray();
-        reconstructed.Should().BeEquivalentTo(capData);
+        _ = reconstructed.Should().BeEquivalentTo(capData);
     }
 
     [Test]
@@ -185,9 +185,9 @@ public class LoadCommandTests
         byte[]? capData = null;
         var result = LoadCommand.CreateFromCapFile(capData!);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<SmartCardError>();
-        result.Error.Message.Should().Contain("null");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<SmartCardError>();
+        _ = result.Error.Message.Should().Contain("null");
         // This should ideally be NullParameterError for null parameter validation
     }
 
@@ -196,9 +196,9 @@ public class LoadCommandTests
     {
         var result = LoadCommand.CreateFromCapFile([]);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<SmartCardError>();
-        result.Error.Message.Should().Contain("empty");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<SmartCardError>();
+        _ = result.Error.Message.Should().Contain("empty");
         // This should ideally be EmptyDataError for empty data validation
     }
 
@@ -210,10 +210,10 @@ public class LoadCommandTests
         var result1 = LoadCommand.CreateFromCapFile(capData, 0);
         var result2 = LoadCommand.CreateFromCapFile(capData, 256);
 
-        result1.IsFailure.Should().BeTrue();
-        result1.Error.Should().BeOfType<SmartCardError>();
-        result2.IsFailure.Should().BeTrue();
-        result2.Error.Should().BeOfType<SmartCardError>();
+        _ = result1.IsFailure.Should().BeTrue();
+        _ = result1.Error.Should().BeOfType<SmartCardError>();
+        _ = result2.IsFailure.Should().BeTrue();
+        _ = result2.Error.Should().BeOfType<SmartCardError>();
     }
 
     [Test]
@@ -225,16 +225,16 @@ public class LoadCommandTests
 
         var apdu = command.ToApdu();
 
-        apdu[0].Should().Be(0x80); // CLA
-        apdu[1].Should().Be(0xE8); // INS
-        apdu[2].Should().Be(0x00); // P1 (continuation)
-        apdu[3].Should().Be(0x00); // P2 (block number)
+        _ = apdu[0].Should().Be(0x80); // CLA
+        _ = apdu[1].Should().Be(0xE8); // INS
+        _ = apdu[2].Should().Be(0x00); // P1 (continuation)
+        _ = apdu[3].Should().Be(0x00); // P2 (block number)
 
         // Data should include C4 tag and length
         var dataField = apdu.Skip(5).Take(apdu[4]).ToArray();
-        dataField[0].Should().Be(0xC4); // TLV tag
-        dataField[1].Should().Be(4); // Total length (actual data length)
-        dataField.Skip(2).ToArray().Should().BeEquivalentTo(data); // Actual data
+        _ = dataField[0].Should().Be(0xC4); // TLV tag
+        _ = dataField[1].Should().Be(4); // Total length (actual data length)
+        _ = dataField.Skip(2).ToArray().Should().BeEquivalentTo(data); // Actual data
     }
 
     [Test]
@@ -246,12 +246,12 @@ public class LoadCommandTests
 
         var apdu = command.ToApdu();
 
-        apdu[2].Should().Be(0x00); // P1 (continuation)
-        apdu[3].Should().Be(0x01); // P2 (block number)
+        _ = apdu[2].Should().Be(0x00); // P1 (continuation)
+        _ = apdu[3].Should().Be(0x01); // P2 (block number)
 
         // Data should be raw data without TLV header
         var dataField = apdu.Skip(5).Take(apdu[4]).ToArray();
-        dataField.Should().BeEquivalentTo(data);
+        _ = dataField.Should().BeEquivalentTo(data);
     }
 
     [Test]
@@ -263,8 +263,8 @@ public class LoadCommandTests
 
         var apdu = command.ToApdu();
 
-        apdu[2].Should().Be(0x80); // P1 (final)
-        apdu[3].Should().Be(0x02); // P2 (block number)
+        _ = apdu[2].Should().Be(0x80); // P1 (final)
+        _ = apdu[3].Should().Be(0x02); // P2 (block number)
     }
 
     [Test]
@@ -283,10 +283,10 @@ public class LoadCommandTests
         var apdu = firstCommand.ToApdu();
 
         var dataField = apdu.Skip(5).Take(apdu[4]).ToArray();
-        dataField[0].Should().Be(0xC4); // TLV tag
-        dataField[1].Should().Be(0x82); // Length form (2 bytes follow)
-        dataField[2].Should().Be(0x12); // Length high byte
-        dataField[3].Should().Be(0x34); // Length low byte
+        _ = dataField[0].Should().Be(0xC4); // TLV tag
+        _ = dataField[1].Should().Be(0x82); // Length form (2 bytes follow)
+        _ = dataField[2].Should().Be(0x12); // Length high byte
+        _ = dataField[3].Should().Be(0x34); // Length low byte
     }
 
     [Test]
@@ -298,7 +298,7 @@ public class LoadCommandTests
 
         var apdu = command.ToApdu();
 
-        apdu[^1].Should().Be(0x00); // Le field
+        _ = apdu[^1].Should().Be(0x00); // Le field
     }
 
     [Test]
@@ -312,9 +312,9 @@ public class LoadCommandTests
         var response = new LoadResponse(data, statusWord);
 
         // Assert
-        response.Data.Should().BeEquivalentTo(data);
-        response.StatusWord.Should().Be(statusWord);
-        response.IsSuccessful.Should().BeTrue();
+        _ = response.Data.Should().BeEquivalentTo(data);
+        _ = response.StatusWord.Should().Be(statusWord);
+        _ = response.IsSuccessful.Should().BeTrue();
     }
 
     [Test]
@@ -328,8 +328,8 @@ public class LoadCommandTests
         var response = new LoadResponse(data, statusWord);
 
         // Assert
-        response.IsSuccessful.Should().BeFalse();
-        response.StatusWord.Should().Be(statusWord);
+        _ = response.IsSuccessful.Should().BeFalse();
+        _ = response.StatusWord.Should().Be(statusWord);
     }
 
     [Test]
@@ -343,9 +343,9 @@ public class LoadCommandTests
         var response = LoadResponse.Parse(data, statusWord);
 
         // Assert
-        response.Data.Should().BeEquivalentTo(data);
-        response.StatusWord.Should().Be(statusWord);
-        response.IsSuccessful.Should().BeTrue();
+        _ = response.Data.Should().BeEquivalentTo(data);
+        _ = response.StatusWord.Should().Be(statusWord);
+        _ = response.IsSuccessful.Should().BeTrue();
     }
 
     [Test]
@@ -355,8 +355,8 @@ public class LoadCommandTests
         var response = LoadResponse.Parse(null, 0x9000);
 
         // Assert
-        response.Data.Should().NotBeNull();
-        response.Data.Length.Should().Be(0);
+        _ = response.Data.Should().NotBeNull();
+        _ = response.Data.Length.Should().Be(0);
     }
 
     [Test]
@@ -368,7 +368,7 @@ public class LoadCommandTests
 
         var str = command.ToString();
 
-        str.Should().Be("LOAD");
+        _ = str.Should().Be("LOAD");
     }
 
     [Test]
@@ -378,7 +378,7 @@ public class LoadCommandTests
         var isValid = CapFileLoader.ValidateCapFile(null);
 
         // Assert
-        isValid.Should().BeFalse();
+        _ = isValid.Should().BeFalse();
     }
 
     [Test]
@@ -388,7 +388,7 @@ public class LoadCommandTests
         var isValid = CapFileLoader.ValidateCapFile([]);
 
         // Assert
-        isValid.Should().BeFalse();
+        _ = isValid.Should().BeFalse();
     }
 
     [Test]
@@ -401,7 +401,7 @@ public class LoadCommandTests
         var isValid = CapFileLoader.ValidateCapFile(shortData);
 
         // Assert
-        isValid.Should().BeFalse();
+        _ = isValid.Should().BeFalse();
     }
 
     [Test]
@@ -413,8 +413,8 @@ public class LoadCommandTests
         );
 
         // Assert
-        description.Should().NotBeNull();
-        description.Should().Contain("Incorrect data");
+        _ = description.Should().NotBeNull();
+        _ = description.Should().Contain("Incorrect data");
     }
 
     [Test]
@@ -424,8 +424,8 @@ public class LoadCommandTests
         var description = CapFileLoader.GetErrorDescription(0x1234);
 
         // Assert
-        description.Should().Contain("Unknown error");
-        description.Should().Contain("1234");
+        _ = description.Should().Contain("Unknown error");
+        _ = description.Should().Contain("1234");
     }
 
     [Test]
@@ -435,7 +435,7 @@ public class LoadCommandTests
         var description = CapFileLoader.GetErrorDescription(CapFileLoader.ErrorCodes.Success);
 
         // Assert
-        description.Should().Be("Success");
+        _ = description.Should().Be("Success");
     }
 
 }

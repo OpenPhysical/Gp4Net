@@ -50,13 +50,13 @@ public class Scp02ImplementationDetectionTests
     {
         // Act
         var result = Scp02Protocol.GetScp02Implementation(implementationParameter);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue($"{description} - should succeed");
-        result.Value.Should().Be(expectedImplementation, description);
+        _ = result.IsSuccess.Should().BeTrue($"{description} - should succeed");
+        _ = result.Value.Should().Be(expectedImplementation, description);
         
-        TestContext.WriteLine($"✓ {description}");
-        TestContext.WriteLine($"Implementation parameter 0x{implementationParameter:X2} correctly detected as {expectedImplementation}");
+        TestContext.Out.WriteLine($"✓ {description}");
+        TestContext.Out.WriteLine($"Implementation parameter 0x{implementationParameter:X2} correctly detected as {expectedImplementation}");
     }
 
     [TestCase(0x01, "i=01 is not a valid SCP02 implementation")]
@@ -72,16 +72,16 @@ public class Scp02ImplementationDetectionTests
     {
         // Act & Assert
         var result = Scp02Protocol.GetScp02Implementation(invalidImplementationParameter);
-        
-        result.IsFailure.Should().BeTrue($"{description} - should fail with error");
-        result.Error.Should().BeOfType<UnsupportedImplementationError>();
-        result.Error.Message.Should().Contain($"i={invalidImplementationParameter:X2}",
+
+        _ = result.IsFailure.Should().BeTrue($"{description} - should fail with error");
+        _ = result.Error.Should().BeOfType<UnsupportedImplementationError>();
+        _ = result.Error.Message.Should().Contain($"i={invalidImplementationParameter:X2}",
             $"{description} - should fail with specific implementation error");
-        result.Error.Message.Should().Contain("00, 02, 04, 05, 15, 35, 55, 75",
+        _ = result.Error.Message.Should().Contain("00, 02, 04, 05, 15, 35, 55, 75",
             $"{description} - should provide guidance on valid implementations");
         
-        TestContext.WriteLine($"✓ {description}");
-        TestContext.WriteLine($"Invalid implementation parameter 0x{invalidImplementationParameter:X2} correctly rejected with error: {result.Error.Message}");
+        TestContext.Out.WriteLine($"✓ {description}");
+        TestContext.Out.WriteLine($"Invalid implementation parameter 0x{invalidImplementationParameter:X2} correctly rejected with error: {result.Error.Message}");
     }
 
     [Test]
@@ -93,20 +93,20 @@ public class Scp02ImplementationDetectionTests
         var hostChallenge = Convert.FromHexString("719426F20E234840");
         
         var parseResult = InitializeUpdateResponse.Parse(realClrResponse);
-        parseResult.IsSuccess.Should().BeTrue("Real GP Pro response should parse successfully");
+        _ = parseResult.IsSuccess.Should().BeTrue("Real GP Pro response should parse successfully");
         
         // The ScpParameter should be at byte 11 (0x02 in this case)
-        TestContext.WriteLine($"Parsed ScpParameter: 0x{parseResult.Value.ScpParameter:X2}");
+        TestContext.Out.WriteLine($"Parsed ScpParameter: 0x{parseResult.Value.ScpParameter:X2}");
         
         // Act
         var result = _protocol.ProcessInitializeUpdateResponse(parseResult.Value, hostChallenge);
-        
+
         // Assert - Should not fail due to unknown implementation (will fail on cryptogram, but that's expected)
-        result.IsFailure.Should().BeTrue("Expected failure due to cryptogram mismatch with zero keys");
-        result.Error.Message.Should().NotContain("Unknown SCP02 implementation parameter", 
+        _ = result.IsFailure.Should().BeTrue("Expected failure due to cryptogram mismatch with zero keys");
+        _ = result.Error.Message.Should().NotContain("Unknown SCP02 implementation parameter",
             "Real GP Pro response should have recognizable implementation parameter");
         
-        TestContext.WriteLine($"✓ Real GP Pro CLR trace correctly parsed implementation parameter");
+        TestContext.Out.WriteLine($"✓ Real GP Pro CLR trace correctly parsed implementation parameter");
     }
 
     [Test]
@@ -118,20 +118,20 @@ public class Scp02ImplementationDetectionTests
         var hostChallenge = Convert.FromHexString("BD76C16D1D2E2D76");
         
         var parseResult = InitializeUpdateResponse.Parse(realMacResponse);
-        parseResult.IsSuccess.Should().BeTrue("Real GP Pro response should parse successfully");
+        _ = parseResult.IsSuccess.Should().BeTrue("Real GP Pro response should parse successfully");
         
         // The ScpParameter should be at byte 11 (0x02 in this case)
-        TestContext.WriteLine($"Parsed ScpParameter: 0x{parseResult.Value.ScpParameter:X2}");
+        TestContext.Out.WriteLine($"Parsed ScpParameter: 0x{parseResult.Value.ScpParameter:X2}");
         
         // Act
         var result = _protocol.ProcessInitializeUpdateResponse(parseResult.Value, hostChallenge);
-        
+
         // Assert - Should not fail due to unknown implementation
-        result.IsFailure.Should().BeTrue("Expected failure due to cryptogram mismatch with zero keys");
-        result.Error.Message.Should().NotContain("Unknown SCP02 implementation parameter", 
+        _ = result.IsFailure.Should().BeTrue("Expected failure due to cryptogram mismatch with zero keys");
+        _ = result.Error.Message.Should().NotContain("Unknown SCP02 implementation parameter",
             "Real GP Pro response should have recognizable implementation parameter");
         
-        TestContext.WriteLine($"✓ Real GP Pro MAC trace correctly parsed implementation parameter");
+        TestContext.Out.WriteLine($"✓ Real GP Pro MAC trace correctly parsed implementation parameter");
     }
 
     /// <summary>

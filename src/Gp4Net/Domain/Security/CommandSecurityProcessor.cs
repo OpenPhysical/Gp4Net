@@ -222,14 +222,14 @@ public static class CommandSecurityProcessor
             cmac.BlockUpdate(macInput, 0, macInput.Length);
             
             var fullMac = new byte[16];
-            cmac.DoFinal(fullMac, 0);
+            _ = cmac.DoFinal(fullMac, 0);
 
             // Return truncated 8-byte MAC and full 16-byte chaining value
             var mac = new byte[8];
             Array.Copy(fullMac, 0, mac, 0, 8);
             
             return Result.Success<(byte[], ImmutableArray<byte>), SmartCardError>(
-                (mac, ImmutableArray.Create(fullMac))
+                (mac, [..fullMac])
             );
         }
         else
@@ -240,14 +240,14 @@ public static class CommandSecurityProcessor
             desMac.Init(new KeyParameter(sessionKeys.SMac)); // ISO9797Alg3Mac handles 16/24 byte keys internally
             desMac.BlockUpdate(macInput, 0, macInput.Length);
             var mac = new byte[8];
-            desMac.DoFinal(mac, 0);
+            _ = desMac.DoFinal(mac, 0);
             
             // For SCP02, update only first 8 bytes of chaining value
             var newChainingValue = macChainingValue.ToArray();
             Array.Copy(mac, 0, newChainingValue, 0, 8);
             
             return Result.Success<(byte[], ImmutableArray<byte>), SmartCardError>(
-                (mac, ImmutableArray.Create(newChainingValue))
+                (mac, [..newChainingValue])
             );
         }
     }
@@ -339,15 +339,13 @@ public static class CommandSecurityProcessor
 
     private static (bool hasData, byte originalLc, byte? originalLe) ParseCommandStructure(byte[] command)
     {
-        if (command.Length <= 4)
+        switch (command.Length)
         {
-            return (false, 0, null);
-        }
-
-        if (command.Length == 5)
-        {
-            // Could be Case 2 (P1 P2 P3=Le) or Case 3 with Lc=0
-            return (false, 0, command[4]);
+            case <= 4:
+                return (false, 0, null);
+            case 5:
+                // Could be Case 2 (P1 P2 P3=Le) or Case 3 with Lc=0
+                return (false, 0, command[4]);
         }
 
         var potentialLc = command[4];

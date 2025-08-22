@@ -322,15 +322,12 @@ public class Scp03Protocol : SecureChannelProtocolBase
                     return macService.CalculateAesCmac(context.SessionKeys.SMac, macInput, 16); // Full 16-byte MAC for chaining
                 });
 
-            if (extAuthResult.IsSuccess)
+            if (extAuthResult.IsFailure)
             {
-                macChainingValue = extAuthResult.Value;
+                return Result.Failure<Security.SecureChannelState, SmartCardError>(
+                    SmartCardError.CryptographicError("Failed to calculate initial MAC chaining value"));
             }
-            else
-            {
-                // Fallback to zero if calculation fails
-                macChainingValue = new byte[16];
-            }
+            macChainingValue = extAuthResult.Value;
         }
         else
         {

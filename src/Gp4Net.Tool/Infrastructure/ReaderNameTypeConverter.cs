@@ -130,20 +130,22 @@ public class ReaderNameTypeConverter : TypeConverter
             .Where(r => r.Contains(input, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        if (partialMatches.Count == 1)
+        switch (partialMatches.Count)
         {
-            var selectedReader = partialMatches[0];
-            AnsiConsole.MarkupLine(
-                $"[yellow]Using reader with partial match:[/] {selectedReader}"
-            );
-            return new Reader(selectedReader, isPartialMatch: true);
-        }
-
-        if (partialMatches.Count > 1)
-        {
-            AnsiConsole.MarkupLine($"[yellow]Multiple readers found matching '{input}':[/]");
-            var selected = PromptUserToSelectReader(partialMatches);
-            return new Reader(selected, isPartialMatch: true);
+            case 1:
+            {
+                var selectedReader = partialMatches[0];
+                AnsiConsole.MarkupLine(
+                    $"[yellow]Using reader with partial match:[/] {selectedReader}"
+                );
+                return new Reader(selectedReader, isPartialMatch: true);
+            }
+            case > 1:
+            {
+                AnsiConsole.MarkupLine($"[yellow]Multiple readers found matching '{input}':[/]");
+                var selected = PromptUserToSelectReader(partialMatches);
+                return new Reader(selected, isPartialMatch: true);
+            }
         }
 
         // No matches found
@@ -172,18 +174,18 @@ public class ReaderNameTypeConverter : TypeConverter
             .Where(r => !r.StartsWith("Virtual", StringComparison.OrdinalIgnoreCase))
             .ToList();
         
-        if (physicalReaders.Count == 0)
+        switch (physicalReaders.Count)
         {
-            throw new ArgumentException(
-                "No physical card readers found for auto-detection. Virtual readers must be explicitly specified (e.g., --reader virtual-scp03)."
-            );
-        }
-        
-        if (physicalReaders.Count == 1)
-        {
-            var selectedReader = physicalReaders[0];
-            AnsiConsole.MarkupLine($"[green]Auto-detected reader:[/] {selectedReader}");
-            return new Reader(selectedReader, isAutoDetected: true);
+            case 0:
+                throw new ArgumentException(
+                    "No physical card readers found for auto-detection. Virtual readers must be explicitly specified (e.g., --reader virtual-scp03)."
+                );
+            case 1:
+            {
+                var selectedReader = physicalReaders[0];
+                AnsiConsole.MarkupLine($"[green]Auto-detected reader:[/] {selectedReader}");
+                return new Reader(selectedReader, isAutoDetected: true);
+            }
         }
 
         // Multiple physical readers found - prompt user to choose

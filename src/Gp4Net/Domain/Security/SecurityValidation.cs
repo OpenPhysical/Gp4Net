@@ -66,8 +66,10 @@ public static class SecurityValidation
     /// </summary>
     /// <param name="response">The response to check.</param>
     /// <returns>True if response contains data, false otherwise.</returns>
-    public static bool HasResponseData(byte[] response) => 
-        response?.Length > 2;
+    public static bool HasResponseData(byte[] response)
+    {
+        return response?.Length > 2;
+    }
 
     /// <summary>
     /// Determines if R-MAC should be added to a response based on status word.
@@ -95,6 +97,8 @@ public static class SecurityValidation
     /// </summary>
     /// <param name="response">The response to check.</param>
     /// <returns>True if response contains R-MAC, false otherwise.</returns>
-    public static bool HasRMac(byte[] response) =>
-        response?.Length >= 10; // Minimum: 2 status bytes + 8 MAC bytes
+    public static bool HasRMac(byte[] response)
+    {
+        return response?.Length >= 10; // Minimum: 2 status bytes + 8 MAC bytes
+    }
 }

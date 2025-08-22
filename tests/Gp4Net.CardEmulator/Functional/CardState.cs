@@ -198,8 +198,8 @@ public record CardState(
         
         // Return appropriate default counter based on SCP version
         return ScpVersion == 0x02 
-            ? new byte[] { 0x00, 0x01 } // 2-byte counter for SCP02
-            : new byte[] { 0x00, 0x00, 0x01 }; // 3-byte counter for SCP03
+            ? [0x00, 0x01] // 2-byte counter for SCP02
+            : [0x00, 0x00, 0x01]; // 3-byte counter for SCP03
     }
 
     /// <summary>
@@ -233,24 +233,29 @@ public record CardState(
     {
         var newCounter = new byte[counter.Length];
         System.Array.Copy(counter, newCounter, counter.Length);
-            
-        // Increment in big-endian format
-        if (counter.Length == 2)
+
+        switch (counter.Length)
         {
-            // 2-byte counter for SCP02
-            var value = (newCounter[0] << 8) | newCounter[1];
-            value++;
-            newCounter[0] = (byte)(value >> 8);
-            newCounter[1] = (byte)value;
-        }
-        else if (counter.Length == 3)
-        {
-            // 3-byte counter for SCP03
-            var value = (newCounter[0] << 16) | (newCounter[1] << 8) | newCounter[2];
-            value++;
-            newCounter[0] = (byte)(value >> 16);
-            newCounter[1] = (byte)(value >> 8);
-            newCounter[2] = (byte)value;
+            // Increment in big-endian format
+            case 2:
+            {
+                // 2-byte counter for SCP02
+                var value = (newCounter[0] << 8) | newCounter[1];
+                value++;
+                newCounter[0] = (byte)(value >> 8);
+                newCounter[1] = (byte)value;
+                break;
+            }
+            case 3:
+            {
+                // 3-byte counter for SCP03
+                var value = (newCounter[0] << 16) | (newCounter[1] << 8) | newCounter[2];
+                value++;
+                newCounter[0] = (byte)(value >> 16);
+                newCounter[1] = (byte)(value >> 8);
+                newCounter[2] = (byte)value;
+                break;
+            }
         }
             
         return newCounter;

@@ -24,23 +24,23 @@ public class ChipInfoTests
         
         // Act
         var chipInfo = ChipInfo.FromCplcData(cplc);
-        
+
         // Assert
-        chipInfo.Manufacturer.Should().Be(IcFabricator.NXP);
-        chipInfo.ChipType.Should().Be(IcType.P71D321);
-        chipInfo.Platform.Should().Be(ChipPlatform.SmartMX3);
-        chipInfo.Architecture.Should().Be("IntegralSecurity 2.0");
-        chipInfo.OperatingSystem.Should().Be(OperatingSystemId.JCOP4);
-        chipInfo.JavaCardVersion.HasValue.Should().BeTrue();
-        chipInfo.JavaCardVersion.Value.Should().Be("3.0.5");
-        chipInfo.GlobalPlatformVersion.HasValue.Should().BeTrue();
-        chipInfo.GlobalPlatformVersion.Value.Should().Be("2.3.1");
-        chipInfo.JcopVersion.HasValue.Should().BeTrue();
-        chipInfo.JcopVersion.Value.Should().Be("4");
-        chipInfo.CryptoCapabilities.Should().Be(CryptoCapabilities.P71D321Standard);
-        chipInfo.SecurityFeatures.Should().Be(SecurityFeatures.P71D321Standard);
-        chipInfo.Certifications.Should().Contain(SecurityCertification.CommonCriteriaEAL6Plus);
-        chipInfo.Certifications.Should().Contain(SecurityCertification.FIPS140_2_Level3);
+        _ = chipInfo.Manufacturer.Should().Be(IcFabricator.NXP);
+        _ = chipInfo.ChipType.Should().Be(IcType.P71D321);
+        _ = chipInfo.Platform.Should().Be(ChipPlatform.SmartMX3);
+        _ = chipInfo.Architecture.Should().Be("IntegralSecurity 2.0");
+        _ = chipInfo.OperatingSystem.Should().Be(OperatingSystemId.JCOP4);
+        _ = chipInfo.JavaCardVersion.HasValue.Should().BeTrue();
+        _ = chipInfo.JavaCardVersion.Value.Should().Be("3.0.5");
+        _ = chipInfo.GlobalPlatformVersion.HasValue.Should().BeTrue();
+        _ = chipInfo.GlobalPlatformVersion.Value.Should().Be("2.3.1");
+        _ = chipInfo.JcopVersion.HasValue.Should().BeTrue();
+        _ = chipInfo.JcopVersion.Value.Should().Be("4");
+        _ = chipInfo.CryptoCapabilities.Should().Be(CryptoCapabilities.P71D321Standard);
+        _ = chipInfo.SecurityFeatures.Should().Be(SecurityFeatures.P71D321Standard);
+        _ = chipInfo.Certifications.Should().Contain(SecurityCertification.CommonCriteriaEAL6Plus);
+        _ = chipInfo.Certifications.Should().Contain(SecurityCertification.FIPS140_2_Level3);
     }
     
     [Test]
@@ -56,15 +56,15 @@ public class ChipInfoTests
         
         // Act
         var chipInfo = ChipInfo.FromCplcData(cplc);
-        
+
         // Assert
-        chipInfo.Manufacturer.Should().Be(IcFabricator.Unknown);
-        chipInfo.ChipType.Should().Be(IcType.Unknown);
-        chipInfo.Platform.Should().Be(ChipPlatform.Unknown);
-        chipInfo.OperatingSystem.Should().Be(OperatingSystemId.Unknown);
-        chipInfo.JavaCardVersion.HasValue.Should().BeFalse();
-        chipInfo.GlobalPlatformVersion.HasValue.Should().BeFalse();
-        chipInfo.JcopVersion.HasValue.Should().BeFalse();
+        _ = chipInfo.Manufacturer.Should().Be(IcFabricator.Unknown);
+        _ = chipInfo.ChipType.Should().Be(IcType.Unknown);
+        _ = chipInfo.Platform.Should().Be(ChipPlatform.Unknown);
+        _ = chipInfo.OperatingSystem.Should().Be(OperatingSystemId.Unknown);
+        _ = chipInfo.JavaCardVersion.HasValue.Should().BeFalse();
+        _ = chipInfo.GlobalPlatformVersion.HasValue.Should().BeFalse();
+        _ = chipInfo.JcopVersion.HasValue.Should().BeFalse();
     }
     
     [Test]
@@ -81,9 +81,9 @@ public class ChipInfoTests
         
         // Act
         var description = chipInfo.GetDescription();
-        
+
         // Assert
-        description.Should().Be("NXP SmartMX3 P71D321 344KB Flash / 12KB RAM");
+        _ = description.Should().Be("NXP SmartMX3 P71D321 344KB Flash / 12KB RAM");
     }
     
     [TestCase(P71MemoryConfiguration.P71D251, "256KB Flash / 12KB RAM")]
@@ -101,9 +101,9 @@ public class ChipInfoTests
         
         // Act
         var description = chipInfo.GetMemoryDescription();
-        
+
         // Assert
-        description.Should().Be(expected);
+        _ = description.Should().Be(expected);
     }
     
     [Test]
@@ -122,9 +122,9 @@ public class ChipInfoTests
         
         // Act
         var certifications = chipInfo.GetCertificationsString();
-        
+
         // Assert
-        certifications.Should().Be("CC EAL6+, FIPS 140-2 L3, EMVCo");
+        _ = certifications.Should().Be("CC EAL6+, FIPS 140-2 L3, EMVCo");
     }
     
     [Test]
@@ -140,9 +140,9 @@ public class ChipInfoTests
         
         // Act
         var description = chipInfo.GetOperatingSystemDescription();
-        
+
         // Assert
-        description.Should().Be("JCOP 4 / Java Card 3.0.5 / GP 2.3.1");
+        _ = description.Should().Be("JCOP 4 / Java Card 3.0.5 / GP 2.3.1");
     }
     
     [Test]
@@ -156,12 +156,12 @@ public class ChipInfoTests
         
         // Act
         var summary = chipInfo.GetCryptoSummary();
-        
+
         // Assert
-        summary.Should().Contain("3DES");
-        summary.Should().Contain("AES-128/192/256");
-        summary.Should().Contain("RSA-2048/4096");
-        summary.Should().Contain("ECC P-256/384/521/544");
+        _ = summary.Should().Contain("3DES");
+        _ = summary.Should().Contain("AES-128/192/256");
+        _ = summary.Should().Contain("RSA-2048/4096");
+        _ = summary.Should().Contain("ECC P-256/384/521/544");
     }
     
     [Test]
@@ -175,9 +175,9 @@ public class ChipInfoTests
         
         // Act
         var name = cplc.GetManufacturerName();
-        
+
         // Assert
-        name.Should().Be("NXP");
+        _ = name.Should().Be("NXP");
     }
     
     [Test]
@@ -191,9 +191,9 @@ public class ChipInfoTests
         
         // Act
         var name = cplc.GetManufacturerName();
-        
+
         // Assert
-        name.Should().Be("Unknown (0x9999)");
+        _ = name.Should().Be("Unknown (0x9999)");
     }
     
     [Test]
@@ -207,9 +207,9 @@ public class ChipInfoTests
         
         // Act
         var model = cplc.GetChipModel();
-        
+
         // Assert
-        model.Should().Be("P71D321");
+        _ = model.Should().Be("P71D321");
     }
     
     [Test]
@@ -223,8 +223,8 @@ public class ChipInfoTests
         
         // Act
         var osName = cplc.GetOperatingSystemName();
-        
+
         // Assert
-        osName.Should().Be("JCOP4");
+        _ = osName.Should().Be("JCOP4");
     }
 }

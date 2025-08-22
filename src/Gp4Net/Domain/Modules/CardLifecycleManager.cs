@@ -154,7 +154,7 @@ public static class CardLifecycleManager
 
         // Create SET STATUS command for the card (no AID means card-level operation)
         Result<SetStatusCommand, SmartCardError> cmdResult = 
-            CommandFactory.CreateSetStatusCommand(Array.Empty<byte>(), p1);
+            CommandFactory.CreateSetStatusCommand([], p1);
         
         if (cmdResult.IsFailure)
         {
@@ -179,8 +179,9 @@ public static class CardLifecycleManager
     /// <summary>
     /// Maps application lifecycle state to SET STATUS P1 parameter.
     /// </summary>
-    private static Result<byte, SmartCardError> MapLifecycleStateToP1(LifecycleState state) =>
-        state switch
+    private static Result<byte, SmartCardError> MapLifecycleStateToP1(LifecycleState state)
+    {
+        return state switch
         {
             LifecycleState.Installed => Result.Success<byte, SmartCardError>(0x03),
             LifecycleState.Selectable => Result.Success<byte, SmartCardError>(0x07),
@@ -189,6 +190,7 @@ public static class CardLifecycleManager
             _ => Result.Failure<byte, SmartCardError>(
                 SmartCardError.InvalidArgument($"Cannot set lifecycle state to: {state}"))
         };
+    }
 
     /// <summary>
     /// Installs an application for installation.
@@ -216,8 +218,8 @@ public static class CardLifecycleManager
                 packageAid,
                 moduleAid,       // moduleAid  
                 applicationAid,  // applicationAid
-                new[] { privileges },  // privileges as array
-                installParameters ?? Array.Empty<byte>());
+                [privileges],  // privileges as array
+                installParameters ?? []);
         
         if (cmdResult.IsFailure)
         {
@@ -258,7 +260,7 @@ public static class CardLifecycleManager
                 applicationAid,  // packageAid
                 applicationAid,  // moduleAid (same as package for make selectable)
                 applicationAid,  // applicationAid
-                new byte[] { 0x00 }); // privileges (default)
+                [0x00]); // privileges (default)
         
         if (cmdResult.IsFailure)
         {

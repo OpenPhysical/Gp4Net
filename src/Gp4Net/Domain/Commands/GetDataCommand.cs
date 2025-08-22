@@ -203,14 +203,14 @@ public class GetDataCommand : IApduCommand
     /// <returns>The APDU command bytes.</returns>
     public byte[] ToApdu()
     {
-        return new byte[]
-        {
+        return
+        [
             Cla,
             Ins,
             P1,
             P2,
-            0x00, // Le (expecting response)
-        };
+            0x00 // Le (expecting response)
+        ];
     }
 
     // IApduCommand implementation
@@ -268,7 +268,10 @@ public class GetDataCommand : IApduCommand
     /// Returns a string representation of the command.
     /// </summary>
     /// <returns>"GET DATA"</returns>
-    public override string ToString() => "GET DATA";
+    public override string ToString()
+    {
+        return "GET DATA";
+    }
 }
 
 /// <summary>

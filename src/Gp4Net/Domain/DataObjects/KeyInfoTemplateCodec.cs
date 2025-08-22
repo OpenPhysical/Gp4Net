@@ -42,13 +42,13 @@ public static class KeyInfoTemplateCodec
         // Key version number (C0)
         if (keyInfo.KeyVersionNumber.HasValue)
         {
-            WriteTlv(contentStream, 0xC0, new[] { keyInfo.KeyVersionNumber.Value });
+            WriteTlv(contentStream, 0xC0, [keyInfo.KeyVersionNumber.Value]);
         }
             
         // Key identifier (C1)
         if (keyInfo.KeyIdentifier.HasValue)
         {
-            WriteTlv(contentStream, 0xC1, new[] { keyInfo.KeyIdentifier.Value });
+            WriteTlv(contentStream, 0xC1, [keyInfo.KeyIdentifier.Value]);
         }
             
         // Key types and lengths (C2)
@@ -65,21 +65,20 @@ public static class KeyInfoTemplateCodec
         }
             
         var content = contentStream.ToArray();
-            
-        // Write length
-        if (content.Length <= 127)
+
+        switch (content.Length)
         {
-            stream.WriteByte((byte)content.Length);
-        }
-        else if (content.Length <= 255)
-        {
-            stream.WriteByte(0x81);
-            stream.WriteByte((byte)content.Length);
-        }
-        else
-        {
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidData("Key information template too large for encoding"));
+            // Write length
+            case <= 127:
+                stream.WriteByte((byte)content.Length);
+                break;
+            case <= 255:
+                stream.WriteByte(0x81);
+                stream.WriteByte((byte)content.Length);
+                break;
+            default:
+                return Result.Failure<byte[], SmartCardError>(
+                    SmartCardError.InvalidData("Key information template too large for encoding"));
         }
             
         // Write content
@@ -167,20 +166,19 @@ public static class KeyInfoTemplateCodec
     private static void WriteTlv(Stream stream, byte tag, byte[] value)
     {
         stream.WriteByte(tag);
-        
-        // Write length
-        if (value.Length <= 127)
+
+        switch (value.Length)
         {
-            stream.WriteByte((byte)value.Length);
-        }
-        else if (value.Length <= 255)
-        {
-            stream.WriteByte(0x81);
-            stream.WriteByte((byte)value.Length);
-        }
-        else
-        {
-            throw new ArgumentException($"Value too long for simple TLV encoding: {value.Length} bytes");
+            // Write length
+            case <= 127:
+                stream.WriteByte((byte)value.Length);
+                break;
+            case <= 255:
+                stream.WriteByte(0x81);
+                stream.WriteByte((byte)value.Length);
+                break;
+            default:
+                throw new ArgumentException($"Value too long for simple TLV encoding: {value.Length} bytes");
         }
         
         stream.Write(value, 0, value.Length);
@@ -206,7 +204,7 @@ public class KeyInfoTemplate
     /// <summary>
     /// Key types and their lengths.
     /// </summary>
-    public List<KeyTypeAndLength> KeyTypesAndLengths { get; set; } = new();
+    public List<KeyTypeAndLength> KeyTypesAndLengths { get; set; } = [];
 }
     
 /// <summary>

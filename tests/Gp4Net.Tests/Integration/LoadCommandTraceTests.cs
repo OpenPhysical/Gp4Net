@@ -87,35 +87,33 @@ public class LoadCommandTraceTests : TraceBasedTestBase
     {
         var header = new List<byte> { 0xC4 }; // Tag
             
-        if (totalSize <= 0x7F)
+        switch (totalSize)
         {
-            header.Add((byte)totalSize);
-        }
-        else if (totalSize <= 0xFF)
-        {
-            header.Add(0x81);
-            header.Add((byte)totalSize);
-        }
-        else if (totalSize <= 0xFFFF)
-        {
-            header.Add(0x82);
-            header.Add((byte)(totalSize >> 8));
-            header.Add((byte)(totalSize & 0xFF));
-        }
-        else if (totalSize <= 0xFFFFFF)
-        {
-            header.Add(0x83);
-            header.Add((byte)(totalSize >> 16));
-            header.Add((byte)((totalSize >> 8) & 0xFF));
-            header.Add((byte)(totalSize & 0xFF));
-        }
-        else
-        {
-            header.Add(0x84);
-            header.Add((byte)(totalSize >> 24));
-            header.Add((byte)((totalSize >> 16) & 0xFF));
-            header.Add((byte)((totalSize >> 8) & 0xFF));
-            header.Add((byte)(totalSize & 0xFF));
+            case <= 0x7F:
+                header.Add((byte)totalSize);
+                break;
+            case <= 0xFF:
+                header.Add(0x81);
+                header.Add((byte)totalSize);
+                break;
+            case <= 0xFFFF:
+                header.Add(0x82);
+                header.Add((byte)(totalSize >> 8));
+                header.Add((byte)(totalSize & 0xFF));
+                break;
+            case <= 0xFFFFFF:
+                header.Add(0x83);
+                header.Add((byte)(totalSize >> 16));
+                header.Add((byte)((totalSize >> 8) & 0xFF));
+                header.Add((byte)(totalSize & 0xFF));
+                break;
+            default:
+                header.Add(0x84);
+                header.Add((byte)(totalSize >> 24));
+                header.Add((byte)((totalSize >> 16) & 0xFF));
+                header.Add((byte)((totalSize >> 8) & 0xFF));
+                header.Add((byte)(totalSize & 0xFF));
+                break;
         }
             
         return [.. header];
@@ -188,25 +186,23 @@ public class LoadCommandTraceTests : TraceBasedTestBase
                     
                 // Determine length encoding size
                 var headerSize = 1; // C4 tag
-                if (commandData[1] == 0x82)
+                switch (commandData[1])
                 {
-                    headerSize += 3; // 82 + 2 length bytes
-                }
-                else if (commandData[1] == 0x83)
-                {
-                    headerSize += 4; // 83 + 3 length bytes
-                }
-                else if (commandData[1] == 0x84)
-                {
-                    headerSize += 5; // 84 + 4 length bytes
-                }
-                else if (commandData[1] <= 0x7F)
-                {
-                    headerSize += 1; // Direct length
-                }
-                else if (commandData[1] == 0x81)
-                {
-                    headerSize += 2; // 81 + 1 length byte
+                    case 0x82:
+                        headerSize += 3; // 82 + 2 length bytes
+                        break;
+                    case 0x83:
+                        headerSize += 4; // 83 + 3 length bytes
+                        break;
+                    case 0x84:
+                        headerSize += 5; // 84 + 4 length bytes
+                        break;
+                    case <= 0x7F:
+                        headerSize += 1; // Direct length
+                        break;
+                    case 0x81:
+                        headerSize += 2; // 81 + 1 length byte
+                        break;
                 }
                     
                 reassembledData.AddRange(commandData[headerSize..]);

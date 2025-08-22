@@ -105,7 +105,7 @@ public class DeleteCommandCryptoIntegrationTests
             DeleteRelated = true
         };
 
-        _mockGlobalPlatformService
+        _ = _mockGlobalPlatformService
             .Setup(s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success<bool, SmartCardError>(true));
 
@@ -136,7 +136,7 @@ public class DeleteCommandCryptoIntegrationTests
             DeleteRelated = true // This should delete related applets
         };
 
-        _mockGlobalPlatformService
+        _ = _mockGlobalPlatformService
             .Setup(s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success<bool, SmartCardError>(true));
 
@@ -167,7 +167,7 @@ public class DeleteCommandCryptoIntegrationTests
             DeleteRelated = false // This should NOT delete related applets
         };
 
-        _mockGlobalPlatformService
+        _ = _mockGlobalPlatformService
             .Setup(s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success<bool, SmartCardError>(true));
 
@@ -198,7 +198,7 @@ public class DeleteCommandCryptoIntegrationTests
         };
 
         var error = SmartCardError.FromStatusWord(0x6A82); // Application not found
-        _mockGlobalPlatformService
+        _ = _mockGlobalPlatformService
             .Setup(s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Failure<bool, SmartCardError>(error));
 
@@ -221,7 +221,7 @@ public class DeleteCommandCryptoIntegrationTests
             Debug = true // Enable debug to see crypto details
         };
 
-        _mockGlobalPlatformService
+        _ = _mockGlobalPlatformService
             .Setup(s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success<bool, SmartCardError>(true));
 
@@ -250,7 +250,7 @@ public class DeleteCommandCryptoIntegrationTests
             DeleteRelated = true
         };
 
-        _mockGlobalPlatformService
+        _ = _mockGlobalPlatformService
             .Setup(s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success<bool, SmartCardError>(true));
 

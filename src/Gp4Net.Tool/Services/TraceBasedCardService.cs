@@ -21,7 +21,7 @@ public class TraceBasedCardService : ICardService
     private readonly string _tracePath;
     private int _currentExchangeIndex;
     private string _currentOperationFilter = string.Empty;
-    private readonly HashSet<int> _allowedExchangeIndices = new();
+    private readonly HashSet<int> _allowedExchangeIndices = [];
     private bool _isConnected;
     private TraceBasedCardChannel _currentChannel;
 
@@ -65,7 +65,7 @@ public class TraceBasedCardService : ICardService
             // No filter - allow all exchanges
             for (var i = 0; i < _exchanges.Count; i++)
             {
-                _allowedExchangeIndices.Add(i);
+                _ = _allowedExchangeIndices.Add(i);
             }
         }
         else
@@ -80,7 +80,7 @@ public class TraceBasedCardService : ICardService
             {
                 if (requestedOps.Contains(exchange.Operation))
                 {
-                    _allowedExchangeIndices.Add(exchange.Index - 1); // Index is 1-based in trace
+                    _ = _allowedExchangeIndices.Add(exchange.Index - 1); // Index is 1-based in trace
                 }
             }
         }
@@ -88,7 +88,7 @@ public class TraceBasedCardService : ICardService
 
     public IReadOnlyList<string> GetReaders()
     {
-        return new[] { $"TraceBasedReader:{_tracePath}" };
+        return [$"TraceBasedReader:{_tracePath}"];
     }
 
     public bool Connect(string readerName)

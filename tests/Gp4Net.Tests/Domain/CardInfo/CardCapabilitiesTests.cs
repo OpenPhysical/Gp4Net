@@ -31,18 +31,18 @@ public class CardCapabilitiesTests
         var capabilities = CardCapabilities.Parse(data);
 
         // Assert
-        capabilities.Should().NotBeNull();
-        capabilities.ScpOptions.Should().HaveCount(1);
+        _ = capabilities.Should().NotBeNull();
+        _ = capabilities.ScpOptions.Should().HaveCount(1);
 
         var scpOption = capabilities.ScpOptions.First();
-        scpOption.ScpId.Should().Be(0x03);
-        scpOption.Implementation.Should().Be(0x70);
+        _ = scpOption.ScpId.Should().Be(0x03);
+        _ = scpOption.Implementation.Should().Be(0x70);
 
-        capabilities.SupportedKeyLengths.ContainsKey(0x03).Should().BeTrue();
+        _ = capabilities.SupportedKeyLengths.ContainsKey(0x03).Should().BeTrue();
         var keyLengths = capabilities.SupportedKeyLengths[0x03];
-        keyLengths.Should().Contain(128);
-        keyLengths.Should().Contain(192);
-        keyLengths.Should().Contain(256);
+        _ = keyLengths.Should().Contain(128);
+        _ = keyLengths.Should().Contain(192);
+        _ = keyLengths.Should().Contain(256);
     }
 
     [Test]
@@ -62,10 +62,10 @@ public class CardCapabilitiesTests
         var capabilities = CardCapabilities.Parse(data);
 
         // Assert
-        capabilities.SdPrivileges.HasValue.Should().BeTrue();
-        capabilities.SdPrivileges.Value.SecurityDomain.Should().BeTrue();
-        capabilities.SdPrivileges.Value.DapVerification.Should().BeTrue();
-        capabilities.SdPrivileges.Value.CardLock.Should().BeFalse();
+        _ = capabilities.SdPrivileges.HasValue.Should().BeTrue();
+        _ = capabilities.SdPrivileges.Value.SecurityDomain.Should().BeTrue();
+        _ = capabilities.SdPrivileges.Value.DapVerification.Should().BeTrue();
+        _ = capabilities.SdPrivileges.Value.CardLock.Should().BeFalse();
     }
 
     [Test]
@@ -85,9 +85,9 @@ public class CardCapabilitiesTests
         var capabilities = CardCapabilities.Parse(data);
 
         // Assert
-        capabilities.AppPrivileges.HasValue.Should().BeTrue();
-        capabilities.AppPrivileges.Value.FinalApplication.Should().BeTrue();
-        capabilities.AppPrivileges.Value.CardLock.Should().BeFalse();
+        _ = capabilities.AppPrivileges.HasValue.Should().BeTrue();
+        _ = capabilities.AppPrivileges.Value.FinalApplication.Should().BeTrue();
+        _ = capabilities.AppPrivileges.Value.CardLock.Should().BeFalse();
     }
 
     [Test]
@@ -106,10 +106,10 @@ public class CardCapabilitiesTests
         var capabilities = CardCapabilities.Parse(data);
 
         // Assert
-        capabilities.Algorithms.HasValue.Should().BeTrue();
+        _ = capabilities.Algorithms.HasValue.Should().BeTrue();
         var hashAlgs = capabilities.Algorithms.Value.GetHashAlgorithms();
-        hashAlgs.Should().Contain("SHA-1");
-        hashAlgs.Should().Contain("SHA-256");
+        _ = hashAlgs.Should().Contain("SHA-1");
+        _ = hashAlgs.Should().Contain("SHA-256");
     }
 
     [Test]
@@ -128,10 +128,10 @@ public class CardCapabilitiesTests
         var capabilities = CardCapabilities.Parse(data);
 
         // Assert
-        capabilities.CipherSuites.ContainsKey(CipherUsage.DapVerification).Should().BeTrue();
+        _ = capabilities.CipherSuites.ContainsKey(CipherUsage.DapVerification).Should().BeTrue();
         var ciphers = capabilities.CipherSuites[CipherUsage.DapVerification];
-        ciphers.Should().Contain(CipherSuite.Des3Mac);
-        ciphers.Should().Contain(CipherSuite.AesCmac128);
+        _ = ciphers.Should().Contain(CipherSuite.Des3Mac);
+        _ = ciphers.Should().Contain(CipherSuite.AesCmac128);
     }
 
     [Test]
@@ -182,18 +182,18 @@ public class CardCapabilitiesTests
         var capabilities = CardCapabilities.Parse(data);
 
         // Assert
-        capabilities.Should().NotBeNull();
-        capabilities.ScpOptions.Should().NotBeEmpty();
-        capabilities.SdPrivileges.Should().NotBeNull();
-        capabilities.AppPrivileges.Should().NotBeNull();
-        capabilities.Algorithms.Should().NotBeNull();
-        capabilities.CipherSuites.Should().NotBeEmpty();
+        _ = capabilities.Should().NotBeNull();
+        _ = capabilities.ScpOptions.Should().NotBeEmpty();
+        _ = capabilities.SdPrivileges.Should().NotBeNull();
+        _ = capabilities.AppPrivileges.Should().NotBeNull();
+        _ = capabilities.Algorithms.Should().NotBeNull();
+        _ = capabilities.CipherSuites.Should().NotBeEmpty();
 
         // Verify the ToString() method produces readable output
         var output = capabilities.ToString();
-        output.Should().Contain("SCP03");
-        output.Should().Contain("AES");
-        output.Should().Contain("SecurityDomain");
+        _ = output.Should().Contain("SCP03");
+        _ = output.Should().Contain("AES");
+        _ = output.Should().Contain("SecurityDomain");
     }
 
     [Test]
@@ -225,9 +225,9 @@ public class CardCapabilitiesTests
         var output = capabilities.ToString();
 
         // Assert
-        output.Should().Contain("Card Capabilities:");
-        output.Should().Contain("Supports SCP03 i=70 with AES-128 AES-192 AES-256");
-        output.Should().Contain("DAP");
-        output.Should().Contain("SecurityDomain");
+        _ = output.Should().Contain("Card Capabilities:");
+        _ = output.Should().Contain("Supports SCP03 i=70 with AES-128 AES-192 AES-256");
+        _ = output.Should().Contain("DAP");
+        _ = output.Should().Contain("SecurityDomain");
     }
 }

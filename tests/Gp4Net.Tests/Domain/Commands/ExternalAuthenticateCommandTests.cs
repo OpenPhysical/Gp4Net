@@ -22,11 +22,11 @@ public class ExternalAuthenticateCommandTests
         var result = ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, mac);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        command.SecurityLevel.Should().Be(securityLevel);
-        command.HostCryptogram.Should().BeEquivalentTo(hostCryptogram);
-        command.Mac.Should().BeEquivalentTo(mac);
+        _ = command.SecurityLevel.Should().Be(securityLevel);
+        _ = command.HostCryptogram.Should().BeEquivalentTo(hostCryptogram);
+        _ = command.Mac.Should().BeEquivalentTo(mac);
     }
 
     [Test]
@@ -36,8 +36,8 @@ public class ExternalAuthenticateCommandTests
         var result = ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, null!, new byte[8]);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Host cryptogram cannot be null");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("Host cryptogram cannot be null");
     }
 
     [Test]
@@ -54,8 +54,8 @@ public class ExternalAuthenticateCommandTests
         var result = ExternalAuthenticateCommand.CreateWithoutMac(SecurityLevel.CMac, hostCryptogram);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Host cryptogram must be 8 bytes");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("Host cryptogram must be 8 bytes");
     }
 
     [Test]
@@ -73,8 +73,8 @@ public class ExternalAuthenticateCommandTests
         var result = ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, hostCryptogram, mac);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("MAC must be 8 bytes");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("MAC must be 8 bytes");
     }
 
     [Test]
@@ -88,9 +88,9 @@ public class ExternalAuthenticateCommandTests
         var result = ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        command.Mac.Should().BeEmpty();
+        _ = command.Mac.Should().BeEmpty();
     }
 
     [Test]
@@ -100,21 +100,21 @@ public class ExternalAuthenticateCommandTests
         var securityLevel = SecurityLevel.None;
         var hostCryptogram = Convert.FromHexString("0102030405060708");
         var result = ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
 
         // Act
         var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
-        apdu[0].Should().Be(0x84); // CLA - Secure messaging
-        apdu[1].Should().Be(0x82); // INS - EXTERNAL AUTHENTICATE
-        apdu[2].Should().Be((byte)securityLevel); // P1 - Security Level
-        apdu[3].Should().Be(0x00); // P2 - RFU
-        apdu[4].Should().Be(0x08); // Lc - Data length (8 bytes cryptogram)
-        apdu[5..13].Should().BeEquivalentTo(hostCryptogram); // Data - Host Cryptogram
+        _ = apdu[0].Should().Be(0x84); // CLA - Secure messaging
+        _ = apdu[1].Should().Be(0x82); // INS - EXTERNAL AUTHENTICATE
+        _ = apdu[2].Should().Be((byte)securityLevel); // P1 - Security Level
+        _ = apdu[3].Should().Be(0x00); // P2 - RFU
+        _ = apdu[4].Should().Be(0x08); // Lc - Data length (8 bytes cryptogram)
+        _ = apdu[5..13].Should().BeEquivalentTo(hostCryptogram); // Data - Host Cryptogram
         // No Le byte for EXTERNAL AUTHENTICATE
-        apdu.Length.Should().Be(13); // 5 header + 8 data
+        _ = apdu.Length.Should().Be(13); // 5 header + 8 data
     }
 
     [Test]
@@ -125,21 +125,21 @@ public class ExternalAuthenticateCommandTests
         var hostCryptogram = Convert.FromHexString("0102030405060708");
         var mac = Convert.FromHexString("1112131415161718");
         var result = ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, mac);
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
 
         // Act
         var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
-        apdu[0].Should().Be(0x84); // CLA - Secure messaging
-        apdu[1].Should().Be(0x82); // INS - EXTERNAL AUTHENTICATE
-        apdu[2].Should().Be((byte)securityLevel); // P1 - Security Level
-        apdu[3].Should().Be(0x00); // P2 - RFU
-        apdu[4].Should().Be(0x10); // Lc - Data length (8 cryptogram + 8 MAC)
-        apdu[5..13].Should().BeEquivalentTo(hostCryptogram); // Host Cryptogram
-        apdu[13..21].Should().BeEquivalentTo(mac); // MAC
-        apdu.Length.Should().Be(21); // 5 header + 8 cryptogram + 8 MAC
+        _ = apdu[0].Should().Be(0x84); // CLA - Secure messaging
+        _ = apdu[1].Should().Be(0x82); // INS - EXTERNAL AUTHENTICATE
+        _ = apdu[2].Should().Be((byte)securityLevel); // P1 - Security Level
+        _ = apdu[3].Should().Be(0x00); // P2 - RFU
+        _ = apdu[4].Should().Be(0x10); // Lc - Data length (8 cryptogram + 8 MAC)
+        _ = apdu[5..13].Should().BeEquivalentTo(hostCryptogram); // Host Cryptogram
+        _ = apdu[13..21].Should().BeEquivalentTo(mac); // MAC
+        _ = apdu.Length.Should().Be(21); // 5 header + 8 cryptogram + 8 MAC
     }
 
     [Test]
@@ -153,14 +153,14 @@ public class ExternalAuthenticateCommandTests
         // Arrange
         var hostCryptogram = new byte[8];
         var result = ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
 
         // Act
         var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
-        apdu[2].Should().Be(expectedP1); // P1
+        _ = apdu[2].Should().Be(expectedP1); // P1
     }
 
     [Test]
@@ -171,7 +171,7 @@ public class ExternalAuthenticateCommandTests
             SecurityLevel.CMac,
             new byte[8],
             new byte[8]);
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
 
         // Act
@@ -179,8 +179,8 @@ public class ExternalAuthenticateCommandTests
         var apdu2 = ApduBuilder.BuildApdu(command);
 
         // Assert
-        apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
-        apdu2.Should().BeEquivalentTo(apdu1); // But with same content
+        _ = apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
+        _ = apdu2.Should().BeEquivalentTo(apdu1); // But with same content
     }
 
     [Test]
@@ -190,14 +190,14 @@ public class ExternalAuthenticateCommandTests
         var hostCryptogram = Convert.FromHexString("0102030405060708");
         var mac = Convert.FromHexString("1112131415161718");
         var commandResult = ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, hostCryptogram, mac);
-        commandResult.IsSuccess.Should().BeTrue();
+        _ = commandResult.IsSuccess.Should().BeTrue();
         var command = commandResult.Value;
 
         // Act
         var result = command.ToString();
 
         // Assert
-        result.Should().Contain("EXTERNAL AUTHENTICATE");
+        _ = result.Should().Contain("EXTERNAL AUTHENTICATE");
     }
 
     [Test]
@@ -217,15 +217,15 @@ public class ExternalAuthenticateCommandTests
             SecurityLevel.CMac,
             new byte[8],
             new byte[8]);
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
         var apdu = ApduBuilder.BuildApdu(command);
 
-        apdu.Length.Should().Be(21); // 5 header + 8 cryptogram + 8 MAC
-        apdu[0].Should().Be(0x84); // CLA
-        apdu[1].Should().Be(0x82); // INS
-        apdu[3].Should().Be(0x00); // P2
-        apdu[4].Should().Be(0x10); // Lc
+        _ = apdu.Length.Should().Be(21); // 5 header + 8 cryptogram + 8 MAC
+        _ = apdu[0].Should().Be(0x84); // CLA
+        _ = apdu[1].Should().Be(0x82); // INS
+        _ = apdu[3].Should().Be(0x00); // P2
+        _ = apdu[4].Should().Be(0x10); // Lc
     }
 
     [Test]
@@ -247,10 +247,10 @@ public class ExternalAuthenticateCommandTests
         foreach (var (securityLevel, expectedP1) in testCases)
         {
             var result = ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, new byte[8]);
-            result.IsSuccess.Should().BeTrue();
+            _ = result.IsSuccess.Should().BeTrue();
             var command = result.Value;
             var apdu = ApduBuilder.BuildApdu(command);
-            apdu[2].Should().Be(expectedP1);
+            _ = apdu[2].Should().Be(expectedP1);
         }
     }
 }

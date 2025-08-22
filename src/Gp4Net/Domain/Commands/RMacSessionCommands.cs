@@ -57,7 +57,7 @@ public class BeginRMacSessionCommand
     {
         Cla = cla;
         P1 = p1;
-        Data = data != null ? (byte[])data.Clone() : Array.Empty<byte>();
+        Data = data != null ? (byte[])data.Clone() : [];
         Mac = mac != null ? (byte[])mac.Clone() : null;
     }
 
@@ -144,7 +144,10 @@ public class BeginRMacSessionCommand
     /// Returns a string representation of this command.
     /// </summary>
     /// <returns>A string describing this command.</returns>
-    public override string ToString() => "BEGIN R-MAC SESSION";
+    public override string ToString()
+    {
+        return "BEGIN R-MAC SESSION";
+    }
 }
 
 /// <summary>
@@ -264,7 +267,10 @@ public class EndRMacSessionCommand
     /// Returns a string representation of this command.
     /// </summary>
     /// <returns>A string describing this command.</returns>
-    public override string ToString() => "END R-MAC SESSION";
+    public override string ToString()
+    {
+        return "END R-MAC SESSION";
+    }
 }
 
 /// <summary>
@@ -316,5 +322,8 @@ public class EndRMacSessionResponse
     /// Returns a string representation of this response.
     /// </summary>
     /// <returns>A string describing this response.</returns>
-    public override string ToString() => $"END R-MAC SESSION RESPONSE (R-MAC: {Convert.ToHexString(RMac)})";
+    public override string ToString()
+    {
+        return $"END R-MAC SESSION RESPONSE (R-MAC: {Convert.ToHexString(RMac)})";
+    }
 }

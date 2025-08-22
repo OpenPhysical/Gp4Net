@@ -25,30 +25,30 @@ public static class CommandProcessors
     {
         if (!environment.EffectiveOptions.EnableLogging)
             return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
-                CommandResult.Success(Array.Empty<byte>(), Constants.StatusWords.Success, environment)));
+                CommandResult.Success([], Constants.StatusWords.Success, environment)));
 
         var commandName = command.GetType().Name;
         var commandBytes = GetCommandBytes(command);
-        
+
         environment.Logger.LogDebug(
-            "Executing command {CommandName}: {CommandBytes}", 
-            commandName, 
+            "Executing command {CommandName}: {CommandBytes}",
+            commandName,
             Convert.ToHexString(commandBytes));
-        
+
         return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
-            CommandResult.Success(Array.Empty<byte>(), Constants.StatusWords.Success, environment)));
+            CommandResult.Success([], Constants.StatusWords.Success, environment)));
     };
 
     /// <summary>
     /// Wraps command with secure channel if available and required.
     /// </summary>
-    public static CommandProcessor WrapSecureChannel = async (command, environment, cancellationToken) =>
+    public static CommandProcessor WrapSecureChannel = static (command, environment, cancellationToken) =>
     {
         // Check if command requires secure channel
         if (!RequiresSecureChannel(command, environment))
         {
-            return Result.Success<CommandResult, SmartCardError>(
-                CommandResult.Success(Array.Empty<byte>(), Constants.StatusWords.Success, environment));
+            return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
+                CommandResult.Success([], Constants.StatusWords.Success, environment)));
         }
 
         // Check if secure channel is available
@@ -56,19 +56,19 @@ public static class CommandProcessors
         {
             if (environment.EffectiveOptions.RequiresSecureChannel)
             {
-                return Result.Failure<CommandResult, SmartCardError>(
-                    SmartCardError.SecurityError("Secure channel required but not established"));
+                return Task.FromResult(Result.Failure<CommandResult, SmartCardError>(
+                    SmartCardError.SecurityError("Secure channel required but not established")));
             }
-            
-            return Result.Success<CommandResult, SmartCardError>(
-                CommandResult.Success(Array.Empty<byte>(), Constants.StatusWords.Success, environment));
+
+            return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
+                CommandResult.Success([], Constants.StatusWords.Success, environment)));
         }
 
         var secureChannelState = environment.SecureChannel.Value;
-        
+
         // Build command bytes
         var commandBytes = GetCommandBytes(command);
-        
+
         // Apply secure channel wrapping using CommandSecurityProcessor
         var wrapResult = Domain.Security.CommandSecurityProcessor.ApplyCommandSecurity(
             command,
@@ -77,22 +77,22 @@ public static class CommandProcessors
             secureChannelState.MacChaining.Value,
             secureChannelState.EncryptionCounter,
             secureChannelState.ProtocolVersion);
-        
+
         if (wrapResult.IsFailure)
         {
-            environment.Logger.LogError("Failed to wrap command with secure channel: {Error}", 
+            environment.Logger.LogError("Failed to wrap command with secure channel: {Error}",
                 wrapResult.Error.Message);
-            return Result.Failure<CommandResult, SmartCardError>(wrapResult.Error);
+            return Task.FromResult(Result.Failure<CommandResult, SmartCardError>(wrapResult.Error));
         }
-        
+
         var (wrappedBytes, newState) = wrapResult.Value;
-        
+
         // Create wrapped command that carries the secured bytes
         var wrappedCommand = new WrappedApduCommand(command, wrappedBytes);
-        
+
         // Update environment with new secure channel state
         var newEnvironment = environment.WithSecureChannel(newState);
-        
+
         // Log the transformation
         if (environment.EffectiveOptions.EnableLogging)
         {
@@ -100,14 +100,14 @@ public static class CommandProcessors
                 "Wrapped command with secure channel: CLA {OriginalCla:X2} -> {WrappedCla:X2}, Length {OriginalLength} -> {WrappedLength}",
                 command.Cla, wrappedCommand.Cla, commandBytes.Length, wrappedBytes.Length);
         }
-        
+
         // Store wrapped command in context for ExecuteTransport to use
         var metadata = new CommandMetadata(
             SecureChannelWrapped: true);
-        
+
         // Return success but with empty data - the actual response will come from ExecuteTransport
-        return Result.Success<CommandResult, SmartCardError>(
-            CommandResult.Success(Array.Empty<byte>(), Constants.StatusWords.Success, newEnvironment, metadata));
+        return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
+            CommandResult.Success([], Constants.StatusWords.Success, newEnvironment, metadata)));
     };
 
     /// <summary>
@@ -116,13 +116,13 @@ public static class CommandProcessors
     public static CommandProcessor ExecuteTransport = async (command, environment, cancellationToken) =>
     {
         var stopwatch = Stopwatch.StartNew();
-        
+
         try
         {
             // Check if we have a wrapped command from secure channel processing
             IApduCommand commandToSend = command;
             byte[] commandBytes;
-            
+
             // Get command bytes - use wrapped bytes if available
             if (command is WrappedApduCommand wrapped)
             {
@@ -133,7 +133,7 @@ public static class CommandProcessors
             {
                 commandBytes = GetCommandBytes(command);
             }
-            
+
             // Log the actual command being sent
             if (environment.EffectiveOptions.EnableLogging)
             {
@@ -141,23 +141,23 @@ public static class CommandProcessors
                     "Transmitting command: {CommandHex}",
                     Convert.ToHexString(commandBytes));
             }
-            
+
             // Execute via transport
             var response = await environment.Transport.TransmitAsync(
-                commandToSend, 
-                environment.Channel, 
+                commandToSend,
+                environment.Channel,
                 cancellationToken);
-            
+
             stopwatch.Stop();
-            
+
             // Combine response bytes for metadata
             var responseBytes = CombineResponseBytes(response.Data, response.StatusWord);
-            
+
             var metadata = new CommandMetadata(
                 ExecutionTime: stopwatch.Elapsed,
                 TransmittedBytes: commandBytes,
                 ReceivedBytes: responseBytes);
-            
+
             return Result.Success<CommandResult, SmartCardError>(
                 CommandResult.Success(response.Data, response.StatusWord, environment, metadata));
         }
@@ -165,7 +165,7 @@ public static class CommandProcessors
         {
             stopwatch.Stop();
             environment.Logger.LogError(ex, "Transport execution failed");
-            
+
             return Result.Failure<CommandResult, SmartCardError>(
                 SmartCardError.CommunicationError("Failed to execute command", Maybe<Exception>.From(ex)));
         }
@@ -179,11 +179,11 @@ public static class CommandProcessors
         // This processor is a pass-through for now since secure channel unwrapping
         // is not implemented yet. We preserve the response data from ExecuteTransport.
         // The actual unwrapping would happen here in a complete implementation.
-        
+
         // Return success without data - FunctionComposition will preserve data from ExecuteTransport
         var metadata = new CommandMetadata(SecureChannelUnwrapped: true);
         return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
-            CommandResult.Success(Array.Empty<byte>(), Constants.StatusWords.Success, environment, metadata)));
+            CommandResult.Success([], Constants.StatusWords.Success, environment, metadata)));
     };
 
     /// <summary>
@@ -195,15 +195,15 @@ public static class CommandProcessors
         {
             var metadata = new CommandMetadata(ResponseLogged: true);
             return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
-                CommandResult.Success(Array.Empty<byte>(), Constants.StatusWords.Success, environment, metadata)));
+                CommandResult.Success([], Constants.StatusWords.Success, environment, metadata)));
         }
 
         // This would log the response from previous processors
         environment.Logger.LogDebug("Command completed");
-        
+
         var logMetadata = new CommandMetadata(ResponseLogged: true);
         return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
-            CommandResult.Success(Array.Empty<byte>(), Constants.StatusWords.Success, environment, logMetadata)));
+            CommandResult.Success([], Constants.StatusWords.Success, environment, logMetadata)));
     };
 
     /// <summary>
@@ -219,7 +219,7 @@ public static class CommandProcessors
             enableSecureChannel ? UnwrapSecureChannel : FunctionComposition.Identity,
             enableLogging ? LogResponse : FunctionComposition.Identity
         };
-        
+
         return FunctionComposition.ComposeMany(processors);
     }
 
@@ -231,7 +231,7 @@ public static class CommandProcessors
         // Commands that never require secure channel
         if (command is SelectCommand or InitializeUpdateCommand)
             return false;
-            
+
         // Check command options
         return environment.EffectiveOptions.RequiresSecureChannel;
     }
@@ -241,12 +241,12 @@ public static class CommandProcessors
     /// </summary>
     private static byte[] GetCommandBytes(IApduCommand command)
     {
-        var buffer = new System.Collections.Generic.List<byte> 
-        { 
-            command.Cla, 
-            command.Ins, 
-            command.P1, 
-            command.P2 
+        var buffer = new System.Collections.Generic.List<byte>
+        {
+            command.Cla,
+            command.Ins,
+            command.P1,
+            command.P2
         };
 
         if (command.Data?.Length > 0)
@@ -267,18 +267,18 @@ public static class CommandProcessors
         if (command.ExpectedResponseLength.HasValue)
         {
             var le = command.ExpectedResponseLength.Value;
-            if (le == 0)
+            switch (le)
             {
-                buffer.Add(0x00);
-            }
-            else if (le <= 255)
-            {
-                buffer.Add((byte)le);
-            }
-            else
-            {
-                buffer.Add((byte)(le >> 8));
-                buffer.Add((byte)(le & 0xFF));
+                case 0:
+                    buffer.Add(0x00);
+                    break;
+                case <= 255:
+                    buffer.Add((byte)le);
+                    break;
+                default:
+                    buffer.Add((byte)(le >> 8));
+                    buffer.Add((byte)(le & 0xFF));
+                    break;
             }
         }
 

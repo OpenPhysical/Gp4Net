@@ -63,8 +63,9 @@ public static class OpidFormatExtensions
     /// <param name="format">The OPID format.</param>
     /// <returns>The regex pattern for the format.</returns>
     /// <exception cref="ArgumentException">Thrown when the format is not supported.</exception>
-    public static string GetPattern(this OpidFormat format) =>
-        format switch
+    public static string GetPattern(this OpidFormat format)
+    {
+        return format switch
         {
             OpidFormat.Format2 => @"^\d{4}-\d{3}-\d{3}$", // 12 digits: 4-3-3
             OpidFormat.Format3 => @"^\d{4}-\d{3}-\d{4}$", // 13 digits: 4-3-4
@@ -76,14 +77,16 @@ public static class OpidFormatExtensions
             OpidFormat.Format9 => @"^\d{4}-\d{4}-\d{4}-\d{5}$", // 18 digits: 4-4-4-5
             _ => throw new ArgumentException($"Unknown OPID format: {format}")
         };
+    }
 
     /// <summary>
     /// Gets the expected total digit count for the format.
     /// </summary>
     /// <param name="format">The OPID format.</param>
     /// <returns>The expected total number of digits.</returns>
-    public static int GetExpectedDigitCount(this OpidFormat format) =>
-        format switch
+    public static int GetExpectedDigitCount(this OpidFormat format)
+    {
+        return format switch
         {
             OpidFormat.Format2 => 12,
             OpidFormat.Format3 => 13,
@@ -95,14 +98,16 @@ public static class OpidFormatExtensions
             OpidFormat.Format9 => 18,
             _ => throw new ArgumentException($"Unknown OPID format: {format}")
         };
+    }
 
     /// <summary>
     /// Gets a human-readable description of the format pattern.
     /// </summary>
     /// <param name="format">The OPID format.</param>
     /// <returns>A description of the format pattern.</returns>
-    public static string GetDescription(this OpidFormat format) =>
-        format switch
+    public static string GetDescription(this OpidFormat format)
+    {
+        return format switch
         {
             OpidFormat.Format2 => "IIII-III-III",
             OpidFormat.Format3 => "IIII-III-IIII",
@@ -114,6 +119,7 @@ public static class OpidFormatExtensions
             OpidFormat.Format9 => "IIII-IIII-IIII-IIIII",
             _ => throw new ArgumentException($"Unknown OPID format: {format}")
         };
+    }
 
     /// <summary>
     /// Validates whether a string matches the pattern for this format.

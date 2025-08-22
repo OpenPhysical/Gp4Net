@@ -51,7 +51,7 @@ public record MacChainingState(
 
         return Result.Success<MacChainingState, SmartCardError>(
             new MacChainingState(
-                ImmutableArray.Create(initialValue),
+                [..initialValue],
                 protocolVersion,
                 implementationParameter
             )
@@ -108,7 +108,10 @@ public record MacChainingState(
     /// <summary>
     /// Converts the chaining value to a byte array.
     /// </summary>
-    public byte[] ToArray() => Value.ToArray();
+    public byte[] ToArray()
+    {
+        return Value.ToArray();
+    }
 
     /// <summary>
     /// Updates the chaining value, maintaining protocol version and implementation parameter.

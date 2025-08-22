@@ -17,134 +17,178 @@ public record SmartCardError(
     /// <summary>
     /// Creates a simple error with just code and message.
     /// </summary>
-    private static SmartCardError Simple(string code, string message) =>
-        new(code, message, Maybe<ushort>.None, Maybe<Exception>.None, Maybe<IReadOnlyDictionary<string, object>>.None);
+    private static SmartCardError Simple(string code, string message)
+    {
+        return new(code, message, Maybe<ushort>.None, Maybe<Exception>.None, Maybe<IReadOnlyDictionary<string, object>>.None);
+    }
 
     /// <summary>
     /// Creates an error with status word.
     /// </summary>
-    private static SmartCardError WithStatus(string code, string message, ushort sw) =>
-        new(code, message, Maybe<ushort>.From(sw), Maybe<Exception>.None, Maybe<IReadOnlyDictionary<string, object>>.None);
+    private static SmartCardError WithStatus(string code, string message, ushort sw)
+    {
+        return new(code, message, Maybe<ushort>.From(sw), Maybe<Exception>.None, Maybe<IReadOnlyDictionary<string, object>>.None);
+    }
 
     /// <summary>
     /// Creates an error from a status word.
     /// </summary>
-    public static SmartCardError FromStatusWord(ushort sw) =>
-        WithStatus($"SW_{sw:X4}", GetStatusWordDescription(sw), sw);
+    public static SmartCardError FromStatusWord(ushort sw)
+    {
+        return WithStatus($"SW_{sw:X4}", GetStatusWordDescription(sw), sw);
+    }
 
     /// <summary>
     /// Creates an error for a communication failure.
     /// </summary>
-    public static SmartCardError CommunicationError(string message, Maybe<Exception> ex = default) =>
-        new("COMM_ERROR", message, Maybe<ushort>.None, ex, Maybe<IReadOnlyDictionary<string, object>>.None);
+    public static SmartCardError CommunicationError(string message, Maybe<Exception> ex = default)
+    {
+        return new("COMM_ERROR", message, Maybe<ushort>.None, ex, Maybe<IReadOnlyDictionary<string, object>>.None);
+    }
 
     /// <summary>
     /// Creates an error for a security failure.
     /// </summary>
-    public static SmartCardError SecurityError(string message, Maybe<ushort> sw = default) =>
-        new("SECURITY_ERROR", message, sw, Maybe<Exception>.None, Maybe<IReadOnlyDictionary<string, object>>.None);
+    public static SmartCardError SecurityError(string message, Maybe<ushort> sw = default)
+    {
+        return new("SECURITY_ERROR", message, sw, Maybe<Exception>.None, Maybe<IReadOnlyDictionary<string, object>>.None);
+    }
 
     /// <summary>
     /// Creates an error for invalid data.
     /// </summary>
-    public static SmartCardError InvalidData(string message) =>
-        Simple("INVALID_DATA", message);
+    public static SmartCardError InvalidData(string message)
+    {
+        return Simple("INVALID_DATA", message);
+    }
 
     /// <summary>
     /// Creates an error for invalid arguments.
     /// </summary>
-    public static SmartCardError InvalidArgument(string message) =>
-        Simple("INVALID_ARGUMENT", message);
+    public static SmartCardError InvalidArgument(string message)
+    {
+        return Simple("INVALID_ARGUMENT", message);
+    }
 
     /// <summary>
     /// Creates an error for unsupported operations.
     /// </summary>
-    public static SmartCardError Unsupported(string message) =>
-        Simple("UNSUPPORTED", message);
+    public static SmartCardError Unsupported(string message)
+    {
+        return Simple("UNSUPPORTED", message);
+    }
 
     /// <summary>
     /// Creates an error for invalid response data.
     /// </summary>
-    public static SmartCardError InvalidResponse(string message) =>
-        Simple("INVALID_RESPONSE", message);
+    public static SmartCardError InvalidResponse(string message)
+    {
+        return Simple("INVALID_RESPONSE", message);
+    }
 
     /// <summary>
     /// Creates an error for card-specific errors.
     /// </summary>
-    public static SmartCardError CardError(string message) =>
-        Simple("CARD_ERROR", message);
+    public static SmartCardError CardError(string message)
+    {
+        return Simple("CARD_ERROR", message);
+    }
 
     /// <summary>
     /// Creates an error for unsupported instructions (6D00).
     /// </summary>
-    public static SmartCardError InstructionNotSupported() =>
-        WithStatus("INSTRUCTION_NOT_SUPPORTED", "Invalid instruction", 0x6D00);
+    public static SmartCardError InstructionNotSupported()
+    {
+        return WithStatus("INSTRUCTION_NOT_SUPPORTED", "Invalid instruction", 0x6D00);
+    }
 
     /// <summary>
     /// Creates an error for wrong length (6700).
     /// </summary>
-    public static SmartCardError WrongLength() =>
-        WithStatus("WRONG_LENGTH", "Wrong length", 0x6700);
+    public static SmartCardError WrongLength()
+    {
+        return WithStatus("WRONG_LENGTH", "Wrong length", 0x6700);
+    }
 
     /// <summary>
     /// Creates an error for incorrect data (6A80).
     /// </summary>
-    public static SmartCardError IncorrectData() =>
-        WithStatus("INCORRECT_DATA", "Wrong data", 0x6A80);
+    public static SmartCardError IncorrectData()
+    {
+        return WithStatus("INCORRECT_DATA", "Wrong data", 0x6A80);
+    }
 
     /// <summary>
     /// Creates an error for security status not satisfied (6982).
     /// </summary>
-    public static SmartCardError SecurityStatusNotSatisfied() =>
-        WithStatus("SECURITY_STATUS_NOT_SATISFIED", "Security status not satisfied", 0x6982);
+    public static SmartCardError SecurityStatusNotSatisfied()
+    {
+        return WithStatus("SECURITY_STATUS_NOT_SATISFIED", "Security status not satisfied", 0x6982);
+    }
 
     /// <summary>
     /// Creates an error for referenced data not found (6A88).
     /// </summary>
-    public static SmartCardError ReferencedDataNotFound() =>
-        WithStatus("REFERENCED_DATA_NOT_FOUND", "Referenced data not found", 0x6A88);
+    public static SmartCardError ReferencedDataNotFound()
+    {
+        return WithStatus("REFERENCED_DATA_NOT_FOUND", "Referenced data not found", 0x6A88);
+    }
 
     /// <summary>
     /// Creates an error for cryptographic operations.
     /// </summary>
-    public static SmartCardError CryptographicError(string message) =>
-        Simple("CRYPTOGRAPHIC_ERROR", message);
+    public static SmartCardError CryptographicError(string message)
+    {
+        return Simple("CRYPTOGRAPHIC_ERROR", message);
+    }
 
     /// <summary>
     /// Creates an error for file not found (6A82).
     /// </summary>
-    public static SmartCardError FileNotFound() =>
-        WithStatus("FILE_NOT_FOUND", "File not found", 0x6A82);
+    public static SmartCardError FileNotFound()
+    {
+        return WithStatus("FILE_NOT_FOUND", "File not found", 0x6A82);
+    }
 
     /// <summary>
     /// Creates an error for authentication failures.
     /// </summary>
-    public static SmartCardError AuthenticationFailed(string message) =>
-        WithStatus("AUTHENTICATION_FAILED", message, 0x6300);
+    public static SmartCardError AuthenticationFailed(string message)
+    {
+        return WithStatus("AUTHENTICATION_FAILED", message, 0x6300);
+    }
 
     /// <summary>
     /// Creates an error for blocked authentication due to too many attempts.
     /// </summary>
-    public static SmartCardError AuthenticationBlocked(string message) =>
-        Simple("AUTHENTICATION_BLOCKED", message);
+    public static SmartCardError AuthenticationBlocked(string message)
+    {
+        return Simple("AUTHENTICATION_BLOCKED", message);
+    }
 
     /// <summary>
     /// Creates an error for initialization failures.
     /// </summary>
-    public static SmartCardError InitializationFailed(string message) =>
-        Simple("INITIALIZATION_FAILED", message);
+    public static SmartCardError InitializationFailed(string message)
+    {
+        return Simple("INITIALIZATION_FAILED", message);
+    }
 
     /// <summary>
     /// Creates an error for unexpected errors.
     /// </summary>
-    public static SmartCardError UnexpectedError(string message, Maybe<Exception> ex = default) =>
-        new("UNEXPECTED_ERROR", message, Maybe<ushort>.None, ex, Maybe<IReadOnlyDictionary<string, object>>.None);
+    public static SmartCardError UnexpectedError(string message, Maybe<Exception> ex = default)
+    {
+        return new("UNEXPECTED_ERROR", message, Maybe<ushort>.None, ex, Maybe<IReadOnlyDictionary<string, object>>.None);
+    }
 
     /// <summary>
     /// Creates an error for conditions not satisfied (6985).
     /// </summary>
-    public static SmartCardError ConditionsNotSatisfied() =>
-        WithStatus("CONDITIONS_NOT_SATISFIED", "Conditions of use not satisfied", 0x6985);
+    public static SmartCardError ConditionsNotSatisfied()
+    {
+        return WithStatus("CONDITIONS_NOT_SATISFIED", "Conditions of use not satisfied", 0x6985);
+    }
 
     /// <summary>
     /// Adds context information to the error.
@@ -173,8 +217,9 @@ public record SmartCardError(
         return this with { Context = Maybe<IReadOnlyDictionary<string, object>>.From(newContext) };
     }
 
-    private static string GetStatusWordDescription(ushort sw) =>
-        sw switch
+    private static string GetStatusWordDescription(ushort sw)
+    {
+        return sw switch
         {
             0x9000 => "Success",
             0x6283 => "Selected file invalidated",
@@ -207,10 +252,13 @@ public record SmartCardError(
             _ when (sw & 0xFF00) == 0x6C00 => $"Wrong length ({sw & 0xFF} bytes expected)",
             _ => $"Unknown status word: {sw:X4}"
         };
+    }
 
-    public override string ToString() =>
-        StatusWord.Map(sw => $"{Code}: {Message} (SW={sw:X4})")
+    public override string ToString()
+    {
+        return StatusWord.Map(sw => $"{Code}: {Message} (SW={sw:X4})")
             .GetValueOrDefault($"{Code}: {Message}");
+    }
 }
 
 /// <summary>

@@ -165,7 +165,7 @@ public class GpScriptModule
         // GetStatus functionality requires using GlobalPlatformService
         // This method is deprecated in favor of the functional API
         _logger.LogWarning("GetStatus in Lua scripts is not implemented. Use GlobalPlatformService directly.");
-        return Array.Empty<Table>();
+        return [];
     }
 
     /// <summary>

@@ -46,25 +46,25 @@ public class Scp03RealCardValidationTests
         Console.WriteLine($"Expected Implementation Option: 0x{vector.ImplementationOption:X2}");
         
         var responseResult = InitializeUpdateResponse.Parse(responseData);
-        
+
         // Assert parsing succeeded
-        responseResult.IsSuccess.Should().BeTrue($"Failed to parse INITIALIZE UPDATE response for {vector.Name}");
+        _ = responseResult.IsSuccess.Should().BeTrue($"Failed to parse INITIALIZE UPDATE response for {vector.Name}");
         var response = responseResult.Value;
         
         Console.WriteLine($"Parsed KDD: {Convert.ToHexString(response.KeyDiversificationData)}");
         Console.WriteLine($"Parsed ScpId: 0x{response.ScpId:X2}");
         Console.WriteLine($"Parsed ScpParameter: 0x{response.ScpParameter:X2}");
-        
+
         // Validate parsed components match trace data
-        response.KeyDiversificationData.Should().BeEquivalentTo(vector.KDD,
+        _ = response.KeyDiversificationData.Should().BeEquivalentTo(vector.KDD,
             $"KDD parsing failed for {vector.Name}");
-        response.CardChallenge.Should().BeEquivalentTo(vector.CardChallenge,
+        _ = response.CardChallenge.Should().BeEquivalentTo(vector.CardChallenge,
             $"Card challenge parsing failed for {vector.Name}");
-        response.CardCryptogram.Should().BeEquivalentTo(vector.ExpectedCardCryptogram,
+        _ = response.CardCryptogram.Should().BeEquivalentTo(vector.ExpectedCardCryptogram,
             $"Card cryptogram parsing failed for {vector.Name}");
-        response.ScpId.Should().Be(vector.ScpVersion,
+        _ = response.ScpId.Should().Be(vector.ScpVersion,
             $"SCP version parsing failed for {vector.Name}");
-        response.ScpParameter.Should().Be(vector.ImplementationOption,
+        _ = response.ScpParameter.Should().Be(vector.ImplementationOption,
             $"Implementation option parsing failed for {vector.Name}");
     }
     
@@ -73,26 +73,26 @@ public class Scp03RealCardValidationTests
     {
         // Validate that our real card test vector has all required data
         var vector = Scp03RealCardTestVectors.P71_SCP03_Session;
-        
-        vector.Name.Should().NotBeNullOrEmpty();
-        vector.Description.Should().NotBeNullOrEmpty();
-        vector.CardInfo.Should().NotBeNull();
-        vector.CardInfo.ATR.Should().NotBeEmpty();
-        vector.CardInfo.ISD_AID.Should().NotBeEmpty();
-        vector.StaticKeyEnc.Should().HaveCount(16);
-        vector.StaticKeyMac.Should().HaveCount(16);
-        vector.StaticKeyDek.Should().HaveCount(16);
-        vector.HostChallenge.Should().HaveCount(8);
-        vector.CardChallenge.Should().HaveCount(8);
-        vector.ExpectedSEnc.Should().HaveCount(16);
-        vector.ExpectedSMac.Should().HaveCount(16);
-        vector.ExpectedSRMac.Should().HaveCount(16);
-        vector.ExpectedCardCryptogram.Should().HaveCount(8);
-        vector.ExpectedHostCryptogram.Should().HaveCount(8);
-        vector.InitializeUpdateCommand.Should().NotBeEmpty();
-        vector.InitializeUpdateResponse.Should().NotBeEmpty();
-        vector.ExternalAuthenticateCommand.Should().NotBeEmpty();
-        vector.ExternalAuthenticateResponse.Should().NotBeEmpty();
+
+        _ = vector.Name.Should().NotBeNullOrEmpty();
+        _ = vector.Description.Should().NotBeNullOrEmpty();
+        _ = vector.CardInfo.Should().NotBeNull();
+        _ = vector.CardInfo.ATR.Should().NotBeEmpty();
+        _ = vector.CardInfo.ISD_AID.Should().NotBeEmpty();
+        _ = vector.StaticKeyEnc.Should().HaveCount(16);
+        _ = vector.StaticKeyMac.Should().HaveCount(16);
+        _ = vector.StaticKeyDek.Should().HaveCount(16);
+        _ = vector.HostChallenge.Should().HaveCount(8);
+        _ = vector.CardChallenge.Should().HaveCount(8);
+        _ = vector.ExpectedSEnc.Should().HaveCount(16);
+        _ = vector.ExpectedSMac.Should().HaveCount(16);
+        _ = vector.ExpectedSRMac.Should().HaveCount(16);
+        _ = vector.ExpectedCardCryptogram.Should().HaveCount(8);
+        _ = vector.ExpectedHostCryptogram.Should().HaveCount(8);
+        _ = vector.InitializeUpdateCommand.Should().NotBeEmpty();
+        _ = vector.InitializeUpdateResponse.Should().NotBeEmpty();
+        _ = vector.ExternalAuthenticateCommand.Should().NotBeEmpty();
+        _ = vector.ExternalAuthenticateResponse.Should().NotBeEmpty();
     }
     
     [Test]
@@ -100,20 +100,20 @@ public class Scp03RealCardValidationTests
     {
         // Validate P71 card capabilities match expected values from trace
         var vector = Scp03RealCardTestVectors.P71_SCP03_Session;
-        
-        vector.SupportedSCPVersions.Should().Contain("i=70", 
+
+        _ = vector.SupportedSCPVersions.Should().Contain("i=70",
             "P71 card should support SCP03 i=70");
-        vector.SupportedKeyLengths.Should().Contain("AES-128",
+        _ = vector.SupportedKeyLengths.Should().Contain("AES-128",
             "P71 card should support AES-128");
-        vector.SupportedPrivileges.Should().Contain("SecurityDomain",
+        _ = vector.SupportedPrivileges.Should().Contain("SecurityDomain",
             "P71 card should support SecurityDomain privilege");
-        
+
         // Validate implementation option
-        vector.ImplementationOption.Should().Be(0x70,
+        _ = vector.ImplementationOption.Should().Be(0x70,
             "P71 card uses SCP03 i=70");
-        
+
         // Validate key version
-        vector.KeyVersion.Should().Be(0x01,
+        _ = vector.KeyVersion.Should().Be(0x01,
             "P71 card uses key version 01");
     }
 }

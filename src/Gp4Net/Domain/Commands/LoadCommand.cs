@@ -180,35 +180,33 @@ public class LoadCommand : IApduCommand
 
             // Encode length (up to 3 bytes for length field)
             var totalSize = TotalCapSize!.Value;
-            if (totalSize <= 0x7F)
+            switch (totalSize)
             {
-                data.Add((byte)totalSize);
-            }
-            else if (totalSize <= 0xFF)
-            {
-                data.Add(0x81);
-                data.Add((byte)totalSize);
-            }
-            else if (totalSize <= 0xFFFF)
-            {
-                data.Add(0x82);
-                data.Add((byte)(totalSize >> 8));
-                data.Add((byte)(totalSize & 0xFF));
-            }
-            else if (totalSize <= 0xFFFFFF)
-            {
-                data.Add(0x83);
-                data.Add((byte)(totalSize >> 16));
-                data.Add((byte)((totalSize >> 8) & 0xFF));
-                data.Add((byte)(totalSize & 0xFF));
-            }
-            else
-            {
-                data.Add(0x84);
-                data.Add((byte)(totalSize >> 24));
-                data.Add((byte)((totalSize >> 16) & 0xFF));
-                data.Add((byte)((totalSize >> 8) & 0xFF));
-                data.Add((byte)(totalSize & 0xFF));
+                case <= 0x7F:
+                    data.Add((byte)totalSize);
+                    break;
+                case <= 0xFF:
+                    data.Add(0x81);
+                    data.Add((byte)totalSize);
+                    break;
+                case <= 0xFFFF:
+                    data.Add(0x82);
+                    data.Add((byte)(totalSize >> 8));
+                    data.Add((byte)(totalSize & 0xFF));
+                    break;
+                case <= 0xFFFFFF:
+                    data.Add(0x83);
+                    data.Add((byte)(totalSize >> 16));
+                    data.Add((byte)((totalSize >> 8) & 0xFF));
+                    data.Add((byte)(totalSize & 0xFF));
+                    break;
+                default:
+                    data.Add(0x84);
+                    data.Add((byte)(totalSize >> 24));
+                    data.Add((byte)((totalSize >> 16) & 0xFF));
+                    data.Add((byte)((totalSize >> 8) & 0xFF));
+                    data.Add((byte)(totalSize & 0xFF));
+                    break;
             }
         }
 
@@ -291,7 +289,7 @@ public class LoadCommand : IApduCommand
                 SmartCardError.InvalidArgument("CAP file data cannot be empty."));
         }
 
-        if (maxBlockSize < 1 || maxBlockSize > 255)
+        if (maxBlockSize is < 1 or > 255)
         {
             return Result.Failure<IList<LoadCommand>, SmartCardError>(
                 SmartCardError.InvalidArgument(
@@ -341,26 +339,19 @@ public class LoadCommand : IApduCommand
     {
         // C4 tag (1 byte) + length encoding
         var tagSize = 1;
-            
-        if (totalSize <= 0x7F)
+
+        switch (totalSize)
         {
-            return tagSize + 1; // 1 byte length
-        }
-        else if (totalSize <= 0xFF)
-        {
-            return tagSize + 2; // 0x81 + 1 byte length
-        }
-        else if (totalSize <= 0xFFFF)
-        {
-            return tagSize + 3; // 0x82 + 2 bytes length
-        }
-        else if (totalSize <= 0xFFFFFF)
-        {
-            return tagSize + 4; // 0x83 + 3 bytes length
-        }
-        else
-        {
-            return tagSize + 5; // 0x84 + 4 bytes length
+            case <= 0x7F:
+                return tagSize + 1; // 1 byte length
+            case <= 0xFF:
+                return tagSize + 2; // 0x81 + 1 byte length
+            case <= 0xFFFF:
+                return tagSize + 3; // 0x82 + 2 bytes length
+            case <= 0xFFFFFF:
+                return tagSize + 4; // 0x83 + 3 bytes length
+            default:
+                return tagSize + 5; // 0x84 + 4 bytes length
         }
     }
 
@@ -408,35 +399,33 @@ public class LoadCommand : IApduCommand
 
             // Encode length (up to 3 bytes for length field)
             var totalSize = TotalCapSize!.Value;
-            if (totalSize <= 0x7F)
+            switch (totalSize)
             {
-                data.Add((byte)totalSize);
-            }
-            else if (totalSize <= 0xFF)
-            {
-                data.Add(0x81);
-                data.Add((byte)totalSize);
-            }
-            else if (totalSize <= 0xFFFF)
-            {
-                data.Add(0x82);
-                data.Add((byte)(totalSize >> 8));
-                data.Add((byte)(totalSize & 0xFF));
-            }
-            else if (totalSize <= 0xFFFFFF)
-            {
-                data.Add(0x83);
-                data.Add((byte)(totalSize >> 16));
-                data.Add((byte)((totalSize >> 8) & 0xFF));
-                data.Add((byte)(totalSize & 0xFF));
-            }
-            else
-            {
-                data.Add(0x84);
-                data.Add((byte)(totalSize >> 24));
-                data.Add((byte)((totalSize >> 16) & 0xFF));
-                data.Add((byte)((totalSize >> 8) & 0xFF));
-                data.Add((byte)(totalSize & 0xFF));
+                case <= 0x7F:
+                    data.Add((byte)totalSize);
+                    break;
+                case <= 0xFF:
+                    data.Add(0x81);
+                    data.Add((byte)totalSize);
+                    break;
+                case <= 0xFFFF:
+                    data.Add(0x82);
+                    data.Add((byte)(totalSize >> 8));
+                    data.Add((byte)(totalSize & 0xFF));
+                    break;
+                case <= 0xFFFFFF:
+                    data.Add(0x83);
+                    data.Add((byte)(totalSize >> 16));
+                    data.Add((byte)((totalSize >> 8) & 0xFF));
+                    data.Add((byte)(totalSize & 0xFF));
+                    break;
+                default:
+                    data.Add(0x84);
+                    data.Add((byte)(totalSize >> 24));
+                    data.Add((byte)((totalSize >> 16) & 0xFF));
+                    data.Add((byte)((totalSize >> 8) & 0xFF));
+                    data.Add((byte)(totalSize & 0xFF));
+                    break;
             }
         }
 
@@ -463,7 +452,10 @@ public class LoadCommand : IApduCommand
     /// Returns a string representation of this command.
     /// </summary>
     /// <returns>The string "LOAD".</returns>
-    public override string ToString() => "LOAD";
+    public override string ToString()
+    {
+        return "LOAD";
+    }
 }
 
 /// <summary>

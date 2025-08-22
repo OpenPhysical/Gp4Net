@@ -49,12 +49,12 @@ public class Scp02ImplementationClassificationTests
     {
         // Act
         var result = implementation.IsScp02();
-        
+
         // Assert
-        result.Should().Be(expected, description);
+        _ = result.Should().Be(expected, description);
         
-        TestContext.WriteLine($"✓ {description}");
-        TestContext.WriteLine($"Implementation {implementation} (0x{(byte)implementation:X2}) correctly classified as SCP02: {result}");
+        TestContext.Out.WriteLine($"✓ {description}");
+        TestContext.Out.WriteLine($"Implementation {implementation} (0x{(byte)implementation:X2}) correctly classified as SCP02: {result}");
     }
 
     [TestCase(ScpImplementation.Scp03Aes128, false, "i=10 should not be classified as SCP02 (is SCP03)")]
@@ -70,12 +70,12 @@ public class Scp02ImplementationClassificationTests
     {
         // Act
         var result = implementation.IsScp02();
-        
+
         // Assert
-        result.Should().Be(expected, description);
+        _ = result.Should().Be(expected, description);
         
-        TestContext.WriteLine($"✓ {description}");
-        TestContext.WriteLine($"Implementation {implementation} (0x{(byte)implementation:X2}) correctly classified as SCP02: {result}");
+        TestContext.Out.WriteLine($"✓ {description}");
+        TestContext.Out.WriteLine($"Implementation {implementation} (0x{(byte)implementation:X2}) correctly classified as SCP02: {result}");
     }
 
     /// <summary>
@@ -101,12 +101,12 @@ public class Scp02ImplementationClassificationTests
             // Act - Cast byte to enum and test classification
             var implementation = (ScpImplementation)value;
             var result = implementation.IsScp02();
-            
+
             // Assert
-            result.Should().BeFalse($"Value 0x{value:X2} should be classified as SCP03, not SCP02");
-            implementation.IsScp03().Should().BeTrue($"Value 0x{value:X2} should be classified as SCP03");
+            _ = result.Should().BeFalse($"Value 0x{value:X2} should be classified as SCP03, not SCP02");
+            _ = implementation.IsScp03().Should().BeTrue($"Value 0x{value:X2} should be classified as SCP03");
             
-            TestContext.WriteLine($"✓ SCP03 value 0x{value:X2} correctly excluded from SCP02 classification");
+            TestContext.Out.WriteLine($"✓ SCP03 value 0x{value:X2} correctly excluded from SCP02 classification");
         }
     }
 
@@ -128,12 +128,12 @@ public class Scp02ImplementationClassificationTests
         // Act - Cast raw byte value to enum (may not be defined)
         var implementation = (ScpImplementation)value;
         var result = implementation.IsScp02();
-        
+
         // Assert
-        result.Should().BeFalse(description);
+        _ = result.Should().BeFalse(description);
         
-        TestContext.WriteLine($"✓ {description}");
-        TestContext.WriteLine($"Value 0x{value:X2} correctly rejected as non-SCP02");
+        TestContext.Out.WriteLine($"✓ {description}");
+        TestContext.Out.WriteLine($"Value 0x{value:X2} correctly rejected as non-SCP02");
     }
 
     /// <summary>
@@ -155,18 +155,18 @@ public class Scp02ImplementationClassificationTests
             {
                 // If IsScp02() says it's SCP02, GetScp02Implementation() should succeed
                 var result = Scp02Protocol.GetScp02Implementation(byteValue);
-                result.IsSuccess.Should().BeTrue($"IsScp02() returned true for 0x{byteValue:X2}, but GetScp02Implementation() failed: {(result.IsFailure ? result.Error.Message : "unknown error")}");
+                _ = result.IsSuccess.Should().BeTrue($"IsScp02() returned true for 0x{byteValue:X2}, but GetScp02Implementation() failed: {(result.IsFailure ? result.Error.Message : "unknown error")}");
             }
             else
             {
                 // If IsScp02() says it's not SCP02, GetScp02Implementation() should fail
                 var result = Scp02Protocol.GetScp02Implementation(byteValue);
-                result.IsFailure.Should().BeTrue($"IsScp02() returned false for 0x{byteValue:X2}, but GetScp02Implementation() succeeded");
-                result.Error.Should().BeOfType<UnsupportedImplementationError>();
+                _ = result.IsFailure.Should().BeTrue($"IsScp02() returned false for 0x{byteValue:X2}, but GetScp02Implementation() succeeded");
+                _ = result.Error.Should().BeOfType<UnsupportedImplementationError>();
             }
         }
         
-        TestContext.WriteLine("✓ IsScp02() and GetScp02Implementation() are consistent across all 256 possible byte values");
+        TestContext.Out.WriteLine("✓ IsScp02() and GetScp02Implementation() are consistent across all 256 possible byte values");
     }
 
     /// <summary>
@@ -185,12 +185,12 @@ public class Scp02ImplementationClassificationTests
     {
         // Act
         var result = implementation.IsScp02();
-        
+
         // Assert
-        result.Should().Be(expected, description);
+        _ = result.Should().Be(expected, description);
         
-        TestContext.WriteLine($"✓ {description}");
-        TestContext.WriteLine($"Legacy alias {implementation} correctly classified as SCP02: {result}");
+        TestContext.Out.WriteLine($"✓ {description}");
+        TestContext.Out.WriteLine($"Legacy alias {implementation} correctly classified as SCP02: {result}");
     }
 
     /// <summary>
@@ -216,16 +216,16 @@ public class Scp02ImplementationClassificationTests
         // Act - Cast undefined byte value to enum
         var implementation = (ScpImplementation)value;
         var result = implementation.IsScp02();
-        
+
         // Assert
-        result.Should().Be(expected, description);
+        _ = result.Should().Be(expected, description);
         
         // Also verify that GetScp02Implementation() would fail for these values
         var implResult = Scp02Protocol.GetScp02Implementation(value);
-        implResult.IsFailure.Should().BeTrue($"GetScp02Implementation() should fail for undefined value 0x{value:X2}");
-        implResult.Error.Should().BeOfType<UnsupportedImplementationError>();
+        _ = implResult.IsFailure.Should().BeTrue($"GetScp02Implementation() should fail for undefined value 0x{value:X2}");
+        _ = implResult.Error.Should().BeOfType<UnsupportedImplementationError>();
         
-        TestContext.WriteLine($"✓ {description}");
-        TestContext.WriteLine($"Undefined value 0x{value:X2} correctly rejected by both IsScp02() and GetScp02Implementation()");
+        TestContext.Out.WriteLine($"✓ {description}");
+        TestContext.Out.WriteLine($"Undefined value 0x{value:X2} correctly rejected by both IsScp02() and GetScp02Implementation()");
     }
 }

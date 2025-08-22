@@ -501,21 +501,21 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
             result.Add((byte)tag);
         }
 
-        // Add length
-        if (data.Length < 0x80)
+        switch (data.Length)
         {
-            result.Add((byte)data.Length);
-        }
-        else if (data.Length < 0x100)
-        {
-            result.Add(0x81);
-            result.Add((byte)data.Length);
-        }
-        else
-        {
-            result.Add(0x82);
-            result.Add((byte)(data.Length >> 8));
-            result.Add((byte)(data.Length & 0xFF));
+            // Add length
+            case < 0x80:
+                result.Add((byte)data.Length);
+                break;
+            case < 0x100:
+                result.Add(0x81);
+                result.Add((byte)data.Length);
+                break;
+            default:
+                result.Add(0x82);
+                result.Add((byte)(data.Length >> 8));
+                result.Add((byte)(data.Length & 0xFF));
+                break;
         }
 
         // Add data
@@ -584,20 +584,20 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
             var inputMethods = new[] { hasKeyValuePairs, hasFile, hasInteractive }.Count(x =>
                 x
             );
-            if (inputMethods == 0)
+            switch (inputMethods)
             {
-                return ValidationResult.Error(
-                    "Must specify data using key=value pairs, --file, or --interactive"
-                );
-            }
-            if (inputMethods > 1)
-            {
-                return ValidationResult.Error(
-                    "Cannot combine key=value pairs, --file, and --interactive options"
-                );
+                case 0:
+                    return ValidationResult.Error(
+                        "Must specify data using key=value pairs, --file, or --interactive"
+                    );
+                case > 1:
+                    return ValidationResult.Error(
+                        "Cannot combine key=value pairs, --file, and --interactive options"
+                    );
+                default:
+                    return ValidationResult.Success();
             }
 
-            return ValidationResult.Success();
         }
     }
 }

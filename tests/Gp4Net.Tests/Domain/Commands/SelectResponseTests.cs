@@ -17,11 +17,11 @@ public class SelectResponseTests
     {
         var result = SelectResponse.Parse(null);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<InvalidDataError>();
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<InvalidDataError>();
         var error = (InvalidDataError)result.Error;
-        error.Field.Should().Be("Response");
-        error.Reason.Should().Be("cannot be null");
+        _ = error.Field.Should().Be("Response");
+        _ = error.Reason.Should().Be("cannot be null");
     }
 
     [Test]
@@ -29,9 +29,9 @@ public class SelectResponseTests
     {
         var result = SelectResponse.Parse([]);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.RawData.Should().BeEmpty();
-        result.Value.Fci.Should().BeNull();
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.RawData.Should().BeEmpty();
+        _ = result.Value.Fci.Should().BeNull();
     }
 
     [Test]
@@ -41,9 +41,9 @@ public class SelectResponseTests
 
         var result = SelectResponse.Parse(nonFciData);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.RawData.Should().BeEquivalentTo(nonFciData);
-        result.Value.Fci.Should().BeNull();
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.RawData.Should().BeEquivalentTo(nonFciData);
+        _ = result.Value.Fci.Should().BeNull();
     }
 
     [Test]
@@ -53,10 +53,10 @@ public class SelectResponseTests
 
         var result = SelectResponse.Parse(fciData);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Fci.Should().NotBeNull();
-        result.Value.Fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
-        result.Value.Fci.MaxCommandDataLength.Should().Be(255);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Fci.Should().NotBeNull();
+        _ = result.Value.Fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
+        _ = result.Value.Fci.MaxCommandDataLength.Should().Be(255);
     }
 
     [Test]
@@ -67,33 +67,33 @@ public class SelectResponseTests
         {
             builder.Add(0x84, Convert.FromHexString("A0000000030000")); // AID
             builder.Add(0x50, Encoding.UTF8.GetBytes("ISD")); // Label
-            builder.Add(0x87, new byte[] { 0x01 }); // Priority
+            builder.Add(0x87, [0x01]); // Priority
             builder.Add(0xA5, subBuilder =>
             {
-                subBuilder.Add(0x9F65, new byte[] { 0x01, 0x00 }); // Max command length (256)
-                subBuilder.Add(0x9F66, new byte[] { 0x02, 0x00 }); // Max response length (512)
-                subBuilder.Add(0x42, new byte[] { 0x12, 0x34 }); // Issuer ID
-                subBuilder.Add(0x45, new byte[] { 0x56, 0x78 }); // Card Image
-                subBuilder.Add(0x66, new byte[] { 0x9A, 0xBC }); // Card Data
+                subBuilder.Add(0x9F65, [0x01, 0x00]); // Max command length (256)
+                subBuilder.Add(0x9F66, [0x02, 0x00]); // Max response length (512)
+                subBuilder.Add(0x42, [0x12, 0x34]); // Issuer ID
+                subBuilder.Add(0x45, [0x56, 0x78]); // Card Image
+                subBuilder.Add(0x66, [0x9A, 0xBC]); // Card Data
             });
-            builder.Add(0xBF0C, new byte[] { 0xDE, 0xF0 }); // Discretionary Data
+            builder.Add(0xBF0C, [0xDE, 0xF0]); // Discretionary Data
         });
 
         var fciData = tlvBuilder.Build();
         var result = SelectResponse.Parse(fciData);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var fci = result.Value.Fci;
-        fci.Should().NotBeNull();
-        fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A0000000030000"));
-        fci.ApplicationLabel.Should().Be("ISD");
-        fci.ApplicationPriorityIndicator.Should().Be(0x01);
-        fci.MaxCommandDataLength.Should().Be(256);
-        fci.MaxResponseDataLength.Should().Be(512);
-        fci.IssuerIdentificationNumber.Should().BeEquivalentTo(new byte[] { 0x12, 0x34 });
-        fci.CardImageNumber.Should().BeEquivalentTo(new byte[] { 0x56, 0x78 });
-        fci.CardData.Should().BeEquivalentTo(new byte[] { 0x9A, 0xBC });
-        fci.DiscretionaryData.Should().BeEquivalentTo(new byte[] { 0xDE, 0xF0 });
+        _ = fci.Should().NotBeNull();
+        _ = fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A0000000030000"));
+        _ = fci.ApplicationLabel.Should().Be("ISD");
+        _ = fci.ApplicationPriorityIndicator.Should().Be(0x01);
+        _ = fci.MaxCommandDataLength.Should().Be(256);
+        _ = fci.MaxResponseDataLength.Should().Be(512);
+        _ = fci.IssuerIdentificationNumber.Should().BeEquivalentTo(new byte[] { 0x12, 0x34 });
+        _ = fci.CardImageNumber.Should().BeEquivalentTo(new byte[] { 0x56, 0x78 });
+        _ = fci.CardData.Should().BeEquivalentTo(new byte[] { 0x9A, 0xBC });
+        _ = fci.DiscretionaryData.Should().BeEquivalentTo(new byte[] { 0xDE, 0xF0 });
     }
 
     [Test]
@@ -105,20 +105,20 @@ public class SelectResponseTests
             builder.Add(0x84, Convert.FromHexString("A000000151000000"));
             builder.Add(0xA5, subBuilder =>
             {
-                subBuilder.Add(0x9F65, new byte[] { 0xFF }); // Single byte max command
-                subBuilder.Add(0x9F66, new byte[] { 0x80 }); // Single byte max response
+                subBuilder.Add(0x9F65, [0xFF]); // Single byte max command
+                subBuilder.Add(0x9F66, [0x80]); // Single byte max response
             });
         });
 
         var fciData = tlvBuilder.Build();
         var result = SelectResponse.Parse(fciData);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var fci = result.Value.Fci;
-        fci.Should().NotBeNull();
+        _ = fci.Should().NotBeNull();
         // After verifying not null, we can safely access properties
-        fci.MaxCommandDataLength.Should().Be(255);
-        fci.MaxResponseDataLength.Should().Be(128);
+        _ = fci.MaxCommandDataLength.Should().Be(255);
+        _ = fci.MaxResponseDataLength.Should().Be(128);
     }
 
     [Test]
@@ -134,11 +134,11 @@ public class SelectResponseTests
         var fciData = tlvBuilder.Build();
         var result = SelectResponse.Parse(fciData);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var fci = result.Value.Fci;
-        fci.Should().NotBeNull();
+        _ = fci.Should().NotBeNull();
         // After verifying not null, we can safely access properties
-        fci.ApplicationLabel.Should().Be("");
+        _ = fci.ApplicationLabel.Should().Be("");
     }
 
     [Test]
@@ -154,11 +154,11 @@ public class SelectResponseTests
         var fciData = tlvBuilder.Build();
         var result = SelectResponse.Parse(fciData);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var fci = result.Value.Fci;
-        fci.Should().NotBeNull();
+        _ = fci.Should().NotBeNull();
         // After verifying not null, we can safely access properties
-        fci.ApplicationPriorityIndicator.Should().BeNull();
+        _ = fci.ApplicationPriorityIndicator.Should().BeNull();
     }
 
     [Test]
@@ -168,17 +168,17 @@ public class SelectResponseTests
         tlvBuilder.Add(0x6F, builder =>
         {
             builder.Add(0x84, Convert.FromHexString("A000000151000000"));
-            builder.Add(0x9F38, new byte[] { 0x9F, 0x66, 0x02 }); // PDOL
+            builder.Add(0x9F38, [0x9F, 0x66, 0x02]); // PDOL
         });
 
         var fciData = tlvBuilder.Build();
         var result = SelectResponse.Parse(fciData);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var fci = result.Value.Fci;
-        fci.Should().NotBeNull();
+        _ = fci.Should().NotBeNull();
         // After verifying not null, we can safely access properties
-        fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
+        _ = fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
     }
 
     [Test]
@@ -189,9 +189,9 @@ public class SelectResponseTests
 
         var result = SelectResponse.Parse(malformedData);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Fci.Should().BeNull();
-        result.Value.RawData.Should().BeEquivalentTo(malformedData);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Fci.Should().BeNull();
+        _ = result.Value.RawData.Should().BeEquivalentTo(malformedData);
     }
 
     [Test]
@@ -201,8 +201,8 @@ public class SelectResponseTests
 
         var result = SelectResponse.ParseWithFci(fciData);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Fci.Should().NotBeNull();
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Fci.Should().NotBeNull();
     }
 
     [Test]
@@ -213,7 +213,7 @@ public class SelectResponseTests
 
         originalData[0] = 0xFF;
 
-        response.RawData[0].Should().Be(0x01);
+        _ = response.RawData[0].Should().Be(0x01);
     }
 
     [Test]
@@ -224,8 +224,8 @@ public class SelectResponseTests
 
         var response = new SelectResponse(rawData, fci);
 
-        response.RawData.Should().BeEquivalentTo(rawData);
-        response.Fci.Should().BeEquivalentTo(fci);
+        _ = response.RawData.Should().BeEquivalentTo(rawData);
+        _ = response.Fci.Should().BeEquivalentTo(fci);
     }
 }
 
@@ -257,15 +257,15 @@ public class FileControlInformationTests
             discretionaryData: discretionaryData
         );
 
-        fci.ApplicationAid.Should().BeEquivalentTo(aid);
-        fci.ApplicationLabel.Should().Be(label);
-        fci.ApplicationPriorityIndicator.Should().Be(priority);
-        fci.MaxCommandDataLength.Should().Be(maxCommand);
-        fci.MaxResponseDataLength.Should().Be(maxResponse);
-        fci.IssuerIdentificationNumber.Should().BeEquivalentTo(issuerNumber);
-        fci.CardImageNumber.Should().BeEquivalentTo(cardImage);
-        fci.CardData.Should().BeEquivalentTo(cardData);
-        fci.DiscretionaryData.Should().BeEquivalentTo(discretionaryData);
+        _ = fci.ApplicationAid.Should().BeEquivalentTo(aid);
+        _ = fci.ApplicationLabel.Should().Be(label);
+        _ = fci.ApplicationPriorityIndicator.Should().Be(priority);
+        _ = fci.MaxCommandDataLength.Should().Be(maxCommand);
+        _ = fci.MaxResponseDataLength.Should().Be(maxResponse);
+        _ = fci.IssuerIdentificationNumber.Should().BeEquivalentTo(issuerNumber);
+        _ = fci.CardImageNumber.Should().BeEquivalentTo(cardImage);
+        _ = fci.CardData.Should().BeEquivalentTo(cardData);
+        _ = fci.DiscretionaryData.Should().BeEquivalentTo(discretionaryData);
     }
 
     [Test]
@@ -273,15 +273,15 @@ public class FileControlInformationTests
     {
         var fci = new FileControlInformation();
 
-        fci.ApplicationAid.Should().BeEmpty();
-        fci.ApplicationLabel.Should().BeNull();
-        fci.ApplicationPriorityIndicator.Should().BeNull();
-        fci.MaxCommandDataLength.Should().BeNull();
-        fci.MaxResponseDataLength.Should().BeNull();
-        fci.IssuerIdentificationNumber.Should().BeEmpty();
-        fci.CardImageNumber.Should().BeEmpty();
-        fci.CardData.Should().BeEmpty();
-        fci.DiscretionaryData.Should().BeEmpty();
+        _ = fci.ApplicationAid.Should().BeEmpty();
+        _ = fci.ApplicationLabel.Should().BeNull();
+        _ = fci.ApplicationPriorityIndicator.Should().BeNull();
+        _ = fci.MaxCommandDataLength.Should().BeNull();
+        _ = fci.MaxResponseDataLength.Should().BeNull();
+        _ = fci.IssuerIdentificationNumber.Should().BeEmpty();
+        _ = fci.CardImageNumber.Should().BeEmpty();
+        _ = fci.CardData.Should().BeEmpty();
+        _ = fci.DiscretionaryData.Should().BeEmpty();
     }
 
     [Test]
@@ -309,25 +309,25 @@ public class FileControlInformationTests
         discretionaryData[0] = 0xFF;
 
         // Verify FCI arrays are not affected
-        fci.ApplicationAid.Should().NotBeNull();
+        _ = fci.ApplicationAid.Should().NotBeNull();
         // After verifying ApplicationAid is not null, we can safely access its elements
-        fci.ApplicationAid[0].Should().Be(0xA0);
-        
-        fci.IssuerIdentificationNumber.Should().NotBeNull();
+        _ = fci.ApplicationAid[0].Should().Be(0xA0);
+
+        _ = fci.IssuerIdentificationNumber.Should().NotBeNull();
         // After verifying IssuerIdentificationNumber is not null, we can safely access its elements
-        fci.IssuerIdentificationNumber[0].Should().Be(0x12);
-        
-        fci.CardImageNumber.Should().NotBeNull();
+        _ = fci.IssuerIdentificationNumber[0].Should().Be(0x12);
+
+        _ = fci.CardImageNumber.Should().NotBeNull();
         // After verifying CardImageNumber is not null, we can safely access its elements
-        fci.CardImageNumber[0].Should().Be(0x56);
-        
-        fci.CardData.Should().NotBeNull();
+        _ = fci.CardImageNumber[0].Should().Be(0x56);
+
+        _ = fci.CardData.Should().NotBeNull();
         // After verifying CardData is not null, we can safely access its elements
-        fci.CardData[0].Should().Be(0x9A);
-        
-        fci.DiscretionaryData.Should().NotBeNull();
+        _ = fci.CardData[0].Should().Be(0x9A);
+
+        _ = fci.DiscretionaryData.Should().NotBeNull();
         // After verifying DiscretionaryData is not null, we can safely access its elements
-        fci.DiscretionaryData[0].Should().Be(0xDE);
+        _ = fci.DiscretionaryData[0].Should().Be(0xDE);
     }
 
     [Test]
@@ -341,10 +341,10 @@ public class FileControlInformationTests
             discretionaryData: []
         );
 
-        fci.ApplicationAid.Should().BeEmpty();
-        fci.IssuerIdentificationNumber.Should().BeEmpty();
-        fci.CardImageNumber.Should().BeEmpty();
-        fci.CardData.Should().BeEmpty();
-        fci.DiscretionaryData.Should().BeEmpty();
+        _ = fci.ApplicationAid.Should().BeEmpty();
+        _ = fci.IssuerIdentificationNumber.Should().BeEmpty();
+        _ = fci.CardImageNumber.Should().BeEmpty();
+        _ = fci.CardData.Should().BeEmpty();
+        _ = fci.DiscretionaryData.Should().BeEmpty();
     }
 }

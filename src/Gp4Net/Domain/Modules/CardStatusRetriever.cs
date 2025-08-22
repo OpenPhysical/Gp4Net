@@ -70,7 +70,7 @@ public static class CardStatusRetriever
     {
         Result<GetStatusCommand, SmartCardError> cmdResult = CommandFactory.CreateGetStatusCommand(
             GetStatusCommand.StatusSubset.IssuerSecurityDomain,
-            new byte[] { 0x4F, 0x00 }); // Tag 4F, length 0
+            [0x4F, 0x00]); // Tag 4F, length 0
         
         if (cmdResult.IsFailure)
         {
@@ -94,7 +94,7 @@ public static class CardStatusRetriever
     {
         Result<GetStatusCommand, SmartCardError> cmdResult = CommandFactory.CreateGetStatusCommand(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
-            new byte[] { 0x4F, 0x00 }); // Tag 4F, length 0
+            [0x4F, 0x00]); // Tag 4F, length 0
         
         if (cmdResult.IsFailure)
         {
@@ -118,7 +118,7 @@ public static class CardStatusRetriever
     {
         Result<GetStatusCommand, SmartCardError> cmdResult = CommandFactory.CreateGetStatusCommand(
             GetStatusCommand.StatusSubset.ExecutableLoadFiles,
-            new byte[] { 0x4F, 0x00 }); // Tag 4F, length 0
+            [0x4F, 0x00]); // Tag 4F, length 0
         
         if (cmdResult.IsFailure)
         {
@@ -142,7 +142,7 @@ public static class CardStatusRetriever
     {
         Result<GetStatusCommand, SmartCardError> cmdResult = CommandFactory.CreateGetStatusCommand(
             GetStatusCommand.StatusSubset.ExecutableLoadFilesAndModules,
-            new byte[] { 0x4F, 0x00 }); // Tag 4F, length 0
+            [0x4F, 0x00]); // Tag 4F, length 0
         
         if (cmdResult.IsFailure)
         {
@@ -229,9 +229,79 @@ public static class CardStatusRetriever
                 SmartCardError.InvalidResponse($"GET STATUS failed with SW: {response.StatusWord:X4}"));
         }
 
-        // For now, return empty list as we need to implement proper parsing
-        // This would require parsing the TLV structure for load file information
-        return Result.Success<ImmutableList<ExecutableLoadFile>, SmartCardError>(
-            ImmutableList<ExecutableLoadFile>.Empty);
+        var data = response.Data ?? [];
+
+        // Parse TLV entries per GP Table 11-37; cards return multiple E3 entries (per-entry templates)
+        var tlvs = Gp4Net.Core.Tlv.TlvParser.ParseAll(data).ToImmutableList();
+
+        // Per GP Table 11-37, all load file responses MUST use E3 containers. All traced cards comply.
+        var entryTlvs = tlvs.Where(t => t.TagNumber == 0xE3).ToImmutableList();
+
+        var builder = ImmutableList.CreateBuilder<ExecutableLoadFile>();
+
+        foreach (var entry in entryTlvs)
+        {
+            // For E3 templates, parse children; otherwise, treat the TLV itself as a container
+            var children = entry.TagNumber == 0xE3
+                ? entry.ParseNestedTlv().ToImmutableList()
+                : new[] { entry }.ToImmutableList();
+
+            // Aid (4F)
+            var aidTlv = children.FirstOrDefault(c => c.TagNumber == 0x4F);
+            if (aidTlv == null || aidTlv.Value == null || aidTlv.Value.Length == 0)
+            {
+                // Skip malformed entry without AID
+                continue;
+            }
+            var aid = aidTlv.Value;
+
+            // Lifecycle (prefer 9F70, else Unknown)
+            var lifeTlv = children.FirstOrDefault(c => c.TagNumber == 0x9F70);
+            var lifecycle = lifeTlv != null && lifeTlv.Value != null && lifeTlv.Value.Length > 0
+                ? MapLifecycle(lifeTlv.Value[0])
+                : LifecycleState.Unknown;
+
+            // Modules (84 can appear multiple times)
+            var moduleTlvs = children.Where(c => c.TagNumber == 0x84 && c.Value != null && c.Value.Length > 0);
+            var modules = moduleTlvs
+                .Select(m => new ExecutableModule(m.Value))
+                .ToImmutableList();
+
+            // Associated Security Domain AID (observed tag CC in traces)
+            var sdTlv = children.FirstOrDefault(c => c.TagNumber == 0xCC);
+            var sdAidMaybe = sdTlv != null && sdTlv.Value != null && sdTlv.Value.Length >= 5 && sdTlv.Value.Length <= 16
+                ? Maybe<byte[]>.From(sdTlv.Value)
+                : Maybe<byte[]>.None;
+
+            // Version (observed tag CE 02 [major][minor])
+            var verTlv = children.FirstOrDefault(c => c.TagNumber == 0xCE);
+            var versionMaybe = Maybe<string>.None;
+            if (verTlv != null && verTlv.Value != null && verTlv.Value.Length >= 2)
+            {
+                var major = verTlv.Value[0];
+                var minor = verTlv.Value[1];
+                versionMaybe = Maybe<string>.From($"{major}.{minor}");
+            }
+
+            builder.Add(new ExecutableLoadFile(
+                Aid: aid,
+                LifecycleState: lifecycle,
+                Version: versionMaybe,
+                ExecutableModules: modules,
+                AssociatedSecurityDomainAid: sdAidMaybe));
+        }
+
+        return Result.Success<ImmutableList<ExecutableLoadFile>, SmartCardError>(builder.ToImmutable());
+
+        static LifecycleState MapLifecycle(byte b) => b switch
+        {
+            0x01 => LifecycleState.Loaded,
+            0x03 => LifecycleState.Installed,
+            0x07 => LifecycleState.Selectable,
+            0x0F => LifecycleState.Personalized,
+            0x7F => LifecycleState.Locked,
+            0xFF => LifecycleState.Terminated,
+            _ => LifecycleState.Unknown
+        };
     }
 }

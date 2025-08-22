@@ -66,11 +66,11 @@ public class CapFileLoadingWorkflow
             ErrorMessage = errorMessage;
             ExecutedCommands = executedCommands
                 .Map(commands => (IReadOnlyList<object>)new List<object>(commands))
-                .GetValueOrDefault(Array.Empty<object>());
+                .GetValueOrDefault([]);
             LoadedPackageAid = loadedPackageAid.Map(aid => (byte[])aid.Clone());
             InstalledAppletAids = installedAppletAids
                 .Map(aids => (IReadOnlyList<byte[]>)new List<byte[]>(aids.Select(aid => (byte[])aid.Clone())))
-                .GetValueOrDefault(Array.Empty<byte[]>());
+                .GetValueOrDefault([]);
         }
     }
 
@@ -199,7 +199,7 @@ public class CapFileLoadingWorkflow
             var validationErrors = new List<string>();
 
             // Validate package AID
-            if (capFile.PackageAid.Length < 5 || capFile.PackageAid.Length > 16)
+            if (capFile.PackageAid.Length is < 5 or > 16)
             {
                 validationErrors.Add("Package AID must be between 5 and 16 bytes");
             }
@@ -229,7 +229,7 @@ public class CapFileLoadingWorkflow
             // Validate applets
             foreach (var applet in capFile.Applets)
             {
-                if (applet.Aid.Length < 5 || applet.Aid.Length > 16)
+                if (applet.Aid.Length is < 5 or > 16)
                 {
                     validationErrors.Add(
                         $"Applet AID must be between 5 and 16 bytes: {Convert.ToHexString(applet.Aid)}"
@@ -305,15 +305,13 @@ public class CapFileLoadingWorkflow
         // Basic estimation - in practice this would be more sophisticated
         var codeSize = capFile
             .Components.Where(c =>
-                c.Tag == CapFileStructure.ComponentTags.Method
-                || c.Tag == CapFileStructure.ComponentTags.Class
+                c.Tag is CapFileStructure.ComponentTags.Method or CapFileStructure.ComponentTags.Class
             )
             .Sum(c => c.Size);
 
         var dataSize = capFile
             .Components.Where(c =>
-                c.Tag == CapFileStructure.ComponentTags.StaticField
-                || c.Tag == CapFileStructure.ComponentTags.ConstantPool
+                c.Tag is CapFileStructure.ComponentTags.StaticField or CapFileStructure.ComponentTags.ConstantPool
             )
             .Sum(c => c.Size);
 

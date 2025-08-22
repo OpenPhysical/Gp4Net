@@ -18,7 +18,7 @@ public class DiversificationDataParserTests
         var result = DiversificationDataParser.ParseAsHex(Maybe<byte[]>.From(data));
 
         // Assert
-        result.Should().BeEquivalentTo("CF0A0215031070060301060000");
+        _ = result.Should().BeEquivalentTo("CF0A0215031070060301060000");
     }
 
     [Test]
@@ -31,7 +31,7 @@ public class DiversificationDataParserTests
         var result = DiversificationDataParser.ParseAsHex(Maybe<byte[]>.From(data));
 
         // Assert
-        result.Should().BeEquivalentTo(string.Empty);
+        _ = result.Should().BeEquivalentTo(string.Empty);
     }
 
     [Test]
@@ -41,7 +41,7 @@ public class DiversificationDataParserTests
         var result = DiversificationDataParser.ParseAsHex(Maybe<byte[]>.None);
 
         // Assert
-        result.Should().BeEquivalentTo(string.Empty);
+        _ = result.Should().BeEquivalentTo(string.Empty);
     }
 
     [Test]
@@ -54,8 +54,8 @@ public class DiversificationDataParserTests
         var result = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(data));
 
         // Assert
-        result.Should().Contain("SCP02 (i=15)");
-        result.Should().Contain("SCP03 (i=70)");
+        _ = result.Should().Contain("SCP02 (i=15)");
+        _ = result.Should().Contain("SCP03 (i=70)");
     }
 
     [Test]
@@ -73,11 +73,11 @@ public class DiversificationDataParserTests
         var result = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(data));
 
         // Assert
-        result.Should().Contain("SCP02 (i=15)");
-        result.Should().Contain("SCP03 (i=10)");
-        result.Should().Contain("SCP10 (i=07)");
-        result.Should().Contain("SCP03 (i=01)");
-        result.Should().Contain("SCP11 (i=55)");
+        _ = result.Should().Contain("SCP02 (i=15)");
+        _ = result.Should().Contain("SCP03 (i=10)");
+        _ = result.Should().Contain("SCP10 (i=07)");
+        _ = result.Should().Contain("SCP03 (i=01)");
+        _ = result.Should().Contain("SCP11 (i=55)");
     }
 
     [Test]
@@ -90,9 +90,9 @@ public class DiversificationDataParserTests
         var result = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(data));
 
         // Assert
-        result.Should().Contain("SCP02 (i=15)");
-        result.Should().Contain("SCP03 (i=70)");
-        result.Should().NotContain("SCP00");
+        _ = result.Should().Contain("SCP02 (i=15)");
+        _ = result.Should().Contain("SCP03 (i=70)");
+        _ = result.Should().NotContain("SCP00");
     }
 
     [Test]
@@ -105,7 +105,7 @@ public class DiversificationDataParserTests
         var result = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(data));
 
         // Assert
-        result.Should().BeEquivalentTo("[red]None[/]");
+        _ = result.Should().BeEquivalentTo("[red]None[/]");
     }
 
     [Test]
@@ -118,7 +118,7 @@ public class DiversificationDataParserTests
         var result = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(data));
 
         // Assert
-        result.Should().BeEquivalentTo("[red]None[/]");
+        _ = result.Should().BeEquivalentTo("[red]None[/]");
     }
 
     [Test]
@@ -131,7 +131,7 @@ public class DiversificationDataParserTests
         var result = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(data));
 
         // Assert
-        result.Should().BeEquivalentTo("[red]Parse error[/]");
+        _ = result.Should().BeEquivalentTo("[red]Parse error[/]");
     }
 
     [Test]
@@ -141,7 +141,7 @@ public class DiversificationDataParserTests
         var result = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.None);
 
         // Assert
-        result.Should().BeEquivalentTo("[red]None[/]");
+        _ = result.Should().BeEquivalentTo("[red]None[/]");
     }
 
     [Test]
@@ -154,7 +154,7 @@ public class DiversificationDataParserTests
         var result = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(data));
 
         // Assert
-        result.Should().BeEquivalentTo("[red]None[/]");
+        _ = result.Should().BeEquivalentTo("[red]None[/]");
     }
 
     [Test]
@@ -170,9 +170,9 @@ public class DiversificationDataParserTests
         var result = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(data));
 
         // Assert
-        result.Should().Contain(", ");
+        _ = result.Should().Contain(", ");
         var versions = result.Split(", ");
-        versions.Length.Should().Be(3);
+        _ = versions.Length.Should().Be(3);
     }
 
     [Test]
@@ -189,7 +189,7 @@ public class DiversificationDataParserTests
         var firstCommaIndex = result.IndexOf(',');
         var scp03Index = result.IndexOf("SCP03");
         var scp02Index = result.IndexOf("SCP02");
-        scp03Index.Should().BeLessThan(scp02Index);
+        _ = scp03Index.Should().BeLessThan(scp02Index);
     }
     
     [Test]
@@ -210,11 +210,11 @@ public class DiversificationDataParserTests
 
         // Assert
         // Should not produce invalid SCP versions like SCP35, SCP85, SCP131, SCP72
-        result.Should().NotContain("SCP35");
-        result.Should().NotContain("SCP85");
-        result.Should().NotContain("SCP131");
-        result.Should().NotContain("SCP72");
+        _ = result.Should().NotContain("SCP35");
+        _ = result.Should().NotContain("SCP85");
+        _ = result.Should().NotContain("SCP131");
+        _ = result.Should().NotContain("SCP72");
         // Actually, this card doesn't have SCP support in CF tag
-        result.Should().BeEquivalentTo("[red]None[/]");
+        _ = result.Should().BeEquivalentTo("[red]None[/]");
     }
 }

@@ -28,10 +28,10 @@ public class SecureSessionKeysTests
     [SetUp]
     public void SetUp()
     {
-        this._testSEnc = new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
-        this._testSMac = new byte[] { 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18 };
-        this._testSrMac = new byte[] { 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28 };
-        this._testDek = new byte[] { 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38 };
+        this._testSEnc = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+        this._testSMac = [0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18];
+        this._testSrMac = [0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28];
+        this._testDek = [0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38];
     }
 
     /// <summary>
@@ -51,7 +51,7 @@ public class SecureSessionKeysTests
         )
         {
             // Assert
-            sessionKeys.Should().NotBeNull();
+            _ = sessionKeys.Should().NotBeNull();
         }
     }
 
@@ -72,7 +72,7 @@ public class SecureSessionKeysTests
         )
         {
             // Assert
-            sessionKeys.Should().NotBeNull();
+            _ = sessionKeys.Should().NotBeNull();
         }
     }
 
@@ -104,8 +104,8 @@ public class SecureSessionKeysTests
             });
 
             // Assert
-            executed.Should().BeTrue();
-            receivedKey.Should().BeEquivalentTo(this._testSEnc);
+            _ = executed.Should().BeTrue();
+            _ = receivedKey.Should().BeEquivalentTo(this._testSEnc);
         }
     }
 
@@ -129,7 +129,7 @@ public class SecureSessionKeysTests
             var result = sessionKeys.UseSMac(key => key.Length);
 
             // Assert
-            result.Should().Be(8);
+            _ = result.Should().Be(8);
         }
     }
 
@@ -160,8 +160,8 @@ public class SecureSessionKeysTests
             });
 
             // Assert
-            executed.Should().BeTrue();
-            receivedKey.Should().BeNull();
+            _ = executed.Should().BeTrue();
+            _ = receivedKey.Should().BeNull();
         }
     }
 
@@ -185,10 +185,10 @@ public class SecureSessionKeysTests
             var legacyKeys = secureKeys.ToSessionKeys();
 
             // Assert
-            legacyKeys.SEnc.Should().BeEquivalentTo(this._testSEnc);
-            legacyKeys.SMac.Should().BeEquivalentTo(this._testSMac);
-            legacyKeys.SrMac.Should().BeEquivalentTo(this._testSrMac);
-            legacyKeys.Dek.Should().BeEquivalentTo(this._testDek);
+            _ = legacyKeys.SEnc.Should().BeEquivalentTo(this._testSEnc);
+            _ = legacyKeys.SMac.Should().BeEquivalentTo(this._testSMac);
+            _ = legacyKeys.SrMac.Should().BeEquivalentTo(this._testSrMac);
+            _ = legacyKeys.Dek.Should().BeEquivalentTo(this._testDek);
         }
     }
 
@@ -209,19 +209,19 @@ public class SecureSessionKeysTests
 
         // Act & Assert
         var act1 = () => sessionKeys.UseSEnc(k => { });
-        act1.Should().ThrowExactly<ObjectDisposedException>();
+        _ = act1.Should().ThrowExactly<ObjectDisposedException>();
             
         var act2 = () => sessionKeys.UseSMac(k => { });
-        act2.Should().ThrowExactly<ObjectDisposedException>();
+        _ = act2.Should().ThrowExactly<ObjectDisposedException>();
             
         var act3 = () => sessionKeys.UseSrMac(k => { });
-        act3.Should().ThrowExactly<ObjectDisposedException>();
+        _ = act3.Should().ThrowExactly<ObjectDisposedException>();
             
         var act4 = () => sessionKeys.UseDek(k => { });
-        act4.Should().ThrowExactly<ObjectDisposedException>();
+        _ = act4.Should().ThrowExactly<ObjectDisposedException>();
             
         Action act5 = () => sessionKeys.ToSessionKeys();
-        act5.Should().ThrowExactly<ObjectDisposedException>();
+        _ = act5.Should().ThrowExactly<ObjectDisposedException>();
     }
 
     /// <summary>
@@ -250,9 +250,9 @@ public class SecureSessionKeysTests
             originalSrMac[0] = 0xFF;
 
             // Assert - Keys should be unchanged
-            sessionKeys.UseSEnc(key => key[0].Should().Be(0x01));
-            sessionKeys.UseSMac(key => key[0].Should().Be(0x11));
-            sessionKeys.UseSrMac(key => key[0].Should().Be(0x21));
+            _ = sessionKeys.UseSEnc(key => key[0].Should().Be(0x01));
+            _ = sessionKeys.UseSMac(key => key[0].Should().Be(0x11));
+            _ = sessionKeys.UseSrMac(key => key[0].Should().Be(0x21));
         }
     }
 }

@@ -54,16 +54,16 @@ public static class CardCapabilitiesCodec
         }
             
         // Card identification scheme
-        WriteTlv(stream, 0x63, new[] { capabilities.CardIdentificationScheme });
+        WriteTlv(stream, 0x63, [capabilities.CardIdentificationScheme]);
             
         // Secure channel protocol and implementation
         foreach (var scp in capabilities.SecureChannelProtocols)
         {
-            WriteTlv(stream, 0x64, new[] { scp.Protocol });
+            WriteTlv(stream, 0x64, [scp.Protocol]);
                 
             foreach (var impl in scp.Implementations)
             {
-                WriteTlv(stream, 0x65, new[] { impl.Implementation });
+                WriteTlv(stream, 0x65, [impl.Implementation]);
                     
                 if (impl.KeyTypes.Any())
                 {
@@ -205,20 +205,19 @@ public static class CardCapabilitiesCodec
     private static void WriteTlv(Stream stream, byte tag, byte[] value)
     {
         stream.WriteByte(tag);
-        
-        // Write length
-        if (value.Length <= 127)
+
+        switch (value.Length)
         {
-            stream.WriteByte((byte)value.Length);
-        }
-        else if (value.Length <= 255)
-        {
-            stream.WriteByte(0x81);
-            stream.WriteByte((byte)value.Length);
-        }
-        else
-        {
-            throw new ArgumentException($"Value too long for simple TLV encoding: {value.Length} bytes");
+            // Write length
+            case <= 127:
+                stream.WriteByte((byte)value.Length);
+                break;
+            case <= 255:
+                stream.WriteByte(0x81);
+                stream.WriteByte((byte)value.Length);
+                break;
+            default:
+                throw new ArgumentException($"Value too long for simple TLV encoding: {value.Length} bytes");
         }
         
         stream.Write(value, 0, value.Length);
@@ -249,7 +248,7 @@ public class CardCapabilities
     /// <summary>
     /// Supported secure channel protocols.
     /// </summary>
-    public List<SecureChannelProtocol> SecureChannelProtocols { get; set; } = new();
+    public List<SecureChannelProtocol> SecureChannelProtocols { get; set; } = [];
         
     /// <summary>
     /// Card configuration details.
@@ -276,7 +275,7 @@ public class SecureChannelProtocol
     /// <summary>
     /// Supported implementations for this protocol.
     /// </summary>
-    public List<ScpImplementationSpecifier> Implementations { get; set; } = new();
+    public List<ScpImplementationSpecifier> Implementations { get; set; } = [];
 }
     
 /// <summary>
@@ -294,5 +293,5 @@ public class ScpImplementationSpecifier
     /// <summary>
     /// Supported key types for this implementation.
     /// </summary>
-    public List<byte> KeyTypes { get; set; } = new();
+    public List<byte> KeyTypes { get; set; } = [];
 }

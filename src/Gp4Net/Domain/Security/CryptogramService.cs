@@ -288,7 +288,7 @@ public sealed class CryptogramService
             cmac.BlockUpdate(data, 0, data.Length);
             
             var mac = new byte[16];
-            cmac.DoFinal(mac, 0);
+            _ = cmac.DoFinal(mac, 0);
             
             return Result.Success<byte[], SmartCardError>(mac);
         }

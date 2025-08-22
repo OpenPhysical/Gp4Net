@@ -130,8 +130,10 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
             .Map(decryptedData => (decryptedData, encryptionCounter + 1));
     }
 
-    private static bool HasRMac(byte[] response) =>
-        SecurityValidation.HasRMac(response) && SecurityValidation.ShouldAddRMac(response);
+    private static bool HasRMac(byte[] response)
+    {
+        return SecurityValidation.HasRMac(response) && SecurityValidation.ShouldAddRMac(response);
+    }
 
     private static Result<byte[], SmartCardError> VerifyAndRemoveRMac(
         byte[] response,
@@ -187,17 +189,14 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
     {
         try
         {
-            if (protocolVersion == ProtocolIdentifiers.Scp03)
+            switch (protocolVersion)
             {
-                return DecryptScp03ResponseData(response, sessionKeys, encryptionCounter);
-            }
-            else if (protocolVersion == ProtocolIdentifiers.Scp02)
-            {
-                return DecryptScp02ResponseData(response, sessionKeys);
-            }
-            else
-            {
-                return SmartCardError.InvalidArgument($"Unsupported protocol version: 0x{protocolVersion:X2}");
+                case ProtocolIdentifiers.Scp03:
+                    return DecryptScp03ResponseData(response, sessionKeys, encryptionCounter);
+                case ProtocolIdentifiers.Scp02:
+                    return DecryptScp02ResponseData(response, sessionKeys);
+                default:
+                    return SmartCardError.InvalidArgument($"Unsupported protocol version: 0x{protocolVersion:X2}");
             }
         }
         catch (Exception ex)
@@ -239,7 +238,7 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
 
             for (int i = 0; i < encryptedData.Length; i += 16)
             {
-                cipher.ProcessBlock(encryptedData, i, decrypted, i);
+                _ = cipher.ProcessBlock(encryptedData, i, decrypted, i);
             }
 
             // Remove PKCS#7 padding
@@ -278,17 +277,14 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
     {
         try
         {
-            if (protocolVersion == ProtocolIdentifiers.Scp03)
+            switch (protocolVersion)
             {
-                return CalculateScp03RMac(response, sessionKeys, macChainingValue);
-            }
-            else if (protocolVersion == ProtocolIdentifiers.Scp02)
-            {
-                return CalculateScp02RMac(response, sessionKeys, macChainingValue);
-            }
-            else
-            {
-                return SmartCardError.InvalidArgument($"Unsupported protocol version: 0x{protocolVersion:X2}");
+                case ProtocolIdentifiers.Scp03:
+                    return CalculateScp03RMac(response, sessionKeys, macChainingValue);
+                case ProtocolIdentifiers.Scp02:
+                    return CalculateScp02RMac(response, sessionKeys, macChainingValue);
+                default:
+                    return SmartCardError.InvalidArgument($"Unsupported protocol version: 0x{protocolVersion:X2}");
             }
         }
         catch (Exception ex)
@@ -313,7 +309,7 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
             cmac.BlockUpdate(macInput, 0, macInput.Length);
             
             var mac = new byte[16];
-            cmac.DoFinal(mac, 0);
+            _ = cmac.DoFinal(mac, 0);
             
             // Return first 8 bytes as R-MAC
             return Result.Success<byte[], SmartCardError>(mac.Take(8).ToArray());
@@ -395,7 +391,7 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
             }
             
             var rmac = new byte[8];
-            desMac.DoFinal(rmac, 0);
+            _ = desMac.DoFinal(rmac, 0);
             
             return Result.Success<byte[], SmartCardError>(rmac);
         }

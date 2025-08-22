@@ -13,7 +13,8 @@ public record ApplicationInfo(
     ImmutableList<Privilege> Privileges,
     ApplicationType Type,
     Maybe<string> Version = default,
-    Maybe<byte[]> AssociatedSecurityDomain = default)
+    Maybe<byte[]> AssociatedSecurityDomain = default,
+    Maybe<byte[]> ExecutableLoadFileAid = default)
 {
     /// <summary>
     /// Gets the application AID as a hexadecimal string.
@@ -51,7 +52,10 @@ public record ApplicationInfo(
     /// <summary>
     /// Checks if the application has a specific privilege.
     /// </summary>
-    public bool HasPrivilege(Privilege privilege) => Privileges.Contains(privilege);
+    public bool HasPrivilege(Privilege privilege)
+    {
+        return Privileges.Contains(privilege);
+    }
 
     /// <summary>
     /// Checks if the application is selectable.

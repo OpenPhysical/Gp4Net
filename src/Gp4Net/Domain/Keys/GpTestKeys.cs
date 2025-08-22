@@ -32,7 +32,7 @@ public static class GpTestKeys
     /// Used in some test environments.
     /// </summary>
     public static readonly byte[] AllOnesTestKey =
-    {
+    [
         0xFF,
         0xFF,
         0xFF,
@@ -48,8 +48,8 @@ public static class GpTestKeys
         0xFF,
         0xFF,
         0xFF,
-        0xFF,
-    };
+        0xFF
+    ];
 
     /// <summary>
     /// Creates an SCP02 key set using the standard GP test keys.

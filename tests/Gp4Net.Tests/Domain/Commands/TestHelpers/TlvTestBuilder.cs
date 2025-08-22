@@ -32,35 +32,33 @@ internal class TlvTestBuilder
 
     private void AddTag(int tag)
     {
-        if (tag <= 0xFF)
+        switch (tag)
         {
-            _data.Add((byte)tag);
-        }
-        else if (tag <= 0xFFFF)
-        {
-            _data.Add((byte)(tag >> 8));
-            _data.Add((byte)(tag & 0xFF));
-        }
-        else
-        {
-            throw new NotSupportedException("Tags larger than 2 bytes not supported in this helper");
+            case <= 0xFF:
+                _data.Add((byte)tag);
+                break;
+            case <= 0xFFFF:
+                _data.Add((byte)(tag >> 8));
+                _data.Add((byte)(tag & 0xFF));
+                break;
+            default:
+                throw new NotSupportedException("Tags larger than 2 bytes not supported in this helper");
         }
     }
 
     private void AddLength(int length)
     {
-        if (length <= 127)
+        switch (length)
         {
-            _data.Add((byte)length);
-        }
-        else if (length <= 255)
-        {
-            _data.Add(0x81);
-            _data.Add((byte)length);
-        }
-        else
-        {
-            throw new NotSupportedException("Lengths larger than 255 not supported in this helper");
+            case <= 127:
+                _data.Add((byte)length);
+                break;
+            case <= 255:
+                _data.Add(0x81);
+                _data.Add((byte)length);
+                break;
+            default:
+                throw new NotSupportedException("Lengths larger than 255 not supported in this helper");
         }
     }
 }

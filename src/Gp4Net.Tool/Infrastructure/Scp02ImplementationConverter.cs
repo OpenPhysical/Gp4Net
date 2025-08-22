@@ -134,16 +134,19 @@ public class Scp02ImplementationConverter : TypeConverter
     /// Gets all supported implementation values for help text generation.
     /// </summary>
     /// <returns>Dictionary of supported values</returns>
-    public static IReadOnlyDictionary<string, ScpImplementation> GetSupportedValues() => _validValues;
-    
+    public static IReadOnlyDictionary<string, ScpImplementation> GetSupportedValues()
+    {
+        return _validValues;
+    }
+
     /// <summary>
     /// Gets a list of common implementation options for user guidance.
     /// </summary>
     /// <returns>List of common options with descriptions</returns>
     public static List<(string Value, string Description)> GetCommonOptions()
     {
-        return new List<(string, string)>
-        {
+        return
+        [
             ("15", "Standard SCP02 mode (C-MAC only)"),
             ("CLR", "Alias for 15 - most compatible mode"),
             ("35", "SCP02 with response MAC verification"),
@@ -153,7 +156,7 @@ public class Scp02ImplementationConverter : TypeConverter
             ("75", "Full security mode (R-MAC + R-ENC)"),
             ("RENC", "Alias for 75 - complete bidirectional security"),
             ("1A", "Implicit initiation mode"),
-            ("IMPLICIT", "Alias for 1A - different initiation"),
-        };
+            ("IMPLICIT", "Alias for 1A - different initiation")
+        ];
     }
 }

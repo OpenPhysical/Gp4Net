@@ -66,22 +66,22 @@ public static class DerivationConstants
         /// <summary>
         /// SCP02 C-MAC session key derivation constant (0x0101).
         /// </summary>
-        public static readonly byte[] CMac = { 0x01, 0x01 };
+        public static readonly byte[] CMac = [0x01, 0x01];
 
         /// <summary>
         /// SCP02 R-MAC session key derivation constant (0x0102).
         /// </summary>
-        public static readonly byte[] RMac = { 0x01, 0x02 };
+        public static readonly byte[] RMac = [0x01, 0x02];
 
         /// <summary>
         /// SCP02 data encryption (DEK) session key derivation constant (0x0181).
         /// </summary>
-        public static readonly byte[] DataEncryptionKey = { 0x01, 0x81 };
+        public static readonly byte[] DataEncryptionKey = [0x01, 0x81];
 
         /// <summary>
         /// SCP02 secure channel encryption (S-ENC) session key derivation constant (0x0182).
         /// </summary>
-        public static readonly byte[] SecureChannelEncryption = { 0x01, 0x82 };
+        public static readonly byte[] SecureChannelEncryption = [0x01, 0x82];
     }
 
     /// <summary>
@@ -89,8 +89,8 @@ public static class DerivationConstants
     /// Per GP SCP03 v1.1.1 Section 4.1.5: "A 12 byte 'label' consisting of 11 bytes with value '00'
     /// followed by a one byte derivation constant".
     /// </summary>
-    public static readonly byte[] Scp03Label = new byte[]
-    {
+    public static readonly byte[] Scp03Label =
+    [
         0x00,
         0x00,
         0x00,
@@ -101,8 +101,8 @@ public static class DerivationConstants
         0x00,
         0x00,
         0x00,
-        0x00,
-    };
+        0x00
+    ];
 
     /// <summary>
     /// Separator for SCP03 key derivation.

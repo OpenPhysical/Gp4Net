@@ -18,7 +18,7 @@ public class ScpCapabilitiesParserTests
         var result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
-        result.Should().BeEquivalentTo("SCP02 (i=15)");
+        _ = result.Should().BeEquivalentTo("SCP02 (i=15)");
     }
 
     [Test]
@@ -32,7 +32,7 @@ public class ScpCapabilitiesParserTests
         var result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
-        result.Should().BeEquivalentTo("SCP03 (i=70)");
+        _ = result.Should().BeEquivalentTo("SCP03 (i=70)");
     }
 
     [Test]
@@ -47,7 +47,7 @@ public class ScpCapabilitiesParserTests
         var result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
-        result.Should().BeEquivalentTo("SCP02 (i=15 i=55) SCP03 (i=70)");
+        _ = result.Should().BeEquivalentTo("SCP02 (i=15 i=55) SCP03 (i=70)");
     }
 
     [Test]
@@ -61,7 +61,7 @@ public class ScpCapabilitiesParserTests
 
         // Assert
         // Should not identify as SCP since 82 at top level is for privileges
-        result.Should().BeEquivalentTo(string.Empty);
+        _ = result.Should().BeEquivalentTo(string.Empty);
     }
 
     [Test]
@@ -75,7 +75,7 @@ public class ScpCapabilitiesParserTests
 
         // Assert
         // Should not identify as SCP since 83 at top level is for LFDBH algorithms
-        result.Should().BeEquivalentTo(string.Empty);
+        _ = result.Should().BeEquivalentTo(string.Empty);
     }
 
     [Test]
@@ -89,7 +89,7 @@ public class ScpCapabilitiesParserTests
         var result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
-        result.Should().BeEquivalentTo("SCP10 (i=10)");
+        _ = result.Should().BeEquivalentTo("SCP10 (i=10)");
     }
 
     [Test]
@@ -104,7 +104,7 @@ public class ScpCapabilitiesParserTests
 
         // Assert
         // Should only parse SCP from A0 tag, ignore tag 82
-        result.Should().BeEquivalentTo("SCP02 (i=15)");
+        _ = result.Should().BeEquivalentTo("SCP02 (i=15)");
     }
 
     [Test]
@@ -121,7 +121,7 @@ public class ScpCapabilitiesParserTests
 
         // Assert
         // Should merge SCP03 options and sort by protocol version
-        result.Should().BeEquivalentTo("SCP02 (i=15 i=55) SCP03 (i=10 i=70)");
+        _ = result.Should().BeEquivalentTo("SCP02 (i=15 i=55) SCP03 (i=10 i=70)");
     }
 
     [Test]
@@ -134,7 +134,7 @@ public class ScpCapabilitiesParserTests
         var result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
-        result.Should().BeEquivalentTo(string.Empty);
+        _ = result.Should().BeEquivalentTo(string.Empty);
     }
 
     [Test]
@@ -144,7 +144,7 @@ public class ScpCapabilitiesParserTests
         var result = ScpCapabilitiesParser.Parse(null);
 
         // Assert
-        result.Should().BeEquivalentTo(string.Empty);
+        _ = result.Should().BeEquivalentTo(string.Empty);
     }
 
     [Test]
@@ -157,7 +157,7 @@ public class ScpCapabilitiesParserTests
         var result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
-        result.Should().BeEquivalentTo(string.Empty);
+        _ = result.Should().BeEquivalentTo(string.Empty);
     }
 
     [Test]
@@ -174,7 +174,7 @@ public class ScpCapabilitiesParserTests
 
         // Assert
         // Should ignore unknown SCP FF, only parse valid ones
-        result.Should().BeEquivalentTo("SCP02 (i=15) SCP03 (i=70)");
+        _ = result.Should().BeEquivalentTo("SCP02 (i=15) SCP03 (i=70)");
     }
 
     [Test]
@@ -196,7 +196,7 @@ public class ScpCapabilitiesParserTests
 
         // Assert
         // Should identify SCP02 with all four implementation options
-        result.Should().BeEquivalentTo("SCP02 (i=15 i=35 i=55 i=75)");
+        _ = result.Should().BeEquivalentTo("SCP02 (i=15 i=35 i=55 i=75)");
     }
 
     [Test]
@@ -212,11 +212,11 @@ public class ScpCapabilitiesParserTests
 
         // Assert
         // Should parse as SCP02 with implementation options, not as separate SCPs
-        result.Should().BeEquivalentTo("SCP02 (i=15 i=35 i=55 i=75)");
-        result.Should().NotContain("SCP15");
-        result.Should().NotContain("SCP35");
-        result.Should().NotContain("SCP55");
-        result.Should().NotContain("SCP75");
+        _ = result.Should().BeEquivalentTo("SCP02 (i=15 i=35 i=55 i=75)");
+        _ = result.Should().NotContain("SCP15");
+        _ = result.Should().NotContain("SCP35");
+        _ = result.Should().NotContain("SCP55");
+        _ = result.Should().NotContain("SCP75");
     }
 
     [Test]
@@ -233,6 +233,6 @@ public class ScpCapabilitiesParserTests
         var result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
-        result.Should().BeEquivalentTo("SCP02 SCP03");
+        _ = result.Should().BeEquivalentTo("SCP02 SCP03");
     }
 }

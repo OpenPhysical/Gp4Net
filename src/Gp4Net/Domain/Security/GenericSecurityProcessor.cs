@@ -197,9 +197,11 @@ public static class Scp02SecurityProcessor
         SecurityLevel securityLevel,
         SessionKeys sessionKeys,
         ImmutableArray<byte> macChainingValue,
-        uint encryptionCounter) =>
-        GenericSecurityProcessor<Scp02ProtocolImpl>.ApplyCommandSecurity(
+        uint encryptionCounter)
+    {
+        return GenericSecurityProcessor<Scp02ProtocolImpl>.ApplyCommandSecurity(
             command, securityLevel, sessionKeys, macChainingValue, encryptionCounter);
+    }
 
     /// <summary>
     /// Applies SCP02 response security.
@@ -209,9 +211,11 @@ public static class Scp02SecurityProcessor
         SecurityLevel securityLevel,
         SessionKeys sessionKeys,
         ImmutableArray<byte> macChainingValue,
-        uint encryptionCounter) =>
-        GenericSecurityProcessor<Scp02ProtocolImpl>.ApplyResponseSecurity(
+        uint encryptionCounter)
+    {
+        return GenericSecurityProcessor<Scp02ProtocolImpl>.ApplyResponseSecurity(
             response, securityLevel, sessionKeys, macChainingValue, encryptionCounter);
+    }
 
     /// <summary>
     /// Processes SCP02 INITIALIZE UPDATE.
@@ -220,8 +224,10 @@ public static class Scp02SecurityProcessor
         InitializeUpdateResponse response,
         byte[] hostChallenge,
         IKeySet keySet,
-        byte implementationParameter) =>
-        GenericSecurityProcessor<Scp02ProtocolImpl>.ProcessInitializeUpdate(response, hostChallenge, keySet, implementationParameter);
+        byte implementationParameter)
+    {
+        return GenericSecurityProcessor<Scp02ProtocolImpl>.ProcessInitializeUpdate(response, hostChallenge, keySet, implementationParameter);
+    }
 }
 
 /// <summary>
@@ -238,9 +244,11 @@ public static class Scp03SecurityProcessor
         SecurityLevel securityLevel,
         SessionKeys sessionKeys,
         ImmutableArray<byte> macChainingValue,
-        uint encryptionCounter) =>
-        GenericSecurityProcessor<Scp03ProtocolImpl>.ApplyCommandSecurity(
+        uint encryptionCounter)
+    {
+        return GenericSecurityProcessor<Scp03ProtocolImpl>.ApplyCommandSecurity(
             command, securityLevel, sessionKeys, macChainingValue, encryptionCounter);
+    }
 
     /// <summary>
     /// Applies SCP03 response security.
@@ -250,9 +258,11 @@ public static class Scp03SecurityProcessor
         SecurityLevel securityLevel,
         SessionKeys sessionKeys,
         ImmutableArray<byte> macChainingValue,
-        uint encryptionCounter) =>
-        GenericSecurityProcessor<Scp03ProtocolImpl>.ApplyResponseSecurity(
+        uint encryptionCounter)
+    {
+        return GenericSecurityProcessor<Scp03ProtocolImpl>.ApplyResponseSecurity(
             response, securityLevel, sessionKeys, macChainingValue, encryptionCounter);
+    }
 
     /// <summary>
     /// Processes SCP03 INITIALIZE UPDATE.
@@ -261,6 +271,8 @@ public static class Scp03SecurityProcessor
         InitializeUpdateResponse response,
         byte[] hostChallenge,
         IKeySet keySet,
-        byte implementationParameter) =>
-        GenericSecurityProcessor<Scp03ProtocolImpl>.ProcessInitializeUpdate(response, hostChallenge, keySet, implementationParameter);
+        byte implementationParameter)
+    {
+        return GenericSecurityProcessor<Scp03ProtocolImpl>.ProcessInitializeUpdate(response, hostChallenge, keySet, implementationParameter);
+    }
 }

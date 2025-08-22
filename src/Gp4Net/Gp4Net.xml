@@ -60,6 +60,18 @@
             Threshold for switching from short to extended APDU format.
             </summary>
         </member>
+        <member name="F:Gp4Net.Constants.ApduConstants.MaxResponseChainLength">
+            <summary>
+            Maximum number of GET RESPONSE chains to prevent infinite loops.
+            Protects against malicious cards sending continuous 0x61XX responses.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Constants.ApduConstants.MaxTotalResponseSize">
+            <summary>
+            Maximum total accumulated response size across all chains.
+            Prevents memory exhaustion from excessive response data accumulation.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Constants.CryptographicConstants">
             <summary>
             Cryptographic constants for GlobalPlatform secure channel protocols.
@@ -485,6 +497,24 @@
             End-of-contents octets for indefinite length (0x00 0x00).
             </summary>
         </member>
+        <member name="F:Gp4Net.Constants.TlvConstants.MaxTlvValueSize">
+            <summary>
+            Maximum TLV value size to prevent memory exhaustion attacks.
+            This limit protects against malicious TLV structures claiming massive lengths.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Constants.TlvConstants.MaxTlvParsingDepth">
+            <summary>
+            Maximum total nested TLV parsing depth to prevent stack overflow attacks.
+            Protects against deeply nested TLV structures that could cause recursion bombs.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Constants.TlvConstants.MaxReasonableLengthBytes">
+            <summary>
+            Maximum reasonable TLV length field size in bytes.
+            Per ASN.1 BER specification, lengths larger than 4 bytes (2^32) are not practical.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Constants.TlvTags">
             <summary>
             Standard TLV tag definitions for GlobalPlatform and ISO 7816.
@@ -574,6 +604,41 @@
             Gets all known OIDs.
             </summary>
             <returns>A read-only collection of all known OIDs.</returns>
+        </member>
+        <member name="T:Gp4Net.Core.EncodingUtils">
+            <summary>
+            Safe encoding utilities that handle malformed input gracefully.
+            Provides security-hardened text decoding operations.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Core.EncodingUtils.MaxTextLength">
+            <summary>
+            Maximum reasonable text length to prevent memory exhaustion attacks.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Core.EncodingUtils.SafeUtf8Decode(System.Byte[])">
+            <summary>
+            Safely decodes UTF-8 bytes to string with comprehensive validation.
+            Protects against malformed UTF-8 sequences, excessive lengths, and embedded nulls.
+            </summary>
+            <param name="bytes">The bytes to decode.</param>
+            <returns>Decoded string or error if validation fails.</returns>
+        </member>
+        <member name="M:Gp4Net.Core.EncodingUtils.SafeAsciiDecode(System.Byte[])">
+            <summary>
+            Safely decodes ASCII bytes to string with validation.
+            More restrictive than UTF-8 for cases where only ASCII is expected.
+            </summary>
+            <param name="bytes">The bytes to decode.</param>
+            <returns>Decoded ASCII string or error if validation fails.</returns>
+        </member>
+        <member name="M:Gp4Net.Core.EncodingUtils.SafeToHexString(System.Byte[])">
+            <summary>
+            Safely decodes hex string with validation.
+            Useful for debugging and logging binary data safely.
+            </summary>
+            <param name="bytes">The bytes to convert to hex.</param>
+            <returns>Hex string representation.</returns>
         </member>
         <member name="T:Gp4Net.Core.Functional.FunctionalCombinators">
             <summary>
@@ -1248,7 +1313,7 @@
             <param name="p2">Command parameter P2.</param>
             <param name="aid">AID of object to delete.</param>
             <param name="optionalTlv">If present, extra TLV (e.g. B6 Control Reference Template and inner TLVs).</param>
-            <returns>16-byte AES-CMAC Delete Token, per GP spec structure.</returns>
+            <returns>Result containing the 16-byte AES-CMAC Delete Token or an error.</returns>
         </member>
         <member name="M:Gp4Net.Cryptography.DeleteTokenCalculator.EncodeBerLength(System.Int32)">
             <summary>
@@ -1716,7 +1781,7 @@
             Immutable record representing information about an application on a smart card.
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.ApplicationInfo.#ctor(System.Byte[],Gp4Net.Domain.LifecycleState,System.Collections.Immutable.ImmutableList{Gp4Net.Domain.Privilege},Gp4Net.Domain.ApplicationType,CSharpFunctionalExtensions.Maybe{System.String},CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+        <member name="M:Gp4Net.Domain.ApplicationInfo.#ctor(System.Byte[],Gp4Net.Domain.LifecycleState,System.Collections.Immutable.ImmutableList{Gp4Net.Domain.Privilege},Gp4Net.Domain.ApplicationType,CSharpFunctionalExtensions.Maybe{System.String},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]})">
             <summary>
             Immutable record representing information about an application on a smart card.
             </summary>
@@ -2276,6 +2341,233 @@
             </summary>
             <param name="aid">The package AID.</param>
             <param name="version">The package version.</param>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.CapInstallationOrchestrator">
+            <summary>
+            Functional orchestrator for CAP file installation workflows.
+            Provides pure function composition for complete installation sequences.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.ExecuteFromTrace(Gp4Net.Domain.CapFile.CapInstallationTrace,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+            <summary>
+            Executes a complete CAP installation workflow from trace data.
+            Pure function that composes all installation steps using Result chains.
+            </summary>
+            <param name="traceData">Installation trace data containing command sequence.</param>
+            <param name="environment">Command execution environment.</param>
+            <returns>Result containing installation execution results.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.ExecuteInstallation(Gp4Net.Domain.CapFile.CapInstallationRequest,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+            <summary>
+            Executes CAP installation with explicit parameters.
+            Pure function for programmatic installation without trace dependency.
+            </summary>
+            <param name="request">Installation request parameters.</param>
+            <param name="environment">Command execution environment.</param>
+            <returns>Result containing installation execution results.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.ValidateAgainstTrace(System.Collections.Immutable.ImmutableArray{Gp4Net.Domain.CapFile.ExecutedCommand},Gp4Net.Domain.CapFile.CapInstallationTrace)">
+            <summary>
+            Validates installation command sequence against trace expectations.
+            Pure function for trace matching validation.
+            </summary>
+            <param name="executedCommands">Actually executed commands.</param>
+            <param name="expectedTrace">Expected trace data.</param>
+            <returns>Result containing validation results.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.EnhanceEnvironmentWithInitializeUpdateResponse(Gp4Net.Pipeline.CommandProcessing.CommandResult,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+            <summary>
+            Enhances the command environment with INITIALIZE UPDATE response data.
+            Parses the response and prepares for secure channel establishment.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.EstablishRealSecureChannel(Gp4Net.Pipeline.CommandProcessing.CommandResult,Gp4Net.Domain.SecurityLevel,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+            <summary>
+            Establishes secure channel using the SecureChannelEstablishment module.
+            Uses proper key derivation and cryptographic session establishment.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.EstablishSecureChannelFromMetadata(Gp4Net.Pipeline.CommandProcessing.CommandResult,Gp4Net.Domain.SecurityLevel)">
+            <summary>
+            Creates secure channel state using INITIALIZE UPDATE response metadata.
+            Simulates complete secure channel establishment for testing.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.CreateMockSecureChannelState(Gp4Net.Domain.Commands.InitializeUpdateResponse,Gp4Net.Domain.SecurityLevel)">
+            <summary>
+            Creates a secure channel state for testing purposes.
+            Uses SCP03 test keys for session derivation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.ProcessCommandAsync(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+            <summary>
+            Processes a command using the transport layer.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.ProcessCommand(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+            <summary>
+            Synchronous wrapper for command processing.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.CapInstallationRequest">
+            <summary>
+            Request for CAP installation with explicit parameters.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationRequest.#ctor(System.Byte[],System.Byte[],System.Byte[],System.Byte[],System.Collections.Immutable.ImmutableArray{System.Byte[]},Gp4Net.Domain.Keys.IKeySet)">
+            <summary>
+            Request for CAP installation with explicit parameters.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.CapInstallationResult">
+            <summary>
+            Result of CAP installation execution.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationResult.#ctor(System.Collections.Immutable.ImmutableArray{Gp4Net.Domain.CapFile.ExecutedCommand},System.Boolean,CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CapFile.CapMetadata})">
+            <summary>
+            Result of CAP installation execution.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.ExecutedCommand">
+            <summary>
+            Individual executed command.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.ExecutedCommand.#ctor(System.String,System.String,System.String)">
+            <summary>
+            Individual executed command.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.TraceValidationResult">
+            <summary>
+            Result of trace validation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.TraceValidationResult.#ctor(System.Boolean,System.Collections.Immutable.ImmutableArray{Gp4Net.Domain.CapFile.CommandComparison},Gp4Net.Domain.CapFile.TraceMetadata)">
+            <summary>
+            Result of trace validation.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.CommandComparison">
+            <summary>
+            Comparison between expected and actual commands.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CommandComparison.#ctor(System.String,System.String,System.String,System.Boolean)">
+            <summary>
+            Comparison between expected and actual commands.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.InstallationStepResults">
+            <summary>
+            Container for installation step results.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.InstallationStepResults.#ctor(System.Collections.Immutable.ImmutableArray{Gp4Net.Domain.CapFile.InstallationStepResult},Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+            <summary>
+            Container for installation step results.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.InstallationStepResult">
+            <summary>
+            Result of a single installation step.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.InstallationStepResult.#ctor(System.String,Gp4Net.Domain.CapFile.TraceExchange,System.Byte[],Gp4Net.Core.StatusWord,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+            <summary>
+            Result of a single installation step.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.CapInstallationTraceLoader">
+            <summary>
+            Functional loader for CAP installation traces from JSON format.
+            Provides pure functions for parsing and extracting installation command sequences.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationTraceLoader.LoadInstallationTrace(System.String)">
+            <summary>
+            Loads and parses a CAP installation trace from JSON file.
+            </summary>
+            <param name="jsonFilePath">Path to the JSON trace file.</param>
+            <returns>Result containing parsed installation trace data.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationTraceLoader.ExtractCommandSequence(Gp4Net.Domain.CapFile.CapInstallationTrace)">
+            <summary>
+            Extracts installation command sequence from trace data.
+            </summary>
+            <param name="traceData">Complete trace data.</param>
+            <returns>Result containing installation command sequence.</returns>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.CapInstallationTrace">
+            <summary>
+            Immutable record representing a CAP installation trace.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationTrace.#ctor(Gp4Net.Domain.CapFile.TraceMetadata,System.Collections.Immutable.ImmutableArray{Gp4Net.Domain.CapFile.TraceExchange},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CapFile.CapMetadata})">
+            <summary>
+            Immutable record representing a CAP installation trace.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.TraceMetadata">
+            <summary>
+            Trace metadata extracted from JSON.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.TraceMetadata.#ctor(System.String,System.String,System.String)">
+            <summary>
+            Trace metadata extracted from JSON.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.TraceExchange">
+            <summary>
+            Individual trace exchange.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.TraceExchange.#ctor(System.Int32,System.String,System.String,System.String,System.Int32,System.Boolean)">
+            <summary>
+            Individual trace exchange.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.CapMetadata">
+            <summary>
+            CAP file metadata derived from trace.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapMetadata.#ctor(System.String,System.String,System.String,System.String,System.String)">
+            <summary>
+            CAP file metadata derived from trace.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.SecureChannelCommands">
+            <summary>
+            Secure channel command sequence.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.SecureChannelCommands.#ctor(Gp4Net.Domain.CapFile.TraceExchange,Gp4Net.Domain.CapFile.TraceExchange)">
+            <summary>
+            Secure channel command sequence.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.InstallationCommandSequence">
+            <summary>
+            Complete installation command sequence.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.InstallationCommandSequence.#ctor(Gp4Net.Domain.CapFile.TraceExchange,Gp4Net.Domain.CapFile.SecureChannelCommands,Gp4Net.Domain.CapFile.TraceExchange,System.Collections.Immutable.ImmutableArray{Gp4Net.Domain.CapFile.TraceExchange},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CapFile.TraceExchange})">
+            <summary>
+            Complete installation command sequence.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.CapFile.TraceJsonData">
+            <summary>
+            Internal data structure for parsing.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.TraceJsonData.#ctor(Gp4Net.Domain.CapFile.TraceMetadata,System.Collections.Immutable.ImmutableArray{Gp4Net.Domain.CapFile.TraceExchange})">
+            <summary>
+            Internal data structure for parsing.
+            </summary>
         </member>
         <member name="T:Gp4Net.Domain.CardContent">
             <summary>
@@ -4167,12 +4459,8 @@
         </member>
         <member name="M:Gp4Net.Domain.Commands.DeleteCommand.#ctor(Gp4Net.Domain.Commands.DeleteCommand.DeleteType,Gp4Net.Domain.Commands.DeleteCommand.DeleteTarget,System.Collections.Generic.IList{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]})">
             <summary>
-            Initializes a new instance of the DeleteCommand class.
+            Represents a command to delete an object or application associated with specific AIDs on a smart card.
             </summary>
-            <param name="type">The delete type.</param>
-            <param name="target">The delete target.</param>
-            <param name="aids">The list of AIDs to delete.</param>
-            <param name="deletionToken">The deletion token (optional).</param>
         </member>
         <member name="M:Gp4Net.Domain.Commands.DeleteCommand.CreateForApplication(System.Byte[],System.Boolean,CSharpFunctionalExtensions.Maybe{System.Byte[]})">
             <summary>
@@ -4808,6 +5096,11 @@
             Application lifecycle states.
             </summary>
         </member>
+        <member name="F:Gp4Net.Domain.Commands.ApplicationStatusEntry.LifecycleState.Loaded">
+            <summary>
+            Application is loaded (for load files and apps reporting 0x01).
+            </summary>
+        </member>
         <member name="F:Gp4Net.Domain.Commands.ApplicationStatusEntry.LifecycleState.Installed">
             <summary>
             Application is installed.
@@ -4848,13 +5141,19 @@
             Gets the application privileges.
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.Commands.ApplicationStatusEntry.#ctor(System.Byte[],Gp4Net.Domain.Commands.ApplicationStatusEntry.LifecycleState,System.Byte[])">
+        <member name="P:Gp4Net.Domain.Commands.ApplicationStatusEntry.ExecutableLoadFileAid">
+            <summary>
+            Gets the Executable Load File AID associated with this application (TLV C4), if provided.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.ApplicationStatusEntry.#ctor(System.Byte[],Gp4Net.Domain.Commands.ApplicationStatusEntry.LifecycleState,System.Byte[],System.Byte[])">
             <summary>
             Initializes a new instance of the ApplicationStatusEntry class.
             </summary>
             <param name="aid">The application AID.</param>
             <param name="state">The lifecycle state.</param>
             <param name="privileges">The application privileges.</param>
+            <param name="executableLoadFileAid">The executable load file AID (optional).</param>
         </member>
         <member name="T:Gp4Net.Domain.Commands.GetStatusResponse">
             <summary>
@@ -5343,6 +5642,49 @@
         <member name="P:Gp4Net.Domain.Commands.InitializeUpdateResponse.ScpParameter">
             <summary>
             Gets the secure channel protocol parameter.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.InitializeUpdateResponse.Create(System.Byte[],System.Byte,System.Byte,System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+            Creates a new InitializeUpdateResponse instance with functional validation.
+            GP Card Specification v2.3.1: Factory function for direct test instance creation.
+            </summary>
+            <param name="keyDiversificationData">The key diversification data (0-10 bytes, null for no diversification).</param>
+            <param name="keyVersion">The key version byte.</param>
+            <param name="scpId">The SCP identifier byte.</param>
+            <param name="sequenceCounter">The sequence counter (2-3 bytes, null for SCP03).</param>
+            <param name="cardChallenge">The card challenge (6 bytes for SCP02, 8 bytes for SCP03).</param>
+            <param name="cardCryptogram">The card cryptogram (8 bytes).</param>
+            <returns>A Result containing the created response or validation errors.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.InitializeUpdateResponse.ValidateKeyDiversificationData(System.Byte[])">
+            <summary>
+            Validates key diversification data per GP specification.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.InitializeUpdateResponse.ValidateSequenceCounter(System.Byte[],System.Byte)">
+            <summary>
+            Validates sequence counter per GP specification and SCP version.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.InitializeUpdateResponse.ValidateScpId(System.Byte)">
+            <summary>
+            Validates SCP ID for supported versions.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.InitializeUpdateResponse.ValidateCardChallenge(System.Byte[],System.Byte)">
+            <summary>
+            Validates card challenge per GP specification and SCP version.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.InitializeUpdateResponse.ValidateCardCryptogram(System.Byte[])">
+            <summary>
+            Validates card cryptogram per GP specification.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.InitializeUpdateResponse.CreateInstance(System.Byte[],System.Byte,System.Byte,System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+            Creates the actual instance after validation.
             </summary>
         </member>
         <member name="M:Gp4Net.Domain.Commands.InitializeUpdateResponse.Parse(System.Byte[])">
@@ -6429,6 +6771,11 @@
             Creates a SELECT command for the Issuer Security Domain.
             </summary>
             <returns>A Result containing the SelectCommand or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.SelectCommand.CreateWith(System.Byte[],Gp4Net.Domain.Commands.SelectCommand.SelectMode,Gp4Net.Domain.Commands.SelectCommand.FileControlInfo)">
+            <summary>
+            Internal factory to construct a SELECT command with explicit mode and control info.
+            </summary>
         </member>
         <member name="P:Gp4Net.Domain.Commands.SelectCommand.Cla">
             <inheritdoc />
@@ -8626,11 +8973,21 @@
             Per GlobalPlatform specification, SELECT with empty AID selects the ISD.
             </summary>
         </member>
+        <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreateSelectIsdCommand(Gp4Net.Domain.Commands.SelectCommand.FileControlInfo)">
+            <summary>
+            Creates a SELECT command for the Issuer Security Domain with a specific response control.
+            </summary>
+        </member>
         <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreateSelectCommand(System.Byte[])">
             <summary>
             Creates a SELECT command for a specific AID.
             </summary>
             <param name="aid">The application identifier to select.</param>
+        </member>
+        <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreateSelectCommand(System.Byte[],Gp4Net.Domain.Commands.SelectCommand.SelectMode,Gp4Net.Domain.Commands.SelectCommand.FileControlInfo)">
+            <summary>
+            Creates a SELECT command for a specific AID with explicit mode and response control.
+            </summary>
         </member>
         <member name="M:Gp4Net.Domain.Modules.CommandFactory.CreateInitializeUpdateCommand(System.Byte,System.Byte,System.Byte[])">
             <summary>
@@ -8786,7 +9143,7 @@
             Converts GetStatusResponse entries to domain ApplicationInfo objects.
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.Modules.ResponseParser.ParsePrivileges(System.Byte)">
+        <member name="M:Gp4Net.Domain.Modules.ResponseParser.ParsePrivileges(System.Byte[])">
             <summary>
             Parses privilege byte into individual privilege flags.
             </summary>
@@ -12314,6 +12671,14 @@
         <member name="F:Gp4Net.Domain.SecurityLevel.CDecryption">
             <summary>
             C-DECRYPTION and C-MAC.
+            GP Card Specification v2.3.1: Combined flag for command MAC and decryption.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.SecurityLevel.CEncryption">
+            <summary>
+            Command encryption capability (separate from decryption for protocol flexibility).
+            Note: In most GP implementations, encryption and decryption use the same key material,
+            but this flag allows distinguishing encryption vs decryption operations.
             </summary>
         </member>
         <member name="F:Gp4Net.Domain.SecurityLevel.RMac">
@@ -12344,6 +12709,7 @@
         <member name="M:Gp4Net.Domain.SecurityLevelExtensions.HasCEncryption(Gp4Net.Domain.SecurityLevel)">
             <summary>
             Checks if the security level includes C-ENCRYPTION.
+            GP Card Specification v2.3.1: Command encryption capability for outbound operations.
             </summary>
         </member>
         <member name="M:Gp4Net.Domain.SecurityLevelExtensions.HasRMac(Gp4Net.Domain.SecurityLevel)">
@@ -12487,7 +12853,7 @@
             Metadata collected during command processing.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandProcessing.CommandMetadata.#ctor(System.Nullable{System.TimeSpan},System.Byte[],System.Byte[],System.Boolean,System.Boolean,System.Boolean,System.Int32)">
+        <member name="M:Gp4Net.Pipeline.CommandProcessing.CommandMetadata.#ctor(System.Nullable{System.TimeSpan},System.Byte[],System.Byte[],System.Boolean,System.Boolean,System.Boolean,System.Int32,CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Commands.InitializeUpdateResponse})">
             <summary>
             Metadata collected during command processing.
             </summary>

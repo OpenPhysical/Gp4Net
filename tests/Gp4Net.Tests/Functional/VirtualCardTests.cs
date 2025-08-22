@@ -25,9 +25,9 @@ public class VirtualCardTests
             
         // Act
         var atr = card.GetAtr();
-            
+
         // Assert
-        atr.Should().BeEquivalentTo(Convert.FromHexString("3BD518FF8191FE1FC38073C821100A"));
+        _ = atr.Should().BeEquivalentTo(Convert.FromHexString("3BD518FF8191FE1FC38073C821100A"));
     }
 
     [Test]
@@ -39,11 +39,11 @@ public class VirtualCardTests
             
         // Act
         var response = card.ProcessCommand(selectCommand);
-            
+
         // Assert
-        response.StatusWord.Should().Be(StatusWords.Success);
-        card.IsSelected.Should().BeTrue();
-        response.Data.Length.Should().BeGreaterThan(0); // Should return FCI
+        _ = response.StatusWord.Should().Be(StatusWords.Success);
+        _ = card.IsSelected.Should().BeTrue();
+        _ = response.Data.Length.Should().BeGreaterThan(0); // Should return FCI
     }
 
     [Test]
@@ -55,9 +55,9 @@ public class VirtualCardTests
             
         // Act
         var response = card.ProcessCommand(unsupportedCommand);
-            
+
         // Assert
-        response.StatusWord.Should().Be(StatusWords.InstructionNotSupported);
+        _ = response.StatusWord.Should().Be(StatusWords.InstructionNotSupported);
     }
 
     [Test]
@@ -69,13 +69,13 @@ public class VirtualCardTests
             
         // Act
         var response = card.ProcessCommand(identifyCommand);
-            
+
         // Assert
-        response.StatusWord.Should().Be(StatusWords.Success);
-        response.Data.Should().NotBeEmpty();
+        _ = response.StatusWord.Should().Be(StatusWords.Success);
+        _ = response.Data.Should().NotBeEmpty();
         // Should contain DF28 tag and P71-specific identification data
-        response.Data[0].Should().Be(0xDF);
-        response.Data[1].Should().Be(0x28);
+        _ = response.Data[0].Should().Be(0xDF);
+        _ = response.Data[1].Should().Be(0x28);
     }
 
     [Test]
@@ -89,14 +89,14 @@ public class VirtualCardTests
             0x80, 0x50, 0x00, 0x00, 0x08, 
             0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 // Host challenge
         };
-            
+
         // Act
-        card.ProcessCommand(selectCommand); // Select first
+        _ = card.ProcessCommand(selectCommand); // Select first
         var response = card.ProcessCommand(initUpdateCommand);
-            
+
         // Assert
-        response.StatusWord.Should().Be(StatusWords.Success);
-        response.Data.Length.Should().BeGreaterThanOrEqualTo(28); // Minimum INITIALIZE UPDATE response
+        _ = response.StatusWord.Should().Be(StatusWords.Success);
+        _ = response.Data.Length.Should().BeGreaterThanOrEqualTo(28); // Minimum INITIALIZE UPDATE response
         // Response should contain key version, SCP info, card challenge, and cryptogram
     }
 
@@ -111,13 +111,13 @@ public class VirtualCardTests
             0x80, 0x50, 0x00, 0x00, 0x08, 
             0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08
         };
-            
+
         // Act
-        card.ProcessCommand(selectCommand); // This should work (no crypto needed)
+        _ = card.ProcessCommand(selectCommand); // This should work (no crypto needed)
         var response = card.ProcessCommand(initUpdateCommand); // This should fail
-            
+
         // Assert
-        response.StatusWord.Should().NotBe(StatusWords.Success);
+        _ = response.StatusWord.Should().NotBe(StatusWords.Success);
     }
 
     [Test]
@@ -127,16 +127,16 @@ public class VirtualCardTests
         var card = VirtualCardTestBuilder.P71Card();
         var initialState = card.CurrentState;
         var selectCommand = new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 };
-            
+
         // Act
-        card.ProcessCommand(selectCommand);
+        _ = card.ProcessCommand(selectCommand);
         var newState = card.CurrentState;
-            
+
         // Assert
-        initialState.IsSelected.Should().BeFalse();
-        newState.IsSelected.Should().BeTrue();
+        _ = initialState.IsSelected.Should().BeFalse();
+        _ = newState.IsSelected.Should().BeTrue();
         // Original state should be unchanged (immutability)
-        initialState.Should().NotBe(newState);
+        _ = initialState.Should().NotBe(newState);
     }
 
     [Test]
@@ -155,12 +155,12 @@ public class VirtualCardTests
         
         // Act
         var response = card.ProcessCommand(deleteApdu);
-        
+
         // Assert
-        response.StatusWord.Should().Be(StatusWords.Success);
+        _ = response.StatusWord.Should().Be(StatusWords.Success);
         // Per GlobalPlatform Card Specification v2.3.1 Table 11-26,
         // DELETE Response should contain one byte (00) indicating success
-        response.Data.Should().BeEquivalentTo(new byte[] { 0x00 });
+        _ = response.Data.Should().BeEquivalentTo(new byte[] { 0x00 });
     }
 
     [Test]
@@ -179,19 +179,19 @@ public class VirtualCardTests
         
         // Act
         var response = card.ProcessCommand(ApduBuilder.BuildApdu(installForLoadCommand));
-        
+
         // Assert
-        response.StatusWord.Should().Be(StatusWords.Success);
+        _ = response.StatusWord.Should().Be(StatusWords.Success);
         // Per GlobalPlatform Card Specification v2.3.1 Table 11-13,
         // INSTALL Response should contain application specific data or one byte (00)
-        response.Data.Should().BeEquivalentTo(new byte[] { 0x00 });
+        _ = response.Data.Should().BeEquivalentTo(new byte[] { 0x00 });
     }
 
     private void EstablishSecureChannel(VirtualCard card)
     {
         // SELECT ISD
         var selectCommand = new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 };
-        card.ProcessCommand(selectCommand);
+        _ = card.ProcessCommand(selectCommand);
         
         // INITIALIZE UPDATE
         var hostChallenge = Convert.FromHexString("0102030405060708");
@@ -202,7 +202,7 @@ public class VirtualCardTests
         // Mock EXTERNAL AUTHENTICATE (simplified for testing)
         var extAuthCommand = new byte[] { 0x84, 0x82, 0x01, 0x00, 0x10 }
             .Concat(new byte[16]).ToArray(); // Simplified - would need proper cryptogram
-        card.ProcessCommand(extAuthCommand);
+        _ = card.ProcessCommand(extAuthCommand);
     }
 
     [Test]
@@ -217,17 +217,17 @@ public class VirtualCardTests
         // Act - Call the same pure function multiple times
         var result1 = VirtualCard.ProcessCommandFunctionally(selectCommand, initialState, config, crypto);
         var result2 = VirtualCard.ProcessCommandFunctionally(selectCommand, initialState, config, crypto);
-            
+
         // Assert - Pure function should return identical results
-        result1.IsSuccess.Should().BeTrue();
-        result2.IsSuccess.Should().BeTrue();
+        _ = result1.IsSuccess.Should().BeTrue();
+        _ = result2.IsSuccess.Should().BeTrue();
             
         var (response1, state1) = result1.Value;
         var (response2, state2) = result2.Value;
-            
-        response1.StatusWord.Should().Be(response2.StatusWord);
-        response1.Data.Should().BeEquivalentTo(response2.Data);
-        state1.Should().Be(state2); // Records have value equality
+
+        _ = response1.StatusWord.Should().Be(response2.StatusWord);
+        _ = response1.Data.Should().BeEquivalentTo(response2.Data);
+        _ = state1.Should().Be(state2); // Records have value equality
     }
 
     [Test]
@@ -239,11 +239,11 @@ public class VirtualCardTests
             .WithScp(0x03, Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom)
             .WithTestCrypto()
             .Build();
-            
+
         // Assert
-        card.Configuration.CardType.Should().Contain("P71");
-        card.Configuration.DefaultScpVersion.Should().Be(0x03);
-        card.Configuration.DefaultScpImplementation.Should().Be(Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom);
+        _ = card.Configuration.CardType.Should().Contain("P71");
+        _ = card.Configuration.DefaultScpVersion.Should().Be(0x03);
+        _ = card.Configuration.DefaultScpImplementation.Should().Be(Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom);
     }
 
     [Test]
@@ -252,15 +252,15 @@ public class VirtualCardTests
         // Arrange
         var card = VirtualCardTestBuilder.P71Card();
         var selectCommand = new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 };
-            
+
         // Act
-        card.ProcessCommand(selectCommand); // Change state
-        card.IsSelected.Should().BeTrue();
+        _ = card.ProcessCommand(selectCommand); // Change state
+        _ = card.IsSelected.Should().BeTrue();
             
         card.Reset(); // Reset state
-            
+
         // Assert
-        card.IsSelected.Should().BeFalse();
-        card.IsSecureChannelEstablished.Should().BeFalse();
+        _ = card.IsSelected.Should().BeFalse();
+        _ = card.IsSecureChannelEstablished.Should().BeFalse();
     }
 }

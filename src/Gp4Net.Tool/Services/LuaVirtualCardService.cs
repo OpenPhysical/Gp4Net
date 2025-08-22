@@ -12,7 +12,7 @@ namespace Gp4Net.Tool.Services;
 
 /// <summary>
 /// Virtual card service that uses Lua scripts to simulate card behavior.
-/// Supports URL-style reader names: lua:script.lua?trace=input.txt&param=value
+/// Supports URL-style reader names: lua:script.lua?trace=input.txt and parameter=value
 /// </summary>
 [PublicAPI]
 public class LuaVirtualCardService : ICardService
@@ -84,7 +84,7 @@ public class LuaVirtualCardService : ICardService
             }
 
             var scriptContent = File.ReadAllText(fullScriptPath);
-            _luaScript.DoString(scriptContent);
+            _ = _luaScript.DoString(scriptContent);
 
             // Initialize the script with parameters
             if (_parameters.Count > 0)
@@ -97,7 +97,7 @@ public class LuaVirtualCardService : ICardService
                     {
                         paramTable[kvp.Key] = kvp.Value;
                     }
-                    _luaScript.Call(initFunc, paramTable);
+                    _ = _luaScript.Call(initFunc, paramTable);
                 }
             }
 
@@ -123,7 +123,7 @@ public class LuaVirtualCardService : ICardService
                 var disconnectFunc = _luaScript.Globals.Get("disconnect");
                 if (disconnectFunc is { Type: DataType.Function })
                 {
-                    _luaScript.Call(disconnectFunc);
+                    _ = _luaScript.Call(disconnectFunc);
                 }
             }
             catch (Exception ex)
@@ -205,47 +205,48 @@ public class LuaVirtualCardService : ICardService
 
             var result = _luaScript.Call(processFunc, commandHex);
                 
-            if (result.Type == DataType.Tuple && result.Tuple.Length >= 1)
+            switch (result.Type)
             {
-                var responseHex = result.Tuple[0].String;
-                var responseTime = result.Tuple.Length > 1 ? (int)result.Tuple[1].Number : 20;
-                    
-                var responseBytes = Convert.FromHexString(responseHex.Replace(" ", ""));
-                    
-                // Extract status word (last 2 bytes)
-                var statusWord = responseBytes.Length >= 2 
-                    ? (ushort)((responseBytes[^2] << 8) | responseBytes[^1])
-                    : (ushort)0x9000;
-                    
-                // Extract data (all bytes except last 2)
-                var responseData = responseBytes.Length > 2 
-                    ? responseBytes[..^2] 
-                    : [];
-
-                Logger.Debug($"Received response from Lua script: Data={Convert.ToHexString(responseData)}, SW={statusWord:X4} (took {responseTime}ms)");
-
-                // Simulate response time
-                if (responseTime > 0)
+                case DataType.Tuple when result.Tuple.Length >= 1:
                 {
-                    Task.Delay(responseTime).Wait();
+                    var responseHex = result.Tuple[0].String;
+                    var responseTime = result.Tuple.Length > 1 ? (int)result.Tuple[1].Number : 20;
+                    
+                    var responseBytes = Convert.FromHexString(responseHex.Replace(" ", ""));
+                    
+                    // Extract status word (last 2 bytes)
+                    var statusWord = responseBytes.Length >= 2 
+                        ? (ushort)((responseBytes[^2] << 8) | responseBytes[^1])
+                        : (ushort)0x9000;
+                    
+                    // Extract data (all bytes except last 2)
+                    var responseData = responseBytes.Length > 2 
+                        ? responseBytes[..^2] 
+                        : [];
+
+                    Logger.Debug($"Received response from Lua script: Data={Convert.ToHexString(responseData)}, SW={statusWord:X4} (took {responseTime}ms)");
+
+                    // Simulate response time
+                    if (responseTime > 0)
+                    {
+                        Task.Delay(responseTime).Wait();
+                    }
+
+                    return new CardResponse(responseData, statusWord);
                 }
+                case DataType.String:
+                {
+                    // Simple string response
+                    var responseBytes = Convert.FromHexString(result.String.Replace(" ", ""));
+                    var statusWord = responseBytes.Length >= 2 
+                        ? (ushort)((responseBytes[^2] << 8) | responseBytes[^1])
+                        : (ushort)0x9000;
+                    var responseData = responseBytes.Length > 2 ? responseBytes[..^2] : [];
 
-                return new CardResponse(responseData, statusWord);
-            }
-            else if (result.Type == DataType.String)
-            {
-                // Simple string response
-                var responseBytes = Convert.FromHexString(result.String.Replace(" ", ""));
-                var statusWord = responseBytes.Length >= 2 
-                    ? (ushort)((responseBytes[^2] << 8) | responseBytes[^1])
-                    : (ushort)0x9000;
-                var responseData = responseBytes.Length > 2 ? responseBytes[..^2] : [];
-
-                return new CardResponse(responseData, statusWord);
-            }
-            else
-            {
-                throw new InvalidOperationException($"Invalid response type from Lua script: {result.Type}");
+                    return new CardResponse(responseData, statusWord);
+                }
+                default:
+                    throw new InvalidOperationException($"Invalid response type from Lua script: {result.Type}");
             }
         }
         catch (ScriptRuntimeException ex)
@@ -298,7 +299,7 @@ public class LuaVirtualCardService : ICardService
             }
             else
             {
-                apduBytes.Add(expectedLength == 0 || expectedLength == 256 ? (byte)0x00 : (byte)expectedLength);
+                apduBytes.Add(expectedLength is 0 or 256 ? (byte)0x00 : (byte)expectedLength);
             }
         }
 

@@ -21,9 +21,9 @@ public static class GpTestKeyProvider
     /// </summary>
     private static class Scp02KeyTypeConstants
     {
-        public static readonly byte[] SecureChannelEncryption = { 0x01, 0x82 };
-        public static readonly byte[] CMac = { 0x01, 0x01 };
-        public static readonly byte[] DataEncryptionKey = { 0x01, 0x81 };
+        public static readonly byte[] SecureChannelEncryption = [0x01, 0x82];
+        public static readonly byte[] CMac = [0x01, 0x01];
+        public static readonly byte[] DataEncryptionKey = [0x01, 0x81];
     }
 
     /// <summary>
@@ -129,7 +129,7 @@ public static class GpTestKeyProvider
             byte[] result = new byte[8];
             for (int i = 0; i < paddedData.Length; i += 8)
             {
-                engine.ProcessBlock(paddedData, i, result, 0);
+                _ = engine.ProcessBlock(paddedData, i, result, 0);
             }
 
             // For 2-key 3DES, we need 16 bytes - double the 8-byte result

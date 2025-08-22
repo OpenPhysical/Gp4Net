@@ -17,7 +17,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardData();
 
         // Assert
-        result.HasValue.Should().BeTrue();
+        _ = result.HasValue.Should().BeTrue();
         // Further assertions would require knowing the expected CardDataInfo structure
     }
 
@@ -31,7 +31,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardData();
 
         // Assert
-        result.HasValue.Should().BeFalse();
+        _ = result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -44,7 +44,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardData();
 
         // Assert
-        result.HasValue.Should().BeFalse();
+        _ = result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -57,7 +57,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardData();
 
         // Assert
-        result.HasValue.Should().BeFalse();
+        _ = result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -70,7 +70,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardCapabilities();
 
         // Assert
-        result.HasValue.Should().BeTrue();
+        _ = result.HasValue.Should().BeTrue();
         // Further assertions would require knowing the expected CardCapabilities structure
     }
 
@@ -84,7 +84,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardCapabilities();
 
         // Assert
-        result.HasValue.Should().BeFalse();
+        _ = result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -97,7 +97,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardCapabilities();
 
         // Assert
-        result.HasValue.Should().BeFalse();
+        _ = result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -110,7 +110,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCardCapabilities();
 
         // Assert
-        result.HasValue.Should().BeFalse();
+        _ = result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -123,8 +123,8 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsKeyInformation();
 
         // Assert
-        result.HasValue.Should().BeTrue();
-        result.Value.Keys.Should().NotBeEmpty();
+        _ = result.HasValue.Should().BeTrue();
+        _ = result.Value.Keys.Should().NotBeEmpty();
     }
 
     [Test]
@@ -137,7 +137,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsKeyInformation();
 
         // Assert
-        result.HasValue.Should().BeFalse();
+        _ = result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -150,7 +150,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsKeyInformation();
 
         // Assert
-        result.HasValue.Should().BeFalse();
+        _ = result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -163,7 +163,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsKeyInformation();
 
         // Assert
-        result.HasValue.Should().BeFalse();
+        _ = result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -180,8 +180,8 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCplc();
 
         // Assert
-        result.HasValue.Should().BeTrue();
-        result.Value.IcFabricator.Should().Be(0x1234);
+        _ = result.HasValue.Should().BeTrue();
+        _ = result.Value.IcFabricator.Should().Be(0x1234);
     }
 
     [Test]
@@ -194,7 +194,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCplc();
 
         // Assert
-        result.HasValue.Should().BeFalse();
+        _ = result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -207,7 +207,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCplc();
 
         // Assert
-        result.HasValue.Should().BeFalse();
+        _ = result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -220,7 +220,7 @@ public class GetDataResponseExtensionsTests
         var result = data.ParseAsCplc();
 
         // Assert
-        result.HasValue.Should().BeFalse();
+        _ = result.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -230,9 +230,9 @@ public class GetDataResponseExtensionsTests
         var malformedData = new byte[] { 0xFF, 0xFF, 0xFF };
 
         // Act & Assert - None should throw, all should return None
-        malformedData.ParseAsCardData().HasValue.Should().BeFalse();
-        malformedData.ParseAsCardCapabilities().HasValue.Should().BeFalse();
-        malformedData.ParseAsKeyInformation().HasValue.Should().BeFalse();
-        malformedData.ParseAsCplc().HasValue.Should().BeFalse();
+        _ = malformedData.ParseAsCardData().HasValue.Should().BeFalse();
+        _ = malformedData.ParseAsCardCapabilities().HasValue.Should().BeFalse();
+        _ = malformedData.ParseAsKeyInformation().HasValue.Should().BeFalse();
+        _ = malformedData.ParseAsCplc().HasValue.Should().BeFalse();
     }
 }

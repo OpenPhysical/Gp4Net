@@ -190,15 +190,17 @@ public class CardCapabilities
         }
 
         // Parse supported options (i parameters)
-        supportedOptions.Match(
-            Some: options => {
+        _ = supportedOptions.Match(
+            Some: options =>
+            {
                 if (scpType > 0)
                 {
                     // Parse supported key lengths for SCP03
                     if (scpType == 0x03)
                     {
-                        supportedKeys.Match(
-                            Some: keys => {
+                        _ = supportedKeys.Match(
+                            Some: keys =>
+                            {
                                 if (keys.Length > 0)
                                 {
                                     var keyLengthsBuilder = ImmutableList.CreateBuilder<int>();

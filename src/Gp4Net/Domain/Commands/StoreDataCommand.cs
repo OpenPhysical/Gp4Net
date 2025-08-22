@@ -227,7 +227,10 @@ public class StoreDataCommand : IApduCommand
     /// Returns the string representation of this command.
     /// </summary>
     /// <returns>The string "STORE DATA".</returns>
-    public override string ToString() => "STORE DATA";
+    public override string ToString()
+    {
+        return "STORE DATA";
+    }
 
     /// <summary>
     /// Converts this command to an APDU byte array.

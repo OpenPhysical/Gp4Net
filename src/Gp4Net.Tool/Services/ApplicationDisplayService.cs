@@ -146,16 +146,16 @@ public class ApplicationDisplayService
         var table = new Table();
 
         // Basic columns
-        table.AddColumn("Type");
-        table.AddColumn("AID");
-        table.AddColumn("State");
-        table.AddColumn("Privileges");
+        _ = table.AddColumn("Type");
+        _ = table.AddColumn("AID");
+        _ = table.AddColumn("State");
+        _ = table.AddColumn("Privileges");
 
         // Extended columns
         if (extended)
         {
-            table.AddColumn("Version");
-            table.AddColumn("Assoc. SD");
+            _ = table.AddColumn("Version");
+            _ = table.AddColumn("Assoc. SD");
         }
 
         return table;
@@ -187,7 +187,7 @@ public class ApplicationDisplayService
             );
         }
 
-        table.AddRow(row.ToArray());
+        _ = table.AddRow(row.ToArray());
     }
 
     /// <summary>

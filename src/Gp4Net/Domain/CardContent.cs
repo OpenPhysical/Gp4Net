@@ -68,20 +68,26 @@ public record CardContent(
     /// <summary>
     /// Gets applications by their type.
     /// </summary>
-    public ImmutableList<ApplicationInfo> GetApplicationsByType(ApplicationType type) =>
-        AllApplications.Where(app => app.Type == type).ToImmutableList();
+    public ImmutableList<ApplicationInfo> GetApplicationsByType(ApplicationType type)
+    {
+        return AllApplications.Where(app => app.Type == type).ToImmutableList();
+    }
 
     /// <summary>
     /// Gets applications by their lifecycle state.
     /// </summary>
-    public ImmutableList<ApplicationInfo> GetApplicationsByState(LifecycleState state) =>
-        AllApplications.Where(app => app.LifecycleState == state).ToImmutableList();
+    public ImmutableList<ApplicationInfo> GetApplicationsByState(LifecycleState state)
+    {
+        return AllApplications.Where(app => app.LifecycleState == state).ToImmutableList();
+    }
 
     /// <summary>
     /// Gets executable load files by their lifecycle state.
     /// </summary>
-    public ImmutableList<ExecutableLoadFile> GetLoadFilesByState(LifecycleState state) =>
-        ExecutableLoadFiles.Where(lf => lf.LifecycleState == state).ToImmutableList();
+    public ImmutableList<ExecutableLoadFile> GetLoadFilesByState(LifecycleState state)
+    {
+        return ExecutableLoadFiles.Where(lf => lf.LifecycleState == state).ToImmutableList();
+    }
 
     /// <summary>
     /// Checks if the card has any selectable applications.

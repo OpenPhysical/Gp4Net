@@ -254,7 +254,10 @@ public static class Scp02ImplementationFeatures
     /// </summary>
     /// <param name="impl">The SCP implementation to check</param>
     /// <returns>True if R-MAC is supported, false otherwise</returns>
-    public static bool HasRMacSupport(this ScpImplementation impl) => ((byte)impl & 0x20) != 0;
+    public static bool HasRMacSupport(this ScpImplementation impl)
+    {
+        return ((byte)impl & 0x20) != 0;
+    }
 
     /// <summary>
     /// Determines if this implementation uses 3 separate keys (ENC/MAC/DEK).
@@ -262,7 +265,10 @@ public static class Scp02ImplementationFeatures
     /// </summary>
     /// <param name="impl">The SCP implementation to check</param>
     /// <returns>True if 3 keys are used, false if 1 base key is used</returns>
-    public static bool Uses3Keys(this ScpImplementation impl) => ((byte)impl & 0x01) != 0;
+    public static bool Uses3Keys(this ScpImplementation impl)
+    {
+        return ((byte)impl & 0x01) != 0;
+    }
 
     /// <summary>
     /// Determines if this implementation uses explicit initiation mode.
@@ -270,7 +276,10 @@ public static class Scp02ImplementationFeatures
     /// </summary>
     /// <param name="impl">The SCP implementation to check</param>
     /// <returns>True for explicit mode, false for implicit mode</returns>
-    public static bool IsExplicitMode(this ScpImplementation impl) => ((byte)impl & 0x08) != 0;
+    public static bool IsExplicitMode(this ScpImplementation impl)
+    {
+        return ((byte)impl & 0x08) != 0;
+    }
 
     /// <summary>
     /// Determines if this implementation has ICV encryption for C-MAC session.
@@ -278,7 +287,10 @@ public static class Scp02ImplementationFeatures
     /// </summary>
     /// <param name="impl">The SCP implementation to check</param>
     /// <returns>True if ICV encryption is enabled, false otherwise</returns>
-    public static bool HasIcvEncryption(this ScpImplementation impl) => ((byte)impl & 0x04) != 0;
+    public static bool HasIcvEncryption(this ScpImplementation impl)
+    {
+        return ((byte)impl & 0x04) != 0;
+    }
 
     /// <summary>
     /// Determines if this implementation uses well-known pseudo-random algorithm for card challenge.
@@ -286,7 +298,10 @@ public static class Scp02ImplementationFeatures
     /// </summary>
     /// <param name="impl">The SCP implementation to check</param>
     /// <returns>True for well-known algorithm, false for unspecified method</returns>
-    public static bool UsesWellKnownChallenge(this ScpImplementation impl) => ((byte)impl & 0x40) != 0;
+    public static bool UsesWellKnownChallenge(this ScpImplementation impl)
+    {
+        return ((byte)impl & 0x40) != 0;
+    }
 
     /// <summary>
     /// Determines if this implementation has ICV set to MAC over AID.
@@ -294,7 +309,10 @@ public static class Scp02ImplementationFeatures
     /// </summary>
     /// <param name="impl">The SCP implementation to check</param>
     /// <returns>True for MAC over AID, false for zero ICV</returns>
-    public static bool HasMacOverAid(this ScpImplementation impl) => ((byte)impl & 0x10) != 0;
+    public static bool HasMacOverAid(this ScpImplementation impl)
+    {
+        return ((byte)impl & 0x10) != 0;
+    }
 
     /// <summary>
     /// Determines if this implementation uses C-MAC on modified APDU.
@@ -302,7 +320,10 @@ public static class Scp02ImplementationFeatures
     /// </summary>
     /// <param name="impl">The SCP implementation to check</param>
     /// <returns>True for modified APDU, false for unmodified APDU</returns>
-    public static bool UsesModifiedApdu(this ScpImplementation impl) => ((byte)impl & 0x02) == 0;
+    public static bool UsesModifiedApdu(this ScpImplementation impl)
+    {
+        return ((byte)impl & 0x02) == 0;
+    }
 
     /// <summary>
     /// Gets a human-readable description of the implementation features.

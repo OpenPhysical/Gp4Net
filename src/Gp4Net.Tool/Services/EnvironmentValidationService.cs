@@ -23,7 +23,9 @@ public class EnvironmentValidationService : IEnvironmentValidationService
     /// <summary>
     /// Well-known test keys that should never be used on production cards.
     /// </summary>
-    private static readonly byte[][] WellKnownTestKeys = {
+    private static readonly byte[][] WellKnownTestKeys =
+    [
+
         // Standard GP test key (404142434445464748494A4B4C4D4E4F)
         GpTestKeys.StandardTestKey,
         // Zero key
@@ -32,23 +34,25 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         GpTestKeys.AllOnesTestKey,
         // Other common test keys
         Convert.FromHexString("000102030405060708090A0B0C0D0E0F"), // Sequential
-        Convert.FromHexString("DEADBEEFDEADBEEFDEADBEEFDEADBEEF"), // DEADBEEF pattern
-    };
+        Convert.FromHexString("DEADBEEFDEADBEEFDEADBEEFDEADBEEF") // DEADBEEF pattern
+    ];
 
     /// <summary>
     /// Production card indicators in CPLC data.
     /// </summary>
-    private static readonly string[] ProductionCardIndicators = {
+    private static readonly string[] ProductionCardIndicators =
+    [
         "NXP", "INFINEON", "SAMSUNG", "GEMALTO", "IDEMIA", "OBERTHUR", "GIESECKE",
         "MORPHO", "SAFENET", "SMARTCARD", "PRODUCTION", "COMMERCIAL"
-    };
+    ];
 
     /// <summary>
     /// Test card indicators in CPLC data.
     /// </summary>
-    private static readonly string[] TestCardIndicators = {
+    private static readonly string[] TestCardIndicators =
+    [
         "TEST", "DEVELOPMENT", "SAMPLE", "EVALUATION", "DEMO", "JCOP", "VIRTUAL"
-    };
+    ];
 
     /// <summary>
     /// Initializes a new instance of EnvironmentValidationService.
@@ -307,26 +311,26 @@ public class EnvironmentValidationService : IEnvironmentValidationService
             (CardEnvironment.Production, true) => (
                 false,
                 "DANGEROUS: Test keys should not be used with production cards",
-                new[] { "Using test keys on production cards may cause lockout", "Verify card type before proceeding" }
+                ["Using test keys on production cards may cause lockout", "Verify card type before proceeding"]
             ),
 
             // Questionable combinations
             (CardEnvironment.Test, false) => (
                 true,
                 "Questionable: Production keys with test card",
-                new[] { "Using production keys on test cards may reveal sensitive information" }
+                ["Using production keys on test cards may reveal sensitive information"]
             ),
 
             // Unknown combinations - err on the side of caution
             (CardEnvironment.Unknown, true) => (
                 true,
                 "Caution: Test keys with unknown card type",
-                new[] { "Card type could not be determined", "Test keys are generally safer" }
+                ["Card type could not be determined", "Test keys are generally safer"]
             ),
             (CardEnvironment.Unknown, false) => (
                 false,
                 "CAUTION: Production keys with unknown card type",
-                new[] { "Card type could not be determined", "Production keys may be risky" }
+                ["Card type could not be determined", "Production keys may be risky"]
             ),
 
             _ => (

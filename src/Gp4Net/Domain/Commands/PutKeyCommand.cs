@@ -220,7 +220,10 @@ public class PutKeyCommand : IApduCommand
     /// Returns a string representation of this command.
     /// </summary>
     /// <returns>The command name.</returns>
-    public override string ToString() => "PUT KEY";
+    public override string ToString()
+    {
+        return "PUT KEY";
+    }
 
     /// <summary>
     /// Converts this command to an APDU byte array.
@@ -552,7 +555,7 @@ public class PutKeyResponse
     public PutKeyResponse(IList<byte[]> keyCheckValues)
     {
         KeyCheckValues = new List<byte[]>(
-            keyCheckValues?.Select(kcv => (byte[])kcv.Clone()) ?? Array.Empty<byte[]>()
+            keyCheckValues?.Select(kcv => (byte[])kcv.Clone()) ?? []
         );
     }
 

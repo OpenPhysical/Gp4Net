@@ -38,7 +38,7 @@ public class DynamicTraceTests
         var result = verifier.Verify();
 
         // Assert success with detailed error message if failed
-        result.IsSuccess.Should().BeTrue(
+        _ = result.IsSuccess.Should().BeTrue(
             $"Operation '{testCase.OperationName}' verification failed: {(result.IsFailure ? result.Error : "Unknown error")}"
         );
     }
@@ -108,7 +108,7 @@ public class TraceTestDiscovery : IEnumerable
             }
             catch (Exception ex)
             {
-                TestContext.WriteLine($"Failed to load trace {traceFile}: {ex.Message}");
+                TestContext.Out.WriteLine($"Failed to load trace {traceFile}: {ex.Message}");
                 continue;
             }
 
@@ -118,7 +118,7 @@ public class TraceTestDiscovery : IEnumerable
             // Skip if marked as untestable
             if (trace.TestHints?.SkipReason != null)
             {
-                TestContext.WriteLine($"Skipping {Path.GetFileName(traceFile)}: {trace.TestHints.SkipReason}");
+                TestContext.Out.WriteLine($"Skipping {Path.GetFileName(traceFile)}: {trace.TestHints.SkipReason}");
                 continue;
             }
 
@@ -255,7 +255,12 @@ public abstract class BaseOperationVerifier : IOperationVerifier
 
     protected TraceExchange GetExchange()
     {
-        if (ExchangeIndex < 0 || ExchangeIndex >= Trace.Exchanges?.Count)
+        if (Trace.Exchanges == null)
+        {
+            throw new InvalidOperationException("Trace exchanges collection is null");
+        }
+        
+        if (ExchangeIndex < 0 || ExchangeIndex >= Trace.Exchanges.Count)
         {
             throw new InvalidOperationException($"Exchange index {ExchangeIndex} out of range");
         }
@@ -326,95 +331,100 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
             {
                 var staticKeyBytes = Convert.FromHexString(Trace.Metadata.Hints.StaticKeys);
 
-                if (scpVersion == ScpVersion.Scp03)
+                switch (scpVersion)
                 {
-                    var keySetResult = Scp03KeySet.Create(staticKeyBytes, staticKeyBytes, staticKeyBytes, response.KeyVersion);
-                    if (keySetResult.IsFailure)
+                    case ScpVersion.Scp03:
                     {
-                        return Result.Failure<bool, string>($"Failed to create key set: {keySetResult.Error.Message}");
+                        var keySetResult = Scp03KeySet.Create(staticKeyBytes, staticKeyBytes, staticKeyBytes, response.KeyVersion);
+                        if (keySetResult.IsFailure)
+                        {
+                            return Result.Failure<bool, string>($"Failed to create key set: {keySetResult.Error.Message}");
+                        }
+                        var keySet = keySetResult.Value;
+
+                        // Derive session keys
+                        var keyDerivation = new KeyDerivationService();
+                        var sessionKeysResult = keyDerivation.DeriveSessionKeys(
+                            keySet,
+                            hostChallenge,
+                            response.CardChallenge);
+
+                        if (sessionKeysResult.IsFailure)
+                        {
+                            return Result.Failure<bool, string>($"Key derivation failed: {sessionKeysResult.Error.Message}");
+                        }
+
+                        // Verify card cryptogram
+                        var cryptogramService = new CryptogramService();
+                        var expectedCryptogramResult = cryptogramService.CalculateCardCryptogram(
+                            sessionKeysResult.Value.SMac,
+                            hostChallenge,
+                            response.CardChallenge,
+                            Maybe<byte[]>.None,
+                            ScpVersion.Scp03);
+
+                        if (expectedCryptogramResult.IsFailure)
+                        {
+                            return Result.Failure<bool, string>($"Cryptogram calculation failed: {expectedCryptogramResult.Error.Message}");
+                        }
+
+                        if (!response.CardCryptogram.SequenceEqual(expectedCryptogramResult.Value))
+                        {
+                            return Result.Failure<bool, string>("Card cryptogram verification failed");
+                        }
+                        break;
                     }
-                    var keySet = keySetResult.Value;
-
-                    // Derive session keys
-                    var keyDerivation = new KeyDerivationService();
-                    var sessionKeysResult = keyDerivation.DeriveSessionKeys(
-                        keySet,
-                        hostChallenge,
-                        response.CardChallenge);
-
-                    if (sessionKeysResult.IsFailure)
+                    case ScpVersion.Scp02:
                     {
-                        return Result.Failure<bool, string>($"Key derivation failed: {sessionKeysResult.Error.Message}");
-                    }
+                        var keySetResult = Scp02KeySet.Create(staticKeyBytes, staticKeyBytes, staticKeyBytes, response.KeyVersion);
+                        if (keySetResult.IsFailure)
+                        {
+                            return Result.Failure<bool, string>($"Failed to create key set: {keySetResult.Error.Message}");
+                        }
+                        var keySet = keySetResult.Value;
 
-                    // Verify card cryptogram
-                    var cryptogramService = new CryptogramService();
-                    var expectedCryptogramResult = cryptogramService.CalculateCardCryptogram(
-                        sessionKeysResult.Value.SMac,
-                        hostChallenge,
-                        response.CardChallenge,
-                        Maybe<byte[]>.None,
-                        ScpVersion.Scp03);
+                        // Derive session keys
+                        var keyDerivation = new KeyDerivationService();
+                        var sessionKeysResult = keyDerivation.DeriveSessionKeys(
+                            keySet,
+                            hostChallenge,
+                            response.CardChallenge,
+                            Maybe<byte[]>.From(response.SequenceCounter),
+                            Maybe<ScpImplementation>.From((ScpImplementation)response.ScpParameter));
 
-                    if (expectedCryptogramResult.IsFailure)
-                    {
-                        return Result.Failure<bool, string>($"Cryptogram calculation failed: {expectedCryptogramResult.Error.Message}");
-                    }
+                        if (sessionKeysResult.IsFailure)
+                        {
+                            return Result.Failure<bool, string>($"Key derivation failed: {sessionKeysResult.Error.Message}");
+                        }
 
-                    if (!response.CardCryptogram.SequenceEqual(expectedCryptogramResult.Value))
-                    {
-                        return Result.Failure<bool, string>("Card cryptogram verification failed");
-                    }
-                }
-                else if (scpVersion == ScpVersion.Scp02)
-                {
-                    var keySetResult = Scp02KeySet.Create(staticKeyBytes, staticKeyBytes, staticKeyBytes, response.KeyVersion);
-                    if (keySetResult.IsFailure)
-                    {
-                        return Result.Failure<bool, string>($"Failed to create key set: {keySetResult.Error.Message}");
-                    }
-                    var keySet = keySetResult.Value;
+                        // Log derived session keys for debugging
+                        var sessionKeys = sessionKeysResult.Value;
+                        TestContext.Out.WriteLine($"Derived Session Keys:");
+                        TestContext.Out.WriteLine($"  S-ENC: {Convert.ToHexString(sessionKeys.SEnc)}");
+                        TestContext.Out.WriteLine($"  S-MAC: {Convert.ToHexString(sessionKeys.SMac)}");
 
-                    // Derive session keys
-                    var keyDerivation = new KeyDerivationService();
-                    var sessionKeysResult = keyDerivation.DeriveSessionKeys(
-                        keySet,
-                        hostChallenge,
-                        response.CardChallenge,
-                        Maybe<byte[]>.From(response.SequenceCounter),
-                        Maybe<ScpImplementation>.From((ScpImplementation)response.ScpParameter));
+                        // Verify card cryptogram
+                        var cryptogramService = new CryptogramService();
+                        var expectedCryptogramResult = cryptogramService.CalculateCardCryptogram(
+                            sessionKeys.SEnc,  // SCP02 uses S-ENC for cryptograms
+                            hostChallenge,
+                            response.CardChallenge,
+                            Maybe<byte[]>.From(response.SequenceCounter),
+                            ScpVersion.Scp02);
 
-                    if (sessionKeysResult.IsFailure)
-                    {
-                        return Result.Failure<bool, string>($"Key derivation failed: {sessionKeysResult.Error.Message}");
-                    }
+                        if (expectedCryptogramResult.IsFailure)
+                        {
+                            return Result.Failure<bool, string>($"Cryptogram calculation failed: {expectedCryptogramResult.Error.Message}");
+                        }
 
-                    // Log derived session keys for debugging
-                    var sessionKeys = sessionKeysResult.Value;
-                    TestContext.WriteLine($"Derived Session Keys:");
-                    TestContext.WriteLine($"  S-ENC: {Convert.ToHexString(sessionKeys.SEnc)}");
-                    TestContext.WriteLine($"  S-MAC: {Convert.ToHexString(sessionKeys.SMac)}");
+                        TestContext.Out.WriteLine($"Expected Card Cryptogram: {Convert.ToHexString(expectedCryptogramResult.Value)}");
+                        TestContext.Out.WriteLine($"Actual Card Cryptogram:   {Convert.ToHexString(response.CardCryptogram)}");
 
-                    // Verify card cryptogram
-                    var cryptogramService = new CryptogramService();
-                    var expectedCryptogramResult = cryptogramService.CalculateCardCryptogram(
-                        sessionKeys.SEnc,  // SCP02 uses S-ENC for cryptograms
-                        hostChallenge,
-                        response.CardChallenge,
-                        Maybe<byte[]>.From(response.SequenceCounter),
-                        ScpVersion.Scp02);
-
-                    if (expectedCryptogramResult.IsFailure)
-                    {
-                        return Result.Failure<bool, string>($"Cryptogram calculation failed: {expectedCryptogramResult.Error.Message}");
-                    }
-
-                    TestContext.WriteLine($"Expected Card Cryptogram: {Convert.ToHexString(expectedCryptogramResult.Value)}");
-                    TestContext.WriteLine($"Actual Card Cryptogram:   {Convert.ToHexString(response.CardCryptogram)}");
-
-                    if (!response.CardCryptogram.SequenceEqual(expectedCryptogramResult.Value))
-                    {
-                        return Result.Failure<bool, string>("SCP02 card cryptogram verification failed");
+                        if (!response.CardCryptogram.SequenceEqual(expectedCryptogramResult.Value))
+                        {
+                            return Result.Failure<bool, string>("SCP02 card cryptogram verification failed");
+                        }
+                        break;
                     }
                 }
             }

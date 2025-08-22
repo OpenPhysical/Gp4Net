@@ -37,33 +37,33 @@ public static class Scp02CommandProcessors
         logger?.LogDebug("Card state - SCP implementation: {Impl}", state.ScpImplementation);
         logger?.LogDebug("Card selected: {Selected}", state.IsSelected);
         logger?.LogDebug("Secure channel established: {Established}", state.IsSecureChannelEstablished);
-        
+
         try
         {
             logger?.LogDebug("About to parse INITIALIZE UPDATE command");
             var parseResult = ParseInitializeUpdateCommand(command);
-            
+
             if (parseResult.IsFailure)
             {
                 logger?.LogError("Failed to parse command: {Error}", parseResult.Error.Message);
                 return parseResult.Error;
             }
-            
+
             logger?.LogDebug("Command parsed successfully");
-            
+
             var result = Result.Success<InitializeUpdateRequest, SmartCardError>(parseResult.Value)
-            .Tap(request => logger?.LogDebug("Parsed INITIALIZE UPDATE - KeyVersion: 0x{KeyVersion:X2}, KeyId: 0x{KeyId:X2}, HostChallenge: {Challenge}", 
+            .Tap(request => logger?.LogDebug("Parsed INITIALIZE UPDATE - KeyVersion: 0x{KeyVersion:X2}, KeyId: 0x{KeyId:X2}, HostChallenge: {Challenge}",
                 request.KeyVersion, request.KeyIdentifier, Convert.ToHexString(request.HostChallenge)))
             .TapError(error => logger?.LogError("Failed to parse INITIALIZE UPDATE command: {Error}", error.Message))
             .Bind(request => ValidateScp02Preconditions(request, state, config, logger))
             .Tap(_ => logger?.LogDebug("Preconditions validated successfully"))
             .TapError(error => logger?.LogError("Precondition validation failed: {Error}", error.Message))
             .Bind(request => GenerateScp02CardChallenge(request, state, config, crypto, logger))
-            .Tap(data => logger?.LogDebug("Card challenge generated - CardChallenge: {Challenge}, SequenceCounter: {Counter}", 
+            .Tap(data => logger?.LogDebug("Card challenge generated - CardChallenge: {Challenge}, SequenceCounter: {Counter}",
                 Convert.ToHexString(data.CardChallenge), Convert.ToHexString(data.SequenceCounter)))
             .TapError(error => logger?.LogError("Failed to generate card challenge: {Error}", error.Message))
             .Bind(data => CalculateScp02CardCryptogram(data, state, config, crypto, logger))
-            .Tap(result => logger?.LogDebug("Card cryptogram calculated - Cryptogram: {Cryptogram}", 
+            .Tap(result => logger?.LogDebug("Card cryptogram calculated - Cryptogram: {Cryptogram}",
                 Convert.ToHexString(result.CardCryptogram)))
             .TapError(error => logger?.LogError("Failed to calculate card cryptogram: {Error}", error.Message))
             .Map(result => {
@@ -71,10 +71,10 @@ public static class Scp02CommandProcessors
                 return CreateScp02InitializeUpdateResponse(result, state, config, logger);
             })
             .TapError(error => logger?.LogError("SCP02 INITIALIZE UPDATE failed: {Error}", error.Message));
-            
-            logger?.LogDebug("=== ProcessScp02InitializeUpdate completed with {Status} ===", 
+
+            logger?.LogDebug("=== ProcessScp02InitializeUpdate completed with {Status} ===",
                 result.IsSuccess ? "SUCCESS" : "FAILURE");
-                
+
             return result;
         }
         catch (Exception ex)
@@ -150,9 +150,9 @@ public static class Scp02CommandProcessors
         CardConfiguration config,
         ILogger? logger = null)
     {
-        logger?.LogDebug("Validating SCP02 preconditions - Selected: {Selected}, SCP: 0x{Scp:X2}", 
+        logger?.LogDebug("Validating SCP02 preconditions - Selected: {Selected}, SCP: 0x{Scp:X2}",
             state.IsSelected, (byte)state.ScpVersion);
-            
+
         if (!state.IsSelected)
         {
             logger?.LogWarning("Card not selected");
@@ -179,7 +179,7 @@ public static class Scp02CommandProcessors
     {
         logger?.LogDebug("=== GenerateScp02CardChallenge ===");
         logger?.LogDebug("Generating SCP02 card challenge for key version 0x{KeyVersion:X2}", request.KeyVersion);
-        
+
         // Get sequence counter for the key version
         var sequenceCounter = state.GetSequenceCounter(request.KeyVersion);
         logger?.LogDebug("Sequence counter: {SequenceCounter}", Convert.ToHexString(sequenceCounter));
@@ -187,16 +187,16 @@ public static class Scp02CommandProcessors
         // SCP02 card challenge is 6 random bytes (sequence counter is separate)
         logger?.LogDebug("Calling crypto.GenerateChallenge(6)");
         var challengeResult = crypto.GenerateChallenge(6);
-        
+
         if (challengeResult.IsFailure)
         {
             logger?.LogError("Failed to generate card challenge: {Error}", challengeResult.Error.Message);
             return challengeResult.Error;
         }
-        
+
         var cardChallenge = challengeResult.Value;
         logger?.LogDebug("Generated card challenge: {Challenge}", Convert.ToHexString(cardChallenge));
-        
+
         var result = new Scp02ChallengeData(request, cardChallenge, sequenceCounter);
         logger?.LogDebug("=== GenerateScp02CardChallenge completed successfully ===");
         return Result.Success<Scp02ChallengeData, SmartCardError>(result);
@@ -214,13 +214,13 @@ public static class Scp02CommandProcessors
         // Determine effective key version
         var effectiveKeyVersion = data.Request.KeyVersion;
         logger?.LogDebug("Requested key version: 0x{KeyVersion:X2}", data.Request.KeyVersion);
-        
+
         if (effectiveKeyVersion == 0x00)
         {
             logger?.LogDebug("Key version 0x00 requested - looking for default key");
             effectiveKeyVersion = state.DefaultKeyVersion;
             logger?.LogDebug("State default key version: 0x{KeyVersion:X2}", effectiveKeyVersion);
-            
+
             if (effectiveKeyVersion == 0xFF)
             {
                 logger?.LogDebug("No default key version set - using first available static key");
@@ -238,7 +238,7 @@ public static class Scp02CommandProcessors
             logger?.LogError("Available static keys: {StaticKeys}", string.Join(", ", config.StaticKeys.Keys.Select(k => $"0x{k:X2}")));
             return SmartCardError.ReferencedDataNotFound();
         }
-        
+
         logger?.LogDebug("Found key set for version 0x{KeyVersion:X2}, type: {KeyType}", effectiveKeyVersion, keys.GetType().Name);
 
         // Build SCP02 card cryptogram data
@@ -251,16 +251,16 @@ public static class Scp02CommandProcessors
         cryptogramData[16] = 0x80;
         // Rest is already zeros
 
-        logger?.LogDebug("Calling crypto.CalculateCardCryptogram with SCP version 0x02, implementation: {Impl}", 
+        logger?.LogDebug("Calling crypto.CalculateCardCryptogram with SCP version 0x02, implementation: {Impl}",
             state.ScpImplementation);
-        
+
         logger?.LogDebug("Cryptogram calculation parameters:");
         logger?.LogDebug("  Host challenge: {HostChallenge}", Convert.ToHexString(data.Request.HostChallenge));
         logger?.LogDebug("  Card challenge (6 bytes random): {CardChallenge}", Convert.ToHexString(data.CardChallenge));
         logger?.LogDebug("  Sequence counter: {SeqCounter}", Convert.ToHexString(data.SequenceCounter));
         logger?.LogDebug("  SCP version: 0x02");
         logger?.LogDebug("  Implementation: 0x{Impl:X2}", (byte)state.ScpImplementation);
-        
+
         // Pass the card challenge and sequence counter separately for proper separation of concerns
         var cryptogramResult = crypto.CalculateCardCryptogram(
                 data.Request.HostChallenge,
@@ -269,16 +269,16 @@ public static class Scp02CommandProcessors
                 0x02,
                 (byte)state.ScpImplementation,
                 data.SequenceCounter);  // 2-byte sequence counter
-                
+
         if (cryptogramResult.IsFailure)
         {
             logger?.LogError("Cryptogram calculation failed: {Error}", cryptogramResult.Error.Message);
             return cryptogramResult.Error;
         }
-        
+
         var cryptogram = cryptogramResult.Value;
         logger?.LogDebug("Cryptogram calculation successful: {Cryptogram}", Convert.ToHexString(cryptogram));
-        
+
         var result = new Scp02CryptogramData(
             effectiveKeyVersion,
             state.ScpImplementation,
@@ -287,7 +287,7 @@ public static class Scp02CommandProcessors
             data.SequenceCounter,
             cryptogram,
             keys);
-            
+
         logger?.LogDebug("=== CalculateScp02CardCryptogram completed successfully ===");
         return Result.Success<Scp02CryptogramData, SmartCardError>(result);
     }
@@ -300,17 +300,17 @@ public static class Scp02CommandProcessors
     {
         logger?.LogDebug("=== CreateScp02InitializeUpdateResponse ===");
         logger?.LogDebug("Creating SCP02 INITIALIZE UPDATE response");
-        logger?.LogDebug("Response data - KeyVersion: 0x{KeyVersion:X2}, Implementation: 0x{Impl:X2}", 
+        logger?.LogDebug("Response data - KeyVersion: 0x{KeyVersion:X2}, Implementation: 0x{Impl:X2}",
             data.KeyVersion, (byte)data.Implementation);
         logger?.LogDebug("Sequence counter: {SeqCounter}, Card challenge: {CardChallenge}, Card cryptogram: {Cryptogram}",
-            Convert.ToHexString(data.SequenceCounter), 
+            Convert.ToHexString(data.SequenceCounter),
             Convert.ToHexString(data.CardChallenge),
             Convert.ToHexString(data.CardCryptogram));
-        
+
         // Build SCP02 INITIALIZE UPDATE response per GP spec Table E-8
         var response = new byte[28]; // Fixed size for SCP02
         var offset = 0;
-        
+
         logger?.LogDebug("Creating response with {Length} bytes", response.Length);
 
         // Key diversification data (10 bytes)
@@ -321,7 +321,7 @@ public static class Scp02CommandProcessors
         // Key information (2 bytes) - Key version and SCP ID only
         response[offset++] = data.KeyVersion;
         response[offset++] = 0x02; // SCP02
-        logger?.LogDebug("Added key info - version: 0x{KeyVersion:X2}, SCP: 0x02 at offset {Offset}", 
+        logger?.LogDebug("Added key info - version: 0x{KeyVersion:X2}, SCP: 0x02 at offset {Offset}",
             data.KeyVersion, offset - 2);
         // Note: Implementation parameter is NOT part of the response
 
@@ -410,7 +410,7 @@ public static class Scp02CommandProcessors
         // Extract sequence counter from the card challenge (first 2 bytes)
         var sequenceCounter = state.CardChallenge.Take(2).ToArray();
         var cardChallengeRandom = state.CardChallenge.Skip(2).Take(6).ToArray();
-        
+
         // Calculate expected host cryptogram
         return crypto.CalculateHostCryptogram(
                 state.HostChallenge,
@@ -432,7 +432,7 @@ public static class Scp02CommandProcessors
                     // Command structure: CLA=84 INS=82 P1=SecurityLevel P2=00 LC=10 Data=HostCryptogram
                     return VerifyScp02CommandMac(request, state, crypto);
                 }
-                
+
                 return Result.Success<ExternalAuthenticateRequest, SmartCardError>(request);
             });
     }
@@ -448,27 +448,20 @@ public static class Scp02CommandProcessors
             {
                 // Construct the command data that was MACed
                 // CLA=84 INS=82 P1=SecurityLevel P2=00 LC=10 Data=HostCryptogram
-                byte[] commandHeader = { 0x84, 0x82, request.SecurityLevel, 0x00, 0x10 };
+                byte[] commandHeader = [0x84, 0x82, request.SecurityLevel, 0x00, 0x10];
                 byte[] macInput = commandHeader.Concat(request.HostCryptogram).ToArray();
-                
-                // Calculate expected MAC using the session C-MAC key
-                return crypto.CalculateMac(
-                    macInput,
-                    sessionKeys.CMacKey,
-                    Array.Empty<byte>(), // No chaining value for first command
-                    0x02, // SCP02
-                    (byte)state.ScpImplementation)
+
+                // Emulator: use AES-CMAC over the input with S-MAC (simplified)
+                return crypto.CalculateAesCmac(sessionKeys.SMac, macInput)
                     .Bind(expectedMac =>
                     {
-                        // For SCP02, MAC is typically 8 bytes
-                        byte[] truncatedExpectedMac = expectedMac.Take(8).ToArray();
-                        
-                        if (!request.HostMac.SequenceEqual(truncatedExpectedMac))
+                        // Compare first 8 bytes
+                        byte[] truncated = expectedMac.Take(8).ToArray();
+                        if (!request.HostMac.SequenceEqual(truncated))
                         {
                             return Result.Failure<ExternalAuthenticateRequest, SmartCardError>(
                                 SmartCardError.SecurityStatusNotSatisfied());
                         }
-                        
                         return Result.Success<ExternalAuthenticateRequest, SmartCardError>(request);
                     });
             });
@@ -523,19 +516,19 @@ public static class Scp02CommandProcessors
             initialMacChainingValue: new byte[8], // Initialize with zeros for SCP02
             implementationParameter: (byte)state.ScpImplementation
         );
-        
+
         if (secureChannelStateResult.IsFailure)
         {
-            return (new ApduResponse(Array.Empty<byte>(), StatusWords.AuthenticationMethodBlocked), state);
+            return (new ApduResponse([], StatusWords.AuthenticationMethodBlocked), state);
         }
-        
+
         var secureChannelState = secureChannelStateResult.Value;
 
         // Update state with established secure channel using functional approach
         var newState = state.WithSecureChannel(secureChannelState);
 
         // SCP02 EXTERNAL AUTHENTICATE response is typically empty on success
-        return (new ApduResponse(Array.Empty<byte>(), StatusWords.Success), newState);
+        return (new ApduResponse([], StatusWords.Success), newState);
     }
 
     // Utility methods
@@ -547,7 +540,7 @@ public static class Scp02CommandProcessors
         // Log available keys
         var installedKeyVersions = string.Join(", ", state.InstalledKeys.Keys.Select(k => $"0x{k:X2}"));
         var staticKeyVersions = string.Join(", ", config.StaticKeys.Keys.Select(k => $"0x{k:X2}"));
-        logger?.LogDebug("Available keys - Installed: [{InstalledKeys}], Static: [{StaticKeys}]", 
+        logger?.LogDebug("Available keys - Installed: [{InstalledKeys}], Static: [{StaticKeys}]",
             installedKeyVersions, staticKeyVersions);
 
         // Check installed keys first
@@ -567,7 +560,7 @@ public static class Scp02CommandProcessors
         }
 
         // If key version is 0x00 or 0xFF, try to find any available key
-        if (keyVersion == 0x00 || keyVersion == 0xFF)
+        if (keyVersion is 0x00 or 0xFF)
         {
             logger?.LogDebug("Key version 0x{KeyVersion:X2} is default marker - searching for any available key", keyVersion);
             keySet = config.StaticKeys.Values.FirstOrDefault();
@@ -607,8 +600,8 @@ public static class Scp02CommandProcessors
         // Check if it's INITIALIZE UPDATE or EXTERNAL AUTHENTICATE
         var cla = command[0];
         var ins = command[1];
-        
-        logger?.LogTrace("Checking SCP02 command: CLA={Cla:X2} INS={Ins:X2}, card SCP={Scp:X2}", 
+
+        logger?.LogTrace("Checking SCP02 command: CLA={Cla:X2} INS={Ins:X2}, card SCP={Scp:X2}",
             cla, ins, state.ScpVersion);
 
         if ((cla == 0x80 && ins == 0x50) || (cla == 0x84 && ins == 0x82))

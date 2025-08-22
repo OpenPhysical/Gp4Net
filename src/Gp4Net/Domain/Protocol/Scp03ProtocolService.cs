@@ -405,9 +405,12 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
                (statusWord & 0xFF00) == 0x6200 || 
                (statusWord & 0xFF00) == 0x6300;
     }
-    
-    private static bool HasResponseData(byte[] response) => response.Length > 2;
-    
+
+    private static bool HasResponseData(byte[] response)
+    {
+        return response.Length > 2;
+    }
+
     private static byte[] ConcatenateArrays(params byte[][] arrays)
     {
         var totalLength = arrays.Sum(arr => arr?.Length ?? 0);

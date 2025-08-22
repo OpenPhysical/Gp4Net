@@ -98,7 +98,7 @@ public class DeleteCommandPipelineTests
             Force = true
         };
 
-        _mockGlobalPlatformService
+        _ = _mockGlobalPlatformService
             .Setup(s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success<bool, SmartCardError>(true));
 
@@ -106,7 +106,7 @@ public class DeleteCommandPipelineTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(0);
+        _ = result.Should().Be(0);
         _mockGlobalPlatformService.Verify(
             s => s.DeleteApplicationAsync(
                 It.Is<byte[]>(aid => Convert.ToHexString(aid) == "A000000003000000"),
@@ -126,7 +126,7 @@ public class DeleteCommandPipelineTests
             Force = true
         };
 
-        _mockGlobalPlatformService
+        _ = _mockGlobalPlatformService
             .Setup(s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success<bool, SmartCardError>(true));
 
@@ -134,7 +134,7 @@ public class DeleteCommandPipelineTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(0);
+        _ = result.Should().Be(0);
         _mockGlobalPlatformService.Verify(
             s => s.DeleteApplicationAsync(
                 It.IsAny<byte[]>(),
@@ -157,7 +157,7 @@ public class DeleteCommandPipelineTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(1);
+        _ = result.Should().Be(1);
         _mockGlobalPlatformService.Verify(
             s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -173,7 +173,7 @@ public class DeleteCommandPipelineTests
             Force = true
         };
 
-        _mockGlobalPlatformService
+        _ = _mockGlobalPlatformService
             .Setup(s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success<bool, SmartCardError>(true));
 
@@ -181,7 +181,7 @@ public class DeleteCommandPipelineTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(0); // Success
+        _ = result.Should().Be(0); // Success
         // Should delete the applet using the AID extracted from the CAP file
         _mockGlobalPlatformService.Verify(
             s => s.DeleteApplicationAsync(
@@ -205,7 +205,7 @@ public class DeleteCommandPipelineTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(1);
+        _ = result.Should().Be(1);
         _mockGlobalPlatformService.Verify(
             s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -221,7 +221,7 @@ public class DeleteCommandPipelineTests
             Force = true
         };
 
-        _mockGlobalPlatformService
+        _ = _mockGlobalPlatformService
             .Setup(s => s.GetStatusAsync(StatusSubset.ApplicationsAndSupplementaryDomains, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success<ImmutableList<ApplicationInfo>, SmartCardError>(
                 []));
@@ -230,7 +230,7 @@ public class DeleteCommandPipelineTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(0);
+        _ = result.Should().Be(0);
         _mockGlobalPlatformService.Verify(
             s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -251,13 +251,13 @@ public class DeleteCommandPipelineTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(0);
+        _ = result.Should().Be(0);
         _mockGlobalPlatformService.Verify(
             s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
         // Should not require card connection for dry run
         // Verify no card connection was required by checking the method calls
-        _mockContext.MethodCalls.Should().NotContain("RequireCardConnection(auto)");
+        _ = _mockContext.MethodCalls.Should().NotContain("RequireCardConnection(auto)");
     }
 
     [Test]
@@ -275,7 +275,7 @@ public class DeleteCommandPipelineTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(0); // Success - dry run just shows plan
+        _ = result.Should().Be(0); // Success - dry run just shows plan
         _mockGlobalPlatformService.Verify(
             s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never); // Dry run should not actually delete
@@ -292,7 +292,7 @@ public class DeleteCommandPipelineTests
         };
 
         var error = SmartCardError.FromStatusWord(0x6A82);
-        _mockGlobalPlatformService
+        _ = _mockGlobalPlatformService
             .Setup(s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Failure<bool, SmartCardError>(error));
 
@@ -300,7 +300,7 @@ public class DeleteCommandPipelineTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(1);
+        _ = result.Should().Be(1);
     }
 
     [Test]
@@ -320,7 +320,7 @@ public class DeleteCommandPipelineTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(1);
+        _ = result.Should().Be(1);
     }
 
     [Test]
@@ -329,7 +329,7 @@ public class DeleteCommandPipelineTests
         // Use reflection to access the private static method for testing
         var method = typeof(DeleteCommand).GetMethod("GetHumanReadableError",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-        method.Should().NotBeNull("GetHumanReadableError method should exist");
+        _ = method.Should().NotBeNull("GetHumanReadableError method should exist");
 
         var testCases = new[]
         {
@@ -349,8 +349,8 @@ public class DeleteCommandPipelineTests
         foreach (var (statusWord, expectedMessage) in testCases)
         {
             var error = SmartCardError.FromStatusWord((ushort)statusWord);
-            var result = method!.Invoke(null, new object[] { error }) as string;
-            result.Should().Be(expectedMessage,
+            var result = method!.Invoke(null, [error]) as string;
+            _ = result.Should().Be(expectedMessage,
                 $"Status word {statusWord:X4} should return: {expectedMessage}");
         }
     }
@@ -361,13 +361,13 @@ public class DeleteCommandPipelineTests
         // Use reflection to access the private static method for testing
         var method = typeof(DeleteCommand).GetMethod("GetHumanReadableError",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-        method.Should().NotBeNull();
+        _ = method.Should().NotBeNull();
 
         var originalMessage = "Custom error message";
         var error = SmartCardError.CardError(originalMessage); // Unknown status word
-        var result = method!.Invoke(null, new object[] { error }) as string;
+        var result = method!.Invoke(null, [error]) as string;
 
-        result.Should().BeEquivalentTo(originalMessage);
+        _ = result.Should().BeEquivalentTo(originalMessage);
     }
 
     [Test]
@@ -384,7 +384,7 @@ public class DeleteCommandPipelineTests
         var result = await _command.ExecuteAsync(_mockContext, settings);
 
         // Assert
-        result.Should().Be(1);
+        _ = result.Should().Be(1);
         _mockGlobalPlatformService.Verify(
             s => s.DeleteApplicationAsync(It.IsAny<byte[]>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);

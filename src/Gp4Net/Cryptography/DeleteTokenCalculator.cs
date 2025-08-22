@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 
 namespace Gp4Net.Cryptography;
 
@@ -18,8 +19,8 @@ public static class DeleteTokenCalculator
     /// <param name="p2">Command parameter P2.</param>
     /// <param name="aid">AID of object to delete.</param>
     /// <param name="optionalTlv">If present, extra TLV (e.g. B6 Control Reference Template and inner TLVs).</param>
-    /// <returns>16-byte AES-CMAC Delete Token, per GP spec structure.</returns>
-    public static byte[] ComputeDeleteToken(
+    /// <returns>Result containing the 16-byte AES-CMAC Delete Token or an error.</returns>
+    public static Result<byte[], SmartCardError> ComputeDeleteToken(
         byte[] macKey,
         byte p1,
         byte p2,
@@ -28,17 +29,19 @@ public static class DeleteTokenCalculator
     {
         if (macKey.Length != 16 && macKey.Length != 24 && macKey.Length != 32)
         {
-            throw new ArgumentException("Delete Token MAC key must be 16, 24, or 32 bytes for AES.");
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidArgument("Delete Token MAC key must be 16, 24, or 32 bytes for AES."));
         }
 
-        if (aid.Length == 0)
+        switch (aid.Length)
         {
-            throw new ArgumentException("AID cannot be empty.");
-        }
-
-        if (aid.Length < 5 || aid.Length > 16)
-        {
-            throw new ArgumentException("AID length must be 5-16 bytes per GP spec.");
+            case 0:
+                return Result.Failure<byte[], SmartCardError>(
+                    SmartCardError.InvalidArgument("AID cannot be empty."));
+            case < 5:
+            case > 16:
+                return Result.Failure<byte[], SmartCardError>(
+                    SmartCardError.InvalidArgument("AID length must be 5-16 bytes per GP spec."));
         }
 
         // Step 1: build TLV for object to delete (AID)
@@ -67,8 +70,8 @@ public static class DeleteTokenCalculator
         cmac.Init(new Org.BouncyCastle.Crypto.Parameters.KeyParameter(macKey));
         var mac = new byte[16];
         cmac.BlockUpdate(input.ToArray(), 0, input.Count);
-        cmac.DoFinal(mac, 0);
-        return mac;
+        _ = cmac.DoFinal(mac, 0);
+        return Result.Success<byte[], SmartCardError>(mac);
     }
 
     /// <summary>
@@ -76,16 +79,16 @@ public static class DeleteTokenCalculator
     /// </summary>
     private static byte[] EncodeBerLength(int length)
     {
-        if (length < 0x80)
+        switch (length)
         {
-            return new byte[] { (byte)length };
+            case < 0x80:
+                return [(byte)length];
+            case <= 0xFF:
+                return [0x81, (byte)length];
+            default:
+                // Larger not expected for GP, but included for completeness
+                return [0x82, (byte)((length >> 8) & 0xFF), (byte)(length & 0xFF)];
         }
 
-        if (length <= 0xFF)
-        {
-            return new byte[] { 0x81, (byte)length };
-        }
-        // Larger not expected for GP, but included for completeness
-        return new byte[] { 0x82, (byte)((length >> 8) & 0xFF), (byte)(length & 0xFF) };
     }
 }

@@ -154,7 +154,7 @@ public static class P71CommandProcessors
     private static Result<byte[], SmartCardError> ValidateCplcAccess(CardState state)
     {
         // CPLC data is usually publicly readable
-        return Result.Success<byte[], SmartCardError>(Array.Empty<byte>());
+        return Result.Success<byte[], SmartCardError>([]);
     }
 
     private static ApduResponse CreateP71CplcResponse(CardConfiguration config)

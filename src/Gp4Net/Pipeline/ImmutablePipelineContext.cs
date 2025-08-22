@@ -56,7 +56,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     {
         get
         {
-            return _values.Keys.ToImmutableArray();
+            return [.._values.Keys];
         }
     }
 
@@ -78,7 +78,10 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     }
 
     /// <inheritdoc/>
-    public ImmutableDictionary<string, object> ToImmutableDictionary() => _values;
+    public ImmutableDictionary<string, object> ToImmutableDictionary()
+    {
+        return _values;
+    }
 
     /// <summary>
     /// Creates an empty context.
@@ -94,14 +97,18 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     /// <summary>
     /// Creates a context with a single value.
     /// </summary>
-    public static IPipelineContext Create<T>(string key, T value) =>
-        Empty.With(key, value);
+    public static IPipelineContext Create<T>(string key, T value)
+    {
+        return Empty.With(key, value);
+    }
 
     /// <summary>
     /// Creates a context from a dictionary of values.
     /// </summary>
-    public static IPipelineContext Create(ImmutableDictionary<string, object> values) =>
-        new ImmutablePipelineContext(values);
+    public static IPipelineContext Create(ImmutableDictionary<string, object> values)
+    {
+        return new ImmutablePipelineContext(values);
+    }
 
     public override string ToString()
     {
@@ -109,12 +116,16 @@ public sealed class ImmutablePipelineContext : IPipelineContext
         return $"PipelineContext[{string.Join(", ", items)}]";
     }
 
-    public override bool Equals(object obj) =>
-        obj is ImmutablePipelineContext other &&
+    public override bool Equals(object obj)
+    {
+        return obj is ImmutablePipelineContext other &&
         _values.SequenceEqual(other._values);
+    }
 
-    public override int GetHashCode() =>
-        _values.Aggregate(0, (hash, kvp) => HashCode.Combine(hash, kvp.Key, kvp.Value));
+    public override int GetHashCode()
+    {
+        return _values.Aggregate(0, (hash, kvp) => HashCode.Combine(hash, kvp.Key, kvp.Value));
+    }
 }
 
 /// <summary>
@@ -136,8 +147,10 @@ public static class PipelineContextExtensions
     /// <summary>
     /// Gets a value from the context or a default if not found.
     /// </summary>
-    public static T GetOrDefault<T>(this IPipelineContext context, string key, T defaultValue) =>
-        context.Get<T>(key).GetValueOrDefault(defaultValue);
+    public static T GetOrDefault<T>(this IPipelineContext context, string key, T defaultValue)
+    {
+        return context.Get<T>(key).GetValueOrDefault(defaultValue);
+    }
 
     /// <summary>
     /// Gets a value from the context or computes it if not found.
@@ -153,8 +166,10 @@ public static class PipelineContextExtensions
     /// <summary>
     /// Checks if a key exists in the context.
     /// </summary>
-    public static bool Contains(this IPipelineContext context, string key) =>
-        context.Keys.Contains(key);
+    public static bool Contains(this IPipelineContext context, string key)
+    {
+        return context.Keys.Contains(key);
+    }
 
     /// <summary>
     /// Creates a new context by merging with another context.

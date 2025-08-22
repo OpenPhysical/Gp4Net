@@ -139,27 +139,27 @@ public class AppletDeletionTraceTests
             cardChallenge, 
             128
         );
-        
-        _keyDerivationServiceMock
+
+        _ = _keyDerivationServiceMock
             .Setup(x => x.DeriveSessionKeys(It.IsAny<IKeyDerivationContext>()))
             .Returns(sessionKeys.Value);
-            
+
         // Mock cryptogram calculation - return expected card cryptogram
-        _keyDerivationServiceMock
+        _ = _keyDerivationServiceMock
             .Setup(x => x.CalculateCryptogram(It.IsAny<ICryptogramContext>()))
             .Returns<ICryptogramContext>(ctx =>
             {
-                if (ctx.Type == CryptogramType.CardCryptogram)
+                switch (ctx.Type)
                 {
-                    // Return the expected card cryptogram from the trace
-                    return Convert.FromHexString("A1AEEA9F46AF46B2");
+                    case CryptogramType.CardCryptogram:
+                        // Return the expected card cryptogram from the trace
+                        return Convert.FromHexString("A1AEEA9F46AF46B2");
+                    case CryptogramType.HostCryptogram:
+                        // Return the expected host cryptogram
+                        return Convert.FromHexString("A1883C4B93BE2B01");
+                    default:
+                        return new byte[8];
                 }
-                else if (ctx.Type == CryptogramType.HostCryptogram)
-                {
-                    // Return the expected host cryptogram
-                    return Convert.FromHexString("A1883C4B93BE2B01");
-                }
-                return new byte[8];
             });
             
         var protocol = new Scp03Protocol(keySet, _keyDerivationServiceMock.Object, 0x70);

@@ -78,7 +78,7 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
         var outputDir = Path.GetDirectoryName(settings.OutputFile);
         if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
         {
-            Directory.CreateDirectory(outputDir);
+            _ = Directory.CreateDirectory(outputDir);
         }
 
         // Write JSON with pretty formatting
@@ -99,15 +99,15 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
     private static void DisplaySummary(TraceData traceData)
     {
         var table = new Table();
-        table.AddColumn("Property");
-        table.AddColumn("Value");
+        _ = table.AddColumn("Property");
+        _ = table.AddColumn("Value");
 
-        table.AddRow("Source File", traceData.Metadata.Source.File);
-        table.AddRow("Format", traceData.Metadata.Source.Type);
-        table.AddRow("Total Exchanges", traceData.Exchanges.Count.ToString());
-        table.AddRow("Operations", traceData.Operations.Count.ToString());
-        table.AddRow("Sessions", traceData.Metadata.Sessions.Count.ToString());
-        table.AddRow("Usage Examples", traceData.UsageExamples.Count.ToString());
+        _ = table.AddRow("Source File", traceData.Metadata.Source.File);
+        _ = table.AddRow("Format", traceData.Metadata.Source.Type);
+        _ = table.AddRow("Total Exchanges", traceData.Exchanges.Count.ToString());
+        _ = table.AddRow("Operations", traceData.Operations.Count.ToString());
+        _ = table.AddRow("Sessions", traceData.Metadata.Sessions.Count.ToString());
+        _ = table.AddRow("Usage Examples", traceData.UsageExamples.Count.ToString());
 
         AnsiConsole.Write(table);
 
@@ -139,8 +139,8 @@ public class TraceData
 {
     public TraceMetadata Metadata { get; set; } = new();
     public Dictionary<string, Operation> Operations { get; set; } = new();
-    public List<UsageExample> UsageExamples { get; set; } = new();
-    public List<Exchange> Exchanges { get; set; } = new();
+    public List<UsageExample> UsageExamples { get; set; } = [];
+    public List<Exchange> Exchanges { get; set; } = [];
 }
 
 /// <summary>
@@ -150,7 +150,7 @@ public class TraceMetadata
 {
     public SourceInfo Source { get; set; } = new();
     public CardInfo Card { get; set; } = new();
-    public List<SessionMetadata> Sessions { get; set; } = new();
+    public List<SessionMetadata> Sessions { get; set; } = [];
 }
 
 /// <summary>
@@ -201,7 +201,7 @@ public class SessionMetadata
     public string CardChallenge { get; set; } = string.Empty;
     public string SequenceCounter { get; set; } = "000001";
     public DerivationData DerivationData { get; set; }
-    public List<string> Operations { get; set; } = new();
+    public List<string> Operations { get; set; } = [];
 }
 
 /// <summary>
@@ -224,7 +224,7 @@ public class Operation
     public string SessionId { get; set; } = "session_1";
     public int StartExchange { get; set; }
     public int EndExchange { get; set; }
-    public List<string> Commands { get; set; } = new();
+    public List<string> Commands { get; set; } = [];
     public string ExpectedCli { get; set; } = string.Empty;
     public string PackageAid { get; set; }
     public string AppletAid { get; set; }
@@ -500,32 +500,36 @@ public class ApduAnalyzer
 
         if (CommandDescriptions.TryGetValue(ins, out var baseDesc))
         {
-            // Special handling for GET DATA
-            if (ins == "CA" && commandHex.Length >= 8)
+            switch (ins)
             {
-                var tag = commandHex.Substring(4, 4);
-                if (GetDataTags.TryGetValue(tag, out var tagDesc))
+                // Special handling for GET DATA
+                case "CA" when commandHex.Length >= 8:
                 {
-                    return $"GET {tagDesc}";
+                    var tag = commandHex.Substring(4, 4);
+                    if (GetDataTags.TryGetValue(tag, out var tagDesc))
+                    {
+                        return $"GET {tagDesc}";
+                    }
+
+                    return $"GET DATA (tag {tag})";
                 }
 
-                return $"GET DATA (tag {tag})";
-            }
-
-            // Special handling for INSTALL
-            if (ins == "E6" && commandHex.Length >= 6)
-            {
-                var p1 = commandHex.Substring(4, 2);
-                return p1 switch
+                // Special handling for INSTALL
+                case "E6" when commandHex.Length >= 6:
                 {
-                    "02" => "INSTALL [for load]",
-                    "04" => "INSTALL [for install and make selectable]",
-                    "0C" => "INSTALL [for install]",
-                    _ => $"INSTALL (P1={p1})"
-                };
+                    var p1 = commandHex.Substring(4, 2);
+                    return p1 switch
+                    {
+                        "02" => "INSTALL [for load]",
+                        "04" => "INSTALL [for install and make selectable]",
+                        "0C" => "INSTALL [for install]",
+                        _ => $"INSTALL (P1={p1})"
+                    };
+                }
+                default:
+                    return baseDesc;
             }
 
-            return baseDesc;
         }
 
         return $"UNKNOWN (INS={ins})";
@@ -595,7 +599,7 @@ public class OperationDetector
         {
             "select_isd", new OperationPattern
             {
-                Indicators = new[] { "SELECT" },
+                Indicators = ["SELECT"],
                 RequiredSequence = false,
                 CliTemplate = "gp4net card info"
             }
@@ -603,7 +607,7 @@ public class OperationDetector
         {
             "get_data", new OperationPattern
             {
-                Indicators = new[] { "GET DATA", "GET CPLC", "GET CARD DATA", "GET CARD CAPABILITIES", "GET IIN", "GET CIN", "GET KDD", "GET SSC", "GET KEY INFORMATION" },
+                Indicators = ["GET DATA", "GET CPLC", "GET CARD DATA", "GET CARD CAPABILITIES", "GET IIN", "GET CIN", "GET KDD", "GET SSC", "GET KEY INFORMATION"],
                 RequiredSequence = false,
                 CliTemplate = "gp4net card info"
             }
@@ -611,7 +615,7 @@ public class OperationDetector
         {
             "list", new OperationPattern
             {
-                Indicators = new[] { "GET STATUS" },
+                Indicators = ["GET STATUS"],
                 RequiredSequence = false,
                 CliTemplate = "gp4net applet list"
             }
@@ -619,7 +623,7 @@ public class OperationDetector
         {
             "secure_channel_establish", new OperationPattern
             {
-                Indicators = new[] { "INITIALIZE UPDATE", "EXTERNAL AUTHENTICATE" },
+                Indicators = ["INITIALIZE UPDATE", "EXTERNAL AUTHENTICATE"],
                 RequiredSequence = true,
                 CliTemplate = "gp4net card test-sc -k gp_test_keys"
             }
@@ -627,7 +631,7 @@ public class OperationDetector
         {
             "install_applet", new OperationPattern
             {
-                Indicators = new[] { "INSTALL [for load]" },
+                Indicators = ["INSTALL [for load]"],
                 RequiredSequence = false,
                 CliTemplate = "gp4net applet install {package}.cap"
             }
@@ -635,7 +639,7 @@ public class OperationDetector
         {
             "load_blocks", new OperationPattern
             {
-                Indicators = new[] { "LOAD" },
+                Indicators = ["LOAD"],
                 RequiredSequence = false,
                 CliTemplate = "gp4net applet load"
             }
@@ -643,7 +647,7 @@ public class OperationDetector
         {
             "uninstall", new OperationPattern
             {
-                Indicators = new[] { "DELETE" },
+                Indicators = ["DELETE"],
                 RequiredSequence = false,
                 CliTemplate = "gp4net applet delete {aid}"
             }
@@ -651,7 +655,7 @@ public class OperationDetector
     };
 
     private readonly Dictionary<string, int> _operationCounter = new();
-    private readonly List<DetectedOperation> _detectedOperations = new();
+    private readonly List<DetectedOperation> _detectedOperations = [];
 
     public Dictionary<string, Operation> AnalyzeTrace(List<Exchange> exchanges)
     {
@@ -700,7 +704,7 @@ public class OperationDetector
                     Type = detectedOp,
                     StartIndex = i,
                     EndIndex = i,
-                    Commands = new List<string> { exchange.Description }
+                    Commands = [exchange.Description]
                 });
             }
         }
@@ -711,7 +715,7 @@ public class OperationDetector
         var operations = new Dictionary<string, Operation>();
         
         // Handle operations that require specific sequences
-        MergeSequentialOperations("secure_channel_establish", new[] { "INITIALIZE UPDATE", "EXTERNAL AUTHENTICATE" });
+        MergeSequentialOperations("secure_channel_establish", ["INITIALIZE UPDATE", "EXTERNAL AUTHENTICATE"]);
         
         // Create operations from detected operations
         for (var i = 0; i < _detectedOperations.Count; i++)
@@ -842,7 +846,7 @@ public class OperationDetector
         public string Type { get; set; } = "";
         public int StartIndex { get; set; }
         public int EndIndex { get; set; }
-        public List<string> Commands { get; set; } = new();
+        public List<string> Commands { get; set; } = [];
     }
 
     private string GetUniqueOperationName(string operationType)
@@ -955,7 +959,7 @@ public class SessionAnalyzer
             CardChallenge = scpData?.CardChallenge ?? "",
             SequenceCounter = "000001",
             DerivationData = derivationData,
-            Operations = new List<string>()
+            Operations = []
         };
     }
 
@@ -989,7 +993,7 @@ public class MetadataExtractor
                 ToolVersion = "gp4net-1.0"
             },
             Card = ExtractCardInfo(exchanges),
-            Sessions = new List<SessionMetadata>() // Will be populated by session analyzer
+            Sessions = [] // Will be populated by session analyzer
         };
     }
 

@@ -14,17 +14,21 @@ public static class ResultExtensions
     /// Enables LINQ Select for Result monad (functor map).
     /// </summary>
     public static Result<T2, E> Select<T1, T2, E>(
-        this Result<T1, E> result, 
-        Func<T1, T2> selector) => 
-        result.Map(selector);
+        this Result<T1, E> result,
+        Func<T1, T2> selector)
+    {
+        return result.Map(selector);
+    }
 
     /// <summary>
     /// Enables LINQ SelectMany for Result monad (monadic bind).
     /// </summary>
     public static Result<T2, E> SelectMany<T1, T2, E>(
         this Result<T1, E> result,
-        Func<T1, Result<T2, E>> bind) => 
-        result.Bind(bind);
+        Func<T1, Result<T2, E>> bind)
+    {
+        return result.Bind(bind);
+    }
 
     /// <summary>
     /// Enables LINQ SelectMany with projection for Result monad.
@@ -33,8 +37,10 @@ public static class ResultExtensions
     public static Result<T3, E> SelectMany<T1, T2, T3, E>(
         this Result<T1, E> result,
         Func<T1, Result<T2, E>> bind,
-        Func<T1, T2, T3> project) =>
-        result.Bind(t1 => bind(t1).Map(t2 => project(t1, t2)));
+        Func<T1, T2, T3> project)
+    {
+        return result.Bind(t1 => bind(t1).Map(t2 => project(t1, t2)));
+    }
 
     /// <summary>
     /// Async version of Select for Task&lt;Result&lt;T, E&gt;&gt;.
@@ -120,8 +126,10 @@ public static class ResultExtensions
     /// </summary>
     public static Result<(T1, T2), E> Combine<T1, T2, E>(
         this Result<T1, E> result1,
-        Result<T2, E> result2) =>
-        result1.Bind(t1 => result2.Map(t2 => (t1, t2)));
+        Result<T2, E> result2)
+    {
+        return result1.Bind(t1 => result2.Map(t2 => (t1, t2)));
+    }
 
     /// <summary>
     /// Combines multiple Results into a single Result containing a tuple.
@@ -130,10 +138,12 @@ public static class ResultExtensions
     public static Result<(T1, T2, T3), E> Combine<T1, T2, T3, E>(
         this Result<T1, E> result1,
         Result<T2, E> result2,
-        Result<T3, E> result3) =>
-        result1.Bind(t1 => 
-            result2.Bind(t2 => 
+        Result<T3, E> result3)
+    {
+        return result1.Bind(t1 =>
+            result2.Bind(t2 =>
                 result3.Map(t3 => (t1, t2, t3))));
+    }
 
 
     /// <summary>
@@ -141,16 +151,20 @@ public static class ResultExtensions
     /// </summary>
     public static Result<T, E> ToResult<T, E>(
         this Maybe<T> maybe,
-        E error) =>
-        maybe.HasValue 
+        E error)
+    {
+        return maybe.HasValue
             ? Result.Success<T, E>(maybe.Value)
             : Result.Failure<T, E>(error);
+    }
 
     /// <summary>
     /// Converts Result&lt;T, E&gt; to Maybe&lt;T&gt;, discarding error information.
     /// </summary>
-    public static Maybe<T> ToMaybe<T, E>(this Result<T, E> result) =>
-        result.IsSuccess 
+    public static Maybe<T> ToMaybe<T, E>(this Result<T, E> result)
+    {
+        return result.IsSuccess
             ? Maybe<T>.From(result.Value)
             : Maybe<T>.None;
+    }
 }

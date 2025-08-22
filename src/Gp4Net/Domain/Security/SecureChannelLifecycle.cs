@@ -53,8 +53,9 @@ public record InitializeUpdateData(
     /// <summary>
     /// Validates the initialize update data.
     /// </summary>
-    public Result<InitializeUpdateData, SmartCardError> Validate() =>
-        HostChallenge.Length == 8
+    public Result<InitializeUpdateData, SmartCardError> Validate()
+    {
+        return HostChallenge.Length == 8
             ? CardChallenge.Length == 6
                 ? CardCryptogram.Length == 8
                     ? Result.Success<InitializeUpdateData, SmartCardError>(this)
@@ -64,6 +65,7 @@ public record InitializeUpdateData(
                     new InvalidLengthError("CardChallenge", 6, CardChallenge.Length))
             : Result.Failure<InitializeUpdateData, SmartCardError>(
                 new InvalidLengthError("HostChallenge", 8, HostChallenge.Length));
+    }
 }
 
 /// <summary>
@@ -78,14 +80,16 @@ public record AuthenticatedState(
     /// <summary>
     /// Validates the authenticated state.
     /// </summary>
-    public Result<AuthenticatedState, SmartCardError> Validate() =>
-        Keys != null
+    public Result<AuthenticatedState, SmartCardError> Validate()
+    {
+        return Keys != null
             ? InitialMacChaining.Length == 8
                 ? Result.Success<AuthenticatedState, SmartCardError>(this)
                 : Result.Failure<AuthenticatedState, SmartCardError>(
                     new InvalidLengthError("InitialMacChaining", 8, InitialMacChaining.Length))
             : Result.Failure<AuthenticatedState, SmartCardError>(
                 new NullParameterError(nameof(Keys)));
+    }
 }
 
 /// <summary>
@@ -117,7 +121,7 @@ public record SecureChannelLifecycle(
     /// <summary>
     /// Checks if the secure channel can be initiated.
     /// </summary>
-    public bool CanInitiate => Phase == SecureChannelPhase.NotInitiated || Phase == SecureChannelPhase.Terminated;
+    public bool CanInitiate => Phase is SecureChannelPhase.NotInitiated or SecureChannelPhase.Terminated;
 
     /// <summary>
     /// Checks if the secure channel can be authenticated.
@@ -197,24 +201,28 @@ public static class SecureChannelLifecycleTransitions
     public static SecureChannelLifecycle AbortChannel(
         this SecureChannelLifecycle current,
         string reason,
-        Maybe<ushort> statusWord = default) =>
-        current with
+        Maybe<ushort> statusWord = default)
+    {
+        return current with
         {
             Phase = SecureChannelPhase.Aborted,
             TerminationInfo = Maybe.From(new TerminationReason(reason, statusWord))
         };
+    }
 
     /// <summary>
     /// Transitions to terminated state.
     /// </summary>
     public static SecureChannelLifecycle TerminateChannel(
         this SecureChannelLifecycle current,
-        string reason) =>
-        current with
+        string reason)
+    {
+        return current with
         {
             Phase = SecureChannelPhase.Terminated,
             TerminationInfo = Maybe.From(new TerminationReason(reason))
         };
+    }
 
     /// <summary>
     /// Creates a new SecureChannelState from authenticated lifecycle.

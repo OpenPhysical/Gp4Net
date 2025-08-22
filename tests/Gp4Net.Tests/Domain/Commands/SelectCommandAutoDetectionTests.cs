@@ -18,12 +18,12 @@ public class SelectCommandAutoDetectionTests
         var result = SelectCommand.CreateForIssuerSecurityDomain();
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        command.Should().NotBeNull();
-        command.Aid.Should().BeEmpty();
-        command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
-        command.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFci);
+        _ = command.Should().NotBeNull();
+        _ = command.Aid.Should().BeEmpty();
+        _ = command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
+        _ = command.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFci);
     }
 
     [Test]
@@ -31,14 +31,14 @@ public class SelectCommandAutoDetectionTests
     {
         // Arrange
         var result = SelectCommand.CreateForIssuerSecurityDomain();
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
 
         // Act
         var apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
-        apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 });
+        _ = apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 });
     }
 
     [Test]
@@ -48,9 +48,9 @@ public class SelectCommandAutoDetectionTests
         var result = SelectCommand.Create([]);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        command.Aid.Should().BeEmpty();
+        _ = command.Aid.Should().BeEmpty();
     }
 
     [Test]
@@ -63,15 +63,15 @@ public class SelectCommandAutoDetectionTests
         var result = SelectResponse.Parse(fciData);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var response = result.Value;
-        response.Should().NotBeNull();
-        response.Fci.Should().NotBeNull();
-        response.Fci.ApplicationAid.Should().NotBeNull();
+        _ = response.Should().NotBeNull();
+        _ = response.Fci.Should().NotBeNull();
+        _ = response.Fci.ApplicationAid.Should().NotBeNull();
         // After verifying ApplicationAid is not null, we can safely convert it
         var aidHex = Convert.ToHexString(response.Fci.ApplicationAid);
-        aidHex.Should().BeEquivalentTo("A000000151000000");
-        response.Fci.MaxCommandDataLength.Should().Be((ushort?)255);
+        _ = aidHex.Should().BeEquivalentTo("A000000151000000");
+        _ = response.Fci.MaxCommandDataLength.Should().Be((ushort?)255);
     }
 
     [Test]
@@ -89,8 +89,8 @@ public class SelectCommandAutoDetectionTests
                     0xA5,
                     subBuilder =>
                     {
-                        subBuilder.Add(0x9F65, new byte[] { 0xFF }); // Max command length
-                        subBuilder.Add(0x9F66, new byte[] { 0xFF }); // Max response length
+                        subBuilder.Add(0x9F65, [0xFF]); // Max command length
+                        subBuilder.Add(0x9F66, [0xFF]); // Max response length
                     }
                 );
             }
@@ -102,18 +102,18 @@ public class SelectCommandAutoDetectionTests
         var result = SelectResponse.Parse(fciData);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var response = result.Value;
-        response.Should().NotBeNull();
-        response.Fci.Should().NotBeNull();
+        _ = response.Should().NotBeNull();
+        _ = response.Fci.Should().NotBeNull();
         // After verifying Fci is not null, we can safely access its properties
-        response.Fci.ApplicationAid.Should().NotBeNull();
+        _ = response.Fci.ApplicationAid.Should().NotBeNull();
         // After verifying ApplicationAid is not null, we can safely convert it
         var aidHex = Convert.ToHexString(response.Fci.ApplicationAid);
-        aidHex.Should().BeEquivalentTo("A0000000030000");
-        response.Fci.ApplicationLabel.Should().BeEquivalentTo("ISD");
-        response.Fci.MaxCommandDataLength.Should().Be((ushort?)255);
-        response.Fci.MaxResponseDataLength.Should().Be((ushort?)255);
+        _ = aidHex.Should().BeEquivalentTo("A0000000030000");
+        _ = response.Fci.ApplicationLabel.Should().BeEquivalentTo("ISD");
+        _ = response.Fci.MaxCommandDataLength.Should().Be((ushort?)255);
+        _ = response.Fci.MaxResponseDataLength.Should().Be((ushort?)255);
     }
 
     [Test]
@@ -126,11 +126,11 @@ public class SelectCommandAutoDetectionTests
         var result = SelectResponse.Parse(emptyData);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var response = result.Value;
-        response.Should().NotBeNull();
-        response.Fci.Should().BeNull();
-        response.RawData.Should().BeEmpty();
+        _ = response.Should().NotBeNull();
+        _ = response.Fci.Should().BeNull();
+        _ = response.RawData.Should().BeEmpty();
     }
 
     [Test]
@@ -143,11 +143,11 @@ public class SelectCommandAutoDetectionTests
         var result = SelectResponse.Parse(nonFciData);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var response = result.Value;
-        response.Should().NotBeNull();
-        response.Fci.Should().BeNull(); // Should not parse as FCI
-        response.RawData.Should().BeEquivalentTo(nonFciData);
+        _ = response.Should().NotBeNull();
+        _ = response.Fci.Should().BeNull(); // Should not parse as FCI
+        _ = response.RawData.Should().BeEquivalentTo(nonFciData);
     }
 
     [Test]
@@ -157,12 +157,12 @@ public class SelectCommandAutoDetectionTests
         var result = SelectCommand.Create(null);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<InvalidDataError>();
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<InvalidDataError>();
         var error = result.Error as InvalidDataError;
-        error.Should().NotBeNull();
-        error!.Field.Should().Be("AID");
-        error.Message.Should().Contain("cannot be null");
+        _ = error.Should().NotBeNull();
+        _ = error!.Field.Should().Be("AID");
+        _ = error.Message.Should().Contain("cannot be null");
     }
 
     [Test]
@@ -175,13 +175,13 @@ public class SelectCommandAutoDetectionTests
         var result = SelectCommand.Create(tooLongAid);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<InvalidLengthError>();
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<InvalidLengthError>();
         var error = result.Error as InvalidLengthError;
-        error.Should().NotBeNull();
-        error!.Field.Should().Be("AID");
-        error.Expected.Should().Be(16);
-        error.Actual.Should().Be(17);
+        _ = error.Should().NotBeNull();
+        _ = error!.Field.Should().Be("AID");
+        _ = error.Expected.Should().Be(16);
+        _ = error.Actual.Should().Be(17);
     }
 
     [Test]
@@ -194,10 +194,10 @@ public class SelectCommandAutoDetectionTests
         var result = SelectCommand.Create(aid);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        command.Aid.Should().BeEquivalentTo(aid);
-        command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
+        _ = command.Aid.Should().BeEquivalentTo(aid);
+        _ = command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
     }
 
     [Test]
@@ -210,10 +210,10 @@ public class SelectCommandAutoDetectionTests
         var result = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
-        command.Aid.Should().BeEquivalentTo(aid);
-        ((byte)command.ControlInfo).Should().Be(0x02); // ReturnFci | Next
+        _ = command.Aid.Should().BeEquivalentTo(aid);
+        _ = ((byte)command.ControlInfo).Should().Be(0x02); // ReturnFci | Next
     }
 
     [Test]
@@ -223,12 +223,12 @@ public class SelectCommandAutoDetectionTests
         var result = SelectResponse.Parse(null);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<InvalidDataError>();
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<InvalidDataError>();
         var error = result.Error as InvalidDataError;
-        error.Should().NotBeNull();
-        error!.Field.Should().Be("Response");
-        error.Message.Should().Contain("cannot be null");
+        _ = error.Should().NotBeNull();
+        _ = error!.Field.Should().Be("Response");
+        _ = error.Message.Should().Contain("cannot be null");
     }
 
     [Test]
@@ -236,14 +236,14 @@ public class SelectCommandAutoDetectionTests
     {
         // Arrange
         var result = SelectCommand.Create(Convert.FromHexString("A000000151000000"));
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
 
         // Act
         var str = command.ToString();
 
         // Assert
-        str.Should().Be("SELECT");
+        _ = str.Should().Be("SELECT");
     }
 }
 
@@ -276,39 +276,37 @@ internal class TlvBuilder
 
     private void AddTag(int tag)
     {
-        if (tag <= 0xFF)
+        switch (tag)
         {
-            _data.Add((byte)tag);
-        }
-        else if (tag <= 0xFFFF)
-        {
-            _data.Add((byte)(tag >> 8));
-            _data.Add((byte)(tag & 0xFF));
-        }
-        else
-        {
-            throw new NotSupportedException(
-                "Tags larger than 2 bytes not supported in this helper"
-            );
+            case <= 0xFF:
+                _data.Add((byte)tag);
+                break;
+            case <= 0xFFFF:
+                _data.Add((byte)(tag >> 8));
+                _data.Add((byte)(tag & 0xFF));
+                break;
+            default:
+                throw new NotSupportedException(
+                    "Tags larger than 2 bytes not supported in this helper"
+                );
         }
     }
 
     private void AddLength(int length)
     {
-        if (length <= 127)
+        switch (length)
         {
-            _data.Add((byte)length);
-        }
-        else if (length <= 255)
-        {
-            _data.Add(0x81);
-            _data.Add((byte)length);
-        }
-        else
-        {
-            throw new NotSupportedException(
-                "Lengths larger than 255 not supported in this helper"
-            );
+            case <= 127:
+                _data.Add((byte)length);
+                break;
+            case <= 255:
+                _data.Add(0x81);
+                _data.Add((byte)length);
+                break;
+            default:
+                throw new NotSupportedException(
+                    "Lengths larger than 255 not supported in this helper"
+                );
         }
     }
 }

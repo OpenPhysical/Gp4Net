@@ -26,9 +26,9 @@ public class JsonLuaCardService : ICardService
     private bool _isConnected;
     private string _readerName;
     private TraceData _traceData;
-    private List<string> _requestedOperations = new();
-    private HashSet<int> _allowedExchanges = new();
-    private HashSet<int> _usedExchanges = new();
+    private List<string> _requestedOperations = [];
+    private HashSet<int> _allowedExchanges = [];
+    private HashSet<int> _usedExchanges = [];
     private bool _secureChannelEstablished;
 
     /// <inheritdoc />
@@ -193,7 +193,7 @@ public class JsonLuaCardService : ICardService
         }
 
         // Mark exchange as used
-        _usedExchanges.Add(matchingExchange.Index);
+        _ = _usedExchanges.Add(matchingExchange.Index);
 
         // Extract response
         var responseBytes = Convert.FromHexString(matchingExchange.Response.Replace(" ", ""));
@@ -258,7 +258,7 @@ public class JsonLuaCardService : ICardService
             }
             else
             {
-                apduBytes.Add(expectedLength == 0 || expectedLength == 256 ? (byte)0x00 : (byte)expectedLength);
+                apduBytes.Add(expectedLength is 0 or 256 ? (byte)0x00 : (byte)expectedLength);
             }
         }
 
@@ -349,7 +349,7 @@ public class JsonLuaCardService : ICardService
             {
                 for (var i = operation.StartExchange; i <= operation.EndExchange; i++)
                 {
-                    allowed.Add(i);
+                    _ = allowed.Add(i);
                 }
             }
             else
@@ -397,7 +397,7 @@ function get_operations()
     return ops
 end";
 
-        _luaScript.DoString(luaScript);
+        _ = _luaScript.DoString(luaScript);
     }
 
     private static void RegisterLuaFunctions(Script script)

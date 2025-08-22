@@ -140,7 +140,7 @@ public static class GetStatusTlvParser
         }
 
         // Parse privileges
-        var privileges = ParsePrivileges(privilegesTlv?.Value ?? new byte[0]);
+        var privileges = ParsePrivileges(privilegesTlv?.Value ?? []);
 
         // Determine application type from privileges
         var appType = DetermineApplicationType(privileges);
@@ -329,19 +329,19 @@ public static class GetStatusTlvParser
             return "Unknown";
         }
 
-        // For Java Card CAP files, version is 2 bytes: major.minor
-        if (versionBytes.Length >= 2)
+        switch (versionBytes.Length)
         {
-            return $"{versionBytes[0]}.{versionBytes[1]}";
+            // For Java Card CAP files, version is 2 bytes: major.minor
+            case >= 2:
+                return $"{versionBytes[0]}.{versionBytes[1]}";
+
+            // Single byte version
+            case 1:
+                return versionBytes[0].ToString();
+            default:
+                // Unknown format - return as hex
+                return Convert.ToHexString(versionBytes);
         }
 
-        // Single byte version
-        if (versionBytes.Length == 1)
-        {
-            return versionBytes[0].ToString();
-        }
-
-        // Unknown format - return as hex
-        return Convert.ToHexString(versionBytes);
     }
 }

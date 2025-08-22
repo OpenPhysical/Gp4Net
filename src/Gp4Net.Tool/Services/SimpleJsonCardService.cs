@@ -20,8 +20,8 @@ public class SimpleJsonCardService : ICardService
         
     private SimpleTraceData _traceData;
     private Dictionary<string, string> _parameters = new();
-    private HashSet<int> _allowedExchanges = new();
-    private HashSet<int> _usedExchanges = new();
+    private HashSet<int> _allowedExchanges = [];
+    private HashSet<int> _usedExchanges = [];
     private bool _isConnected;
     private bool _secureChannelEstablished;
     private string _readerName;
@@ -191,7 +191,7 @@ public class SimpleJsonCardService : ICardService
         }
 
         var exchange = _traceData.Exchanges[matchingIndex];
-        _usedExchanges.Add(matchingIndex + 1);
+        _ = _usedExchanges.Add(matchingIndex + 1);
 
         // Extract response
         var responseHex = exchange.Response;
@@ -215,7 +215,7 @@ public class SimpleJsonCardService : ICardService
         Logger.Debug($"Returning response {matchingIndex + 1} ({exchange.Description ?? "UNKNOWN"}): SW={statusWord:X4}");
 
         // Check if this establishes secure channel
-        if ((exchange.Description == "EXT AUTH" || exchange.Description == "EXTERNAL AUTHENTICATE") && statusWord == 0x9000)
+        if (exchange.Description is "EXT AUTH" or "EXTERNAL AUTHENTICATE" && statusWord == 0x9000)
         {
             _secureChannelEstablished = true;
             Logger.Info("Secure channel established");
@@ -328,7 +328,7 @@ public class SimpleJsonCardService : ICardService
             {
                 for (var i = opRange.StartIndex; i <= opRange.EndIndex; i++)
                 {
-                    allowed.Add(i);
+                    _ = allowed.Add(i);
                 }
             }
             else

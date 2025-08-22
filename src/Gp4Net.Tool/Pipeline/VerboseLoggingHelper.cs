@@ -32,29 +32,30 @@ public static class VerboseLoggingHelper
 
         if (logRepository is Hierarchy hierarchy)
         {
-            if (enable && _verboseAppender == null)
+            switch (enable)
             {
-                // Create and add console appender
-                _verboseAppender = new ConsoleAppender
-                {
-                    Name = "VerboseConsoleAppender",
-                    Layout = new PatternLayout(
-                        "%date [%thread] %-5level %logger - %message%newline"
-                    ),
-                    Threshold = Level.Debug
-                };
-                _verboseAppender.ActivateOptions();
+                case true when _verboseAppender == null:
+                    // Create and add console appender
+                    _verboseAppender = new ConsoleAppender
+                    {
+                        Name = "VerboseConsoleAppender",
+                        Layout = new PatternLayout(
+                            "%date [%thread] %-5level %logger - %message%newline"
+                        ),
+                        Threshold = Level.Debug
+                    };
+                    _verboseAppender.ActivateOptions();
 
-                hierarchy.Root.AddAppender(_verboseAppender);
-                hierarchy.Configured = true;
-                hierarchy.RaiseConfigurationChanged(EventArgs.Empty);
-            }
-            else if (!enable && _verboseAppender != null)
-            {
-                // Remove console appender
-                _ = hierarchy.Root.RemoveAppender(_verboseAppender);
-                _verboseAppender = null;
-                hierarchy.RaiseConfigurationChanged(EventArgs.Empty);
+                    hierarchy.Root.AddAppender(_verboseAppender);
+                    hierarchy.Configured = true;
+                    hierarchy.RaiseConfigurationChanged(EventArgs.Empty);
+                    break;
+                case false when _verboseAppender != null:
+                    // Remove console appender
+                    _ = hierarchy.Root.RemoveAppender(_verboseAppender);
+                    _verboseAppender = null;
+                    hierarchy.RaiseConfigurationChanged(EventArgs.Empty);
+                    break;
             }
         }
 

@@ -42,7 +42,7 @@ public static class CommandRegistrationExtensions
                 {
                     if (!branches.ContainsKey(attr.Branch))
                     {
-                        branches[attr.Branch] = new List<(Type, CliCommandAttribute)>();
+                        branches[attr.Branch] = [];
                     }
                     branches[attr.Branch].Add((commandType, attr));
                 }
@@ -58,11 +58,11 @@ public static class CommandRegistrationExtensions
         // Register branches with their commands
         foreach (var (branchName, commands) in branches)
         {
-            config.AddBranch(branchName, branch =>
+            _ = config.AddBranch(branchName, branch =>
             {
                 // Set branch description based on name
                 branch.SetDescription(GetBranchDescription(branchName));
-                    
+
                 foreach (var (type, attr) in commands)
                 {
                     RegisterCommand(branch, services, type, attr);
@@ -84,9 +84,9 @@ public static class CommandRegistrationExtensions
             // This is a pipeline command, wrap it with PipelineCommand<TSettings>
             var settingsType = pipelineInterface.GetGenericArguments()[0];
             registrationType = typeof(PipelineCommand<>).MakeGenericType(settingsType);
-                
+
             // Register the original command implementation for DI
-            services.AddTransient(pipelineInterface, commandType);
+            _ = services.AddTransient(pipelineInterface, commandType);
         }
         else
         {
@@ -104,11 +104,11 @@ public static class CommandRegistrationExtensions
         if (addCommandMethod != null)
         {
             var genericMethod = addCommandMethod.MakeGenericMethod(registrationType);
-            var commandConfig = genericMethod.Invoke(config, new object[] { attr.Name });
+            var commandConfig = genericMethod.Invoke(config, [attr.Name]);
                 
             // Set description
             var withDescriptionMethod = commandConfig?.GetType().GetMethod("WithDescription");
-            withDescriptionMethod?.Invoke(commandConfig, new object[] { attr.Description });
+            _ = (withDescriptionMethod?.Invoke(commandConfig, [attr.Description]));
         }
     }
 

@@ -214,17 +214,14 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
         }
         if (!validationResult.CapFile.HasValue)
         {
-            return new List<(byte[], string, string)>();
+            return [];
         }
         
         var capFile = validationResult.CapFile.Value;
 
         // For CAP files, we typically delete the package, not individual applets
         // The package deletion will cascade to delete all applets
-        return new List<(byte[], string, string)>
-        {
-            (capFile.PackageAid, $"Package {Convert.ToHexString(capFile.PackageAid)}", capFilePath)
-        };
+        return [(capFile.PackageAid, $"Package {Convert.ToHexString(capFile.PackageAid)}", capFilePath)];
     }
 
     private static async Task<List<(byte[] Aid, string Description, string Source)>> GetInteractiveAids(
@@ -251,7 +248,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
         if (applications.Count == 0)
         {
             AnsiConsole.MarkupLine("[yellow]No applications found on card[/]");
-            return new List<(byte[] Aid, string Description, string Source)>();
+            return [];
         }
 
         // Create multi-selection prompt
@@ -302,7 +299,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
                 options.Add("DRY RUN");
             }
 
-            table.AddRow(
+            _ = table.AddRow(
                 $"[yellow]{Convert.ToHexString(aid)}[/]",
                 description,
                 $"[dim]{source}[/]",

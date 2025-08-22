@@ -25,7 +25,7 @@ public static class CardDiscovery
         Convert.FromHexString("A000000003000000"),  // Standard GP ISD
         Convert.FromHexString("A000000151000000"),  // Common alternative ISD
         Convert.FromHexString("A000000018434D00"),  // Another common ISD variant
-        new byte[] { 0xA0, 0x00, 0x00, 0x00, 0x03 }  // Shorter form sometimes used
+        [0xA0, 0x00, 0x00, 0x00, 0x03] // Shorter form sometimes used
     );
 
     /// <summary>
@@ -47,7 +47,13 @@ public static class CardDiscovery
         }
 
         Result<CommandResponse, SmartCardError> response = await executeCommand(selectIsdResult.Value, cancellationToken);
-        
+
+        // If the transport/card returned an error, don't keep probing; propagate the failure
+        if (response.IsFailure)
+        {
+            return Result.Failure<SelectResponse, SmartCardError>(response.Error);
+        }
+
         if (response.IsSuccess)
         {
             Result<SelectResponse, SmartCardError> parseResult = ResponseParser.ParseSelectResponse(response.Value);

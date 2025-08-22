@@ -26,7 +26,7 @@ public class Scp03SecurityProcessorTests
             new byte[16], // S-RMAC
             new byte[16]  // S-DEK
         );
-        _macChainingValue = new byte[16].ToImmutableArray(); // SCP03 MAC chaining value
+        _macChainingValue = [..new byte[16]]; // SCP03 MAC chaining value
     }
 
     [TearDown]
@@ -48,19 +48,19 @@ public class Scp03SecurityProcessorTests
             _macChainingValue,
             0u // encryption counter
         );
-        
-        result.IsSuccess.Should().BeTrue();
+
+        _ = result.IsSuccess.Should().BeTrue();
         var (securedCommand, newState) = result.Value;
-        
+
         // Secured command should be longer than original (includes MAC)
-        securedCommand.Length.Should().BeGreaterThan(4);
-        
+        _ = securedCommand.Length.Should().BeGreaterThan(4);
+
         // CLA should have secure messaging bit set
-        (securedCommand[0] & 0x04).Should().Be(0x04);
-        
+        _ = (securedCommand[0] & 0x04).Should().Be(0x04);
+
         // New state should have updated MAC chaining
-        newState.Should().NotBeNull();
-        newState.ProtocolVersion.Should().Be(0x03);
+        _ = newState.Should().NotBeNull();
+        _ = newState.ProtocolVersion.Should().Be(0x03);
     }
 
     [Test]
@@ -75,16 +75,16 @@ public class Scp03SecurityProcessorTests
             _macChainingValue,
             1u // encryption counter
         );
-        
-        result.IsSuccess.Should().BeTrue();
+
+        _ = result.IsSuccess.Should().BeTrue();
         var (securedCommand, newState) = result.Value;
-        
+
         // Should be both encrypted and MACed
-        securedCommand.Length.Should().BeGreaterThan(4);
-        (securedCommand[0] & 0x04).Should().Be(0x04);
-        
+        _ = securedCommand.Length.Should().BeGreaterThan(4);
+        _ = (securedCommand[0] & 0x04).Should().Be(0x04);
+
         // Encryption counter should be updated in new state
-        newState.EncryptionCounter.Should().Be(2u);
+        _ = newState.EncryptionCounter.Should().Be(2u);
     }
 
     [Test]
@@ -100,14 +100,14 @@ public class Scp03SecurityProcessorTests
             _macChainingValue,
             0u
         );
-        
+
         // For now, this should succeed with the basic implementation
         // In a real implementation, this would verify the R-MAC
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var (processedResponse, newState) = result.Value;
-        
-        processedResponse.Should().NotBeNull();
-        newState.Should().NotBeNull();
+
+        _ = processedResponse.Should().NotBeNull();
+        _ = newState.Should().NotBeNull();
     }
 
     [Test]
@@ -133,7 +133,7 @@ public class Scp03SecurityProcessorTests
         // For now, we expect it to return a proper result structure
         if (result.IsSuccess)
         {
-            result.Value.ProtocolVersion.Should().Be(0x03);
+            _ = result.Value.ProtocolVersion.Should().Be(0x03);
         }
         // If it fails, that's expected until full implementation
     }
@@ -152,10 +152,10 @@ public class Scp03SecurityProcessorTests
             [],
             0u
         );
-        
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<SmartCardError>();
-        result.Error.Message.Should().Contain("MAC chaining value cannot be empty");
+
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<SmartCardError>();
+        _ = result.Error.Message.Should().Contain("MAC chaining value cannot be empty");
     }
 
     private InitializeUpdateResponse CreateTestInitializeUpdateResponse()

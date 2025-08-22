@@ -34,7 +34,7 @@ public class TraceDecryptionIntegrationTests
     {
         // Trace file must be available for test to run
         var tracePath = Path.Combine(TraceDataPath, "Mixed", "configure_gpshell_log.json");
-        File.Exists(tracePath).Should().BeTrue($"Test requires trace file at: {tracePath}");
+        _ = File.Exists(tracePath).Should().BeTrue($"Test requires trace file at: {tracePath}");
 
         var traceData = LoadTraceFile(tracePath);
         var exchanges = ExtractExchangesFromTrace(traceData);
@@ -46,22 +46,22 @@ public class TraceDecryptionIntegrationTests
 
         var result = _decryptorService.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
 
-        result.IsSuccess.Should().BeTrue("Trace decryption should succeed even with plaintext commands");
+        _ = result.IsSuccess.Should().BeTrue("Trace decryption should succeed even with plaintext commands");
         var decryptedTrace = result.Value;
-        decryptedTrace.Exchanges.Should().NotBeEmpty("Trace should contain exchanges");
+        _ = decryptedTrace.Exchanges.Should().NotBeEmpty("Trace should contain exchanges");
         
         // Verify all exchanges have valid decrypted APDUs
         foreach (var exchange in decryptedTrace.Exchanges)
         {
-            exchange.Command.Should().NotBeNull();
-            exchange.Response.Should().NotBeNull();
-            exchange.Command.OriginalBytes.Should().NotBeEmpty();
-            exchange.Response.OriginalBytes.Should().NotBeEmpty();
+            _ = exchange.Command.Should().NotBeNull();
+            _ = exchange.Response.Should().NotBeNull();
+            _ = exchange.Command.OriginalBytes.Should().NotBeEmpty();
+            _ = exchange.Response.OriginalBytes.Should().NotBeEmpty();
             
             // Verify response descriptions include status word information
             if (exchange.Response.Direction == ApduDirection.Response)
             {
-                exchange.Response.Description.Should().Contain("Response:");
+                _ = exchange.Response.Description.Should().Contain("Response:");
             }
         }
     }
@@ -94,17 +94,17 @@ public class TraceDecryptionIntegrationTests
 
         var result = _decryptorService.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
 
-        result.IsSuccess.Should().BeTrue("Service should handle mixed security levels gracefully");
+        _ = result.IsSuccess.Should().BeTrue("Service should handle mixed security levels gracefully");
         var decryptedTrace = result.Value;
-        decryptedTrace.Exchanges.Should().HaveCount(3);
-        
+        _ = decryptedTrace.Exchanges.Should().HaveCount(3);
+
         // First exchange should be plaintext
-        decryptedTrace.Exchanges[0].Command.Status.Should().Be(DecryptionStatus.PlainText);
-        decryptedTrace.Exchanges[0].Response.Status.Should().Be(DecryptionStatus.PlainText);
-        
+        _ = decryptedTrace.Exchanges[0].Command.Status.Should().Be(DecryptionStatus.PlainText);
+        _ = decryptedTrace.Exchanges[0].Response.Status.Should().Be(DecryptionStatus.PlainText);
+
         // Verify response status word descriptions
-        decryptedTrace.Exchanges[0].Response.Description.Should().Contain("Success");
-        decryptedTrace.Exchanges[2].Response.Description.Should().Contain("Referenced Data Not Found");
+        _ = decryptedTrace.Exchanges[0].Response.Description.Should().Contain("Success");
+        _ = decryptedTrace.Exchanges[2].Response.Description.Should().Contain("Referenced Data Not Found");
     }
 
     [Test]
@@ -127,10 +127,10 @@ public class TraceDecryptionIntegrationTests
             var responseBytes = new byte[] { (byte)(statusWord >> 8), (byte)(statusWord & 0xFF) };
             
             var result = _decryptorService.DecryptApdu(responseBytes, ApduDirection.Response, sessionState);
-            
-            result.IsSuccess.Should().BeTrue($"Decryption should succeed for status word 0x{statusWord:X4}");
+
+            _ = result.IsSuccess.Should().BeTrue($"Decryption should succeed for status word 0x{statusWord:X4}");
             var (decryptedApdu, _) = result.Value;
-            decryptedApdu.Description.Should().Contain(expectedDescription, 
+            _ = decryptedApdu.Description.Should().Contain(expectedDescription,
                 $"Description should include '{expectedDescription}' for status word 0x{statusWord:X4}");
         }
     }
@@ -142,12 +142,12 @@ public class TraceDecryptionIntegrationTests
         var exchanges = new[]
         {
             new Gp4Net.Domain.Security.TraceExchange(1,
-                new byte[] { 0x00 }, // Too short for valid APDU
-                new byte[] { 0x90, 0x00 }),
+                [0x00], // Too short for valid APDU
+                [0x90, 0x00]),
             
             new Gp4Net.Domain.Security.TraceExchange(2,
-                new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x08 }, // Missing data despite Lc=8
-                new byte[] { 0x6F, 0x00 })
+                [0x00, 0xA4, 0x04, 0x00, 0x08], // Missing data despite Lc=8
+                [0x6F, 0x00])
         };
 
         var sessionKeys = CreateTestSessionKeys();
@@ -157,9 +157,9 @@ public class TraceDecryptionIntegrationTests
         var result = _decryptorService.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
 
         // Should succeed with graceful degradation
-        result.IsSuccess.Should().BeTrue("Service should handle malformed APDUs gracefully");
+        _ = result.IsSuccess.Should().BeTrue("Service should handle malformed APDUs gracefully");
         var decryptedTrace = result.Value;
-        decryptedTrace.Exchanges.Should().HaveCount(2, "All exchanges should be included even if some fail");
+        _ = decryptedTrace.Exchanges.Should().HaveCount(2, "All exchanges should be included even if some fail");
     }
 
     [TestCase("Mixed/gp_pro_list_success.json")]
@@ -167,12 +167,12 @@ public class TraceDecryptionIntegrationTests
     public void DecryptTrace_WithRealTraceFiles_ShouldProcessWhenAvailable(string relativeTracePath)
     {
         var tracePath = Path.Combine(TraceDataPath, relativeTracePath);
-        File.Exists(tracePath).Should().BeTrue($"Test requires trace file at: {tracePath}");
+        _ = File.Exists(tracePath).Should().BeTrue($"Test requires trace file at: {tracePath}");
 
         var traceData = LoadTraceFile(tracePath);
         var exchanges = ExtractExchangesFromTrace(traceData);
-        
-        exchanges.Should().NotBeEmpty($"Trace file {tracePath} must contain exchanges to test");
+
+        _ = exchanges.Should().NotBeEmpty($"Trace file {tracePath} must contain exchanges to test");
 
         var sessionKeys = CreateTestSessionKeys();
         var securityLevel = SecurityLevel.None;
@@ -180,16 +180,16 @@ public class TraceDecryptionIntegrationTests
 
         var result = _decryptorService.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
 
-        result.IsSuccess.Should().BeTrue($"Should successfully process trace file: {relativeTracePath}");
+        _ = result.IsSuccess.Should().BeTrue($"Should successfully process trace file: {relativeTracePath}");
         var decryptedTrace = result.Value;
-        decryptedTrace.Exchanges.Should().NotBeEmpty("Trace should contain exchanges");
+        _ = decryptedTrace.Exchanges.Should().NotBeEmpty("Trace should contain exchanges");
         
         // Verify basic structure integrity
         foreach (var exchange in decryptedTrace.Exchanges)
         {
-            exchange.Id.Should().BeGreaterThan(0, "Exchange ID should be positive");
-            exchange.Command.OriginalBytes.Should().NotBeEmpty("Command should have data");
-            exchange.Response.OriginalBytes.Should().NotBeEmpty("Response should have data");
+            _ = exchange.Id.Should().BeGreaterThan(0, "Exchange ID should be positive");
+            _ = exchange.Command.OriginalBytes.Should().NotBeEmpty("Command should have data");
+            _ = exchange.Response.OriginalBytes.Should().NotBeEmpty("Response should have data");
         }
     }
 
@@ -203,7 +203,7 @@ public class TraceDecryptionIntegrationTests
     {
         if (!traceData.RootElement.TryGetProperty("exchanges", out var exchangesElement))
         {
-            return Array.Empty<Gp4Net.Domain.Security.TraceExchange>();
+            return [];
         }
 
         var exchanges = new List<Gp4Net.Domain.Security.TraceExchange>();

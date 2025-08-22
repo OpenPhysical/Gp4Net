@@ -25,6 +25,9 @@ public class WsctCardService : ICardService
     private readonly ICardContextWrapper _context;
     private readonly ISecureChannelManager _secureChannelManager;
     private readonly IApduTransportFactory _transportFactory;
+    
+    // Thread safety: Protect all mutable state with reader-writer lock
+    private readonly ReaderWriterLockSlim _stateLock = new();
     private ICardChannelWrapper _channel;
     // Legacy session removed - using functional SecureChannelState instead
     private Domain.Security.SecureChannelState _secureChannelState;
@@ -76,7 +79,7 @@ public class WsctCardService : ICardService
             if (result != ErrorCode.Success)
             {
                 Logger.Warn($"Failed to list readers: {result}");
-                return Array.Empty<string>();
+                return [];
             }
 
             var readers = _context.Readers;
@@ -86,7 +89,7 @@ public class WsctCardService : ICardService
         catch (Exception ex)
         {
             Logger.Error("Failed to list card readers", ex);
-            return Array.Empty<string>();
+            return [];
         }
     }
 
@@ -101,9 +104,11 @@ public class WsctCardService : ICardService
             );
         }
 
+        // Thread safety: Use write lock to protect state modification
+        _stateLock.EnterWriteLock();
         try
         {
-            Disconnect(); // Ensure clean state
+            DisconnectInternal(); // Ensure clean state
 
             _channel = _context.CreateCardChannel(readerName);
             var result = _channel.Connect(WSCT.Wrapper.ShareMode.Exclusive, WSCT.Wrapper.Protocol.T0 | WSCT.Wrapper.Protocol.T1);
@@ -126,10 +131,32 @@ public class WsctCardService : ICardService
             Logger.Error($"Failed to connect to reader {readerName}", ex);
             return false;
         }
+        finally
+        {
+            _stateLock.ExitWriteLock();
+        }
     }
 
     /// <inheritdoc />
     public void Disconnect()
+    {
+        // Thread safety: Use write lock for public disconnect method
+        _stateLock.EnterWriteLock();
+        try
+        {
+            DisconnectInternal();
+        }
+        finally
+        {
+            _stateLock.ExitWriteLock();
+        }
+    }
+
+    /// <summary>
+    /// Internal disconnect method that assumes lock is already held.
+    /// Used by Connect method which already holds write lock.
+    /// </summary>
+    private void DisconnectInternal()
     {
         if (_channel != null)
         {
@@ -147,7 +174,6 @@ public class WsctCardService : ICardService
                 _channel.Dispose();
                 _channel = null;
                 _secureChannelState = null;
-                _secureChannelState = null;
                 _transport = null;
             }
         }
@@ -158,8 +184,17 @@ public class WsctCardService : ICardService
     {
         get
         {
-            // Simply check if channel exists - GetStatus() can hang
-            return _channel != null;
+            // Thread safety: Use read lock to safely check connection state
+            _stateLock.EnterReadLock();
+            try
+            {
+                // Simply check if channel exists - GetStatus() can hang
+                return _channel != null;
+            }
+            finally
+            {
+                _stateLock.ExitReadLock();
+            }
         }
     }
 
@@ -230,12 +265,11 @@ public class WsctCardService : ICardService
 
         try
         {
-            var commandToSend = command;
 
             // Note: Secure channel wrapping should be done through SendCommand(IApduCommand)
-            Logger.Debug($"Sending APDU: {Convert.ToHexString(commandToSend)}");
+            Logger.Debug($"Sending APDU: {Convert.ToHexString(command)}");
 
-            var apdu = _wsctFactory.CreateCommandApdu(commandToSend);
+            var apdu = _wsctFactory.CreateCommandApdu(command);
             var response = _wsctFactory.CreateResponseApdu();
             var result = _channel!.Transmit(apdu, response);
 
@@ -337,7 +371,7 @@ public class WsctCardService : ICardService
                     // For standard length, add LE byte
                     // If expectedLength is 0 or 256, send 0x00 (meaning max response)
                     apduBytes.Add(
-                        expectedLength == 0 || expectedLength == 256
+                        expectedLength is 0 or 256
                             ? (byte)0x00
                             : (byte)expectedLength
                     );
@@ -440,11 +474,21 @@ public class WsctCardService : ICardService
     /// <inheritdoc />
     public void Dispose()
     {
-        if (!_disposed)
+        // Thread safety: Protect disposal from concurrent access
+        _stateLock.EnterWriteLock();
+        try
         {
-            Disconnect();
-            _context?.Dispose();
-            _disposed = true;
+            if (!_disposed)
+            {
+                DisconnectInternal();
+                _context?.Dispose();
+                _disposed = true;
+            }
+        }
+        finally
+        {
+            _stateLock.ExitWriteLock();
+            _stateLock.Dispose(); // Dispose the lock after all operations
         }
     }
 }

@@ -27,16 +27,16 @@ public class KeyInformationTemplateTests
         var template = KeyInformationTemplate.Parse(data);
 
         // Assert
-        template.IsSuccess.Should().BeTrue();
-        template.Value.Keys.Should().HaveCount(1);
+        _ = template.IsSuccess.Should().BeTrue();
+        _ = template.Value.Keys.Should().HaveCount(1);
 
         var key = template.Value.Keys.First();
-        key.KeyId.Should().Be(1);
-        key.KeyVersion.Should().Be(1);
-        key.KeyTypes.Should().HaveCount(2);
-        key.KeyTypes[0].Should().Be(KeyType.TripleDes3Key);
-        key.KeyTypes[1].Should().Be(KeyType.NotAvailable);
-        key.KeyLength.Should().Be(192);
+        _ = key.KeyId.Should().Be(1);
+        _ = key.KeyVersion.Should().Be(1);
+        _ = key.KeyTypes.Should().HaveCount(2);
+        _ = key.KeyTypes[0].Should().Be(KeyType.TripleDes3Key);
+        _ = key.KeyTypes[1].Should().Be(KeyType.NotAvailable);
+        _ = key.KeyLength.Should().Be(192);
     }
 
     [Test]
@@ -56,12 +56,12 @@ public class KeyInformationTemplateTests
         var template = KeyInformationTemplate.Parse(data);
 
         // Assert
-        template.Should().NotBeNull();
+        _ = template.Should().NotBeNull();
         var key = template.Value.Keys.First();
-        key.KeyId.Should().Be(16);
-        key.KeyVersion.Should().Be(2);
-        key.PrimaryKeyType.Should().Be(KeyType.Aes);
-        key.KeyLength.Should().Be(128); // Default AES length
+        _ = key.KeyId.Should().Be(16);
+        _ = key.KeyVersion.Should().Be(2);
+        _ = key.PrimaryKeyType.Should().Be(KeyType.Aes);
+        _ = key.KeyLength.Should().Be(128); // Default AES length
     }
 
     [Test]
@@ -84,12 +84,12 @@ public class KeyInformationTemplateTests
 
         // Assert
         var key = template.Value.Keys.First();
-        key.KeyTypes.Should().HaveCount(3);
-        key.KeyTypes.Should().Contain(KeyType.Des);
-        key.KeyTypes.Should().Contain(KeyType.TripleDes2Key);
-        key.KeyTypes.Should().Contain(KeyType.TripleDes3Key);
-        key.PrimaryKeyType.Should().Be(KeyType.Des); // First type
-        key.KeyLength.Should().Be(64); // DES length
+        _ = key.KeyTypes.Should().HaveCount(3);
+        _ = key.KeyTypes.Should().Contain(KeyType.Des);
+        _ = key.KeyTypes.Should().Contain(KeyType.TripleDes2Key);
+        _ = key.KeyTypes.Should().Contain(KeyType.TripleDes3Key);
+        _ = key.PrimaryKeyType.Should().Be(KeyType.Des); // First type
+        _ = key.KeyLength.Should().Be(64); // DES length
     }
 
     [Test]
@@ -130,26 +130,26 @@ public class KeyInformationTemplateTests
         var template = KeyInformationTemplate.Parse(data[2..]);
 
         // Assert
-        template.Value.Keys.Should().HaveCount(4);
+        _ = template.Value.Keys.Should().HaveCount(4);
 
         // First three keys have same ID but different versions
-        template.Value.Keys[0].KeyId.Should().Be(1);
-        template.Value.Keys[0].KeyVersion.Should().Be(1);
+        _ = template.Value.Keys[0].KeyId.Should().Be(1);
+        _ = template.Value.Keys[0].KeyVersion.Should().Be(1);
 
-        template.Value.Keys[1].KeyId.Should().Be(1);
-        template.Value.Keys[1].KeyVersion.Should().Be(2);
+        _ = template.Value.Keys[1].KeyId.Should().Be(1);
+        _ = template.Value.Keys[1].KeyVersion.Should().Be(2);
 
-        template.Value.Keys[2].KeyId.Should().Be(1);
-        template.Value.Keys[2].KeyVersion.Should().Be(3);
+        _ = template.Value.Keys[2].KeyId.Should().Be(1);
+        _ = template.Value.Keys[2].KeyVersion.Should().Be(3);
 
         // Fourth key has different ID
-        template.Value.Keys[3].KeyId.Should().Be(2);
-        template.Value.Keys[3].KeyVersion.Should().Be(1);
+        _ = template.Value.Keys[3].KeyId.Should().Be(2);
+        _ = template.Value.Keys[3].KeyVersion.Should().Be(1);
 
         // All are AES keys
         foreach (var key in template.Value.Keys)
         {
-            key.PrimaryKeyType.Should().Be(KeyType.Aes);
+            _ = key.PrimaryKeyType.Should().Be(KeyType.Aes);
         }
     }
 
@@ -171,10 +171,10 @@ public class KeyInformationTemplateTests
         var output = template.Value.Keys.First().ToString();
 
         // Assert
-        output.Should().Contain("Version: 2 (0x02)");
-        output.Should().Contain("ID: 1 (0x01)");
-        output.Should().Contain("type: AES");
-        output.Should().Contain("length: 16"); // 128 bits / 8
+        _ = output.Should().Contain("Version: 2 (0x02)");
+        _ = output.Should().Contain("ID: 1 (0x01)");
+        _ = output.Should().Contain("type: AES");
+        _ = output.Should().Contain("length: 16"); // 128 bits / 8
     }
 
     [Test]
@@ -202,23 +202,23 @@ public class KeyInformationTemplateTests
         var output = template.ToString();
 
         // Assert
-        output.Should().Contain("Key Information Template:");
-        output.Should().Contain("Version: 1");
-        output.Should().Contain("3DES");
-        output.Should().Contain("AES");
+        _ = output.Should().Contain("Key Information Template:");
+        _ = output.Should().Contain("Version: 1");
+        _ = output.Should().Contain("3DES");
+        _ = output.Should().Contain("AES");
     }
 
     [Test]
     public void KeyTypeExtensions_ToFriendlyString_ReturnsCorrectNames()
     {
         // Assert various key types format correctly
-        KeyType.Des.ToFriendlyString().Should().BeEquivalentTo("DES");
-        KeyType.TripleDes2Key.ToFriendlyString().Should().BeEquivalentTo("3DES-2KEY");
-        KeyType.TripleDes3Key.ToFriendlyString().Should().BeEquivalentTo("3DES-3KEY");
-        KeyType.Des3.ToFriendlyString().Should().BeEquivalentTo("3DES");
-        KeyType.Aes.ToFriendlyString().Should().BeEquivalentTo("AES");
-        KeyType.NotAvailable.ToFriendlyString().Should().BeEquivalentTo("N/A");
-        KeyType.Unknown.ToFriendlyString().Should().BeEquivalentTo("Unknown(0x00)");
+        _ = KeyType.Des.ToFriendlyString().Should().BeEquivalentTo("DES");
+        _ = KeyType.TripleDes2Key.ToFriendlyString().Should().BeEquivalentTo("3DES-2KEY");
+        _ = KeyType.TripleDes3Key.ToFriendlyString().Should().BeEquivalentTo("3DES-3KEY");
+        _ = KeyType.Des3.ToFriendlyString().Should().BeEquivalentTo("3DES");
+        _ = KeyType.Aes.ToFriendlyString().Should().BeEquivalentTo("AES");
+        _ = KeyType.NotAvailable.ToFriendlyString().Should().BeEquivalentTo("N/A");
+        _ = KeyType.Unknown.ToFriendlyString().Should().BeEquivalentTo("Unknown(0x00)");
     }
 
     [Test]
@@ -231,8 +231,8 @@ public class KeyInformationTemplateTests
         var result = KeyInformationTemplate.Parse(emptyData);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<SmartCardError>();
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<SmartCardError>();
         // This should ideally be EmptyDataError for empty data validation
     }
 
@@ -252,6 +252,6 @@ public class KeyInformationTemplateTests
         var template = KeyInformationTemplate.Parse(data);
 
         // Assert
-        template.Value.Keys.Should().BeEmpty(); // Should not add incomplete key
+        _ = template.Value.Keys.Should().BeEmpty(); // Should not add incomplete key
     }
 }

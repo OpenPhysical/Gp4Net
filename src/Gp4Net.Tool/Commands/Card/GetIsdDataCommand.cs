@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.OpenPhysical;
 using Gp4Net.Tool.Pipeline;
@@ -170,9 +171,30 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 return 1;
             }
 
-            var iin = System.Text.Encoding.ASCII.GetString(iinResult.Value);
-            var cin = System.Text.Encoding.ASCII.GetString(cinResult.Value);
-            var managerUrl = System.Text.Encoding.UTF8.GetString(urlResult.Value);
+            // All OPID components should be ASCII per specification
+            var iinDecodeResult = EncodingUtils.SafeAsciiDecode(iinResult.Value);
+            var cinDecodeResult = EncodingUtils.SafeAsciiDecode(cinResult.Value);
+            var urlDecodeResult = EncodingUtils.SafeAsciiDecode(urlResult.Value);
+
+            if (iinDecodeResult.IsFailure)
+            {
+                context.Display.Error($"Invalid IIN encoding: {iinDecodeResult.Error.Message}");
+                return 1;
+            }
+            if (cinDecodeResult.IsFailure)
+            {
+                context.Display.Error($"Invalid CIN encoding: {cinDecodeResult.Error.Message}");
+                return 1;
+            }
+            if (urlDecodeResult.IsFailure)
+            {
+                context.Display.Error($"Invalid Manager URL encoding: {urlDecodeResult.Error.Message}");
+                return 1;
+            }
+
+            var iin = iinDecodeResult.Value;
+            var cin = cinDecodeResult.Value;
+            var managerUrl = urlDecodeResult.Value;
 
             // Try to reconstruct OPID
             if (
@@ -287,14 +309,18 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 var cin = System.Text.Encoding.ASCII.GetString(
                     Convert.FromHexString(results["CIN"])
                 );
-                var url = System.Text.Encoding.UTF8.GetString(
+                var urlDecodeResult = EncodingUtils.SafeAsciiDecode(
                     Convert.FromHexString(results["Manager URL"])
                 );
-
-                if (OpenPhysicalId.TryFromCardData(iin, cin, url, out var opid) && opid != null)
+                if (urlDecodeResult.IsSuccess)
                 {
-                    results["OPID"] = opid.ToDisplayFormat();
+                    var url = urlDecodeResult.Value;
+                    if (OpenPhysicalId.TryFromCardData(iin, cin, url, out var opid) && opid != null)
+                    {
+                        results["OPID"] = opid.ToDisplayFormat();
+                    }
                 }
+                // If URL decode fails, just skip OPID reconstruction
             }
             catch
             {

@@ -24,22 +24,22 @@ public class KeyInfoTemplateParsingTest
         
         // Parse
         var result = KeyInformationTemplate.Parse(keyInfoBytes);
-        
+
         // Verify parse succeeded
-        result.IsSuccess.Should().BeTrue($"Parse failed: {(result.IsFailure ? result.Error.ToString() : "Unknown")}");
+        _ = result.IsSuccess.Should().BeTrue($"Parse failed: {(result.IsFailure ? result.Error.ToString() : "Unknown")}");
         
         // Verify 3 keys
         var keyInfo = result.Value;
-        keyInfo.Keys.Should().HaveCount(3);
-        
+        _ = keyInfo.Keys.Should().HaveCount(3);
+
         // Verify keys
-        keyInfo.Keys[0].KeyId.Should().Be(1);
-        keyInfo.Keys[0].KeyVersion.Should().Be(1);
-        
-        keyInfo.Keys[1].KeyId.Should().Be(2);
-        keyInfo.Keys[1].KeyVersion.Should().Be(1);
-        
-        keyInfo.Keys[2].KeyId.Should().Be(3);
-        keyInfo.Keys[2].KeyVersion.Should().Be(1);
+        _ = keyInfo.Keys[0].KeyId.Should().Be(1);
+        _ = keyInfo.Keys[0].KeyVersion.Should().Be(1);
+
+        _ = keyInfo.Keys[1].KeyId.Should().Be(2);
+        _ = keyInfo.Keys[1].KeyVersion.Should().Be(1);
+
+        _ = keyInfo.Keys[2].KeyId.Should().Be(3);
+        _ = keyInfo.Keys[2].KeyVersion.Should().Be(1);
     }
 }

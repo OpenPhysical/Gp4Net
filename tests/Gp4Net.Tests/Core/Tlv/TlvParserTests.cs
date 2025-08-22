@@ -21,10 +21,10 @@ public class TlvParserTests
         var tlv = TlvParser.ParseSingle(data);
 
         // Assert
-        tlv.HasValue.Should().BeTrue();
-        tlv.Value.Tag.Should().BeEquivalentTo(new byte[] { 0x80 });
-        tlv.Value.Length.Should().Be(2);
-        tlv.Value.Value.Should().BeEquivalentTo(new byte[] { 0x01, 0x02 });
+        _ = tlv.HasValue.Should().BeTrue();
+        _ = tlv.Value.Tag.Should().BeEquivalentTo(new byte[] { 0x80 });
+        _ = tlv.Value.Length.Should().Be(2);
+        _ = tlv.Value.Value.Should().BeEquivalentTo(new byte[] { 0x01, 0x02 });
     }
 
     [Test]
@@ -37,10 +37,10 @@ public class TlvParserTests
         var tlv = TlvParser.ParseSingle(data);
 
         // Assert
-        tlv.HasValue.Should().BeTrue();
-        tlv.Value.Tag.Should().BeEquivalentTo(new byte[] { 0x9F, 0x70 });
-        tlv.Value.Length.Should().Be(3);
-        tlv.Value.Value.Should().BeEquivalentTo(new byte[] { 0x01, 0x02, 0x03 });
+        _ = tlv.HasValue.Should().BeTrue();
+        _ = tlv.Value.Tag.Should().BeEquivalentTo(new byte[] { 0x9F, 0x70 });
+        _ = tlv.Value.Length.Should().Be(3);
+        _ = tlv.Value.Value.Should().BeEquivalentTo(new byte[] { 0x01, 0x02, 0x03 });
     }
 
     [Test]
@@ -61,14 +61,14 @@ public class TlvParserTests
         var tlv = TlvParser.ParseSingle(data);
 
         // Assert
-        tlv.HasValue.Should().BeTrue();
-        tlv.Value.Tag.Should().BeEquivalentTo(new byte[] { 0x80 });
-        tlv.Value.Length.Should().Be(128);
-        tlv.Value.Length.Should().Be(128);
+        _ = tlv.HasValue.Should().BeTrue();
+        _ = tlv.Value.Tag.Should().BeEquivalentTo(new byte[] { 0x80 });
+        _ = tlv.Value.Length.Should().Be(128);
+        _ = tlv.Value.Length.Should().Be(128);
         // Verify actual pattern in value matches expected sequence
         for (var i = 0; i < 128; i++)
         {
-            tlv.Value.Value[i].Should().Be((byte)(i & 0xFF));
+            _ = tlv.Value.Value[i].Should().Be((byte)(i & 0xFF));
         }
     }
 
@@ -82,10 +82,10 @@ public class TlvParserTests
         var tlv = TlvParser.ParseSingle(data);
 
         // Assert
-        tlv.HasValue.Should().BeTrue();
-        tlv.Value.Tag.Should().BeEquivalentTo(new byte[] { 0x80 });
-        tlv.Value.Length.Should().Be(0);
-        tlv.Value.Value.Should().BeEmpty();
+        _ = tlv.HasValue.Should().BeTrue();
+        _ = tlv.Value.Tag.Should().BeEquivalentTo(new byte[] { 0x80 });
+        _ = tlv.Value.Length.Should().Be(0);
+        _ = tlv.Value.Value.Should().BeEmpty();
     }
 
     [Test]
@@ -98,7 +98,7 @@ public class TlvParserTests
         var tlv = TlvParser.ParseSingle(data);
 
         // Assert
-        tlv.HasValue.Should().BeFalse();
+        _ = tlv.HasValue.Should().BeFalse();
     }
 
     [Test]
@@ -125,11 +125,11 @@ public class TlvParserTests
         var tlvList = TlvParser.ParseAll(data);
 
         // Assert
-        tlvList.Should().NotBeNull();
-        tlvList.Should().HaveCount(3);
-        tlvList![0].Tag.Should().BeEquivalentTo(new byte[] { 0x80 });
-        tlvList[1].Tag.Should().BeEquivalentTo(new byte[] { 0x81 });
-        tlvList[2].Tag.Should().BeEquivalentTo(new byte[] { 0x82 });
+        _ = tlvList.Should().NotBeNull();
+        _ = tlvList.Should().HaveCount(3);
+        _ = tlvList![0].Tag.Should().BeEquivalentTo(new byte[] { 0x80 });
+        _ = tlvList[1].Tag.Should().BeEquivalentTo(new byte[] { 0x81 });
+        _ = tlvList[2].Tag.Should().BeEquivalentTo(new byte[] { 0x82 });
     }
 
     [Test]
@@ -152,14 +152,14 @@ public class TlvParserTests
         var tlvList = TlvParser.ParseAll(data);
 
         // Assert
-        tlvList.Should().NotBeNull();
-        tlvList.Should().HaveCount(1);
-        tlvList![0].Tag.Should().BeEquivalentTo(new byte[] { 0x80 });
-        tlvList[0].Length.Should().Be(5);
+        _ = tlvList.Should().NotBeNull();
+        _ = tlvList.Should().HaveCount(1);
+        _ = tlvList![0].Tag.Should().BeEquivalentTo(new byte[] { 0x80 });
+        _ = tlvList[0].Length.Should().Be(5);
 
         // Parse nested content
         var nested = tlvList[0].ParseNestedTlv();
-        nested.Should().HaveCount(2);
+        _ = nested.Should().HaveCount(2);
     }
 
     [Test]
@@ -186,9 +186,9 @@ public class TlvParserTests
         var found = TlvParser.FindByTag(data, 0x81);
 
         // Assert
-        found.HasValue.Should().BeTrue();
-        found.Value.Tag.Should().BeEquivalentTo(new byte[] { 0x81 });
-        found.Value.Value.Should().BeEquivalentTo(new byte[] { 0x03 });
+        _ = found.HasValue.Should().BeTrue();
+        _ = found.Value.Tag.Should().BeEquivalentTo(new byte[] { 0x81 });
+        _ = found.Value.Value.Should().BeEquivalentTo(new byte[] { 0x03 });
     }
 
     [Test]
@@ -216,54 +216,54 @@ public class TlvParserTests
         var found = TlvParser.FindByTag(data, (ushort)0x9F70);
 
         // Assert
-        found.HasValue.Should().BeTrue();
-        found.Value.Tag.Should().BeEquivalentTo(new byte[] { 0x9F, 0x70 });
-        found.Value.Value.Should().BeEquivalentTo(new byte[] { 0x03 });
+        _ = found.HasValue.Should().BeTrue();
+        _ = found.Value.Tag.Should().BeEquivalentTo(new byte[] { 0x9F, 0x70 });
+        _ = found.Value.Value.Should().BeEquivalentTo(new byte[] { 0x03 });
     }
 
     [Test]
     public void TlvObject_GetValueAsNumber_ConvertsCorrectly()
     {
         // Arrange
-        var tlv = new TlvObject(new byte[] { 0x80 }, new byte[] { 0x01, 0x23, 0x45 });
+        var tlv = new TlvObject([0x80], [0x01, 0x23, 0x45]);
 
         // Act
         var number = tlv.GetValueAsNumber();
 
         // Assert
-        number.HasValue.Should().BeTrue();
-        number.Value.Should().Be(0x012345);
+        _ = number.HasValue.Should().BeTrue();
+        _ = number.Value.Should().Be(0x012345);
     }
 
     [Test]
     public void TlvObject_GetValueAsHexString_FormatsCorrectly()
     {
         // Arrange
-        var tlv = new TlvObject(new byte[] { 0x80 }, new byte[] { 0x01, 0x23, 0x45, 0x67 });
+        var tlv = new TlvObject([0x80], [0x01, 0x23, 0x45, 0x67]);
 
         // Act
         var hexString = tlv.GetValueAsHexString();
 
         // Assert
-        hexString.Should().Be("01234567");
+        _ = hexString.Should().Be("01234567");
     }
 
     [Test]
     public void TagToNumber_ConvertsCorrectly()
     {
         // Arrange & Act & Assert
-        TlvParser.TagToNumber(new byte[] { 0x80 }).Should().Be(0x80u);
-        TlvParser.TagToNumber(new byte[] { 0x9F, 0x70 }).Should().Be(0x9F70u);
-        TlvParser.TagToNumber(new byte[] { 0x9F, 0x7F, 0x2A }).Should().Be(0x9F7F2Au);
+        _ = TlvParser.TagToNumber([0x80]).Should().Be(0x80u);
+        _ = TlvParser.TagToNumber([0x9F, 0x70]).Should().Be(0x9F70u);
+        _ = TlvParser.TagToNumber([0x9F, 0x7F, 0x2A]).Should().Be(0x9F7F2Au);
     }
 
     [Test]
     public void NumberToTag_ConvertsCorrectly()
     {
         // Arrange & Act & Assert
-        TlvParser.NumberToTag(0x80).Should().BeEquivalentTo(new byte[] { 0x80 });
-        TlvParser.NumberToTag(0x9F70).Should().BeEquivalentTo(new byte[] { 0x9F, 0x70 });
-        TlvParser.NumberToTag(0x9F7F2A).Should().BeEquivalentTo(new byte[] { 0x9F, 0x7F, 0x2A });
+        _ = TlvParser.NumberToTag(0x80).Should().BeEquivalentTo(new byte[] { 0x80 });
+        _ = TlvParser.NumberToTag(0x9F70).Should().BeEquivalentTo(new byte[] { 0x9F, 0x70 });
+        _ = TlvParser.NumberToTag(0x9F7F2A).Should().BeEquivalentTo(new byte[] { 0x9F, 0x7F, 0x2A });
     }
 
     [Test]
@@ -285,10 +285,10 @@ public class TlvParserTests
         var tlv = TlvParser.ParseSingle(data, 3, out var consumed);
 
         // Assert
-        tlv.HasValue.Should().BeTrue();
-        tlv.Value.Tag.Should().BeEquivalentTo(new byte[] { 0x80 });
-        tlv.Value.Value.Should().BeEquivalentTo(new byte[] { 0x01, 0x02 });
-        consumed.Should().Be(4); // Tag(1) + Length(1) + Value(2)
+        _ = tlv.HasValue.Should().BeTrue();
+        _ = tlv.Value.Tag.Should().BeEquivalentTo(new byte[] { 0x80 });
+        _ = tlv.Value.Value.Should().BeEquivalentTo(new byte[] { 0x01, 0x02 });
+        _ = consumed.Should().Be(4); // Tag(1) + Length(1) + Value(2)
     }
 
     [Test]
@@ -302,6 +302,6 @@ public class TlvParserTests
         var tlv = TlvParser.ParseSingle(data);
 
         // Assert
-        tlv.HasValue.Should().BeFalse();
+        _ = tlv.HasValue.Should().BeFalse();
     }
 }

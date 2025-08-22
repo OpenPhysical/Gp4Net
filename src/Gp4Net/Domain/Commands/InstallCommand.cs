@@ -122,7 +122,7 @@ public abstract record InstallCommand : IApduCommand
                 SmartCardError.InvalidArgument("Package AID cannot be empty."));
         }
 
-        return Result.Success<ImmutableArray<byte>, SmartCardError>(packageAid.ToImmutableArray());
+        return Result.Success<ImmutableArray<byte>, SmartCardError>([..packageAid]);
     }
 
     /// <summary>
@@ -281,7 +281,10 @@ public abstract record InstallCommand : IApduCommand
         /// <summary>
         /// Returns a string representation of this command.
         /// </summary>
-        public override string ToString() => "INSTALL [for load]";
+        public override string ToString()
+        {
+            return "INSTALL [for load]";
+        }
     }
 
     /// <summary>
@@ -333,7 +336,7 @@ public abstract record InstallCommand : IApduCommand
             Type = type;
             AppletAid = appletAid;
             ModuleAid = moduleAid;
-            Privileges = privileges.IsDefaultOrEmpty ? ImmutableArray.Create<byte>(0x00) : privileges;
+            Privileges = privileges.IsDefaultOrEmpty ? [0x00] : privileges;
             InstallParameters = installParameters;
             InstallToken = installToken;
         }
@@ -383,9 +386,9 @@ public abstract record InstallCommand : IApduCommand
             var command = new InstallForInstallCommand(
                 InstallType.ForInstall,
                 packageAidResult.Value,
-                applicationAid.ToImmutableArray(),
-                moduleAid.ToImmutableArray(),
-                privileges.ToImmutableArray(),
+                [..applicationAid],
+                [..moduleAid],
+                [..privileges],
                 installParameters?.ToImmutableArray() ?? default,
                 installToken?.ToImmutableArray() ?? default);
 
@@ -437,9 +440,9 @@ public abstract record InstallCommand : IApduCommand
             var command = new InstallForInstallCommand(
                 InstallType.ForInstallAndMakeSelectable,
                 packageAidResult.Value,
-                applicationAid.ToImmutableArray(),
-                moduleAid.ToImmutableArray(),
-                privileges.ToImmutableArray(),
+                [..applicationAid],
+                [..moduleAid],
+                [..privileges],
                 installParameters?.ToImmutableArray() ?? default,
                 installToken?.ToImmutableArray() ?? default);
 
@@ -510,7 +513,10 @@ public abstract record InstallCommand : IApduCommand
         /// <summary>
         /// Returns a string representation of this command.
         /// </summary>
-        public override string ToString() => "INSTALL [for install]";
+        public override string ToString()
+        {
+            return "INSTALL [for install]";
+        }
     }
 }
 
@@ -592,7 +598,7 @@ public static class InstallCommandBuilder
             packageAid,
             moduleAid ?? packageAid, // Use package AID as module AID if not specified
             appletAid,
-            privileges ?? new byte[] { 0x00 }, // Default to no privileges
+            privileges ?? [0x00], // Default to no privileges
             installParameters,
             installToken);
     }
@@ -619,7 +625,7 @@ public static class InstallCommandBuilder
             packageAid,
             moduleAid ?? packageAid, // Use package AID as module AID if not specified
             appletAid,
-            privileges ?? new byte[] { 0x00 }, // Default to no privileges
+            privileges ?? [0x00], // Default to no privileges
             installParameters,
             installToken);
     }
@@ -647,18 +653,24 @@ public record InstallCommandResponse(
     /// <summary>
     /// Creates a successful response.
     /// </summary>
-    public static InstallCommandResponse Success(byte[] data = null) =>
-        new(data?.ToImmutableArray() ?? [], StatusWords.Success);
+    public static InstallCommandResponse Success(byte[] data = null)
+    {
+        return new(data?.ToImmutableArray() ?? [], StatusWords.Success);
+    }
 
     /// <summary>
     /// Creates a failed response.
     /// </summary>
-    public static InstallCommandResponse Failure(ushort statusWord, byte[] data = null) =>
-        new(data?.ToImmutableArray() ?? [], statusWord);
+    public static InstallCommandResponse Failure(ushort statusWord, byte[] data = null)
+    {
+        return new(data?.ToImmutableArray() ?? [], statusWord);
+    }
 
     /// <summary>
     /// Parses a response from raw data.
     /// </summary>
-    public static InstallCommandResponse Parse(byte[] responseData, ushort statusWord) =>
-        new(responseData.ToImmutableArray(), statusWord);
+    public static InstallCommandResponse Parse(byte[] responseData, ushort statusWord)
+    {
+        return new([.. responseData], statusWord);
+    }
 }

@@ -61,40 +61,42 @@ public class ApduCommand
         P1 = rawBytes[2];
         P2 = rawBytes[3];
 
-        if (rawBytes.Length == 4)
+        switch (rawBytes.Length)
         {
-            // Case 1: No data, no Le
-            Data = Array.Empty<byte>();
-            Le = null;
-        }
-        else if (rawBytes.Length == 5)
-        {
-            // Case 2: No data, Le present
-            Data = Array.Empty<byte>();
-            Le = rawBytes[4];
-        }
-        else
-        {
-            // Case 3 or 4: Data present
-            var lc = rawBytes[4];
-
-            if (rawBytes.Length == 5 + lc)
-            {
-                // Case 3: Data present, no Le
-                Data = new byte[lc];
-                Array.Copy(rawBytes, 5, Data, 0, lc);
+            case 4:
+                // Case 1: No data, no Le
+                Data = [];
                 Le = null;
-            }
-            else if (rawBytes.Length == 5 + lc + 1)
+                break;
+            case 5:
+                // Case 2: No data, Le present
+                Data = [];
+                Le = rawBytes[4];
+                break;
+            default:
             {
-                // Case 4: Data present, Le present
-                Data = new byte[lc];
-                Array.Copy(rawBytes, 5, Data, 0, lc);
-                Le = rawBytes[5 + lc];
-            }
-            else
-            {
-                throw new ArgumentException("Invalid APDU format", nameof(rawBytes));
+                // Case 3 or 4: Data present
+                var lc = rawBytes[4];
+
+                if (rawBytes.Length == 5 + lc)
+                {
+                    // Case 3: Data present, no Le
+                    Data = new byte[lc];
+                    Array.Copy(rawBytes, 5, Data, 0, lc);
+                    Le = null;
+                }
+                else if (rawBytes.Length == 5 + lc + 1)
+                {
+                    // Case 4: Data present, Le present
+                    Data = new byte[lc];
+                    Array.Copy(rawBytes, 5, Data, 0, lc);
+                    Le = rawBytes[5 + lc];
+                }
+                else
+                {
+                    throw new ArgumentException("Invalid APDU format", nameof(rawBytes));
+                }
+                break;
             }
         }
     }
@@ -139,7 +141,7 @@ public class ApduCommand
     {
         get
         {
-            return (Cla == 0x80 || Cla == 0x84) && Ins == 0xE6;
+            return Cla is 0x80 or 0x84 && Ins == 0xE6;
         }
     }
 
@@ -150,7 +152,7 @@ public class ApduCommand
     {
         get
         {
-            return (Cla == 0x80 || Cla == 0x84) && Ins == 0xE8;
+            return Cla is 0x80 or 0x84 && Ins == 0xE8;
         }
     }
 
@@ -161,7 +163,7 @@ public class ApduCommand
     {
         get
         {
-            return (Cla == 0x80 || Cla == 0x84) && Ins == 0xF2;
+            return Cla is 0x80 or 0x84 && Ins == 0xF2;
         }
     }
 
@@ -172,7 +174,7 @@ public class ApduCommand
     {
         get
         {
-            return (Cla == 0x80 || Cla == 0x84) && Ins == 0xE4;
+            return Cla is 0x80 or 0x84 && Ins == 0xE4;
         }
     }
 
@@ -194,7 +196,7 @@ public class ApduCommand
     {
         get
         {
-            return (Cla == 0x80 || Cla == 0x84) && Ins == 0xD8;
+            return Cla is 0x80 or 0x84 && Ins == 0xD8;
         }
     }
 
@@ -205,7 +207,7 @@ public class ApduCommand
     {
         get
         {
-            return (Cla == 0x80 || Cla == 0x84) && Ins == 0xF0;
+            return Cla is 0x80 or 0x84 && Ins == 0xF0;
         }
     }
 

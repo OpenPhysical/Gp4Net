@@ -84,24 +84,25 @@ public static class Scp03RealCardTestVectors
         ExternalAuthenticateResponse = Convert.FromHexString("9000"),
         
         // Real Card Capabilities (from GET DATA responses in trace)
-        SupportedSCPVersions = new[] { "SCP03 i=00", "i=10", "i=20", "i=60", "i=70" },
-        SupportedKeyLengths = new[] { "AES-128", "AES-196", "AES-256" },
-        SupportedPrivileges = new[] 
-        {
+        SupportedSCPVersions = ["SCP03 i=00", "i=10", "i=20", "i=60", "i=70"],
+        SupportedKeyLengths = ["AES-128", "AES-196", "AES-256"],
+        SupportedPrivileges =
+        [
             "SecurityDomain", "DAPVerification", "DelegatedManagement", 
             "CardReset", "MandatedDAPVerification", "TrustedPath", 
             "TokenVerification", "GlobalDelete", "GlobalLock", 
             "GlobalRegistry", "FinalApplication", "ReceiptGeneration",
             "CipheredLoadFileDataBlock"
-        }
+        ]
     };
     
     /// <summary>
     /// All available real-card test vectors.
     /// </summary>
-    public static readonly Scp03RealCardTestVector[] AllVectors = { 
+    public static readonly Scp03RealCardTestVector[] AllVectors =
+    [
         P71_SCP03_Session
-    };
+    ];
 }
 
 /// <summary>

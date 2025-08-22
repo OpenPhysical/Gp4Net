@@ -40,7 +40,7 @@ public static class DiversificationDataParser
 
     private static string ParseScpSupportFromBytes(byte[] data)
     {
-        if (data.Length == 0 || data.Length < 3) // Minimum: tag + length + some content
+        if (data.Length is 0 or < 3) // Minimum: tag + length + some content
         {
             return "[red]None[/]";
         }
@@ -72,21 +72,22 @@ public static class DiversificationDataParser
                 var scpVersion = cfElement.Value[i];
                 var iParameter = cfElement.Value[i + 1];
 
-                // Skip empty slots (00 00)
-                if (scpVersion == 0x00 && iParameter == 0x00)
+                switch (scpVersion)
                 {
-                    continue;
-                }
-                
-                // Validate SCP version - only 01, 02, 03, 10, 11 are valid
-                // Values like 35, 55, 72, 85, 131 are not valid SCP versions
-                if (scpVersion > 0x11)
-                {
-                    // This is likely card identification data, not SCP support
-                    return "[red]None[/]";
+                    // Skip empty slots (00 00)
+                    case 0x00 when iParameter == 0x00:
+                        continue;
+
+                    // Validate SCP version - only 01, 02, 03, 10, 11 are valid
+                    // Values like 35, 55, 72, 85, 131 are not valid SCP versions
+                    case > 0x11:
+                        // This is likely card identification data, not SCP support
+                        return "[red]None[/]";
+                    default:
+                        scpSupport.Add($"SCP{scpVersion:X2} (i={iParameter:X2})");
+                        break;
                 }
 
-                scpSupport.Add($"SCP{scpVersion:X2} (i={iParameter:X2})");
             }
 
             return scpSupport.Count > 0 ? string.Join(", ", scpSupport) : "[red]None[/]";

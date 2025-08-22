@@ -20,7 +20,7 @@ public record ScpInformation
     /// </summary>
     public ScpInformation(IReadOnlyList<ScpProtocolInfo> protocols)
     {
-        Protocols = protocols ?? Array.Empty<ScpProtocolInfo>();
+        Protocols = protocols ?? [];
     }
     
     /// <summary>
@@ -63,7 +63,7 @@ public record ScpProtocolInfo
     public ScpProtocolInfo(byte version, IReadOnlyList<ScpImplementation> implementationOptions)
     {
         Version = version;
-        ImplementationOptions = implementationOptions ?? Array.Empty<ScpImplementation>();
+        ImplementationOptions = implementationOptions ?? [];
     }
     
     /// <summary>

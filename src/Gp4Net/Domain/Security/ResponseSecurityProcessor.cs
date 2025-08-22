@@ -189,7 +189,7 @@ public static class ResponseSecurityProcessor
         var cipher = new AesEngine();
         cipher.Init(true, new KeyParameter(encKey));
         var result = new byte[16];
-        cipher.ProcessBlock(counterBytes, 0, result, 0);
+        _ = cipher.ProcessBlock(counterBytes, 0, result, 0);
         return result;
     }
 
@@ -212,7 +212,7 @@ public static class ResponseSecurityProcessor
             cmac.BlockUpdate(macInput, 0, macInput.Length);
             
             var fullMac = new byte[16];
-            cmac.DoFinal(fullMac, 0);
+            _ = cmac.DoFinal(fullMac, 0);
 
             // Return truncated 8-byte MAC and full 16-byte chaining value
             var mac = new byte[8];
@@ -231,13 +231,13 @@ public static class ResponseSecurityProcessor
             desMac.Init(new KeyParameter(sessionKeys.SrMac));
             desMac.BlockUpdate(macInput, 0, macInput.Length);
             var mac = new byte[8];
-            desMac.DoFinal(mac, 0);
+            _ = desMac.DoFinal(mac, 0);
             
             // For SCP02, check implementation parameter to determine if R-MAC updates chaining
             // Most implementations (i=15, i=55) do not update chaining value for R-MAC
             // Only i=05 updates chaining value
             var newChainingValue = ShouldUpdateChainingAfterRMac(protocolVersion)
-                ? ImmutableArray.Create(mac)
+                ? [..mac]
                 : macChainingValue;
             
             return Result.Success<(byte[], ImmutableArray<byte>), SmartCardError>(
@@ -274,7 +274,10 @@ public static class ResponseSecurityProcessor
                (statusWord & 0xFF00) == 0x6300;
     }
 
-    private static bool HasResponseData(byte[] response) => response.Length > 2;
+    private static bool HasResponseData(byte[] response)
+    {
+        return response.Length > 2;
+    }
 
     private static bool ShouldUpdateChainingAfterRMac(byte protocolVersion)
     {

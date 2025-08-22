@@ -92,7 +92,7 @@ public sealed class MacService
                     SmartCardError.InvalidArgument("3DES key must be 16 or 24 bytes"));
             }
 
-            if (macLength < 1 || macLength > 8)
+            if (macLength is < 1 or > 8)
             {
                 return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidArgument("MAC length must be between 1 and 8 bytes"));
@@ -109,7 +109,7 @@ public sealed class MacService
             mac.BlockUpdate(data, 0, data.Length);
 
             var fullMac = new byte[8];
-            mac.DoFinal(fullMac, 0);
+            _ = mac.DoFinal(fullMac, 0);
 
             // Return requested MAC length
             if (macLength == 8)
@@ -170,7 +170,7 @@ public sealed class MacService
                     SmartCardError.InvalidArgument("AES key must be 16, 24, or 32 bytes"));
             }
 
-            if (macLength < 1 || macLength > 16)
+            if (macLength is < 1 or > 16)
             {
                 return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidArgument("MAC length must be between 1 and 16 bytes"));
@@ -184,7 +184,7 @@ public sealed class MacService
             cmac.BlockUpdate(data, 0, data.Length);
 
             var mac = new byte[macLength];
-            cmac.DoFinal(mac, 0);
+            _ = cmac.DoFinal(mac, 0);
 
             return Result.Success<byte[], SmartCardError>(mac);
         }

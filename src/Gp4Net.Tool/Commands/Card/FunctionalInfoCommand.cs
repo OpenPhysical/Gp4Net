@@ -141,26 +141,26 @@ public class FunctionalInfoCommand : IPipelineCommand<FunctionalInfoCommand.Sett
             switch (row)
             {
                 case CardInfoTableBuilder.PropertyRow(var name, var value):
-                    table.AddRow(name, value);
+                    _ = table.AddRow(name, value);
                     break;
 
                 case CardInfoTableBuilder.SectionHeader(var title):
-                    table.AddEmptyRow();
-                    table.AddRow($"[bold]{title}[/]", "");
+                    _ = table.AddEmptyRow();
+                    _ = table.AddRow($"[bold]{title}[/]", "");
                     break;
 
                 case CardInfoTableBuilder.StatusRow(var name, var isAvailable, var details):
                     var statusIcon = isAvailable ? "[green]✓[/]" : "[red]✗[/]";
                     var statusText = details.Length > 0 ? details : (isAvailable ? "Available" : "Not Available");
-                    table.AddRow($"{statusIcon} {name}", statusText);
+                    _ = table.AddRow($"{statusIcon} {name}", statusText);
                     break;
 
                 case CardInfoTableBuilder.ErrorRow(var name, var message):
-                    table.AddRow($"[red]{name}[/]", $"[red]{message}[/]");
+                    _ = table.AddRow($"[red]{name}[/]", $"[red]{message}[/]");
                     break;
 
                 case CardInfoTableBuilder.InfoRow(var message):
-                    table.AddRow("", $"[dim]{message}[/]");
+                    _ = table.AddRow("", $"[dim]{message}[/]");
                     break;
             }
         }

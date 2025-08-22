@@ -150,7 +150,7 @@ public class VirtualCardService : ICardService
             }
             else
             {
-                apduBytes.Add(expectedLength == 0 || expectedLength == 256
+                apduBytes.Add(expectedLength is 0 or 256
                     ? (byte)0x00
                     : (byte)expectedLength);
             }
@@ -245,32 +245,34 @@ public class VirtualCardService : ICardService
         {
             // Convert IApduCommand to byte array
             byte[] commandBytes;
-            if (command is ICompleteApduCommand completeCommand)
+            switch (command)
             {
-                commandBytes = completeCommand.GetCompleteApdu();
-            }
-            else if (command is BaseApduCommand baseCommand)
-            {
-                commandBytes = baseCommand.ToApdu();
-            }
-            else
-            {
-                // Manual construction for basic IApduCommand
-                var apdu = new List<byte> { command.Cla, command.Ins, command.P1, command.P2 };
-                    
-                if (command.Data is { Length: > 0 })
+                case ICompleteApduCommand completeCommand:
+                    commandBytes = completeCommand.GetCompleteApdu();
+                    break;
+                case BaseApduCommand baseCommand:
+                    commandBytes = baseCommand.ToApdu();
+                    break;
+                default:
                 {
-                    apdu.Add((byte)command.Data.Length);
-                    apdu.AddRange(command.Data);
-                }
+                    // Manual construction for basic IApduCommand
+                    var apdu = new List<byte> { command.Cla, command.Ins, command.P1, command.P2 };
                     
-                if (command.ExpectedResponseLength.HasValue)
-                {
-                    var le = command.ExpectedResponseLength.Value;
-                    apdu.Add(le == 256 ? (byte)0 : (byte)le);
-                }
+                    if (command.Data is { Length: > 0 })
+                    {
+                        apdu.Add((byte)command.Data.Length);
+                        apdu.AddRange(command.Data);
+                    }
                     
-                commandBytes = apdu.ToArray();
+                    if (command.ExpectedResponseLength.HasValue)
+                    {
+                        var le = command.ExpectedResponseLength.Value;
+                        apdu.Add(le == 256 ? (byte)0 : (byte)le);
+                    }
+                    
+                    commandBytes = apdu.ToArray();
+                    break;
+                }
             }
                 
             // Send to virtual card
@@ -287,11 +289,10 @@ public class VirtualCardService : ICardService
                 new Dictionary<string, object>
                 {
                     [ResponseMetadata.TransmittedBytes] = commandBytes,
-                    [ResponseMetadata.ReceivedBytes] = response.Data.Concat(new byte[] 
-                    { 
+                    [ResponseMetadata.ReceivedBytes] = response.Data.Concat([
                         (byte)(response.StatusWord >> 8), 
-                        (byte)(response.StatusWord & 0xFF) 
-                    }).ToArray()
+                        (byte)(response.StatusWord & 0xFF)
+                    ]).ToArray()
                 });
         }
         catch (Exception ex)

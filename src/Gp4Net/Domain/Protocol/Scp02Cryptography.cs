@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Org.BouncyCastle.Crypto;
@@ -59,7 +60,7 @@ public static class Scp02Cryptography
             // Process the entire 16 bytes
             var sessionKey = new byte[cipher.GetOutputSize(derivationData.Length)];
             var len = cipher.ProcessBytes(derivationData, 0, derivationData.Length, sessionKey, 0);
-            cipher.DoFinal(sessionKey, len);
+            _ = cipher.DoFinal(sessionKey, len);
 
 
             return Result.Success<byte[], SmartCardError>(sessionKey);
@@ -177,7 +178,7 @@ public static class Scp02Cryptography
 
             var result = new byte[cipher.GetOutputSize(data.Length)];
             var len = cipher.ProcessBytes(data, 0, data.Length, result, 0);
-            cipher.DoFinal(result, len);
+            _ = cipher.DoFinal(result, len);
 
             // Return last 8 bytes as cryptogram
             var cryptogram = new byte[8];
@@ -228,31 +229,35 @@ public static class Scp02Cryptography
             Array.Copy(key, 0, k1, 0, 8);
             Array.Copy(key, 8, k2, 0, 8);
             
-            // Single DES CBC for all blocks except the last
+            // Single DES CBC for all blocks using functional aggregation
             var desEngine = new DesEngine();
-            var mac = new byte[8]; // Start with zero IV
             
-            // Process all blocks with single DES
-            for (int i = 0; i < paddedData.Length; i += 8)
-            {
-                // XOR with previous MAC (CBC mode)
-                for (int j = 0; j < 8; j++)
+            // Process all blocks with single DES using functional fold
+            var blockCount = paddedData.Length / 8;
+            var mac = Enumerable.Range(0, blockCount)
+                .Aggregate(new byte[8], (currentMac, blockIndex) =>
                 {
-                    paddedData[i + j] ^= mac[j];
-                }
-                
-                // Encrypt with K1
-                desEngine.Init(true, new KeyParameter(k1));
-                desEngine.ProcessBlock(paddedData, i, mac, 0);
-            }
+                    var blockStart = blockIndex * 8;
+                    var block = new byte[8];
+                    Array.Copy(paddedData, blockStart, block, 0, 8);
+                    
+                    // XOR block with current MAC (CBC mode) - functional transformation
+                    var xorBlock = block.Select((b, i) => (byte)(b ^ currentMac[i])).ToArray();
+                    
+                    // Encrypt with K1
+                    desEngine.Init(true, new KeyParameter(k1));
+                    var result = new byte[8];
+                    _ = desEngine.ProcessBlock(xorBlock, 0, result, 0);
+                    return result;
+                });
             
             // Final transformation: Decrypt with K2, then encrypt with K1
             desEngine.Init(false, new KeyParameter(k2));
             var temp = new byte[8];
-            desEngine.ProcessBlock(mac, 0, temp, 0);
+            _ = desEngine.ProcessBlock(mac, 0, temp, 0);
             
             desEngine.Init(true, new KeyParameter(k1));
-            desEngine.ProcessBlock(temp, 0, mac, 0);
+            _ = desEngine.ProcessBlock(temp, 0, mac, 0);
             
             return Result.Success<byte[], SmartCardError>(mac);
         }

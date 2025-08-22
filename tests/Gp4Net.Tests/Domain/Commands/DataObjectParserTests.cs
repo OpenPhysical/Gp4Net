@@ -19,10 +19,10 @@ public class DataObjectParserTests
         var result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var (tag, data) = result.Value;
-        tag.Should().Be(0x9F70);
-        data.Should().BeEquivalentTo(new byte[] { 0x04, 0x01, 0x02 });
+        _ = tag.Should().Be(0x9F70);
+        _ = data.Should().BeEquivalentTo(new byte[] { 0x04, 0x01, 0x02 });
     }
 
     [Test]
@@ -35,10 +35,10 @@ public class DataObjectParserTests
         var result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var (tag, data) = result.Value;
-        tag.Should().Be(0x9F70);
-        data.Should().BeEquivalentTo(new byte[] { 0x04, 0x01, 0x02 });
+        _ = tag.Should().Be(0x9F70);
+        _ = data.Should().BeEquivalentTo(new byte[] { 0x04, 0x01, 0x02 });
     }
 
     [Test]
@@ -51,12 +51,12 @@ public class DataObjectParserTests
         var result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var (tag, data) = result.Value;
-        tag.Should().Be(0xDF21);
-        data.Length.Should().Be(16);
-        data[0].Should().Be(0x11);
-        data[15].Should().Be(0x00);
+        _ = tag.Should().Be(0xDF21);
+        _ = data.Length.Should().Be(16);
+        _ = data[0].Should().Be(0x11);
+        _ = data[15].Should().Be(0x00);
     }
 
     [Test]
@@ -69,10 +69,10 @@ public class DataObjectParserTests
         var result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var (tag, data) = result.Value;
-        tag.Should().Be(0x00C0);
-        data.Should().BeEquivalentTo(new byte[] { 0x01, 0x02, 0x03, 0x04 });
+        _ = tag.Should().Be(0x00C0);
+        _ = data.Should().BeEquivalentTo(new byte[] { 0x01, 0x02, 0x03, 0x04 });
     }
 
     [Test]
@@ -85,10 +85,10 @@ public class DataObjectParserTests
         var result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var (tag, data) = result.Value;
-        tag.Should().Be(0x9F70);
-        data.Should().BeEmpty();
+        _ = tag.Should().Be(0x9F70);
+        _ = data.Should().BeEmpty();
     }
 
     [Test]
@@ -100,8 +100,8 @@ public class DataObjectParserTests
         var result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().BeEquivalentTo("Data object cannot be null or empty");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().BeEquivalentTo("Data object cannot be null or empty");
     }
 
     [Test]
@@ -114,8 +114,8 @@ public class DataObjectParserTests
         var result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().BeEquivalentTo("Data object cannot be null or empty");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().BeEquivalentTo("Data object cannot be null or empty");
     }
 
     [Test]
@@ -129,8 +129,8 @@ public class DataObjectParserTests
         var result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().BeEquivalentTo("Invalid data object format");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().BeEquivalentTo("Invalid data object format");
     }
 
     [Test]
@@ -143,8 +143,8 @@ public class DataObjectParserTests
         var result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().BeEquivalentTo("Invalid data object format");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().BeEquivalentTo("Invalid data object format");
     }
 
     [Test]
@@ -157,8 +157,8 @@ public class DataObjectParserTests
         var result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().ContainAny("even number of hex characters", "hex characters");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().ContainAny("even number of hex characters", "hex characters");
     }
 
     [Test]
@@ -170,15 +170,15 @@ public class DataObjectParserTests
     {
         // Arrange
         var result = DataObjectParser.ParseRawDataObject(dataObject);
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var (tag, data) = result.Value;
 
         // Act
         var isValid = DataObjectParser.ValidateDataObject(tag, data);
 
         // Assert
-        isValid.Should().BeTrue();
-        tag.Should().Be(expectedTag);
+        _ = isValid.Should().BeTrue();
+        _ = tag.Should().Be(expectedTag);
     }
 
     [Test]
@@ -192,7 +192,7 @@ public class DataObjectParserTests
         var isValid = DataObjectParser.ValidateDataObject(tag, data);
 
         // Assert
-        isValid.Should().BeFalse();
+        _ = isValid.Should().BeFalse();
     }
 
     [Test]
@@ -206,7 +206,7 @@ public class DataObjectParserTests
         var isValid = DataObjectParser.ValidateDataObject(tag, data);
 
         // Assert
-        isValid.Should().BeFalse();
+        _ = isValid.Should().BeFalse();
     }
 
     [Test]
@@ -220,7 +220,7 @@ public class DataObjectParserTests
         var isValid = DataObjectParser.ValidateDataObject(tag, data);
 
         // Assert
-        isValid.Should().BeTrue(); // Empty data is allowed for some tags
+        _ = isValid.Should().BeTrue(); // Empty data is allowed for some tags
     }
 
     [Test]
@@ -232,11 +232,11 @@ public class DataObjectParserTests
     {
         // Act
         var result = DataObjectParser.ParseRawDataObject(dataObject);
-            
+
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var (tag, data) = result.Value;
-        tag.Should().BeGreaterThan(0);
-        data.Should().NotBeNull();
+        _ = tag.Should().BeGreaterThan(0);
+        _ = data.Should().NotBeNull();
     }
 }

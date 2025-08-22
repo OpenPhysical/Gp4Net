@@ -41,11 +41,11 @@ public class Scp02ExternalAuthMacTests
         var result = Scp02ProtocolService.CalculateInitialMacChainingValue(command, sMacKey);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var actualMac = result.Value;
-        
+
         // Verify MAC matches GP Pro calculation exactly
-        actualMac.Should().BeEquivalentTo(expectedMac, 
+        _ = actualMac.Should().BeEquivalentTo(expectedMac,
             $"MAC should match GP Pro calculation. Expected: {Convert.ToHexString(expectedMac)}, " +
             $"Actual: {Convert.ToHexString(actualMac)}");
     }
@@ -69,15 +69,15 @@ public class Scp02ExternalAuthMacTests
         var result = Scp02ProtocolService.CalculateInitialMacChainingValue(command, sMacKey);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var actualMac = result.Value;
-        
+
         // The MAC should be calculated correctly (we expect a specific value based on our host cryptogram)
-        actualMac.Length.Should().Be(8, "MAC should be 8 bytes for SCP02");
+        _ = actualMac.Length.Should().Be(8, "MAC should be 8 bytes for SCP02");
         
         // Log the calculated MAC for debugging
-        TestContext.WriteLine($"Our host cryptogram: {Convert.ToHexString(ourHostCryptogram)}");
-        TestContext.WriteLine($"Calculated MAC: {Convert.ToHexString(actualMac)}");
+        TestContext.Out.WriteLine($"Our host cryptogram: {Convert.ToHexString(ourHostCryptogram)}");
+        TestContext.Out.WriteLine($"Calculated MAC: {Convert.ToHexString(actualMac)}");
     }
 
     /// <summary>
@@ -111,8 +111,8 @@ public class Scp02ExternalAuthMacTests
         var result = Scp02ProtocolService.CalculateInitialMacChainingValue(command, sMacKey);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Length.Should().Be(8, "MAC should be 8 bytes");
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Length.Should().Be(8, "MAC should be 8 bytes");
         
         // The MAC calculation should have used the correct APDU structure
         // We can't directly test the internal APDU, but successful MAC calculation
@@ -148,11 +148,11 @@ public class Scp02ExternalAuthMacTests
             var result = Scp02ProtocolService.CalculateInitialMacChainingValue(command, sMacKey);
 
             // Assert
-            result.IsSuccess.Should().BeTrue($"MAC calculation should succeed for security level {securityLevel}");
-            result.Value.Length.Should().Be(8, $"MAC should be 8 bytes for security level {securityLevel}");
+            _ = result.IsSuccess.Should().BeTrue($"MAC calculation should succeed for security level {securityLevel}");
+            _ = result.Value.Length.Should().Be(8, $"MAC should be 8 bytes for security level {securityLevel}");
             
             // Each security level should produce a different MAC due to different P1 values
-            TestContext.WriteLine($"Security Level {securityLevel} (P1=0x{expectedP1:X2}): MAC = {Convert.ToHexString(result.Value)}");
+            TestContext.Out.WriteLine($"Security Level {securityLevel} (P1=0x{expectedP1:X2}): MAC = {Convert.ToHexString(result.Value)}");
         }
     }
 
@@ -171,12 +171,12 @@ public class Scp02ExternalAuthMacTests
 
         // Act & Assert - Null command
         var nullCommandResult = Scp02ProtocolService.CalculateInitialMacChainingValue(null, validMacKey);
-        nullCommandResult.IsFailure.Should().BeTrue();
-        nullCommandResult.Error.Message.Should().Contain("Command cannot be null");
+        _ = nullCommandResult.IsFailure.Should().BeTrue();
+        _ = nullCommandResult.Error.Message.Should().Contain("Command cannot be null");
 
         // Act & Assert - Null MAC key
         var nullMacKeyResult = Scp02ProtocolService.CalculateInitialMacChainingValue(validCommand, null);
-        nullMacKeyResult.IsFailure.Should().BeTrue();
-        nullMacKeyResult.Error.Message.Should().Contain("MAC key cannot be null");
+        _ = nullMacKeyResult.IsFailure.Should().BeTrue();
+        _ = nullMacKeyResult.Error.Message.Should().Contain("MAC key cannot be null");
     }
 }

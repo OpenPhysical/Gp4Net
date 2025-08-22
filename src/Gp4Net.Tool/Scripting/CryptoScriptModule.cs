@@ -244,7 +244,7 @@ public class CryptoScriptModule
         var digest = new Sha1Digest();
         digest.BlockUpdate(data, 0, data.Length);
         var result = new byte[digest.GetDigestSize()];
-        digest.DoFinal(result, 0);
+        _ = digest.DoFinal(result, 0);
         return result;
     }
 #pragma warning restore CA5350
@@ -258,7 +258,7 @@ public class CryptoScriptModule
         var digest = new Sha256Digest();
         digest.BlockUpdate(data, 0, data.Length);
         var result = new byte[digest.GetDigestSize()];
-        digest.DoFinal(result, 0);
+        _ = digest.DoFinal(result, 0);
         return result;
     }
 
@@ -271,7 +271,7 @@ public class CryptoScriptModule
         var digest = new Sha384Digest();
         digest.BlockUpdate(data, 0, data.Length);
         var result = new byte[digest.GetDigestSize()];
-        digest.DoFinal(result, 0);
+        _ = digest.DoFinal(result, 0);
         return result;
     }
 
@@ -284,7 +284,7 @@ public class CryptoScriptModule
         var digest = new Sha512Digest();
         digest.BlockUpdate(data, 0, data.Length);
         var result = new byte[digest.GetDigestSize()];
-        digest.DoFinal(result, 0);
+        _ = digest.DoFinal(result, 0);
         return result;
     }
 

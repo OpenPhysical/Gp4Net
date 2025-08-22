@@ -18,7 +18,7 @@ public class SecurityDomainDataParserTests
         var result = SecurityDomainDataParser.Decode(data);
 
         // Assert
-        result.Should().Contain("Max APDU: 255 bytes");
+        _ = result.Should().Contain("Max APDU: 255 bytes");
     }
 
     [Test]
@@ -31,7 +31,7 @@ public class SecurityDomainDataParserTests
         var result = SecurityDomainDataParser.Decode(data);
 
         // Assert
-        result.Should().Contain("Lifecycle: Selectable");
+        _ = result.Should().Contain("Lifecycle: Selectable");
     }
 
     [Test]
@@ -44,8 +44,8 @@ public class SecurityDomainDataParserTests
         var result = SecurityDomainDataParser.Decode(data);
 
         // Assert
-        result.Should().Contain("Max APDU: 255 bytes");
-        result.Should().Contain("Lifecycle: Personalized");
+        _ = result.Should().Contain("Max APDU: 255 bytes");
+        _ = result.Should().Contain("Lifecycle: Personalized");
     }
 
     [Test]
@@ -64,7 +64,7 @@ public class SecurityDomainDataParserTests
         var result = SecurityDomainDataParser.Decode(data);
 
         // Assert
-        result.Should().Contain($"Lifecycle: {expectedState}");
+        _ = result.Should().Contain($"Lifecycle: {expectedState}");
     }
 
     [Test]
@@ -77,7 +77,7 @@ public class SecurityDomainDataParserTests
         var result = SecurityDomainDataParser.Decode(data);
 
         // Assert
-        result.Should().Contain("Lifecycle: 0xAB");
+        _ = result.Should().Contain("Lifecycle: 0xAB");
     }
 
     [Test]
@@ -90,7 +90,7 @@ public class SecurityDomainDataParserTests
         var result = SecurityDomainDataParser.Decode(data);
 
         // Assert
-        result.Should().Contain("Tag 9F99: 112233");
+        _ = result.Should().Contain("Tag 9F99: 112233");
     }
 
     [Test]
@@ -103,7 +103,7 @@ public class SecurityDomainDataParserTests
         var result = SecurityDomainDataParser.Decode(data);
 
         // Assert
-        result.Should().BeEquivalentTo("B5041122");
+        _ = result.Should().BeEquivalentTo("B5041122");
     }
 
     [Test]
@@ -116,7 +116,7 @@ public class SecurityDomainDataParserTests
         var result = SecurityDomainDataParser.Decode(data);
 
         // Assert
-        result.Should().BeEquivalentTo(string.Empty);
+        _ = result.Should().BeEquivalentTo(string.Empty);
     }
 
     [Test]
@@ -126,7 +126,7 @@ public class SecurityDomainDataParserTests
         var result = SecurityDomainDataParser.Decode(null);
 
         // Assert
-        result.Should().BeEquivalentTo(string.Empty);
+        _ = result.Should().BeEquivalentTo(string.Empty);
     }
 
     [Test]
@@ -139,6 +139,6 @@ public class SecurityDomainDataParserTests
         var result = SecurityDomainDataParser.Decode(data);
 
         // Assert
-        result.Should().BeEquivalentTo("A5FF112233");
+        _ = result.Should().BeEquivalentTo("A5FF112233");
     }
 }

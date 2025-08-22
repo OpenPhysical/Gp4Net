@@ -154,7 +154,7 @@ public static class FunctionComposition
     public static readonly CommandProcessor Identity = 
         (command, environment, cancellationToken) =>
             Task.FromResult(Result.Success<CommandResult, SmartCardError>(
-                CommandResult.Success(Array.Empty<byte>(), Constants.StatusWords.Success, environment)));
+                CommandResult.Success([], Constants.StatusWords.Success, environment)));
 
     /// <summary>
     /// Merges two metadata instances, preferring values from the second if both present.

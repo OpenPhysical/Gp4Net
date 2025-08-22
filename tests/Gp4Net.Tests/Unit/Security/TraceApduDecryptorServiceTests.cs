@@ -35,7 +35,7 @@ public class TraceApduDecryptorServiceTests
     {
         var service = new TraceApduDecryptorService(null);
 
-        service.Should().NotBeNull();
+        _ = service.Should().NotBeNull();
     }
 
     [Test]
@@ -43,7 +43,7 @@ public class TraceApduDecryptorServiceTests
     {
         var service = new TraceApduDecryptorService(_logger);
 
-        service.Should().NotBeNull();
+        _ = service.Should().NotBeNull();
     }
 
     [TestCase(ApduDirection.Command)]
@@ -58,14 +58,14 @@ public class TraceApduDecryptorServiceTests
 
         var result = _service.DecryptApdu(plaintextApdu, direction, sessionState);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var (decryptedApdu, updatedState) = result.Value;
-        decryptedApdu.OriginalBytes.Should().BeEquivalentTo(plaintextApdu);
-        decryptedApdu.DecryptedBytes.Should().BeEquivalentTo(plaintextApdu);
-        decryptedApdu.Direction.Should().Be(direction);
-        decryptedApdu.Status.Should().Be(DecryptionStatus.PlainText);
-        decryptedApdu.Metadata.Should().Contain("No secure messaging detected");
-        updatedState.Should().Be(sessionState); // State unchanged for plaintext
+        _ = decryptedApdu.OriginalBytes.Should().BeEquivalentTo(plaintextApdu);
+        _ = decryptedApdu.DecryptedBytes.Should().BeEquivalentTo(plaintextApdu);
+        _ = decryptedApdu.Direction.Should().Be(direction);
+        _ = decryptedApdu.Status.Should().Be(DecryptionStatus.PlainText);
+        _ = decryptedApdu.Metadata.Should().Contain("No secure messaging detected");
+        _ = updatedState.Should().Be(sessionState); // State unchanged for plaintext
     }
 
     [Test]
@@ -79,10 +79,10 @@ public class TraceApduDecryptorServiceTests
 
         var result = _service.DecryptApdu(secureCommand, ApduDirection.Command, sessionState);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var (decryptedApdu, _) = result.Value;
-        decryptedApdu.Status.Should().NotBe(DecryptionStatus.PlainText);
-        decryptedApdu.Metadata.Should().Contain("SCP03");
+        _ = decryptedApdu.Status.Should().NotBe(DecryptionStatus.PlainText);
+        _ = decryptedApdu.Metadata.Should().Contain("SCP03");
     }
 
     [Test]
@@ -95,12 +95,12 @@ public class TraceApduDecryptorServiceTests
 
         var result = _service.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var decryptedTrace = result.Value;
-        decryptedTrace.Exchanges.Should().BeEmpty();
-        decryptedTrace.SessionKeys.Should().Be(sessionKeys);
-        decryptedTrace.SecurityLevel.Should().Be(securityLevel);
-        decryptedTrace.ProtocolVersion.Should().Be(protocolVersion);
+        _ = decryptedTrace.Exchanges.Should().BeEmpty();
+        _ = decryptedTrace.SessionKeys.Should().Be(sessionKeys);
+        _ = decryptedTrace.SecurityLevel.Should().Be(securityLevel);
+        _ = decryptedTrace.ProtocolVersion.Should().Be(protocolVersion);
     }
 
     [Test]
@@ -109,8 +109,8 @@ public class TraceApduDecryptorServiceTests
         var exchanges = new[]
         {
             new TraceExchange(1,
-                new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x08, 0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x00 }, // SELECT
-                new byte[] { 0x90, 0x00 }) // Success
+                [0x00, 0xA4, 0x04, 0x00, 0x08, 0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x00], // SELECT
+                [0x90, 0x00]) // Success
         };
         var sessionKeys = CreateTestSessionKeys();
         var securityLevel = SecurityLevel.None;
@@ -118,15 +118,15 @@ public class TraceApduDecryptorServiceTests
 
         var result = _service.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var decryptedTrace = result.Value;
-        decryptedTrace.Exchanges.Should().HaveCount(1);
+        _ = decryptedTrace.Exchanges.Should().HaveCount(1);
 
         var exchange = decryptedTrace.Exchanges.First();
-        exchange.Id.Should().Be(1);
-        exchange.Command.Status.Should().Be(DecryptionStatus.PlainText);
-        exchange.Response.Status.Should().Be(DecryptionStatus.PlainText);
-        exchange.Response.Description.Should().Contain("Success");
+        _ = exchange.Id.Should().Be(1);
+        _ = exchange.Command.Status.Should().Be(DecryptionStatus.PlainText);
+        _ = exchange.Response.Status.Should().Be(DecryptionStatus.PlainText);
+        _ = exchange.Response.Description.Should().Contain("Success");
     }
 
     [Test]
@@ -135,8 +135,8 @@ public class TraceApduDecryptorServiceTests
         var exchanges = new[]
         {
             new TraceExchange(1,
-                new byte[] { 0x84, 0x50, 0x00, 0x00, 0x08, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 },
-                new byte[] { 0x90, 0x00 })
+                [0x84, 0x50, 0x00, 0x00, 0x08, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08],
+                [0x90, 0x00])
         };
 
         // Invalid session keys (empty components)
@@ -147,8 +147,8 @@ public class TraceApduDecryptorServiceTests
 
         var result = _service.DecryptTrace(exchanges, invalidKeys, securityLevel, protocolVersion);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<SmartCardError>();
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<SmartCardError>();
     }
 
     [TestCase(ProtocolIdentifiers.Scp02)]
@@ -158,17 +158,17 @@ public class TraceApduDecryptorServiceTests
         var exchanges = new[]
         {
             new TraceExchange(1,
-                new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 }, // SELECT with no data
-                new byte[] { 0x90, 0x00 }) // Success
+                [0x00, 0xA4, 0x04, 0x00, 0x00], // SELECT with no data
+                [0x90, 0x00]) // Success
         };
         var sessionKeys = CreateTestSessionKeys();
         var securityLevel = SecurityLevel.None;
 
         var result = _service.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var decryptedTrace = result.Value;
-        decryptedTrace.ProtocolVersion.Should().Be(protocolVersion);
+        _ = decryptedTrace.ProtocolVersion.Should().Be(protocolVersion);
     }
 
     [Test]
@@ -177,7 +177,7 @@ public class TraceApduDecryptorServiceTests
         var responseBytes = new byte[] { 0x01, 0x02, 0x90, 0x00 }; // Data + Success status
         var decryptedApdu = new DecryptedApdu(responseBytes, ApduDirection.Response, DecryptionStatus.PlainText, "Test");
 
-        decryptedApdu.Description.Should().Contain("Response: 0x9000 (Success)");
+        _ = decryptedApdu.Description.Should().Contain("Response: 0x9000 (Success)");
     }
 
     [Test]
@@ -186,7 +186,7 @@ public class TraceApduDecryptorServiceTests
         var commandBytes = new byte[] { 0x00, 0xA4, 0x04, 0x00 };
         var decryptedApdu = new DecryptedApdu(commandBytes, ApduDirection.Command, DecryptionStatus.PlainText, "Test");
 
-        decryptedApdu.Description.Should().Contain("Command APDU (4 bytes)");
+        _ = decryptedApdu.Description.Should().Contain("Command APDU (4 bytes)");
     }
 
     [Test]
@@ -195,7 +195,7 @@ public class TraceApduDecryptorServiceTests
         var originalBytes = new byte[] { 0x01, 0x02, 0x03 };
         var decryptedApdu = new DecryptedApdu(originalBytes, ApduDirection.Command, DecryptionStatus.PlainText, "Test");
 
-        decryptedApdu.DecryptedBytes.Should().BeEquivalentTo(originalBytes);
+        _ = decryptedApdu.DecryptedBytes.Should().BeEquivalentTo(originalBytes);
     }
 
     [Test]
@@ -207,9 +207,9 @@ public class TraceApduDecryptorServiceTests
 
         var exchange = new TraceExchange(id, command, response);
 
-        exchange.Id.Should().Be(id);
-        exchange.Command.Should().BeEquivalentTo(command);
-        exchange.Response.Should().BeEquivalentTo(response);
+        _ = exchange.Id.Should().Be(id);
+        _ = exchange.Command.Should().BeEquivalentTo(command);
+        _ = exchange.Response.Should().BeEquivalentTo(response);
     }
 
     [Test]
@@ -222,10 +222,10 @@ public class TraceApduDecryptorServiceTests
 
         var trace = new DecryptedTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
 
-        trace.Exchanges.Should().BeSameAs(exchanges);
-        trace.SessionKeys.Should().Be(sessionKeys);
-        trace.SecurityLevel.Should().Be(securityLevel);
-        trace.ProtocolVersion.Should().Be(protocolVersion);
+        _ = trace.Exchanges.Should().BeSameAs(exchanges);
+        _ = trace.SessionKeys.Should().Be(sessionKeys);
+        _ = trace.SecurityLevel.Should().Be(securityLevel);
+        _ = trace.ProtocolVersion.Should().Be(protocolVersion);
     }
 
     private static SessionKeys CreateTestSessionKeys()

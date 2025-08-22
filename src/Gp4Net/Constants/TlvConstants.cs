@@ -51,7 +51,25 @@ public static class TlvConstants
     /// <summary>
     /// End-of-contents octets for indefinite length (0x00 0x00).
     /// </summary>
-    public static readonly byte[] EndOfContents = { 0x00, 0x00 };
+    public static readonly byte[] EndOfContents = [0x00, 0x00];
+
+    /// <summary>
+    /// Maximum TLV value size to prevent memory exhaustion attacks.
+    /// This limit protects against malicious TLV structures claiming massive lengths.
+    /// </summary>
+    public const int MaxTlvValueSize = 65536; // 64KB - reasonable limit for card data
+
+    /// <summary>
+    /// Maximum total nested TLV parsing depth to prevent stack overflow attacks.
+    /// Protects against deeply nested TLV structures that could cause recursion bombs.
+    /// </summary>
+    public const int MaxTlvParsingDepth = 32;
+
+    /// <summary>
+    /// Maximum reasonable TLV length field size in bytes.
+    /// Per ASN.1 BER specification, lengths larger than 4 bytes (2^32) are not practical.
+    /// </summary>
+    public const int MaxReasonableLengthBytes = 4;
 }
 
 /// <summary>

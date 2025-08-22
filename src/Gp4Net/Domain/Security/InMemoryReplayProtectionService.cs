@@ -19,9 +19,11 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
     /// <inheritdoc />
     public UnitResult<SmartCardError> ValidateSequenceCounter(byte keyVersion, byte[] sequenceCounter)
     {
-        if (sequenceCounter == null || sequenceCounter.Length != 3)
+        // Security fix: Accept both 2-byte (SCP02) and 3-byte sequence counters
+        // SCP02 uses 2-byte sequence counters, while other protocols may use 3-byte
+        if (sequenceCounter == null || (sequenceCounter.Length != 2 && sequenceCounter.Length != 3))
         {
-            return UnitResult.Failure(SmartCardError.InvalidArgument("Sequence counter must be 3 bytes"));
+            return UnitResult.Failure(SmartCardError.InvalidArgument("Sequence counter must be 2 or 3 bytes"));
         }
 
         var counterKey = Convert.ToHexString(sequenceCounter);
@@ -38,9 +40,11 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
     /// <inheritdoc />
     public UnitResult<SmartCardError> RecordSequenceCounter(byte keyVersion, byte[] sequenceCounter)
     {
-        if (sequenceCounter == null || sequenceCounter.Length != 3)
+        // Security fix: Accept both 2-byte (SCP02) and 3-byte sequence counters
+        // SCP02 uses 2-byte sequence counters, while other protocols may use 3-byte
+        if (sequenceCounter == null || (sequenceCounter.Length != 2 && sequenceCounter.Length != 3))
         {
-            return UnitResult.Failure(SmartCardError.InvalidArgument("Sequence counter must be 3 bytes"));
+            return UnitResult.Failure(SmartCardError.InvalidArgument("Sequence counter must be 2 or 3 bytes"));
         }
 
         var counterKey = Convert.ToHexString(sequenceCounter);
@@ -66,7 +70,7 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
 
             foreach (var key in keysToRemove)
             {
-                keyCounters.TryRemove(key, out _);
+                _ = keyCounters.TryRemove(key, out _);
             }
         }
 
@@ -76,7 +80,7 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
     /// <inheritdoc />
     public UnitResult<SmartCardError> ClearKeyVersion(byte keyVersion)
     {
-        _seenCounters.TryRemove(keyVersion, out _);
+        _ = _seenCounters.TryRemove(keyVersion, out _);
         return UnitResult.Success<SmartCardError>();
     }
 

@@ -65,7 +65,7 @@ public class WsctCardChannelWrapper : ICardChannelWrapper
         {
             try
             {
-                _channel.Disconnect(Disposition.UnpowerCard);
+                _ = _channel.Disconnect(Disposition.UnpowerCard);
             }
             catch
             {

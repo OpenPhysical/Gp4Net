@@ -25,7 +25,7 @@ public class Scp02BaseKeyModeTests
         var dekKey = Convert.FromHexString("1122334455667788AABBCCDDEEFF1122");
         
         var keySetResult = Scp02KeySet.Create(encKey, macKey, dekKey, 0x01);
-        keySetResult.IsSuccess.Should().BeTrue();
+        _ = keySetResult.IsSuccess.Should().BeTrue();
         
         var sequenceCounter = Convert.FromHexString("00A5");
         var hostChallenge = Convert.FromHexString("FEDCBA9876543210");
@@ -40,24 +40,24 @@ public class Scp02BaseKeyModeTests
             sequenceCounter,
             implementationParameter
         );
-        
+
         // Assert
-        deriveResult.IsSuccess.Should().BeTrue();
+        _ = deriveResult.IsSuccess.Should().BeTrue();
         var sessionKeys = deriveResult.Value;
         
         // The fix ensures MAC session key is derived from MAC base key, not ENC key
         var expectedSMac = Convert.FromHexString("82D6C3CC4FE50FC6C4DF470744514496");
-        sessionKeys.SMac.Should().BeEquivalentTo(expectedSMac, 
+        _ = sessionKeys.SMac.Should().BeEquivalentTo(expectedSMac,
             "MAC session key should be derived from MAC base key, not ENC key");
             
         // Verify ENC key derivation
         var expectedSEnc = Convert.FromHexString("B1B1E3A7B4FBD9F6BDA5FDDB703C5D47");
-        sessionKeys.SEnc.Should().BeEquivalentTo(expectedSEnc,
+        _ = sessionKeys.SEnc.Should().BeEquivalentTo(expectedSEnc,
             "ENC session key should be derived from ENC base key");
             
         // Verify DEK key derivation  
         var expectedSDek = Convert.FromHexString("CAF3D972A7E964D2BCBF868561574637");
-        sessionKeys.Dek.Should().BeEquivalentTo(expectedSDek,
+        _ = sessionKeys.Dek.Should().BeEquivalentTo(expectedSDek,
             "DEK session key should be derived from DEK base key");
     }
     
@@ -68,7 +68,7 @@ public class Scp02BaseKeyModeTests
         var sameKey = Convert.FromHexString("404142434445464748494A4B4C4D4E4F");
         
         var keySetResult = Scp02KeySet.Create(sameKey, sameKey, sameKey, 0x01);
-        keySetResult.IsSuccess.Should().BeTrue();
+        _ = keySetResult.IsSuccess.Should().BeTrue();
         
         var sequenceCounter = Convert.FromHexString("0001");
         var hostChallenge = Convert.FromHexString("1122334455667788");
@@ -83,16 +83,16 @@ public class Scp02BaseKeyModeTests
             sequenceCounter,
             implementationParameter
         );
-        
+
         // Assert
-        deriveResult.IsSuccess.Should().BeTrue();
+        _ = deriveResult.IsSuccess.Should().BeTrue();
         var sessionKeys = deriveResult.Value;
-        
+
         // When all base keys are the same, the result should be consistent
         // regardless of which base key is used
-        sessionKeys.SMac.Should().NotBeNull();
-        sessionKeys.SEnc.Should().NotBeNull();
-        sessionKeys.Dek.Should().NotBeNull();
+        _ = sessionKeys.SMac.Should().NotBeNull();
+        _ = sessionKeys.SEnc.Should().NotBeNull();
+        _ = sessionKeys.Dek.Should().NotBeNull();
     }
     
     [Test]
@@ -104,7 +104,7 @@ public class Scp02BaseKeyModeTests
         var dekKey = Convert.FromHexString("B1B2B3B4B5B6B7B8B9BABBBCBDBEBFC0");
         
         var keySetResult = Scp02KeySet.Create(encKey, macKey, dekKey, 0x01);
-        keySetResult.IsSuccess.Should().BeTrue();
+        _ = keySetResult.IsSuccess.Should().BeTrue();
         
         var sequenceCounter = Convert.FromHexString("0042");
         var hostChallenge = Convert.FromHexString("0011223344556677");
@@ -119,14 +119,14 @@ public class Scp02BaseKeyModeTests
             sequenceCounter,
             implementationParameter
         );
-        
+
         // Assert
-        deriveResult.IsSuccess.Should().BeTrue();
+        _ = deriveResult.IsSuccess.Should().BeTrue();
         var sessionKeys = deriveResult.Value;
         
         // For i=05, MAC key should be derived (not static)
         var expectedSMac = Convert.FromHexString("8520B9AF247712F7E72BC07D8D920EB3");
-        sessionKeys.SMac.Should().BeEquivalentTo(expectedSMac,
+        _ = sessionKeys.SMac.Should().BeEquivalentTo(expectedSMac,
             "For i=05 (b1=1), MAC key should be derived");
     }
     
@@ -158,7 +158,7 @@ public class Scp02BaseKeyModeTests
         // Test invalid host challenge lengths
         var invalidHostChallenges = new[]
         {
-            (new byte[0], "Empty host challenge"),
+            ([], "Empty host challenge"),
             (new byte[4], "4-byte host challenge"),
             (new byte[12], "12-byte host challenge"),
             (new byte[16], "16-byte host challenge")
@@ -174,21 +174,21 @@ public class Scp02BaseKeyModeTests
                 sequenceCounter,
                 implementationParameter
             );
-            
+
             // Assert
-            result.IsFailure.Should().BeTrue($"{description} should be rejected");
-            result.Error.Should().BeOfType<InvalidLengthError>();
+            _ = result.IsFailure.Should().BeTrue($"{description} should be rejected");
+            _ = result.Error.Should().BeOfType<InvalidLengthError>();
             var lengthError = (InvalidLengthError)result.Error;
-            lengthError.Expected.Should().Be(8);
+            _ = lengthError.Expected.Should().Be(8);
             
-            TestContext.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
+            TestContext.Out.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
         }
         
         // Test invalid card challenge lengths
         var hostChallenge = Convert.FromHexString("1122334455667788");
         var invalidCardChallenges = new[]
         {
-            (new byte[0], "Empty card challenge"),
+            ([], "Empty card challenge"),
             (new byte[4], "4-byte card challenge"),
             (new byte[8], "8-byte card challenge"),
             (new byte[12], "12-byte card challenge")
@@ -204,14 +204,14 @@ public class Scp02BaseKeyModeTests
                 sequenceCounter,
                 implementationParameter
             );
-            
+
             // Assert
-            result.IsFailure.Should().BeTrue($"{description} should be rejected");
-            result.Error.Should().BeOfType<InvalidLengthError>();
+            _ = result.IsFailure.Should().BeTrue($"{description} should be rejected");
+            _ = result.Error.Should().BeOfType<InvalidLengthError>();
             var lengthError = (InvalidLengthError)result.Error;
-            lengthError.Expected.Should().Be(6);
+            _ = lengthError.Expected.Should().Be(6);
             
-            TestContext.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
+            TestContext.Out.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
         }
     }
     
@@ -230,7 +230,7 @@ public class Scp02BaseKeyModeTests
         
         var invalidSequenceCounters = new[]
         {
-            (new byte[0], "Empty sequence counter"),
+            ([], "Empty sequence counter"),
             (new byte[1], "1-byte sequence counter"),
             (new byte[3], "3-byte sequence counter"),
             (new byte[4], "4-byte sequence counter")
@@ -246,14 +246,14 @@ public class Scp02BaseKeyModeTests
                 invalidCounter,
                 implementationParameter
             );
-            
+
             // Assert
-            result.IsFailure.Should().BeTrue($"{description} should be rejected");
-            result.Error.Should().BeOfType<InvalidLengthError>();
+            _ = result.IsFailure.Should().BeTrue($"{description} should be rejected");
+            _ = result.Error.Should().BeOfType<InvalidLengthError>();
             var lengthError = (InvalidLengthError)result.Error;
-            lengthError.Expected.Should().Be(2);
+            _ = lengthError.Expected.Should().Be(2);
             
-            TestContext.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
+            TestContext.Out.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
         }
     }
     
@@ -283,13 +283,13 @@ public class Scp02BaseKeyModeTests
                 sequenceCounter,
                 invalidImpl
             );
-            
+
             // Assert
-            result.IsFailure.Should().BeTrue($"Invalid implementation i={invalidImpl:X2} should be rejected");
-            result.Error.Should().BeOfType<UnsupportedImplementationError>();
-            result.Error.Message.Should().Contain($"i={invalidImpl:X2}", $"Error should identify invalid implementation i={invalidImpl:X2}");
+            _ = result.IsFailure.Should().BeTrue($"Invalid implementation i={invalidImpl:X2} should be rejected");
+            _ = result.Error.Should().BeOfType<UnsupportedImplementationError>();
+            _ = result.Error.Message.Should().Contain($"i={invalidImpl:X2}", $"Error should identify invalid implementation i={invalidImpl:X2}");
             
-            TestContext.WriteLine($"✓ Invalid implementation i={invalidImpl:X2} correctly rejected: {result.Error.Message}");
+            TestContext.Out.WriteLine($"✓ Invalid implementation i={invalidImpl:X2} correctly rejected: {result.Error.Message}");
         }
     }
 }

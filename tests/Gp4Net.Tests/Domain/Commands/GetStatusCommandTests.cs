@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using AwesomeAssertions;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
@@ -21,10 +22,10 @@ public class GetStatusCommandTests
     {
         var result = GetStatusCommand.Create(subset);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Subset.Should().Be(subset);
-        result.Value.Format.Should().Be(GetStatusCommand.ResponseFormat.None);
-        result.Value.SearchCriteria.Should().BeEmpty();
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Subset.Should().Be(subset);
+        _ = result.Value.Format.Should().Be(GetStatusCommand.ResponseFormat.None);
+        _ = result.Value.SearchCriteria.Should().BeEmpty();
     }
 
     [Test]
@@ -37,8 +38,8 @@ public class GetStatusCommandTests
             format
         );
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Format.Should().Be(format);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Format.Should().Be(format);
     }
 
     [Test]
@@ -52,8 +53,8 @@ public class GetStatusCommandTests
             aid
         );
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.SearchCriteria.Should().BeEquivalentTo(aid);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.SearchCriteria.Should().BeEquivalentTo(aid);
     }
 
     [Test]
@@ -69,8 +70,8 @@ public class GetStatusCommandTests
             aid
         );
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Search criteria AID must be between 5 and 16 bytes");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("Search criteria AID must be between 5 and 16 bytes");
     }
 
     [Test]
@@ -87,8 +88,8 @@ public class GetStatusCommandTests
             aid
         );
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.SearchCriteria!.Length.Should().Be(length);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.SearchCriteria!.Length.Should().Be(length);
     }
 
     [Test]
@@ -98,8 +99,8 @@ public class GetStatusCommandTests
 
         var result = GetStatusCommand.Create(invalidSubset);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Invalid status subset");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("Invalid status subset");
     }
 
     [Test]
@@ -112,8 +113,8 @@ public class GetStatusCommandTests
             invalidFormat
         );
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Invalid response format");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("Invalid response format");
     }
 
     [Test]
@@ -129,7 +130,7 @@ public class GetStatusCommandTests
 
         originalAid[0] = 0xFF;
 
-        command.SearchCriteria![0].Should().Be(0xA0);
+        _ = command.SearchCriteria![0].Should().Be(0xA0);
     }
 
     [Test]
@@ -143,12 +144,12 @@ public class GetStatusCommandTests
 
         var apdu = ApduBuilder.BuildApdu(command);
 
-        apdu.Length.Should().Be(5); // CLA INS P1 P2 Le
-        apdu[0].Should().Be(0x80); // CLA
-        apdu[1].Should().Be(0xF2); // INS
-        apdu[2].Should().Be(0x40); // P1 - Applications subset
-        apdu[3].Should().Be(0x00); // P2 - No format
-        apdu[4].Should().Be(0x00); // Le
+        _ = apdu.Length.Should().Be(5); // CLA INS P1 P2 Le
+        _ = apdu[0].Should().Be(0x80); // CLA
+        _ = apdu[1].Should().Be(0xF2); // INS
+        _ = apdu[2].Should().Be(0x40); // P1 - Applications subset
+        _ = apdu[3].Should().Be(0x00); // P2 - No format
+        _ = apdu[4].Should().Be(0x00); // Le
     }
 
     [Test]
@@ -164,14 +165,14 @@ public class GetStatusCommandTests
 
         var apdu = ApduBuilder.BuildApdu(command);
 
-        apdu.Length.Should().Be(5 + aid.Length + 1); // CLA INS P1 P2 Lc Data Le
-        apdu[0].Should().Be(0x80); // CLA
-        apdu[1].Should().Be(0xF2); // INS
-        apdu[2].Should().Be(0x40); // P1
-        apdu[3].Should().Be(0x00); // P2
-        apdu[4].Should().Be((byte)aid.Length); // Lc
-        apdu[5..(5 + aid.Length)].Should().BeEquivalentTo(aid); // Data
-        apdu[5 + aid.Length].Should().Be(0x00); // Le
+        _ = apdu.Length.Should().Be(5 + aid.Length + 1); // CLA INS P1 P2 Lc Data Le
+        _ = apdu[0].Should().Be(0x80); // CLA
+        _ = apdu[1].Should().Be(0xF2); // INS
+        _ = apdu[2].Should().Be(0x40); // P1
+        _ = apdu[3].Should().Be(0x00); // P2
+        _ = apdu[4].Should().Be((byte)aid.Length); // Lc
+        _ = apdu[5..(5 + aid.Length)].Should().BeEquivalentTo(aid); // Data
+        _ = apdu[5 + aid.Length].Should().Be(0x00); // Le
     }
 
     [Test]
@@ -186,7 +187,7 @@ public class GetStatusCommandTests
 
         var apdu = ApduBuilder.BuildApdu(command);
 
-        apdu[2].Should().Be(expectedP1);
+        _ = apdu[2].Should().Be(expectedP1);
     }
 
     [Test]
@@ -202,7 +203,7 @@ public class GetStatusCommandTests
 
         var apdu = ApduBuilder.BuildApdu(command);
 
-        apdu[3].Should().Be(expectedP2);
+        _ = apdu[3].Should().Be(expectedP2);
     }
 
     [Test]
@@ -214,8 +215,8 @@ public class GetStatusCommandTests
         var apdu1 = command.ToApdu();
         var apdu2 = command.ToApdu();
 
-        apdu1.Should().NotBeSameAs(apdu2);
-        apdu2.Should().BeEquivalentTo(apdu1);
+        _ = apdu1.Should().NotBeSameAs(apdu2);
+        _ = apdu2.Should().BeEquivalentTo(apdu1);
     }
 
     [Test]
@@ -228,13 +229,13 @@ public class GetStatusCommandTests
         var command = result.Value;
         var iApduCommand = (IApduCommand)command;
 
-        iApduCommand.Cla.Should().Be(0x80);
-        iApduCommand.Ins.Should().Be(0xF2);
-        command.P1.Should().Be(0x40);
-        command.P2.Should().Be(0x02);
-        command.Data.Should().BeEmpty();
-        command.ExpectedResponseLength.Should().Be(256);
-        command.IsExtendedLength.Should().BeFalse();
+        _ = iApduCommand.Cla.Should().Be(0x80);
+        _ = iApduCommand.Ins.Should().Be(0xF2);
+        _ = command.P1.Should().Be(0x40);
+        _ = command.P2.Should().Be(0x02);
+        _ = command.Data.Should().BeEmpty();
+        _ = command.ExpectedResponseLength.Should().Be(256);
+        _ = command.IsExtendedLength.Should().BeFalse();
     }
 
     [Test]
@@ -248,52 +249,55 @@ public class GetStatusCommandTests
         );
         var command = result.Value;
 
-        command.Data.Should().BeEquivalentTo(aid);
+        _ = command.Data.Should().BeEquivalentTo(aid);
     }
 
     [Test]
     public void GetStatusResponse_Parse_WithValidSingleEntry_ReturnsSuccess()
     {
-        var response = Convert.FromHexString(
-            "07" +               // AID length
-            "A0000000031010" +   // AID
-            "07" +               // Lifecycle state (Selectable)
-            "01" +               // Privileges length
-            "80"                 // Privileges
-        );
+        // TLV: E3 (template) containing 4F (AID), 9F70 (state), C5 (privileges 3 bytes)
+        var aid = Convert.FromHexString("A0000000031010");
+        var tlv = new List<byte>();
+        var inner = new List<byte>();
+        inner.Add(0x4F); inner.Add((byte)aid.Length); inner.AddRange(aid);
+        inner.Add(0x9F); inner.Add(0x70); inner.Add(0x01); inner.Add(0x07);
+        inner.Add(0xC5); inner.Add(0x03); inner.AddRange([0x80, 0x00, 0x00]);
+        tlv.Add(0xE3); tlv.Add((byte)inner.Count); tlv.AddRange(inner);
+        var response = tlv.ToArray();
 
         var result = GetStatusResponse.Parse(response);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Applications.Should().HaveCount(1);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Applications.Should().HaveCount(1);
 
         var app = result.Value.Applications[0];
-        app.Aid.Should().BeEquivalentTo(Convert.FromHexString("A0000000031010"));
-        app.State.Should().Be(ApplicationStatusEntry.LifecycleState.Selectable);
-        app.Privileges.Should().BeEquivalentTo(new byte[] { 0x80 });
+        _ = app.Aid.Should().BeEquivalentTo(Convert.FromHexString("A0000000031010"));
+        _ = app.State.Should().Be(ApplicationStatusEntry.LifecycleState.Selectable);
+        _ = app.Privileges.Should().BeEquivalentTo(new byte[] { 0x80, 0x00, 0x00 });
     }
 
     [Test]
     public void GetStatusResponse_Parse_WithMultipleEntries_ReturnsSuccess()
     {
-        var response = Convert.FromHexString(
-            "07" + "A0000000031010" + "07" + "01" + "80" +  // First app
-            "08" + "A000000003101001" + "0F" + "02" + "C040" // Second app
-        );
+        var aid1 = Convert.FromHexString("A0000000031010");
+        var aid2 = Convert.FromHexString("A000000003101001");
+        var e3_1 = BuildAppEntry(aid1, 0x07, [0x80, 0x00, 0x00]);
+        var e3_2 = BuildAppEntry(aid2, 0x0F, [0xC0, 0x40, 0x00]);
+        var response = e3_1.Concat(e3_2).ToArray();
 
         var result = GetStatusResponse.Parse(response);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Applications.Should().HaveCount(2);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Applications.Should().HaveCount(2);
 
         var app1 = result.Value.Applications[0];
-        app1.Aid.Should().BeEquivalentTo(Convert.FromHexString("A0000000031010"));
-        app1.State.Should().Be(ApplicationStatusEntry.LifecycleState.Selectable);
+        _ = app1.Aid.Should().BeEquivalentTo(Convert.FromHexString("A0000000031010"));
+        _ = app1.State.Should().Be(ApplicationStatusEntry.LifecycleState.Selectable);
 
         var app2 = result.Value.Applications[1];
-        app2.Aid.Should().BeEquivalentTo(Convert.FromHexString("A000000003101001"));
-        app2.State.Should().Be(ApplicationStatusEntry.LifecycleState.Personalized);
-        app2.Privileges.Should().BeEquivalentTo(Convert.FromHexString("C040"));
+        _ = app2.Aid.Should().BeEquivalentTo(Convert.FromHexString("A000000003101001"));
+        _ = app2.State.Should().Be(ApplicationStatusEntry.LifecycleState.Personalized);
+        _ = app2.Privileges.Should().BeEquivalentTo(new byte[] { 0xC0, 0x40, 0x00 });
     }
 
     [Test]
@@ -306,33 +310,24 @@ public class GetStatusCommandTests
         byte stateValue,
         ApplicationStatusEntry.LifecycleState expectedState)
     {
-        var response = new List<byte>();
-        response.Add(0x07); // AID length
-        response.AddRange(Convert.FromHexString("A0000000031010")); // AID
-        response.Add(stateValue); // Lifecycle state
-        response.Add(0x00); // No privileges
+        var aid = Convert.FromHexString("A0000000031010");
+        var e3 = BuildAppEntry(aid, stateValue, [0x00, 0x00, 0x00]);
+        var result = GetStatusResponse.Parse(e3);
 
-        var result = GetStatusResponse.Parse(response.ToArray());
-
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Applications[0].State.Should().Be(expectedState);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Applications[0].State.Should().Be(expectedState);
     }
 
     [Test]
     public void GetStatusResponse_Parse_WithInvalidLifecycleState_ReturnsFailure()
     {
-        var response = Convert.FromHexString(
-            "07" +               // AID length
-            "A0000000031010" +   // AID
-            "FF" +               // Invalid lifecycle state
-            "01" +               // Privileges length
-            "80"                 // Privileges
-        );
+        var aid = Convert.FromHexString("A0000000031010");
+        var e3 = BuildAppEntry(aid, 0xFF, [0x80, 0x00, 0x00]);
 
-        var result = GetStatusResponse.Parse(response);
+        var result = GetStatusResponse.Parse(e3);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Invalid lifecycle state: 0xFF");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("Invalid lifecycle state: 0xFF");
     }
 
     [Test]
@@ -342,8 +337,8 @@ public class GetStatusCommandTests
 
         var result = GetStatusResponse.Parse(response);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Applications.Should().HaveCount(0);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Applications.Should().HaveCount(0);
     }
 
     [Test]
@@ -351,8 +346,8 @@ public class GetStatusCommandTests
     {
         var result = GetStatusResponse.Parse(null);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Response data cannot be null");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("Response data cannot be null");
     }
 
     [Test]
@@ -366,8 +361,8 @@ public class GetStatusCommandTests
 
         var result = GetStatusResponse.Parse(response);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Applications.Should().HaveCount(0);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Applications.Should().HaveCount(0);
     }
 
     [Test]
@@ -377,25 +372,41 @@ public class GetStatusCommandTests
 
         var result = GetStatusResponse.Parse(response);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Applications.Should().HaveCount(0);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Applications.Should().HaveCount(0);
     }
 
     [Test]
     public void GetStatusResponse_Parse_WithNoPrivileges_ParsesCorrectly()
     {
-        var response = Convert.FromHexString(
-            "07" +               // AID length
-            "A0000000031010" +   // AID
-            "07" +               // Lifecycle state
-            "00"                 // No privileges
-        );
+        // Omit C5 to represent no privileges per spec allowance
+        var aid = Convert.FromHexString("A0000000031010");
+        var inner = new List<byte>();
+        inner.Add(0x4F); inner.Add((byte)aid.Length); inner.AddRange(aid);
+        inner.Add(0x9F); inner.Add(0x70); inner.Add(0x01); inner.Add(0x07);
+        var tlv = new List<byte>();
+        tlv.Add(0xE3); tlv.Add((byte)inner.Count); tlv.AddRange(inner);
+        var response = tlv.ToArray();
 
         var result = GetStatusResponse.Parse(response);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Applications.Should().HaveCount(1);
-        result.Value.Applications[0].Privileges.Should().BeEmpty();
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Applications.Should().HaveCount(1);
+        _ = result.Value.Applications[0].Privileges.Should().BeEmpty();
+    }
+
+    private static byte[] BuildAppEntry(byte[] aid, byte lifecycleState, byte[] privileges3)
+    {
+        var inner = new List<byte>();
+        inner.Add(0x4F); inner.Add((byte)aid.Length); inner.AddRange(aid);
+        inner.Add(0x9F); inner.Add(0x70); inner.Add(0x01); inner.Add(lifecycleState);
+        if (privileges3 != null)
+        {
+            inner.Add(0xC5); inner.Add(0x03); inner.AddRange(privileges3);
+        }
+        var e3 = new List<byte>();
+        e3.Add(0xE3); e3.Add((byte)inner.Count); e3.AddRange(inner);
+        return e3.ToArray();
     }
 
     [Test]
@@ -413,8 +424,8 @@ public class GetStatusCommandTests
         originalAid[0] = 0xFF;
         originalPrivileges[0] = 0xFF;
 
-        entry.Aid[0].Should().Be(0xA0);
-        entry.Privileges[0].Should().Be(0x80);
+        _ = entry.Aid[0].Should().Be(0xA0);
+        _ = entry.Privileges[0].Should().Be(0x80);
     }
 
     [Test]
@@ -425,14 +436,14 @@ public class GetStatusCommandTests
 
         var str = command.ToString();
 
-        str.Should().Be("GET STATUS");
+        _ = str.Should().Be("GET STATUS");
     }
 
     [Test]
     public void Constants_HaveCorrectValues()
     {
-        GetStatusCommand.Cla.Should().Be(0x80);
-        GetStatusCommand.Ins.Should().Be(0xF2);
+        _ = GetStatusCommand.Cla.Should().Be(0x80);
+        _ = GetStatusCommand.Ins.Should().Be(0xF2);
     }
 
     [Test]
@@ -443,14 +454,14 @@ public class GetStatusCommandTests
             new ApplicationStatusEntry(
                 Convert.FromHexString("A0000000031010"),
                 ApplicationStatusEntry.LifecycleState.Selectable,
-                new byte[] { 0x80 }
+                [0x80]
             )
         };
 
         var response = new GetStatusResponse(apps);
 
-        response.Applications.Should().NotBeSameAs(apps);
-        response.Applications.Should().HaveCount(1);
+        _ = response.Applications.Should().NotBeSameAs(apps);
+        _ = response.Applications.Should().HaveCount(1);
     }
 
 }

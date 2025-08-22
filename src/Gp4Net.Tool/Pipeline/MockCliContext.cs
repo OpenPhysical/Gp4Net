@@ -132,13 +132,13 @@ public class MockCardService : ICardService
     public bool IsConnected { get; set; } = true;
     public bool IsSecureChannelEstablished { get; set; } = false;
 
-    public IReadOnlyList<string> GetReaders() => new[] { "Mock Reader 1", "Mock Reader 2" };
+    public IReadOnlyList<string> GetReaders() => ["Mock Reader 1", "Mock Reader 2"];
 
     public bool Connect(string readerName) => true;
 
     public void Disconnect() { }
 
-    public byte[] GetAtr() => new byte[] { 0x3B, 0x00 };
+    public byte[] GetAtr() => [0x3B, 0x00];
 
     public CardResponse SendCommand(byte[] command) => new([], 0x9000);
 

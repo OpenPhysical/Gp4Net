@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -205,7 +206,7 @@ public class GetStatusCommand : IApduCommand
         if (searchCriteria != null && searchCriteria.Length > 0)
         {
             // If it looks like a raw AID (not TLV), validate length
-            if (searchCriteria[0] != 0x4F && (searchCriteria.Length < 5 || searchCriteria.Length > 16))
+            if (searchCriteria[0] != 0x4F && searchCriteria.Length is < 5 or > 16)
             {
                 return SmartCardError.InvalidArgument("Search criteria AID must be between 5 and 16 bytes.");
             }
@@ -218,7 +219,10 @@ public class GetStatusCommand : IApduCommand
     /// Returns a string representation of this command.
     /// </summary>
     /// <returns>The command name.</returns>
-    public override string ToString() => "GET STATUS";
+    public override string ToString()
+    {
+        return "GET STATUS";
+    }
 
     /// <summary>
     /// Validates if the provided StatusSubset value is valid.
@@ -272,7 +276,7 @@ public class GetStatusCommand : IApduCommand
         else
         {
             // Case 2: No data but expects response (CLA INS P1 P2 Le)
-            return new byte[] { Cla, Ins, (byte)Subset, (byte)Format, 0x00 };
+            return [Cla, Ins, (byte)Subset, (byte)Format, 0x00];
         }
     }
 }
@@ -288,6 +292,10 @@ public class ApplicationStatusEntry
     /// </summary>
     public enum LifecycleState : byte
     {
+        /// <summary>
+        /// Application is loaded (for load files and apps reporting 0x01).
+        /// </summary>
+        Loaded = 0x01,
         /// <summary>
         /// Application is installed.
         /// </summary>
@@ -330,16 +338,23 @@ public class ApplicationStatusEntry
     public byte[] Privileges { get; }
 
     /// <summary>
+    /// Gets the Executable Load File AID associated with this application (TLV C4), if provided.
+    /// </summary>
+    public byte[] ExecutableLoadFileAid { get; }
+
+    /// <summary>
     /// Initializes a new instance of the ApplicationStatusEntry class.
     /// </summary>
     /// <param name="aid">The application AID.</param>
     /// <param name="state">The lifecycle state.</param>
     /// <param name="privileges">The application privileges.</param>
-    public ApplicationStatusEntry(byte[] aid, LifecycleState state, byte[] privileges)
+    /// <param name="executableLoadFileAid">The executable load file AID (optional).</param>
+    public ApplicationStatusEntry(byte[] aid, LifecycleState state, byte[] privileges, byte[] executableLoadFileAid = null)
     {
         Aid = (byte[])aid.Clone();
         State = state;
         Privileges = (byte[])privileges.Clone();
+        ExecutableLoadFileAid = executableLoadFileAid != null ? (byte[])executableLoadFileAid.Clone() : [];
     }
 }
 
@@ -347,8 +362,8 @@ public class ApplicationStatusEntry
 /// Represents the response to a GET STATUS command.
 /// </summary>
 [PublicAPI]
-public class GetStatusResponse
-{
+    public class GetStatusResponse
+    {
     /// <summary>
     /// Gets the list of application status entries.
     /// </summary>
@@ -368,75 +383,69 @@ public class GetStatusResponse
     /// </summary>
     /// <param name="response">The response data (excluding status word).</param>
     /// <returns>A Result containing either the parsed response or an error.</returns>
-    public static Result<GetStatusResponse, SmartCardError> Parse(byte[] response)
-    {
-        if (response == null)
+        public static Result<GetStatusResponse, SmartCardError> Parse(byte[] response)
         {
-            return SmartCardError.InvalidArgument("Response data cannot be null");
+            if (response == null)
+            {
+                return SmartCardError.InvalidArgument("Response data cannot be null");
+            }
+
+            // Spec-aligned TLV-only parsing (Table 11-36). No legacy formats.
+            return ParseTlv(response);
         }
 
-        var applications = new List<ApplicationStatusEntry>();
-        var offset = 0;
-
-        while (offset < response.Length)
+        private static Result<GetStatusResponse, SmartCardError> ParseTlv(byte[] response)
         {
-            // Check if we have at least the minimum entry size
-            if (offset + 3 >= response.Length)
+            try
             {
-                break;
-            }
+                var tlvs = Gp4Net.Core.Tlv.TlvParser.ParseAll(response);
+                var entries = new List<ApplicationStatusEntry>();
 
-            // AID length
-            var aidLength = response[offset++];
-            if (aidLength == 0 || offset + aidLength >= response.Length)
+                foreach (var t in tlvs)
+                {
+                    // Per GP Table 11-36, all responses MUST use E3 containers. All traced cards comply.
+                    if (t.TagNumber != 0xE3)
+                    {
+                        continue; // Skip non-E3 entries - specification violation
+                    }
+
+                    var children = t.ParseNestedTlv().ToList();
+                var aidTlv = children.FirstOrDefault(c => c.TagNumber == 0x4F);
+                var lcTlv = children.FirstOrDefault(c => c.TagNumber == 0x9F70);
+                var privTlv = children.FirstOrDefault(c => c.TagNumber == 0xC5);
+                var elfTlv = children.FirstOrDefault(c => c.TagNumber == 0xC4);
+
+                    if (aidTlv == null || lcTlv == null)
+                    {
+                        // Insufficient data for an entry; skip
+                        continue;
+                    }
+
+                    var aid = aidTlv.Value ?? [];
+                    if (lcTlv.Value == null || lcTlv.Value.Length == 0)
+                    {
+                        continue;
+                    }
+                    var lc = lcTlv.Value[0];
+                    if (!IsValidLifecycleState(lc))
+                    {
+                        return SmartCardError.InvalidResponse($"Invalid lifecycle state: 0x{lc:X2}");
+                    }
+
+                    var priv = privTlv?.Value ?? [];
+                    var elf = elfTlv?.Value ?? [];
+                    entries.Add(new ApplicationStatusEntry(aid, (ApplicationStatusEntry.LifecycleState)lc, priv, elf));
+                }
+
+                return new GetStatusResponse(entries);
+            }
+            catch
             {
-                break;
+                return SmartCardError.InvalidResponse("Failed to parse GET STATUS TLV response");
             }
-
-            // AID
-            var aid = new byte[aidLength];
-            Array.Copy(response, offset, aid, 0, aidLength);
-            offset += aidLength;
-
-            // Lifecycle state
-            if (offset >= response.Length)
-            {
-                break;
-            }
-
-            var stateValue = response[offset++];
-            if (!IsValidLifecycleState(stateValue))
-            {
-                return SmartCardError.InvalidResponse($"Invalid lifecycle state: 0x{stateValue:X2}");
-            }
-            var state = (ApplicationStatusEntry.LifecycleState)stateValue;
-
-            // Privileges length
-            if (offset >= response.Length)
-            {
-                break;
-            }
-
-            var privilegesLength = response[offset++];
-
-            // Privileges
-            if (offset + privilegesLength > response.Length)
-            {
-                break;
-            }
-
-            var privileges = new byte[privilegesLength];
-            if (privilegesLength > 0)
-            {
-                Array.Copy(response, offset, privileges, 0, privilegesLength);
-                offset += privilegesLength;
-            }
-
-            applications.Add(new ApplicationStatusEntry(aid, state, privileges));
         }
 
-        return new GetStatusResponse(applications);
-    }
+        // No legacy parser: GET STATUS responses must be TLV per Table 11-36/11-37.
 
     /// <summary>
     /// Validates if the provided lifecycle state value is valid.
@@ -445,6 +454,7 @@ public class GetStatusResponse
     {
         return state switch
         {
+            0x01 => true, // Loaded
             0x03 => true, // Installed
             0x07 => true, // Selectable
             0x0F => true, // Personalized

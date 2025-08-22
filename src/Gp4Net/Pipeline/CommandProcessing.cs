@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Security;
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
@@ -35,14 +36,18 @@ public static class CommandProcessing
         /// <summary>
         /// Creates a new environment with updated secure channel state.
         /// </summary>
-        public CommandEnvironment WithSecureChannel(SecureChannelState secureChannel) =>
-            this with { SecureChannel = Maybe<SecureChannelState>.From(secureChannel) };
+        public CommandEnvironment WithSecureChannel(SecureChannelState secureChannel)
+        {
+            return this with { SecureChannel = Maybe<SecureChannelState>.From(secureChannel) };
+        }
 
         /// <summary>
         /// Creates a new environment without secure channel.
         /// </summary>
-        public CommandEnvironment WithoutSecureChannel() =>
-            this with { SecureChannel = Maybe<SecureChannelState>.None };
+        public CommandEnvironment WithoutSecureChannel()
+        {
+            return this with { SecureChannel = Maybe<SecureChannelState>.None };
+        }
 
         /// <summary>
         /// Gets the effective options, using defaults if not specified.
@@ -66,8 +71,10 @@ public static class CommandProcessing
             byte[] data,
             StatusWord statusWord,
             CommandEnvironment environment,
-            CommandMetadata metadata = null) =>
-            new(data, statusWord, environment, metadata ?? new CommandMetadata());
+            CommandMetadata metadata = null)
+        {
+            return new(data, statusWord, environment, metadata ?? new CommandMetadata());
+        }
 
         /// <summary>
         /// Checks if the command was successful.
@@ -86,5 +93,6 @@ public static class CommandProcessing
         bool SecureChannelWrapped = false,
         bool SecureChannelUnwrapped = false,
         bool ResponseLogged = false,
-        int RetryCount = 0);
+        int RetryCount = 0,
+        Maybe<InitializeUpdateResponse> InitializeUpdateResponse = default);
 }

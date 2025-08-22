@@ -75,8 +75,8 @@ public static class CardResponseSecurityProcessor
                                 cmac.BlockUpdate(macInput, 0, macInput.Length);
                                 
                                 var fullMac = new byte[16];
-                                cmac.DoFinal(fullMac, 0);
-                                newMacChainingValue = ImmutableArray.Create(fullMac);
+                                _ = cmac.DoFinal(fullMac, 0);
+                                newMacChainingValue = [..fullMac];
                             }
 
                             // Insert R-MAC before status word
@@ -235,7 +235,7 @@ public static class CardResponseSecurityProcessor
             cmac.BlockUpdate(macInput, 0, macInput.Length);
             
             var fullMac = new byte[16];
-            cmac.DoFinal(fullMac, 0);
+            _ = cmac.DoFinal(fullMac, 0);
             
             // Return truncated 8-byte MAC
             var mac = new byte[8];
@@ -250,7 +250,7 @@ public static class CardResponseSecurityProcessor
             desMac.Init(new KeyParameter(sessionKeys.SrMac));
             desMac.BlockUpdate(macInput, 0, macInput.Length);
             var mac = new byte[8];
-            desMac.DoFinal(mac, 0);
+            _ = desMac.DoFinal(mac, 0);
             return Result.Success<byte[], SmartCardError>(mac);
         }
     }
@@ -281,7 +281,7 @@ public static class CardResponseSecurityProcessor
         cipher.Init(true, new KeyParameter(sEncKey));
         
         var icv = new byte[16];
-        cipher.ProcessBlock(counterBlock, 0, icv, 0);
+        _ = cipher.ProcessBlock(counterBlock, 0, icv, 0);
 
         return Result.Success<byte[], SmartCardError>(icv);
     }

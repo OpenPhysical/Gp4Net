@@ -106,7 +106,7 @@ public static class ResponseParser
                 SmartCardError.InvalidResponse($"GET DATA failed with SW: {response.StatusWord:X4}"));
         }
 
-        return Result.Success<byte[], SmartCardError>(response.Data ?? Array.Empty<byte>());
+        return Result.Success<byte[], SmartCardError>(response.Data ?? []);
     }
 
     /// <summary>
@@ -144,12 +144,14 @@ public static class ResponseParser
     /// <summary>
     /// Converts GetStatusResponse entries to domain ApplicationInfo objects.
     /// </summary>
-    private static ImmutableList<ApplicationInfo> ConvertToApplicationInfos(GetStatusResponse response) =>
-        response.Applications.Select(entry =>
+    private static ImmutableList<ApplicationInfo> ConvertToApplicationInfos(GetStatusResponse response)
+    {
+        return response.Applications.Select(entry =>
         {
             // Map lifecycle state from GetStatusResponse to domain model
             LifecycleState lcState = entry.State switch
             {
+                ApplicationStatusEntry.LifecycleState.Loaded => LifecycleState.Loaded,
                 ApplicationStatusEntry.LifecycleState.Installed => LifecycleState.Installed,
                 ApplicationStatusEntry.LifecycleState.Selectable => LifecycleState.Selectable,
                 ApplicationStatusEntry.LifecycleState.Personalized => LifecycleState.Personalized,
@@ -158,9 +160,9 @@ public static class ResponseParser
                 _ => LifecycleState.Unknown
             };
 
-            // Parse privileges from the first byte of privileges array
+            // Parse privileges from up to 3 bytes (C5: 3 bytes)
             ImmutableList<Privilege> privilegesList = entry.Privileges.Length > 0
-                ? ParsePrivileges(entry.Privileges[0])
+                ? ParsePrivileges(entry.Privileges)
                 : ImmutableList<Privilege>.Empty;
 
             // Determine application type based on privileges
@@ -172,26 +174,47 @@ public static class ResponseParser
                 entry.Aid,
                 lcState,
                 privilegesList,
-                appType);
+                appType,
+                Version: Maybe<string>.None,
+                AssociatedSecurityDomain: Maybe<byte[]>.None,
+                ExecutableLoadFileAid: (entry is { ExecutableLoadFileAid: { Length: > 0 } c4 })
+                    ? Maybe<byte[]>.From(c4)
+                    : Maybe<byte[]>.None);
         }).ToImmutableList();
+    }
 
     /// <summary>
     /// Parses privilege byte into individual privilege flags.
     /// </summary>
-    private static ImmutableList<Privilege> ParsePrivileges(byte privileges)
+    private static ImmutableList<Privilege> ParsePrivileges(byte[] privBytes)
     {
-        ImmutableList<Privilege>.Builder privList = ImmutableList.CreateBuilder<Privilege>();
+        var b1 = privBytes.Length > 0 ? privBytes[0] : (byte)0x00;
+        var b2 = privBytes.Length > 1 ? privBytes[1] : (byte)0x00;
+        var b3 = privBytes.Length > 2 ? privBytes[2] : (byte)0x00;
 
-        if ((privileges & 0x80) != 0) privList.Add(Privilege.SecurityDomain);
-        if ((privileges & 0x40) != 0) privList.Add(Privilege.DapVerification);
-        if ((privileges & 0x20) != 0) privList.Add(Privilege.DelegatedManagement);
-        if ((privileges & 0x10) != 0) privList.Add(Privilege.CardLock);
-        if ((privileges & 0x08) != 0) privList.Add(Privilege.CardTerminate);
-        if ((privileges & 0x04) != 0) privList.Add(Privilege.CardReset);
-        if ((privileges & 0x02) != 0) privList.Add(Privilege.CvmManagement);
-        if ((privileges & 0x01) != 0) privList.Add(Privilege.MandatedDapVerification);
+        var list = ImmutableList.CreateBuilder<Privilege>();
 
-        return privList.ToImmutable();
+        if ((b1 & 0x80) != 0) list.Add(Privilege.SecurityDomain);
+        if ((b1 & 0x40) != 0) list.Add(Privilege.DapVerification);
+        if ((b1 & 0x20) != 0) list.Add(Privilege.DelegatedManagement);
+        if ((b1 & 0x10) != 0) list.Add(Privilege.CardLock);
+        if ((b1 & 0x08) != 0) list.Add(Privilege.CardTerminate);
+        if ((b1 & 0x04) != 0) list.Add(Privilege.CardReset);
+        if ((b1 & 0x02) != 0) list.Add(Privilege.CvmManagement);
+        if ((b1 & 0x01) != 0) list.Add(Privilege.TrustedPath);
+
+        if ((b2 & 0x80) != 0) list.Add(Privilege.AuthorizedManagement);
+        if ((b2 & 0x40) != 0) list.Add(Privilege.TokenVerification);
+        if ((b2 & 0x20) != 0) list.Add(Privilege.GlobalDelete);
+        if ((b2 & 0x10) != 0) list.Add(Privilege.GlobalLock);
+        if ((b2 & 0x08) != 0) list.Add(Privilege.GlobalRegistry);
+        if ((b2 & 0x04) != 0) list.Add(Privilege.FinalApplication);
+        if ((b2 & 0x02) != 0) list.Add(Privilege.GlobalService);
+        if ((b2 & 0x01) != 0) list.Add(Privilege.ReceiptGeneration);
+
+        if ((b3 & 0x01) != 0) list.Add(Privilege.MandatedDapVerification);
+
+        return list.ToImmutable();
     }
 
     /// <summary>
@@ -201,7 +224,7 @@ public static class ResponseParser
     {
         if (data == null || data.Length < 2)
         {
-            return Array.Empty<byte>();
+            return [];
         }
 
         // For two-byte tags like 9F7F, we need to handle them specially
@@ -230,10 +253,10 @@ public static class ResponseParser
         if (expectedTag <= 0xFF)
         {
             TlvObject element = elements.FirstOrDefault(e => e.TagNumber == expectedTag);
-            return element?.Value ?? Array.Empty<byte>();
+            return element?.Value ?? [];
         }
 
-        return Array.Empty<byte>();
+        return [];
     }
 
     /// <summary>

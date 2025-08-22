@@ -48,10 +48,9 @@ public class T0ApduTransportTests
         // First response indicates more data available (SW1=0x61)
         _ = _mockChannel
             .SetupSequence(c => c.TransmitAsync(It.IsAny<byte[]>(), default))
-            .ReturnsAsync(new byte[] { 0x61, 0x10 }) // 16 more bytes available
+            .ReturnsAsync([0x61, 0x10]) // 16 more bytes available
             .ReturnsAsync(
-                new byte[]
-                {
+                [
                     0x01,
                     0x02,
                     0x03,
@@ -69,8 +68,8 @@ public class T0ApduTransportTests
                     0x0F,
                     0x10,
                     0x90,
-                    0x00,
-                }
+                    0x00
+                ]
             ); // Data + SW
 
         // Act
@@ -102,10 +101,9 @@ public class T0ApduTransportTests
         // First response indicates wrong LE (SW1=0x6C)
         _ = _mockChannel
             .SetupSequence(c => c.TransmitAsync(It.IsAny<byte[]>(), default))
-            .ReturnsAsync(new byte[] { 0x6C, 0x10 }) // Correct length is 0x10
+            .ReturnsAsync([0x6C, 0x10]) // Correct length is 0x10
             .ReturnsAsync(
-                new byte[]
-                {
+                [
                     0x01,
                     0x02,
                     0x03,
@@ -123,8 +121,8 @@ public class T0ApduTransportTests
                     0x0F,
                     0x10,
                     0x90,
-                    0x00,
-                }
+                    0x00
+                ]
             ); // Data + SW
 
         // Act
@@ -154,7 +152,7 @@ public class T0ApduTransportTests
             .Callback<byte[], System.Threading.CancellationToken>(
                 (cmd, ct) => capturedCommand = cmd
             )
-            .ReturnsAsync(new byte[] { 0x90, 0x00 });
+            .ReturnsAsync([0x90, 0x00]);
 
         // Act
         _ = await _transport.TransmitAsync(command, _mockChannel.Object);

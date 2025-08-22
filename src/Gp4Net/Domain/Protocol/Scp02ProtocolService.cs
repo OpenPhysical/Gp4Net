@@ -383,7 +383,10 @@ public sealed class Scp02ProtocolService : IScpProtocolService<Scp02ProtocolServ
                (statusWord & 0xFF00) == 0x6300;
     }
 
-    private static bool HasResponseData(byte[] response) => response.Length > 2;
+    private static bool HasResponseData(byte[] response)
+    {
+        return response.Length > 2;
+    }
 
     /// <inheritdoc />
     public static Result<Security.MacChainingState, SmartCardError> UpdateChainingAfterCMac(

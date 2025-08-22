@@ -59,10 +59,10 @@ public class GlobalPlatformServiceTests
 
         var result = await _service.SelectIsdAsync();
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNull();
-        result.Value.Fci.Should().NotBeNull();
-        result.Value.Fci!.ApplicationAid.Should().Equal(new byte[] { 0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00 });
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Should().NotBeNull();
+        _ = result.Value.Fci.Should().NotBeNull();
+        _ = result.Value.Fci!.ApplicationAid.Should().Equal(new byte[] { 0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00 });
     }
 
     [Test]
@@ -72,44 +72,44 @@ public class GlobalPlatformServiceTests
 
         var result = await _service.SelectIsdAsync();
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().NotBeNull();
-        result.Error.Should().BeOfType<SmartCardError>();
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().NotBeNull();
+        _ = result.Error.Should().BeOfType<SmartCardError>();
         // When any error occurs during ISD selection, the method returns its own error message
-        result.Error.Message.Should().Be("No ISD found on card");
+        _ = result.Error.Message.Should().Be("No ISD found on card");
     }
 
     [Test]
     public async Task GetStatusAsync_WithValidApplications_ReturnsApplicationList()
     {
-        // GET STATUS response format per entry:
-        // AID length, AID, lifecycle state, privileges length, privileges
+        // GET STATUS response format per GP Table 11-36: E3 container with nested TLVs
+        // Based on real card traces - all cards use E3 containers exactly as specified
         var statusResponse = new byte[] {
-            // Entry 1
-            0x08, // AID length
-            0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, // AID (8 bytes)
-            0x07, // Lifecycle state (selectable)
-            0x01, // Privileges length
-            0x00  // Privileges data
+            // E3 container
+            0xE3, 0x0F, // E3 tag, length 15
+            // Nested TLVs per Table 11-36
+            0x4F, 0x08, 0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, // AID
+            0x9F, 0x70, 0x01, 0x07, // Lifecycle state (selectable)
+            0xC5, 0x01, 0x00        // Privileges (1 byte)
         };
         _testCardService.SetNextResponse(statusResponse);
 
         var result = await _service.GetStatusAsync(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeEmpty();
-        result.Value[0].Aid.Should().Equal(new byte[] { 0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00 });
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Should().NotBeEmpty();
+        _ = result.Value[0].Aid.Should().Equal(new byte[] { 0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00 });
     }
 
     [Test]
     public async Task GetStatusAsync_WithEmptyResponse_ReturnsEmptyList()
     {
-        _testCardService.SetNextResponse(new byte[] { });
+        _testCardService.SetNextResponse([]);
 
         var result = await _service.GetStatusAsync(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().BeEmpty();
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Should().BeEmpty();
     }
 
     [Test]
@@ -121,8 +121,8 @@ public class GlobalPlatformServiceTests
 
         var result = await _service.GetStatusAsync(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().BeEmpty(); // Parser handles invalid data gracefully by returning empty list
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Should().BeEmpty(); // Parser handles invalid data gracefully by returning empty list
     }
 
     [Test]
@@ -136,8 +136,8 @@ public class GlobalPlatformServiceTests
 
         var result = await _service.GetDataAsync(tag);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().Equal(new byte[] { 0x66, 0x04, 0x73, 0xD0, 0x00, 0x01 });
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Should().Equal(new byte[] { 0x66, 0x04, 0x73, 0xD0, 0x00, 0x01 });
     }
 
     [Test]
@@ -167,8 +167,8 @@ public class GlobalPlatformServiceTests
         // The result will be failure due to invalid cryptogram, which is expected
         // This test verifies that the service properly handles the secure channel flow
         // even when cryptographic validation fails
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<SmartCardError>();
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<SmartCardError>();
         // Failed cryptogram verification - should ideally be CryptogramVerificationError
     }
 
@@ -192,31 +192,31 @@ public class GlobalPlatformServiceTests
             new byte[16], // MAC chaining value (16 bytes for SCP03)
             0x00 // implementation parameter
         );
-        testSessionResult.IsSuccess.Should().BeTrue();
+        _ = testSessionResult.IsSuccess.Should().BeTrue();
         var updatedServiceResult = _testCardService.WithContextValue(
             ContextKeys.SecureChannelSession, testSessionResult.Value);
-        updatedServiceResult.IsSuccess.Should().BeTrue();
+        _ = updatedServiceResult.IsSuccess.Should().BeTrue();
         _testCardService = (TestSmartCardService)updatedServiceResult.Value;
         _service = new GlobalPlatformService(_testCardService, _testSecureChannelManager, _logger);
 
         var result = await _service.InstallCapFileAsync(capFileData, options);
 
         // The implementation currently returns unsupported
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<SmartCardError>();
-        result.Error.Message.Should().Contain("CAP file installation requires LOAD and INSTALL command implementation");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<SmartCardError>();
+        _ = result.Error.Message.Should().Contain("CAP file installation requires LOAD and INSTALL command implementation");
     }
 
     [Test]
     public async Task DeleteApplicationAsync_WithValidAid_ReturnsSuccess()
     {
         var aid = new byte[] { 0xA0, 0x00, 0x00, 0x00, 0x03, 0x53, 0x50, 0x41 };
-        _testCardService.SetNextResponse(new byte[] { });
+        _testCardService.SetNextResponse([]);
 
         var result = await _service.DeleteApplicationAsync(aid, deleteRelated: true);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Should().BeTrue();
     }
 
     [Test]
@@ -227,9 +227,9 @@ public class GlobalPlatformServiceTests
 
         var result = await _service.DeleteApplicationAsync(aid, deleteRelated: false);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<SmartCardError>();
-        result.Error.Message.Should().Contain("Authentication failed");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<SmartCardError>();
+        _ = result.Error.Message.Should().Contain("Authentication failed");
     }
 
     [Test]
@@ -246,8 +246,8 @@ public class GlobalPlatformServiceTests
 
         var result = await _service.GetDataAsync(keyInfoTag);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().Equal(keyInfoResponse); // GetDataAsync returns full response data
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Should().Equal(keyInfoResponse); // GetDataAsync returns full response data
     }
 
     /// <summary>
@@ -445,7 +445,7 @@ public class GlobalPlatformServiceTests
             ICardChannel channel,
             CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(new ApduResponse(new byte[0], StatusWords.Success));
+            return Task.FromResult(new ApduResponse([], StatusWords.Success));
         }
     }
 }

@@ -54,7 +54,7 @@ public static class CplcDateParser
             return date.Value.ToString("yyyy-MM-dd");
         }
 
-        if (cplcDate == InvalidDateMax || cplcDate == InvalidDateMin)
+        if (cplcDate is InvalidDateMax or InvalidDateMin)
         {
             return "(invalid date format)";
         }

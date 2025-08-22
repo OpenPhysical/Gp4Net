@@ -168,7 +168,7 @@ public class DeleteCommand : IApduCommand
     {
         var data = new List<byte>();
 
-        if (Target == DeleteTarget.ByAid || Target == DeleteTarget.WithRelated)
+        if (Target is DeleteTarget.ByAid or DeleteTarget.WithRelated)
         {
             // For AID deletion, encode as TLV: 4F <len> <AIDs concatenated>
             var totalAidLength = Aids.Sum(aid => aid.Length);
@@ -180,7 +180,7 @@ public class DeleteCommand : IApduCommand
             }
             // If DeletionTokenKey or DeletionToken is present, emit TLV (calculated as needed)
             var tokenToUse = DeletionToken;
-            
+
             // If no token but we have a key, compute the token
             if (!tokenToUse.HasValue && DeleteTokenKey.HasValue)
             {
@@ -190,22 +190,21 @@ public class DeleteCommand : IApduCommand
                     return SmartCardError.InvalidArgument("Delete token calculation requires exactly one AID.");
                 }
                 // Compute token using the DeleteTokenCalculator
-                try
+                var tokenResult = Gp4Net.Cryptography.DeleteTokenCalculator.ComputeDeleteToken(
+                    DeleteTokenKey.Value,
+                    P1,
+                    P2,
+                    Aids[0],
+                    Maybe<byte[]>.None); // No optional TLV for now
+
+                if (tokenResult.IsFailure)
                 {
-                    var computedToken = Gp4Net.Cryptography.DeleteTokenCalculator.ComputeDeleteToken(
-                        DeleteTokenKey.Value, 
-                        P1, 
-                        P2, 
-                        Aids[0], 
-                        Maybe<byte[]>.None); // No optional TLV for now
-                    tokenToUse = Maybe<byte[]>.From(computedToken);
+                    return tokenResult.Error;
                 }
-                catch (Exception ex)
-                {
-                    return SmartCardError.CryptographicError($"Failed to compute delete token: {ex.Message}");
-                }
+
+                tokenToUse = Maybe<byte[]>.From(tokenResult.Value);
             }
-            
+
             // Add token if present
             if (tokenToUse.HasValue && tokenToUse.Value.Length > 0)
             {
@@ -219,14 +218,15 @@ public class DeleteCommand : IApduCommand
             // For key deletion, as TLV: D0 (keyId) + D2 (keyVer) per entry
             foreach (var keyRef in Aids)
             {
-                if (keyRef.Length == 2)
+                switch (keyRef.Length)
                 {
-                    data.Add(0xD0); data.Add(1); data.Add(keyRef[0]);
-                    data.Add(0xD2); data.Add(1); data.Add(keyRef[1]);
-                }
-                else if (keyRef.Length == 1)
-                {
-                    data.Add(0xD0); data.Add(1); data.Add(keyRef[0]);
+                    case 2:
+                        data.Add(0xD0); data.Add(1); data.Add(keyRef[0]);
+                        data.Add(0xD2); data.Add(1); data.Add(keyRef[1]);
+                        break;
+                    case 1:
+                        data.Add(0xD0); data.Add(1); data.Add(keyRef[0]);
+                        break;
                 }
             }
         }
@@ -235,12 +235,8 @@ public class DeleteCommand : IApduCommand
     }
 
     /// <summary>
-    /// Initializes a new instance of the DeleteCommand class.
+    /// Represents a command to delete an object or application associated with specific AIDs on a smart card.
     /// </summary>
-    /// <param name="type">The delete type.</param>
-    /// <param name="target">The delete target.</param>
-    /// <param name="aids">The list of AIDs to delete.</param>
-    /// <param name="deletionToken">The deletion token (optional).</param>
     private DeleteCommand(
         DeleteType type,
         DeleteTarget target,
@@ -285,7 +281,7 @@ public class DeleteCommand : IApduCommand
         var target = deleteRelated
             ? DeleteTarget.WithRelated
             : DeleteTarget.ByAid;
-        return new DeleteCommand(type, target, new[] { aid }, deletionToken);
+        return new DeleteCommand(type, target, [aid], deletionToken);
     }
 
     /// <summary>
@@ -317,7 +313,7 @@ public class DeleteCommand : IApduCommand
         var target = deleteRelated
             ? DeleteTarget.WithRelated
             : DeleteTarget.ByAid;
-        return new DeleteCommand(type, target, new[] { aid }, deletionToken);
+        return new DeleteCommand(type, target, [aid], deletionToken);
     }
 
     /// <summary>
@@ -349,7 +345,7 @@ public class DeleteCommand : IApduCommand
         var target = deleteRelated
             ? DeleteTarget.WithRelated
             : DeleteTarget.ByAid;
-        return new DeleteCommand(type, target, new[] { aid }, deletionToken);
+        return new DeleteCommand(type, target, [aid], deletionToken);
     }
 
     /// <summary>
@@ -414,7 +410,7 @@ public class DeleteCommand : IApduCommand
         return new DeleteCommand(
             DeleteType.DeleteObjectOnly,
             DeleteTarget.ByAid,
-            new[] { keyReference },
+            [keyReference],
             deletionToken
         );
     }
@@ -423,7 +419,10 @@ public class DeleteCommand : IApduCommand
     /// Returns the string representation of this command.
     /// </summary>
     /// <returns>The string "DELETE".</returns>
-    public override string ToString() => "DELETE";
+    public override string ToString()
+    {
+        return "DELETE";
+    }
 
     /// <summary>
     /// Converts this command to an APDU byte array.
@@ -433,18 +432,18 @@ public class DeleteCommand : IApduCommand
     {
         var data = new List<byte>();
 
-        if (Target == DeleteTarget.ByAid || Target == DeleteTarget.WithRelated)
+        if (Target is DeleteTarget.ByAid or DeleteTarget.WithRelated)
         {
             // For AID deletion, encode as:
             // 4F <total_len> <AID1><AID2>... [<token_len> <token>]
             // Based on the trace: 4F09A000000308000010000
-                
+
             // Calculate total length of all AIDs
             var totalAidLength = Aids.Sum(aid => aid.Length);
-                
+
             data.Add(0x4F); // AID tag
             data.Add((byte)totalAidLength);
-                
+
             // Add all AIDs concatenated
             foreach (var aid in Aids)
             {
@@ -479,7 +478,7 @@ public class DeleteCommand : IApduCommand
         };
 
         apdu.AddRange(data);
-            
+
         // DELETE commands do NOT use LE byte per GP Pro traces
         // Trace: 84E40080134F09A0000003080000100020EEDD243F094FAD (no LE)
 
@@ -530,7 +529,7 @@ public class DeleteResponse
         IsSuccessful = statusWord == StatusWords.Success;
         DeletionReceipts = deletionReceipts
             .Map(receipts => (IReadOnlyList<DeletionReceipt>)new List<DeletionReceipt>(receipts))
-            .GetValueOrDefault(Array.Empty<DeletionReceipt>());
+            .GetValueOrDefault([]);
     }
 
     /// <summary>
@@ -548,50 +547,56 @@ public class DeleteResponse
             // According to GP spec Table 11-25, DELETE response has:
             // - Length of delete confirmation (1-2 bytes): Mandatory
             // - Delete confirmation (0-n bytes): Conditional
-                
+
             var offset = 0;
-                
+
             // Read the length of delete confirmation
             if (offset < response.Length)
             {
                 var confirmationLength = response[offset];
                 offset++;
-                    
+
                 // Handle extended length encoding (81 80 - 81 FF)
                 if (confirmationLength == 0x81 && offset < response.Length)
                 {
                     confirmationLength = response[offset];
                     offset++;
                 }
-                    
+
                 // Parse deletion confirmation if present
-                if (confirmationLength > 0 && offset + confirmationLength <= response.Length)
+                if (confirmationLength <= 0 || offset + confirmationLength > response.Length)
                 {
-                    // Parse the deletion confirmation data
-                    var confirmationEnd = offset + confirmationLength;
-                    while (offset < confirmationEnd)
+                    return new DeleteResponse(
+                        response ?? [],
+                        statusWord,
+                        deletionReceipts.Count > 0 ? Maybe<IList<DeletionReceipt>>.From(deletionReceipts) : Maybe<IList<DeletionReceipt>>.None
+                    );
+                }
+
+                // Parse the deletion confirmation data
+                var confirmationEnd = offset + confirmationLength;
+                while (offset < confirmationEnd)
+                {
+                    // Look for AID TLV (4F tag)
+                    if (offset + 2 < confirmationEnd && response[offset] == 0x4F)
                     {
-                        // Look for AID TLV (4F tag)
-                        if (offset + 2 < confirmationEnd && response[offset] == 0x4F)
+                        var aidLength = response[offset + 1];
+                        if (offset + 2 + aidLength <= confirmationEnd)
                         {
-                            var aidLength = response[offset + 1];
-                            if (offset + 2 + aidLength <= confirmationEnd)
-                            {
-                                var aid = new byte[aidLength];
-                                Array.Copy(response, offset + 2, aid, 0, aidLength);
-                                deletionReceipts.Add(new DeletionReceipt(aid, true));
-                                offset += 2 + aidLength;
-                            }
-                            else
-                            {
-                                break;
-                            }
+                            var aid = new byte[aidLength];
+                            Array.Copy(response, offset + 2, aid, 0, aidLength);
+                            deletionReceipts.Add(new DeletionReceipt(aid, true));
+                            offset += 2 + aidLength;
                         }
                         else
                         {
-                            // Skip unknown data
-                            offset++;
+                            break;
                         }
+                    }
+                    else
+                    {
+                        // Skip unknown data
+                        offset++;
                     }
                 }
             }
@@ -612,12 +617,12 @@ public class DeleteResponse
     {
         return StatusWord switch
         {
-            var sw when sw == StatusWords.Success => "Deletion successful",
-            var sw when sw == StatusWords.IncorrectData => "Incorrect data or AID not found",
-            var sw when sw == StatusWords.FileNotFound => "Application not found",
-            var sw when sw == StatusWords.ConditionsNotSatisfied => "Conditions not satisfied (dependencies exist)",
-            var sw when sw == StatusWords.ReferencedDataNotFound => "Referenced data not found",
-            var sw when sw == StatusWords.GenericFailure => "Generic failure during deletion",
+            _ when StatusWord == StatusWords.Success => "Deletion successful",
+            _ when StatusWord == StatusWords.IncorrectData => "Incorrect data or AID not found",
+            _ when StatusWord == StatusWords.FileNotFound => "Application not found",
+            _ when StatusWord == StatusWords.ConditionsNotSatisfied => "Conditions not satisfied (dependencies exist)",
+            _ when StatusWord == StatusWords.ReferencedDataNotFound => "Referenced data not found",
+            _ when StatusWord == StatusWords.GenericFailure => "Generic failure during deletion",
             _ => $"Unknown error: {StatusWord.Value:X}",
         };
     }

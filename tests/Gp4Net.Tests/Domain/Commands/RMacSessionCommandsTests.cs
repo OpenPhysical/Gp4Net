@@ -14,8 +14,8 @@ public class RMacSessionCommandsTests
     {
         var result = BeginRMacSessionCommand.Create(SecurityLevel.RMac);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.P1.Should().Be((byte)SecurityLevel.RMac);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.P1.Should().Be((byte)SecurityLevel.RMac);
     }
 
     [Test]
@@ -23,8 +23,8 @@ public class RMacSessionCommandsTests
     {
         var result = BeginRMacSessionCommand.Create((SecurityLevel)255);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Invalid security level");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("Invalid security level");
     }
 
     [Test]
@@ -32,8 +32,8 @@ public class RMacSessionCommandsTests
     {
         var result = BeginRMacSessionCommand.Create(SecurityLevel.RMac, 0xFF);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Invalid CLA byte");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("Invalid CLA byte");
     }
 
     [Test]
@@ -42,8 +42,8 @@ public class RMacSessionCommandsTests
         var invalidMac = new byte[4]; // Should be 8 bytes
         var result = BeginRMacSessionCommand.Create(SecurityLevel.RMac, mac: invalidMac);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("MAC must be exactly 8 bytes");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("MAC must be exactly 8 bytes");
     }
 
     [Test]
@@ -51,7 +51,7 @@ public class RMacSessionCommandsTests
     {
         var result = BeginRMacSessionCommand.Create(SecurityLevel.RMac);
 
-        result.Value.ToString().Should().Be("BEGIN R-MAC SESSION");
+        _ = result.Value.ToString().Should().Be("BEGIN R-MAC SESSION");
     }
 
     [Test]
@@ -59,8 +59,8 @@ public class RMacSessionCommandsTests
     {
         var result = EndRMacSessionCommand.Create(SecurityLevel.RMac);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.P2.Should().Be(0x03);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.P2.Should().Be(0x03);
     }
 
     [Test]
@@ -68,8 +68,8 @@ public class RMacSessionCommandsTests
     {
         var result = EndRMacSessionCommand.Create((SecurityLevel)255);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Invalid security level");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("Invalid security level");
     }
 
     [Test]
@@ -77,7 +77,7 @@ public class RMacSessionCommandsTests
     {
         var result = EndRMacSessionCommand.Create(SecurityLevel.RMac);
 
-        result.Value.ToString().Should().Be("END R-MAC SESSION");
+        _ = result.Value.ToString().Should().Be("END R-MAC SESSION");
     }
 
     [Test]
@@ -86,8 +86,8 @@ public class RMacSessionCommandsTests
         var validRMac = new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
         var result = EndRMacSessionResponse.Parse(validRMac);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.RMac.Should().BeEquivalentTo(validRMac);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.RMac.Should().BeEquivalentTo(validRMac);
     }
 
     [Test]
@@ -96,9 +96,9 @@ public class RMacSessionCommandsTests
         var invalidRMac = new byte[] { 0x01, 0x02 }; // Should be 8 bytes
         var result = EndRMacSessionResponse.Parse(invalidRMac);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Response must be exactly 8 bytes");
-        result.Error.Message.Should().Contain("got 2 bytes");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("Response must be exactly 8 bytes");
+        _ = result.Error.Message.Should().Contain("got 2 bytes");
     }
 
     [Test]
@@ -106,8 +106,8 @@ public class RMacSessionCommandsTests
     {
         var result = EndRMacSessionResponse.Parse(null);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Message.Should().Contain("Response data cannot be null");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Message.Should().Contain("Response data cannot be null");
     }
 
     [Test]
@@ -117,7 +117,7 @@ public class RMacSessionCommandsTests
         var result = EndRMacSessionResponse.Parse(validRMac);
         var toString = result.Value.ToString();
 
-        toString.Should().StartWith("END R-MAC SESSION RESPONSE");
-        toString.Should().Contain("0102030405060708");
+        _ = toString.Should().StartWith("END R-MAC SESSION RESPONSE");
+        _ = toString.Should().Contain("0102030405060708");
     }
 }

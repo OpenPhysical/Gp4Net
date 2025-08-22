@@ -342,7 +342,7 @@ public class GpShellScriptParser
         foreach (var kvp in parameters.Where(p => !p.Key.StartsWith("arg")))
         {
             var value =
-                kvp.Value == "true" || kvp.Value == "false" ? kvp.Value : $"\"{kvp.Value}\"";
+                kvp.Value is "true" or "false" ? kvp.Value : $"\"{kvp.Value}\"";
             args.Add($"{kvp.Key} = {value}");
         }
 

@@ -107,22 +107,37 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
     public static bool operator >=(StatusWord left, StatusWord right) => left._value >= right._value;
 
     /// <inheritdoc />
-    public bool Equals(StatusWord other) => _value == other._value;
+    public bool Equals(StatusWord other)
+    {
+        return _value == other._value;
+    }
 
     /// <inheritdoc />
-    public override bool Equals(object obj) => obj is StatusWord other && Equals(other);
+    public override bool Equals(object obj)
+    {
+        return obj is StatusWord other && Equals(other);
+    }
 
     /// <inheritdoc />
-    public override int GetHashCode() => _value.GetHashCode();
+    public override int GetHashCode()
+    {
+        return _value.GetHashCode();
+    }
 
     /// <inheritdoc />
-    public int CompareTo(StatusWord other) => _value.CompareTo(other._value);
+    public int CompareTo(StatusWord other)
+    {
+        return _value.CompareTo(other._value);
+    }
 
     /// <summary>
     /// Returns a string representation of the status word in hexadecimal format.
     /// </summary>
     /// <returns>The status word formatted as "0xXXXX".</returns>
-    public override string ToString() => $"0x{_value:X4}";
+    public override string ToString()
+    {
+        return $"0x{_value:X4}";
+    }
 
     /// <summary>
     /// Returns a descriptive string representation of the status word.

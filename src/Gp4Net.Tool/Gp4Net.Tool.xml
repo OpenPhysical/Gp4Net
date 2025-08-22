@@ -573,7 +573,7 @@
         </member>
         <member name="T:Gp4Net.Tool.Commands.Applet.LoadCommand">
             <summary>
-            Command to load a CAP file package onto the card without installing applets.
+            Command to load a CAP file package onto a GlobalPlatform card without installing applets.
             </summary>
         </member>
         <member name="M:Gp4Net.Tool.Commands.Applet.LoadCommand.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Tool.Services.IDomainServiceFactory,Gp4Net.Tool.Services.IKeysetResolver)">
@@ -1386,7 +1386,7 @@
         </member>
         <member name="T:Gp4Net.Tool.Commands.Card.TestSecureChannelCommand">
             <summary>
-            Test command for establishing a secure channel with GP test keys.
+            Command to test secure channel establishment with GlobalPlatform test keys.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Card.TestSecureChannelCommand.Settings">
@@ -4053,7 +4053,12 @@
             Resolves a keyset from various sources.
             </summary>
         </member>
-        <!-- Badly formed XML comment ignored for member "T:Gp4Net.Tool.Services.LuaVirtualCardService" -->
+        <member name="T:Gp4Net.Tool.Services.LuaVirtualCardService">
+            <summary>
+            Virtual card service that uses Lua scripts to simulate card behavior.
+            Supports URL-style reader names: lua:script.lua?trace=input.txt and parameter=value
+            </summary>
+        </member>
         <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.GetReaders">
             <inheritdoc />
         </member>
@@ -4334,6 +4339,12 @@
         </member>
         <member name="M:Gp4Net.Tool.Services.WsctCardService.Disconnect">
             <inheritdoc />
+        </member>
+        <member name="M:Gp4Net.Tool.Services.WsctCardService.DisconnectInternal">
+            <summary>
+            Internal disconnect method that assumes lock is already held.
+            Used by Connect method which already holds write lock.
+            </summary>
         </member>
         <member name="P:Gp4Net.Tool.Services.WsctCardService.IsConnected">
             <inheritdoc />

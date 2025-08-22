@@ -366,61 +366,65 @@ public sealed class KeyDerivationService : IKeyDerivationService
         _logger.LogDebug("Calculating cryptogram of type {Type} for protocol 0x{Protocol:X2}",
             context.Type, context.ProtocolVersion);
 
-        // For SCP03 authentication cryptograms, use the data derivation scheme
-        if (context.ProtocolVersion == 0x03 &&
-            (context.Type == CryptogramType.CardCryptogram || context.Type == CryptogramType.HostCryptogram))
+        switch (context.ProtocolVersion)
         {
-            // Validate context data length
-            if (context.Data.Length != 16)
+            // For SCP03 authentication cryptograms, use the data derivation scheme
+            case 0x03 when
+                context.Type is CryptogramType.CardCryptogram or CryptogramType.HostCryptogram:
             {
-                return Result.Failure<byte[], SmartCardError>(
-                    new InvalidLengthError("cryptogramContext", 16, context.Data.Length));
+                // Validate context data length
+                if (context.Data.Length != 16)
+                {
+                    return Result.Failure<byte[], SmartCardError>(
+                        new InvalidLengthError("cryptogramContext", 16, context.Data.Length));
+                }
+
+                // Determine derivation constant based on cryptogram type
+                var derivationConstant = context.Type switch
+                {
+                    CryptogramType.CardCryptogram => DerivationConstants.CardCryptogram, // 0x00
+                    CryptogramType.HostCryptogram => DerivationConstants.HostCryptogram, // 0x01
+                    _ => throw new InvalidOperationException($"Unexpected cryptogram type: {context.Type}")
+                };
+
+                // Use SCP03 data derivation scheme
+                return DeriveScp03Data(
+                    context.Key,
+                    derivationConstant,
+                    context.Data,
+                    64); // 64 bits = 8 bytes output
             }
 
-            // Determine derivation constant based on cryptogram type
-            var derivationConstant = context.Type switch
+            // For SCP02, the data is already properly formatted by CryptogramBuilder
+            // It includes the sequence counter and proper padding, so we should not decompose it
+            case 0x02:
+                // For SCP02, use the appropriate MAC algorithm based on cryptogram type
+                return context.Type switch
+                {
+                    CryptogramType.CardCryptogram or CryptogramType.HostCryptogram => 
+                        // SCP02 uses Full 3DES MAC for cryptograms
+                        CryptographicOperations.CalculateFull3DesMac(context.Key, context.Data),
+                    
+                    CryptogramType.CommandMac or CryptogramType.ResponseMac => 
+                        // SCP02 uses Retail MAC for C-MAC and R-MAC
+                        CryptographicOperations.CalculateRetailMac(context.Key, context.Data),
+                    
+                    _ => Result.Failure<byte[], SmartCardError>(
+                        new UnsupportedImplementationError($"SCP02 cryptogram type: {context.Type}"))
+                };
+            default:
             {
-                CryptogramType.CardCryptogram => DerivationConstants.CardCryptogram, // 0x00
-                CryptogramType.HostCryptogram => DerivationConstants.HostCryptogram, // 0x01
-                _ => throw new InvalidOperationException($"Unexpected cryptogram type: {context.Type}")
-            };
-
-            // Use SCP03 data derivation scheme
-            return DeriveScp03Data(
-                context.Key,
-                derivationConstant,
-                context.Data,
-                64); // 64 bits = 8 bytes output
+                // For other protocols, delegate to CryptogramService
+                var cryptogramService = new Gp4Net.Domain.Security.CryptogramService();
+        
+                // For non-SCP02 protocols, use the existing logic
+                return cryptogramService.CalculateCryptogram(
+                    context.Key,
+                    context.Data,
+                    GetProtocolFromContext(context));
+            }
         }
 
-        // For SCP02, the data is already properly formatted by CryptogramBuilder
-        // It includes the sequence counter and proper padding, so we should not decompose it
-        if (context.ProtocolVersion == 0x02)
-        {
-            // For SCP02, use the appropriate MAC algorithm based on cryptogram type
-            return context.Type switch
-            {
-                CryptogramType.CardCryptogram or CryptogramType.HostCryptogram => 
-                    // SCP02 uses Full 3DES MAC for cryptograms
-                    CryptographicOperations.CalculateFull3DesMac(context.Key, context.Data),
-                    
-                CryptogramType.CommandMac or CryptogramType.ResponseMac => 
-                    // SCP02 uses Retail MAC for C-MAC and R-MAC
-                    CryptographicOperations.CalculateRetailMac(context.Key, context.Data),
-                    
-                _ => Result.Failure<byte[], SmartCardError>(
-                    new UnsupportedImplementationError($"SCP02 cryptogram type: {context.Type}"))
-            };
-        }
-        
-        // For other protocols, delegate to CryptogramService
-        var cryptogramService = new Gp4Net.Domain.Security.CryptogramService();
-        
-        // For non-SCP02 protocols, use the existing logic
-        return cryptogramService.CalculateCryptogram(
-            context.Key,
-            context.Data,
-            GetProtocolFromContext(context));
     }
 
     private static ScpVersion GetProtocolFromContext(ICryptogramContext context)
@@ -467,11 +471,13 @@ internal static class KeyDerivationExtensions
     /// </summary>
     /// <param name="keySet">The generic key set</param>
     /// <returns>A Result containing the cast key set or an error</returns>
-    internal static Result<Scp02KeySet, SmartCardError> AsScp02KeySet(this IKeySet keySet) =>
-        keySet is Scp02KeySet scp02KeySet
+    internal static Result<Scp02KeySet, SmartCardError> AsScp02KeySet(this IKeySet keySet)
+    {
+        return keySet is Scp02KeySet scp02KeySet
             ? Result.Success<Scp02KeySet, SmartCardError>(scp02KeySet)
             : Result.Failure<Scp02KeySet, SmartCardError>(
                 new InvalidKeyError("KeySet", "SCP02 requires Scp02KeySet"));
+    }
 
     /// <summary>
     /// Converts a Maybe to a Result with a custom error message.
@@ -480,8 +486,10 @@ internal static class KeyDerivationExtensions
     /// <param name="maybe">The Maybe value</param>
     /// <param name="errorMessage">Error message if Maybe has no value</param>
     /// <returns>A Result containing the value or an error</returns>
-    internal static Result<T, SmartCardError> ToResult<T>(this Maybe<T> maybe, string errorMessage) =>
-        maybe.HasValue
+    internal static Result<T, SmartCardError> ToResult<T>(this Maybe<T> maybe, string errorMessage)
+    {
+        return maybe.HasValue
             ? Result.Success<T, SmartCardError>(maybe.Value)
             : Result.Failure<T, SmartCardError>(new InvalidFormatError("parameter", errorMessage));
+    }
 }

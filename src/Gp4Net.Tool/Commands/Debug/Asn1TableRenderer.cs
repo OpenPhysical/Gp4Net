@@ -113,9 +113,9 @@ public static class Asn1TableRenderer
     public static void RenderToTable(IEnumerable<Asn1TableBuilder.Asn1Row> rows)
     {
         var table = new Table();
-        table.AddColumn("Offset");
-        table.AddColumn("Type");
-        table.AddColumn("Value");
+        _ = table.AddColumn("Offset");
+        _ = table.AddColumn("Type");
+        _ = table.AddColumn("Value");
 
         foreach (var row in rows)
         {
@@ -123,7 +123,7 @@ public static class Asn1TableRenderer
             {
                 case Asn1TableBuilder.Asn1DataRow(var depth, var offset, var typeInfo, var value, var rawBytes):
                     var indent = new string(' ', depth * 2);
-                    table.AddRow(
+                    _ = table.AddRow(
                         offset,
                         $"{indent}{StripMarkup(typeInfo)}",
                         StripMarkup(value.GetValueOrDefault("-"))
@@ -132,7 +132,7 @@ public static class Asn1TableRenderer
 
                 case Asn1TableBuilder.ContainerHeaderRow(var depth, var containerType, var elementCount):
                     var containerIndent = new string(' ', depth * 2);
-                    table.AddRow(
+                    _ = table.AddRow(
                         "",
                         $"{containerIndent}{containerType}",
                         $"{elementCount} elements"

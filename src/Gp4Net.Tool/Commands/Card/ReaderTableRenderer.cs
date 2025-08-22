@@ -72,10 +72,10 @@ public static class ReaderTableRenderer
     private static Table CreateTable()
     {
         var table = new Table();
-        
+
         // Reader table columns
-        table.AddColumn("Index");
-        table.AddColumn("Reader Name");
+        _ = table.AddColumn("Index");
+        _ = table.AddColumn("Reader Name");
         
         return table;
     }
@@ -88,18 +88,18 @@ public static class ReaderTableRenderer
         switch (row)
         {
             case ReaderTableBuilder.ReaderDataRow(var index, var name, var status):
-                table.AddRow(index, name);
+                _ = table.AddRow(index, name);
                 break;
                 
             case ReaderTableBuilder.SectionHeaderRow(var title):
                 // Add empty row before section header for spacing
                 if (table.Rows.Count > 0)
                 {
-                    table.AddRow("", "");
+                    _ = table.AddRow("", "");
                 }
-                
+
                 // Add header row with bold formatting
-                table.AddRow($"[bold]{title}[/]", "");
+                _ = table.AddRow($"[bold]{title}[/]", "");
                 break;
                 
             case ReaderTableBuilder.SummaryRow(var message):

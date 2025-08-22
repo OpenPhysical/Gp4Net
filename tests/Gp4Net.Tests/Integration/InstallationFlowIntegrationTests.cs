@@ -80,32 +80,32 @@ public class InstallationFlowIntegrationTests
             hostChallenge: OpenFips201InstallationTrace.HostChallenge,
             useMaxResponseLength: true
         );
-        
-        initUpdateCmd.IsSuccess.Should().BeTrue("INITIALIZE UPDATE command creation should succeed");
+
+        _ = initUpdateCmd.IsSuccess.Should().BeTrue("INITIALIZE UPDATE command creation should succeed");
         
         // Test INITIALIZE UPDATE response parsing
         var responseData = OpenFips201InstallationTrace.InitializeUpdateResponse.Take(
             OpenFips201InstallationTrace.InitializeUpdateResponse.Length - 2).ToArray(); // Remove SW1SW2
         var parsedResponseResult = InitializeUpdateResponse.Parse(responseData);
-        parsedResponseResult.IsSuccess.Should().BeTrue("Failed to parse INITIALIZE UPDATE response");
+        _ = parsedResponseResult.IsSuccess.Should().BeTrue("Failed to parse INITIALIZE UPDATE response");
         var parsedResponse = parsedResponseResult.Value;
-        
-        parsedResponse.CardChallenge.Should().BeEquivalentTo(
+
+        _ = parsedResponse.CardChallenge.Should().BeEquivalentTo(
             OpenFips201InstallationTrace.CardChallenge,
             "Card challenge should match trace");
-        
+
         // Validate that the parsed challenge matches expected length
-        parsedResponse.CardChallenge.Length.Should().Be(8, "Card challenge should be 8 bytes");
+        _ = parsedResponse.CardChallenge.Length.Should().Be(8, "Card challenge should be 8 bytes");
         
         // Test that we can identify installation commands correctly
         var installCmd = OpenFips201InstallationTrace.InstallForLoadCommand;
-        installCmd[0].Should().Be(0x84, "INSTALL command should use secure messaging (CLA=0x84)");
-        installCmd[1].Should().Be(0xE6, "INSTALL command should have INS=0xE6");
-        installCmd[2].Should().Be(0x02, "INSTALL [for load] should have P1=0x02");
+        _ = installCmd[0].Should().Be(0x84, "INSTALL command should use secure messaging (CLA=0x84)");
+        _ = installCmd[1].Should().Be(0xE6, "INSTALL command should have INS=0xE6");
+        _ = installCmd[2].Should().Be(0x02, "INSTALL [for load] should have P1=0x02");
         
         var loadCmd = OpenFips201InstallationTrace.FirstLoadCommand;
-        loadCmd[0].Should().Be(0x84, "LOAD command should use secure messaging (CLA=0x84)");
-        loadCmd[1].Should().Be(0xE8, "LOAD command should have INS=0xE8");
+        _ = loadCmd[0].Should().Be(0x84, "LOAD command should use secure messaging (CLA=0x84)");
+        _ = loadCmd[1].Should().Be(0xE8, "LOAD command should have INS=0xE8");
     }
     
     [Test]
@@ -113,51 +113,51 @@ public class InstallationFlowIntegrationTests
     {
         // Test that we can extract and validate CAP file metadata
         // This would typically be done by parsing the CAP file before installation
-        
-        OpenFips201InstallationTrace.PackageName.Should().Be("com.makina.security.openfips201",
+
+        _ = OpenFips201InstallationTrace.PackageName.Should().Be("com.makina.security.openfips201",
             "Package name should match trace");
-        OpenFips201InstallationTrace.AppletName.Should().Be("com.makina.security.openfips201.OpenFIPS201",
+        _ = OpenFips201InstallationTrace.AppletName.Should().Be("com.makina.security.openfips201.OpenFIPS201",
             "Applet name should match trace");
-        OpenFips201InstallationTrace.Version.Should().Be("1.10",
+        _ = OpenFips201InstallationTrace.Version.Should().Be("1.10",
             "Version should match trace");
-        OpenFips201InstallationTrace.CodeSize.Should().Be(21780,
+        _ = OpenFips201InstallationTrace.CodeSize.Should().Be(21780,
             "Code size should match trace");
-        OpenFips201InstallationTrace.SHA256.Should().Be("da7243300d1f08622a102bfefc40b3f6c86d010aa1fa45efd9e31a0b34b8f959",
+        _ = OpenFips201InstallationTrace.SHA256.Should().Be("da7243300d1f08622a102bfefc40b3f6c86d010aa1fa45efd9e31a0b34b8f959",
             "SHA-256 hash should match trace");
         
         // Validate AID formats
         var packageAidBytes = Convert.FromHexString(OpenFips201InstallationTrace.PackageAID);
-        packageAidBytes.Length.Should().BeInRange(5, 16, "Package AID should be valid length");
+        _ = packageAidBytes.Length.Should().BeInRange(5, 16, "Package AID should be valid length");
         
         var appletAidBytes = Convert.FromHexString(OpenFips201InstallationTrace.AppletAID);
-        appletAidBytes.Length.Should().BeInRange(5, 16, "Applet AID should be valid length");
+        _ = appletAidBytes.Length.Should().BeInRange(5, 16, "Applet AID should be valid length");
     }
     
     [Test]
     public void InstallationFlow_SecureChannelParameters_MatchTrace()
     {
         // Test that SCP03 parameters from the trace are valid
-        
-        OpenFips201InstallationTrace.HostChallenge.Length.Should().Be(8,
+
+        _ = OpenFips201InstallationTrace.HostChallenge.Length.Should().Be(8,
             "Host challenge should be 8 bytes");
-        OpenFips201InstallationTrace.CardChallenge.Length.Should().Be(8,
+        _ = OpenFips201InstallationTrace.CardChallenge.Length.Should().Be(8,
             "Card challenge should be 8 bytes");
-            
-        OpenFips201InstallationTrace.ExpectedSEnc.Length.Should().Be(16,
+
+        _ = OpenFips201InstallationTrace.ExpectedSEnc.Length.Should().Be(16,
             "S-ENC key should be 16 bytes for AES-128");
-        OpenFips201InstallationTrace.ExpectedSMac.Length.Should().Be(16,
+        _ = OpenFips201InstallationTrace.ExpectedSMac.Length.Should().Be(16,
             "S-MAC key should be 16 bytes for AES-128");
-        OpenFips201InstallationTrace.ExpectedSRMac.Length.Should().Be(16,
+        _ = OpenFips201InstallationTrace.ExpectedSRMac.Length.Should().Be(16,
             "S-RMAC key should be 16 bytes for AES-128");
-        
+
         // All session keys should be different (proper key diversification)
-        OpenFips201InstallationTrace.ExpectedSEnc.Should().NotBeEquivalentTo(
+        _ = OpenFips201InstallationTrace.ExpectedSEnc.Should().NotBeEquivalentTo(
             OpenFips201InstallationTrace.ExpectedSMac,
             "S-ENC and S-MAC should be different");
-        OpenFips201InstallationTrace.ExpectedSEnc.Should().NotBeEquivalentTo(
+        _ = OpenFips201InstallationTrace.ExpectedSEnc.Should().NotBeEquivalentTo(
             OpenFips201InstallationTrace.ExpectedSRMac,
             "S-ENC and S-RMAC should be different");
-        OpenFips201InstallationTrace.ExpectedSMac.Should().NotBeEquivalentTo(
+        _ = OpenFips201InstallationTrace.ExpectedSMac.Should().NotBeEquivalentTo(
             OpenFips201InstallationTrace.ExpectedSRMac,
             "S-MAC and S-RMAC should be different");
     }
@@ -169,24 +169,24 @@ public class InstallationFlowIntegrationTests
         
         // INITIALIZE UPDATE: CLA=80, INS=50, P1=00, P2=00, Lc=08, Data=8bytes, Le=00
         var initCmd = OpenFips201InstallationTrace.InitializeUpdateCommand;
-        initCmd[0].Should().Be(0x80, "INITIALIZE UPDATE CLA should be 0x80");
-        initCmd[1].Should().Be(0x50, "INITIALIZE UPDATE INS should be 0x50");
-        initCmd[4].Should().Be(0x08, "INITIALIZE UPDATE Lc should be 0x08");
+        _ = initCmd[0].Should().Be(0x80, "INITIALIZE UPDATE CLA should be 0x80");
+        _ = initCmd[1].Should().Be(0x50, "INITIALIZE UPDATE INS should be 0x50");
+        _ = initCmd[4].Should().Be(0x08, "INITIALIZE UPDATE Lc should be 0x08");
         
         // EXTERNAL AUTHENTICATE: CLA=84 (secure), INS=82, P1=01, P2=00
         var extAuthCmd = OpenFips201InstallationTrace.ExternalAuthenticateCommand;
-        extAuthCmd[0].Should().Be(0x84, "EXTERNAL AUTHENTICATE CLA should be 0x84 (secure)");
-        extAuthCmd[1].Should().Be(0x82, "EXTERNAL AUTHENTICATE INS should be 0x82");
+        _ = extAuthCmd[0].Should().Be(0x84, "EXTERNAL AUTHENTICATE CLA should be 0x84 (secure)");
+        _ = extAuthCmd[1].Should().Be(0x82, "EXTERNAL AUTHENTICATE INS should be 0x82");
         
         // INSTALL [for load]: CLA=84 (secure), INS=E6, P1=02, P2=00
         var installCmd = OpenFips201InstallationTrace.InstallForLoadCommand;
-        installCmd[0].Should().Be(0x84, "INSTALL CLA should be 0x84 (secure)");
-        installCmd[1].Should().Be(0xE6, "INSTALL INS should be 0xE6");
-        installCmd[2].Should().Be(0x02, "INSTALL P1 should be 0x02 (for load)");
+        _ = installCmd[0].Should().Be(0x84, "INSTALL CLA should be 0x84 (secure)");
+        _ = installCmd[1].Should().Be(0xE6, "INSTALL INS should be 0xE6");
+        _ = installCmd[2].Should().Be(0x02, "INSTALL P1 should be 0x02 (for load)");
         
         // LOAD: CLA=84 (secure), INS=E8, P1=00, P2=00
         var loadCmd = OpenFips201InstallationTrace.FirstLoadCommand;
-        loadCmd[0].Should().Be(0x84, "LOAD CLA should be 0x84 (secure)");
-        loadCmd[1].Should().Be(0xE8, "LOAD INS should be 0xE8");
+        _ = loadCmd[0].Should().Be(0x84, "LOAD CLA should be 0x84 (secure)");
+        _ = loadCmd[1].Should().Be(0xE8, "LOAD INS should be 0xE8");
     }
 }

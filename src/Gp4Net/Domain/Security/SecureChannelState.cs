@@ -3,6 +3,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
+using Org.BouncyCastle.Security;
 
 namespace Gp4Net.Domain.Security;
 
@@ -24,8 +25,10 @@ public record SecureChannelState(
     /// Creates a new secure channel state with the encryption counter incremented.
     /// Used for R-ENC operations where each encryption operation must use a unique counter.
     /// </summary>
-    public SecureChannelState IncrementEncryptionCounter() =>
-        this with { EncryptionCounter = EncryptionCounter + 1 };
+    public SecureChannelState IncrementEncryptionCounter()
+    {
+        return this with { EncryptionCounter = EncryptionCounter + 1 };
+    }
 
     /// <summary>
     /// Creates a new secure channel state with an updated MAC chaining state.
@@ -171,10 +174,8 @@ public record SecureChannelState(
 
         // Generate cryptographically secure session ID
         var sessionId = new byte[8];
-        using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
-        {
-            rng.GetBytes(sessionId);
-        }
+        var secureRandom = new SecureRandom();
+        secureRandom.NextBytes(sessionId);
 
         return Result.Success<SecureChannelState, SmartCardError>(
             new SecureChannelState(
@@ -183,7 +184,7 @@ public record SecureChannelState(
                 protocolVersion,
                 macChainingResult.Value,
                 0, // Start with counter = 0 per GP specification
-                ImmutableArray.Create(sessionId)
+                [..sessionId]
             ));
     }
 

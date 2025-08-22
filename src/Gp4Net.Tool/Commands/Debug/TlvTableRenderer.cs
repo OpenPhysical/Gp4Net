@@ -90,10 +90,10 @@ public static class TlvTableRenderer
     public static void RenderToTable(IEnumerable<TlvTableBuilder.TlvRow> rows)
     {
         var table = new Table();
-        table.AddColumn("Element");
-        table.AddColumn("Tag");
-        table.AddColumn("Length");
-        table.AddColumn("Content");
+        _ = table.AddColumn("Element");
+        _ = table.AddColumn("Tag");
+        _ = table.AddColumn("Length");
+        _ = table.AddColumn("Content");
 
         foreach (var row in rows)
         {
@@ -101,7 +101,7 @@ public static class TlvTableRenderer
             {
                 case TlvTableBuilder.TlvDataRow(var elementIndex, var depth, var tagInfo, var lengthInfo, var content, var asciiContent, var rawBytes):
                     var indent = new string(' ', depth * 2);
-                    table.AddRow(
+                    _ = table.AddRow(
                         $"{indent}{elementIndex}",
                         StripMarkup(tagInfo),
                         lengthInfo,
@@ -111,7 +111,7 @@ public static class TlvTableRenderer
 
                 case TlvTableBuilder.NestedTlvHeaderRow(var depth, var message):
                     var nestedIndent = new string(' ', depth * 2);
-                    table.AddRow(
+                    _ = table.AddRow(
                         "",
                         $"{nestedIndent}Nested TLV",
                         "",
@@ -121,7 +121,7 @@ public static class TlvTableRenderer
 
                 case TlvTableBuilder.TagInterpretationRow(var depth, var interpretation):
                     var interpIndent = new string(' ', depth * 2);
-                    table.AddRow(
+                    _ = table.AddRow(
                         "",
                         $"{interpIndent}Interpretation",
                         "",

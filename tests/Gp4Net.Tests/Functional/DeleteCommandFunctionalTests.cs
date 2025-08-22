@@ -34,7 +34,7 @@ public class DeleteCommandFunctionalTests
         _virtualCardService.GetReaderManager().AddReader(_reader);
 
         // Connect to the card
-        _virtualCardService.Connect("Test Reader");
+        _ = _virtualCardService.Connect("Test Reader");
     }
 
     [TearDown]
@@ -53,20 +53,20 @@ public class DeleteCommandFunctionalTests
         var deleteCommandResult = DeleteCommand.CreateForApplication(testAppAid, deleteRelated: false);
 
         // Assert
-        deleteCommandResult.IsSuccess.Should().BeTrue();
+        _ = deleteCommandResult.IsSuccess.Should().BeTrue();
         var deleteCommand = deleteCommandResult.Value;
         var apdu = deleteCommand.ToApdu();
 
         // Verify APDU structure
-        apdu[0].Should().Be(0x80); // CLA
-        apdu[1].Should().Be(0xE4); // INS (DELETE)
-        apdu[2].Should().Be(0x80); // P1 (delete object only)
-        apdu[3].Should().Be(0x00); // P2 (by AID)
+        _ = apdu[0].Should().Be(0x80); // CLA
+        _ = apdu[1].Should().Be(0xE4); // INS (DELETE)
+        _ = apdu[2].Should().Be(0x80); // P1 (delete object only)
+        _ = apdu[3].Should().Be(0x00); // P2 (by AID)
 
         // Verify data contains AID in TLV format
         var dataOffset = 5;
-        apdu[dataOffset].Should().Be(0x4F); // AID tag
-        apdu[dataOffset + 1].Should().Be((byte)testAppAid.Length);
+        _ = apdu[dataOffset].Should().Be(0x4F); // AID tag
+        _ = apdu[dataOffset + 1].Should().Be((byte)testAppAid.Length);
     }
 
     [Test]
@@ -80,17 +80,17 @@ public class DeleteCommandFunctionalTests
             testAppAid,
             deleteRelated: true,
             deletionToken);
-        deleteCommandResult.IsSuccess.Should().BeTrue();
+        _ = deleteCommandResult.IsSuccess.Should().BeTrue();
         var deleteCommand = deleteCommandResult.Value;
 
         // Act
         var apdu = deleteCommand.ToApdu();
 
         // Assert
-        apdu[0].Should().Be(0x80); // CLA
-        apdu[1].Should().Be(0xE4); // INS
-        apdu[2].Should().Be(0x00); // P1 (delete object and related)
-        apdu[3].Should().Be(0x80); // P2 (with related)
+        _ = apdu[0].Should().Be(0x80); // CLA
+        _ = apdu[1].Should().Be(0xE4); // INS
+        _ = apdu[2].Should().Be(0x00); // P1 (delete object and related)
+        _ = apdu[3].Should().Be(0x80); // P2 (with related)
 
         // Verify token is appended after AID TLV
         var dataOffset = 5;
@@ -98,7 +98,7 @@ public class DeleteCommandFunctionalTests
         var tokenOffset = dataOffset + 2 + aidLength;
 
         var tokenInApdu = apdu.Skip(tokenOffset).Take(deletionToken.Length).ToArray();
-        tokenInApdu.Should().BeEquivalentTo(deletionToken);
+        _ = tokenInApdu.Should().BeEquivalentTo(deletionToken);
     }
 
     [Test]
@@ -113,7 +113,7 @@ public class DeleteCommandFunctionalTests
         };
 
         var deleteCommandResult = DeleteCommand.CreateForApplications(aids);
-        deleteCommandResult.IsSuccess.Should().BeTrue();
+        _ = deleteCommandResult.IsSuccess.Should().BeTrue();
         var deleteCommand = deleteCommandResult.Value;
 
         // Act
@@ -123,14 +123,14 @@ public class DeleteCommandFunctionalTests
         var totalAidLength = aids.Sum(aid => aid.Length); // 21 bytes
         var dataOffset = 5;
 
-        apdu[dataOffset].Should().Be(0x4F); // AID tag
-        apdu[dataOffset + 1].Should().Be((byte)totalAidLength);
+        _ = apdu[dataOffset].Should().Be(0x4F); // AID tag
+        _ = apdu[dataOffset + 1].Should().Be((byte)totalAidLength);
 
         // Verify all AIDs are concatenated
         var offset = dataOffset + 2;
         foreach (var aid in aids)
         {
-            apdu.Skip(offset).Take(aid.Length).Should().BeEquivalentTo(aid);
+            _ = apdu.Skip(offset).Take(aid.Length).Should().BeEquivalentTo(aid);
             offset += aid.Length;
         }
     }
@@ -142,25 +142,25 @@ public class DeleteCommandFunctionalTests
         var packageAid = Convert.FromHexString("A0000003080000100000");
 
         var deleteCommandResult = DeleteCommand.CreateForPackage(packageAid, deleteRelated: true);
-        deleteCommandResult.IsSuccess.Should().BeTrue();
+        _ = deleteCommandResult.IsSuccess.Should().BeTrue();
         var deleteCommand = deleteCommandResult.Value;
 
         // Act
         var apdu = deleteCommand.ToApdu();
 
         // Assert - Verify command structure
-        apdu[0].Should().Be(0x80); // CLA
-        apdu[1].Should().Be(0xE4); // INS
-        apdu[2].Should().Be(0x00); // P1 (delete object and related)
-        apdu[3].Should().Be(0x80); // P2 (with related)
+        _ = apdu[0].Should().Be(0x80); // CLA
+        _ = apdu[1].Should().Be(0xE4); // INS
+        _ = apdu[2].Should().Be(0x00); // P1 (delete object and related)
+        _ = apdu[3].Should().Be(0x80); // P2 (with related)
 
         // Verify AID encoding
         var dataOffset = 5;
-        apdu[dataOffset].Should().Be(0x4F); // AID tag
-        apdu[dataOffset + 1].Should().Be((byte)packageAid.Length);
+        _ = apdu[dataOffset].Should().Be(0x4F); // AID tag
+        _ = apdu[dataOffset + 1].Should().Be((byte)packageAid.Length);
 
         var aidInApdu = apdu.Skip(dataOffset + 2).Take(packageAid.Length).ToArray();
-        aidInApdu.Should().BeEquivalentTo(packageAid);
+        _ = aidInApdu.Should().BeEquivalentTo(packageAid);
     }
 
     [Test]
@@ -171,24 +171,24 @@ public class DeleteCommandFunctionalTests
         byte keyVersion = 0x73;
 
         var deleteCommandResult = DeleteCommand.CreateForKey(keyId, keyVersion);
-        deleteCommandResult.IsSuccess.Should().BeTrue();
+        _ = deleteCommandResult.IsSuccess.Should().BeTrue();
         var deleteCommand = deleteCommandResult.Value;
 
         // Act
         var apdu = deleteCommand.ToApdu();
 
         // Assert
-        apdu[0].Should().Be(0x80); // CLA
-        apdu[1].Should().Be(0xE4); // INS
-        apdu[2].Should().Be(0x80); // P1 (delete object only)
-        apdu[3].Should().Be(0x00); // P2 (by AID)
+        _ = apdu[0].Should().Be(0x80); // CLA
+        _ = apdu[1].Should().Be(0xE4); // INS
+        _ = apdu[2].Should().Be(0x80); // P1 (delete object only)
+        _ = apdu[3].Should().Be(0x00); // P2 (by AID)
 
         // For key deletion, the "AID" contains key reference
         var dataOffset = 5;
-        apdu[dataOffset].Should().Be(0x4F); // Still uses AID tag
-        apdu[dataOffset + 1].Should().Be(0x02); // Length = 2 (keyId + keyVersion)
-        apdu[dataOffset + 2].Should().Be(keyId);
-        apdu[dataOffset + 3].Should().Be(keyVersion);
+        _ = apdu[dataOffset].Should().Be(0x4F); // Still uses AID tag
+        _ = apdu[dataOffset + 1].Should().Be(0x02); // Length = 2 (keyId + keyVersion)
+        _ = apdu[dataOffset + 2].Should().Be(keyId);
+        _ = apdu[dataOffset + 3].Should().Be(keyVersion);
     }
 
     [Test]
@@ -202,9 +202,9 @@ public class DeleteCommandFunctionalTests
         var deleteResponse = DeleteResponse.Parse(responseData, statusWord);
 
         // Assert
-        deleteResponse.IsSuccessful.Should().BeTrue();
-        deleteResponse.StatusWord.Should().Be(0x9000);
-        deleteResponse.DeletionReceipts.Should().BeEmpty();
+        _ = deleteResponse.IsSuccessful.Should().BeTrue();
+        _ = deleteResponse.StatusWord.Should().Be(0x9000);
+        _ = deleteResponse.DeletionReceipts.Should().BeEmpty();
     }
 
     [Test]
@@ -224,10 +224,10 @@ public class DeleteCommandFunctionalTests
         var deleteResponse = DeleteResponse.Parse(responseData, statusWord);
 
         // Assert
-        deleteResponse.IsSuccessful.Should().BeTrue();
-        deleteResponse.DeletionReceipts.Should().HaveCount(1);
-        deleteResponse.DeletionReceipts[0].Aid.Should().BeEquivalentTo(deletedAid);
-        deleteResponse.DeletionReceipts[0].IsSuccessful.Should().BeTrue();
+        _ = deleteResponse.IsSuccessful.Should().BeTrue();
+        _ = deleteResponse.DeletionReceipts.Should().HaveCount(1);
+        _ = deleteResponse.DeletionReceipts[0].Aid.Should().BeEquivalentTo(deletedAid);
+        _ = deleteResponse.DeletionReceipts[0].IsSuccessful.Should().BeTrue();
     }
 
     [Test]
@@ -242,13 +242,13 @@ public class DeleteCommandFunctionalTests
         var result2 = DeleteCommand.CreateForApplication(aid, true, deletionToken);
 
         // Assert - Pure function produces identical results
-        result1.IsSuccess.Should().BeTrue();
-        result2.IsSuccess.Should().BeTrue();
+        _ = result1.IsSuccess.Should().BeTrue();
+        _ = result2.IsSuccess.Should().BeTrue();
 
         var apdu1 = result1.Value.ToApdu();
         var apdu2 = result2.Value.ToApdu();
 
-        apdu1.Should().BeEquivalentTo(apdu2);
+        _ = apdu1.Should().BeEquivalentTo(apdu2);
     }
 
     [Test]
@@ -257,7 +257,7 @@ public class DeleteCommandFunctionalTests
         // Arrange
         var aid = Convert.FromHexString("A0000003080000100001");
         var deleteCommandResult = DeleteCommand.CreateForApplication(aid);
-        deleteCommandResult.IsSuccess.Should().BeTrue();
+        _ = deleteCommandResult.IsSuccess.Should().BeTrue();
         var deleteCommand = deleteCommandResult.Value;
 
         // Act
@@ -268,8 +268,8 @@ public class DeleteCommandFunctionalTests
         secureApdu[0] = 0x84; // Secure messaging bit
 
         // Assert
-        secureApdu[0].Should().Be(0x84);
-        secureApdu[1].Should().Be(0xE4); // INS unchanged
+        _ = secureApdu[0].Should().Be(0x84);
+        _ = secureApdu[1].Should().Be(0xE4); // INS unchanged
     }
 
     [Test]
@@ -286,22 +286,22 @@ public class DeleteCommandFunctionalTests
             aid,
             deleteRelated: true,
             deletionToken);
-        deleteCommandResult.IsSuccess.Should().BeTrue();
+        _ = deleteCommandResult.IsSuccess.Should().BeTrue();
         var deleteCommand = deleteCommandResult.Value;
 
         // Act
         var apdu = deleteCommand.ToApdu();
 
         // Assert - Structure matches trace
-        apdu[0].Should().Be(0x80); // CLA (before secure messaging)
-        apdu[1].Should().Be(0xE4); // INS
-        apdu[2].Should().Be(0x00); // P1 (delete object and related)
-        apdu[3].Should().Be(0x80); // P2 (with related)
-        apdu[4].Should().Be(0x13); // Lc = 19 bytes (2 + 9 + 8)
+        _ = apdu[0].Should().Be(0x80); // CLA (before secure messaging)
+        _ = apdu[1].Should().Be(0xE4); // INS
+        _ = apdu[2].Should().Be(0x00); // P1 (delete object and related)
+        _ = apdu[3].Should().Be(0x80); // P2 (with related)
+        _ = apdu[4].Should().Be(0x13); // Lc = 19 bytes (2 + 9 + 8)
 
         // Data: 4F09<AID><TOKEN>
-        apdu[5].Should().Be(0x4F); // AID tag
-        apdu[6].Should().Be(0x09); // AID length
+        _ = apdu[5].Should().Be(0x4F); // AID tag
+        _ = apdu[6].Should().Be(0x09); // AID length
 
         // Verify complete data section
         var expectedData = new byte[] { 0x4F, 0x09 }
@@ -310,7 +310,7 @@ public class DeleteCommandFunctionalTests
             .ToArray();
 
         var actualData = apdu.Skip(5).ToArray();
-        actualData.Should().BeEquivalentTo(expectedData);
+        _ = actualData.Should().BeEquivalentTo(expectedData);
     }
 
     [Test]
@@ -326,8 +326,8 @@ public class DeleteCommandFunctionalTests
         var response = _virtualCardService.SendCommand(selectCommand);
 
         // Assert
-        response.IsSuccessful.Should().BeTrue();
-        response.Data.Should().NotBeEmpty(); // Should return FCI
+        _ = response.IsSuccessful.Should().BeTrue();
+        _ = response.Data.Should().NotBeEmpty(); // Should return FCI
     }
 
     [Test]
@@ -339,16 +339,16 @@ public class DeleteCommandFunctionalTests
         // Non-existent AID
         var nonExistentAid = Convert.FromHexString("AABBCCDDEE");
         var result1 = DeleteCommand.CreateForApplication(nonExistentAid);
-        result1.IsSuccess.Should().BeTrue();
+        _ = result1.IsSuccess.Should().BeTrue();
 
         // Empty AID list (should fail at creation)
         var result2 = DeleteCommand.CreateForApplications(Array.Empty<byte[]>());
-        result2.IsFailure.Should().BeTrue();
-        result2.Error.Message.Should().Contain("At least one AID must be provided");
+        _ = result2.IsFailure.Should().BeTrue();
+        _ = result2.Error.Message.Should().Contain("At least one AID must be provided");
 
         // Null AID (should fail at creation)
         var result3 = DeleteCommand.CreateForApplication(null!);
-        result3.IsFailure.Should().BeTrue();
-        result3.Error.Message.Should().Contain("AID cannot be null");
+        _ = result3.IsFailure.Should().BeTrue();
+        _ = result3.Error.Message.Should().Contain("AID cannot be null");
     }
 }

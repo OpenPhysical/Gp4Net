@@ -401,7 +401,7 @@ public class SecureChannelWorkflow
                 protocolVersion,
                 MacChainingState.Create(macChainingValue, protocolVersion, 0x00).Value,
                 0,
-                Guid.NewGuid().ToByteArray().Take(8).ToImmutableArray()
+                [..Guid.NewGuid().ToByteArray().Take(8)]
             );
 
         return new SecureChannelResult

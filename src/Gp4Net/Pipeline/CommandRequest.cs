@@ -14,32 +14,42 @@ public record CommandRequest(
     /// <summary>
     /// Creates a simple request with just a command.
     /// </summary>
-    public static CommandRequest Create(IApduCommand command) =>
-        new(command, ImmutablePipelineContext.Empty);
+    public static CommandRequest Create(IApduCommand command)
+    {
+        return new(command, ImmutablePipelineContext.Empty);
+    }
 
     /// <summary>
     /// Creates a request with a command and context.
     /// </summary>
-    public static CommandRequest Create(IApduCommand command, IPipelineContext context) =>
-        new(command, context);
+    public static CommandRequest Create(IApduCommand command, IPipelineContext context)
+    {
+        return new(command, context);
+    }
 
     /// <summary>
     /// Creates a new request with updated context.
     /// </summary>
-    public CommandRequest WithContext(IPipelineContext context) =>
-        this with { Context = context };
+    public CommandRequest WithContext(IPipelineContext context)
+    {
+        return this with { Context = context };
+    }
 
     /// <summary>
     /// Creates a new request with updated options.
     /// </summary>
-    public CommandRequest WithOptions(CommandOptions options) =>
-        this with { Options = options };
+    public CommandRequest WithOptions(CommandOptions options)
+    {
+        return this with { Options = options };
+    }
 
     /// <summary>
     /// Creates a new request with a context value added.
     /// </summary>
-    public CommandRequest WithContextValue<T>(string key, T value) where T : class =>
-        this with { Context = Context.With(key, value) };
+    public CommandRequest WithContextValue<T>(string key, T value) where T : class
+    {
+        return this with { Context = Context.With(key, value) };
+    }
 }
 
 /// <summary>

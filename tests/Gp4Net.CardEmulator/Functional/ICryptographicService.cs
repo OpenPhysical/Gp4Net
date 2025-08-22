@@ -105,6 +105,7 @@ public interface ICryptographicService
     /// <param name="encryptionCounter">The current encryption counter.</param>
     /// <param name="scpVersion">The SCP version.</param>
     /// <param name="securityLevel">The security level specifying which security to apply.</param>
+    /// <param name="currentState">The current card state.</param>
     /// <returns>The secured response data and updated state.</returns>
     Result<(byte[] securedData, CardState newState), SmartCardError> ApplyResponseSecurity(
         byte[] responseData,

@@ -13,6 +13,7 @@ using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
 using log4net;
+using Org.BouncyCastle.Security;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -254,8 +255,8 @@ public abstract class BaseCommand<TSettings> : AsyncCommand<TSettings>
     private static byte[] GenerateHostChallenge()
     {
         var challenge = new byte[8];
-        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
-        rng.GetBytes(challenge);
+        var secureRandom = new SecureRandom();
+        secureRandom.NextBytes(challenge);
         return challenge;
     }
 }

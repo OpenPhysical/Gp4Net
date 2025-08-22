@@ -53,9 +53,18 @@ public class GlobalPlatformService : IGlobalPlatformService
         _logger.LogInformation("Selecting Issuer Security Domain with auto-detection");
 
         // Use the CardDiscovery module
-        return await CardDiscovery.DetectAndSelectIsdAsync(
+        var result = await CardDiscovery.DetectAndSelectIsdAsync(
             async (cmd, ct) => await _cardService.ExecuteCommandAsync(cmd, ct),
             cancellationToken);
+
+        // Normalize errors to a consistent message expected by tests/consumers
+        if (result.IsFailure)
+        {
+            return Result.Failure<SelectResponse, SmartCardError>(
+                SmartCardError.CardError("No ISD found on card"));
+        }
+
+        return result;
     }
 
     /// <inheritdoc/>

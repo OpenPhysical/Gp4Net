@@ -296,25 +296,31 @@ public class CapFileStructure
 
                 components.Add(component);
 
-                // Extract package information from header component
-                if (component.Tag == ComponentTags.Header)
+                switch (component.Tag)
                 {
-                    var header = HeaderComponent.Parse(component.Data);
-                    packageAid = header.PackageAid;
-                    packageVersion = header.PackageVersion;
-                    capFileVersion = new CapVersion(
-                        header.CapFileMajorVersion,
-                        header.CapFileMinorVersion
-                    );
-                    headerFlags = header.Flags;
+                    // Extract package information from header component
+                    case ComponentTags.Header:
+                    {
+                        var header = HeaderComponent.Parse(component.Data);
+                        packageAid = header.PackageAid;
+                        packageVersion = header.PackageVersion;
+                        capFileVersion = new CapVersion(
+                            header.CapFileMajorVersion,
+                            header.CapFileMinorVersion
+                        );
+                        headerFlags = header.Flags;
+                        break;
+                    }
+
+                    // Extract applet information from applet component
+                    case ComponentTags.Applet:
+                    {
+                        var appletComponent = AppletComponent.Parse(component.Data);
+                        applets.AddRange(appletComponent.Applets);
+                        break;
+                    }
                 }
 
-                // Extract applet information from applet component
-                if (component.Tag == ComponentTags.Applet)
-                {
-                    var appletComponent = AppletComponent.Parse(component.Data);
-                    applets.AddRange(appletComponent.Applets);
-                }
             }
         }
 
@@ -342,7 +348,7 @@ public class CapFileStructure
     {
         // Standard loading order for Java Card
         byte[] loadOrder =
-        {
+        [
             ComponentTags.Header,
             ComponentTags.Directory,
             ComponentTags.Import,
@@ -353,8 +359,8 @@ public class CapFileStructure
             ComponentTags.Export,
             ComponentTags.ConstantPool,
             ComponentTags.ReferenceLocation,
-            ComponentTags.Descriptor,
-        };
+            ComponentTags.Descriptor
+        ];
 
         var componentDict = Components.ToDictionary(c => c.Tag, c => c);
 

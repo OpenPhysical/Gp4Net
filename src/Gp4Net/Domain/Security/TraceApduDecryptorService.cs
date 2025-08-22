@@ -355,14 +355,14 @@ public sealed class TraceApduDecryptorService
         if (protocolVersion == ProtocolIdentifiers.Scp03)
         {
             // For SCP03, MAC chaining value is the full 16-byte CMAC
-            return ImmutableArray.Create(newMac);
+            return [..newMac];
         }
         else
         {
             // For SCP02, update first 8 bytes of chaining value
             var newChaining = currentChaining.ToArray();
             Array.Copy(newMac, 0, newChaining, 0, Math.Min(8, newMac.Length));
-            return ImmutableArray.Create(newChaining);
+            return [..newChaining];
         }
     }
 
@@ -422,7 +422,7 @@ public sealed class TraceApduDecryptorService
             for (int i = 0; i < apduBytes.Length - 2; i++)
             {
                 var tag = apduBytes[i];
-                if (tag == 0x87 || tag == 0x8E || tag == 0x99)
+                if (tag is 0x87 or 0x8E or 0x99)
                 {
                     return true;
                 }

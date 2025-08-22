@@ -3,6 +3,7 @@ using System.Linq;
 using AwesomeAssertions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Domain.Modules;
 using Gp4Net.Transport;
 using NUnit.Framework;
 
@@ -19,10 +20,10 @@ public class SelectCommandTests
 
         var result = SelectCommand.Create(aid);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Aid.Should().BeEquivalentTo(aid);
-        result.Value.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
-        result.Value.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFci);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Aid.Should().BeEquivalentTo(aid);
+        _ = result.Value.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
+        _ = result.Value.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFci);
     }
 
     [Test]
@@ -32,10 +33,10 @@ public class SelectCommandTests
 
         var result = SelectCommand.Create(aid);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Aid.Should().BeEmpty();
-        result.Value.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
-        result.Value.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFci);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Aid.Should().BeEmpty();
+        _ = result.Value.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
+        _ = result.Value.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFci);
     }
 
     [Test]
@@ -43,11 +44,11 @@ public class SelectCommandTests
     {
         var result = SelectCommand.Create(null);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<InvalidDataError>();
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<InvalidDataError>();
         var error = (InvalidDataError)result.Error;
-        error.Field.Should().Be("AID");
-        error.Reason.Should().Be("cannot be null");
+        _ = error.Field.Should().Be("AID");
+        _ = error.Reason.Should().Be("cannot be null");
     }
 
     [Test]
@@ -58,8 +59,8 @@ public class SelectCommandTests
 
         var result = SelectCommand.Create(aid);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Aid.Should().BeEquivalentTo(aid);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Aid.Should().BeEquivalentTo(aid);
     }
 
     [Test]
@@ -69,12 +70,12 @@ public class SelectCommandTests
 
         var result = SelectCommand.Create(aid);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<InvalidLengthError>();
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<InvalidLengthError>();
         var error = (InvalidLengthError)result.Error;
-        error.Field.Should().Be("AID");
-        error.Expected.Should().Be(16);
-        error.Actual.Should().Be(17);
+        _ = error.Field.Should().Be("AID");
+        _ = error.Expected.Should().Be(16);
+        _ = error.Actual.Should().Be(17);
     }
 
     [Test]
@@ -84,8 +85,8 @@ public class SelectCommandTests
 
         var result = SelectCommand.Create(aid, SelectCommand.SelectMode.First);
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFci);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFci);
     }
 
     [Test]
@@ -95,9 +96,10 @@ public class SelectCommandTests
 
         var result = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
 
-        result.IsSuccess.Should().BeTrue();
-        var expectedControlInfo = (SelectCommand.FileControlInfo)((byte)SelectCommand.FileControlInfo.ReturnFci | (byte)SelectCommand.SelectMode.Next);
-        result.Value.ControlInfo.Should().Be(expectedControlInfo);
+        _ = result.IsSuccess.Should().BeTrue();
+        // GP Card Specification v2.3.1 Table 11-81: P2=0x02 for "Next occurrence"
+        _ = result.Value.ControlInfo.Should().Be((SelectCommand.FileControlInfo)SelectCommand.SelectMode.Next);
+        _ = ((byte)result.Value.ControlInfo).Should().Be(0x02, "GP Table 11-81: P2=0x02 for Next occurrence");
     }
 
     [Test]
@@ -105,10 +107,10 @@ public class SelectCommandTests
     {
         var result = SelectCommand.CreateForIssuerSecurityDomain();
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Aid.Should().BeEmpty();
-        result.Value.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
-        result.Value.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFci);
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.Aid.Should().BeEmpty();
+        _ = result.Value.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
+        _ = result.Value.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFci);
     }
 
     [Test]
@@ -118,12 +120,12 @@ public class SelectCommandTests
         var result = SelectCommand.Create(aid);
         var command = result.Value;
 
-        command.Cla.Should().Be(0x00);
-        command.Ins.Should().Be(0xA4);
-        command.P1.Should().Be((byte)SelectCommand.SelectionControl.SelectByName);
-        command.P2.Should().Be((byte)SelectCommand.FileControlInfo.ReturnFci);
-        command.Data.Should().BeEquivalentTo(aid);
-        command.ExpectedResponseLength.Should().Be(256);
+        _ = command.Cla.Should().Be(0x00);
+        _ = command.Ins.Should().Be(0xA4);
+        _ = command.P1.Should().Be((byte)SelectCommand.SelectionControl.SelectByName);
+        _ = command.P2.Should().Be((byte)SelectCommand.FileControlInfo.ReturnFci);
+        _ = command.Data.Should().BeEquivalentTo(aid);
+        _ = command.ExpectedResponseLength.Should().Be(256);
     }
 
     [Test]
@@ -134,7 +136,7 @@ public class SelectCommandTests
 
         var apdu = ApduBuilder.BuildApdu(command);
 
-        apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 });
+        _ = apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 });
     }
 
     [Test]
@@ -150,7 +152,7 @@ public class SelectCommandTests
             .Concat(aid)
             .Concat(new byte[] { 0x00 })
             .ToArray();
-        apdu.Should().BeEquivalentTo(expected);
+        _ = apdu.Should().BeEquivalentTo(expected);
     }
 
     [Test]
@@ -166,7 +168,7 @@ public class SelectCommandTests
             .Concat(aid)
             .Concat(new byte[] { 0x00 })
             .ToArray();
-        apdu.Should().BeEquivalentTo(expected);
+        _ = apdu.Should().BeEquivalentTo(expected);
     }
 
     [Test]
@@ -175,7 +177,7 @@ public class SelectCommandTests
         var result = SelectCommand.Create([]);
         var command = result.Value;
 
-        command.ToString().Should().Be("SELECT");
+        _ = command.ToString().Should().Be("SELECT");
     }
 
     [Test]
@@ -187,34 +189,34 @@ public class SelectCommandTests
 
         originalAid[0] = 0xFF;
 
-        command.Aid[0].Should().Be(0xA0);
+        _ = command.Aid[0].Should().Be(0xA0);
     }
 
     [Test]
     public void SelectMode_FirstValue_IsZero()
     {
-        ((byte)SelectCommand.SelectMode.First).Should().Be(0x00);
+        _ = ((byte)SelectCommand.SelectMode.First).Should().Be(0x00);
     }
 
     [Test]
     public void SelectMode_NextValue_IsCorrect()
     {
-        ((byte)SelectCommand.SelectMode.Next).Should().Be(0x02);
+        _ = ((byte)SelectCommand.SelectMode.Next).Should().Be(0x02);
     }
 
     [Test]
     public void SelectionControl_SelectByName_IsCorrect()
     {
-        ((byte)SelectCommand.SelectionControl.SelectByName).Should().Be(0x04);
+        _ = ((byte)SelectCommand.SelectionControl.SelectByName).Should().Be(0x04);
     }
 
     [Test]
     public void FileControlInfo_Values_AreCorrect()
     {
-        ((byte)SelectCommand.FileControlInfo.ReturnFci).Should().Be(0x00);
-        ((byte)SelectCommand.FileControlInfo.ReturnFcp).Should().Be(0x04);
-        ((byte)SelectCommand.FileControlInfo.ReturnFmd).Should().Be(0x08);
-        ((byte)SelectCommand.FileControlInfo.NoResponseData).Should().Be(0x0C);
+        _ = ((byte)SelectCommand.FileControlInfo.ReturnFci).Should().Be(0x00);
+        _ = ((byte)SelectCommand.FileControlInfo.ReturnFcp).Should().Be(0x04);
+        _ = ((byte)SelectCommand.FileControlInfo.ReturnFmd).Should().Be(0x08);
+        _ = ((byte)SelectCommand.FileControlInfo.NoResponseData).Should().Be(0x0C);
     }
 
     [Test]
@@ -224,28 +226,28 @@ public class SelectCommandTests
         var result = SelectCommand.Create(aid);
         var command = result.Value;
 
-        command.IsExtendedLength.Should().BeFalse();
+        _ = command.IsExtendedLength.Should().BeFalse();
     }
 
     // Test the obsolete method for backward compatibility
     [Test]
     public void CreateEmptySelect_IsObsolete_ButWorks()
     {
-        var command = SelectCommand.CreateForIssuerSecurityDomain().Value;
+        var command = CommandFactory.CreateSelectIsdCommand().Value;
 
-        command.Aid.Should().BeEmpty();
-        command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
-        command.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFci);
+        _ = command.Aid.Should().BeEmpty();
+        _ = command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
+        _ = command.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFci);
     }
 
     [Test]
     public void CreateEmptySelect_WithCustomControlInfo_SetsCorrectValue()
     {
-        var command = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.ReturnFcp);
+        var command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp).Value;
 
-        command.Aid.Should().BeEmpty();
-        command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
-        command.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFcp);
+        _ = command.Aid.Should().BeEmpty();
+        _ = command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
+        _ = command.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFcp);
     }
 
     [Test]
@@ -264,95 +266,95 @@ public class SelectCommandTests
 
             var result = SelectCommand.Create(aid);
 
-            result.IsSuccess.Should().BeTrue($"AID length {length} should be valid");
-            result.Value.Aid.Length.Should().Be(length);
+            _ = result.IsSuccess.Should().BeTrue($"AID length {length} should be valid");
+            _ = result.Value.Aid.Length.Should().Be(length);
         }
     }
 
     [Test]
     public void ClassAndInstructionConstants_AreCorrect()
     {
-        SelectCommand.ClassByte.Should().Be(0x00);
-        SelectCommand.InstructionByte.Should().Be(0xA4);
+        _ = SelectCommand.ClassByte.Should().Be(0x00);
+        _ = SelectCommand.InstructionByte.Should().Be(0xA4);
     }
 
     [Test]
     public void ExpectedResponseLength_WithNoResponseData_ReturnsNull()
     {
-        var command = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.NoResponseData);
+        var command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.NoResponseData).Value;
 
-        command.ExpectedResponseLength.HasNoValue.Should().BeTrue();
+        _ = command.ExpectedResponseLength.HasNoValue.Should().BeTrue();
     }
 
     [Test]
     public void ExpectedResponseLength_WithReturnFci_Returns256()
     {
-        var command = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.ReturnFci);
+        var command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFci).Value;
 
-        command.ExpectedResponseLength.Should().Be(256);
+        _ = command.ExpectedResponseLength.Should().Be(256);
     }
 
     [Test]
     public void ExpectedResponseLength_WithReturnFcp_Returns256()
     {
-        var command = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.ReturnFcp);
+        var command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp).Value;
 
-        command.ExpectedResponseLength.Should().Be(256);
+        _ = command.ExpectedResponseLength.Should().Be(256);
     }
 
     [Test]
     public void ExpectedResponseLength_WithReturnFmd_Returns256()
     {
-        var command = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.ReturnFmd);
+        var command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFmd).Value;
 
-        command.ExpectedResponseLength.Should().Be(256);
+        _ = command.ExpectedResponseLength.Should().Be(256);
     }
 
     [Test]
     public void ToApdu_WithNoResponseData_GeneratesCorrectApdu()
     {
-        var command = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.NoResponseData);
+        var command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.NoResponseData).Value;
 
         var apdu = ApduBuilder.BuildApdu(command);
 
-        apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x0C });
+        _ = apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x0C });
     }
 
     [Test]
     public void ToApdu_WithReturnFcp_GeneratesCorrectApdu()
     {
-        var command = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.ReturnFcp);
+        var command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp).Value;
 
         var apdu = ApduBuilder.BuildApdu(command);
 
-        apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x04, 0x00 });
+        _ = apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x04, 0x00 });
     }
 
     [Test]
     public void ToApdu_WithReturnFmd_GeneratesCorrectApdu()
     {
-        var command = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.ReturnFmd);
+        var command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFmd).Value;
 
         var apdu = ApduBuilder.BuildApdu(command);
 
-        apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x08, 0x00 });
+        _ = apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x08, 0x00 });
     }
 
     [Test]
     public void ToApdu_WithAidAndReturnFcp_GeneratesCorrectApdu()
     {
         var aid = Convert.FromHexString("A000000151000000");
-        var command = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.ReturnFcp);
+        var command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp).Value;
         // Need to access through Create method since constructor is private
         var result = SelectCommand.Create(aid, SelectCommand.SelectMode.First);
         var createdCommand = result.Value;
 
         // Create manually with ReturnFcp since we can't easily combine Create with different FileControlInfo
-        var manualCommand = SelectCommand.CreateEmptySelect(SelectCommand.FileControlInfo.ReturnFcp);
+        var manualCommand = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp).Value;
 
         var apdu = ApduBuilder.BuildApdu(manualCommand);
 
-        apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x04, 0x00 });
+        _ = apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x04, 0x00 });
     }
 
     [Test]
@@ -368,11 +370,161 @@ public class SelectCommandTests
 
         foreach (var option in options)
         {
-            var command = SelectCommand.CreateEmptySelect(option);
+            var command = CommandFactory.CreateSelectIsdCommand(option).Value;
 
-            command.ControlInfo.Should().Be(option, $"FileControlInfo {option} should be set correctly");
-            command.Aid.Should().BeEmpty($"AID should be empty for {option}");
-            command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName, $"Control should be SelectByName for {option}");
+            _ = command.ControlInfo.Should().Be(option, $"FileControlInfo {option} should be set correctly");
+            _ = command.Aid.Should().BeEmpty($"AID should be empty for {option}");
+            _ = command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName, $"Control should be SelectByName for {option}");
         }
+    }
+
+    /// <summary>
+    /// GP Card Specification v2.3.1 Table 11-81 compliance tests.
+    /// Tests the SELECT command P2 parameter calculation according to GP specification.
+    /// </summary>
+    [Test]
+    public void GP_Table_11_81_P2_Parameter_First_Occurrence_Should_Be_0x00()
+    {
+        // GP Card Specification v2.3.1 Table 11-81: 
+        // b8 b7 b6 b5 b4 b3 b2 b1 | Meaning
+        // 0  0  0  0  0  0  0  0  | First or only occurrence
+        
+        var aid = Convert.FromHexString("A000000151000000");
+        var result = SelectCommand.Create(aid, SelectCommand.SelectMode.First);
+
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.P2.Should().Be(0x00, "GP Table 11-81: First occurrence should be P2=0x00");
+    }
+
+    [Test]
+    public void GP_Table_11_81_P2_Parameter_Next_Occurrence_Should_Be_0x02()
+    {
+        // GP Card Specification v2.3.1 Table 11-81:
+        // b8 b7 b6 b5 b4 b3 b2 b1 | Meaning
+        // 0  0  0  0  0  0  1  0  | Next occurrence
+        
+        var aid = Convert.FromHexString("A000000151000000");
+        var result = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
+
+        _ = result.IsSuccess.Should().BeTrue();
+        _ = result.Value.P2.Should().Be(0x02, "GP Table 11-81: Next occurrence should be P2=0x02");
+    }
+
+    [Test]
+    public void GP_Table_11_80_P1_Parameter_Should_Always_Be_0x04_For_SelectByName()
+    {
+        // GP Card Specification v2.3.1 Table 11-80:
+        // b8 b7 b6 b5 b4 b3 b2 b1 | Meaning
+        // 0  0  0  0  0  1  0  0  | Select by name
+        
+        var aid = Convert.FromHexString("A000000151000000");
+        
+        // Test both modes to ensure P1 is consistent
+        var firstResult = SelectCommand.Create(aid, SelectCommand.SelectMode.First);
+        var nextResult = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
+
+        _ = firstResult.IsSuccess.Should().BeTrue();
+        _ = nextResult.IsSuccess.Should().BeTrue();
+        
+        _ = firstResult.Value.P1.Should().Be(0x04, "GP Table 11-80: Select by name should be P1=0x04");
+        _ = nextResult.Value.P1.Should().Be(0x04, "GP Table 11-80: Select by name should be P1=0x04 regardless of mode");
+    }
+
+    [Test]
+    public void GP_Compliance_SELECT_Command_APDU_Structure_First_Occurrence()
+    {
+        // GP Card Specification v2.3.1: SELECT command for first occurrence
+        // Expected APDU: CLA=0x00, INS=0xA4, P1=0x04, P2=0x00, Lc=8, Data=AID, Le=0x00
+        
+        var aid = Convert.FromHexString("A000000151000000");
+        var result = SelectCommand.Create(aid, SelectCommand.SelectMode.First);
+        var command = result.Value;
+
+        var apdu = ApduBuilder.BuildApdu(command);
+
+        var expected = new byte[] { 
+            0x00,  // CLA
+            0xA4,  // INS = SELECT
+            0x04,  // P1 = Select by name (GP Table 11-80)
+            0x00,  // P2 = First occurrence (GP Table 11-81)
+            0x08   // Lc = AID length
+        }
+        .Concat(aid)           // AID data
+        .Concat(new byte[] { 0x00 })  // Le
+        .ToArray();
+        
+        _ = apdu.Should().BeEquivalentTo(expected, "APDU should match GP specification for first occurrence");
+    }
+
+    [Test]
+    public void GP_Compliance_SELECT_Command_APDU_Structure_Next_Occurrence()
+    {
+        // GP Card Specification v2.3.1: SELECT command for next occurrence
+        // Expected APDU: CLA=0x00, INS=0xA4, P1=0x04, P2=0x02, Lc=8, Data=AID, Le=0x00
+        
+        var aid = Convert.FromHexString("A000000151000000");
+        var result = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
+        var command = result.Value;
+
+        var apdu = ApduBuilder.BuildApdu(command);
+
+        var expected = new byte[] { 
+            0x00,  // CLA
+            0xA4,  // INS = SELECT
+            0x04,  // P1 = Select by name (GP Table 11-80)
+            0x02,  // P2 = Next occurrence (GP Table 11-81)
+            0x08   // Lc = AID length
+        }
+        .Concat(aid)           // AID data
+        .Concat(new byte[] { 0x00 })  // Le
+        .ToArray();
+        
+        _ = apdu.Should().BeEquivalentTo(expected, "APDU should match GP specification for next occurrence");
+    }
+
+    [Test]
+    public void GP_Compliance_IssuerSecurityDomain_Selection()
+    {
+        // GP Card Specification v2.3.1: SELECT ISD with empty AID
+        // Expected APDU: CLA=0x00, INS=0xA4, P1=0x04, P2=0x00 (no Lc/data, Le=0x00)
+        
+        var result = SelectCommand.CreateForIssuerSecurityDomain();
+        var command = result.Value;
+
+        var apdu = ApduBuilder.BuildApdu(command);
+
+        var expected = new byte[] { 
+            0x00,  // CLA
+            0xA4,  // INS = SELECT
+            0x04,  // P1 = Select by name (GP Table 11-80)
+            0x00,  // P2 = First occurrence (GP Table 11-81)
+            0x00   // Lc = 0 (empty AID for ISD)
+        };
+        
+        _ = apdu.Should().BeEquivalentTo(expected, "ISD selection should match GP specification");
+    }
+
+    /// <summary>
+    /// Tests that the bug described in the original analysis is fixed.
+    /// The bug was incorrect P2 parameter calculation using bitwise OR.
+    /// </summary>
+    [Test]
+    public void Original_P2_Calculation_Bug_Should_Be_Fixed()
+    {
+        // Original bug: P2 was calculated as FileControlInfo.ReturnFci (0x00) | SelectMode.Next (0x02) = 0x02
+        // This accidentally produced the correct result for Next mode but was wrong for the wrong reason
+        // The fix: P2 should be directly from GP Table 11-81 values
+        
+        var aid = Convert.FromHexString("A000000151000000");
+        
+        var firstResult = SelectCommand.Create(aid, SelectCommand.SelectMode.First);
+        var nextResult = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
+
+        _ = firstResult.Value.P2.Should().Be(0x00, "Fixed: First mode should be P2=0x00 per GP Table 11-81");
+        _ = nextResult.Value.P2.Should().Be(0x02, "Fixed: Next mode should be P2=0x02 per GP Table 11-81");
+        
+        // The values should match SelectMode enum values directly, not from bitwise OR
+        _ = firstResult.Value.P2.Should().Be((byte)SelectCommand.SelectMode.First);
+        _ = nextResult.Value.P2.Should().Be((byte)SelectCommand.SelectMode.Next);
     }
 }

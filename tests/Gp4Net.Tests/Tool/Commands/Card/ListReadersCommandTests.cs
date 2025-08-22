@@ -56,7 +56,7 @@ public class ListReadersCommandTests
     public void Constructor_WithNoDependencies_CreatesInstance()
     {
         // Act & Assert
-        this._command.Should().NotBeNull();
+        _ = this._command.Should().NotBeNull();
     }
 
     /// <summary>
@@ -74,7 +74,7 @@ public class ListReadersCommandTests
         var result = await this._command.ExecuteAsync(this._mockContext, settings);
 
         // Assert
-        result.Should().Be(0);
+        _ = result.Should().Be(0);
         this._mockCardService.Verify(x => x.GetReaders(), Times.Once);
     }
 
@@ -93,7 +93,7 @@ public class ListReadersCommandTests
         var result = await this._command.ExecuteAsync(this._mockContext, settings);
 
         // Assert
-        result.Should().Be(0);
+        _ = result.Should().Be(0);
         this._mockCardService.Verify(x => x.GetReaders(), Times.Once);
     }
 
@@ -113,7 +113,7 @@ public class ListReadersCommandTests
         var result = await this._command.ExecuteAsync(this._mockContext, settings);
 
         // Assert
-        result.Should().Be(1);
+        _ = result.Should().Be(1);
         this._mockCardService.Verify(x => x.GetReaders(), Times.Once);
     }
 }

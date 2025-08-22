@@ -156,6 +156,6 @@ public class Scp03TraceTests : TraceBasedTestBase
         // 3. Wrap them with the secure channel
         // 4. Compare against the trace
             
-        Assert.That(true, Is.True, "Trace replay validates the command sequence");
+        Assert.Pass("Trace replay validates the command sequence");
     }
 }

@@ -167,36 +167,39 @@ public class KeysetResolver : IKeysetResolver
             throw new InvalidOperationException("Script must return enc, mac, and dek keys");
         }
 
-        // Determine protocol based on key length and rmac presence
-        if (encKey.Length == 16 && macKey.Length == 16 && dekKey.Length == 16)
+        switch (encKey.Length)
         {
-            // 3DES keys - likely SCP02
-            var keySetResult = Scp02KeySet.Create(encKey, macKey, dekKey, version);
-            if (keySetResult.IsFailure)
+            // Determine protocol based on key length and rmac presence
+            case 16 when macKey.Length == 16 && dekKey.Length == 16:
             {
-                throw new InvalidOperationException($"Failed to create Scp02KeySet: {keySetResult.Error.Message}");
+                // 3DES keys - likely SCP02
+                var keySetResult = Scp02KeySet.Create(encKey, macKey, dekKey, version);
+                if (keySetResult.IsFailure)
+                {
+                    throw new InvalidOperationException($"Failed to create Scp02KeySet: {keySetResult.Error.Message}");
+                }
+                return keySetResult.Value;
             }
-            return keySetResult.Value;
-        }
-        else if (encKey.Length >= 16 && rmacKey != null)
-        {
-            // AES keys with RMAC - SCP03
-            var keySetResult = Scp03KeySet.Create(encKey, macKey, dekKey, version);
-            if (keySetResult.IsFailure)
+            case >= 16 when rmacKey != null:
             {
-                throw new InvalidOperationException($"Failed to create Scp03KeySet: {keySetResult.Error.Message}");
+                // AES keys with RMAC - SCP03
+                var keySetResult = Scp03KeySet.Create(encKey, macKey, dekKey, version);
+                if (keySetResult.IsFailure)
+                {
+                    throw new InvalidOperationException($"Failed to create Scp03KeySet: {keySetResult.Error.Message}");
+                }
+                return keySetResult.Value;
             }
-            return keySetResult.Value;
-        }
-        else
-        {
-            // Default to SCP02
-            var keySetResult = Scp02KeySet.Create(encKey, macKey, dekKey, version);
-            if (keySetResult.IsFailure)
+            default:
             {
-                throw new InvalidOperationException($"Failed to create Scp02KeySet: {keySetResult.Error.Message}");
+                // Default to SCP02
+                var keySetResult = Scp02KeySet.Create(encKey, macKey, dekKey, version);
+                if (keySetResult.IsFailure)
+                {
+                    throw new InvalidOperationException($"Failed to create Scp02KeySet: {keySetResult.Error.Message}");
+                }
+                return keySetResult.Value;
             }
-            return keySetResult.Value;
         }
     }
 
@@ -208,19 +211,18 @@ public class KeysetResolver : IKeysetResolver
             return null;
         }
 
-        if (value.Type == DataType.UserData && value.UserData.Object is byte[] bytes)
+        switch (value.Type)
         {
-            return bytes;
+            case DataType.UserData when value.UserData.Object is byte[] bytes:
+                return bytes;
+            case DataType.String:
+                return Convert.FromHexString(value.String.Replace(" ", ""));
+            default:
+                throw new InvalidOperationException(
+                    $"Invalid type for key '{key}': expected bytes or hex string"
+                );
         }
 
-        if (value.Type == DataType.String)
-        {
-            return Convert.FromHexString(value.String.Replace(" ", ""));
-        }
-
-        throw new InvalidOperationException(
-            $"Invalid type for key '{key}': expected bytes or hex string"
-        );
     }
 
     private static byte GetByteFromTable(Table table, string key, byte defaultValue)

@@ -12,12 +12,9 @@ using Spectre.Console.Cli;
 namespace Gp4Net.Tool.Commands.Card;
 
 /// <summary>
-/// Test command for establishing a secure channel with GP test keys.
-/// </summary>
-[PublicAPI]
-/// <summary>
 /// Command to test secure channel establishment with GlobalPlatform test keys.
 /// </summary>
+[PublicAPI]
 [Description("Test secure channel establishment with GP test keys")]
 public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Settings>
 {

@@ -96,7 +96,7 @@ public static class CryptographicOperations
             var currentBlock = new byte[8];
             for (int i = 0; i < data.Length; i += 8)
             {
-                cipher.ProcessBlock(data, i, currentBlock, 0);
+                _ = cipher.ProcessBlock(data, i, currentBlock, 0);
             }
             
             return Result.Success<byte[], SmartCardError>(currentBlock);
@@ -359,7 +359,7 @@ public static class CryptographicOperations
 
             var encrypted = new byte[data.Length];
             var len = cipher.ProcessBytes(data, 0, data.Length, encrypted, 0);
-            cipher.DoFinal(encrypted, len);
+            _ = cipher.DoFinal(encrypted, len);
 
             return Result.Success<byte[], SmartCardError>(encrypted);
         }
@@ -402,7 +402,7 @@ public static class CryptographicOperations
 
             var decrypted = new byte[encryptedData.Length];
             var len = cipher.ProcessBytes(encryptedData, 0, encryptedData.Length, decrypted, 0);
-            cipher.DoFinal(decrypted, len);
+            _ = cipher.DoFinal(decrypted, len);
 
             return Result.Success<byte[], SmartCardError>(decrypted);
         }
@@ -447,7 +447,7 @@ public static class CryptographicOperations
 
             var encrypted = new byte[data.Length];
             var len = cipher.ProcessBytes(data, 0, data.Length, encrypted, 0);
-            cipher.DoFinal(encrypted, len);
+            _ = cipher.DoFinal(encrypted, len);
 
             return Result.Success<byte[], SmartCardError>(encrypted);
         }
@@ -492,7 +492,7 @@ public static class CryptographicOperations
 
             var decrypted = new byte[encryptedData.Length];
             var len = cipher.ProcessBytes(encryptedData, 0, encryptedData.Length, decrypted, 0);
-            cipher.DoFinal(decrypted, len);
+            _ = cipher.DoFinal(decrypted, len);
 
             return Result.Success<byte[], SmartCardError>(decrypted);
         }
@@ -518,7 +518,7 @@ public static class CryptographicOperations
                 return SmartCardError.InvalidArgument("Data cannot be null");
             }
 
-            if (blockSize <= 0 || blockSize > 255)
+            if (blockSize is <= 0 or > 255)
             {
                 return SmartCardError.InvalidArgument($"Invalid block size: {blockSize}");
             }
@@ -527,9 +527,9 @@ public static class CryptographicOperations
             var paddingLength = blockSize - (data.Length % blockSize);
             var paddedData = new byte[data.Length + paddingLength];
             Array.Copy(data, 0, paddedData, 0, data.Length);
-            
+
             // Use BouncyCastle's ISO 7816-4 padding
-            padding.AddPadding(paddedData, data.Length);
+            _ = padding.AddPadding(paddedData, data.Length);
 
             return Result.Success<byte[], SmartCardError>(paddedData);
         }
@@ -584,7 +584,7 @@ public static class CryptographicOperations
                 return SmartCardError.InvalidArgument("Data cannot be null");
             }
 
-            if (blockSize <= 0 || blockSize > 255)
+            if (blockSize is <= 0 or > 255)
             {
                 return SmartCardError.InvalidArgument($"Invalid block size: {blockSize}");
             }
@@ -593,9 +593,9 @@ public static class CryptographicOperations
             var paddingLength = blockSize - (data.Length % blockSize);
             var paddedData = new byte[data.Length + paddingLength];
             Array.Copy(data, 0, paddedData, 0, data.Length);
-            
+
             // Use BouncyCastle's PKCS#7 padding
-            padding.AddPadding(paddedData, data.Length);
+            _ = padding.AddPadding(paddedData, data.Length);
 
             return Result.Success<byte[], SmartCardError>(paddedData);
         }
@@ -664,7 +664,7 @@ public static class CryptographicOperations
         
         // Apply ISO 7816-4 padding using BouncyCastle's implementation
         var padding = new ISO7816d4Padding();
-        padding.AddPadding(paddedData, data.Length);
+        _ = padding.AddPadding(paddedData, data.Length);
 
         return Result.Success<byte[], SmartCardError>(paddedData);
     }
@@ -753,7 +753,7 @@ public static class CryptographicOperations
             cipher.Init(true, new KeyParameter(sEncKey));
             
             var icv = new byte[16];
-            cipher.ProcessBlock(counterBlock, 0, icv, 0);
+            _ = cipher.ProcessBlock(counterBlock, 0, icv, 0);
             
             return Result.Success<byte[], SmartCardError>(icv);
         }

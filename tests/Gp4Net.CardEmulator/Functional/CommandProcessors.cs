@@ -170,17 +170,15 @@ public static class CommandProcessors
             return Result.Failure<byte[], SmartCardError>(SmartCardError.InstructionNotSupported());
         }
 
-        // Handle SELECT with no data (select by default)
-        if (command.Length == 4)
+        switch (command.Length)
         {
-            Console.WriteLine("DEBUG: ParseSelectCommand - empty SELECT (default)");
-            return Result.Success<byte[], SmartCardError>(Array.Empty<byte>());
-        }
-
-        if (command.Length < 5)
-        {
-            Console.WriteLine("DEBUG: ParseSelectCommand failed - missing Lc byte");
-            return Result.Failure<byte[], SmartCardError>(SmartCardError.WrongLength());
+            // Handle SELECT with no data (select by default)
+            case 4:
+                Console.WriteLine("DEBUG: ParseSelectCommand - empty SELECT (default)");
+                return Result.Success<byte[], SmartCardError>([]);
+            case < 5:
+                Console.WriteLine("DEBUG: ParseSelectCommand failed - missing Lc byte");
+                return Result.Failure<byte[], SmartCardError>(SmartCardError.WrongLength());
         }
 
         var lc = command[4];
@@ -293,31 +291,30 @@ public static class CommandProcessors
         CardConfiguration config,
         ICryptographicService crypto)
     {
-        // Check if pseudo-random challenge generation is required (SCP03 i=70)
-        if (state.ScpVersion == 0x03 && state.ScpImplementation.UsesPseudoRandom())
+        switch (state.ScpVersion)
         {
-            // SCP03 i=70: Use pseudo-random challenge generation
-            return GeneratePseudoRandomChallenge(request, state, config, crypto);
-        }
-        else if (state.ScpVersion == 0x02)
-        {
-            // SCP02: Generate 6-byte random challenge and combine with 2-byte sequence counter
-            var sequenceCounter = state.GetSequenceCounter(request.KeyVersion);
-            return crypto.GenerateChallenge(6)
-                .Map(randomChallenge => 
-                {
-                    // Combine sequence counter + random challenge for 8-byte total
-                    var fullChallenge = new byte[8];
-                    Array.Copy(sequenceCounter, 0, fullChallenge, 0, 2);
-                    Array.Copy(randomChallenge, 0, fullChallenge, 2, 6);
-                    return (request, fullChallenge);
-                });
-        }
-        else
-        {
-            // SCP03: Standard 8-byte random challenge generation
-            return crypto.GenerateChallenge(8)
-                .Map(challenge => (request, challenge));
+            // Check if pseudo-random challenge generation is required (SCP03 i=70)
+            case 0x03 when state.ScpImplementation.UsesPseudoRandom():
+                // SCP03 i=70: Use pseudo-random challenge generation
+                return GeneratePseudoRandomChallenge(request, state, config, crypto);
+            case 0x02:
+            {
+                // SCP02: Generate 6-byte random challenge and combine with 2-byte sequence counter
+                var sequenceCounter = state.GetSequenceCounter(request.KeyVersion);
+                return crypto.GenerateChallenge(6)
+                    .Map(randomChallenge => 
+                    {
+                        // Combine sequence counter + random challenge for 8-byte total
+                        var fullChallenge = new byte[8];
+                        Array.Copy(sequenceCounter, 0, fullChallenge, 0, 2);
+                        Array.Copy(randomChallenge, 0, fullChallenge, 2, 6);
+                        return (request, fullChallenge);
+                    });
+            }
+            default:
+                // SCP03: Standard 8-byte random challenge generation
+                return crypto.GenerateChallenge(8)
+                    .Map(challenge => (request, challenge));
         }
     }
 
@@ -630,7 +627,7 @@ public static class CommandProcessors
         
         if (secureChannelStateResult.IsFailure)
         {
-            return (new ApduResponse(Array.Empty<byte>(), StatusWords.AuthenticationMethodBlocked), state);
+            return (new ApduResponse([], StatusWords.AuthenticationMethodBlocked), state);
         }
         
         var secureChannelState = secureChannelStateResult.Value;
@@ -639,7 +636,7 @@ public static class CommandProcessors
         var newState = state.WithSecureChannel(secureChannelState);
 
         // EXTERNAL AUTHENTICATE response is typically empty on success
-        return (new ApduResponse(Array.Empty<byte>(), StatusWords.Success), newState);
+        return (new ApduResponse([], StatusWords.Success), newState);
     }
 
     // Placeholder implementations for other commands

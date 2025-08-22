@@ -25,7 +25,7 @@ public class InitializeUpdateResponseParsingTests
     {
         var testCases = new[]
         {
-            (new byte[0], "INITIALIZE UPDATE response too short: 0 bytes, expected at least 28"),
+            ([], "INITIALIZE UPDATE response too short: 0 bytes, expected at least 28"),
             (new byte[10], "INITIALIZE UPDATE response too short: 10 bytes, expected at least 28"),
             (new byte[27], "INITIALIZE UPDATE response too short: 27 bytes, expected at least 28")
         };
@@ -34,12 +34,12 @@ public class InitializeUpdateResponseParsingTests
         {
             // Act
             var result = InitializeUpdateResponse.Parse(response);
-            
+
             // Assert
-            result.IsFailure.Should().BeTrue("Too short response should be rejected");
-            result.Error.Message.Should().Contain(expectedError);
+            _ = result.IsFailure.Should().BeTrue("Too short response should be rejected");
+            _ = result.Error.Message.Should().Contain(expectedError);
             
-            TestContext.WriteLine($"✓ Response of {response.Length} bytes correctly rejected: {result.Error.Message}");
+            TestContext.Out.WriteLine($"✓ Response of {response.Length} bytes correctly rejected: {result.Error.Message}");
         }
     }
 
@@ -82,23 +82,23 @@ public class InitializeUpdateResponseParsingTests
         
         // Act
         var result = InitializeUpdateResponse.Parse(response);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue("Minimum valid SCP02 response should parse successfully");
+        _ = result.IsSuccess.Should().BeTrue("Minimum valid SCP02 response should parse successfully");
         
         var parsed = result.Value;
-        parsed.KeyVersion.Should().Be(0x01);
-        parsed.ScpId.Should().Be(0x02);
-        parsed.ScpParameter.Should().Be(0x00); // Padding for SCP02
-        parsed.SequenceCounter.Length.Should().Be(2);
-        parsed.CardChallenge.Length.Should().Be(6, "SCP02 uses 6-byte card challenge");
-        parsed.CardCryptogram.Length.Should().Be(8);
+        _ = parsed.KeyVersion.Should().Be(0x01);
+        _ = parsed.ScpId.Should().Be(0x02);
+        _ = parsed.ScpParameter.Should().Be(0x00); // Padding for SCP02
+        _ = parsed.SequenceCounter.Length.Should().Be(2);
+        _ = parsed.CardChallenge.Length.Should().Be(6, "SCP02 uses 6-byte card challenge");
+        _ = parsed.CardCryptogram.Length.Should().Be(8);
         
-        TestContext.WriteLine("✓ Minimum valid SCP02 response parsed successfully");
-        TestContext.WriteLine($"Key version: 0x{parsed.KeyVersion:X2}");
-        TestContext.WriteLine($"SCP ID: 0x{parsed.ScpId:X2}");
-        TestContext.WriteLine($"Sequence counter: {Convert.ToHexString(parsed.SequenceCounter)}");
-        TestContext.WriteLine($"Card challenge: {Convert.ToHexString(parsed.CardChallenge)}");
+        TestContext.Out.WriteLine("✓ Minimum valid SCP02 response parsed successfully");
+        TestContext.Out.WriteLine($"Key version: 0x{parsed.KeyVersion:X2}");
+        TestContext.Out.WriteLine($"SCP ID: 0x{parsed.ScpId:X2}");
+        TestContext.Out.WriteLine($"Sequence counter: {Convert.ToHexString(parsed.SequenceCounter)}");
+        TestContext.Out.WriteLine($"Card challenge: {Convert.ToHexString(parsed.CardChallenge)}");
     }
 
     [Test]
@@ -138,24 +138,24 @@ public class InitializeUpdateResponseParsingTests
         
         // Act
         var result = InitializeUpdateResponse.Parse(response);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue("Valid SCP03 response should parse successfully");
+        _ = result.IsSuccess.Should().BeTrue("Valid SCP03 response should parse successfully");
         
         var parsed = result.Value;
-        parsed.KeyVersion.Should().Be(0x01);
-        parsed.ScpId.Should().Be(0x03);
-        parsed.ScpParameter.Should().Be(0x70);
-        parsed.SequenceCounter.Length.Should().Be(3);
-        parsed.CardChallenge.Length.Should().Be(8, "SCP03 uses 8-byte card challenge");
-        parsed.CardCryptogram.Length.Should().Be(8);
+        _ = parsed.KeyVersion.Should().Be(0x01);
+        _ = parsed.ScpId.Should().Be(0x03);
+        _ = parsed.ScpParameter.Should().Be(0x70);
+        _ = parsed.SequenceCounter.Length.Should().Be(3);
+        _ = parsed.CardChallenge.Length.Should().Be(8, "SCP03 uses 8-byte card challenge");
+        _ = parsed.CardCryptogram.Length.Should().Be(8);
         
-        TestContext.WriteLine("✓ Valid SCP03 response parsed successfully");
-        TestContext.WriteLine($"Key version: 0x{parsed.KeyVersion:X2}");
-        TestContext.WriteLine($"SCP ID: 0x{parsed.ScpId:X2}");
-        TestContext.WriteLine($"Implementation parameter: 0x{parsed.ScpParameter:X2}");
-        TestContext.WriteLine($"Sequence counter: {Convert.ToHexString(parsed.SequenceCounter)}");
-        TestContext.WriteLine($"Card challenge: {Convert.ToHexString(parsed.CardChallenge)}");
+        TestContext.Out.WriteLine("✓ Valid SCP03 response parsed successfully");
+        TestContext.Out.WriteLine($"Key version: 0x{parsed.KeyVersion:X2}");
+        TestContext.Out.WriteLine($"SCP ID: 0x{parsed.ScpId:X2}");
+        TestContext.Out.WriteLine($"Implementation parameter: 0x{parsed.ScpParameter:X2}");
+        TestContext.Out.WriteLine($"Sequence counter: {Convert.ToHexString(parsed.SequenceCounter)}");
+        TestContext.Out.WriteLine($"Card challenge: {Convert.ToHexString(parsed.CardChallenge)}");
     }
 
     [Test]
@@ -166,23 +166,23 @@ public class InitializeUpdateResponseParsingTests
         
         // Act
         var result = InitializeUpdateResponse.Parse(realResponse);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue("Real GP Pro CLR response should parse successfully");
+        _ = result.IsSuccess.Should().BeTrue("Real GP Pro CLR response should parse successfully");
         
         var parsed = result.Value;
-        parsed.KeyDiversificationData.Should().Equal(Convert.FromHexString("00002345558083204839"));
-        parsed.KeyVersion.Should().Be(0x01);
-        parsed.ScpId.Should().Be(0x02);
-        parsed.ScpParameter.Should().Be(0x00); // SCP02 padding
-        parsed.SequenceCounter.Should().Equal(Convert.FromHexString("0011"));
-        parsed.CardChallenge.Should().Equal(Convert.FromHexString("C284EC19415D"));
-        parsed.CardCryptogram.Should().Equal(Convert.FromHexString("17F4198ADCD5102D"));
+        _ = parsed.KeyDiversificationData.Should().Equal(Convert.FromHexString("00002345558083204839"));
+        _ = parsed.KeyVersion.Should().Be(0x01);
+        _ = parsed.ScpId.Should().Be(0x02);
+        _ = parsed.ScpParameter.Should().Be(0x00); // SCP02 padding
+        _ = parsed.SequenceCounter.Should().Equal(Convert.FromHexString("0011"));
+        _ = parsed.CardChallenge.Should().Equal(Convert.FromHexString("C284EC19415D"));
+        _ = parsed.CardCryptogram.Should().Equal(Convert.FromHexString("17F4198ADCD5102D"));
         
-        TestContext.WriteLine("✓ Real GP Pro CLR trace parsed correctly");
-        TestContext.WriteLine($"KDD: {Convert.ToHexString(parsed.KeyDiversificationData)}");
-        TestContext.WriteLine($"Key version: 0x{parsed.KeyVersion:X2}");
-        TestContext.WriteLine($"SCP: 0x{parsed.ScpId:X2} (parameter 0x{parsed.ScpParameter:X2})");
+        TestContext.Out.WriteLine("✓ Real GP Pro CLR trace parsed correctly");
+        TestContext.Out.WriteLine($"KDD: {Convert.ToHexString(parsed.KeyDiversificationData)}");
+        TestContext.Out.WriteLine($"Key version: 0x{parsed.KeyVersion:X2}");
+        TestContext.Out.WriteLine($"SCP: 0x{parsed.ScpId:X2} (parameter 0x{parsed.ScpParameter:X2})");
     }
 
     [Test]
@@ -193,22 +193,22 @@ public class InitializeUpdateResponseParsingTests
         
         // Act
         var result = InitializeUpdateResponse.Parse(realResponse);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue("Real GP Pro MAC response should parse successfully");
+        _ = result.IsSuccess.Should().BeTrue("Real GP Pro MAC response should parse successfully");
         
         var parsed = result.Value;
-        parsed.KeyDiversificationData.Should().Equal(Convert.FromHexString("00002345558083204839"));
-        parsed.KeyVersion.Should().Be(0x01);
-        parsed.ScpId.Should().Be(0x02);
-        parsed.ScpParameter.Should().Be(0x00); // SCP02 padding
-        parsed.SequenceCounter.Should().Equal(Convert.FromHexString("0012"));
-        parsed.CardChallenge.Should().Equal(Convert.FromHexString("3E6DB216F8D5"));
-        parsed.CardCryptogram.Should().Equal(Convert.FromHexString("8177E15BAA128DF9"));
+        _ = parsed.KeyDiversificationData.Should().Equal(Convert.FromHexString("00002345558083204839"));
+        _ = parsed.KeyVersion.Should().Be(0x01);
+        _ = parsed.ScpId.Should().Be(0x02);
+        _ = parsed.ScpParameter.Should().Be(0x00); // SCP02 padding
+        _ = parsed.SequenceCounter.Should().Equal(Convert.FromHexString("0012"));
+        _ = parsed.CardChallenge.Should().Equal(Convert.FromHexString("3E6DB216F8D5"));
+        _ = parsed.CardCryptogram.Should().Equal(Convert.FromHexString("8177E15BAA128DF9"));
         
-        TestContext.WriteLine("✓ Real GP Pro MAC trace parsed correctly");
-        TestContext.WriteLine($"KDD: {Convert.ToHexString(parsed.KeyDiversificationData)}");
-        TestContext.WriteLine($"Sequence counter: {Convert.ToHexString(parsed.SequenceCounter)}");
+        TestContext.Out.WriteLine("✓ Real GP Pro MAC trace parsed correctly");
+        TestContext.Out.WriteLine($"KDD: {Convert.ToHexString(parsed.KeyDiversificationData)}");
+        TestContext.Out.WriteLine($"Sequence counter: {Convert.ToHexString(parsed.SequenceCounter)}");
     }
 
     [Test]
@@ -232,17 +232,17 @@ public class InitializeUpdateResponseParsingTests
         
         // Act
         var result = InitializeUpdateResponse.Parse(response);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue("Parser should handle corrupted KDD gracefully");
+        _ = result.IsSuccess.Should().BeTrue("Parser should handle corrupted KDD gracefully");
         
         var parsed = result.Value;
-        parsed.KeyDiversificationData.Should().Equal(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF });
-        parsed.KeyVersion.Should().Be(0x01);
-        parsed.ScpId.Should().Be(0x02);
+        _ = parsed.KeyDiversificationData.Should().Equal(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF });
+        _ = parsed.KeyVersion.Should().Be(0x01);
+        _ = parsed.ScpId.Should().Be(0x02);
         
-        TestContext.WriteLine("✓ Corrupted key diversification data preserved correctly");
-        TestContext.WriteLine($"KDD: {Convert.ToHexString(parsed.KeyDiversificationData)}");
+        TestContext.Out.WriteLine("✓ Corrupted key diversification data preserved correctly");
+        TestContext.Out.WriteLine($"KDD: {Convert.ToHexString(parsed.KeyDiversificationData)}");
     }
 
     [Test]
@@ -264,17 +264,17 @@ public class InitializeUpdateResponseParsingTests
         
         // Act
         var result = InitializeUpdateResponse.Parse(response);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue("Parser should handle unknown SCP versions gracefully");
+        _ = result.IsSuccess.Should().BeTrue("Parser should handle unknown SCP versions gracefully");
         
         var parsed = result.Value;
-        parsed.KeyVersion.Should().Be(0x01);
-        parsed.ScpId.Should().Be(0x99, "Unknown SCP ID should be preserved");
-        parsed.ScpParameter.Should().Be(0x00, "Should use padding for unknown SCP");
+        _ = parsed.KeyVersion.Should().Be(0x01);
+        _ = parsed.ScpId.Should().Be(0x99, "Unknown SCP ID should be preserved");
+        _ = parsed.ScpParameter.Should().Be(0x00, "Should use padding for unknown SCP");
         
-        TestContext.WriteLine("✓ Unknown SCP version handled gracefully");
-        TestContext.WriteLine($"SCP ID: 0x{parsed.ScpId:X2} (unknown, but preserved)");
+        TestContext.Out.WriteLine("✓ Unknown SCP version handled gracefully");
+        TestContext.Out.WriteLine($"SCP ID: 0x{parsed.ScpId:X2} (unknown, but preserved)");
     }
 
     [Test]
@@ -299,20 +299,20 @@ public class InitializeUpdateResponseParsingTests
         
         // Act
         var result = InitializeUpdateResponse.Parse(response);
-        
+
         // Assert
-        result.IsSuccess.Should().BeTrue("Parser should handle extra trailing bytes");
+        _ = result.IsSuccess.Should().BeTrue("Parser should handle extra trailing bytes");
         
         var parsed = result.Value;
-        parsed.KeyVersion.Should().Be(0x01);
-        parsed.ScpId.Should().Be(0x02);
-        parsed.SequenceCounter.Should().Equal(new byte[] { 0x00, 0x01 });
-        parsed.CardChallenge.Length.Should().Be(6, "SCP02 card challenge should be 6 bytes");
-        parsed.CardCryptogram.Length.Should().Be(8);
+        _ = parsed.KeyVersion.Should().Be(0x01);
+        _ = parsed.ScpId.Should().Be(0x02);
+        _ = parsed.SequenceCounter.Should().Equal(new byte[] { 0x00, 0x01 });
+        _ = parsed.CardChallenge.Length.Should().Be(6, "SCP02 card challenge should be 6 bytes");
+        _ = parsed.CardCryptogram.Length.Should().Be(8);
         
-        TestContext.WriteLine("✓ Extra trailing bytes handled correctly");
-        TestContext.WriteLine($"Response length: {response.Length} bytes (28 valid + 4 extra)");
-        TestContext.WriteLine($"Parsed card challenge: {Convert.ToHexString(parsed.CardChallenge)}");
+        TestContext.Out.WriteLine("✓ Extra trailing bytes handled correctly");
+        TestContext.Out.WriteLine($"Response length: {response.Length} bytes (28 valid + 4 extra)");
+        TestContext.Out.WriteLine($"Parsed card challenge: {Convert.ToHexString(parsed.CardChallenge)}");
     }
 
     [Test]
@@ -366,13 +366,13 @@ public class InitializeUpdateResponseParsingTests
             // Assert
             if (expectedSuccess)
             {
-                result.IsSuccess.Should().BeTrue($"Parsing should succeed for {description}");
-                TestContext.WriteLine($"✓ {description}: Success");
+                _ = result.IsSuccess.Should().BeTrue($"Parsing should succeed for {description}");
+                TestContext.Out.WriteLine($"✓ {description}: Success");
             }
             else
             {
-                result.IsFailure.Should().BeTrue($"Parsing should fail for {description}");
-                TestContext.WriteLine($"✓ {description}: Failed as expected");
+                _ = result.IsFailure.Should().BeTrue($"Parsing should fail for {description}");
+                TestContext.Out.WriteLine($"✓ {description}: Failed as expected");
             }
         }
     }

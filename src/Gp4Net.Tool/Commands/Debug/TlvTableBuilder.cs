@@ -305,22 +305,23 @@ public static class TlvTableBuilder
     /// </summary>
     private static Maybe<string> GetTlvContent(TlvObject element)
     {
-        if (element.Value.Length == 0)
+        switch (element.Value.Length)
         {
-            return Maybe<string>.From("(empty)");
-        }
-        else if (element.Value.Length <= 32)
-        {
-            // Short content - show as hex
-            var hexContent = Convert.ToHexString(element.Value);
-            return Maybe<string>.From($"Content: {hexContent}");
-        }
-        else
-        {
-            // Long content - show truncated hex
-            var truncated = element.Value[..16];
-            var hexContent = Convert.ToHexString(truncated);
-            return Maybe<string>.From($"Content: {hexContent}... ({element.Value.Length} bytes total)");
+            case 0:
+                return Maybe<string>.From("(empty)");
+            case <= 32:
+            {
+                // Short content - show as hex
+                var hexContent = Convert.ToHexString(element.Value);
+                return Maybe<string>.From($"Content: {hexContent}");
+            }
+            default:
+            {
+                // Long content - show truncated hex
+                var truncated = element.Value[..16];
+                var hexContent = Convert.ToHexString(truncated);
+                return Maybe<string>.From($"Content: {hexContent}... ({element.Value.Length} bytes total)");
+            }
         }
     }
 
@@ -377,18 +378,18 @@ public static class TlvTableBuilder
         var valueLength = element.Value.Length;
         int lengthFieldSize;
         
-        if (valueLength < 128)
+        switch (valueLength)
         {
-            lengthFieldSize = 1;
-        }
-        else if (valueLength <= 255)
-        {
-            lengthFieldSize = 2;
-        }
-        else
-        {
-            // For now, assume max 2-byte length encoding
-            lengthFieldSize = 3;
+            case < 128:
+                lengthFieldSize = 1;
+                break;
+            case <= 255:
+                lengthFieldSize = 2;
+                break;
+            default:
+                // For now, assume max 2-byte length encoding
+                lengthFieldSize = 3;
+                break;
         }
         
         var result = new byte[tagLength + lengthFieldSize + valueLength];
@@ -439,7 +440,7 @@ public static class TlvTableBuilder
     {
         foreach (var b in data)
         {
-            if (b < 32 || b > 126)
+            if (b is < 32 or > 126)
             {
                 return false;
             }

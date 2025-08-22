@@ -38,20 +38,20 @@ public class KeyDerivationTests
         );
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var sessionKeys = result.Value;
-            
-        sessionKeys.SEnc.Length.Should().Be(16);
-        sessionKeys.SMac.Length.Should().Be(16);
-        sessionKeys.SrMac.Length.Should().Be(16);
+
+        _ = sessionKeys.SEnc.Length.Should().Be(16);
+        _ = sessionKeys.SMac.Length.Should().Be(16);
+        _ = sessionKeys.SrMac.Length.Should().Be(16);
         // Verify keys are different from master keys
-        sessionKeys.SEnc.Should().NotEqual(keySet.EncKey);
-        sessionKeys.SMac.Should().NotEqual(keySet.MacKey);
-        sessionKeys.SrMac.Should().NotEqual(keySet.MacKey);
+        _ = sessionKeys.SEnc.Should().NotEqual(keySet.EncKey);
+        _ = sessionKeys.SMac.Should().NotEqual(keySet.MacKey);
+        _ = sessionKeys.SrMac.Should().NotEqual(keySet.MacKey);
         // Verify keys are not all zeros
-        sessionKeys.SEnc.Should().NotEqual(new byte[16]);
-        sessionKeys.SMac.Should().NotEqual(new byte[16]);
-        sessionKeys.SrMac.Should().NotEqual(new byte[16]);
+        _ = sessionKeys.SEnc.Should().NotEqual(new byte[16]);
+        _ = sessionKeys.SMac.Should().NotEqual(new byte[16]);
+        _ = sessionKeys.SrMac.Should().NotEqual(new byte[16]);
     }
 
     [Test]
@@ -85,15 +85,15 @@ public class KeyDerivationTests
         );
 
         // Assert
-        result1.IsSuccess.Should().BeTrue();
-        result2.IsSuccess.Should().BeTrue();
+        _ = result1.IsSuccess.Should().BeTrue();
+        _ = result2.IsSuccess.Should().BeTrue();
             
         var sessionKeys1 = result1.Value;
         var sessionKeys2 = result2.Value;
-            
-        sessionKeys1.SEnc.Should().NotEqual(sessionKeys2.SEnc);
-        sessionKeys1.SMac.Should().NotEqual(sessionKeys2.SMac);
-        sessionKeys1.SrMac.Should().NotEqual(sessionKeys2.SrMac);
+
+        _ = sessionKeys1.SEnc.Should().NotEqual(sessionKeys2.SEnc);
+        _ = sessionKeys1.SMac.Should().NotEqual(sessionKeys2.SMac);
+        _ = sessionKeys1.SrMac.Should().NotEqual(sessionKeys2.SrMac);
     }
 
     [Test]
@@ -107,16 +107,16 @@ public class KeyDerivationTests
         var result = KeyDerivation.CalculateCryptogram(key, data, true);
 
         // Assert
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var cryptogram = result.Value;
-            
-        cryptogram.Length.Should().Be(8);
+
+        _ = cryptogram.Length.Should().Be(8);
         // Verify cryptogram is not all zeros (would indicate a calculation error)
-        cryptogram.Should().NotEqual(new byte[8]);
+        _ = cryptogram.Should().NotEqual(new byte[8]);
         // Verify cryptogram is deterministic - same inputs should produce same output
         var result2 = KeyDerivation.CalculateCryptogram(key, data, true);
-        result2.IsSuccess.Should().BeTrue();
-        cryptogram.Should().BeEquivalentTo(result2.Value);
+        _ = result2.IsSuccess.Should().BeTrue();
+        _ = cryptogram.Should().BeEquivalentTo(result2.Value);
     }
 
     [Test]
@@ -141,11 +141,11 @@ public class KeyDerivationTests
         );
 
         // Assert
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<InvalidLengthError>();
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<InvalidLengthError>();
         var lengthError = (InvalidLengthError)result.Error;
-        lengthError.Field.Should().Be("hostChallenge");
-        lengthError.Expected.Should().Be(8);
-        lengthError.Actual.Should().Be(5);
+        _ = lengthError.Field.Should().Be("hostChallenge");
+        _ = lengthError.Expected.Should().Be(8);
+        _ = lengthError.Actual.Should().Be(5);
     }
 }

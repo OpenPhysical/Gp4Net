@@ -26,24 +26,24 @@ public class SecurityDomainInfoCodecTests
         };
 
         var encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
-        
+
         // Assert encoding succeeded
-        encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
+        _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
         var encoded = encodedResult.Value;
 
-        encoded.Should().NotBeEmpty();
-        encoded[0].Should().Be(0xC1, "first byte should be tag 0xC1");
-        encoded[1].Should().BeGreaterThan(0, "length should be positive");
+        _ = encoded.Should().NotBeEmpty();
+        _ = encoded[0].Should().Be(0xC1, "first byte should be tag 0xC1");
+        _ = encoded[1].Should().BeGreaterThan(0, "length should be positive");
 
         // Should contain OID tag sequence
-        encoded.Should().Contain(0x9F, "should contain first byte of OID tag");
-        encoded.Should().Contain(0x70, "should contain second byte of OID tag");
+        _ = encoded.Should().Contain(0x9F, "should contain first byte of OID tag");
+        _ = encoded.Should().Contain(0x70, "should contain second byte of OID tag");
 
         // Should contain image data tag
-        encoded.Should().Contain(0xC5, "should contain image data tag");
+        _ = encoded.Should().Contain(0xC5, "should contain image data tag");
 
         // Should contain lifecycle data tag
-        encoded.Should().Contain(0xC4, "should contain lifecycle data tag");
+        _ = encoded.Should().Contain(0xC4, "should contain lifecycle data tag");
     }
 
     [Test]
@@ -55,17 +55,17 @@ public class SecurityDomainInfoCodecTests
         };
 
         var encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
-        
+
         // Assert encoding succeeded
-        encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
+        _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
         var encoded = encodedResult.Value;
 
-        encoded.Should().NotBeEmpty();
-        encoded[0].Should().Be(0xC1);
-        encoded.Should().Contain(0x9F, "should contain OID tag");
-        encoded.Should().Contain(0x70, "should contain OID tag");
-        encoded.Should().NotContain(0xC5, "should not contain image data tag");
-        encoded.Should().NotContain(0xC4, "should not contain lifecycle data tag");
+        _ = encoded.Should().NotBeEmpty();
+        _ = encoded[0].Should().Be(0xC1);
+        _ = encoded.Should().Contain(0x9F, "should contain OID tag");
+        _ = encoded.Should().Contain(0x70, "should contain OID tag");
+        _ = encoded.Should().NotContain(0xC5, "should not contain image data tag");
+        _ = encoded.Should().NotContain(0xC4, "should not contain lifecycle data tag");
     }
 
     [Test]
@@ -81,12 +81,12 @@ public class SecurityDomainInfoCodecTests
 
         var result = SecurityDomainInfoCodec.Decode(testData);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var sdInfo = result.Value;
 
-        sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
-        sdInfo.ImageData.Should().BeEquivalentTo(new byte[] { 0x01, 0x02, 0x03 });
-        sdInfo.LifeCycleData.Should().BeEquivalentTo(new byte[] { 0x07 });
+        _ = sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
+        _ = sdInfo.ImageData.Should().BeEquivalentTo(new byte[] { 0x01, 0x02, 0x03 });
+        _ = sdInfo.LifeCycleData.Should().BeEquivalentTo(new byte[] { 0x07 });
     }
 
     [Test]
@@ -101,13 +101,13 @@ public class SecurityDomainInfoCodecTests
 
         var result = SecurityDomainInfoCodec.Decode(testData);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var sdInfo = result.Value;
 
-        sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
-        sdInfo.SecurityDomainAid.Should().NotBeNull();
-        sdInfo.SecurityDomainAid[0].Should().Be(0x4F, "should preserve tag");
-        sdInfo.SecurityDomainAid[1].Should().Be(0x05, "should preserve length");
+        _ = sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
+        _ = sdInfo.SecurityDomainAid.Should().NotBeNull();
+        _ = sdInfo.SecurityDomainAid[0].Should().Be(0x4F, "should preserve tag");
+        _ = sdInfo.SecurityDomainAid[1].Should().Be(0x05, "should preserve length");
     }
 
     [Test]
@@ -117,10 +117,10 @@ public class SecurityDomainInfoCodecTests
 
         var result = SecurityDomainInfoCodec.Decode(invalidData);
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().BeOfType<SmartCardError>();
-        result.Error.Code.Should().Be("INVALID_DATA");
-        result.Error.Message.Should().Contain("Invalid security domain information format - expected tag 0xC1");
+        _ = result.IsFailure.Should().BeTrue();
+        _ = result.Error.Should().BeOfType<SmartCardError>();
+        _ = result.Error.Code.Should().Be("INVALID_DATA");
+        _ = result.Error.Message.Should().Contain("Invalid security domain information format - expected tag 0xC1");
     }
 
     [Test]
@@ -134,9 +134,9 @@ public class SecurityDomainInfoCodecTests
 
         var result = SecurityDomainInfoCodec.Decode(testData);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var sdInfo = result.Value;
-        sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
+        _ = sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
     }
 
     [Test]
@@ -151,17 +151,17 @@ public class SecurityDomainInfoCodecTests
         };
 
         var encodedResult = SecurityDomainInfoCodec.Encode(original);
-        encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
+        _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
         var encoded = encodedResult.Value;
         var decoded = SecurityDomainInfoCodec.Decode(encoded);
 
-        decoded.IsSuccess.Should().BeTrue();
+        _ = decoded.IsSuccess.Should().BeTrue();
         var result = decoded.Value;
 
-        result.Oid.Should().BeEquivalentTo(original.Oid);
-        result.SecurityDomainAid.Should().BeEquivalentTo(original.SecurityDomainAid);
-        result.ImageData.Should().BeEquivalentTo(original.ImageData);
-        result.LifeCycleData.Should().BeEquivalentTo(original.LifeCycleData);
+        _ = result.Oid.Should().BeEquivalentTo(original.Oid);
+        _ = result.SecurityDomainAid.Should().BeEquivalentTo(original.SecurityDomainAid);
+        _ = result.ImageData.Should().BeEquivalentTo(original.ImageData);
+        _ = result.LifeCycleData.Should().BeEquivalentTo(original.LifeCycleData);
     }
 
     [Test]
@@ -170,15 +170,15 @@ public class SecurityDomainInfoCodecTests
         var sdInfo = new SecurityDomainInfo();
 
         var encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
-        
+
         // Assert encoding succeeded
-        encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
+        _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
         var encoded = encodedResult.Value;
 
-        encoded.Should().NotBeEmpty();
-        encoded[0].Should().Be(0xC1);
-        encoded[1].Should().Be(0x00, "should have zero content length");
-        encoded.Should().HaveCount(2);
+        _ = encoded.Should().NotBeEmpty();
+        _ = encoded[0].Should().Be(0xC1);
+        _ = encoded[1].Should().Be(0x00, "should have zero content length");
+        _ = encoded.Should().HaveCount(2);
     }
 
     [Test]
@@ -188,12 +188,12 @@ public class SecurityDomainInfoCodecTests
 
         var result = SecurityDomainInfoCodec.Decode(emptyData);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var sdInfo = result.Value;
-        sdInfo.Oid.Should().BeNull();
-        sdInfo.SecurityDomainAid.Should().BeNull();
-        sdInfo.ImageData.Should().BeNull();
-        sdInfo.LifeCycleData.Should().BeNull();
+        _ = sdInfo.Oid.Should().BeNull();
+        _ = sdInfo.SecurityDomainAid.Should().BeNull();
+        _ = sdInfo.ImageData.Should().BeNull();
+        _ = sdInfo.LifeCycleData.Should().BeNull();
     }
 
     [Test]
@@ -207,13 +207,13 @@ public class SecurityDomainInfoCodecTests
 
         var result = SecurityDomainInfoCodec.Decode(testData);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var sdInfo = result.Value;
 
-        sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
-        sdInfo.SecurityDomainAid.Should().BeNull();
-        sdInfo.ImageData.Should().BeNull();
-        sdInfo.LifeCycleData.Should().BeNull();
+        _ = sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
+        _ = sdInfo.SecurityDomainAid.Should().BeNull();
+        _ = sdInfo.ImageData.Should().BeNull();
+        _ = sdInfo.LifeCycleData.Should().BeNull();
     }
 
     [Test]
@@ -227,9 +227,9 @@ public class SecurityDomainInfoCodecTests
 
         var result = SecurityDomainInfoCodec.Decode(testData);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var sdInfo = result.Value;
-        sdInfo.Oid.Should().BeNull(); // Should not set zero-length OID
+        _ = sdInfo.Oid.Should().BeNull(); // Should not set zero-length OID
     }
 
     [Test]
@@ -241,16 +241,16 @@ public class SecurityDomainInfoCodecTests
         };
 
         var encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
-        
+
         // Assert encoding succeeded
-        encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
+        _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
         var encoded = encodedResult.Value;
 
-        encoded.Should().NotBeEmpty();
-        encoded[0].Should().Be(0xC1);
-        encoded.Should().Contain(0xC5, "should contain image data tag");
-        encoded.Should().NotContain(0x9F, "should not contain OID tag");
-        encoded.Should().NotContain(0xC4, "should not contain lifecycle data tag");
+        _ = encoded.Should().NotBeEmpty();
+        _ = encoded[0].Should().Be(0xC1);
+        _ = encoded.Should().Contain(0xC5, "should contain image data tag");
+        _ = encoded.Should().NotContain(0x9F, "should not contain OID tag");
+        _ = encoded.Should().NotContain(0xC4, "should not contain lifecycle data tag");
     }
 
     [Test]
@@ -265,10 +265,10 @@ public class SecurityDomainInfoCodecTests
 
         var result = SecurityDomainInfoCodec.Decode(testData);
 
-        result.IsSuccess.Should().BeTrue();
+        _ = result.IsSuccess.Should().BeTrue();
         var sdInfo = result.Value;
-        sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
+        _ = sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
         // Unknown tag should be handled as potential AID data
-        sdInfo.SecurityDomainAid.Should().NotBeNull();
+        _ = sdInfo.SecurityDomainAid.Should().NotBeNull();
     }
 }

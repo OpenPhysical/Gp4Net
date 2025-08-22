@@ -116,9 +116,7 @@ public static class ScpCapabilitiesParser
                     {
                         var scpVersion = element.Value[0];
                         // Valid SCP versions per GP specification
-                        if (scpVersion == 0x02 || scpVersion == 0x03 || 
-                            scpVersion == 0x10 || scpVersion == 0x11 ||
-                            scpVersion == 0x80 || scpVersion == 0x81)
+                        if (scpVersion is 0x02 or 0x03 or 0x10 or 0x11 or 0x80 or 0x81)
                         {
                             currentScpType = scpVersion;
                             if (!protocols.ContainsKey(scpVersion))
