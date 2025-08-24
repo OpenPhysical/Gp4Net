@@ -38,7 +38,7 @@ public record CardState(
             return new CardState(
                 IsSelected: false,
                 ScpVersion: 0x02,
-                ScpImplementation: Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac,
+                ScpImplementation: Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15,
                 SecureChannel: Maybe<SecureChannelState>.None,
                 CurrentKeys: null,
                 HostChallenge: null,

@@ -86,17 +86,15 @@ public abstract class TraceBasedTestBase : IDisposable
     /// </summary>
     protected static string GetTraceFilePath(string fileName)
     {
-        // Try multiple possible locations
+        // Try valid organized directory structure locations only
         var possiblePaths = new[]
         {
-            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "Mixed", fileName),
-            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "SCP02", fileName),
-            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "SCP03", fileName),
-            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "Invalid", fileName),
-            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "docs", "traces", fileName),
-            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "traces", fileName),
-            Path.Combine(TestContextHelper.GetTestDataDirectory(), "traces", fileName),
-            Path.Combine(Directory.GetCurrentDirectory(), "traces", fileName),
+            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "Operations", "Installation", fileName),
+            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "Operations", "Deletion", fileName),
+            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "Operations", "CardManagement", fileName),
+            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "Protocol", "SCP02", fileName),
+            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "Protocol", "SCP03", fileName),
+            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "Complex", fileName),
             fileName // Absolute path
         };
 

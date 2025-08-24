@@ -34,7 +34,7 @@ public record CardConfiguration(
         SupportedInstructions: CreateP71SupportedInstructions(),
         CardType: "NXP P71",
         DefaultScpVersion: 0x02,
-        DefaultScpImplementation: Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac
+        DefaultScpImplementation: Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15
     );
 
     /// <summary>
@@ -48,7 +48,7 @@ public record CardConfiguration(
         SupportedInstructions: CreateStandardGpInstructions(),
         CardType: "Generic JavaCard",
         DefaultScpVersion: 0x02,
-        DefaultScpImplementation: Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac
+        DefaultScpImplementation: Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15
     );
 
     /// <summary>
@@ -63,7 +63,7 @@ public record CardConfiguration(
         SupportedInstructions: CreateStandardGpInstructions(),
         CardType: "Dual Protocol (SCP02/SCP03)",
         DefaultScpVersion: 0x02, // Default to SCP02 for compatibility
-        DefaultScpImplementation: Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac
+        DefaultScpImplementation: Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15
     );
 
     /// <summary>
@@ -78,7 +78,7 @@ public record CardConfiguration(
         SupportedInstructions: CreateStandardGpInstructions(),
         CardType: "SCP03-First Card",
         DefaultScpVersion: 0x03, // Default to SCP03
-        DefaultScpImplementation: Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom
+        DefaultScpImplementation: Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70
     );
 
     /// <summary>
@@ -106,6 +106,30 @@ public record CardConfiguration(
     {
         DefaultScpVersion = version,
         DefaultScpImplementation = implementation
+    };
+
+    /// <summary>
+    /// Creates a new configuration with an additional key set at specified version.
+    /// </summary>
+    public CardConfiguration WithKeySet(byte version, IKeySet keySet) => this with
+    {
+        StaticKeys = StaticKeys.SetItem(version, keySet)
+    };
+
+    /// <summary>
+    /// Creates a new configuration with updated ATR.
+    /// </summary>
+    public CardConfiguration WithAtr(byte[] atr) => this with
+    {
+        Atr = atr
+    };
+
+    /// <summary>
+    /// Creates a new configuration with updated ISD AID.
+    /// </summary>
+    public CardConfiguration WithIsdAid(byte[] isdAid) => this with
+    {
+        IsdAid = isdAid
     };
 
     private static ImmutableDictionary<byte, IKeySet> CreateP71Keys()

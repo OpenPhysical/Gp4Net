@@ -246,7 +246,7 @@ public class InitializeUpdateResponseParsingTests
     }
 
     [Test]
-    public void Parse_WithUnknownScpVersion_ShouldParseButPreserveScpId()
+    public void Parse_WithUnknownScpVersion_ShouldFailSecurely()
     {
         // Arrange - Response with unknown SCP version 0x99
         var response = new byte[28];
@@ -265,16 +265,13 @@ public class InitializeUpdateResponseParsingTests
         // Act
         var result = InitializeUpdateResponse.Parse(response);
 
-        // Assert
-        _ = result.IsSuccess.Should().BeTrue("Parser should handle unknown SCP versions gracefully");
+        // Assert - Parser should fail secure for unknown SCP versions
+        _ = result.IsFailure.Should().BeTrue("Parser should fail immediately for unknown SCP versions");
+        _ = result.Error.Message.Should().Contain("Unsupported SCP version", "Error should specify unsupported version");
+        _ = result.Error.Message.Should().Contain("01", "Error should include the unsupported version number");
         
-        var parsed = result.Value;
-        _ = parsed.KeyVersion.Should().Be(0x01);
-        _ = parsed.ScpId.Should().Be(0x99, "Unknown SCP ID should be preserved");
-        _ = parsed.ScpParameter.Should().Be(0x00, "Should use padding for unknown SCP");
-        
-        TestContext.Out.WriteLine("✓ Unknown SCP version handled gracefully");
-        TestContext.Out.WriteLine($"SCP ID: 0x{parsed.ScpId:X2} (unknown, but preserved)");
+        TestContext.Out.WriteLine("✓ Unknown SCP version correctly rejected (fail secure)");
+        TestContext.Out.WriteLine($"Error: {result.Error.Message}");
     }
 
     [Test]

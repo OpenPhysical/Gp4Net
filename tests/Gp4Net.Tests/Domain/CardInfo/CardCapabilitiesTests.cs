@@ -1,4 +1,6 @@
 using System.Linq;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
 using NUnit.Framework;
 using AwesomeAssertions;
@@ -28,7 +30,9 @@ public class CardCapabilitiesTests
         };
 
         // Act
-        var capabilities = CardCapabilities.Parse(data);
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+        _ = result.IsSuccess.Should().BeTrue();
+        CardCapabilities capabilities = result.Value;
 
         // Assert
         _ = capabilities.Should().NotBeNull();
@@ -59,7 +63,9 @@ public class CardCapabilitiesTests
         };
 
         // Act
-        var capabilities = CardCapabilities.Parse(data);
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+        _ = result.IsSuccess.Should().BeTrue();
+        CardCapabilities capabilities = result.Value;
 
         // Assert
         _ = capabilities.SdPrivileges.HasValue.Should().BeTrue();
@@ -82,7 +88,9 @@ public class CardCapabilitiesTests
         };
 
         // Act
-        var capabilities = CardCapabilities.Parse(data);
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+        _ = result.IsSuccess.Should().BeTrue();
+        CardCapabilities capabilities = result.Value;
 
         // Assert
         _ = capabilities.AppPrivileges.HasValue.Should().BeTrue();
@@ -103,7 +111,9 @@ public class CardCapabilitiesTests
         };
 
         // Act
-        var capabilities = CardCapabilities.Parse(data);
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+        _ = result.IsSuccess.Should().BeTrue();
+        CardCapabilities capabilities = result.Value;
 
         // Assert
         _ = capabilities.Algorithms.HasValue.Should().BeTrue();
@@ -125,7 +135,9 @@ public class CardCapabilitiesTests
         };
 
         // Act
-        var capabilities = CardCapabilities.Parse(data);
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+        _ = result.IsSuccess.Should().BeTrue();
+        CardCapabilities capabilities = result.Value;
 
         // Assert
         _ = capabilities.CipherSuites.ContainsKey(CipherUsage.DapVerification).Should().BeTrue();
@@ -179,7 +191,9 @@ public class CardCapabilitiesTests
         };
 
         // Act
-        var capabilities = CardCapabilities.Parse(data);
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+        _ = result.IsSuccess.Should().BeTrue();
+        CardCapabilities capabilities = result.Value;
 
         // Assert
         _ = capabilities.Should().NotBeNull();
@@ -221,7 +235,9 @@ public class CardCapabilitiesTests
         };
 
         // Act
-        var capabilities = CardCapabilities.Parse(data);
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+        _ = result.IsSuccess.Should().BeTrue();
+        CardCapabilities capabilities = result.Value;
         var output = capabilities.ToString();
 
         // Assert

@@ -141,44 +141,48 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
         ImmutableArray<byte> macChainingValue,
         byte protocolVersion)
     {
-        try
-        {
-            if (response.Length < 10) // Minimum: 8 bytes R-MAC + 2 bytes SW
+        var lengthValidation = ValidateResponseLength(response, 10, "Response too short to contain R-MAC");
+        if (lengthValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(lengthValidation.Error);
+            
+        var extractionResult = Result.Try(() =>
             {
-                return SmartCardError.InvalidData("Response too short to contain R-MAC");
-            }
+                // Extract R-MAC (8 bytes before status word)
+                var rmacOffset = response.Length - 10;
+                var receivedRMac = response.Skip(rmacOffset).Take(8).ToArray();
 
-            // Extract R-MAC (8 bytes before status word)
-            var rmacOffset = response.Length - 10;
-            var receivedRMac = response.Skip(rmacOffset).Take(8).ToArray();
+                // Extract data without R-MAC for verification
+                var dataBeforeRMac = response.Take(rmacOffset).ToArray();
+                var statusWord = response.TakeLast(2).ToArray();
+                var dataForMac = dataBeforeRMac.Concat(statusWord).ToArray();
 
-            // Extract data without R-MAC for verification
-            var dataBeforeRMac = response.Take(rmacOffset).ToArray();
-            var statusWord = response.TakeLast(2).ToArray();
-            var dataForMac = dataBeforeRMac.Concat(statusWord).ToArray();
-
+                return (dataForMac, receivedRMac);
+            }, ex => SmartCardError.SecurityError($"R-MAC extraction failed: {ex.Message}"));
+            
+        if (extractionResult.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(extractionResult.Error);
+            
+        if (extractionResult.IsSuccess)
+        {
+            var extractedValue = extractionResult.Value;
+            var (dataForMac, receivedRMac) = extractedValue;
+            
             // Calculate expected R-MAC
-            var expectedRMacResult = CalculateRMac(dataForMac, sessionKeys, macChainingValue, protocolVersion);
-            if (expectedRMacResult.IsFailure)
-            {
-                return expectedRMacResult.Error;
-            }
+            return CalculateRMac(dataForMac, sessionKeys, macChainingValue, protocolVersion)
+                .Bind(expectedRMac =>
+                {
+                    // Verify R-MAC (compare first 8 bytes)
+                    if (!receivedRMac.SequenceEqual(expectedRMac.Take(8).ToArray()))
+                    {
+                        return SmartCardError.SecurityError("R-MAC verification failed");
+                    }
 
-            var expectedRMac = expectedRMacResult.Value;
-
-            // Verify R-MAC (compare first 8 bytes)
-            if (!receivedRMac.SequenceEqual(expectedRMac.Take(8).ToArray()))
-            {
-                return SmartCardError.SecurityError("R-MAC verification failed");
-            }
-
-            // Return response without R-MAC
-            return Result.Success<byte[], SmartCardError>(dataForMac);
+                    // Return response without R-MAC
+                    return Result.Success<byte[], SmartCardError>(dataForMac);
+                });
         }
-        catch (Exception ex)
-        {
-            return SmartCardError.SecurityError($"R-MAC verification failed: {ex.Message}");
-        }
+        
+        return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidData("Extraction failed"));
     }
 
     private static Result<byte[], SmartCardError> DecryptResponseData(
@@ -187,22 +191,12 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
         uint encryptionCounter,
         byte protocolVersion)
     {
-        try
+        return protocolVersion switch
         {
-            switch (protocolVersion)
-            {
-                case ProtocolIdentifiers.Scp03:
-                    return DecryptScp03ResponseData(response, sessionKeys, encryptionCounter);
-                case ProtocolIdentifiers.Scp02:
-                    return DecryptScp02ResponseData(response, sessionKeys);
-                default:
-                    return SmartCardError.InvalidArgument($"Unsupported protocol version: 0x{protocolVersion:X2}");
-            }
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.CryptographicError($"Response decryption failed: {ex.Message}");
-        }
+            ProtocolIdentifiers.Scp03 => DecryptScp03ResponseData(response, sessionKeys, encryptionCounter),
+            ProtocolIdentifiers.Scp02 => DecryptScp02ResponseData(response, sessionKeys),
+            _ => SmartCardError.InvalidArgument($"Unsupported protocol version: 0x{protocolVersion:X2}")
+        };
     }
 
     private static Result<byte[], SmartCardError> DecryptScp03ResponseData(
@@ -210,54 +204,55 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
         SessionKeys sessionKeys,
         uint encryptionCounter)
     {
-        try
+        return Result.Try(() =>
         {
             // Extract encrypted response data (without status word)
             var statusOffset = response.Length - 2;
             var encryptedData = response.Take(statusOffset).ToArray();
-
-            // Build ICV for SCP03 R-ENC: counter with MSB set to 0x80
-            var icv = new byte[16];
-            icv[12] = (byte)(encryptionCounter >> 24);
-            icv[13] = (byte)(encryptionCounter >> 16);
-            icv[14] = (byte)(encryptionCounter >> 8);
-            icv[15] = (byte)encryptionCounter;
-            icv[12] |= 0x80; // Set MSB for response decryption
-
-            // Encrypt using AES-CBC with the counter-based ICV
-            var cipher = new CbcBlockCipher(new AesEngine());
-            cipher.Init(false, new ParametersWithIV(new KeyParameter(sessionKeys.SEnc), icv)); // false for decryption
-
-            // Encrypted data should be padded to block size
-            if (encryptedData.Length % 16 != 0)
-            {
-                return SmartCardError.InvalidData("Encrypted response data not aligned to AES block size");
-            }
-
-            var decrypted = new byte[encryptedData.Length];
-
-            for (int i = 0; i < encryptedData.Length; i += 16)
-            {
-                _ = cipher.ProcessBlock(encryptedData, i, decrypted, i);
-            }
-
-            // Remove PKCS#7 padding
-            var unpaddedResult = Protocol.CryptographicOperations.RemovePkcs7Padding(decrypted);
-            if (unpaddedResult.IsFailure)
-            {
-                return unpaddedResult.Error;
-            }
-
-            // Combine decrypted data with original status word
             var statusWord = response.TakeLast(2).ToArray();
-            var result = unpaddedResult.Value.Concat(statusWord).ToArray();
-
-            return Result.Success<byte[], SmartCardError>(result);
-        }
-        catch (Exception ex)
+            
+            return (encryptedData, statusWord);
+        }, ex => SmartCardError.CryptographicError($"Data extraction failed: {ex.Message}"))
+        .Bind(extractedData =>
         {
-            return SmartCardError.CryptographicError($"SCP03 response decryption failed: {ex.Message}");
-        }
+            var (encryptedData, statusWord) = extractedData;
+            
+            var alignmentValidation = ValidateAesBlockAlignment(encryptedData);
+            if (alignmentValidation.IsFailure)
+                return Result.Failure<byte[], SmartCardError>(alignmentValidation.Error);
+                
+            var icvResult = BuildScp03ResponseIcv(encryptionCounter);
+            if (icvResult.IsFailure)
+                return Result.Failure<byte[], SmartCardError>(icvResult.Error);
+                
+            if (icvResult.IsSuccess)
+            {
+                var icvValue = icvResult.Value;
+                var decryptResult = DecryptWithAesCbc(encryptedData, sessionKeys.SEnc, icvValue);
+                if (decryptResult.IsFailure)
+                    return Result.Failure<byte[], SmartCardError>(decryptResult.Error);
+                    
+                if (decryptResult.IsSuccess)
+                {
+                    var decryptedValue = decryptResult.Value;
+                    var unpaddingResult = Protocol.CryptographicOperations.RemovePkcs7Padding(decryptedValue);
+                    if (unpaddingResult.IsFailure)
+                        return Result.Failure<byte[], SmartCardError>(unpaddingResult.Error);
+                        
+                    if (unpaddingResult.IsSuccess)
+                    {
+                        var unpaddedValue = unpaddingResult.Value;
+                        return Result.Success<byte[], SmartCardError>(unpaddedValue.Concat(statusWord).ToArray());
+                    }
+                    
+                    return Result.Failure<byte[], SmartCardError>(SmartCardError.CryptographicError("Padding removal failed"));
+                }
+                
+                return Result.Failure<byte[], SmartCardError>(SmartCardError.CryptographicError("Decryption failed"));
+            }
+            
+            return Result.Failure<byte[], SmartCardError>(SmartCardError.CryptographicError("ICV generation failed"));
+        });
     }
 
     private static Result<byte[], SmartCardError> DecryptScp02ResponseData(
@@ -275,22 +270,12 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
         ImmutableArray<byte> macChainingValue,
         byte protocolVersion)
     {
-        try
+        return protocolVersion switch
         {
-            switch (protocolVersion)
-            {
-                case ProtocolIdentifiers.Scp03:
-                    return CalculateScp03RMac(response, sessionKeys, macChainingValue);
-                case ProtocolIdentifiers.Scp02:
-                    return CalculateScp02RMac(response, sessionKeys, macChainingValue);
-                default:
-                    return SmartCardError.InvalidArgument($"Unsupported protocol version: 0x{protocolVersion:X2}");
-            }
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.CryptographicError($"R-MAC calculation failed: {ex.Message}");
-        }
+            ProtocolIdentifiers.Scp03 => CalculateScp03RMac(response, sessionKeys, macChainingValue),
+            ProtocolIdentifiers.Scp02 => CalculateScp02RMac(response, sessionKeys, macChainingValue),
+            _ => SmartCardError.InvalidArgument($"Unsupported protocol version: 0x{protocolVersion:X2}")
+        };
     }
 
     private static Result<byte[], SmartCardError> CalculateScp03RMac(
@@ -298,7 +283,7 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
         SessionKeys sessionKeys,
         ImmutableArray<byte> macChainingValue)
     {
-        try
+        return Result.Try(() =>
         {
             // Build MAC input: MAC chaining value || response data (including status word)
             var macInput = macChainingValue.ToArray().Concat(response).ToArray();
@@ -312,12 +297,8 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
             _ = cmac.DoFinal(mac, 0);
             
             // Return first 8 bytes as R-MAC
-            return Result.Success<byte[], SmartCardError>(mac.Take(8).ToArray());
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.CryptographicError($"SCP03 R-MAC calculation failed: {ex.Message}");
-        }
+            return mac.Take(8).ToArray();
+        }, ex => SmartCardError.CryptographicError($"SCP03 R-MAC calculation failed: {ex.Message}"));
     }
 
     private static Result<byte[], SmartCardError> CalculateScp02RMac(
@@ -325,31 +306,100 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
         SessionKeys sessionKeys,
         ImmutableArray<byte> macChainingValue)
     {
-        try
+        var lengthValidation = ValidateResponseLength(response, 2, "Response too short for R-MAC calculation");
+        if (lengthValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(lengthValidation.Error);
+            
+        var componentsResult = ExtractScp02ResponseComponents(response);
+        if (componentsResult.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(componentsResult.Error);
+            
+        if (componentsResult.IsSuccess)
         {
-            // Per GP Card Spec v2.3.1 Section E.4.5 R-MAC Generation:
-            // R-MAC is computed on:
-            // 1. The stripped APDU command message (without C-MAC, modified header, logical channel = 0)
-            // 2. Response data length (Li)
-            // 3. Response data
-            // 4. Status bytes
-            
-            // For trace decryption, we only have the response data + status word
-            // We need to reconstruct the full R-MAC input data
-            
-            if (response.Length < 2)
+            var componentsValue = componentsResult.Value;
+            var macInputResult = BuildScp02MacInput(componentsValue.responseData, componentsValue.statusBytes);
+            if (macInputResult.IsFailure)
+                return Result.Failure<byte[], SmartCardError>(macInputResult.Error);
+                
+            if (macInputResult.IsSuccess)
             {
-                return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidData("Response too short for R-MAC calculation"));
+                var macInputValue = macInputResult.Value;
+                return CalculateScp02DesRetailMac(macInputValue, sessionKeys.SrMac, macChainingValue);
+            }
+            
+            return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidData("MAC input build failed"));
+        }
+        
+        return Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidData("Component extraction failed"));
+    }
+
+    private static UnitResult<SmartCardError> ValidateResponseLength(byte[] response, int minimumLength, string errorMessage)
+    {
+        return (response.Length < minimumLength)
+            ? SmartCardError.InvalidData(errorMessage)
+            : UnitResult.Success<SmartCardError>();
+    }
+
+    private static UnitResult<SmartCardError> ValidateAesBlockAlignment(byte[] data)
+    {
+        return (data.Length % 16 != 0)
+            ? SmartCardError.InvalidData("Encrypted response data not aligned to AES block size")
+            : UnitResult.Success<SmartCardError>();
+    }
+
+    private static Result<byte[], SmartCardError> BuildScp03ResponseIcv(uint encryptionCounter)
+    {
+        return Result.Try(() =>
+        {
+            // Build ICV for SCP03 R-ENC: counter with MSB set to 0x80
+            var icv = new byte[16];
+            icv[12] = (byte)(encryptionCounter >> 24);
+            icv[13] = (byte)(encryptionCounter >> 16);
+            icv[14] = (byte)(encryptionCounter >> 8);
+            icv[15] = (byte)encryptionCounter;
+            icv[12] |= 0x80; // Set MSB for response decryption
+            
+            return icv;
+        }, ex => SmartCardError.CryptographicError($"ICV generation failed: {ex.Message}"));
+    }
+
+    private static Result<byte[], SmartCardError> DecryptWithAesCbc(byte[] encryptedData, byte[] key, byte[] icv)
+    {
+        return Result.Try(() =>
+        {
+            // Encrypt using AES-CBC with the counter-based ICV
+            var cipher = new CbcBlockCipher(new AesEngine());
+            cipher.Init(false, new ParametersWithIV(new KeyParameter(key), icv)); // false for decryption
+
+            var decrypted = new byte[encryptedData.Length];
+
+            for (int i = 0; i < encryptedData.Length; i += 16)
+            {
+                _ = cipher.ProcessBlock(encryptedData, i, decrypted, i);
             }
 
-            // Extract response data and status word
+            return decrypted;
+        }, ex => SmartCardError.CryptographicError($"AES-CBC decryption failed: {ex.Message}"));
+    }
+
+    private static Result<(byte[] responseData, byte[] statusBytes), SmartCardError> ExtractScp02ResponseComponents(byte[] response)
+    {
+        return Result.Try(() =>
+        {
             var statusOffset = response.Length - 2;
             var responseData = new byte[statusOffset];
             Array.Copy(response, 0, responseData, 0, statusOffset);
             var statusBytes = new byte[2];
             Array.Copy(response, statusOffset, statusBytes, 0, 2);
             
+            return (responseData, statusBytes);
+        }, ex => SmartCardError.InvalidData($"Failed to extract response components: {ex.Message}"));
+    }
+
+    private static Result<byte[], SmartCardError> BuildScp02MacInput(byte[] responseData, byte[] statusBytes)
+    {
+        return Result.Try(() =>
+        {
             // Build R-MAC input according to SCP02 spec:
             // For response-only R-MAC (without command context), we calculate over:
             // Response Length (1 byte) + Response Data + Status Word (2 bytes)
@@ -366,11 +416,19 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
             // Status bytes
             Array.Copy(statusBytes, 0, macInput, offset, 2);
             
+            return macInput;
+        }, ex => SmartCardError.InvalidData($"Failed to build MAC input: {ex.Message}"));
+    }
+
+    private static Result<byte[], SmartCardError> CalculateScp02DesRetailMac(byte[] macInput, byte[] key, ImmutableArray<byte> macChainingValue)
+    {
+        return Result.Try(() =>
+        {
             // Calculate R-MAC using 3DES with ISO 9797-1 Algorithm 3 (Retail MAC)
             // Use R-MAC session key (SrMac) with MAC chaining value as ICV
             var engine = new DesEngine();
             var desMac = new ISO9797Alg3Mac(engine);
-            desMac.Init(new KeyParameter(sessionKeys.SrMac));
+            desMac.Init(new KeyParameter(key));
             
             // Apply MAC chaining value
             if (macChainingValue.Length >= 8)
@@ -393,13 +451,8 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
             var rmac = new byte[8];
             _ = desMac.DoFinal(rmac, 0);
             
-            return Result.Success<byte[], SmartCardError>(rmac);
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CryptographicError($"SCP02 R-MAC calculation failed: {ex.Message}"));
-        }
+            return rmac;
+        }, ex => SmartCardError.CryptographicError($"SCP02 R-MAC calculation failed: {ex.Message}"));
     }
 
 }

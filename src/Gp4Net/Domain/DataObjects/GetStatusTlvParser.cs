@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -47,7 +48,8 @@ public static class GetStatusTlvParser
 
             foreach (var tlv in tlvObjects)
             {
-                if (tlv.TagNumber == TAG_GP_REGISTRY_DATA)
+                var tagNumber = tlv.GetTagNumber();
+                if (tagNumber.IsSuccess && tagNumber.Value == TAG_GP_REGISTRY_DATA)
                 {
                     var appResult = ParseApplicationFromRegistryData(tlv);
                     if (appResult.IsSuccess)
@@ -88,7 +90,10 @@ public static class GetStatusTlvParser
 
             foreach (var tlv in tlvObjects)
             {
-                if (tlv.TagNumber == TAG_GP_REGISTRY_DATA)
+                var tagResult = tlv.GetTagNumber();
+                if (tagResult.IsFailure) continue; // Skip invalid tags
+                
+                if (tagResult.Value == TAG_GP_REGISTRY_DATA)
                 {
                     var loadFileResult = ParseLoadFileFromRegistryData(tlv);
                     if (loadFileResult.IsSuccess)
@@ -116,44 +121,70 @@ public static class GetStatusTlvParser
         var nestedTlvs = registryTlv.ParseNestedTlv();
         
         // Extract required fields
-        var aidTlv = nestedTlvs.FirstOrDefault(t => t.TagNumber == TAG_AID);
-        var lifecycleTlv = nestedTlvs.FirstOrDefault(t => t.TagNumber == TAG_LIFECYCLE_STATE);
-        var privilegesTlv = nestedTlvs.FirstOrDefault(t => t.TagNumber == TAG_PRIVILEGES);
+        var aidTlv = Maybe<TlvObject>.None;
+        var lifecycleTlv = Maybe<TlvObject>.None;
+        var privilegesTlv = Maybe<TlvObject>.None;
+        
+        foreach (var tlv in nestedTlvs)
+        {
+            var tagResult = tlv.GetTagNumber();
+            if (tagResult.IsFailure) continue;
+            
+            switch (tagResult.Value)
+            {
+                case TAG_AID:
+                    aidTlv = Maybe<TlvObject>.From(tlv);
+                    break;
+                case TAG_LIFECYCLE_STATE:
+                    lifecycleTlv = Maybe<TlvObject>.From(tlv);
+                    break;
+                case TAG_PRIVILEGES:
+                    privilegesTlv = Maybe<TlvObject>.From(tlv);
+                    break;
+            }
+        }
 
-        if (aidTlv is null)
+        if (aidTlv.HasNoValue)
         {
             return Result.Failure<ApplicationInfo, SmartCardError>(
                 SmartCardError.InvalidData("Application AID (tag 4F) not found in registry data"));
         }
 
-        if (lifecycleTlv is null)
+        if (lifecycleTlv.HasNoValue)
         {
             return Result.Failure<ApplicationInfo, SmartCardError>(
                 SmartCardError.InvalidData("Lifecycle state (tag 9F70) not found in registry data"));
         }
 
         // Parse lifecycle state
-        var lifecycleState = ParseLifecycleState(lifecycleTlv.Value);
+        var lifecycleState = ParseLifecycleState(lifecycleTlv.Value.Value);
         if (lifecycleState.IsFailure)
         {
             return Result.Failure<ApplicationInfo, SmartCardError>(lifecycleState.Error);
         }
 
-        // Parse privileges
-        var privileges = ParsePrivileges(privilegesTlv?.Value ?? []);
+        // Parse privileges - use empty array if not present
+        var privilegesData = privilegesTlv.HasValue ? privilegesTlv.Value.Value : [];
+        var privileges = ParsePrivileges(privilegesData);
 
         // Determine application type from privileges
         var appType = DetermineApplicationType(privileges);
 
         // Extract optional fields
-        var associatedSdTlv = nestedTlvs.FirstOrDefault(t => t.TagNumber == TAG_ASSOCIATED_SECURITY_DOMAIN);
-        var associatedSecurityDomain = associatedSdTlv != null 
-            ? Maybe<byte[]>.From((byte[])associatedSdTlv.Value.Clone())
-            : Maybe<byte[]>.None;
+        var associatedSecurityDomain = Maybe<byte[]>.None;
+        foreach (var tlv in nestedTlvs)
+        {
+            var tagResult = tlv.GetTagNumber();
+            if (tagResult.IsSuccess && tagResult.Value == TAG_ASSOCIATED_SECURITY_DOMAIN)
+            {
+                associatedSecurityDomain = Maybe<byte[]>.From((byte[])tlv.Value.Clone());
+                break;
+            }
+        }
 
         return Result.Success<ApplicationInfo, SmartCardError>(
             new ApplicationInfo(
-                Aid: (byte[])aidTlv.Value.Clone(),
+                Aid: (byte[])aidTlv.Value.Value.Clone(),
                 LifecycleState: lifecycleState.Value,
                 Privileges: privileges,
                 Type: appType,
@@ -168,21 +199,24 @@ public static class GetStatusTlvParser
     {
         var nestedTlvs = registryTlv.ParseNestedTlv();
         
-        // Extract required fields
-        var aidTlv = nestedTlvs.FirstOrDefault(t => t.TagNumber == TAG_AID);
-        var lifecycleTlv = nestedTlvs.FirstOrDefault(t => t.TagNumber == TAG_LIFECYCLE_STATE);
+        // Extract required fields using functional approach
+        var aidTlvMaybe = FindTlvByTag(nestedTlvs, (ushort)TAG_AID);
+        var lifecycleTlvMaybe = FindTlvByTag(nestedTlvs, (ushort)TAG_LIFECYCLE_STATE);
 
-        if (aidTlv is null)
+        if (aidTlvMaybe.HasNoValue)
         {
             return Result.Failure<ExecutableLoadFile, SmartCardError>(
                 SmartCardError.InvalidData("Load file AID (tag 4F) not found in registry data"));
         }
 
-        if (lifecycleTlv is null)
+        if (lifecycleTlvMaybe.HasNoValue)
         {
             return Result.Failure<ExecutableLoadFile, SmartCardError>(
                 SmartCardError.InvalidData("Lifecycle state (tag 9F70) not found in registry data"));
         }
+        
+        var aidTlv = aidTlvMaybe.Value;
+        var lifecycleTlv = lifecycleTlvMaybe.Value;
 
         // Parse lifecycle state
         var lifecycleState = ParseLifecycleState(lifecycleTlv.Value);
@@ -192,13 +226,17 @@ public static class GetStatusTlvParser
         }
 
         // Parse version if available
-        var versionTlv = nestedTlvs.FirstOrDefault(t => t.TagNumber == TAG_LOAD_FILE_VERSION);
-        var version = versionTlv != null 
-            ? Maybe<string>.From(ParseVersionString(versionTlv.Value))
+        var versionTlvMaybe = FindTlvByTag(nestedTlvs, (ushort)TAG_LOAD_FILE_VERSION);
+        var version = versionTlvMaybe.HasValue 
+            ? Maybe<string>.From(ParseVersionString(versionTlvMaybe.Value.Value))
             : Maybe<string>.None;
 
         // Parse executable modules
-        var moduleTlvs = nestedTlvs.Where(t => t.TagNumber == TAG_EXECUTABLE_MODULE_AID);
+        var moduleTlvs = nestedTlvs.Where(t => 
+        {
+            var tagResult = t.GetTagNumber();
+            return tagResult.IsSuccess && tagResult.Value == (ushort)TAG_EXECUTABLE_MODULE_AID;
+        });
         var modules = ImmutableList.CreateBuilder<ExecutableModule>();
         
         foreach (var moduleTlv in moduleTlvs)
@@ -208,9 +246,9 @@ public static class GetStatusTlvParser
         }
 
         // Extract associated security domain
-        var associatedSdTlv = nestedTlvs.FirstOrDefault(t => t.TagNumber == TAG_ASSOCIATED_SECURITY_DOMAIN);
-        var associatedSecurityDomain = associatedSdTlv != null 
-            ? Maybe<byte[]>.From((byte[])associatedSdTlv.Value.Clone())
+        var associatedSdTlvMaybe = FindTlvByTag(nestedTlvs, (ushort)TAG_ASSOCIATED_SECURITY_DOMAIN);
+        var associatedSecurityDomain = associatedSdTlvMaybe.HasValue 
+            ? Maybe<byte[]>.From((byte[])associatedSdTlvMaybe.Value.Value.Clone())
             : Maybe<byte[]>.None;
 
         return Result.Success<ExecutableLoadFile, SmartCardError>(
@@ -342,6 +380,24 @@ public static class GetStatusTlvParser
                 // Unknown format - return as hex
                 return Convert.ToHexString(versionBytes);
         }
-
+    }
+    
+    /// <summary>
+    /// Finds a TLV object by tag number using functional approach.
+    /// </summary>
+    /// <param name="tlvObjects">The collection of TLV objects to search.</param>
+    /// <param name="targetTag">The target tag number to find.</param>
+    /// <returns>Maybe containing the found TLV object.</returns>
+    private static Maybe<TlvObject> FindTlvByTag(IEnumerable<TlvObject> tlvObjects, ushort targetTag)
+    {
+        foreach (var tlv in tlvObjects)
+        {
+            var tagResult = tlv.GetTagNumber();
+            if (tagResult.IsSuccess && tagResult.Value == targetTag)
+            {
+                return Maybe<TlvObject>.From(tlv);
+            }
+        }
+        return Maybe<TlvObject>.None;
     }
 }

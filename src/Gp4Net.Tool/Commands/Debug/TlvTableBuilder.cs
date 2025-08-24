@@ -238,7 +238,8 @@ public static class TlvTableBuilder
     {
         var tagHex = element.GetTagAsHexString();
         byte firstTagByte = element.Tag[0];
-        var tagName = GetKnownTagName(element.TagNumber);
+        var tagNumberResult = element.GetTagNumber();
+        var tagName = tagNumberResult.IsSuccess ? GetKnownTagName(tagNumberResult.Value) : "UNKNOWN";
         var tagClass = GetTagClass(firstTagByte);
         var constructed = (firstTagByte & 0x20) != 0 ? "constructed" : "primitive";
             
@@ -343,13 +344,30 @@ public static class TlvTableBuilder
     /// </summary>
     private static Maybe<string> GetKnownTagInterpretation(TlvObject element)
     {
-        return element.TagNumber switch
+        return element.GetTagNumber().Match(
+            tagNumber => InterpretByTagNumber(tagNumber, element),
+            error => Maybe<string>.None
+        );
+    }
+    
+    private static Maybe<string> InterpretByTagNumber(uint tagNumber, TlvObject element)
+    {
+        var elementValue = GetTlvValueUsingReflection(element);
+        if (elementValue == null) return Maybe<string>.None;
+        
+        return tagNumber switch
         {
-            0x4F when element.Value.Length >= 5 => Maybe<string>.From($"AID: {Convert.ToHexString(element.Value)}"),
-            0x8A when element.Value.Length == 1 => Maybe<string>.From($"Life Cycle: {GetLifeCycleStateName(element.Value[0])}"),
+            0x4F when elementValue.Length >= 5 => Maybe<string>.From($"AID: {Convert.ToHexString(elementValue)}"),
+            0x8A when elementValue.Length == 1 => Maybe<string>.From($"Life Cycle: {GetLifeCycleStateName(elementValue[0])}"),
             0x81 or 0x82 or 0x83 => Maybe<string>.From("Security-related data - may indicate SCP support"),
             _ => Maybe<string>.None
         };
+    }
+    
+    private static byte[] GetTlvValueUsingReflection(TlvObject element)
+    {
+        var valueProperty = typeof(TlvObject).GetProperty("Value");
+        return valueProperty?.GetValue(element) as byte[] ?? Array.Empty<byte>();
     }
 
     /// <summary>

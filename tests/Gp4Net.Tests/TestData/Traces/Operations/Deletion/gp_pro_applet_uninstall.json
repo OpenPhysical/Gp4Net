@@ -1,0 +1,122 @@
+{
+  "metadata": {
+    "source": {
+      "file": "docs/traces/gp_pro_applet_uninstall.txt",
+      "type": "gp_pro",
+      "generated": "2025-08-23T03:00:59.486112Z",
+      "tool_version": "gp4net-unified-converter-1.0"
+    },
+    "card": {
+      "atr": "3BD518FF8191FE1FC38073C821100A",
+      "isd_aid": "A000000151000000",
+      "card_type": "GP_COMPLIANT"
+    },
+    "warnings": [],
+    "hints": {
+      "static_keys": "404142434445464748494A4B4C4D4E4F",
+      "expected_session_keys": {
+        "s_enc": "8528317332886BF53390C8F141A0D793",
+        "s_mac": "10110A26F982BE99829C3816EF1EB4A5",
+        "s_rmac": "718D60A711A1F0778A7A1AEEAB96B19C"
+      }
+    }
+  },
+  "test_hints": {
+    "testable_operations": [
+      {
+        "name": "select",
+        "exchange_index": 0,
+        "verify": [
+          "aid"
+        ]
+      },
+      {
+        "name": "initialize_update",
+        "exchange_index": 1,
+        "verify": [
+          "key_derivation",
+          "card_cryptogram"
+        ]
+      },
+      {
+        "name": "external_authenticate",
+        "exchange_index": 2,
+        "verify": [
+          "secure_channel"
+        ]
+      },
+      {
+        "name": "delete",
+        "exchange_index": 7,
+        "verify": [
+          "delete_command",
+          "delete_response_6a88_valid"
+        ]
+      }
+    ],
+    "scp_version": 3
+  },
+  "exchanges": [
+    {
+      "command": "00A4040000",
+      "response": "6F108408A000000151000000A5049F6501FF9000",
+      "description": "SELECT ISD",
+      "response_time_ms": 19
+    },
+    {
+      "command": "8050000008FA4C144173EEA5DA00",
+      "response": "0370000000000000000001037081E02F9C4061653AA1AEEA9F46AF46B20000109000",
+      "description": "INITIALIZE UPDATE - SCP03",
+      "response_time_ms": 51
+    },
+    {
+      "command": "8482010010A1883C4B93BE2B01FFC7CC05DCC39D2E",
+      "response": "9000",
+      "description": "EXTERNAL AUTHENTICATE - Secure messaging",
+      "response_time_ms": 18
+    },
+    {
+      "command": "84F280020A4F00442EA795FFF66F7B00",
+      "response": "E3264F08A0000001510000009F700101C5039EFE80C407A0000001515350CC08A0000001510000009000",
+      "description": "GET STATUS - Secure messaging",
+      "response_time_ms": 20
+    },
+    {
+      "command": "84F240020A4F00CEFEB6C1F221B24000",
+      "response": "6A88",
+      "description": "GET STATUS - Secure messaging",
+      "response_time_ms": 13
+    },
+    {
+      "command": "84F210020A4F00231A78EACDCE108500",
+      "response": "E3254F07A00000015153509F700101CE02FFFF8408A000000151535041CC08A000000151000000E3314F0DA00000016443446F634C6974659F700101CE020100840EA00000016443446F634C69746501CC08A000000151000000E31B4F07A00000006202049F700101CE020100CC08A000000151000000E31B4F07A00000006202029F700101CE020103CC08A0000001510000009000",
+      "description": "GET STATUS - Secure messaging",
+      "response_time_ms": 43
+    },
+    {
+      "command": "84F220020A4F00051D723F53636AC600",
+      "response": "E31B4F07A00000015153509F700101CE02FFFFCC08A000000151000000E3214F0DA00000016443446F634C6974659F700101CE020100CC08A000000151000000E31B4F07A00000006202049F700101CE020100CC08A000000151000000E31B4F07A00000006202029F700101CE020103CC08A0000001510000009000",
+      "description": "GET STATUS - Secure messaging",
+      "response_time_ms": 39
+    },
+    {
+      "command": "84E40080134F09A000000308000010007547C55C046E221C",
+      "response": "6A88",
+      "description": "DELETE",
+      "response_time_ms": 19
+    }
+  ],
+  "sessions": {
+    "session_1": {
+      "scp_version": 3,
+      "implementation": "i=00",
+      "key_version": 1,
+      "host_challenge": "FA4C144173EEA5DA",
+      "card_challenge": "01037081E02F9C40",
+      "sequence_counter": "81E0",
+      "key_diversification_data": "03700000000000000000",
+      "card_cryptogram": "61653AA1AEEA9F46",
+      "host_cryptogram": "A1883C4B93BE2B01"
+    }
+  }
+}

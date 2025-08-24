@@ -26,9 +26,9 @@ public static class CommandProcessors
         byte[] command,
         CardState state,
         CardConfiguration config,
-        ILogger? logger = null)
+        LoggingService logging)
     {
-        logger?.LogDebug("Processing SELECT command");
+        logging.LogDebug("Processing SELECT command");
         Console.WriteLine($"DEBUG: Virtual card processing SELECT, current IsSelected: {state.IsSelected}");
         
         var result = ParseSelectCommand(command)
@@ -61,24 +61,25 @@ public static class CommandProcessors
         CardState state,
         CardConfiguration config,
         ICryptographicService crypto,
-        ILogger? logger = null)
+        LoggingService logging)
     {
-        logger?.LogDebug("Processing INITIALIZE UPDATE - Card SCP version: 0x{Scp:X2}", (byte)state.ScpVersion);
+        logging.LogDebug("Processing INITIALIZE UPDATE - Card SCP version: 0x{Scp:X2}", (byte)state.ScpVersion);
         
         // Delegate to protocol-specific processors
-        if (Scp02CommandProcessors.IsScp02Command(command, state, logger))
+        var legacyLogger = logging.Logger.Match(l => l, () => (ILogger?)null);
+        if (Scp02CommandProcessors.IsScp02Command(command, state, legacyLogger))
         {
-            logger?.LogDebug("Routing to SCP02 processor");
-            return Scp02CommandProcessors.ProcessScp02InitializeUpdate(command, state, config, crypto, logger);
+            logging.LogDebug("Routing to SCP02 processor");
+            return Scp02CommandProcessors.ProcessScp02InitializeUpdate(command, state, config, crypto, legacyLogger);
         }
         else if (Scp03CommandProcessors.IsScp03Command(command, state))
         {
-            logger?.LogDebug("Routing to SCP03 processor");
-            return Scp03CommandProcessors.ProcessScp03InitializeUpdate(command, state, config, crypto, logger);
+            logging.LogDebug("Routing to SCP03 processor");
+            return Scp03CommandProcessors.ProcessScp03InitializeUpdate(command, state, config, crypto, legacyLogger);
         }
         
         // Fallback to generic implementation
-        logger?.LogDebug("Using generic INITIALIZE UPDATE processor");
+        logging.LogDebug("Using generic INITIALIZE UPDATE processor");
         return ParseInitializeUpdateCommand(command)
             .Bind(request => ValidateInitializeUpdatePreconditions(request, state))
             .Bind(request => GenerateCardChallengeForRequest(request, state, config, crypto))
@@ -94,20 +95,21 @@ public static class CommandProcessors
         CardState state,
         CardConfiguration config,
         ICryptographicService crypto,
-        ILogger? logger = null)
+        LoggingService logging)
     {
-        logger?.LogDebug("Processing EXTERNAL AUTHENTICATE");
+        logging.LogDebug("Processing EXTERNAL AUTHENTICATE");
         
         // Delegate to protocol-specific processors
+        var legacyLogger = logging.Logger.Match(l => l, () => (ILogger?)null);
         if (Scp02CommandProcessors.IsScp02Command(command, state))
         {
-            logger?.LogDebug("Routing to SCP02 external authenticate processor");
-            return Scp02CommandProcessors.ProcessScp02ExternalAuthenticate(command, state, config, crypto, logger);
+            logging.LogDebug("Routing to SCP02 external authenticate processor");
+            return Scp02CommandProcessors.ProcessScp02ExternalAuthenticate(command, state, config, crypto, legacyLogger);
         }
         else if (Scp03CommandProcessors.IsScp03Command(command, state))
         {
-            logger?.LogDebug("Routing to SCP03 external authenticate processor");
-            return Scp03CommandProcessors.ProcessScp03ExternalAuthenticate(command, state, config, crypto, logger);
+            logging.LogDebug("Routing to SCP03 external authenticate processor");
+            return Scp03CommandProcessors.ProcessScp03ExternalAuthenticate(command, state, config, crypto, legacyLogger);
         }
         
         // Fallback to generic implementation
@@ -125,9 +127,9 @@ public static class CommandProcessors
         byte[] command,
         CardState state,
         CardConfiguration config,
-        ILogger? logger = null)
+        LoggingService logging)
     {
-        logger?.LogDebug("Processing GET DATA command");
+        logging.LogDebug("Processing GET DATA command");
         return ParseGetDataCommand(command)
             .Bind(tag => ValidateGetDataAccess(tag, state))
             .Bind(tag => RetrieveDataObject(tag, state, config))
@@ -141,9 +143,9 @@ public static class CommandProcessors
         byte[] command,
         CardState state,
         CardConfiguration config,
-        ILogger? logger = null)
+        LoggingService logging)
     {
-        logger?.LogDebug("Processing GET STATUS command");
+        logging.LogDebug("Processing GET STATUS command");
         return ParseGetStatusCommand(command)
             .Bind(request => ValidateGetStatusAccess(request, state))
             .Bind(request => RetrieveStatusData(request, state, config))
@@ -294,7 +296,7 @@ public static class CommandProcessors
         switch (state.ScpVersion)
         {
             // Check if pseudo-random challenge generation is required (SCP03 i=70)
-            case 0x03 when state.ScpImplementation.UsesPseudoRandom():
+            case 0x03 when state.ScpImplementation == ScpImplementation.Scp03I70:
                 // SCP03 i=70: Use pseudo-random challenge generation
                 return GeneratePseudoRandomChallenge(request, state, config, crypto);
             case 0x02:

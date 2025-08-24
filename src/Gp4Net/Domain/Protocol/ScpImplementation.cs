@@ -177,69 +177,41 @@ public enum ScpImplementation : byte
     // ==========================================
     
     /// <summary>
-    /// SCP03: AES with 128-bit keys
+    /// SCP03 i=10: AES with 128-bit keys
     /// Standard SCP03 implementation
     /// </summary>
-    Scp03Aes128 = 0x10,
+    Scp03I10 = 0x10,
     
     /// <summary>
-    /// SCP03: No response MAC (11)
+    /// SCP03 i=11: AES with 128-bit keys, no response MAC
     /// Per GlobalPlatform SCP03 v1.1.1 Section 6.2.5
     /// Response MAC calculation and verification is disabled
     /// </summary>
-    Scp03NoResponseMac = 0x11,
+    Scp03I11 = 0x11,
     
     /// <summary>
-    /// SCP03: AES with 192-bit keys
+    /// SCP03 i=20: AES with 192-bit keys
     /// </summary>
-    Scp03Aes192 = 0x20,
+    Scp03I20 = 0x20,
     
     /// <summary>
-    /// SCP03: AES with 256-bit keys
+    /// SCP03 i=30: AES with 256-bit keys
     /// </summary>
-    Scp03Aes256 = 0x30,
+    Scp03I30 = 0x30,
     
     /// <summary>
-    /// SCP03: Random card challenge (60)
+    /// SCP03 i=60: AES with 128-bit keys, random card challenge
     /// Per GlobalPlatform SCP03 v1.1.1 Section 6.2.1
     /// Card generates truly random challenge instead of pseudo-random
     /// </summary>
-    Scp03RandomChallenge = 0x60,
+    Scp03I60 = 0x60,
     
     /// <summary>
-    /// SCP03: Pseudo-random card challenge
+    /// SCP03 i=70: AES with 128-bit keys, pseudo-random card challenge
     /// Card challenge derived using KDF instead of random
     /// </summary>
-    Scp03PseudoRandom = 0x70,
+    Scp03I70 = 0x70,
     
-    // ==========================================
-    // Legacy Aliases for Backward Compatibility
-    // ==========================================
-    
-    /// <summary>
-    /// Legacy alias for Scp02I15 - most common SCP02 implementation
-    /// </summary>
-    Scp02StaticMac = Scp02I15,
-    
-    /// <summary>
-    /// Legacy alias for Scp02I55 - SCP02 with well-known challenge
-    /// </summary>
-    Scp02CmacMult = Scp02I55,
-    
-    /// <summary>
-    /// Legacy alias for Scp02I1A - SCP02 implicit mode
-    /// </summary>
-    Scp02CmacXor = Scp02I1A,
-    
-    /// <summary>
-    /// Legacy alias for Scp02I04 - SCP02 with 1 base key
-    /// </summary>
-    Scp02ExplicitInitVector = Scp02I04,
-    
-    /// <summary>
-    /// Legacy alias for Scp02I05 - SCP02 without ICV encryption
-    /// </summary>
-    Scp02ImplicitInitVector = Scp02I05,
 }
 
 /// <summary>
@@ -272,24 +244,24 @@ public static class Scp02ImplementationFeatures
 
     /// <summary>
     /// Determines if this implementation uses explicit initiation mode.
-    /// Per GP Card Spec Table E-1, bit b3 (0x08) indicates initiation mode.
+    /// Per GP Card Spec Table E-1, bit b3 (0x04) indicates initiation mode.
     /// </summary>
     /// <param name="impl">The SCP implementation to check</param>
     /// <returns>True for explicit mode, false for implicit mode</returns>
     public static bool IsExplicitMode(this ScpImplementation impl)
     {
-        return ((byte)impl & 0x08) != 0;
+        return ((byte)impl & 0x04) != 0;
     }
 
     /// <summary>
     /// Determines if this implementation has ICV encryption for C-MAC session.
-    /// Per GP Card Spec Table E-1, bit b5 (0x04) indicates ICV encryption.
+    /// Per GP Card Spec Table E-1, bit b5 (0x10) indicates ICV encryption.
     /// </summary>
     /// <param name="impl">The SCP implementation to check</param>
     /// <returns>True if ICV encryption is enabled, false otherwise</returns>
     public static bool HasIcvEncryption(this ScpImplementation impl)
     {
-        return ((byte)impl & 0x04) != 0;
+        return ((byte)impl & 0x10) != 0;
     }
 
     /// <summary>
@@ -305,13 +277,13 @@ public static class Scp02ImplementationFeatures
 
     /// <summary>
     /// Determines if this implementation has ICV set to MAC over AID.
-    /// Per GP Card Spec Table E-1, bit b4 (0x10) indicates ICV initialization.
+    /// Per GP Card Spec Table E-1, bit b4 (0x08) indicates ICV initialization.
     /// </summary>
     /// <param name="impl">The SCP implementation to check</param>
     /// <returns>True for MAC over AID, false for zero ICV</returns>
     public static bool HasMacOverAid(this ScpImplementation impl)
     {
-        return ((byte)impl & 0x10) != 0;
+        return ((byte)impl & 0x08) != 0;
     }
 
     /// <summary>
@@ -442,42 +414,4 @@ public static class Scp02ImplementationFeatures
         };
     }
     
-    // ==========================================
-    // Legacy Extension Methods for Backward Compatibility
-    // ==========================================
-    
-    /// <summary>
-    /// Legacy method for checking pseudo-random challenge support.
-    /// For backward compatibility with existing code.
-    /// </summary>
-    /// <param name="impl">The SCP implementation to check</param>
-    /// <returns>True if pseudo-random challenge is used</returns>
-    public static bool UsesPseudoRandom(this ScpImplementation impl)
-    {
-        if (impl.IsScp02())
-        {
-            return impl.UsesWellKnownChallenge();
-        }
-        
-        // SCP03: i=70 uses pseudo-random
-        return impl == ScpImplementation.Scp03PseudoRandom;
-    }
-    
-    /// <summary>
-    /// Legacy method for checking static MAC usage.
-    /// For backward compatibility with existing code.
-    /// Maps to ICV encryption feature for SCP02.
-    /// </summary>
-    /// <param name="impl">The SCP implementation to check</param>
-    /// <returns>True if static MAC behavior is used</returns>
-    public static bool UsesStaticMac(this ScpImplementation impl)
-    {
-        if (impl.IsScp02())
-        {
-            // For SCP02, "static MAC" traditionally referred to ICV encryption behavior
-            return impl.HasIcvEncryption();
-        }
-        
-        return false;
-    }
 }

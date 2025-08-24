@@ -43,7 +43,7 @@ public sealed class SecureKeyStore
     /// </summary>
     public static Result<SecureKeyStore, SmartCardError> Create()
     {
-        try
+        return Result.Try(() =>
         {
             // Generate cryptographically secure master key and salt
             var masterKey = new byte[32]; // 256-bit key
@@ -53,17 +53,11 @@ public sealed class SecureKeyStore
             random.NextBytes(masterKey);
             random.NextBytes(salt);
 
-            return Result.Success<SecureKeyStore, SmartCardError>(
-                new SecureKeyStore(
-                    ImmutableDictionary<string, EncryptedKey>.Empty,
-                    masterKey,
-                    salt));
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<SecureKeyStore, SmartCardError>(
-                SmartCardError.SecurityError($"Failed to create secure key store: {ex.Message}"));
-        }
+            return new SecureKeyStore(
+                ImmutableDictionary<string, EncryptedKey>.Empty,
+                masterKey,
+                salt);
+        }, ex => SmartCardError.SecurityError($"Failed to create secure key store: {ex.Message}"));
     }
 
     /// <summary>
@@ -89,7 +83,7 @@ public sealed class SecureKeyStore
                 SmartCardError.InvalidArgument($"Key with ID '{keyId}' already exists"));
         }
 
-        try
+        return Result.Try(() =>
         {
             // Encrypt the key before storing
             var encryptedKey = EncryptKey(keyId, keyData);
@@ -98,14 +92,8 @@ public sealed class SecureKeyStore
             // Clear the original key data
             Array.Clear(keyData, 0, keyData.Length);
 
-            return Result.Success<SecureKeyStore, SmartCardError>(
-                new SecureKeyStore(newKeys, _masterKey, _salt));
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<SecureKeyStore, SmartCardError>(
-                SmartCardError.SecurityError($"Failed to add key: {ex.Message}"));
-        }
+            return new SecureKeyStore(newKeys, _masterKey, _salt);
+        }, ex => SmartCardError.SecurityError($"Failed to add key: {ex.Message}"));
     }
 
     /// <summary>
@@ -126,17 +114,11 @@ public sealed class SecureKeyStore
                 SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found"));
         }
 
-        try
+        return Result.Try(() =>
         {
             var decryptedKey = DecryptKey(keyId, encryptedKey);
-            return Result.Success<SecureKey, SmartCardError>(
-                new SecureKey(keyId, decryptedKey));
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<SecureKey, SmartCardError>(
-                SmartCardError.SecurityError($"Failed to retrieve key: {ex.Message}"));
-        }
+            return new SecureKey(keyId, decryptedKey);
+        }, ex => SmartCardError.SecurityError($"Failed to retrieve key: {ex.Message}"));
     }
 
     /// <summary>
@@ -344,15 +326,8 @@ public sealed class SecureKey : IDisposable
                 SmartCardError.InvalidArgument("Cannot use disposed key"));
         }
 
-        try
-        {
-            return operation(_keyData);
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<T, SmartCardError>(
-                SmartCardError.UnexpectedError($"Key operation failed: {ex.Message}", ex));
-        }
+        return Result.Try(() => operation(_keyData), ex => SmartCardError.UnexpectedError($"Key operation failed: {ex.Message}", ex))
+            .Bind(result => result);
     }
 
     /// <summary>

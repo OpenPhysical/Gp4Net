@@ -100,7 +100,13 @@ public static class KeyInfoTemplateCodec
             
         // Parse the outer TLV structure
         var outerTlvMaybe = TlvParser.ParseSingle(data);
-        if (!outerTlvMaybe.HasValue || outerTlvMaybe.Value.TagNumber != 0xE0)
+        if (!outerTlvMaybe.HasValue)
+        {
+            return SmartCardError.InvalidData("Invalid key information template format - no outer TLV found");
+        }
+        
+        var tagResult = outerTlvMaybe.Value.GetTagNumber();
+        if (tagResult.IsFailure || tagResult.Value != 0xE0)
         {
             return SmartCardError.InvalidData("Invalid key information template format - expected tag 0xE0");
         }
@@ -116,7 +122,10 @@ public static class KeyInfoTemplateCodec
                 
             foreach (var element in elements)
             {
-                switch (element.TagNumber)
+                var tagNumberResult = element.GetTagNumber();
+                if (tagNumberResult.IsFailure) continue;
+                
+                switch (tagNumberResult.Value)
                 {
                     case 0xC0: // Key version number
                         if (element.Length == 1)

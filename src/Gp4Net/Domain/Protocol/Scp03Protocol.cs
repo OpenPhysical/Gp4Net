@@ -502,10 +502,10 @@ public class Scp03Protocol : SecureChannelProtocolBase
     {
         return implementationParameter switch
         {
-            0x70 => ScpImplementation.Scp03PseudoRandom,
-            0x60 => ScpImplementation.Scp03RandomChallenge,
-            0x11 => ScpImplementation.Scp03NoResponseMac,
-            _ => ScpImplementation.Scp03PseudoRandom
+            0x70 => ScpImplementation.Scp03I70,
+            0x60 => ScpImplementation.Scp03I60,
+            0x11 => ScpImplementation.Scp03I11,
+            _ => ScpImplementation.Scp03I70
         };
     }
 }

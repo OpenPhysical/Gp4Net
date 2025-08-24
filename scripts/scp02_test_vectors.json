@@ -19,8 +19,8 @@
   },
   "vectors": [
     {
-      "name": "SCP02 i=15 Static MAC with GP Test Keys",
-      "description": "Implementation i=15 means static MAC keys per GP Card Spec Table E-1",
+      "name": "SCP02 i=15 Derived MAC with GP Test Keys",
+      "description": "Implementation i=15 derives MAC keys per GP Card Spec Section E.4.1 and live card trace data",
       "implementation_option": "0x15",
       "static_keys": {
         "enc": "404142434445464748494A4B4C4D4E4F",
@@ -34,7 +34,7 @@
       },
       "expected_session_keys": {
         "s_enc": "25C9794A1205FF244F5FA0378D2F8D59",
-        "s_mac": "404142434445464748494A4B4C4D4E4F",
+        "s_mac": "9BED98891580C3B245FE9EC58BFA8D2A",
         "s_dek": "0E51FDF196141F227A57BD154012FD39"
       },
       "cryptogram_data": {
@@ -76,7 +76,7 @@
     },
     {
       "name": "SCP02 Edge Case - Minimum Sequence Counter",
-      "description": "Tests boundary conditions in cryptogram calculation with sequence counter 0000",
+      "description": "Tests boundary conditions with sequence counter 0000, i=15 derives MAC keys per GP Card Spec Section E.4.1",
       "implementation_option": "0x15",
       "static_keys": {
         "enc": "AAAAAAAAAAAAAAAA0000000000000000",
@@ -90,7 +90,7 @@
       },
       "expected_session_keys": {
         "s_enc": "A3BBB3F1E6C82F990D4EED66CC3665F9",
-        "s_mac": "BBBBBBBBBBBBBBBB1111111111111111",
+        "s_mac": "B701CD103F177D2071BA7801D765FDA4",
         "s_dek": "95ECBB4B79D514145507BBF5A6913362"
       },
       "cryptogram_data": {

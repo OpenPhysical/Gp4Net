@@ -71,14 +71,14 @@ public record CardDataInfo(
     /// </summary>
     private static Result<CardDataInfo, SmartCardError> ParseCardDataElements(byte[] data)
     {
-        try
+        return Result.Try(() =>
         {
             var tags = ParseTlvTags(data);
             var oids = ExtractOids(data);
             var gpVersionFromOid = ExtractGpVersionFromOids(oids);
             var gpVersion = ExtractGpVersionFromTags(tags);
             
-            return Result.Success<CardDataInfo, SmartCardError>(new CardDataInfo(
+            return new CardDataInfo(
                 data,
                 tags,
                 gpVersion,
@@ -87,12 +87,8 @@ public record CardDataInfo(
                 tags.TryGetValue(0x66, out var chipDetails) ? Maybe<byte[]>.From(chipDetails) : Maybe<byte[]>.None,
                 oids,
                 gpVersionFromOid
-            ));
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.InvalidData($"Failed to parse card data: {ex.Message}");
-        }
+            );
+        }, ex => SmartCardError.InvalidData($"Failed to parse card data: {ex.Message}"));
     }
 
     /// <summary>
@@ -105,7 +101,11 @@ public record CardDataInfo(
         
         foreach (var element in TlvParser.ParseAll(data))
         {
-            tags[(ushort)element.TagNumber] = element.Value;
+            var tagNumber = element.GetTagNumber();
+            if (tagNumber.IsSuccess)
+            {
+                tags[(ushort)tagNumber.Value] = element.Value;
+            }
         }
         
         return tags;
@@ -129,7 +129,8 @@ public record CardDataInfo(
     {
         foreach (var element in TlvParser.ParseAll(data))
         {
-            if (element.TagNumber == 0x06)
+            var tagNumber = element.GetTagNumber();
+            if (tagNumber.IsSuccess && tagNumber.Value == 0x06)
             {
                 // Parse OID using BouncyCastle ASN.1 parser
                 ParseOid(element.Value).Match(

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
@@ -83,52 +84,45 @@ public sealed class MacService
                 SmartCardError.InvalidArgument("Key cannot be empty"));
         }
 
-        try
-        {
-
-            if (key.Length != 16 && key.Length != 24)
+        var keyValidationResult = ValidateKeyLength(key, new[] { 16, 24 }, "3DES key must be 16 or 24 bytes");
+        if (keyValidationResult.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(keyValidationResult.Error);
+            
+        var macLengthResult = ValidateMacLength(macLength, 1, 8, "MAC length must be between 1 and 8 bytes");
+        if (macLengthResult.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(macLengthResult.Error);
+            
+        return Result.Try(() =>
             {
-                return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("3DES key must be 16 or 24 bytes"));
-            }
+                _logger.LogTrace("Calculating 3DES MAC over {DataLength} bytes", data.Length);
 
-            if (macLength is < 1 or > 8)
+                // Use ISO 9797-1 MAC Algorithm 3 (retail MAC) with ISO 7816-4 padding
+                // Per GP Card Spec v2.3.1 Section B.1.2.2: uses ISO/IEC 9797-1 padding method 2
+                // IMPORTANT: ISO9797Alg3Mac requires a DesEngine, not DesEdeEngine
+                // The MAC algorithm handles the 3DES transformation internally
+                var mac = new ISO9797Alg3Mac(new DesEngine(), new ISO7816d4Padding());
+                mac.Init(new KeyParameter(key));
+                mac.BlockUpdate(data, 0, data.Length);
+
+                var fullMac = new byte[8];
+                _ = mac.DoFinal(fullMac, 0);
+
+                // Return requested MAC length
+                if (macLength == 8)
+                {
+                    return fullMac;
+                }
+                else
+                {
+                    var truncatedMac = new byte[macLength];
+                    Array.Copy(fullMac, 0, truncatedMac, 0, macLength);
+                    return truncatedMac;
+                }
+            }, ex => 
             {
-                return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("MAC length must be between 1 and 8 bytes"));
-            }
-
-            _logger.LogTrace("Calculating 3DES MAC over {DataLength} bytes", data.Length);
-
-            // Use ISO 9797-1 MAC Algorithm 3 (retail MAC) with ISO 7816-4 padding
-            // Per GP Card Spec v2.3.1 Section B.1.2.2: uses ISO/IEC 9797-1 padding method 2
-            // IMPORTANT: ISO9797Alg3Mac requires a DesEngine, not DesEdeEngine
-            // The MAC algorithm handles the 3DES transformation internally
-            var mac = new ISO9797Alg3Mac(new DesEngine(), new ISO7816d4Padding());
-            mac.Init(new KeyParameter(key));
-            mac.BlockUpdate(data, 0, data.Length);
-
-            var fullMac = new byte[8];
-            _ = mac.DoFinal(fullMac, 0);
-
-            // Return requested MAC length
-            if (macLength == 8)
-            {
-                return Result.Success<byte[], SmartCardError>(fullMac);
-            }
-            else
-            {
-                var truncatedMac = new byte[macLength];
-                Array.Copy(fullMac, 0, truncatedMac, 0, macLength);
-                return Result.Success<byte[], SmartCardError>(truncatedMac);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to calculate 3DES MAC");
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CryptographicError($"3DES MAC calculation failed: {ex.Message}"));
-        }
+                _logger.LogError(ex, "Failed to calculate 3DES MAC");
+                return SmartCardError.CryptographicError($"3DES MAC calculation failed: {ex.Message}");
+            });
     }
 
     /// <summary>
@@ -161,39 +155,32 @@ public sealed class MacService
                 SmartCardError.InvalidArgument("Key cannot be empty"));
         }
 
-        try
-        {
-
-            if (key.Length != 16 && key.Length != 24 && key.Length != 32)
+        var keyValidationResult = ValidateKeyLength(key, new[] { 16, 24, 32 }, "AES key must be 16, 24, or 32 bytes");
+        if (keyValidationResult.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(keyValidationResult.Error);
+            
+        var macLengthResult = ValidateMacLength(macLength, 1, 16, "MAC length must be between 1 and 16 bytes");
+        if (macLengthResult.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(macLengthResult.Error);
+            
+        return Result.Try(() =>
             {
-                return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("AES key must be 16, 24, or 32 bytes"));
-            }
+                _logger.LogTrace("Calculating AES-CMAC over {DataLength} bytes", data.Length);
 
-            if (macLength is < 1 or > 16)
+                // Calculate CMAC
+                var cmac = new CMac(new AesEngine(), macLength * 8); // macLength in bits
+                cmac.Init(new KeyParameter(key));
+                cmac.BlockUpdate(data, 0, data.Length);
+
+                var mac = new byte[macLength];
+                _ = cmac.DoFinal(mac, 0);
+
+                return mac;
+            }, ex => 
             {
-                return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("MAC length must be between 1 and 16 bytes"));
-            }
-
-            _logger.LogTrace("Calculating AES-CMAC over {DataLength} bytes", data.Length);
-
-            // Calculate CMAC
-            var cmac = new CMac(new AesEngine(), macLength * 8); // macLength in bits
-            cmac.Init(new KeyParameter(key));
-            cmac.BlockUpdate(data, 0, data.Length);
-
-            var mac = new byte[macLength];
-            _ = cmac.DoFinal(mac, 0);
-
-            return Result.Success<byte[], SmartCardError>(mac);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to calculate AES-CMAC");
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CryptographicError($"AES-CMAC calculation failed: {ex.Message}"));
-        }
+                _logger.LogError(ex, "Failed to calculate AES-CMAC");
+                return SmartCardError.CryptographicError($"AES-CMAC calculation failed: {ex.Message}");
+            });
     }
 
     /// <summary>
@@ -202,56 +189,39 @@ public sealed class MacService
     /// </summary>
     /// <param name="key">The MAC key.</param>
     /// <param name="data">The data to calculate MAC over.</param>
-    /// <param name="chainingValue">The current chaining value (will be updated).</param>
+    /// <param name="chainingValue">The current chaining state.</param>
     /// <param name="protocol">The secure channel protocol version.</param>
     /// <param name="macLength">The desired MAC length in bytes.</param>
-    /// <returns>The calculated MAC or an error.</returns>
-    public Result<byte[], SmartCardError> CalculateMacWithChaining(
+    /// <returns>A result containing the MAC and new chaining state, or an error.</returns>
+    public Result<(byte[] mac, byte[] newChainingValue), SmartCardError> CalculateMacWithChaining(
         byte[] key,
         byte[] data,
-        ref byte[] chainingValue,
+        byte[] chainingValue,
         ScpVersion protocol,
         int macLength = 8)
     {
-        try
+        var chainingMaybe = Maybe<byte[]>.From(chainingValue);
+        var preparedDataResult = chainingMaybe.Match(
+            Some: chainData => 
+                (protocol == ScpVersion.Scp03 && chainData.Length > 0)
+                    ? Result.Success<(byte[], bool), SmartCardError>((
+                        CombineArrays(chainData, data),
+                        true))
+                    : Result.Success<(byte[], bool), SmartCardError>((data, false)),
+            None: () => Result.Success<(byte[], bool), SmartCardError>((data, false)));
+                
+        return preparedDataResult
+        .Bind(preparedData =>
         {
-            // For SCP03, prepend chaining value to data
-            if (protocol == ScpVersion.Scp03 && chainingValue != null && chainingValue.Length > 0)
-            {
-                var chainedData = new byte[chainingValue.Length + data.Length];
-                Array.Copy(chainingValue, 0, chainedData, 0, chainingValue.Length);
-                Array.Copy(data, 0, chainedData, chainingValue.Length, data.Length);
-                
-                var result = CalculateMac(key, chainedData, protocol, macLength);
-                
-                // Update chaining value with the calculated MAC
-                if (result.IsSuccess)
+            var (macData, isChained) = preparedData;
+            return CalculateMac(key, macData, protocol, macLength)
+                .Map(mac => 
                 {
-                    chainingValue = result.Value;
-                }
-                
-                return result;
-            }
-            else
-            {
-                // No chaining or first MAC in chain
-                var result = CalculateMac(key, data, protocol, macLength);
-                
-                // Initialize or update chaining value
-                if (result.IsSuccess && protocol == ScpVersion.Scp03)
-                {
-                    chainingValue = result.Value;
-                }
-                
-                return result;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to calculate MAC with chaining");
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CryptographicError($"MAC calculation with chaining failed: {ex.Message}"));
-        }
+                    // Return both MAC and new chaining state
+                    var newChainingState = (isChained || protocol == ScpVersion.Scp03) ? mac : chainingValue;
+                    return (mac, newChainingState);
+                });
+        });
     }
 
     /// <summary>
@@ -289,5 +259,30 @@ public sealed class MacService
                     : Result.Failure<bool, SmartCardError>(
                         SmartCardError.SecurityError("MAC verification failed"));
             });
+    }
+
+    private static UnitResult<SmartCardError> ValidateKeyLength(byte[] key, int[] validLengths, string errorMessage)
+    {
+        return validLengths.Contains(key.Length)
+            ? UnitResult.Success<SmartCardError>()
+            : UnitResult.Failure<SmartCardError>(SmartCardError.InvalidArgument(errorMessage));
+    }
+
+    private static UnitResult<SmartCardError> ValidateMacLength(int macLength, int minLength, int maxLength, string errorMessage)
+    {
+        return (macLength >= minLength && macLength <= maxLength)
+            ? UnitResult.Success<SmartCardError>()
+            : UnitResult.Failure<SmartCardError>(SmartCardError.InvalidArgument(errorMessage));
+    }
+
+    /// <summary>
+    /// Combines two byte arrays into a single array using functional approach.
+    /// </summary>
+    private static byte[] CombineArrays(byte[] first, byte[] second)
+    {
+        var result = new byte[first.Length + second.Length];
+        first.CopyTo(result, 0);
+        second.CopyTo(result, first.Length);
+        return result;
     }
 }

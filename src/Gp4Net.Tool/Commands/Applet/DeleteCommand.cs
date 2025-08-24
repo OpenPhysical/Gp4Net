@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.CapFile;
@@ -455,7 +456,10 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
             if (selectResult.IsSuccess)
             {
                 var response = selectResult.Value;
-                AnsiConsole.MarkupLine($"[dim]ISD AID: {Convert.ToHexString(response.Fci?.ApplicationAid ?? [])}[/]");
+                var aid = response.Fci
+                    .Map(fci => fci.ApplicationAid)
+                    .GetValueOrDefault(Array.Empty<byte>());
+                AnsiConsole.MarkupLine($"[dim]ISD AID: {Convert.ToHexString(aid)}[/]");
             }
         }
         catch

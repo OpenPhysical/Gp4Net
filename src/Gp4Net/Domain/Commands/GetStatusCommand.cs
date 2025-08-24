@@ -3,6 +3,7 @@ using System.Linq;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Core.Tlv;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 
@@ -404,25 +405,52 @@ public class ApplicationStatusEntry
                 foreach (var t in tlvs)
                 {
                     // Per GP Table 11-36, all responses MUST use E3 containers. All traced cards comply.
-                    if (t.TagNumber != 0xE3)
+                    var tagResult = t.GetTagNumber();
+                    if (tagResult.IsFailure || tagResult.Value != 0xE3)
                     {
                         continue; // Skip non-E3 entries - specification violation
                     }
 
                     var children = t.ParseNestedTlv().ToList();
-                var aidTlv = children.FirstOrDefault(c => c.TagNumber == 0x4F);
-                var lcTlv = children.FirstOrDefault(c => c.TagNumber == 0x9F70);
-                var privTlv = children.FirstOrDefault(c => c.TagNumber == 0xC5);
-                var elfTlv = children.FirstOrDefault(c => c.TagNumber == 0xC4);
+                    // Find required TLVs using functional approach
+                    var aidTlvMaybe = Maybe<TlvObject>.None;
+                    var lcTlvMaybe = Maybe<TlvObject>.None;
+                    var privTlvMaybe = Maybe<TlvObject>.None;
+                    var elfTlvMaybe = Maybe<TlvObject>.None;
+                    
+                    foreach (var child in children)
+                    {
+                        var childTagResult = child.GetTagNumber();
+                        if (childTagResult.IsFailure) continue;
+                        
+                        switch (childTagResult.Value)
+                        {
+                            case 0x4F:
+                                aidTlvMaybe = Maybe<TlvObject>.From(child);
+                                break;
+                            case 0x9F70:
+                                lcTlvMaybe = Maybe<TlvObject>.From(child);
+                                break;
+                            case 0xC5:
+                                privTlvMaybe = Maybe<TlvObject>.From(child);
+                                break;
+                            case 0xC4:
+                                elfTlvMaybe = Maybe<TlvObject>.From(child);
+                                break;
+                        }
+                    }
 
-                    if (aidTlv == null || lcTlv == null)
+                    if (aidTlvMaybe.HasNoValue || lcTlvMaybe.HasNoValue)
                     {
                         // Insufficient data for an entry; skip
                         continue;
                     }
+                    
+                    var aidTlv = aidTlvMaybe.Value;
+                    var lcTlv = lcTlvMaybe.Value;
 
-                    var aid = aidTlv.Value ?? [];
-                    if (lcTlv.Value == null || lcTlv.Value.Length == 0)
+                    var aid = aidTlv.Value;
+                    if (lcTlv.Value.Length == 0)
                     {
                         continue;
                     }
@@ -432,8 +460,8 @@ public class ApplicationStatusEntry
                         return SmartCardError.InvalidResponse($"Invalid lifecycle state: 0x{lc:X2}");
                     }
 
-                    var priv = privTlv?.Value ?? [];
-                    var elf = elfTlv?.Value ?? [];
+                    var priv = privTlvMaybe.HasValue ? privTlvMaybe.Value.Value : [];
+                    var elf = elfTlvMaybe.HasValue ? elfTlvMaybe.Value.Value : [];
                     entries.Add(new ApplicationStatusEntry(aid, (ApplicationStatusEntry.LifecycleState)lc, priv, elf));
                 }
 

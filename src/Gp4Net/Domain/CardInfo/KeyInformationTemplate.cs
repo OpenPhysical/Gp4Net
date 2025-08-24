@@ -86,7 +86,8 @@ public class KeyInformationTemplate
             
         foreach (var element in elements)
         {
-            if (element.TagNumber == 0xC0) // Key Information Data
+            var tagNumber = element.GetTagNumber();
+            if (tagNumber.IsSuccess && tagNumber.Value == 0xC0) // Key Information Data
             {
                 template.ParseKeyInformationData(element.Value);
             }

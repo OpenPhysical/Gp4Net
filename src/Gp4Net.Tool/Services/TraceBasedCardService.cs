@@ -142,18 +142,33 @@ public class TraceBasedCardService : ICardService
         return SendCommand(apdu);
     }
 
+    /// <summary>
+    /// Secure channel establishment for trace-based testing.
+    /// Returns true if the trace contains secure channel establishment operations.
+    /// The actual secure channel state is managed by the pipeline processors.
+    /// </summary>
     public bool EstablishSecureChannel(byte[] keySet, byte securityLevel)
     {
-        // For trace-based testing, secure channel is always "established"
-        // The actual secure channel commands are part of the trace
-        return true;
+        // Check if trace contains INITIALIZE UPDATE and EXTERNAL AUTHENTICATE operations
+        var hasInitUpdate = _exchanges.Any(e => 
+            e.Command.Length >= 10 && 
+            e.Command.Substring(0, 4).Equals("8050", StringComparison.OrdinalIgnoreCase));
+            
+        var hasExtAuth = _exchanges.Any(e => 
+            e.Command.Length >= 10 && 
+            e.Command.Substring(0, 4).Equals("8482", StringComparison.OrdinalIgnoreCase));
+            
+        return hasInitUpdate && hasExtAuth;
     }
 
+    /// <summary>
+    /// Secure channel is established if the trace contains both INITIALIZE UPDATE and EXTERNAL AUTHENTICATE.
+    /// </summary>
     public bool IsSecureChannelEstablished
     {
         get
         {
-            return true;
+            return EstablishSecureChannel([], 0);
         }
     }
 

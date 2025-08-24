@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core.Tlv;
 
@@ -64,31 +65,29 @@ public static class DiversificationDataParser
                 return "[red]Parse error[/]";
             }
 
-            var scpSupport = new List<string>();
-
-            // Parse 5 pairs of bytes (SCP version + i= parameter) from the CF content
-            for (var i = 0; i < 10; i += 2)
+            // Parse 5 pairs of bytes (SCP version + i= parameter) from the CF content using functional approach
+            var scpPairs = Enumerable.Range(0, 5)
+                .Select(pairIndex => new 
+                { 
+                    ScpVersion = cfElement.Value[pairIndex * 2], 
+                    IParameter = cfElement.Value[pairIndex * 2 + 1] 
+                })
+                .Where(pair => !(pair.ScpVersion == 0x00 && pair.IParameter == 0x00)) // Skip empty slots
+                .ToList();
+                
+            // Check for invalid SCP versions - fail if any found
+            foreach (var pair in scpPairs)
             {
-                var scpVersion = cfElement.Value[i];
-                var iParameter = cfElement.Value[i + 1];
-
-                switch (scpVersion)
+                if (pair.ScpVersion > 0x11)
                 {
-                    // Skip empty slots (00 00)
-                    case 0x00 when iParameter == 0x00:
-                        continue;
-
-                    // Validate SCP version - only 01, 02, 03, 10, 11 are valid
-                    // Values like 35, 55, 72, 85, 131 are not valid SCP versions
-                    case > 0x11:
-                        // This is likely card identification data, not SCP support
-                        return "[red]None[/]";
-                    default:
-                        scpSupport.Add($"SCP{scpVersion:X2} (i={iParameter:X2})");
-                        break;
+                    // This is likely card identification data, not SCP support
+                    return "[red]None[/]";
                 }
-
             }
+            
+            var scpSupport = scpPairs
+                .Select(pair => $"SCP{pair.ScpVersion:X2} (i={pair.IParameter:X2})")
+                .ToList();
 
             return scpSupport.Count > 0 ? string.Join(", ", scpSupport) : "[red]None[/]";
         }

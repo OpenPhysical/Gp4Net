@@ -115,7 +115,13 @@ public static class CardCapabilitiesCodec
             
         // Parse the outer TLV structure
         var outerTlvMaybe = TlvParser.ParseSingle(data);
-        if (!outerTlvMaybe.HasValue || outerTlvMaybe.Value.TagNumber != 0x66)
+        if (!outerTlvMaybe.HasValue)
+        {
+            return SmartCardError.InvalidData("Invalid card capabilities data format - no outer TLV found");
+        }
+        
+        var tagResult = outerTlvMaybe.Value.GetTagNumber();
+        if (tagResult.IsFailure || tagResult.Value != 0x66)
         {
             return SmartCardError.InvalidData("Invalid card capabilities data format - expected tag 0x66");
         }
@@ -135,7 +141,10 @@ public static class CardCapabilitiesCodec
                 
             foreach (var element in elements)
             {
-                switch (element.TagNumber)
+                var tagNumberResult = element.GetTagNumber();
+                if (tagNumberResult.IsFailure) continue;
+                
+                switch (tagNumberResult.Value)
                 {
                     case 0x06: // Card recognition data OID
                         capabilities.CardRecognitionData = element.Value;

@@ -32,7 +32,7 @@ public class WsctCardService : ICardService
     // Legacy session removed - using functional SecureChannelState instead
     private Domain.Security.SecureChannelState _secureChannelState;
     private IApduTransport _transport;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the WsctCardService class.
@@ -474,21 +474,50 @@ public class WsctCardService : ICardService
     /// <inheritdoc />
     public void Dispose()
     {
-        // Thread safety: Protect disposal from concurrent access
-        _stateLock.EnterWriteLock();
+        // Early exit if already disposed - avoid any lock operations on disposed objects
+        if (_disposed)
+        {
+            return;
+        }
+
+        // Use atomic check-and-set to prevent double disposal
+        // This must be done outside of any lock to avoid accessing disposed lock
+        ReaderWriterLockSlim lockToDispose = null;
+        
         try
         {
-            if (!_disposed)
+            // Only enter lock if not disposed - check again inside to prevent race conditions
+            _stateLock.EnterWriteLock();
+            try
             {
-                DisconnectInternal();
-                _context?.Dispose();
-                _disposed = true;
+                if (!_disposed)
+                {
+                    // Disconnect and clean up card resources first
+                    DisconnectInternal();
+                    
+                    // Dispose context
+                    _context?.Dispose();
+                    
+                    // Mark as disposed before releasing lock
+                    _disposed = true;
+                    
+                    // Capture lock reference for disposal outside the lock
+                    lockToDispose = _stateLock;
+                }
+            }
+            finally
+            {
+                _stateLock.ExitWriteLock();
             }
         }
-        finally
+        catch (ObjectDisposedException)
         {
-            _stateLock.ExitWriteLock();
-            _stateLock.Dispose(); // Dispose the lock after all operations
+            // Lock was already disposed - this is expected in double-disposal scenarios
+            // Just return safely as disposal is already complete
+            return;
         }
+        
+        // Dispose the lock outside of its own scope to prevent accessing disposed object
+        lockToDispose?.Dispose();
     }
 }

@@ -33,7 +33,7 @@ public class TraceDecryptionIntegrationTests
     public void DecryptTrace_WithConfigureGpshellTrace_ShouldProcessSuccessfully()
     {
         // Trace file must be available for test to run
-        var tracePath = Path.Combine(TraceDataPath, "Mixed", "configure_gpshell_log.json");
+        var tracePath = Path.Combine(TraceDataPath, "Complex", "configure_gpshell_log.json");
         _ = File.Exists(tracePath).Should().BeTrue($"Test requires trace file at: {tracePath}");
 
         var traceData = LoadTraceFile(tracePath);
@@ -162,8 +162,8 @@ public class TraceDecryptionIntegrationTests
         _ = decryptedTrace.Exchanges.Should().HaveCount(2, "All exchanges should be included even if some fail");
     }
 
-    [TestCase("Mixed/gp_pro_list_success.json")]
-    [TestCase("Mixed/configure_gpshell.json")]
+    [TestCase("Complex/gp_pro_list_success.json")]
+    [TestCase("Complex/configure_gpshell.json")]
     public void DecryptTrace_WithRealTraceFiles_ShouldProcessWhenAvailable(string relativeTracePath)
     {
         var tracePath = Path.Combine(TraceDataPath, relativeTracePath);
@@ -207,14 +207,18 @@ public class TraceDecryptionIntegrationTests
         }
 
         var exchanges = new List<Gp4Net.Domain.Security.TraceExchange>();
+        var currentIndex = 1; // Default index counter for traces without explicit indices
         
         foreach (var exchangeElement in exchangesElement.EnumerateArray())
         {
-            if (exchangeElement.TryGetProperty("index", out var indexProp) &&
-                exchangeElement.TryGetProperty("command", out var commandProp) &&
+            if (exchangeElement.TryGetProperty("command", out var commandProp) &&
                 exchangeElement.TryGetProperty("response", out var responseProp))
             {
-                var index = indexProp.GetInt32();
+                // Try to get explicit index, or use auto-incrementing counter
+                var index = exchangeElement.TryGetProperty("index", out var indexProp) 
+                    ? indexProp.GetInt32() 
+                    : currentIndex++;
+                    
                 var commandHex = commandProp.GetString() ?? "";
                 var responseHex = responseProp.GetString() ?? "";
                 

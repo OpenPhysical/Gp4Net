@@ -70,31 +70,22 @@ public static class CapInstallationTraceLoader
 
     private static Result<string, SmartCardError> ReadJsonContent(string filePath)
     {
-        try
+        return Result.Try(() =>
         {
             var content = File.ReadAllText(filePath);
-            if (string.IsNullOrWhiteSpace(content))
-                return SmartCardError.InvalidData("Trace file is empty");
-
-            return Result.Success<string, SmartCardError>(content);
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.UnexpectedError($"Failed to read trace file: {ex.Message}");
-        }
+            return string.IsNullOrWhiteSpace(content)
+                ? Result.Failure<string, SmartCardError>(SmartCardError.InvalidData("Trace file is empty"))
+                : Result.Success<string, SmartCardError>(content);
+        }, ex => SmartCardError.UnexpectedError($"Failed to read trace file: {ex.Message}"))
+            .Bind(result => result);
     }
 
     private static Result<JsonElement, SmartCardError> ParseJsonStructure(string jsonContent)
     {
-        try
-        {
-            var document = JsonDocument.Parse(jsonContent);
-            return Result.Success<JsonElement, SmartCardError>(document.RootElement);
-        }
-        catch (JsonException ex)
-        {
-            return SmartCardError.InvalidData($"Invalid JSON format: {ex.Message}");
-        }
+        return Result.Try(() => JsonDocument.Parse(jsonContent).RootElement,
+            ex => ex is JsonException
+                ? SmartCardError.InvalidData($"Invalid JSON format: {ex.Message}")
+                : SmartCardError.UnexpectedError($"Failed to parse JSON: {ex.Message}"));
     }
 
     private static Result<TraceJsonData, SmartCardError> ExtractInstallationData(JsonElement root)
@@ -106,64 +97,58 @@ public static class CapInstallationTraceLoader
 
     private static Result<TraceMetadata, SmartCardError> ExtractMetadata(JsonElement root)
     {
-        try
+        if (!root.TryGetProperty("metadata", out var metadataElement))
         {
-            if (!root.TryGetProperty("metadata", out var metadataElement))
-                return SmartCardError.InvalidData("Missing metadata section in trace");
-
-            if (!metadataElement.TryGetProperty("card", out var cardElement))
-                return SmartCardError.InvalidData("Missing card metadata in trace");
-
-            var atr = cardElement.TryGetProperty("atr", out var atrElement) 
-                ? atrElement.GetString() ?? "UNKNOWN"
-                : "UNKNOWN";
-
-            var isdAid = cardElement.TryGetProperty("isd_aid", out var isdElement)
-                ? isdElement.GetString() ?? "A000000151000000"
-                : "A000000151000000";
-
-            var cardType = cardElement.TryGetProperty("card_type", out var typeElement)
-                ? typeElement.GetString() ?? "UNKNOWN"
-                : "UNKNOWN";
-
-            return Result.Success<TraceMetadata, SmartCardError>(
-                new TraceMetadata(atr, isdAid, cardType));
+            return Result.Failure<TraceMetadata, SmartCardError>(
+                SmartCardError.InvalidData("Missing metadata section in trace"));
         }
-        catch (Exception ex)
+
+        if (!metadataElement.TryGetProperty("card", out var cardElement))
         {
-            return SmartCardError.InvalidData($"Failed to parse metadata: {ex.Message}");
+            return Result.Failure<TraceMetadata, SmartCardError>(
+                SmartCardError.InvalidData("Missing card metadata in trace"));
         }
+
+        var atr = cardElement.TryGetProperty("atr", out var atrElement) 
+            ? atrElement.GetString() ?? "UNKNOWN"
+            : "UNKNOWN";
+
+        var isdAid = cardElement.TryGetProperty("isd_aid", out var isdElement)
+            ? isdElement.GetString() ?? "A000000151000000"
+            : "A000000151000000";
+
+        var cardType = cardElement.TryGetProperty("card_type", out var typeElement)
+            ? typeElement.GetString() ?? "UNKNOWN"
+            : "UNKNOWN";
+
+        return Result.Success<TraceMetadata, SmartCardError>(
+            new TraceMetadata(atr, isdAid, cardType));
     }
 
     private static Result<ImmutableArray<TraceExchange>, SmartCardError> ExtractExchanges(JsonElement root)
     {
-        try
+        if (!root.TryGetProperty("exchanges", out var exchangesElement))
         {
-            if (!root.TryGetProperty("exchanges", out var exchangesElement))
-                return SmartCardError.InvalidData("Missing exchanges section in trace");
-
-            var exchanges = ImmutableArray.CreateBuilder<TraceExchange>();
-
-            foreach (var exchangeElement in exchangesElement.EnumerateArray())
-            {
-                var exchangeResult = ParseExchange(exchangeElement);
-                if (exchangeResult.IsFailure)
-                    return exchangeResult.Error;
-
-                exchanges.Add(exchangeResult.Value);
-            }
-
-            return Result.Success<ImmutableArray<TraceExchange>, SmartCardError>(exchanges.ToImmutable());
+            return Result.Failure<ImmutableArray<TraceExchange>, SmartCardError>(
+                SmartCardError.InvalidData("Missing exchanges section in trace"));
         }
-        catch (Exception ex)
-        {
-            return SmartCardError.InvalidData($"Failed to parse exchanges: {ex.Message}");
-        }
+
+        var exchanges = ImmutableArray.CreateBuilder<TraceExchange>();
+
+        return exchangesElement.EnumerateArray()
+            .Select(ParseExchange)
+            .Aggregate(Result.Success<ImmutableArray<TraceExchange>.Builder, SmartCardError>(exchanges),
+                (acc, exchangeResult) => acc.Bind(builder =>
+                    exchangeResult.Map(exchange => {
+                        builder.Add(exchange);
+                        return builder;
+                    })))
+            .Map(builder => builder.ToImmutable());
     }
 
     private static Result<TraceExchange, SmartCardError> ParseExchange(JsonElement exchangeElement)
     {
-        try
+        return Result.Try(() =>
         {
             var index = exchangeElement.TryGetProperty("index", out var indexElement) 
                 ? indexElement.GetInt32() 
@@ -189,13 +174,8 @@ public static class CapInstallationTraceLoader
                 ? secureElement.GetBoolean()
                 : false;
 
-            return Result.Success<TraceExchange, SmartCardError>(
-                new TraceExchange(index, command, response, description, responseTime, secureMessaging));
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.InvalidData($"Failed to parse exchange: {ex.Message}");
-        }
+            return new TraceExchange(index, command, response, description, responseTime, secureMessaging);
+        }, ex => SmartCardError.InvalidData($"Failed to parse exchange: {ex.Message}"));
     }
 
     private static CapInstallationTrace CreateInstallationTrace(TraceJsonData data)

@@ -1,5 +1,6 @@
 using System;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
@@ -65,13 +66,18 @@ public class SelectCommandAutoDetectionTests
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
         var response = result.Value;
-        _ = response.Should().NotBeNull();
-        _ = response.Fci.Should().NotBeNull();
-        _ = response.Fci.ApplicationAid.Should().NotBeNull();
-        // After verifying ApplicationAid is not null, we can safely convert it
-        var aidHex = Convert.ToHexString(response.Fci.ApplicationAid);
-        _ = aidHex.Should().BeEquivalentTo("A000000151000000");
-        _ = response.Fci.MaxCommandDataLength.Should().Be((ushort?)255);
+        _ = response.Fci.HasValue.Should().BeTrue();
+        _ = response.Fci.Match(
+            fci => {
+                _ = fci.ApplicationAid.Should().NotBeEmpty();
+                var aidHex = Convert.ToHexString(fci.ApplicationAid);
+                _ = aidHex.Should().BeEquivalentTo("A000000151000000");
+                fci.MaxCommandDataLength.Match(
+                    value => { _ = value.Should().Be(255); return true; },
+                    () => { _ = false.Should().BeTrue("MaxCommandDataLength should have a value"); return false; });
+                return true;
+            },
+            () => { _ = false.Should().BeTrue("FCI should have a value"); return false; });
     }
 
     [Test]
@@ -104,16 +110,24 @@ public class SelectCommandAutoDetectionTests
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
         var response = result.Value;
-        _ = response.Should().NotBeNull();
-        _ = response.Fci.Should().NotBeNull();
-        // After verifying Fci is not null, we can safely access its properties
-        _ = response.Fci.ApplicationAid.Should().NotBeNull();
-        // After verifying ApplicationAid is not null, we can safely convert it
-        var aidHex = Convert.ToHexString(response.Fci.ApplicationAid);
-        _ = aidHex.Should().BeEquivalentTo("A0000000030000");
-        _ = response.Fci.ApplicationLabel.Should().BeEquivalentTo("ISD");
-        _ = response.Fci.MaxCommandDataLength.Should().Be((ushort?)255);
-        _ = response.Fci.MaxResponseDataLength.Should().Be((ushort?)255);
+        _ = response.Fci.HasValue.Should().BeTrue();
+        _ = response.Fci.Match(
+            fci => {
+                _ = fci.ApplicationAid.Should().NotBeEmpty();
+                var aidHex = Convert.ToHexString(fci.ApplicationAid);
+                _ = aidHex.Should().BeEquivalentTo("A0000000030000");
+                fci.ApplicationLabel.Match(
+                    label => { _ = label.Should().BeEquivalentTo("ISD"); return true; },
+                    () => { _ = false.Should().BeTrue("ApplicationLabel should have a value"); return false; });
+                fci.MaxCommandDataLength.Match(
+                    value => { _ = value.Should().Be(255); return true; },
+                    () => { _ = false.Should().BeTrue("MaxCommandDataLength should have a value"); return false; });
+                fci.MaxResponseDataLength.Match(
+                    value => { _ = value.Should().Be(255); return true; },
+                    () => { _ = false.Should().BeTrue("MaxResponseDataLength should have a value"); return false; });
+                return true;
+            },
+            () => { _ = false.Should().BeTrue("FCI should have a value"); return false; });
     }
 
     [Test]
@@ -129,7 +143,7 @@ public class SelectCommandAutoDetectionTests
         _ = result.IsSuccess.Should().BeTrue();
         var response = result.Value;
         _ = response.Should().NotBeNull();
-        _ = response.Fci.Should().BeNull();
+        _ = response.Fci.HasValue.Should().BeFalse();
         _ = response.RawData.Should().BeEmpty();
     }
 
@@ -146,7 +160,7 @@ public class SelectCommandAutoDetectionTests
         _ = result.IsSuccess.Should().BeTrue();
         var response = result.Value;
         _ = response.Should().NotBeNull();
-        _ = response.Fci.Should().BeNull(); // Should not parse as FCI
+        _ = response.Fci.HasValue.Should().BeFalse(); // Should not parse as FCI
         _ = response.RawData.Should().BeEquivalentTo(nonFciData);
     }
 

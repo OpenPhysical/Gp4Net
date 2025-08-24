@@ -40,22 +40,27 @@ public class ConnectCommand : IPipelineCommand<ConnectCommand.Settings>
             var response = selectResult.Value;
             context.Display.Success("✓ ISD successfully selected");
             
-            // Display AID if available
-            if (response.Fci?.ApplicationAid is { Length: > 0 })
-            {
-                context.Display.Info($"ISD AID: {Convert.ToHexString(response.Fci.ApplicationAid)}");
-            }
+            // Display FCI information using functional pattern
+            response.Fci.Match(
+                fci => 
+                {
+                    if (fci.ApplicationAid.Length > 0)
+                    {
+                        context.Display.Info($"ISD AID: {Convert.ToHexString(fci.ApplicationAid)}");
+                    }
+                    
+                    if (fci.CardData.Length > 0)
+                    {
+                        context.Display.Verbose($"Card data: {Convert.ToHexString(fci.CardData)}");
+                    }
+                    return true;
+                },
+                () => false);
             
             // Display raw response data in verbose mode
-            if (response.RawData is { Length: > 0 })
+            if (response.RawData.Length > 0)
             {
                 context.Display.Verbose($"Response data: {Convert.ToHexString(response.RawData)}");
-            }
-            
-            // Display card data if available
-            if (response.Fci?.CardData is { Length: > 0 })
-            {
-                context.Display.Verbose($"Card data: {Convert.ToHexString(response.Fci.CardData)}");
             }
         }
         else

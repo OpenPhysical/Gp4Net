@@ -51,29 +51,12 @@ public static class DataObjectParser
             }
         }
 
-        ushort tag;
-        try
-        {
-            tag = Convert.ToUInt16(tagHex, 16);
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
-                SmartCardError.InvalidArgument($"Invalid tag format: {ex.Message}"));
-        }
-
-        byte[] data;
-        try
-        {
-            data = string.IsNullOrEmpty(dataHex) ? [] : Convert.FromHexString(dataHex);
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
-                SmartCardError.InvalidArgument($"Invalid data format: {ex.Message}"));
-        }
-
-        return Result.Success<(ushort tag, byte[] data), SmartCardError>((tag, data));
+        return Result.Try(() => Convert.ToUInt16(tagHex, 16), ex => 
+                SmartCardError.InvalidArgument($"Invalid tag format: {ex.Message}"))
+            .Bind(parsedTag => 
+                Result.Try(() => string.IsNullOrEmpty(dataHex) ? [] : Convert.FromHexString(dataHex), ex => 
+                    SmartCardError.InvalidArgument($"Invalid data format: {ex.Message}"))
+                .Map(parsedData => (parsedTag, parsedData)));
     }
 
     /// <summary>

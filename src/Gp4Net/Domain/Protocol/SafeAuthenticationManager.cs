@@ -29,25 +29,50 @@ public class SafeAuthenticationManager : ISafeAuthenticationManager
     public const int DefaultMaxAttempts = 3;
 
     /// <summary>
-    /// Initializes a new instance of SafeAuthenticationManager.
+    /// Private constructor for successful creation.
+    /// </summary>
+    private SafeAuthenticationManager(
+        ISecureChannelManager innerManager,
+        ILogger<SafeAuthenticationManager> logger,
+        int maxAttempts)
+    {
+        _innerManager = innerManager;
+        _logger = logger;
+        _maxAttempts = maxAttempts;
+    }
+
+    /// <summary>
+    /// Creates a SafeAuthenticationManager with functional validation.
     /// </summary>
     /// <param name="innerManager">The underlying secure channel manager.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="maxAttempts">Maximum attempts before blocking (default: 3).</param>
-    public SafeAuthenticationManager(
+    /// <returns>A result containing the manager or an error.</returns>
+    public static Result<SafeAuthenticationManager, SmartCardError> Create(
         ISecureChannelManager innerManager,
         ILogger<SafeAuthenticationManager> logger,
-        int maxAttempts = DefaultMaxAttempts
-    )
+        int maxAttempts = DefaultMaxAttempts)
     {
-        if (maxAttempts < 1)
+        if (innerManager == null)
         {
-            throw new ArgumentException("Maximum attempts must be at least 1", nameof(maxAttempts));
+            return Result.Failure<SafeAuthenticationManager, SmartCardError>(
+                SmartCardError.InvalidArgument("Inner manager cannot be null"));
         }
 
-        _innerManager = innerManager;
-        _logger = logger;
-        _maxAttempts = maxAttempts;
+        if (logger == null)
+        {
+            return Result.Failure<SafeAuthenticationManager, SmartCardError>(
+                SmartCardError.InvalidArgument("Logger cannot be null"));
+        }
+
+        if (maxAttempts < 1)
+        {
+            return Result.Failure<SafeAuthenticationManager, SmartCardError>(
+                SmartCardError.InvalidArgument("Maximum attempts must be at least 1"));
+        }
+
+        return Result.Success<SafeAuthenticationManager, SmartCardError>(
+            new SafeAuthenticationManager(innerManager, logger, maxAttempts));
     }
 
     /// <inheritdoc />
@@ -73,7 +98,7 @@ public class SafeAuthenticationManager : ISafeAuthenticationManager
 
         // Generate a card identifier for attempt tracking
         var cardId = await GetCardIdentifierAsync(channel, transport, cancellationToken);
-        var tracker = _attemptTrackers.GetOrAdd(cardId, _ => new AttemptTracker());
+        var tracker = _attemptTrackers.GetOrAdd(cardId, _ => new AttemptTracker(0));
 
         // Check if we've exceeded the maximum attempts
         if (tracker.FailedAttempts >= _maxAttempts)
@@ -93,92 +118,8 @@ public class SafeAuthenticationManager : ISafeAuthenticationManager
             );
         }
 
-        try
-        {
-            _logger.LogInformation(
-                "Attempting secure channel establishment for card {CardId} " +
-                "(attempt {CurrentAttempt}/{MaxAttempts})",
-                cardId,
-                tracker.FailedAttempts + 1,
-                _maxAttempts
-            );
-
-            // Attempt authentication using the inner manager
-            var sessionResult = await _innerManager.EstablishAsync(
-                channel,
-                transport,
-                keySet,
-                securityLevel,
-                cancellationToken
-            );
-
-            if (sessionResult.IsFailure)
-            {
-                return sessionResult;
-            }
-
-            var session = sessionResult.Value;
-
-            // Success - reset attempt counter
-            tracker.Reset();
-                
-            _logger.LogInformation(
-                "Secure channel established successfully for card {CardId}. Attempt counter reset.",
-                cardId
-            );
-
-            return Result.Success<Security.SecureChannelState, SmartCardError>(session);
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("EXTERNAL AUTHENTICATE failed"))
-        {
-            // Authentication failed - increment counter
-            tracker.IncrementFailedAttempts();
-                
-            _logger.LogWarning(
-                "Authentication failed for card {CardId}. Failed attempts: {FailedAttempts}/{MaxAttempts}. " +
-                "Error: {ErrorMessage}",
-                cardId,
-                tracker.FailedAttempts,
-                _maxAttempts,
-                ex.Message
-            );
-
-            if (tracker.FailedAttempts >= _maxAttempts)
-            {
-                _logger.LogError(
-                    "Maximum authentication attempts reached for card {CardId}. " +
-                    "Further attempts blocked to prevent card lockout.",
-                    cardId
-                );
-            }
-
-            return Result.Failure<Security.SecureChannelState, SmartCardError>(
-                SmartCardError.AuthenticationFailed(
-                    $"Authentication failed ({tracker.FailedAttempts}/{_maxAttempts}): {ex.Message}"
-                )
-            );
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("INITIALIZE UPDATE failed"))
-        {
-            // INITIALIZE UPDATE failed - this might not be a key issue, so don't increment counter
-            _logger.LogWarning(
-                "INITIALIZE UPDATE failed for card {CardId}: {ErrorMessage}",
-                cardId,
-                ex.Message
-            );
-
-            return Result.Failure<Security.SecureChannelState, SmartCardError>(
-                SmartCardError.InitializationFailed(ex.Message)
-            );
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error during secure channel establishment for card {CardId}", cardId);
-                
-            return Result.Failure<Security.SecureChannelState, SmartCardError>(
-                SmartCardError.UnexpectedError($"Secure channel establishment failed: {ex.Message}")
-            );
-        }
+        return await AttemptSecureChannelEstablishmentAsync(
+            channel, transport, keySet, securityLevel, cancellationToken, cardId, tracker);
     }
 
     /// <inheritdoc />
@@ -203,7 +144,7 @@ public class SafeAuthenticationManager : ISafeAuthenticationManager
                 SmartCardError.InvalidArgument("Key set cannot be null"));
 
         var cardId = await GetCardIdentifierAsync(channel, transport, cancellationToken);
-        var tracker = _attemptTrackers.GetOrAdd(cardId, _ => new AttemptTracker());
+        var tracker = _attemptTrackers.GetOrAdd(cardId, _ => new AttemptTracker(0));
 
         if (tracker.FailedAttempts >= _maxAttempts)
         {
@@ -221,41 +162,8 @@ public class SafeAuthenticationManager : ISafeAuthenticationManager
             );
         }
 
-        try
-        {
-            var sessionResult = await _innerManager.EstablishAutoDetectAsync(
-                channel,
-                transport,
-                keySet,
-                securityLevel,
-                cancellationToken
-            );
-
-            if (sessionResult.IsFailure)
-            {
-                return sessionResult;
-            }
-
-            var session = sessionResult.Value;
-            tracker.Reset();
-            return Result.Success<Security.SecureChannelState, SmartCardError>(session);
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("EXTERNAL AUTHENTICATE failed"))
-        {
-            tracker.IncrementFailedAttempts();
-                
-            return Result.Failure<Security.SecureChannelState, SmartCardError>(
-                SmartCardError.AuthenticationFailed(
-                    $"Auto-detect authentication failed ({tracker.FailedAttempts}/{_maxAttempts}): {ex.Message}"
-                )
-            );
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<Security.SecureChannelState, SmartCardError>(
-                SmartCardError.UnexpectedError($"Auto-detect authentication failed: {ex.Message}")
-            );
-        }
+        return await AttemptAutoDetectEstablishmentAsync(
+            channel, transport, keySet, securityLevel, cancellationToken, cardId, tracker);
     }
 
     /// <summary>
@@ -319,39 +227,170 @@ public class SafeAuthenticationManager : ISafeAuthenticationManager
         return Task.FromResult(cardId);
     }
 
-    /// <summary>
-    /// Tracks authentication attempts for a specific card.
-    /// </summary>
-    private class AttemptTracker
+    private async Task<Result<Security.SecureChannelState, SmartCardError>> AttemptSecureChannelEstablishmentAsync(
+        ICardChannel channel,
+        IApduTransport transport, 
+        IKeySet keySet,
+        SecurityLevel securityLevel,
+        CancellationToken cancellationToken,
+        string cardId,
+        AttemptTracker tracker)
     {
-        private readonly object _lock = new();
-        private int _failedAttempts;
+        _logger.LogInformation(
+            "Attempting secure channel establishment for card {CardId} " +
+            "(attempt {CurrentAttempt}/{MaxAttempts})",
+            cardId,
+            tracker.FailedAttempts + 1,
+            _maxAttempts
+        );
 
-        public int FailedAttempts
+        // Attempt authentication using the inner manager
+        var sessionResult = await _innerManager.EstablishAsync(
+            channel,
+            transport,
+            keySet,
+            securityLevel,
+            cancellationToken
+        );
+
+        return sessionResult.IsSuccess
+            ? HandleSuccessfulAuthentication(sessionResult.Value, cardId, tracker)
+            : HandleFailedAuthentication(sessionResult, cardId, tracker);
+    }
+
+    private async Task<Result<Security.SecureChannelState, SmartCardError>> AttemptAutoDetectEstablishmentAsync(
+        ICardChannel channel,
+        IApduTransport transport,
+        IKeySet keySet,
+        SecurityLevel securityLevel,
+        CancellationToken cancellationToken,
+        string cardId,
+        AttemptTracker tracker)
+    {
+        var sessionResult = await _innerManager.EstablishAutoDetectAsync(
+            channel,
+            transport,
+            keySet,
+            securityLevel,
+            cancellationToken
+        );
+
+        return sessionResult.IsSuccess
+            ? HandleSuccessfulAutoDetect(sessionResult.Value, tracker)
+            : HandleFailedAutoDetect(sessionResult, cardId, tracker);
+    }
+
+    private Result<Security.SecureChannelState, SmartCardError> HandleSuccessfulAuthentication(
+        Security.SecureChannelState session,
+        string cardId,
+        AttemptTracker tracker)
+    {
+        // Success - reset attempt counter
+        tracker.Reset();
+            
+        _logger.LogInformation(
+            "Secure channel established successfully for card {CardId}. Attempt counter reset.",
+            cardId
+        );
+
+        return Result.Success<Security.SecureChannelState, SmartCardError>(session);
+    }
+
+    private Result<Security.SecureChannelState, SmartCardError> HandleFailedAuthentication(
+        Result<Security.SecureChannelState, SmartCardError> sessionResult,
+        string cardId,
+        AttemptTracker tracker)
+    {
+        // Check if this is an authentication failure that should increment the counter
+        var errorMessage = sessionResult.Error.Message;
+        
+        if (IsExternalAuthenticateFailure(errorMessage))
         {
-            get
+            // Authentication failed - increment counter
+            tracker.IncrementFailedAttempts();
+                
+            _logger.LogWarning(
+                "Authentication failed for card {CardId}. Failed attempts: {FailedAttempts}/{MaxAttempts}. " +
+                "Error: {ErrorMessage}",
+                cardId,
+                tracker.FailedAttempts,
+                _maxAttempts,
+                errorMessage
+            );
+
+            if (tracker.FailedAttempts >= _maxAttempts)
             {
-                lock (_lock)
-                {
-                    return _failedAttempts;
-                }
+                _logger.LogError(
+                    "Maximum authentication attempts reached for card {CardId}. " +
+                    "Further attempts blocked to prevent card lockout.",
+                    cardId
+                );
             }
+
+            return SmartCardError.AuthenticationFailed(
+                $"Authentication failed ({tracker.FailedAttempts}/{_maxAttempts}): {errorMessage}"
+            );
+        }
+        
+        if (IsInitializeUpdateFailure(errorMessage))
+        {
+            // INITIALIZE UPDATE failed - this might not be a key issue, so don't increment counter
+            _logger.LogWarning(
+                "INITIALIZE UPDATE failed for card {CardId}: {ErrorMessage}",
+                cardId,
+                errorMessage
+            );
+
+            return SmartCardError.InitializationFailed(errorMessage);
         }
 
-        public void IncrementFailedAttempts()
+        // Other failures - don't increment counter
+        _logger.LogError("Unexpected error during secure channel establishment for card {CardId}: {Error}", cardId, errorMessage);
+        return SmartCardError.UnexpectedError($"Secure channel establishment failed: {errorMessage}");
+    }
+
+    private Result<Security.SecureChannelState, SmartCardError> HandleSuccessfulAutoDetect(
+        Security.SecureChannelState session,
+        AttemptTracker tracker)
+    {
+        tracker.Reset();
+        return Result.Success<Security.SecureChannelState, SmartCardError>(session);
+    }
+
+    private Result<Security.SecureChannelState, SmartCardError> HandleFailedAutoDetect(
+        Result<Security.SecureChannelState, SmartCardError> sessionResult,
+        string cardId,
+        AttemptTracker tracker)
+    {
+        var errorMessage = sessionResult.Error.Message;
+        
+        if (IsExternalAuthenticateFailure(errorMessage))
         {
-            lock (_lock)
-            {
-                _failedAttempts++;
-            }
+            tracker.IncrementFailedAttempts();
+                
+            return SmartCardError.AuthenticationFailed(
+                $"Auto-detect authentication failed ({tracker.FailedAttempts}/{_maxAttempts}): {errorMessage}"
+            );
         }
 
-        public void Reset()
-        {
-            lock (_lock)
-            {
-                _failedAttempts = 0;
-            }
-        }
+        return SmartCardError.UnexpectedError($"Auto-detect authentication failed: {errorMessage}");
+    }
+
+    private static bool IsExternalAuthenticateFailure(string errorMessage) =>
+        errorMessage?.Contains("EXTERNAL AUTHENTICATE failed") == true;
+
+    private static bool IsInitializeUpdateFailure(string errorMessage) =>
+        errorMessage?.Contains("INITIALIZE UPDATE failed") == true;
+
+    /// <summary>
+    /// Immutable record for tracking authentication attempts for a specific card.
+    /// </summary>
+    private record AttemptTracker(int FailedAttempts)
+    {
+        public static AttemptTracker Empty => new(0);
+
+        public AttemptTracker IncrementFailedAttempts() => this with { FailedAttempts = FailedAttempts + 1 };
+
+        public AttemptTracker Reset() => Empty;
     }
 }

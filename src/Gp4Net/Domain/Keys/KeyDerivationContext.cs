@@ -127,7 +127,7 @@ public sealed record KeyDerivationContext(
 
         // Use default implementation if not provided
         var actualImplementation = implementation.HasNoValue 
-            ? Maybe<Gp4Net.Domain.Protocol.ScpImplementation>.From(Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom)
+            ? Maybe<Gp4Net.Domain.Protocol.ScpImplementation>.From(Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70)
             : implementation;
 
         // Validate implementation is SCP03
@@ -196,7 +196,7 @@ public sealed record KeyDerivationContext(
         return (byte)Implementation.GetValueOrDefault(
             Protocol == ScpVersion.Scp02 
                 ? Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15 
-                : Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom);
+                : Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70);
     }
 
     /// <summary>

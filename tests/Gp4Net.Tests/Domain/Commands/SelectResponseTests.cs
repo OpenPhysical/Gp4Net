@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Tests.Domain.Commands.TestHelpers;
@@ -30,8 +31,12 @@ public class SelectResponseTests
         var result = SelectResponse.Parse([]);
 
         _ = result.IsSuccess.Should().BeTrue();
-        _ = result.Value.RawData.Should().BeEmpty();
-        _ = result.Value.Fci.Should().BeNull();
+        if (result.IsSuccess)
+        {
+            var response = result.Value;
+            _ = response.RawData.Should().BeEmpty();
+            _ = response.Fci.HasValue.Should().BeFalse();
+        }
     }
 
     [Test]
@@ -42,8 +47,12 @@ public class SelectResponseTests
         var result = SelectResponse.Parse(nonFciData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        _ = result.Value.RawData.Should().BeEquivalentTo(nonFciData);
-        _ = result.Value.Fci.Should().BeNull();
+        if (result.IsSuccess)
+        {
+            var response = result.Value;
+            _ = response.RawData.Should().BeEquivalentTo(nonFciData);
+            _ = response.Fci.HasValue.Should().BeFalse();
+        }
     }
 
     [Test]
@@ -54,9 +63,18 @@ public class SelectResponseTests
         var result = SelectResponse.Parse(fciData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        _ = result.Value.Fci.Should().NotBeNull();
-        _ = result.Value.Fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
-        _ = result.Value.Fci.MaxCommandDataLength.Should().Be(255);
+        if (result.IsSuccess)
+        {
+            var response = result.Value;
+            var aid = response.Fci.Map(fci => fci.ApplicationAid).GetValueOrDefault(Array.Empty<byte>());
+            _ = aid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
+            
+            response.Fci.Match(
+                fci => fci.MaxCommandDataLength.Match(
+                    value => value.Should().Be(255),
+                    () => false.Should().BeTrue("MaxCommandDataLength should have a value")),
+                () => false.Should().BeTrue("FCI should have a value"));
+        }
     }
 
     [Test]
@@ -83,17 +101,33 @@ public class SelectResponseTests
         var result = SelectResponse.Parse(fciData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var fci = result.Value.Fci;
-        _ = fci.Should().NotBeNull();
-        _ = fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A0000000030000"));
-        _ = fci.ApplicationLabel.Should().Be("ISD");
-        _ = fci.ApplicationPriorityIndicator.Should().Be(0x01);
-        _ = fci.MaxCommandDataLength.Should().Be(256);
-        _ = fci.MaxResponseDataLength.Should().Be(512);
-        _ = fci.IssuerIdentificationNumber.Should().BeEquivalentTo(new byte[] { 0x12, 0x34 });
-        _ = fci.CardImageNumber.Should().BeEquivalentTo(new byte[] { 0x56, 0x78 });
-        _ = fci.CardData.Should().BeEquivalentTo(new byte[] { 0x9A, 0xBC });
-        _ = fci.DiscretionaryData.Should().BeEquivalentTo(new byte[] { 0xDE, 0xF0 });
+        if (result.IsSuccess)
+        {
+            var response = result.Value;
+            _ = response.Fci.HasValue.Should().BeTrue();
+            response.Fci.Match(
+                fci => {
+                    _ = fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A0000000030000"));
+                    fci.ApplicationLabel.Match(
+                        label => { _ = label.Should().Be("ISD"); return true; },
+                        () => { _ = false.Should().BeTrue("ApplicationLabel should have a value"); return false; });
+                    fci.ApplicationPriorityIndicator.Match(
+                        value => { _ = value.Should().Be(0x01); return true; },
+                        () => { _ = false.Should().BeTrue("ApplicationPriorityIndicator should have a value"); return false; });
+                    fci.MaxCommandDataLength.Match(
+                        value => { _ = value.Should().Be(256); return true; },
+                        () => { _ = false.Should().BeTrue("MaxCommandDataLength should have a value"); return false; });
+                    fci.MaxResponseDataLength.Match(
+                        value => { _ = value.Should().Be(512); return true; },
+                        () => { _ = false.Should().BeTrue("MaxResponseDataLength should have a value"); return false; });
+                    _ = fci.IssuerIdentificationNumber.Should().BeEquivalentTo(new byte[] { 0x12, 0x34 });
+                    _ = fci.CardImageNumber.Should().BeEquivalentTo(new byte[] { 0x56, 0x78 });
+                    _ = fci.CardData.Should().BeEquivalentTo(new byte[] { 0x9A, 0xBC });
+                    _ = fci.DiscretionaryData.Should().BeEquivalentTo(new byte[] { 0xDE, 0xF0 });
+                    return true;
+                },
+                () => { _ = false.Should().BeTrue("FCI should have a value"); return false; });
+        }
     }
 
     [Test]
@@ -114,11 +148,22 @@ public class SelectResponseTests
         var result = SelectResponse.Parse(fciData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var fci = result.Value.Fci;
-        _ = fci.Should().NotBeNull();
-        // After verifying not null, we can safely access properties
-        _ = fci.MaxCommandDataLength.Should().Be(255);
-        _ = fci.MaxResponseDataLength.Should().Be(128);
+        if (result.IsSuccess)
+        {
+            var response = result.Value;
+            _ = response.Fci.HasValue.Should().BeTrue();
+            response.Fci.Match(
+                fci => {
+                    fci.MaxCommandDataLength.Match(
+                        value => { _ = value.Should().Be(255); return true; },
+                        () => { _ = false.Should().BeTrue("MaxCommandDataLength should have a value"); return false; });
+                    fci.MaxResponseDataLength.Match(
+                        value => { _ = value.Should().Be(128); return true; },
+                        () => { _ = false.Should().BeTrue("MaxResponseDataLength should have a value"); return false; });
+                    return true;
+                },
+                () => { _ = false.Should().BeTrue("FCI should have a value"); return false; });
+        }
     }
 
     [Test]
@@ -135,10 +180,19 @@ public class SelectResponseTests
         var result = SelectResponse.Parse(fciData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var fci = result.Value.Fci;
-        _ = fci.Should().NotBeNull();
-        // After verifying not null, we can safely access properties
-        _ = fci.ApplicationLabel.Should().Be("");
+        if (result.IsSuccess)
+        {
+            var response = result.Value;
+            _ = response.Fci.HasValue.Should().BeTrue();
+            response.Fci.Match(
+                fci => {
+                    fci.ApplicationLabel.Match(
+                        label => { _ = label.Should().Be(""); return true; },
+                        () => { _ = false.Should().BeTrue("ApplicationLabel should have a value"); return false; });
+                    return true;
+                },
+                () => { _ = false.Should().BeTrue("FCI should have a value"); return false; });
+        }
     }
 
     [Test]
@@ -155,10 +209,17 @@ public class SelectResponseTests
         var result = SelectResponse.Parse(fciData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var fci = result.Value.Fci;
-        _ = fci.Should().NotBeNull();
-        // After verifying not null, we can safely access properties
-        _ = fci.ApplicationPriorityIndicator.Should().BeNull();
+        if (result.IsSuccess)
+        {
+            var response = result.Value;
+            _ = response.Fci.HasValue.Should().BeTrue();
+            response.Fci.Match(
+                fci => {
+                    _ = fci.ApplicationPriorityIndicator.HasValue.Should().BeFalse();
+                    return true;
+                },
+                () => { _ = false.Should().BeTrue("FCI should have a value"); return false; });
+        }
     }
 
     [Test]
@@ -175,10 +236,17 @@ public class SelectResponseTests
         var result = SelectResponse.Parse(fciData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var fci = result.Value.Fci;
-        _ = fci.Should().NotBeNull();
-        // After verifying not null, we can safely access properties
-        _ = fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
+        if (result.IsSuccess)
+        {
+            var response = result.Value;
+            _ = response.Fci.HasValue.Should().BeTrue();
+            response.Fci.Match(
+                fci => {
+                    _ = fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
+                    return true;
+                },
+                () => { _ = false.Should().BeTrue("FCI should have a value"); return false; });
+        }
     }
 
     [Test]
@@ -190,8 +258,12 @@ public class SelectResponseTests
         var result = SelectResponse.Parse(malformedData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        _ = result.Value.Fci.Should().BeNull();
-        _ = result.Value.RawData.Should().BeEquivalentTo(malformedData);
+        if (result.IsSuccess)
+        {
+            var response = result.Value;
+            _ = response.Fci.HasValue.Should().BeFalse();
+            _ = response.RawData.Should().BeEquivalentTo(malformedData);
+        }
     }
 
     [Test]
@@ -202,7 +274,11 @@ public class SelectResponseTests
         var result = SelectResponse.ParseWithFci(fciData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        _ = result.Value.Fci.Should().NotBeNull();
+        if (result.IsSuccess)
+        {
+            var response = result.Value;
+            _ = response.Fci.HasValue.Should().BeTrue();
+        }
     }
 
     [Test]
@@ -220,12 +296,24 @@ public class SelectResponseTests
     public void Constructor_WithFci_StoresBoth()
     {
         var rawData = new byte[] { 0x01, 0x02, 0x03 };
-        var fci = new FileControlInformation(applicationAid: Convert.FromHexString("A000000151000000"));
+        var fci = new FileControlInformation(
+            applicationAid: Convert.FromHexString("A000000151000000"),
+            applicationLabel: string.Empty,
+            applicationPriorityIndicator: Maybe<byte>.None,
+            maxCommandDataLength: Maybe<ushort>.None,
+            maxResponseDataLength: Maybe<ushort>.None,
+            issuerIdentificationNumber: Array.Empty<byte>(),
+            cardImageNumber: Array.Empty<byte>(),
+            cardData: Array.Empty<byte>(),
+            discretionaryData: Array.Empty<byte>()
+        );
 
         var response = new SelectResponse(rawData, fci);
 
         _ = response.RawData.Should().BeEquivalentTo(rawData);
-        _ = response.Fci.Should().BeEquivalentTo(fci);
+        _ = response.Fci.HasValue.Should().BeTrue();
+        var actualFci = response.Fci.GetValueOrDefault();
+        _ = actualFci.Should().BeEquivalentTo(fci);
     }
 }
 
@@ -271,13 +359,23 @@ public class FileControlInformationTests
     [Test]
     public void Constructor_WithNullParameters_HandlesCorrectly()
     {
-        var fci = new FileControlInformation();
+        var fci = new FileControlInformation(
+            applicationAid: Array.Empty<byte>(),
+            applicationLabel: null!,
+            applicationPriorityIndicator: Maybe<byte>.None,
+            maxCommandDataLength: Maybe<ushort>.None,
+            maxResponseDataLength: Maybe<ushort>.None,
+            issuerIdentificationNumber: Array.Empty<byte>(),
+            cardImageNumber: Array.Empty<byte>(),
+            cardData: Array.Empty<byte>(),
+            discretionaryData: Array.Empty<byte>()
+        );
 
         _ = fci.ApplicationAid.Should().BeEmpty();
-        _ = fci.ApplicationLabel.Should().BeNull();
-        _ = fci.ApplicationPriorityIndicator.Should().BeNull();
-        _ = fci.MaxCommandDataLength.Should().BeNull();
-        _ = fci.MaxResponseDataLength.Should().BeNull();
+        _ = fci.ApplicationLabel.HasValue.Should().BeFalse();
+        _ = fci.ApplicationPriorityIndicator.HasValue.Should().BeFalse();
+        _ = fci.MaxCommandDataLength.HasValue.Should().BeFalse();
+        _ = fci.MaxResponseDataLength.HasValue.Should().BeFalse();
         _ = fci.IssuerIdentificationNumber.Should().BeEmpty();
         _ = fci.CardImageNumber.Should().BeEmpty();
         _ = fci.CardData.Should().BeEmpty();
@@ -295,6 +393,10 @@ public class FileControlInformationTests
 
         var fci = new FileControlInformation(
             applicationAid: aid,
+            applicationLabel: string.Empty,
+            applicationPriorityIndicator: Maybe<byte>.None,
+            maxCommandDataLength: Maybe<ushort>.None,
+            maxResponseDataLength: Maybe<ushort>.None,
             issuerIdentificationNumber: issuerNumber,
             cardImageNumber: cardImage,
             cardData: cardData,
@@ -309,24 +411,19 @@ public class FileControlInformationTests
         discretionaryData[0] = 0xFF;
 
         // Verify FCI arrays are not affected
-        _ = fci.ApplicationAid.Should().NotBeNull();
-        // After verifying ApplicationAid is not null, we can safely access its elements
+        _ = fci.ApplicationAid.Should().NotBeEmpty();
         _ = fci.ApplicationAid[0].Should().Be(0xA0);
 
-        _ = fci.IssuerIdentificationNumber.Should().NotBeNull();
-        // After verifying IssuerIdentificationNumber is not null, we can safely access its elements
+        _ = fci.IssuerIdentificationNumber.Should().NotBeEmpty();
         _ = fci.IssuerIdentificationNumber[0].Should().Be(0x12);
 
-        _ = fci.CardImageNumber.Should().NotBeNull();
-        // After verifying CardImageNumber is not null, we can safely access its elements
+        _ = fci.CardImageNumber.Should().NotBeEmpty();
         _ = fci.CardImageNumber[0].Should().Be(0x56);
 
-        _ = fci.CardData.Should().NotBeNull();
-        // After verifying CardData is not null, we can safely access its elements
+        _ = fci.CardData.Should().NotBeEmpty();
         _ = fci.CardData[0].Should().Be(0x9A);
 
-        _ = fci.DiscretionaryData.Should().NotBeNull();
-        // After verifying DiscretionaryData is not null, we can safely access its elements
+        _ = fci.DiscretionaryData.Should().NotBeEmpty();
         _ = fci.DiscretionaryData[0].Should().Be(0xDE);
     }
 
@@ -335,6 +432,10 @@ public class FileControlInformationTests
     {
         var fci = new FileControlInformation(
             applicationAid: [],
+            applicationLabel: string.Empty,
+            applicationPriorityIndicator: Maybe<byte>.None,
+            maxCommandDataLength: Maybe<ushort>.None,
+            maxResponseDataLength: Maybe<ushort>.None,
             issuerIdentificationNumber: [],
             cardImageNumber: [],
             cardData: [],

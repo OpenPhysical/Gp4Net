@@ -16,31 +16,31 @@ public static class VirtualCardTestBuilder
     /// Creates a P71 card with test cryptographic service.
     /// </summary>
     public static VirtualCard P71Card() =>
-        new(CardConfiguration.P71(), new CryptographicService());
+        new VirtualCard(CardConfiguration.P71(), new CryptographicService());
 
     /// <summary>
     /// Creates a generic JavaCard with test cryptographic service.
     /// </summary>
     public static VirtualCard GenericCard() =>
-        new(CardConfiguration.Generic(), new CryptographicService());
+        new VirtualCard(CardConfiguration.Generic(), new CryptographicService());
 
     /// <summary>
     /// Creates a card with the specified configuration.
     /// </summary>
     public static VirtualCard WithConfiguration(CardConfiguration config) =>
-        new(config, new CryptographicService());
+        new VirtualCard(config, new CryptographicService());
 
     /// <summary>
     /// Creates a card with mock crypto service that always fails (for testing error conditions).
     /// </summary>
     public static VirtualCard WithFailingCrypto(this CardConfiguration config) =>
-        new(config, new FailingCryptographicService());
+        new VirtualCard(config, new FailingCryptographicService());
 
     /// <summary>
     /// Creates a card with deterministic test crypto service.
     /// </summary>
     public static VirtualCard WithTestCrypto(this CardConfiguration config) =>
-        new(config, new CryptographicService());
+        new VirtualCard(config, new CryptographicService());
 
     /// <summary>
     /// Creates a P71 card that supports IDENTIFY command.
@@ -83,8 +83,8 @@ public static class VirtualCardTestBuilder
     {
         var config = scpVersion switch
         {
-            0x02 => CardConfiguration.P71().WithScpDefaults(0x02, Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac),
-            0x03 => CardConfiguration.P71().WithScpDefaults(0x03, Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom),
+            0x02 => CardConfiguration.P71().WithScpDefaults(0x02, Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15),
+            0x03 => CardConfiguration.P71().WithScpDefaults(0x03, Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70),
             _ => throw new ArgumentException($"Unsupported SCP version: {scpVersion:X2}")
         };
 
@@ -125,7 +125,7 @@ public static class VirtualCardTestBuilder
         var config = CardConfiguration.Generic() with
         {
             DefaultScpVersion = 0x02,
-            DefaultScpImplementation = Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac
+            DefaultScpImplementation = Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15
         };
             
         var card = new VirtualCard(config, new CryptographicService());
@@ -140,7 +140,7 @@ public static class VirtualCardTestBuilder
         var config = CardConfiguration.Generic() with
         {
             DefaultScpVersion = 0x03,
-            DefaultScpImplementation = Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom
+            DefaultScpImplementation = Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70
         };
             
         var card = new VirtualCard(config, new CryptographicService());
@@ -178,6 +178,42 @@ public static class VirtualCardTestBuilder
     /// Creates a card builder for complex test scenarios.
     /// </summary>
     public static VirtualCardBuilder Builder() => new();
+
+    /// <summary>
+    /// Creates a virtual card configured to match specific trace requirements.
+    /// Analyzes trace data to determine exact key versions, protocols, and capabilities needed.
+    /// </summary>
+    public static VirtualCard ForTrace(string traceFileName)
+    {
+        return traceFileName switch
+        {
+            "gp_pro_install_scp03.json" => CreateChainFixTraceCard(),
+            _ => throw new ArgumentException($"No trace configuration available for: {traceFileName}")
+        };
+    }
+
+    /// <summary>
+    /// Creates a card configuration matching the ChainFix installation trace.
+    /// Based on analysis of gp_pro_install_scp03.json trace data.
+    /// </summary>
+    private static VirtualCard CreateChainFixTraceCard()
+    {
+        // From trace analysis:
+        // - ATR: "3BD518FF8191FE1FC38073C821100A"  
+        // - ISD AID: "A000000151000000"
+        // - INITIALIZE UPDATE command: P1=00 (key version 0x00)
+        // - Response shows SCP03 i=70 (0x0370)
+        
+        var scp03Keys = Gp4Net.Domain.Keys.GpTestKeys.CreateScp03TestKeySet(keyVersion: 0x00);
+        
+        var config = CardConfiguration.Generic()
+            .WithAtr(Convert.FromHexString("3BD518FF8191FE1FC38073C821100A"))
+            .WithIsdAid(Convert.FromHexString("A000000151000000"))
+            .WithKeySet(0x00, scp03Keys)
+            .WithScpDefaults(0x03, Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70);
+            
+        return new VirtualCard(config, new CryptographicService());
+    }
 }
 
 /// <summary>

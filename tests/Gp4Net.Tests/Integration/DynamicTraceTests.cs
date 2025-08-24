@@ -31,11 +31,17 @@ public class DynamicTraceTests
     [TestCaseSource(typeof(TraceTestDiscovery))]
     public void VerifyTraceOperation(TraceTestCase testCase)
     {
+        TestContext.Out.WriteLine($"=== VerifyTraceOperation starting: {testCase.TestName} ===");
+        TestContext.Out.WriteLine($"Operation: {testCase.OperationName}, Trace: {testCase.Trace?.FilePath ?? "unknown"}");
+        
         // Create appropriate verifier based on operation
         var verifier = OperationVerifierFactory.Create(testCase.OperationName, testCase.Trace);
+        TestContext.Out.WriteLine($"Created verifier type: {verifier.GetType().Name}");
 
         // Run verification
+        TestContext.Out.WriteLine("About to call verifier.Verify()");
         var result = verifier.Verify();
+        TestContext.Out.WriteLine($"Verification result: Success={result.IsSuccess}, Error={(result.IsFailure ? result.Error : "None")}");
 
         // Assert success with detailed error message if failed
         _ = result.IsSuccess.Should().BeTrue(
@@ -75,6 +81,17 @@ public class TraceTestDiscovery : IEnumerable
         var baseDir = Path.Combine(TestContext.CurrentContext.TestDirectory, TraceDirectory);
         Console.WriteLine($"[TraceTestDiscovery] Looking for traces in: {baseDir}");
         Console.WriteLine($"[TraceTestDiscovery] Directory exists: {Directory.Exists(baseDir)}");
+        
+        // Additional diagnostics for subdirectories
+        if (Directory.Exists(baseDir))
+        {
+            var subdirs = Directory.GetDirectories(baseDir, "*", SearchOption.AllDirectories);
+            Console.WriteLine($"[TraceTestDiscovery] Found {subdirs.Length} subdirectories");
+            foreach (var subdir in subdirs.Take(5)) // Log first 5 to avoid spam
+            {
+                Console.WriteLine($"[TraceTestDiscovery] Subdir: {subdir}");
+            }
+        }
 
         if (!Directory.Exists(baseDir))
         {
@@ -298,13 +315,21 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
 
     public override Result<bool, string> Verify()
     {
+        TestContext.Out.WriteLine($"=== InitializeUpdateVerifier starting for trace: {Trace.FilePath ?? "unknown"} ===");
+        
         try
         {
+            TestContext.Out.WriteLine($"Getting exchange at index: {ExchangeIndex}");
             var exchange = GetExchange();
+            
+            TestContext.Out.WriteLine($"Processing exchange: {exchange.Command} -> {exchange.Response}");
 
             // Parse command and response
             var commandBytes = Convert.FromHexString(exchange.Command);
             var responseBytes = Convert.FromHexString(exchange.Response);
+            
+            TestContext.Out.WriteLine($"Command bytes length: {commandBytes.Length}");
+            TestContext.Out.WriteLine($"Response bytes length: {responseBytes.Length}");
 
             // Extract host challenge from command
             if (commandBytes.Length < 13) // CLA INS P1 P2 Lc + 8 bytes
@@ -323,12 +348,20 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
             }
             var response = parseResult.Value;
 
-            // Determine SCP version
-            var scpVersion = response.KeyDiversificationData.Length == 10 ? ScpVersion.Scp02 : ScpVersion.Scp03;
+            // Determine SCP version from the actual SCP ID field in the response
+            var scpVersion = (response.ScpId & 0x03) switch
+            {
+                0x02 => ScpVersion.Scp02,
+                0x03 => ScpVersion.Scp03,
+                _ => throw new InvalidOperationException($"Unsupported SCP version: {response.ScpId & 0x03:X2}")
+            };
 
             // If we have static keys, verify key derivation
+            TestContext.Out.WriteLine($"Checking for static keys - Metadata: {Trace.Metadata != null}, Hints: {Trace.Metadata?.Hints != null}, StaticKeys: {Trace.Metadata?.Hints?.StaticKeys}");
+            
             if (Trace.Metadata?.Hints?.StaticKeys != null)
             {
+                TestContext.Out.WriteLine($"Found static keys: {Trace.Metadata.Hints.StaticKeys}");
                 var staticKeyBytes = Convert.FromHexString(Trace.Metadata.Hints.StaticKeys);
 
                 switch (scpVersion)
@@ -368,10 +401,23 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
                             return Result.Failure<bool, string>($"Cryptogram calculation failed: {expectedCryptogramResult.Error.Message}");
                         }
 
-                        if (!response.CardCryptogram.SequenceEqual(expectedCryptogramResult.Value))
+                        // Use functional comparison with proper null handling
+                        TestContext.Out.WriteLine($"About to compare SCP03 cryptograms - Expected null: {expectedCryptogramResult.Value == null}, Actual null: {response.CardCryptogram == null}");
+                        
+                        var lengthsMatch = expectedCryptogramResult.Value.Length == response.CardCryptogram.Length;
+                        var sequencesEqual = expectedCryptogramResult.Value.SequenceEqual(response.CardCryptogram);
+                        
+                        TestContext.Out.WriteLine($"SCP03 - Lengths match: {lengthsMatch}, Sequences equal: {sequencesEqual}");
+                        
+                        var cryptogramMatches = lengthsMatch && sequencesEqual;
+                        
+                        if (!cryptogramMatches)
                         {
-                            return Result.Failure<bool, string>("Card cryptogram verification failed");
+                            TestContext.Out.WriteLine("SCP03 card cryptogram verification FAILED");
+                            return Result.Failure<bool, string>("SCP03 card cryptogram verification failed");
                         }
+                        
+                        TestContext.Out.WriteLine("SCP03 card cryptogram verification PASSED");
                         break;
                     }
                     case ScpVersion.Scp02:
@@ -420,10 +466,27 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
                         TestContext.Out.WriteLine($"Expected Card Cryptogram: {Convert.ToHexString(expectedCryptogramResult.Value)}");
                         TestContext.Out.WriteLine($"Actual Card Cryptogram:   {Convert.ToHexString(response.CardCryptogram)}");
 
-                        if (!response.CardCryptogram.SequenceEqual(expectedCryptogramResult.Value))
+                        // Debug: Check array lengths and content
+                        TestContext.Out.WriteLine($"Expected Length: {expectedCryptogramResult.Value.Length}");
+                        TestContext.Out.WriteLine($"Actual Length:   {response.CardCryptogram.Length}");
+                        
+                        // Use functional comparison with proper null handling
+                        TestContext.Out.WriteLine($"About to compare cryptograms - Expected null: {expectedCryptogramResult.Value == null}, Actual null: {response.CardCryptogram == null}");
+                        
+                        var lengthsMatch = expectedCryptogramResult.Value.Length == response.CardCryptogram.Length;
+                        var sequencesEqual = expectedCryptogramResult.Value.SequenceEqual(response.CardCryptogram);
+                        
+                        TestContext.Out.WriteLine($"Lengths match: {lengthsMatch}, Sequences equal: {sequencesEqual}");
+                        
+                        var cryptogramMatches = lengthsMatch && sequencesEqual;
+                        
+                        if (!cryptogramMatches)
                         {
+                            TestContext.Out.WriteLine("SCP02 card cryptogram verification FAILED");
                             return Result.Failure<bool, string>("SCP02 card cryptogram verification failed");
                         }
+                        
+                        TestContext.Out.WriteLine("SCP02 card cryptogram verification PASSED");
                         break;
                     }
                 }
@@ -433,6 +496,8 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
         }
         catch (Exception ex)
         {
+            TestContext.Out.WriteLine($"Exception during verification: {ex.GetType().Name}: {ex.Message}");
+            TestContext.Out.WriteLine($"Stack trace: {ex.StackTrace}");
             return Result.Failure<bool, string>($"Exception during verification: {ex.Message}");
         }
     }

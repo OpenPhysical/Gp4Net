@@ -977,6 +977,18 @@
             Builds ISD details from SELECT response.
             </summary>
         </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.CreateIsdFciRows(Gp4Net.Domain.Commands.FileControlInformation)">
+            <summary>
+            Creates table rows from File Control Information (FCI) data for ISD context.
+            Extracts key FCI components with "ISD " prefix for proper categorization.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.CreateFciRows(Gp4Net.Domain.Commands.FileControlInformation)">
+            <summary>
+            Creates table rows from File Control Information (FCI) data.
+            Extracts key FCI components like AID, application label, and other available data.
+            </summary>
+        </member>
         <member name="M:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.BuildManufacturingInfo(Gp4Net.Domain.CardInfo.CardInformation)">
             <summary>
             Builds manufacturing information from CPLC and chip data.
@@ -4133,6 +4145,18 @@
         <member name="M:Gp4Net.Tool.Services.TraceBasedCardService.SetOperationFilter(System.String)">
             <summary>
             Sets the operation filter to limit which exchanges are replayed.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.TraceBasedCardService.EstablishSecureChannel(System.Byte[],System.Byte)">
+            <summary>
+            Secure channel establishment for trace-based testing.
+            Returns true if the trace contains secure channel establishment operations.
+            The actual secure channel state is managed by the pipeline processors.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.TraceBasedCardService.IsSecureChannelEstablished">
+            <summary>
+            Secure channel is established if the trace contains both INITIALIZE UPDATE and EXTERNAL AUTHENTICATE.
             </summary>
         </member>
         <member name="M:Gp4Net.Tool.Services.TraceBasedCardService.GetNextExchange(System.Byte[])">

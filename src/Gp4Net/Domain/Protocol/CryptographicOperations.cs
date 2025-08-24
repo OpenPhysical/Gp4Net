@@ -69,42 +69,90 @@ public static class CryptographicOperations
     /// <returns>The 8-byte MAC.</returns>
     public static Result<byte[], SmartCardError> CalculateFull3DesMac(byte[] key, byte[] data)
     {
-        try
+        var validation = ValidateInputs(key, data, "Key and data cannot be null");
+        if (validation.IsFailure) return Result.Failure<byte[], SmartCardError>(validation.Error);
+        
+        var keyValidation = ValidateKeyLength(key, new[] { 16, 24 }, "3DES key must be 16 or 24 bytes");
+        if (keyValidation.IsFailure) return Result.Failure<byte[], SmartCardError>(keyValidation.Error);
+        
+        var paddingValidation = ValidateDataPadding(data, 8, "Data must be padded to 8-byte blocks");
+        if (paddingValidation.IsFailure) return Result.Failure<byte[], SmartCardError>(paddingValidation.Error);
+        
+        return Calculate3DesMacInternal(key, data);
+    }
+    
+    private static Result<byte[], SmartCardError> Calculate3DesMacInternal(byte[] key, byte[] data)
+    {
+        var expandedKey = ExpandTripleDesKey(key);
+        
+        // Full CBC-MAC with Triple DES
+        var cipher = new CbcBlockCipher(new DesEdeEngine());
+        cipher.Init(true, new ParametersWithIV(new KeyParameter(expandedKey), new byte[8]));
+        
+        // Process all blocks
+        var currentBlock = new byte[8];
+        for (int i = 0; i < data.Length; i += 8)
         {
-            if (key == null || data == null)
-            {
-                return SmartCardError.InvalidArgument("Key and data cannot be null");
-            }
-
-            if (key.Length != 16 && key.Length != 24)
-            {
-                return SmartCardError.InvalidArgument($"3DES key must be 16 or 24 bytes, got {key.Length}");
-            }
-
-            if (data.Length % 8 != 0)
-            {
-                return SmartCardError.InvalidArgument("Data must be padded to 8-byte blocks");
-            }
-
-            var expandedKey = ExpandTripleDesKey(key);
-            
-            // Full CBC-MAC with Triple DES
-            var cipher = new CbcBlockCipher(new DesEdeEngine());
-            cipher.Init(true, new ParametersWithIV(new KeyParameter(expandedKey), new byte[8]));
-            
-            // Process all blocks
-            var currentBlock = new byte[8];
-            for (int i = 0; i < data.Length; i += 8)
-            {
-                _ = cipher.ProcessBlock(data, i, currentBlock, 0);
-            }
-            
-            return Result.Success<byte[], SmartCardError>(currentBlock);
+            cipher.ProcessBlock(data, i, currentBlock, 0);
         }
-        catch (Exception ex)
-        {
-            return SmartCardError.CryptographicError($"Full 3DES-MAC calculation failed: {ex.Message}");
-        }
+        
+        return Result.Success<byte[], SmartCardError>(currentBlock);
+    }
+
+    private static UnitResult<SmartCardError> ValidateInputs(byte[] key, byte[] data, string errorMessage)
+    {
+        return (key == null || data == null) 
+            ? SmartCardError.InvalidArgument(errorMessage)
+            : UnitResult.Success<SmartCardError>();
+    }
+
+    private static UnitResult<SmartCardError> ValidateInputs(byte[] key, byte[] iv, byte[] data, string errorMessage)
+    {
+        return (key == null || iv == null || data == null) 
+            ? SmartCardError.InvalidArgument(errorMessage)
+            : UnitResult.Success<SmartCardError>();
+    }
+
+    private static UnitResult<SmartCardError> ValidateIvLength(byte[] iv, int expectedLength, string errorMessage)
+    {
+        return (iv.Length == expectedLength)
+            ? UnitResult.Success<SmartCardError>()
+            : UnitResult.Failure<SmartCardError>(SmartCardError.InvalidArgument(errorMessage));
+    }
+
+    private static UnitResult<SmartCardError> ValidateKeyLength(byte[] key, int[] validLengths, string errorMessage)
+    {
+        return validLengths.Contains(key.Length)
+            ? UnitResult.Success<SmartCardError>()
+            : UnitResult.Failure<SmartCardError>(SmartCardError.InvalidArgument($"{errorMessage}, got {key.Length}"));
+    }
+
+    private static UnitResult<SmartCardError> ValidateDataPadding(byte[] data, int blockSize, string errorMessage)
+    {
+        return (data.Length % blockSize == 0)
+            ? UnitResult.Success<SmartCardError>()
+            : UnitResult.Failure<SmartCardError>(SmartCardError.InvalidArgument(errorMessage));
+    }
+
+    private static UnitResult<SmartCardError> ValidateNonNullData(byte[] data, string errorMessage)
+    {
+        return (data == null) 
+            ? SmartCardError.InvalidArgument(errorMessage)
+            : UnitResult.Success<SmartCardError>();
+    }
+
+    private static UnitResult<SmartCardError> ValidateNonNullNonEmptyData(byte[] data, string errorMessage)
+    {
+        return (data == null || data.Length == 0) 
+            ? SmartCardError.InvalidArgument(errorMessage)
+            : UnitResult.Success<SmartCardError>();
+    }
+
+    private static UnitResult<SmartCardError> ValidateBlockSize(int blockSize)
+    {
+        return (blockSize is <= 0 or > 255)
+            ? SmartCardError.InvalidArgument($"Invalid block size: {blockSize}")
+            : UnitResult.Success<SmartCardError>();
     }
 
     /// <summary>
@@ -146,43 +194,37 @@ public static class CryptographicOperations
     /// <returns>The encrypted and padded data.</returns>
     public static Result<byte[], SmartCardError> EncryptAesCbcWithPadding(byte[] key, byte[] iv, byte[] data)
     {
-        try
-        {
-            if (key == null || iv == null || data == null)
+        var inputValidation = ValidateInputs(key, iv, data, "Key, IV, and data cannot be null");
+        if (inputValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(inputValidation.Error);
+            
+        var ivValidation = ValidateIvLength(iv, 16, "IV must be 16 bytes for AES");
+        if (ivValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(ivValidation.Error);
+            
+        return Result.Try(() =>
             {
-                return SmartCardError.InvalidArgument("Key, IV, and data cannot be null");
-            }
+                // Use BouncyCastle's high-level API with integrated padding
+                var cipher = new PaddedBufferedBlockCipher(
+                    new CbcBlockCipher(new AesEngine()), 
+                    new ISO7816d4Padding()
+                );
+                cipher.Init(true, new ParametersWithIV(new KeyParameter(key), iv));
 
-            if (iv.Length != 16)
-            {
-                return SmartCardError.InvalidArgument("IV must be 16 bytes for AES");
-            }
+                var output = new byte[cipher.GetOutputSize(data.Length)];
+                var len = cipher.ProcessBytes(data, 0, data.Length, output, 0);
+                len += cipher.DoFinal(output, len);
 
-            // Use BouncyCastle's high-level API with integrated padding
-            var cipher = new PaddedBufferedBlockCipher(
-                new CbcBlockCipher(new AesEngine()), 
-                new ISO7816d4Padding()
-            );
-            cipher.Init(true, new ParametersWithIV(new KeyParameter(key), iv));
+                // Return only the actual encrypted bytes
+                if (len < output.Length)
+                {
+                    var result = new byte[len];
+                    Array.Copy(output, 0, result, 0, len);
+                    return result;
+                }
 
-            var output = new byte[cipher.GetOutputSize(data.Length)];
-            var len = cipher.ProcessBytes(data, 0, data.Length, output, 0);
-            len += cipher.DoFinal(output, len);
-
-            // Return only the actual encrypted bytes
-            if (len < output.Length)
-            {
-                var result = new byte[len];
-                Array.Copy(output, 0, result, 0, len);
-                return Result.Success<byte[], SmartCardError>(result);
-            }
-
-            return Result.Success<byte[], SmartCardError>(output);
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.CryptographicError($"AES-CBC encryption failed: {ex.Message}");
-        }
+                return output;
+            }, ex => SmartCardError.CryptographicError($"AES-CBC encryption failed: {ex.Message}"));
     }
 
     /// <summary>
@@ -195,38 +237,32 @@ public static class CryptographicOperations
     /// <returns>The decrypted and unpadded data.</returns>
     public static Result<byte[], SmartCardError> DecryptAesCbcWithPadding(byte[] key, byte[] iv, byte[] encryptedData)
     {
-        try
-        {
-            if (key == null || iv == null || encryptedData == null)
+        var inputValidation = ValidateInputs(key, iv, encryptedData, "Key, IV, and encrypted data cannot be null");
+        if (inputValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(inputValidation.Error);
+            
+        var ivValidation = ValidateIvLength(iv, 16, "IV must be 16 bytes for AES");
+        if (ivValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(ivValidation.Error);
+            
+        return Result.Try(() =>
             {
-                return SmartCardError.InvalidArgument("Key, IV, and encrypted data cannot be null");
-            }
+                // Use BouncyCastle's high-level API with integrated padding
+                var cipher = new PaddedBufferedBlockCipher(
+                    new CbcBlockCipher(new AesEngine()), 
+                    new ISO7816d4Padding()
+                );
+                cipher.Init(false, new ParametersWithIV(new KeyParameter(key), iv));
 
-            if (iv.Length != 16)
-            {
-                return SmartCardError.InvalidArgument("IV must be 16 bytes for AES");
-            }
+                var output = new byte[cipher.GetOutputSize(encryptedData.Length)];
+                var len = cipher.ProcessBytes(encryptedData, 0, encryptedData.Length, output, 0);
+                len += cipher.DoFinal(output, len);
 
-            // Use BouncyCastle's high-level API with integrated padding
-            var cipher = new PaddedBufferedBlockCipher(
-                new CbcBlockCipher(new AesEngine()), 
-                new ISO7816d4Padding()
-            );
-            cipher.Init(false, new ParametersWithIV(new KeyParameter(key), iv));
-
-            var output = new byte[cipher.GetOutputSize(encryptedData.Length)];
-            var len = cipher.ProcessBytes(encryptedData, 0, encryptedData.Length, output, 0);
-            len += cipher.DoFinal(output, len);
-
-            // Return only the actual decrypted bytes
-            var result = new byte[len];
-            Array.Copy(output, 0, result, 0, len);
-            return Result.Success<byte[], SmartCardError>(result);
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.CryptographicError($"AES-CBC decryption failed: {ex.Message}");
-        }
+                // Return only the actual decrypted bytes
+                var result = new byte[len];
+                Array.Copy(output, 0, result, 0, len);
+                return result;
+            }, ex => SmartCardError.CryptographicError($"AES-CBC decryption failed: {ex.Message}"));
     }
 
     /// <summary>
@@ -239,45 +275,39 @@ public static class CryptographicOperations
     /// <returns>The encrypted and padded data.</returns>
     public static Result<byte[], SmartCardError> Encrypt3DesCbcWithPadding(byte[] key, byte[] iv, byte[] data)
     {
-        try
-        {
-            if (key == null || iv == null || data == null)
+        var inputValidation = ValidateInputs(key, iv, data, "Key, IV, and data cannot be null");
+        if (inputValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(inputValidation.Error);
+            
+        var ivValidation = ValidateIvLength(iv, 8, "IV must be 8 bytes for 3DES");
+        if (ivValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(ivValidation.Error);
+            
+        return Result.Try(() =>
             {
-                return SmartCardError.InvalidArgument("Key, IV, and data cannot be null");
-            }
+                var expandedKey = ExpandTripleDesKey(key);
 
-            if (iv.Length != 8)
-            {
-                return SmartCardError.InvalidArgument("IV must be 8 bytes for 3DES");
-            }
+                // Use BouncyCastle's high-level API with integrated padding
+                var cipher = new PaddedBufferedBlockCipher(
+                    new CbcBlockCipher(new DesEdeEngine()), 
+                    new ISO7816d4Padding()
+                );
+                cipher.Init(true, new ParametersWithIV(new KeyParameter(expandedKey), iv));
 
-            var expandedKey = ExpandTripleDesKey(key);
+                var output = new byte[cipher.GetOutputSize(data.Length)];
+                var len = cipher.ProcessBytes(data, 0, data.Length, output, 0);
+                len += cipher.DoFinal(output, len);
 
-            // Use BouncyCastle's high-level API with integrated padding
-            var cipher = new PaddedBufferedBlockCipher(
-                new CbcBlockCipher(new DesEdeEngine()), 
-                new ISO7816d4Padding()
-            );
-            cipher.Init(true, new ParametersWithIV(new KeyParameter(expandedKey), iv));
+                // Return only the actual encrypted bytes
+                if (len < output.Length)
+                {
+                    var result = new byte[len];
+                    Array.Copy(output, 0, result, 0, len);
+                    return result;
+                }
 
-            var output = new byte[cipher.GetOutputSize(data.Length)];
-            var len = cipher.ProcessBytes(data, 0, data.Length, output, 0);
-            len += cipher.DoFinal(output, len);
-
-            // Return only the actual encrypted bytes
-            if (len < output.Length)
-            {
-                var result = new byte[len];
-                Array.Copy(output, 0, result, 0, len);
-                return Result.Success<byte[], SmartCardError>(result);
-            }
-
-            return Result.Success<byte[], SmartCardError>(output);
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.CryptographicError($"3DES-CBC encryption failed: {ex.Message}");
-        }
+                return output;
+            }, ex => SmartCardError.CryptographicError($"3DES-CBC encryption failed: {ex.Message}"));
     }
 
     /// <summary>
@@ -290,40 +320,34 @@ public static class CryptographicOperations
     /// <returns>The decrypted and unpadded data.</returns>
     public static Result<byte[], SmartCardError> Decrypt3DesCbcWithPadding(byte[] key, byte[] iv, byte[] encryptedData)
     {
-        try
-        {
-            if (key == null || iv == null || encryptedData == null)
+        var inputValidation = ValidateInputs(key, iv, encryptedData, "Key, IV, and encrypted data cannot be null");
+        if (inputValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(inputValidation.Error);
+            
+        var ivValidation = ValidateIvLength(iv, 8, "IV must be 8 bytes for 3DES");
+        if (ivValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(ivValidation.Error);
+            
+        return Result.Try(() =>
             {
-                return SmartCardError.InvalidArgument("Key, IV, and encrypted data cannot be null");
-            }
+                var expandedKey = ExpandTripleDesKey(key);
 
-            if (iv.Length != 8)
-            {
-                return SmartCardError.InvalidArgument("IV must be 8 bytes for 3DES");
-            }
+                // Use BouncyCastle's high-level API with integrated padding
+                var cipher = new PaddedBufferedBlockCipher(
+                    new CbcBlockCipher(new DesEdeEngine()), 
+                    new ISO7816d4Padding()
+                );
+                cipher.Init(false, new ParametersWithIV(new KeyParameter(expandedKey), iv));
 
-            var expandedKey = ExpandTripleDesKey(key);
+                var output = new byte[cipher.GetOutputSize(encryptedData.Length)];
+                var len = cipher.ProcessBytes(encryptedData, 0, encryptedData.Length, output, 0);
+                len += cipher.DoFinal(output, len);
 
-            // Use BouncyCastle's high-level API with integrated padding
-            var cipher = new PaddedBufferedBlockCipher(
-                new CbcBlockCipher(new DesEdeEngine()), 
-                new ISO7816d4Padding()
-            );
-            cipher.Init(false, new ParametersWithIV(new KeyParameter(expandedKey), iv));
-
-            var output = new byte[cipher.GetOutputSize(encryptedData.Length)];
-            var len = cipher.ProcessBytes(encryptedData, 0, encryptedData.Length, output, 0);
-            len += cipher.DoFinal(output, len);
-
-            // Return only the actual decrypted bytes
-            var result = new byte[len];
-            Array.Copy(output, 0, result, 0, len);
-            return Result.Success<byte[], SmartCardError>(result);
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.CryptographicError($"3DES-CBC decryption failed: {ex.Message}");
-        }
+                // Return only the actual decrypted bytes
+                var result = new byte[len];
+                Array.Copy(output, 0, result, 0, len);
+                return result;
+            }, ex => SmartCardError.CryptographicError($"3DES-CBC decryption failed: {ex.Message}"));
     }
 
     /// <summary>
@@ -337,36 +361,29 @@ public static class CryptographicOperations
     /// <returns>The encrypted data.</returns>
     public static Result<byte[], SmartCardError> EncryptAesCbc(byte[] key, byte[] iv, byte[] data)
     {
-        try
-        {
-            if (key == null || iv == null || data == null)
+        var inputValidation = ValidateInputs(key, iv, data, "Key, IV, and data cannot be null");
+        if (inputValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(inputValidation.Error);
+            
+        var ivValidation = ValidateIvLength(iv, 16, "IV must be 16 bytes for AES");
+        if (ivValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(ivValidation.Error);
+            
+        var paddingValidation = ValidateDataPadding(data, 16, "Data must be padded to 16-byte blocks");
+        if (paddingValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(paddingValidation.Error);
+            
+        return Result.Try(() =>
             {
-                return SmartCardError.InvalidArgument("Key, IV, and data cannot be null");
-            }
+                var cipher = new BufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
+                cipher.Init(true, new ParametersWithIV(new KeyParameter(key), iv));
 
-            if (iv.Length != 16)
-            {
-                return SmartCardError.InvalidArgument("IV must be 16 bytes for AES");
-            }
+                var encrypted = new byte[data.Length];
+                var len = cipher.ProcessBytes(data, 0, data.Length, encrypted, 0);
+                _ = cipher.DoFinal(encrypted, len);
 
-            if (data.Length % 16 != 0)
-            {
-                return SmartCardError.InvalidArgument("Data must be padded to 16-byte blocks");
-            }
-
-            var cipher = new BufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
-            cipher.Init(true, new ParametersWithIV(new KeyParameter(key), iv));
-
-            var encrypted = new byte[data.Length];
-            var len = cipher.ProcessBytes(data, 0, data.Length, encrypted, 0);
-            _ = cipher.DoFinal(encrypted, len);
-
-            return Result.Success<byte[], SmartCardError>(encrypted);
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.CryptographicError($"AES-CBC encryption failed: {ex.Message}");
-        }
+                return encrypted;
+            }, ex => SmartCardError.CryptographicError($"AES-CBC encryption failed: {ex.Message}"));
     }
 
     /// <summary>
@@ -380,36 +397,29 @@ public static class CryptographicOperations
     /// <returns>The decrypted data.</returns>
     public static Result<byte[], SmartCardError> DecryptAesCbc(byte[] key, byte[] iv, byte[] encryptedData)
     {
-        try
-        {
-            if (key == null || iv == null || encryptedData == null)
+        var inputValidation = ValidateInputs(key, iv, encryptedData, "Key, IV, and encrypted data cannot be null");
+        if (inputValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(inputValidation.Error);
+            
+        var ivValidation = ValidateIvLength(iv, 16, "IV must be 16 bytes for AES");
+        if (ivValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(ivValidation.Error);
+            
+        var paddingValidation = ValidateDataPadding(encryptedData, 16, "Encrypted data must be in 16-byte blocks");
+        if (paddingValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(paddingValidation.Error);
+            
+        return Result.Try(() =>
             {
-                return SmartCardError.InvalidArgument("Key, IV, and encrypted data cannot be null");
-            }
+                var cipher = new BufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
+                cipher.Init(false, new ParametersWithIV(new KeyParameter(key), iv));
 
-            if (iv.Length != 16)
-            {
-                return SmartCardError.InvalidArgument("IV must be 16 bytes for AES");
-            }
+                var decrypted = new byte[encryptedData.Length];
+                var len = cipher.ProcessBytes(encryptedData, 0, encryptedData.Length, decrypted, 0);
+                _ = cipher.DoFinal(decrypted, len);
 
-            if (encryptedData.Length % 16 != 0)
-            {
-                return SmartCardError.InvalidArgument("Encrypted data must be in 16-byte blocks");
-            }
-
-            var cipher = new BufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
-            cipher.Init(false, new ParametersWithIV(new KeyParameter(key), iv));
-
-            var decrypted = new byte[encryptedData.Length];
-            var len = cipher.ProcessBytes(encryptedData, 0, encryptedData.Length, decrypted, 0);
-            _ = cipher.DoFinal(decrypted, len);
-
-            return Result.Success<byte[], SmartCardError>(decrypted);
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.CryptographicError($"AES-CBC decryption failed: {ex.Message}");
-        }
+                return decrypted;
+            }, ex => SmartCardError.CryptographicError($"AES-CBC decryption failed: {ex.Message}"));
     }
 
     /// <summary>
@@ -423,38 +433,31 @@ public static class CryptographicOperations
     /// <returns>The encrypted data.</returns>
     public static Result<byte[], SmartCardError> Encrypt3DesCbc(byte[] key, byte[] iv, byte[] data)
     {
-        try
-        {
-            if (key == null || iv == null || data == null)
+        var inputValidation = ValidateInputs(key, iv, data, "Key, IV, and data cannot be null");
+        if (inputValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(inputValidation.Error);
+            
+        var ivValidation = ValidateIvLength(iv, 8, "IV must be 8 bytes for 3DES");
+        if (ivValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(ivValidation.Error);
+            
+        var paddingValidation = ValidateDataPadding(data, 8, "Data must be padded to 8-byte blocks");
+        if (paddingValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(paddingValidation.Error);
+            
+        return Result.Try(() =>
             {
-                return SmartCardError.InvalidArgument("Key, IV, and data cannot be null");
-            }
+                var expandedKey = ExpandTripleDesKey(key);
 
-            if (iv.Length != 8)
-            {
-                return SmartCardError.InvalidArgument("IV must be 8 bytes for 3DES");
-            }
+                var cipher = new BufferedBlockCipher(new CbcBlockCipher(new DesEdeEngine()));
+                cipher.Init(true, new ParametersWithIV(new KeyParameter(expandedKey), iv));
 
-            if (data.Length % 8 != 0)
-            {
-                return SmartCardError.InvalidArgument("Data must be padded to 8-byte blocks");
-            }
+                var encrypted = new byte[data.Length];
+                var len = cipher.ProcessBytes(data, 0, data.Length, encrypted, 0);
+                _ = cipher.DoFinal(encrypted, len);
 
-            var expandedKey = ExpandTripleDesKey(key);
-
-            var cipher = new BufferedBlockCipher(new CbcBlockCipher(new DesEdeEngine()));
-            cipher.Init(true, new ParametersWithIV(new KeyParameter(expandedKey), iv));
-
-            var encrypted = new byte[data.Length];
-            var len = cipher.ProcessBytes(data, 0, data.Length, encrypted, 0);
-            _ = cipher.DoFinal(encrypted, len);
-
-            return Result.Success<byte[], SmartCardError>(encrypted);
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.CryptographicError($"3DES-CBC encryption failed: {ex.Message}");
-        }
+                return encrypted;
+            }, ex => SmartCardError.CryptographicError($"3DES-CBC encryption failed: {ex.Message}"));
     }
 
     /// <summary>
@@ -468,38 +471,31 @@ public static class CryptographicOperations
     /// <returns>The decrypted data.</returns>
     public static Result<byte[], SmartCardError> Decrypt3DesCbc(byte[] key, byte[] iv, byte[] encryptedData)
     {
-        try
-        {
-            if (key == null || iv == null || encryptedData == null)
+        var inputValidation = ValidateInputs(key, iv, encryptedData, "Key, IV, and encrypted data cannot be null");
+        if (inputValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(inputValidation.Error);
+            
+        var ivValidation = ValidateIvLength(iv, 8, "IV must be 8 bytes for 3DES");
+        if (ivValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(ivValidation.Error);
+            
+        var paddingValidation = ValidateDataPadding(encryptedData, 8, "Encrypted data must be in 8-byte blocks");
+        if (paddingValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(paddingValidation.Error);
+            
+        return Result.Try(() =>
             {
-                return SmartCardError.InvalidArgument("Key, IV, and encrypted data cannot be null");
-            }
+                var expandedKey = ExpandTripleDesKey(key);
 
-            if (iv.Length != 8)
-            {
-                return SmartCardError.InvalidArgument("IV must be 8 bytes for 3DES");
-            }
+                var cipher = new BufferedBlockCipher(new CbcBlockCipher(new DesEdeEngine()));
+                cipher.Init(false, new ParametersWithIV(new KeyParameter(expandedKey), iv));
 
-            if (encryptedData.Length % 8 != 0)
-            {
-                return SmartCardError.InvalidArgument("Encrypted data must be in 8-byte blocks");
-            }
+                var decrypted = new byte[encryptedData.Length];
+                var len = cipher.ProcessBytes(encryptedData, 0, encryptedData.Length, decrypted, 0);
+                _ = cipher.DoFinal(decrypted, len);
 
-            var expandedKey = ExpandTripleDesKey(key);
-
-            var cipher = new BufferedBlockCipher(new CbcBlockCipher(new DesEdeEngine()));
-            cipher.Init(false, new ParametersWithIV(new KeyParameter(expandedKey), iv));
-
-            var decrypted = new byte[encryptedData.Length];
-            var len = cipher.ProcessBytes(encryptedData, 0, encryptedData.Length, decrypted, 0);
-            _ = cipher.DoFinal(decrypted, len);
-
-            return Result.Success<byte[], SmartCardError>(decrypted);
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.CryptographicError($"3DES-CBC decryption failed: {ex.Message}");
-        }
+                return decrypted;
+            }, ex => SmartCardError.CryptographicError($"3DES-CBC decryption failed: {ex.Message}"));
     }
 
     /// <summary>
@@ -511,32 +507,28 @@ public static class CryptographicOperations
     /// <returns>The padded data.</returns>
     public static Result<byte[], SmartCardError> ApplyIso7816Padding(byte[] data, int blockSize)
     {
-        try
-        {
-            if (data == null)
-            {
-                return SmartCardError.InvalidArgument("Data cannot be null");
-            }
+        var dataValidation = ValidateNonNullData(data, "Data cannot be null");
+        if (dataValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(dataValidation.Error);
+            
+        var blockSizeValidation = ValidateBlockSize(blockSize);
+        if (blockSizeValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(blockSizeValidation.Error);
+            
+        return ApplyPadding(data, blockSize);
+    }
+    
+    private static Result<byte[], SmartCardError> ApplyPadding(byte[] data, int blockSize)
+    {
+        var padding = new ISO7816d4Padding();
+        var paddingLength = blockSize - (data.Length % blockSize);
+        var paddedData = new byte[data.Length + paddingLength];
+        Array.Copy(data, 0, paddedData, 0, data.Length);
 
-            if (blockSize is <= 0 or > 255)
-            {
-                return SmartCardError.InvalidArgument($"Invalid block size: {blockSize}");
-            }
+        // Use BouncyCastle's ISO 7816-4 padding - this operation cannot fail with valid input
+        padding.AddPadding(paddedData, data.Length);
 
-            var padding = new ISO7816d4Padding();
-            var paddingLength = blockSize - (data.Length % blockSize);
-            var paddedData = new byte[data.Length + paddingLength];
-            Array.Copy(data, 0, paddedData, 0, data.Length);
-
-            // Use BouncyCastle's ISO 7816-4 padding
-            _ = padding.AddPadding(paddedData, data.Length);
-
-            return Result.Success<byte[], SmartCardError>(paddedData);
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.InvalidArgument($"Padding failed: {ex.Message}");
-        }
+        return Result.Success<byte[], SmartCardError>(paddedData);
     }
 
     /// <summary>
@@ -547,25 +539,29 @@ public static class CryptographicOperations
     /// <returns>The unpadded data.</returns>
     public static Result<byte[], SmartCardError> RemoveIso7816Padding(byte[] paddedData)
     {
-        try
-        {
-            if (paddedData == null || paddedData.Length == 0)
-            {
-                return SmartCardError.InvalidArgument("Padded data cannot be null or empty");
-            }
-
-            var padding = new ISO7816d4Padding();
-            var padCount = padding.PadCount(paddedData);
+        var dataValidation = ValidateNonNullNonEmptyData(paddedData, "Padded data cannot be null or empty");
+        if (dataValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(dataValidation.Error);
             
-            var unpaddedData = new byte[paddedData.Length - padCount];
-            Array.Copy(paddedData, 0, unpaddedData, 0, unpaddedData.Length);
-
-            return Result.Success<byte[], SmartCardError>(unpaddedData);
-        }
-        catch (Exception ex)
+        return RemovePadding(paddedData);
+    }
+    
+    private static Result<byte[], SmartCardError> RemovePadding(byte[] paddedData)
+    {
+        var padding = new ISO7816d4Padding();
+        var padCount = padding.PadCount(paddedData);
+        
+        // Validate padding count is reasonable
+        if (padCount < 0 || padCount >= paddedData.Length)
         {
-            return SmartCardError.InvalidData($"Unpadding failed: {ex.Message}");
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidData("Invalid padding in response data"));
         }
+        
+        var unpaddedData = new byte[paddedData.Length - padCount];
+        Array.Copy(paddedData, 0, unpaddedData, 0, unpaddedData.Length);
+
+        return Result.Success<byte[], SmartCardError>(unpaddedData);
     }
 
     /// <summary>
@@ -577,32 +573,28 @@ public static class CryptographicOperations
     /// <returns>The padded data.</returns>
     public static Result<byte[], SmartCardError> ApplyPkcs7Padding(byte[] data, int blockSize)
     {
-        try
-        {
-            if (data == null)
-            {
-                return SmartCardError.InvalidArgument("Data cannot be null");
-            }
+        var dataValidation = ValidateNonNullData(data, "Data cannot be null");
+        if (dataValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(dataValidation.Error);
+            
+        var blockSizeValidation = ValidateBlockSize(blockSize);
+        if (blockSizeValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(blockSizeValidation.Error);
+            
+        return ApplyPkcs7PaddingInternal(data, blockSize);
+    }
+    
+    private static Result<byte[], SmartCardError> ApplyPkcs7PaddingInternal(byte[] data, int blockSize)
+    {
+        var padding = new Pkcs7Padding();
+        var paddingLength = blockSize - (data.Length % blockSize);
+        var paddedData = new byte[data.Length + paddingLength];
+        Array.Copy(data, 0, paddedData, 0, data.Length);
 
-            if (blockSize is <= 0 or > 255)
-            {
-                return SmartCardError.InvalidArgument($"Invalid block size: {blockSize}");
-            }
+        // Use BouncyCastle's PKCS#7 padding - this operation cannot fail with valid input
+        padding.AddPadding(paddedData, data.Length);
 
-            var padding = new Pkcs7Padding();
-            var paddingLength = blockSize - (data.Length % blockSize);
-            var paddedData = new byte[data.Length + paddingLength];
-            Array.Copy(data, 0, paddedData, 0, data.Length);
-
-            // Use BouncyCastle's PKCS#7 padding
-            _ = padding.AddPadding(paddedData, data.Length);
-
-            return Result.Success<byte[], SmartCardError>(paddedData);
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.InvalidArgument($"Padding failed: {ex.Message}");
-        }
+        return Result.Success<byte[], SmartCardError>(paddedData);
     }
 
     /// <summary>
@@ -613,25 +605,29 @@ public static class CryptographicOperations
     /// <returns>The unpadded data.</returns>
     public static Result<byte[], SmartCardError> RemovePkcs7Padding(byte[] paddedData)
     {
-        try
-        {
-            if (paddedData == null || paddedData.Length == 0)
-            {
-                return SmartCardError.InvalidArgument("Padded data cannot be null or empty");
-            }
-
-            var padding = new Pkcs7Padding();
-            var padCount = padding.PadCount(paddedData);
+        var dataValidation = ValidateNonNullNonEmptyData(paddedData, "Padded data cannot be null or empty");
+        if (dataValidation.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(dataValidation.Error);
             
-            var unpaddedData = new byte[paddedData.Length - padCount];
-            Array.Copy(paddedData, 0, unpaddedData, 0, unpaddedData.Length);
-
-            return Result.Success<byte[], SmartCardError>(unpaddedData);
-        }
-        catch (Exception ex)
+        return RemovePkcs7PaddingInternal(paddedData);
+    }
+    
+    private static Result<byte[], SmartCardError> RemovePkcs7PaddingInternal(byte[] paddedData)
+    {
+        var padding = new Pkcs7Padding();
+        var padCount = padding.PadCount(paddedData);
+        
+        // Validate padding count is reasonable
+        if (padCount < 0 || padCount >= paddedData.Length)
         {
-            return SmartCardError.InvalidData($"Unpadding failed: {ex.Message}");
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidData("Invalid PKCS#7 padding in response data"));
         }
+        
+        var unpaddedData = new byte[paddedData.Length - padCount];
+        Array.Copy(paddedData, 0, unpaddedData, 0, unpaddedData.Length);
+
+        return Result.Success<byte[], SmartCardError>(unpaddedData);
     }
 
     /// <summary>
@@ -733,13 +729,13 @@ public static class CryptographicOperations
         uint encryptionCounter,
         byte protocolVersion)
     {
-        try
+        if (protocolVersion != ProtocolIdentifiers.Scp03)
         {
-            if (protocolVersion != ProtocolIdentifiers.Scp03)
-            {
-                return Result.Success<byte[], SmartCardError>(new byte[8]); // Zero IV for SCP02
-            }
+            return Result.Success<byte[], SmartCardError>(new byte[8]); // Zero IV for SCP02
+        }
 
+        return Result.Try(() =>
+        {
             // Per GP SCP03 spec section 6.2.6:
             // Command ICV uses encryption counter
             var counterBlock = new byte[16];
@@ -755,12 +751,8 @@ public static class CryptographicOperations
             var icv = new byte[16];
             _ = cipher.ProcessBlock(counterBlock, 0, icv, 0);
             
-            return Result.Success<byte[], SmartCardError>(icv);
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.CryptographicError($"ICV generation failed: {ex.Message}");
-        }
+            return icv;
+        }, ex => SmartCardError.CryptographicError($"ICV generation failed: {ex.Message}"));
     }
 
     /// <summary>

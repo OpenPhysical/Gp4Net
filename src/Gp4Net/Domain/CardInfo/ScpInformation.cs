@@ -115,12 +115,12 @@ public record ScpProtocolInfo
         // For SCP03 and other protocols, use explicit descriptions
         return implementation switch
         {
-            ScpImplementation.Scp03Aes128 => "AES-128",
-            ScpImplementation.Scp03Aes192 => "AES-192", 
-            ScpImplementation.Scp03Aes256 => "AES-256",
-            ScpImplementation.Scp03NoResponseMac => "AES-128 (no R-MAC)",
-            ScpImplementation.Scp03RandomChallenge => "Random card challenge",
-            ScpImplementation.Scp03PseudoRandom => "Pseudo-random card challenge",
+            ScpImplementation.Scp03I10 => "AES-128",
+            ScpImplementation.Scp03I20 => "AES-192", 
+            ScpImplementation.Scp03I30 => "AES-256",
+            ScpImplementation.Scp03I11 => "AES-128 (no R-MAC)",
+            ScpImplementation.Scp03I60 => "Random card challenge",
+            ScpImplementation.Scp03I70 => "Pseudo-random card challenge",
             _ => $"Unknown implementation 0x{((byte)implementation):X2}"
         };
     }

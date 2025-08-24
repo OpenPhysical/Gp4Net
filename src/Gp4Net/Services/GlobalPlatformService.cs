@@ -80,6 +80,7 @@ public class GlobalPlatformService : IGlobalPlatformService
             keySet,
             securityLevel,
             async (cmd, ct) => await _cardService.ExecuteCommandAsync(cmd, ct),
+            selectedAid: null,
             cancellationToken);
 
         // The secure channel state will be managed by the SecureChannelManager
@@ -124,10 +125,79 @@ public class GlobalPlatformService : IGlobalPlatformService
                 SmartCardError.InvalidData("CAP file data is empty"));
         }
 
-        // For now, return a not-implemented result with meaningful error
-        // Full implementation would parse CAP file and send LOAD/INSTALL commands
-        return await Task.FromResult(Result.Failure<InstallationResult, SmartCardError>(
-            SmartCardError.Unsupported("CAP file installation requires LOAD and INSTALL command implementation")));
+        // Create loading commands using the CAP file loading workflow
+        var createCommandsResult = Domain.CapFile.CapFileLoadingWorkflow.CreateLoadingCommands(capFileData);
+        
+        if (createCommandsResult.IsFailure)
+        {
+            return Result.Failure<InstallationResult, SmartCardError>(createCommandsResult.Error);
+        }
+
+        var commands = createCommandsResult.Value;
+        _logger.LogInformation("Created {Count} installation commands from CAP file", commands.Count);
+
+        // Execute all commands through the card service using functional composition
+        var tasks = commands
+            .Select(async command => 
+                (await _cardService.ExecuteCommandAsync(command, cancellationToken))
+                    .Map(response => (command, response)))
+            .ToArray();
+            
+        var results = await Task.WhenAll(tasks);
+        
+        // Check for any failures - fail fast on first error
+        foreach (var result in results)
+        {
+            if (result.IsFailure)
+            {
+                return Result.Failure<InstallationResult, SmartCardError>(result.Error);
+            }
+        }
+        
+        // All successful - extract values
+        var successfulResults = results.Select(r => r.Value).ToArray();
+        
+        _logger.LogInformation("Successfully installed CAP file with {Count} commands", successfulResults.Length);
+        
+        return Result.Success<InstallationResult, SmartCardError>(
+            new InstallationResult(
+                PackageAid: ExtractPackageAidFromResults(successfulResults),
+                InstalledApplets: ExtractInstalledAppletsFromResults(successfulResults),
+                ExecutedCommands: successfulResults.Length));
+    }
+
+    /// <summary>
+    /// Extracts the package AID from installation results by analyzing INSTALL [for load] commands.
+    /// </summary>
+    /// <param name="results">The command execution results.</param>
+    /// <returns>The package AID bytes extracted from successful installation commands.</returns>
+    private static byte[] ExtractPackageAidFromResults((IApduCommand command, Pipeline.CommandResponse response)[] results)
+    {
+        var packageAids = results
+            .Where(r => r.response.IsSuccess)
+            .Select(r => r.command)
+            .OfType<Domain.Commands.InstallCommand>()
+            .Select(cmd => cmd.PackageAid.ToArray())
+            .Where(aid => aid.Length > 0)
+            .ToArray();
+
+        return packageAids.Length > 0 ? packageAids[0] : [];
+    }
+
+    /// <summary>
+    /// Extracts installed applet AIDs from installation results by analyzing command data.
+    /// </summary>
+    /// <param name="results">The command execution results.</param>
+    /// <returns>List of installed applet AIDs extracted from successful installation commands.</returns>
+    private static ImmutableList<byte[]> ExtractInstalledAppletsFromResults((IApduCommand command, Pipeline.CommandResponse response)[] results)
+    {
+        return results
+            .Where(r => r.response.IsSuccess)
+            .Select(r => r.command)
+            .OfType<Domain.Commands.InstallCommand>()
+            .Select(cmd => cmd.PackageAid.ToArray())
+            .Where(aid => aid.Length > 0)
+            .ToImmutableList();
     }
 
     /// <inheritdoc/>

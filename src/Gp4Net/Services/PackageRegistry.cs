@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Services;
@@ -21,9 +25,20 @@ public class PackageRegistry
     /// </summary>
     public PackageRegistry()
     {
-        _packages = [];
-        _aidLookup = [];
-        LoadPackageDatabase();
+        Result<(ImmutableDictionary<string, PackageInfo> packages, ImmutableDictionary<string, PackageInfo> aidLookup), SmartCardError> result = 
+            LoadPackageDatabase();
+        
+        if (result.IsSuccess)
+        {
+            _packages = result.Value.packages.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            _aidLookup = result.Value.aidLookup.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        }
+        else
+        {
+            // Fallback to empty dictionaries if loading fails
+            _packages = [];
+            _aidLookup = [];
+        }
     }
 
     /// <summary>
@@ -79,39 +94,42 @@ public class PackageRegistry
         return Convert.ToHexString(aid).ToUpper();
     }
 
-    private void LoadPackageDatabase()
+    private static Result<(ImmutableDictionary<string, PackageInfo> packages, ImmutableDictionary<string, PackageInfo> aidLookup), SmartCardError> LoadPackageDatabase()
     {
-        try
+        Assembly assembly = Assembly.GetExecutingAssembly();
+        string resourceName = "Gp4Net.Data.known-packages.json";
+
+        var streamMaybe = Maybe<Stream>.From(assembly.GetManifestResourceStream(resourceName));
+        if (streamMaybe.HasNoValue)
         {
-            var assembly = Assembly.GetExecutingAssembly();
-            var resourceName = "Gp4Net.Data.known-packages.json";
+            return Result.Failure<(ImmutableDictionary<string, PackageInfo>, ImmutableDictionary<string, PackageInfo>), SmartCardError>(
+                SmartCardError.InvalidArgument($"Could not find embedded resource: {resourceName}"));
+        }
+        
+        using var stream = streamMaybe.Value;
 
-            using var stream = assembly.GetManifestResourceStream(resourceName);
-            if (stream == null)
-            {
-                throw new InvalidOperationException(
-                    $"Could not find embedded resource: {resourceName}"
-                );
-            }
+        using StreamReader reader = new StreamReader(stream);
+        string json = reader.ReadToEnd();
 
-            using var reader = new StreamReader(stream);
-            var json = reader.ReadToEnd();
+        JsonSerializerOptions options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        };
 
-            var options = new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            };
+        var databaseMaybe = Maybe<PackageDatabase>.From(JsonSerializer.Deserialize<PackageDatabase>(json, options));
+        if (databaseMaybe.HasNoValue || databaseMaybe.Value.Packages.Count == 0)
+        {
+            return Result.Failure<(ImmutableDictionary<string, PackageInfo>, ImmutableDictionary<string, PackageInfo>), SmartCardError>(
+                SmartCardError.InvalidArgument("Invalid package database format"));
+        }
+        
+        var database = databaseMaybe.Value;
 
-            var database = JsonSerializer.Deserialize<PackageDatabase>(json, options);
-            if (database?.Packages == null)
-            {
-                throw new InvalidOperationException("Invalid package database format");
-            }
-
-            // Load packages and create AID lookup
-            foreach (var kvp in database.Packages)
-            {
-                var packageInfo = new PackageInfo
+        // Functional transformation to immutable collections
+        ImmutableDictionary<string, PackageInfo> packages = database.Packages
+            .ToImmutableDictionary(
+                kvp => kvp.Key,
+                kvp => new PackageInfo
                 {
                     Key = kvp.Key,
                     Name = kvp.Value.Name ?? string.Empty,
@@ -121,21 +139,15 @@ public class PackageRegistry
                     MinorVersion = kvp.Value.MinorVersion,
                     SourceFile = kvp.Value.SourceFile ?? string.Empty,
                     SdkVersion = kvp.Value.SdkVersion ?? string.Empty,
-                };
+                });
 
-                _packages[kvp.Key] = packageInfo;
+        // Create AID lookup from packages with non-empty AIDs
+        ImmutableDictionary<string, PackageInfo> aidLookup = packages.Values
+            .Where(pkg => !string.IsNullOrEmpty(pkg.Aid))
+            .ToImmutableDictionary(pkg => pkg.Aid.ToUpper(), pkg => pkg);
 
-                // Also index by AID for quick lookup
-                if (!string.IsNullOrEmpty(packageInfo.Aid))
-                {
-                    _aidLookup[packageInfo.Aid.ToUpper()] = packageInfo;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException("Failed to load package database", ex);
-        }
+        return Result.Success<(ImmutableDictionary<string, PackageInfo>, ImmutableDictionary<string, PackageInfo>), SmartCardError>(
+            (packages, aidLookup));
     }
 
     private class PackageDatabase

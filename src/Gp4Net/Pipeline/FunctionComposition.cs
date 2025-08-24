@@ -29,11 +29,19 @@ public static class FunctionComposition
             return await result.Bind(async cmdResult =>
             {
                 // Check if the first processor created a wrapped command
-                var commandForSecond = command;
+                IApduCommand commandForSecond = command;
                 if (cmdResult.Data.Length > 0 && cmdResult.Metadata?.SecureChannelWrapped == true)
                 {
                     // First processor wrapped the command, create WrappedApduCommand for subsequent processors
-                    commandForSecond = new WrappedApduCommand(command, cmdResult.Data);
+                    Result<WrappedApduCommand, SmartCardError> wrappedResult = 
+                        WrappedApduCommand.Create(command, cmdResult.Data);
+                    
+                    if (wrappedResult.IsFailure)
+                    {
+                        return Result.Failure<CommandResult, SmartCardError>(wrappedResult.Error);
+                    }
+                    
+                    commandForSecond = wrappedResult.Value;
                 }
                 
                 // Use the updated environment from the first processor

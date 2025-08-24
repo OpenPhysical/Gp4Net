@@ -63,7 +63,10 @@ public static class ScpCapabilitiesParser
     {
         foreach (var element in elements)
         {
-            switch (element.TagNumber)
+            var tagNumber = element.GetTagNumber();
+            if (tagNumber.IsFailure) continue;
+            
+            switch (tagNumber.Value)
             {
                 case 0xA0: // Constructed tag containing SCP information
                     // Per GP Card Spec, A0 tag in capabilities contains nested TLV
@@ -109,7 +112,10 @@ public static class ScpCapabilitiesParser
         
         foreach (var element in elements)
         {
-            switch (element.TagNumber)
+            var tagNumber = element.GetTagNumber();
+            if (tagNumber.IsFailure) continue;
+            
+            switch (tagNumber.Value)
             {
                 case 0x80: // SCP type ('02', '03', '10', '11', '80', '81')
                     if (element.Value != null && element.Value.Length > 0)

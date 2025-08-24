@@ -62,10 +62,11 @@ public class Scp02CryptogramVerificationTest
         Console.WriteLine($"Expected:      {Convert.ToHexString(expectedSEncKey)}");
         _ = sessionKeys.SEnc.SequenceEqual(expectedSEncKey).Should().BeTrue("Session S-ENC key mismatch");
         
-        // For i=15, S-MAC should be static
+        // For i=15, S-MAC should be derived per GP Card Spec Section E.4.1 and live card trace data
+        var expectedSMacKey = Convert.FromHexString("9BED98891580C3B245FE9EC58BFA8D2A"); // Derived value from live card
         Console.WriteLine($"Session S-MAC: {Convert.ToHexString(sessionKeys.SMac)}");
-        Console.WriteLine($"Expected:      {Convert.ToHexString(staticMacKey)}");
-        _ = sessionKeys.SMac.SequenceEqual(staticMacKey).Should().BeTrue("Session S-MAC key should be static for i=15");
+        Console.WriteLine($"Expected:      {Convert.ToHexString(expectedSMacKey)}");
+        _ = sessionKeys.SMac.SequenceEqual(expectedSMacKey).Should().BeTrue("Session S-MAC key should be derived for i=15 per GP Card Spec Section E.4.1 and live trace data");
         
         // Test 3: Calculate cryptogram using protocol implementation with S-ENC key
         Console.WriteLine("\n=== Test 3: Cryptogram Calculation ===");

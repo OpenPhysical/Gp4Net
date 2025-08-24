@@ -79,20 +79,6 @@ public class CardCapabilities
         Data = rawData; // Validation done in TryParse
     }
 
-    /// <summary>
-    /// Parses card capabilities from tag 0x67 data.
-    /// </summary>
-    /// <param name="data">The capabilities data bytes.</param>
-    /// <returns>The parsed capabilities.</returns>
-    /// <exception cref="ArgumentException">Thrown when data is null or empty.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when parsing fails.</exception>
-    /// <remarks>Consider using TryParse for functional error handling.</remarks>
-    public static CardCapabilities Parse(byte[] data)
-    {
-        return TryParse(Maybe<byte[]>.From(data)).Match(
-            onSuccess: caps => caps,
-            onFailure: error => throw new InvalidOperationException(error.Message));
-    }
 
     /// <summary>
     /// Attempts to parse card capabilities data using functional error handling.
@@ -111,54 +97,53 @@ public class CardCapabilities
 
     private static Result<CardCapabilities, SmartCardError> TryParseFromBytes(byte[] data)
     {
-
-        try
+        return Result.Try(() =>
         {
             var capabilities = new CardCapabilities(data);
 
-            // Parse DER structure
-            foreach (var element in TlvParser.ParseAll(data))
-            {
-                switch (element.TagNumber)
-                {
-                    case 0xA0: // SCP options
-                        capabilities.ParseScpOptions(element.Value);
-                        break;
-                    case 0x80: // Security Domain privileges
-                        capabilities.SdPrivileges = Maybe<SecurityDomainPrivileges>.From(ParseSecurityDomainPrivileges(element.Value));
-                        break;
-                    case 0x81: // Application privileges
-                        capabilities.AppPrivileges = Maybe<ApplicationPrivileges>.From(ParseApplicationPrivileges(element.Value));
-                        break;
-                    case 0x82: // Supported algorithms
-                        capabilities.Algorithms = Maybe<SupportedAlgorithms>.From(ParseSupportedAlgorithms(element.Value));
-                        break;
-                    case 0x83: // LFDB hash algorithms
-                        capabilities.ParseCipherSuite(CipherUsage.LfdbHash, element.Value);
-                        break;
-                    case 0x84: // Token verification ciphers
-                        capabilities.ParseCipherSuite(CipherUsage.TokenVerification, element.Value);
-                        break;
-                    case 0x85: // Receipt generation ciphers
-                        capabilities.ParseCipherSuite(CipherUsage.ReceiptGeneration, element.Value);
-                        break;
-                    case 0x86: // DAP verification ciphers
-                        capabilities.ParseCipherSuite(CipherUsage.DapVerification, element.Value);
-                        break;
-                    case 0x87: // Mandated DAP verification ciphers
-                        capabilities.ParseCipherSuite(
-                            CipherUsage.MandatedDapVerification,
-                            element.Value
-                        );
-                        break;
-                }
-            }
+            // Parse DER structure using functional composition
+            TlvParser.ParseAll(data)
+                .ToList()
+                .ForEach(element => ProcessTlvObject(capabilities, element));
 
             return capabilities;
-        }
-        catch (Exception ex)
+        }, ex => SmartCardError.InvalidData($"Failed to parse card capabilities: {ex.Message}"));
+    }
+
+    private static void ProcessTlvObject(CardCapabilities capabilities, TlvObject element)
+    {
+        var tagNumber = element.GetTagNumber();
+        if (tagNumber.IsFailure) return;
+        
+        switch (tagNumber.Value)
         {
-            return SmartCardError.InvalidData($"Failed to parse card capabilities: {ex.Message}");
+            case 0xA0: // SCP options
+                capabilities.ParseScpOptions(element.Value);
+                break;
+            case 0x80: // Security Domain privileges
+                capabilities.SdPrivileges = Maybe<SecurityDomainPrivileges>.From(ParseSecurityDomainPrivileges(element.Value));
+                break;
+            case 0x81: // Application privileges
+                capabilities.AppPrivileges = Maybe<ApplicationPrivileges>.From(ParseApplicationPrivileges(element.Value));
+                break;
+            case 0x82: // Supported algorithms
+                capabilities.Algorithms = Maybe<SupportedAlgorithms>.From(ParseSupportedAlgorithms(element.Value));
+                break;
+            case 0x83: // LFDB hash algorithms
+                capabilities.ParseCipherSuite(CipherUsage.LfdbHash, element.Value);
+                break;
+            case 0x84: // Token verification ciphers
+                capabilities.ParseCipherSuite(CipherUsage.TokenVerification, element.Value);
+                break;
+            case 0x85: // Receipt generation ciphers
+                capabilities.ParseCipherSuite(CipherUsage.ReceiptGeneration, element.Value);
+                break;
+            case 0x86: // DAP verification ciphers
+                capabilities.ParseCipherSuite(CipherUsage.DapVerification, element.Value);
+                break;
+            case 0x87: // Mandated DAP verification ciphers
+                capabilities.ParseCipherSuite(CipherUsage.MandatedDapVerification, element.Value);
+                break;
         }
     }
 
@@ -171,7 +156,10 @@ public class CardCapabilities
 
         foreach (var element in TlvParser.ParseAll(data))
         {
-            switch (element.TagNumber)
+            var tagNumber = element.GetTagNumber();
+        if (tagNumber.IsFailure) return;
+        
+        switch (tagNumber.Value)
             {
                 case 0x80: // SCP type
                     if (element.Value.Length > 0)

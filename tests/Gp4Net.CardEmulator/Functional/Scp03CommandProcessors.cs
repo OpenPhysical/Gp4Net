@@ -33,33 +33,32 @@ public static class Scp03CommandProcessors
         ILogger? logger = null)
     {
         logger?.LogDebug("Processing SCP03 INITIALIZE UPDATE command");
-        Console.WriteLine("DEBUG: ProcessScp03InitializeUpdate called");
         
-        var result = ParseInitializeUpdateCommand(command)
+        Result<(ApduResponse, CardState), SmartCardError> result = ParseInitializeUpdateCommand(command)
             .Bind(request => 
             {
-                Console.WriteLine("DEBUG: ParseInitializeUpdateCommand succeeded");
-                return ValidateScp03Preconditions(request, state, config);
+                logger?.LogDebug("ParseInitializeUpdateCommand succeeded");
+                return ValidateScp03Preconditions(request, state, config, logger);
             })
             .Bind(request => 
             {
-                Console.WriteLine("DEBUG: ValidateScp03Preconditions succeeded");
+                logger?.LogDebug("ValidateScp03Preconditions succeeded");
                 return GenerateScp03CardChallenge(request, state, config, crypto);
             })
             .Bind(data => 
             {
-                Console.WriteLine("DEBUG: GenerateScp03CardChallenge succeeded");
+                logger?.LogDebug("GenerateScp03CardChallenge succeeded");
                 return CalculateScp03CardCryptogram(data, state, config, crypto);
             })
-            .Map(result => 
+            .Map(response => 
             {
-                Console.WriteLine("DEBUG: CalculateScp03CardCryptogram succeeded, creating response");
-                return CreateScp03InitializeUpdateResponse(result, state, config);
+                logger?.LogDebug("CalculateScp03CardCryptogram succeeded, creating response");
+                return CreateScp03InitializeUpdateResponse(response, state, config);
             });
             
         if (result.IsFailure)
         {
-            Console.WriteLine($"DEBUG: ProcessScp03InitializeUpdate failed: {result.Error.Message}");
+            logger?.LogError("ProcessScp03InitializeUpdate failed: {ErrorMessage}", result.Error.Message);
         }
         
         return result;
@@ -126,32 +125,34 @@ public static class Scp03CommandProcessors
     private static Result<InitializeUpdateRequest, SmartCardError> ValidateScp03Preconditions(
         InitializeUpdateRequest request,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config,
+        ILogger? logger = null)
     {
-        Console.WriteLine($"DEBUG: SCP03 validation - IsSelected: {state.IsSelected}, ScpVersion: 0x{(byte)state.ScpVersion:X2}, ScpImpl: 0x{(byte)state.ScpImplementation:X2}");
+        logger?.LogDebug("SCP03 validation - IsSelected: {IsSelected}, ScpVersion: 0x{ScpVersion:X2}, ScpImpl: 0x{ScpImpl:X2}",
+            state.IsSelected, (byte)state.ScpVersion, (byte)state.ScpImplementation);
         
         if (!state.IsSelected)
         {
-            Console.WriteLine("DEBUG: SCP03 validation failed - card not selected");
+            logger?.LogError("SCP03 validation failed - card not selected");
             return SmartCardError.ConditionsNotSatisfied();
         }
 
         // Verify SCP03 is configured
         if (state.ScpVersion != 0x03)
         {
-            Console.WriteLine($"DEBUG: SCP03 validation failed - wrong SCP version: 0x{(byte)state.ScpVersion:X2}");
+            logger?.LogError("SCP03 validation failed - wrong SCP version: 0x{ScpVersion:X2}", (byte)state.ScpVersion);
             return SmartCardError.InvalidArgument("Card is not configured for SCP03");
         }
 
         // Validate implementation parameter
-        var validImplementations = new byte[] { 0x00, 0x10, 0x20, 0x60, 0x70 };
+        byte[] validImplementations = new byte[] { 0x00, 0x10, 0x20, 0x60, 0x70 };
         if (!validImplementations.Any(v => v == (byte)state.ScpImplementation))
         {
-            Console.WriteLine($"DEBUG: SCP03 validation failed - invalid implementation: 0x{(byte)state.ScpImplementation:X2}");
+            logger?.LogError("SCP03 validation failed - invalid implementation: 0x{ScpImpl:X2}", (byte)state.ScpImplementation);
             return SmartCardError.InvalidArgument($"Invalid SCP03 implementation: {state.ScpImplementation:X2}");
         }
 
-        Console.WriteLine("DEBUG: SCP03 validation passed");
+        logger?.LogDebug("SCP03 validation passed");
         return Result.Success<InitializeUpdateRequest, SmartCardError>(request);
     }
 
@@ -165,7 +166,7 @@ public static class Scp03CommandProcessors
         Console.WriteLine($"DEBUG: Available key versions: {string.Join(", ", config.StaticKeys.Keys.Select(k => $"0x{k:X2}"))}");
         
         // Check if pseudo-random challenge generation is required (i=70)
-        if (state.ScpImplementation.UsesPseudoRandom())
+        if (state.ScpImplementation == Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70)
         {
             Console.WriteLine("DEBUG: Using pseudo-random challenge generation (i=70)");
             
@@ -303,7 +304,7 @@ public static class Scp03CommandProcessors
             .WithKeys(data.Keys);
 
         // Increment sequence counter if pseudo-random challenges are used (i=70)
-        if (data.Implementation.UsesPseudoRandom())
+        if (data.Implementation == Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70)
         {
             newState = newState.WithIncrementedSequenceCounter(data.KeyVersion);
         }

@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using AwesomeAssertions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
@@ -142,11 +143,8 @@ public class VirtualCardTests
     [Test]
     public void ProcessCommand_DeleteApplication_RemovesFromCardState()
     {
-        // Arrange
-        var card = VirtualCardTestBuilder.P71Card();
-        
-        // First establish a secure channel (required for DELETE command)
-        EstablishSecureChannel(card);
+        // Arrange - Create card with established secure channel for DELETE command testing
+        var card = CreateCardWithSecureChannel();
         
         // Create DELETE command for a test application
         var testAid = Convert.FromHexString("A00000030800001000");
@@ -166,9 +164,8 @@ public class VirtualCardTests
     [Test]
     public void ProcessCommand_InstallForLoad_PreparesForCapFileLoading()
     {
-        // Arrange
-        var card = VirtualCardTestBuilder.P71Card();
-        EstablishSecureChannel(card);
+        // Arrange - Create card with established secure channel for INSTALL command testing
+        var card = CreateCardWithSecureChannel();
         
         // GlobalPlatform Card Specification v2.3.1 Section 11.5.2.1 INSTALL [for load]
         var packageAid = Convert.FromHexString("A000000308000010");
@@ -187,22 +184,49 @@ public class VirtualCardTests
         _ = response.Data.Should().BeEquivalentTo(new byte[] { 0x00 });
     }
 
-    private void EstablishSecureChannel(VirtualCard card)
+    /// <summary>
+    /// Creates a virtual card with an established secure channel state for unit testing.
+    /// Applies proper security level required for DELETE and INSTALL commands.
+    /// </summary>
+    private VirtualCard CreateCardWithSecureChannel()
     {
-        // SELECT ISD
+        var card = VirtualCardTestBuilder.P71Card();
+        
+        // First SELECT the ISD to put the card in selected state
         var selectCommand = new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 };
         _ = card.ProcessCommand(selectCommand);
         
-        // INITIALIZE UPDATE
-        var hostChallenge = Convert.FromHexString("0102030405060708");
-        var initUpdateCommand = new byte[] { 0x80, 0x50, 0x00, 0x00, 0x08 }
-            .Concat(hostChallenge).ToArray();
-        var initResponse = card.ProcessCommand(initUpdateCommand);
+        // Create test session keys for secure channel (deterministic for unit testing)
+        var sessionKeys = new Gp4Net.Domain.Keys.SessionKeys(
+            sEnc: new byte[16], 
+            sMac: new byte[16], 
+            sRMac: new byte[16],
+            dek: new byte[16]
+        );
         
-        // Mock EXTERNAL AUTHENTICATE (simplified for testing)
-        var extAuthCommand = new byte[] { 0x84, 0x82, 0x01, 0x00, 0x10 }
-            .Concat(new byte[16]).ToArray(); // Simplified - would need proper cryptogram
-        _ = card.ProcessCommand(extAuthCommand);
+        // Create secure channel state with C-MAC security level (required for DELETE/INSTALL)
+        var secureChannelResult = Gp4Net.Domain.Security.SecureChannelState.Create(
+            sessionKeys: sessionKeys,
+            securityLevel: Gp4Net.Domain.SecurityLevel.CMac, // 0x01 - Command MAC required
+            protocolVersion: 0x02, // SCP02 for P71 cards
+            initialMacChainingValue: new byte[8],
+            implementationParameter: 0x00
+        );
+        
+        // Apply secure channel state to card (unit testing approach)
+        if (secureChannelResult.IsSuccess)
+        {
+            var cardStateField = typeof(VirtualCard).GetField("_state", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (cardStateField is not null)
+            {
+                var currentState = (CardState)cardStateField.GetValue(card)!;
+                var newState = currentState.WithSecureChannel(secureChannelResult.Value);
+                cardStateField.SetValue(card, newState);
+            }
+        }
+        
+        return card;
     }
 
     [Test]
@@ -215,8 +239,8 @@ public class VirtualCardTests
         var selectCommand = new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 };
             
         // Act - Call the same pure function multiple times
-        var result1 = VirtualCard.ProcessCommandFunctionally(selectCommand, initialState, config, crypto);
-        var result2 = VirtualCard.ProcessCommandFunctionally(selectCommand, initialState, config, crypto);
+        var result1 = VirtualCard.ProcessCommandFunctionally(selectCommand, initialState, config, crypto, LoggingService.None);
+        var result2 = VirtualCard.ProcessCommandFunctionally(selectCommand, initialState, config, crypto, LoggingService.None);
 
         // Assert - Pure function should return identical results
         _ = result1.IsSuccess.Should().BeTrue();
@@ -236,14 +260,14 @@ public class VirtualCardTests
         // Arrange & Act
         var card = VirtualCardTestBuilder.Builder()
             .AsP71()
-            .WithScp(0x03, Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom)
+            .WithScp(0x03, Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70)
             .WithTestCrypto()
             .Build();
 
         // Assert
         _ = card.Configuration.CardType.Should().Contain("P71");
         _ = card.Configuration.DefaultScpVersion.Should().Be(0x03);
-        _ = card.Configuration.DefaultScpImplementation.Should().Be(Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom);
+        _ = card.Configuration.DefaultScpImplementation.Should().Be(Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70);
     }
 
     [Test]

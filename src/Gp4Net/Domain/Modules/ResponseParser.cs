@@ -252,7 +252,11 @@ public static class ResponseParser
         // For single-byte tags
         if (expectedTag <= 0xFF)
         {
-            TlvObject element = elements.FirstOrDefault(e => e.TagNumber == expectedTag);
+            TlvObject element = elements.FirstOrDefault(e => 
+            {
+                var tagNumber = e.GetTagNumber();
+                return tagNumber.IsSuccess && tagNumber.Value == expectedTag;
+            });
             return element?.Value ?? [];
         }
 

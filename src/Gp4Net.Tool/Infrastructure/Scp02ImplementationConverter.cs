@@ -36,9 +36,9 @@ public class Scp02ImplementationConverter : TypeConverter
         {"7A", ScpImplementation.Scp02I7A},
         
         // SCP03 hex values
-        {"10", ScpImplementation.Scp03Aes128}, {"11", ScpImplementation.Scp03NoResponseMac},
-        {"20", ScpImplementation.Scp03Aes192}, {"30", ScpImplementation.Scp03Aes256},
-        {"60", ScpImplementation.Scp03RandomChallenge}, {"70", ScpImplementation.Scp03PseudoRandom},
+        {"10", ScpImplementation.Scp03I10}, {"11", ScpImplementation.Scp03I11},
+        {"20", ScpImplementation.Scp03I20}, {"30", ScpImplementation.Scp03I30},
+        {"60", ScpImplementation.Scp03I60}, {"70", ScpImplementation.Scp03I70},
         
         // Specific aliases based on exact features (no ambiguity)
         {"CLR", ScpImplementation.Scp02I15},        // Most common SCP02 mode (i=15)

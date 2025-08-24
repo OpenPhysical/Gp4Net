@@ -175,9 +175,9 @@ public class CapFileStructure
             return ParseZipFormat(capFileData);
         }
 
-        throw new InvalidDataException(
-            "Only ZIP/JAR format CAP files are supported. Raw binary CAP format is not supported."
-        );
+        return Result.Failure<CapFileStructure, SmartCardError>(
+            SmartCardError.Unsupported(
+                "Only ZIP/JAR format CAP files are supported. Raw binary CAP format is not supported."));
     }
 
     /// <summary>

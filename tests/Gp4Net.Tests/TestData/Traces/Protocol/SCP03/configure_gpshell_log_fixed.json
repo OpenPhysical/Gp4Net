@@ -1,0 +1,209 @@
+{
+  "metadata": {
+    "source": {
+      "file": "docs/traces/configure_gpshell_log.txt",
+      "type": "gpshell",
+      "generated": "2025-08-04T10:11:28.542343Z",
+      "tool_version": "gp4net-converter-2.0"
+    },
+    "card": {
+      "atr": "3BD518FF8191FE1FC38073C821100A",
+      "isd_aid": "A000000151000000",
+      "card_type": "UNKNOWN",
+      "cplc": null
+    },
+    "sessions": [
+      {
+        "session_id": "session_1",
+        "scp_version": 3,
+        "scp_implementation": "i=70",
+        "key_version": 1,
+        "security_level": "C_MAC|R_MAC|C_ENC|R_ENC",
+        "key_diversification": "none",
+        "host_challenge": "1443E205269A2AB5",
+        "card_challenge": "3C2B9786B83B4A40",
+        "sequence_counter": "000001",
+        "derivation_data": {
+          "kdd": "000023455580832048390102",
+          "host_challenge": "1443E205269A2AB5",
+          "card_challenge": "3C2B9786B83B4A40",
+          "card_cryptogram": "328149BB6F3F"
+        },
+        "operations": ["select_isd", "get_data", "secure_channel_establish", "install_applet"]
+      }
+    ],
+    "conversion": {
+      "tool_version": "2.0",
+      "timestamp": "2025-08-04T10:11:28.542343Z",
+      "warnings": [],
+      "enhancements": [
+        "added_test_hints",
+        "analyzed_operations"
+      ]
+    }
+  },
+  "operations": {
+    "select_isd": {
+      "description": "SELECT ISD",
+      "session_id": "session_1",
+      "start_exchange": 1,
+      "end_exchange": 1,
+      "commands": ["SELECT"],
+      "expected_cli": "gp4net card info",
+      "package_aid": null,
+      "applet_aid": null,
+      "target_aid": "A000000151000000"
+    },
+    "get_data": {
+      "description": "GET secure channel protocol details",
+      "session_id": "session_1",
+      "start_exchange": 2,
+      "end_exchange": 2,
+      "commands": ["GET DATA"],
+      "expected_cli": "gp4net card info",
+      "package_aid": null,
+      "applet_aid": null,
+      "target_aid": null
+    },
+    "secure_channel_establish": {
+      "description": "SCP authentication",
+      "session_id": "session_1",
+      "start_exchange": 3,
+      "end_exchange": 4,
+      "commands": ["INITIALIZE UPDATE", "EXTERNAL AUTHENTICATE"],
+      "expected_cli": "gp4net card test-sc -k gp_test_keys",
+      "package_aid": null,
+      "applet_aid": null,
+      "target_aid": null
+    },
+    "install_applet": {
+      "description": "Install application package",
+      "session_id": "session_1",
+      "start_exchange": 5,
+      "end_exchange": 141,
+      "commands": ["INSTALL [for load]", "LOAD"],
+      "expected_cli": "gp4net applet install OpenFIPS201-v1_10_2-chainfix.cap",
+      "package_aid": "A00000030800001000",
+      "applet_aid": "A000000151",
+      "target_aid": null
+    }
+  },
+  "usage_examples": [
+    {
+      "description": "SELECT ISD only",
+      "command": "gp4net card info -r 'lua:trace.lua?operations=select_isd'"
+    },
+    {
+      "description": "GET secure channel protocol details only",
+      "command": "gp4net card info -r 'lua:trace.lua?operations=get_data'"
+    },
+    {
+      "description": "SCP authentication only",
+      "command": "gp4net card test-sc -k gp_test_keys -r 'lua:trace.lua?operations=secure_channel_establish'"
+    },
+    {
+      "description": "Install application package only",
+      "command": "gp4net applet install OpenFIPS201-v1_10_2-chainfix.cap -r 'lua:trace.lua?operations=install_applet'"
+    },
+    {
+      "description": "Complete workflow",
+      "command": "gp4net script eval 'full_workflow()' -r 'lua:trace.lua?operations=select_isd,get_data,secure_channel_establish,install_applet'"
+    }
+  ],
+  "exchanges": [
+    {
+      "index": 1,
+      "operation": "select_isd",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "00A4040008A000000151000000",
+      "response": "9000",
+      "response_time_ms": 18,
+      "description": "SELECT",
+      "source_line": 12,
+      "secure_messaging": false,
+      "scp_data": null
+    },
+    {
+      "index": 2,
+      "operation": "get_data",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "80CA006600",
+      "response": "664D734B06072A864886FC6B01600B06092A864886FC6B020203630906072A864886FC6B03640B06092A864886FC6B040255650D060B2A864886FC6B0507020000660C060A2B060104012A026E01039000",
+      "response_time_ms": 18,
+      "description": "GET DATA (tag 0066)",
+      "source_line": 18,
+      "secure_messaging": false,
+      "scp_data": null
+    },
+    {
+      "index": 3,
+      "operation": "secure_channel_establish",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "80500000081443E205269A2AB500",
+      "response": "00002345558083204839010200013C2B9786B83B4A40328149BB6F3F9000",
+      "response_time_ms": 35,
+      "description": "INITIALIZE UPDATE",
+      "source_line": 29,
+      "secure_messaging": false,
+      "scp_data": {
+        "host_challenge": "1443E205269A2AB5",
+        "card_challenge": "3C2B9786B83B4A40",
+        "card_cryptogram": "328149BB6F3F",
+        "key_version": 1,
+        "scp_id": "03",
+        "host_cryptogram": null,
+        "session_established": false
+      }
+    },
+    {
+      "index": 4,
+      "operation": "secure_channel_establish",
+      "session_id": "session_1",
+      "step_in_operation": 2,
+      "command": "848203001007B2E3773126A490BC24C2ADC1FF46C8",
+      "response": "9000",
+      "response_time_ms": 34,
+      "description": "EXTERNAL AUTHENTICATE",
+      "source_line": 33,
+      "secure_messaging": true,
+      "scp_data": {
+        "host_challenge": null,
+        "card_challenge": null,
+        "card_cryptogram": null,
+        "key_version": null,
+        "scp_id": null,
+        "host_cryptogram": "07B2E3773126A490BC24C2ADC1FF46C8",
+        "session_established": true
+      }
+    },
+    {
+      "index": 5,
+      "operation": "install_applet",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "84E60200285B35732868A3027E2881C0D9C5FC012D13B064F2E22BFCB4FA3D06E0DA9314854DBA37472AEC5FAF00",
+      "response": "009000",
+      "response_time_ms": 20,
+      "description": "INSTALL [for load]",
+      "source_line": 44,
+      "secure_messaging": true,
+      "scp_data": null
+    },
+    {
+      "index": 6,
+      "operation": "install_applet",
+      "session_id": "session_1",
+      "step_in_operation": 2,
+      "command": "84E80000F8447D3EA162C35893A127A403AACD1D2CFA480A1CFBCD6F6A5A71A592F180876C7E83DE507ADC629BE0EA4E695C6875E05B02D2FB746942781DFA2899E7428235D6E18FA98D4F9DD42E17DE3CB369FBB59B7E5DAE2E4204FE162B21C0FEC471E5E9A361F2B8CA7B017E31F08D4756D4459DD38939AF99A9258470EBD3C8C4E528C7ED1E7DFD0F08CB7CB98DFAE62F50887ADA0C0160E21CC0B1DDE8D46BB891708EED2B95648D7325628AA7CE2714910CA189FC290E4CB897C0F23EC8EFC88CE02405AE0E86B869FADD56C91C91623EAE47C4C8503E6601EE1CF242E6C1D886605EB98C874C286D6808EA69C4020A378589DF027ACF2E85E2",
+      "response": "009000",
+      "response_time_ms": 20,
+      "description": "LOAD",
+      "source_line": 48,
+      "secure_messaging": true,
+      "scp_data": null
+    }
+  ]
+}

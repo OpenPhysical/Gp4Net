@@ -28,7 +28,7 @@ public class KeyDerivationServiceTests
     public void Scp02_I00_Should_Use_Derived_Mac_Keys()
     {
         // Load test data from JSON file
-        var jsonPath = Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData", "Traces", "scp02_CLR.json");
+        var jsonPath = Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData", "Traces", "Protocol", "SCP02", "gp_pro_scp02_clr.json");
         var jsonContent = File.ReadAllText(jsonPath);
         var testData = JsonDocument.Parse(jsonContent);
         
@@ -72,13 +72,17 @@ public class KeyDerivationServiceTests
     }
     
     [Test]
-    public void Scp02_I15_Should_Use_Static_Mac_Keys()
+    public void Scp02_I15_Should_Use_Derived_Mac_Keys()
     {
-        // Test that i=15 uses static MAC keys (the exception case)
+        // Test that i=15 derives MAC keys per GP Card Specification Section E.4.1 and live card trace data
+        // All SCP02 implementations derive MAC keys from static keys using constant 0x0101
         var staticKeys = Convert.FromHexString("404142434445464748494A4B4C4D4E4F");
         var hostChallenge = Convert.FromHexString("719426F20E234840");
         var cardChallenge = Convert.FromHexString("C284EC19415D");
         var sequenceCounter = Convert.FromHexString("0011");
+        
+        // Expected session MAC key from live trace data (CLR mode i=15)
+        var expectedSMac = Convert.FromHexString("0D446132B168F75CD6F0A780693A4DD3");
         
         // Create SCP02 key set
         var keySetResult = Scp02KeySet.Create(staticKeys, staticKeys, staticKeys, 0x01);
@@ -95,22 +99,23 @@ public class KeyDerivationServiceTests
         _ = sessionKeysResult.IsSuccess.Should().BeTrue();
         var sessionKeys = sessionKeysResult.Value;
 
-        // For i=15, MAC key should remain static (same as input)
-        _ = sessionKeys.SMac.Should().BeEquivalentTo(staticKeys, "i=15 should use static MAC keys");
+        // For i=15, MAC key should be derived per GP Card Spec Section E.4.1 and live trace data
+        _ = sessionKeys.SMac.Should().BeEquivalentTo(expectedSMac, "i=15 should derive MAC keys per GP Card Spec Section E.4.1 and live trace data");
+        _ = sessionKeys.SMac.Should().NotBeEquivalentTo(staticKeys, "i=15 should not use static MAC keys");
 
-        // But S-ENC should still be derived
+        // S-ENC should always be derived
         _ = sessionKeys.SEnc.Should().NotBeEquivalentTo(staticKeys, "S-ENC should always be derived");
         
-        TestContext.Out.WriteLine($"Implementation i=15 correctly uses static MAC keys");
+        TestContext.Out.WriteLine($"Implementation i=15 correctly derives MAC keys");
         TestContext.Out.WriteLine($"Static MAC: {Convert.ToHexString(staticKeys)}");
-        TestContext.Out.WriteLine($"S-MAC (static): {Convert.ToHexString(sessionKeys.SMac)}");
+        TestContext.Out.WriteLine($"S-MAC (derived): {Convert.ToHexString(sessionKeys.SMac)}");
     }
     
     [TestCase(ScpImplementation.Scp02I00, true, "i=00 should derive MAC keys")]
     [TestCase(ScpImplementation.Scp02I02, true, "i=02 should derive MAC keys")]
     [TestCase(ScpImplementation.Scp02I04, true, "i=04 should derive MAC keys")]
     [TestCase(ScpImplementation.Scp02I05, true, "i=05 should derive MAC keys")]
-    [TestCase(ScpImplementation.Scp02I15, false, "i=15 should use static MAC keys")]
+    [TestCase(ScpImplementation.Scp02I15, true, "i=15 should derive MAC keys per GP Card Spec Section E.4.1 and live trace data")]
     [TestCase(ScpImplementation.Scp02I35, true, "i=35 should derive MAC keys")]
     [TestCase(ScpImplementation.Scp02I55, true, "i=55 should derive MAC keys")]
     [TestCase(ScpImplementation.Scp02I75, true, "i=75 should derive MAC keys")]

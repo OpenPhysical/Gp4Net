@@ -60,9 +60,13 @@ public class GlobalPlatformServiceTests
         var result = await _service.SelectIsdAsync();
 
         _ = result.IsSuccess.Should().BeTrue();
-        _ = result.Value.Should().NotBeNull();
-        _ = result.Value.Fci.Should().NotBeNull();
-        _ = result.Value.Fci!.ApplicationAid.Should().Equal(new byte[] { 0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00 });
+        if (result.IsSuccess)
+        {
+            var response = result.Value;
+            _ = response.Fci.HasValue.Should().BeTrue();
+            var aid = response.Fci.Map(fci => fci.ApplicationAid).GetValueOrDefault(Array.Empty<byte>());
+            _ = aid.Should().Equal(new byte[] { 0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00 });
+        }
     }
 
     [Test]
@@ -201,10 +205,10 @@ public class GlobalPlatformServiceTests
 
         var result = await _service.InstallCapFileAsync(capFileData, options);
 
-        // The implementation currently returns unsupported
+        // The implementation should reject invalid CAP file format
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
-        _ = result.Error.Message.Should().Contain("CAP file installation requires LOAD and INSTALL command implementation");
+        _ = result.Error.Message.Should().Contain("Only ZIP/JAR format CAP files are supported");
     }
 
     [Test]

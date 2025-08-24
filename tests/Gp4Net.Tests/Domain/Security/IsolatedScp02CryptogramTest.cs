@@ -23,7 +23,7 @@ public class IsolatedScp02CryptogramTest
     public void SCP02_Cryptogram_Should_Match_Real_Card_Response()
     {
         // Load test data from JSON file
-        var jsonPath = Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData", "Traces", "scp02_CLR.json");
+        var jsonPath = Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData", "Traces", "Protocol", "SCP02", "gp_pro_scp02_clr.json");
         var jsonContent = File.ReadAllText(jsonPath);
         var testData = JsonDocument.Parse(jsonContent);
 
@@ -105,7 +105,7 @@ public class IsolatedScp02CryptogramTest
     public void SCP02_Cryptogram_Step_By_Step_Debug()
     {
         // Load test data from JSON file
-        var jsonPath = Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData", "Traces", "scp02_CLR.json");
+        var jsonPath = Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData", "Traces", "Protocol", "SCP02", "gp_pro_scp02_clr.json");
         var jsonContent = File.ReadAllText(jsonPath);
         var testData = JsonDocument.Parse(jsonContent);
 

@@ -780,11 +780,11 @@ public class CryptographicService : ICryptographicService
         public byte GetImplementationParameter()
         {
             // Default SCP03 implementation parameter
-            return Implementation.GetValueOrDefault(Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom) switch
+            return Implementation.GetValueOrDefault(Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70) switch
             {
-                Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom => 0x70,
-                Gp4Net.Domain.Protocol.ScpImplementation.Scp03RandomChallenge => 0x60,
-                Gp4Net.Domain.Protocol.ScpImplementation.Scp03NoResponseMac => 0x11,
+                Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70 => 0x70,
+                Gp4Net.Domain.Protocol.ScpImplementation.Scp03I60 => 0x60,
+                Gp4Net.Domain.Protocol.ScpImplementation.Scp03I11 => 0x11,
                 _ => 0x70  // Default to pseudo-random
             };
         }

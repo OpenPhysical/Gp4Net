@@ -98,7 +98,13 @@ public static class SecurityDomainInfoCodec
             
         // Parse the outer TLV structure
         var outerTlvMaybe = TlvParser.ParseSingle(data);
-        if (!outerTlvMaybe.HasValue || outerTlvMaybe.Value.TagNumber != 0xC1)
+        if (!outerTlvMaybe.HasValue)
+        {
+            return SmartCardError.InvalidData("No TLV data found");
+        }
+        
+        var tagResult = outerTlvMaybe.Value.GetTagNumber();
+        if (tagResult.IsFailure || tagResult.Value != 0xC1)
         {
             return SmartCardError.InvalidData("Invalid security domain information format - expected tag 0xC1");
         }
@@ -127,7 +133,10 @@ public static class SecurityDomainInfoCodec
                         break;
                     }
                     case 1:
-                        switch (element.TagNumber)
+                        var elementTagNumber = element.GetTagNumber();
+                        if (elementTagNumber.IsFailure) continue;
+                        
+                        switch (elementTagNumber.Value)
                         {
                             case 0xC5: // Image data
                                 sdInfo.ImageData = element.Value;
@@ -143,7 +152,7 @@ public static class SecurityDomainInfoCodec
                                 {
                                     // Reconstruct TLV format for AID
                                     using var aidStream = new MemoryStream();
-                                    WriteTlv(aidStream, (byte)element.TagNumber, element.Value);
+                                    WriteTlv(aidStream, (byte)elementTagNumber.Value, element.Value);
                                     sdInfo.SecurityDomainAid = aidStream.ToArray();
                                 }
                                 break;

@@ -1219,7 +1219,7 @@
             Converts a tag array to a numeric value for common 1-3 byte tags.
             </summary>
             <param name="tag">The tag bytes.</param>
-            <returns>The numeric tag value.</returns>
+            <returns>A result containing the numeric tag value or an error.</returns>
         </member>
         <member name="M:Gp4Net.Core.Tlv.TlvParser.NumberToTag(System.UInt32)">
             <summary>
@@ -1248,10 +1248,11 @@
             Gets the length of the value.
             </summary>
         </member>
-        <member name="P:Gp4Net.Core.Tlv.TlvObject.TagNumber">
+        <member name="M:Gp4Net.Core.Tlv.TlvObject.GetTagNumber">
             <summary>
-            Gets the tag as a numeric value (for common 1-3 byte tags).
+            Gets the tag as a numeric value using functional error handling.
             </summary>
+            <returns>A result containing the tag number or an error.</returns>
         </member>
         <member name="M:Gp4Net.Core.Tlv.TlvObject.#ctor(System.Byte[],System.Byte[])">
             <summary>
@@ -2348,21 +2349,23 @@
             Provides pure function composition for complete installation sequences.
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.ExecuteFromTrace(Gp4Net.Domain.CapFile.CapInstallationTrace,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.ExecuteFromTrace(Gp4Net.Domain.CapFile.CapInstallationTrace,Gp4Net.Domain.Security.ISecureChannelStrategy,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
             <summary>
             Executes a complete CAP installation workflow from trace data.
             Pure function that composes all installation steps using Result chains.
             </summary>
             <param name="traceData">Installation trace data containing command sequence.</param>
+            <param name="secureChannelStrategy">Strategy for secure channel establishment.</param>
             <param name="environment">Command execution environment.</param>
             <returns>Result containing installation execution results.</returns>
         </member>
-        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.ExecuteInstallation(Gp4Net.Domain.CapFile.CapInstallationRequest,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.ExecuteInstallation(Gp4Net.Domain.CapFile.CapInstallationRequest,Gp4Net.Domain.Security.ISecureChannelStrategy,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
             <summary>
             Executes CAP installation with explicit parameters.
             Pure function for programmatic installation without trace dependency.
             </summary>
             <param name="request">Installation request parameters.</param>
+            <param name="secureChannelStrategy">Strategy for secure channel establishment.</param>
             <param name="environment">Command execution environment.</param>
             <returns>Result containing installation execution results.</returns>
         </member>
@@ -2379,12 +2382,6 @@
             <summary>
             Enhances the command environment with INITIALIZE UPDATE response data.
             Parses the response and prepares for secure channel establishment.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.EstablishRealSecureChannel(Gp4Net.Pipeline.CommandProcessing.CommandResult,Gp4Net.Domain.SecurityLevel,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
-            <summary>
-            Establishes secure channel using the SecureChannelEstablishment module.
-            Uses proper key derivation and cryptographic session establishment.
             </summary>
         </member>
         <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.EstablishSecureChannelFromMetadata(Gp4Net.Pipeline.CommandProcessing.CommandResult,Gp4Net.Domain.SecurityLevel)">
@@ -2731,16 +2728,6 @@
             <summary>
             Gets a value indicating whether SCP03 is supported.
             </summary>
-        </member>
-        <member name="M:Gp4Net.Domain.CardInfo.CardCapabilities.Parse(System.Byte[])">
-            <summary>
-            Parses card capabilities from tag 0x67 data.
-            </summary>
-            <param name="data">The capabilities data bytes.</param>
-            <returns>The parsed capabilities.</returns>
-            <exception cref="T:System.ArgumentException">Thrown when data is null or empty.</exception>
-            <exception cref="T:System.InvalidOperationException">Thrown when parsing fails.</exception>
-            <remarks>Consider using TryParse for functional error handling.</remarks>
         </member>
         <member name="M:Gp4Net.Domain.CardInfo.CardCapabilities.TryParse(CSharpFunctionalExtensions.Maybe{System.Byte[]})">
             <summary>
@@ -6851,7 +6838,7 @@
             Gets the discretionary data.
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.Commands.FileControlInformation.#ctor(System.Byte[],System.String,System.Nullable{System.Byte},System.Nullable{System.UInt16},System.Nullable{System.UInt16},System.Byte[],System.Byte[],System.Byte[],System.Byte[])">
+        <member name="M:Gp4Net.Domain.Commands.FileControlInformation.#ctor(System.Byte[],CSharpFunctionalExtensions.Maybe{System.String},CSharpFunctionalExtensions.Maybe{System.Byte},CSharpFunctionalExtensions.Maybe{System.UInt16},CSharpFunctionalExtensions.Maybe{System.UInt16},System.Byte[],System.Byte[],System.Byte[],System.Byte[])">
             <summary>
             Initializes a new instance of the FileControlInformation class.
             </summary>
@@ -6880,7 +6867,7 @@
             Gets the raw response data.
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.Commands.SelectResponse.#ctor(System.Byte[],Gp4Net.Domain.Commands.FileControlInformation)">
+        <member name="M:Gp4Net.Domain.Commands.SelectResponse.#ctor(System.Byte[],CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Commands.FileControlInformation})">
             <summary>
             Initializes a new instance of the SelectResponse class.
             </summary>
@@ -6906,9 +6893,19 @@
             Parses FCI data from response.
             </summary>
             <param name="data">The FCI data.</param>
-            <returns>The parsed FCI.</returns>
+            <returns>The parsed FCI or None if unparseable.</returns>
         </member>
-        <member name="M:Gp4Net.Domain.Commands.SelectResponse.ParseProprietaryTemplate(Gp4Net.Core.Tlv.TlvObject,System.Nullable{System.UInt16}@,System.Nullable{System.UInt16}@,System.Byte[]@,System.Byte[]@,System.Byte[]@)">
+        <member name="T:Gp4Net.Domain.Commands.SelectResponse.ProprietaryTemplateData">
+            <summary>
+            Result of parsing FCI proprietary template data.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.SelectResponse.ProprietaryTemplateData.#ctor(CSharpFunctionalExtensions.Maybe{System.UInt16},CSharpFunctionalExtensions.Maybe{System.UInt16},System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+            Result of parsing FCI proprietary template data.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Commands.SelectResponse.ParseProprietaryTemplate(Gp4Net.Core.Tlv.TlvObject)">
             <summary>
             Parses the proprietary template within FCI.
             </summary>
@@ -7282,6 +7279,14 @@
             Parses version string from version TLV value bytes.
             For Java Card CAP files, this is major.minor format.
             </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.DataObjects.GetStatusTlvParser.FindTlvByTag(System.Collections.Generic.IEnumerable{Gp4Net.Core.Tlv.TlvObject},System.UInt16)">
+            <summary>
+            Finds a TLV object by tag number using functional approach.
+            </summary>
+            <param name="tlvObjects">The collection of TLV objects to search.</param>
+            <param name="targetTag">The target tag number to find.</param>
+            <returns>Maybe containing the found TLV object.</returns>
         </member>
         <member name="T:Gp4Net.Domain.DataObjects.KeyInfoTemplateCodec">
             <summary>
@@ -8152,7 +8157,7 @@
         <member name="M:Gp4Net.Domain.Keys.KeyDerivationService.UsesDerivedMacKeys(Gp4Net.Domain.Protocol.ScpImplementation)">
             <summary>
             Determines whether an SCP02 implementation uses derived MAC keys or static MAC keys.
-            Based on GlobalPlatform test vectors and real-world implementations.
+            Based on GlobalPlatform Card Specification v2.3.1 Section E.4.1 and live card trace data.
             </summary>
             <param name="implementation">The SCP02 implementation</param>
             <returns>True if MAC keys should be derived, false if they should remain static</returns>
@@ -9164,13 +9169,14 @@
             Handles SCP02 and SCP03 protocol flows.
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.Modules.SecureChannelEstablishment.EstablishAsync(Gp4Net.Domain.Keys.IKeySet,Gp4Net.Domain.SecurityLevel,System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Threading.CancellationToken)">
+        <member name="M:Gp4Net.Domain.Modules.SecureChannelEstablishment.EstablishAsync(Gp4Net.Domain.Keys.IKeySet,Gp4Net.Domain.SecurityLevel,System.Func{Gp4Net.Transport.IApduCommand,System.Threading.CancellationToken,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Pipeline.CommandResponse,Gp4Net.Core.SmartCardError}}},System.Byte[],System.Threading.CancellationToken)">
             <summary>
             Establishes a secure channel with the card.
             </summary>
             <param name="keySet">The key set to use for authentication.</param>
             <param name="securityLevel">The desired security level.</param>
             <param name="executeCommand">Function to execute APDU commands.</param>
+            <param name="selectedAid">The AID of the selected application (required for implicit mode with MAC over AID).</param>
             <param name="cancellationToken">Cancellation token.</param>
             <returns>The established secure channel state or an error.</returns>
         </member>
@@ -9189,7 +9195,7 @@
             Sends EXTERNAL AUTHENTICATE command.
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.Modules.SecureChannelEstablishment.CreateSecureChannelState(Gp4Net.Domain.Protocol.ISecureChannelProtocol,Gp4Net.Domain.Protocol.SecureChannelContext,Gp4Net.Domain.SecurityLevel)">
+        <member name="M:Gp4Net.Domain.Modules.SecureChannelEstablishment.CreateSecureChannelState(Gp4Net.Domain.Protocol.ISecureChannelProtocol,Gp4Net.Domain.Protocol.SecureChannelContext,Gp4Net.Domain.SecurityLevel,System.Byte[])">
             <summary>
             Creates the secure channel state after successful authentication.
             </summary>
@@ -10305,11 +10311,17 @@
         </member>
         <member name="M:Gp4Net.Domain.Protocol.SafeAuthenticationManager.#ctor(Gp4Net.Domain.Protocol.ISecureChannelManager,Microsoft.Extensions.Logging.ILogger{Gp4Net.Domain.Protocol.SafeAuthenticationManager},System.Int32)">
             <summary>
-            Initializes a new instance of SafeAuthenticationManager.
+            Private constructor for successful creation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.SafeAuthenticationManager.Create(Gp4Net.Domain.Protocol.ISecureChannelManager,Microsoft.Extensions.Logging.ILogger{Gp4Net.Domain.Protocol.SafeAuthenticationManager},System.Int32)">
+            <summary>
+            Creates a SafeAuthenticationManager with functional validation.
             </summary>
             <param name="innerManager">The underlying secure channel manager.</param>
             <param name="logger">The logger.</param>
             <param name="maxAttempts">Maximum attempts before blocking (default: 3).</param>
+            <returns>A result containing the manager or an error.</returns>
         </member>
         <member name="M:Gp4Net.Domain.Protocol.SafeAuthenticationManager.EstablishSecureChannelAsync(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,Gp4Net.Domain.Keys.IKeySet,Gp4Net.Domain.SecurityLevel,System.Threading.CancellationToken)">
             <inheritdoc />
@@ -10343,7 +10355,12 @@
         </member>
         <member name="T:Gp4Net.Domain.Protocol.SafeAuthenticationManager.AttemptTracker">
             <summary>
-            Tracks authentication attempts for a specific card.
+            Immutable record for tracking authentication attempts for a specific card.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Protocol.SafeAuthenticationManager.AttemptTracker.#ctor(System.Int32)">
+            <summary>
+            Immutable record for tracking authentication attempts for a specific card.
             </summary>
         </member>
         <member name="T:Gp4Net.Domain.Protocol.Scp02Cryptography">
@@ -11100,65 +11117,40 @@
             Bitmap: 01111010 (b1=0, b2=1, b3=0, b4=1, b5=1, b6=1, b7=1)
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03Aes128">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03I10">
             <summary>
-            SCP03: AES with 128-bit keys
+            SCP03 i=10: AES with 128-bit keys
             Standard SCP03 implementation
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03NoResponseMac">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03I11">
             <summary>
-            SCP03: No response MAC (11)
+            SCP03 i=11: AES with 128-bit keys, no response MAC
             Per GlobalPlatform SCP03 v1.1.1 Section 6.2.5
             Response MAC calculation and verification is disabled
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03Aes192">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03I20">
             <summary>
-            SCP03: AES with 192-bit keys
+            SCP03 i=20: AES with 192-bit keys
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03Aes256">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03I30">
             <summary>
-            SCP03: AES with 256-bit keys
+            SCP03 i=30: AES with 256-bit keys
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03RandomChallenge">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03I60">
             <summary>
-            SCP03: Random card challenge (60)
+            SCP03 i=60: AES with 128-bit keys, random card challenge
             Per GlobalPlatform SCP03 v1.1.1 Section 6.2.1
             Card generates truly random challenge instead of pseudo-random
             </summary>
         </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom">
+        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70">
             <summary>
-            SCP03: Pseudo-random card challenge
+            SCP03 i=70: AES with 128-bit keys, pseudo-random card challenge
             Card challenge derived using KDF instead of random
-            </summary>
-        </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02StaticMac">
-            <summary>
-            Legacy alias for Scp02I15 - most common SCP02 implementation
-            </summary>
-        </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02CmacMult">
-            <summary>
-            Legacy alias for Scp02I55 - SCP02 with well-known challenge
-            </summary>
-        </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02CmacXor">
-            <summary>
-            Legacy alias for Scp02I1A - SCP02 implicit mode
-            </summary>
-        </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02ExplicitInitVector">
-            <summary>
-            Legacy alias for Scp02I04 - SCP02 with 1 base key
-            </summary>
-        </member>
-        <member name="F:Gp4Net.Domain.Protocol.ScpImplementation.Scp02ImplicitInitVector">
-            <summary>
-            Legacy alias for Scp02I05 - SCP02 without ICV encryption
             </summary>
         </member>
         <member name="T:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures">
@@ -11185,7 +11177,7 @@
         <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.IsExplicitMode(Gp4Net.Domain.Protocol.ScpImplementation)">
             <summary>
             Determines if this implementation uses explicit initiation mode.
-            Per GP Card Spec Table E-1, bit b3 (0x08) indicates initiation mode.
+            Per GP Card Spec Table E-1, bit b3 (0x04) indicates initiation mode.
             </summary>
             <param name="impl">The SCP implementation to check</param>
             <returns>True for explicit mode, false for implicit mode</returns>
@@ -11193,7 +11185,7 @@
         <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.HasIcvEncryption(Gp4Net.Domain.Protocol.ScpImplementation)">
             <summary>
             Determines if this implementation has ICV encryption for C-MAC session.
-            Per GP Card Spec Table E-1, bit b5 (0x04) indicates ICV encryption.
+            Per GP Card Spec Table E-1, bit b5 (0x10) indicates ICV encryption.
             </summary>
             <param name="impl">The SCP implementation to check</param>
             <returns>True if ICV encryption is enabled, false otherwise</returns>
@@ -11209,7 +11201,7 @@
         <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.HasMacOverAid(Gp4Net.Domain.Protocol.ScpImplementation)">
             <summary>
             Determines if this implementation has ICV set to MAC over AID.
-            Per GP Card Spec Table E-1, bit b4 (0x10) indicates ICV initialization.
+            Per GP Card Spec Table E-1, bit b4 (0x08) indicates ICV initialization.
             </summary>
             <param name="impl">The SCP implementation to check</param>
             <returns>True for MAC over AID, false for zero ICV</returns>
@@ -11258,23 +11250,6 @@
             </summary>
             <param name="impl">The SCP implementation to check</param>
             <returns>Key length in bits, or 0 if not SCP03</returns>
-        </member>
-        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.UsesPseudoRandom(Gp4Net.Domain.Protocol.ScpImplementation)">
-            <summary>
-            Legacy method for checking pseudo-random challenge support.
-            For backward compatibility with existing code.
-            </summary>
-            <param name="impl">The SCP implementation to check</param>
-            <returns>True if pseudo-random challenge is used</returns>
-        </member>
-        <member name="M:Gp4Net.Domain.Protocol.Scp02ImplementationFeatures.UsesStaticMac(Gp4Net.Domain.Protocol.ScpImplementation)">
-            <summary>
-            Legacy method for checking static MAC usage.
-            For backward compatibility with existing code.
-            Maps to ICV encryption feature for SCP02.
-            </summary>
-            <param name="impl">The SCP implementation to check</param>
-            <returns>True if static MAC behavior is used</returns>
         </member>
         <member name="T:Gp4Net.Domain.Protocol.ScpProtocolOperations">
             <summary>
@@ -11554,6 +11529,65 @@
             Creates a failed PUT KEY result.
             </summary>
         </member>
+        <member name="T:Gp4Net.Domain.Security.AidMacCalculationService">
+            <summary>
+            Service for calculating MAC over AID for SCP02 implicit secure channel initiation.
+            Per GP Card Specification v2.3.1 Section E.3.3.
+            All methods are pure functions following functional programming principles.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.AidMacCalculationService.CalculateIcvFromAidMac(System.Byte[],System.Byte[],Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Calculates the Initial Chaining Vector (ICV) from MAC over AID for implicit mode implementations.
+            Per GP Section E.3.3: "When using implicit Secure Channel Session initiation, the ICV shall be 
+            a MAC computed on the AID of the selected Application."
+            </summary>
+            <param name="selectedAid">The AID of the selected application</param>
+            <param name="cMacSessionKey">The 16-byte C-MAC session key</param>
+            <param name="implementation">The SCP02 implementation parameter</param>
+            <returns>Result containing the 8-byte ICV calculated from AID MAC</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.AidMacCalculationService.ShouldCalculateIcvFromAid(Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Determines whether the initial ICV should be calculated from AID MAC.
+            Pure function that encapsulates the GP specification rules.
+            </summary>
+            <param name="implementation">The SCP02 implementation parameter</param>
+            <returns>True if ICV should be calculated from AID MAC, false for zero ICV</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.AidMacCalculationService.CreateInitialMacChainingState(System.Byte[],System.Byte[],Gp4Net.Domain.Protocol.ScpImplementation,System.Byte)">
+            <summary>
+            Creates the appropriate initial MAC chaining state based on implementation requirements.
+            For implicit mode with MAC over AID, calculates ICV from AID MAC.
+            For all other cases, returns zero-initialized ICV.
+            </summary>
+            <param name="selectedAid">The AID of the selected application (can be null for explicit mode)</param>
+            <param name="cMacSessionKey">The C-MAC session key</param>
+            <param name="implementation">The SCP02 implementation parameter</param>
+            <param name="protocolVersion">The protocol version</param>
+            <returns>Result containing the appropriate MacChainingState</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.AidMacCalculationService.ApplyGpPadding(System.Byte[])">
+            <summary>
+            Applies GP padding to the AID per Section E.3.3.
+            Pads with 0x80 followed by zeros to reach a multiple of 8 bytes.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.AidMacCalculationService.CalculateMacOverPaddedData(System.Byte[],System.Byte[])">
+            <summary>
+            Calculates 3DES MAC over the padded AID using ISO 9797-1 Algorithm 3.
+            Uses zero ICV for the MAC calculation per GP specification.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.AidMacCalculationService.ValidateAidMacRequirements(Gp4Net.Domain.Protocol.ScpImplementation,System.Byte[],System.Byte[])">
+            <summary>
+            Validates that the implementation, AID, and session keys are compatible with AID MAC requirements.
+            </summary>
+            <param name="implementation">The SCP02 implementation parameter</param>
+            <param name="selectedAid">The selected AID</param>
+            <param name="cMacSessionKey">The C-MAC session key</param>
+            <returns>Result indicating validation success or specific error</returns>
+        </member>
         <member name="T:Gp4Net.Domain.Security.ApduParser">
             <summary>
             Pure static APDU parsing operations shared across security processors.
@@ -11682,6 +11716,12 @@
             This is the main entry point for command security processing.
             </summary>
         </member>
+        <member name="M:Gp4Net.Domain.Security.CommandSecurityProcessor.ApplyCommandSecurity(Gp4Net.Transport.IApduCommand,Gp4Net.Domain.SecurityLevel,Gp4Net.Domain.Keys.SessionKeys,Gp4Net.Domain.Security.MacChainingState,System.UInt32)">
+            <summary>
+            Applies command security with full MAC chaining state support including ICV encryption.
+            This overload supports SCP02 ICV encryption per GP Card Specification v2.3.1 Section E.3.4.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Domain.Security.CommandSecurityProcessor.MacResult">
             <summary>
             Result of MAC application containing the wrapped command and new chaining value.
@@ -11690,6 +11730,33 @@
         <member name="M:Gp4Net.Domain.Security.CommandSecurityProcessor.MacResult.#ctor(System.Byte[],System.Collections.Immutable.ImmutableArray{System.Byte})">
             <summary>
             Result of MAC application containing the wrapped command and new chaining value.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Security.CommandSecurityProcessor.MacResultWithState">
+            <summary>
+            Result of MAC application with full MAC chaining state including implementation parameter.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.CommandSecurityProcessor.MacResultWithState.#ctor(System.Byte[],Gp4Net.Domain.Security.MacChainingState)">
+            <summary>
+            Result of MAC application with full MAC chaining state including implementation parameter.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.CommandSecurityProcessor.ApplyMacWithIcvEncryption(System.Byte[],Gp4Net.Domain.Keys.SessionKeys,Gp4Net.Domain.Security.MacChainingState)">
+            <summary>
+            Applies MAC with ICV encryption support for SCP02 implementations.
+            Per GP Card Specification v2.3.1 Section E.3.4.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.CommandSecurityProcessor.CalculateCMacWithIcvEncryption(System.Byte[],Gp4Net.Domain.Keys.SessionKeys,Gp4Net.Domain.Security.MacChainingState)">
+            <summary>
+            Calculates C-MAC with ICV encryption support for SCP02.
+            Applies ICV encryption per GP Card Specification v2.3.1 Section E.3.4.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.CommandSecurityProcessor.CreateNewStateWithMacChaining(System.Byte[],Gp4Net.Domain.Keys.SessionKeys,Gp4Net.Domain.SecurityLevel,Gp4Net.Domain.Security.MacChainingState,System.UInt32)">
+            <summary>
+            Creates a new secure channel state with updated MAC chaining state.
             </summary>
         </member>
         <member name="T:Gp4Net.Domain.Security.CommandSecurityProcessorAdapter">
@@ -11905,6 +11972,48 @@
         <member name="M:Gp4Net.Domain.Security.HostResponseSecurityProcessor.ApplyResponseSecurity(System.Byte[],Gp4Net.Domain.SecurityLevel,Gp4Net.Domain.Keys.SessionKeys,System.Collections.Immutable.ImmutableArray{System.Byte},System.UInt32,System.Byte)">
             <inheritdoc />
         </member>
+        <member name="T:Gp4Net.Domain.Security.IcvEncryptionService">
+            <summary>
+            Service for applying SCP02 ICV encryption per GP Card Specification v2.3.1 Section E.3.4.
+            All methods are pure functions following functional programming principles.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.IcvEncryptionService.ProcessIcvForMacCalculation(System.Byte[],System.Byte[],Gp4Net.Domain.Protocol.ScpImplementation,System.Boolean)">
+            <summary>
+            Applies ICV encryption to the MAC chaining value if required by the implementation.
+            Per GP Section E.3.4: "The encryption mechanism used is single DES with the first half
+            of the Secure Channel C-MAC session key."
+            </summary>
+            <param name="macChainingValue">The current MAC chaining value (ICV)</param>
+            <param name="cMacSessionKey">The 16-byte C-MAC session key</param>
+            <param name="implementation">The SCP02 implementation parameter</param>
+            <param name="isFirstIcvOfSession">True if this is the first ICV of the session (never encrypted)</param>
+            <returns>Result containing the processed ICV (encrypted or unencrypted based on requirements)</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.IcvEncryptionService.EncryptIcvWithFirstHalfOfCMacKey(System.Byte[],System.Byte[])">
+            <summary>
+            Encrypts the ICV using single DES with the first half of the C-MAC session key.
+            Per GP Section E.3.4: "The encryption mechanism used is single DES with the first half
+            of the Secure Channel C-MAC session key."
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.IcvEncryptionService.ShouldApplyIcvEncryption(Gp4Net.Domain.Protocol.ScpImplementation,System.Boolean)">
+            <summary>
+            Determines whether ICV encryption should be applied based on implementation and session state.
+            This is a pure function that encapsulates the GP specification rules.
+            </summary>
+            <param name="implementation">The SCP02 implementation parameter</param>
+            <param name="isFirstIcvOfSession">True if this is the first ICV of the session</param>
+            <returns>True if ICV encryption should be applied, false otherwise</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.IcvEncryptionService.ValidateIcvEncryptionRequirements(Gp4Net.Domain.Protocol.ScpImplementation,System.Byte[])">
+            <summary>
+            Validates that the implementation and session keys are compatible with ICV encryption requirements.
+            </summary>
+            <param name="implementation">The SCP02 implementation parameter</param>
+            <param name="cMacSessionKey">The C-MAC session key</param>
+            <returns>Result indicating validation success or specific error</returns>
+        </member>
         <member name="T:Gp4Net.Domain.Security.InMemoryReplayProtectionService">
             <summary>
             In-memory implementation of replay protection service.
@@ -12012,6 +12121,39 @@
         <member name="F:Gp4Net.Domain.Security.SecureChannelOperation.SecureMessaging">
             <summary>
             General secure messaging operation.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Security.ISecureChannelStrategy">
+            <summary>
+            Strategy interface for secure channel establishment.
+            Supports both trace replay and live execution modes with different implementations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.ISecureChannelStrategy.EstablishSecureChannel(Gp4Net.Domain.SecurityLevel,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+            <summary>
+            Establishes a secure channel with the specified security level.
+            Implementation varies based on execution mode (trace replay vs live execution).
+            </summary>
+            <param name="securityLevel">The desired security level for the secure channel.</param>
+            <param name="environment">The command execution environment.</param>
+            <returns>Result containing the established secure channel state or an error.</returns>
+        </member>
+        <member name="T:Gp4Net.Domain.Security.LiveSecureChannelStrategy">
+            <summary>
+            Live secure channel strategy that performs actual secure channel establishment.
+            Uses the SecureChannelEstablishment module to execute the full SCP protocol flow.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.LiveSecureChannelStrategy.#ctor(Gp4Net.Domain.Keys.IKeySet)">
+            <summary>
+            Initializes a new instance of the LiveSecureChannelStrategy.
+            </summary>
+            <param name="keySet">The key set to use for secure channel establishment.</param>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.LiveSecureChannelStrategy.EstablishSecureChannel(Gp4Net.Domain.SecurityLevel,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+            <summary>
+            Establishes a secure channel by executing the full SCP protocol flow.
+            Sends INITIALIZE UPDATE and EXTERNAL AUTHENTICATE commands to the card.
             </summary>
         </member>
         <member name="T:Gp4Net.Domain.Security.MacChainingState">
@@ -12178,17 +12320,17 @@
             <param name="macLength">The desired MAC length in bytes.</param>
             <returns>The calculated MAC or an error.</returns>
         </member>
-        <member name="M:Gp4Net.Domain.Security.MacService.CalculateMacWithChaining(System.Byte[],System.Byte[],System.Byte[]@,Gp4Net.Constants.ScpVersion,System.Int32)">
+        <member name="M:Gp4Net.Domain.Security.MacService.CalculateMacWithChaining(System.Byte[],System.Byte[],System.Byte[],Gp4Net.Constants.ScpVersion,System.Int32)">
             <summary>
             Calculates a MAC with chaining for protocols that require it.
             Updates the chaining value for subsequent MAC calculations.
             </summary>
             <param name="key">The MAC key.</param>
             <param name="data">The data to calculate MAC over.</param>
-            <param name="chainingValue">The current chaining value (will be updated).</param>
+            <param name="chainingValue">The current chaining state.</param>
             <param name="protocol">The secure channel protocol version.</param>
             <param name="macLength">The desired MAC length in bytes.</param>
-            <returns>The calculated MAC or an error.</returns>
+            <returns>A result containing the MAC and new chaining state, or an error.</returns>
         </member>
         <member name="M:Gp4Net.Domain.Security.MacService.VerifyMac(System.Byte[],System.Byte[],System.Byte[],Gp4Net.Constants.ScpVersion)">
             <summary>
@@ -12200,13 +12342,18 @@
             <param name="protocol">The secure channel protocol version.</param>
             <returns>Success (true) if MAC is valid, failure with error otherwise.</returns>
         </member>
+        <member name="M:Gp4Net.Domain.Security.MacService.CombineArrays(System.Byte[],System.Byte[])">
+            <summary>
+            Combines two byte arrays into a single array using functional approach.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Domain.Security.ResponseSecurityProcessor">
             <summary>
             Functional processor for applying security to APDU responses.
             All methods are pure functions with no side effects.
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.Security.ResponseSecurityProcessor.ApplyResponseSecurity(System.Byte[],Gp4Net.Domain.SecurityLevel,Gp4Net.Domain.Keys.SessionKeys,System.Collections.Immutable.ImmutableArray{System.Byte},System.UInt32,System.Byte)">
+        <member name="M:Gp4Net.Domain.Security.ResponseSecurityProcessor.ApplyResponseSecurity(System.Byte[],Gp4Net.Domain.SecurityLevel,Gp4Net.Domain.Keys.SessionKeys,System.Collections.Immutable.ImmutableArray{System.Byte},System.UInt32,System.Byte,Gp4Net.Domain.Protocol.ScpImplementation)">
             <summary>
             Applies response security processing (R-MAC verification and/or R-DECRYPTION) to a response.
             Returns the processed response and updated secure channel state.
@@ -12216,6 +12363,12 @@
         <member name="M:Gp4Net.Domain.Security.ResponseSecurityProcessor.GenerateScp03EncryptionIcv(System.Byte[],System.UInt32)">
             <summary>
             Generates the encryption ICV for SCP03.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.ResponseSecurityProcessor.ShouldUpdateChainingAfterRMac(System.Byte,Gp4Net.Domain.Protocol.ScpImplementation)">
+            <summary>
+            Determines if R-MAC should update the MAC chaining value based on SCP implementation.
+            Per GlobalPlatform Card Specification v2.3.1 Section 6.2.6.
             </summary>
         </member>
         <member name="T:Gp4Net.Domain.Security.SecureChannelPhase">
@@ -12653,6 +12806,26 @@
             APDU decryption failed due to an error.
             </summary>
         </member>
+        <member name="T:Gp4Net.Domain.Security.TraceSecureChannelStrategy">
+            <summary>
+            Trace-based secure channel strategy that creates secure channel state from trace data.
+            Parses INITIALIZE UPDATE responses from traces to derive session keys deterministically.
+            Used for trace replay and validation scenarios.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.TraceSecureChannelStrategy.#ctor(Gp4Net.Domain.CapFile.CapInstallationTrace,Gp4Net.Domain.Keys.IKeySet)">
+            <summary>
+            Initializes a new instance of the TraceSecureChannelStrategy.
+            </summary>
+            <param name="trace">The trace data containing secure channel establishment commands.</param>
+            <param name="keySet">The key set to use for session key derivation.</param>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.TraceSecureChannelStrategy.EstablishSecureChannel(Gp4Net.Domain.SecurityLevel,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+            <summary>
+            Creates secure channel state using the existing SecureChannelEstablishment module.
+            Uses the Virtual Card to provide trace-compliant responses for deterministic testing.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Domain.SecurityLevel">
             <summary>
             Security level flags for secure channel protocols.
@@ -12880,7 +13053,51 @@
         </member>
         <member name="F:Gp4Net.Pipeline.CommandProcessors.UnwrapSecureChannel">
             <summary>
-            Unwraps secure channel response if needed.
+            Unwraps secure channel response using the active secure channel state.
+            This processor operates on the response data from ExecuteTransport by creating a response processor.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.CommandProcessors.CreateSecureChannelResponseUnwrapper(Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
+            <summary>
+            Creates a response processor that unwraps secure channel responses.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.CommandProcessors.UnwrapSecureChannelResponse(System.Byte[],Gp4Net.Domain.Security.SecureChannelState)">
+            <summary>
+            Functional secure channel response unwrapper.
+            </summary>
+            <param name="encryptedResponse">The encrypted response data.</param>
+            <param name="channelState">The secure channel state containing keys and counters.</param>
+            <returns>A result containing the decrypted response or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Pipeline.CommandProcessors.UnwrapScp02Response(System.Byte[],Gp4Net.Domain.Security.SecureChannelState)">
+            <summary>
+            Unwraps SCP02 encrypted response using functional cryptographic operations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.CommandProcessors.UnwrapScp03Response(System.Byte[],Gp4Net.Domain.Security.SecureChannelState)">
+            <summary>
+            Unwraps SCP03 encrypted response using functional cryptographic operations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.CommandProcessors.VerifyScp02ResponseMac(System.Byte[],System.Byte[],System.Byte[],Gp4Net.Domain.Security.SecureChannelState)">
+            <summary>
+            Verifies SCP02 response MAC using Triple-DES CBC-MAC.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.CommandProcessors.VerifyScp03ResponseMac(System.Byte[],System.Byte[],System.Byte[],Gp4Net.Domain.Security.SecureChannelState)">
+            <summary>
+            Verifies SCP03 response MAC using AES-CMAC.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.CommandProcessors.DecryptScp02ResponseData(System.Byte[],Gp4Net.Domain.Security.SecureChannelState)">
+            <summary>
+            Decrypts SCP02 response data using Triple-DES CBC.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.CommandProcessors.DecryptScp03ResponseData(System.Byte[],Gp4Net.Domain.Security.SecureChannelState)">
+            <summary>
+            Decrypts SCP03 response data using AES-CBC.
             </summary>
         </member>
         <member name="F:Gp4Net.Pipeline.CommandProcessors.LogResponse">
@@ -12891,6 +13108,7 @@
         <member name="M:Gp4Net.Pipeline.CommandProcessors.CreatePipeline(System.Boolean,System.Boolean)">
             <summary>
             Creates a processor that executes the complete command pipeline.
+            Secure channel unwrapping is now integrated into ExecuteTransport.
             </summary>
         </member>
         <member name="M:Gp4Net.Pipeline.CommandProcessors.RequiresSecureChannel(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
@@ -13234,8 +13452,12 @@
         </member>
         <member name="M:Gp4Net.Pipeline.PipelineContextExtensions.GetRequired``1(Gp4Net.Pipeline.IPipelineContext,System.String)">
             <summary>
-            Gets a required value from the context, throwing if not found.
+            Gets a required value from the context using functional error handling.
             </summary>
+            <typeparam name="T">The type of value to retrieve.</typeparam>
+            <param name="context">The pipeline context.</param>
+            <param name="key">The key to look up.</param>
+            <returns>A result containing the value or an error if not found.</returns>
         </member>
         <member name="M:Gp4Net.Pipeline.PipelineContextExtensions.GetOrDefault``1(Gp4Net.Pipeline.IPipelineContext,System.String,``0)">
             <summary>
@@ -13323,10 +13545,16 @@
         </member>
         <member name="M:Gp4Net.Pipeline.WrappedApduCommand.#ctor(Gp4Net.Transport.IApduCommand,System.Byte[])">
             <summary>
-            Initializes a new instance of WrappedApduCommand.
+            Private constructor for successful creation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Pipeline.WrappedApduCommand.Create(Gp4Net.Transport.IApduCommand,System.Byte[])">
+            <summary>
+            Creates a new WrappedApduCommand with functional validation.
             </summary>
             <param name="originalCommand">The original command before wrapping.</param>
             <param name="wrappedBytes">The secured command bytes.</param>
+            <returns>A result containing the wrapped command or an error.</returns>
         </member>
         <member name="P:Gp4Net.Pipeline.WrappedApduCommand.Cla">
             <inheritdoc />
@@ -13415,6 +13643,20 @@
         </member>
         <member name="M:Gp4Net.Services.GlobalPlatformService.InstallCapFileAsync(System.Byte[],Gp4Net.Services.InstallOptions,System.Threading.CancellationToken)">
             <inheritdoc/>
+        </member>
+        <member name="M:Gp4Net.Services.GlobalPlatformService.ExtractPackageAidFromResults(System.ValueTuple{Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.CommandResponse}[])">
+            <summary>
+            Extracts the package AID from installation results by analyzing INSTALL [for load] commands.
+            </summary>
+            <param name="results">The command execution results.</param>
+            <returns>The package AID bytes extracted from successful installation commands.</returns>
+        </member>
+        <member name="M:Gp4Net.Services.GlobalPlatformService.ExtractInstalledAppletsFromResults(System.ValueTuple{Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.CommandResponse}[])">
+            <summary>
+            Extracts installed applet AIDs from installation results by analyzing command data.
+            </summary>
+            <param name="results">The command execution results.</param>
+            <returns>List of installed applet AIDs extracted from successful installation commands.</returns>
         </member>
         <member name="M:Gp4Net.Services.GlobalPlatformService.DeleteApplicationAsync(System.Byte[],System.Boolean,System.Threading.CancellationToken)">
             <inheritdoc/>
@@ -13721,18 +13963,16 @@
             
             Example usage:
             <code>
-            var transport = new T0ApduTransport();
-            var secureChannelManager = new SecureChannelManager();
+            IApduTransport transport = new T0ApduTransport();
+            ISecureChannelManager secureChannelManager = new SecureChannelManager();
             
-            var configResult = ServiceFactory.CreateServiceConfiguration(transport, secureChannelManager);
+            Result&lt;ServiceConfiguration, SmartCardError&gt; configResult = ServiceFactory.CreateServiceConfiguration(
+                cardChannel, transport, secureChannelManager);
             
-            configResult.Match(
-                config => {
-                    var context = config.CreateServiceContext();
-                    // Use services through context...
-                },
-                error => Console.WriteLine($"Configuration failed: {error}")
-            );
+            Result&lt;IPipelineContext, SmartCardError&gt; contextResult = configResult.Bind(config =&gt; 
+                Result.Success&lt;IPipelineContext, SmartCardError&gt;(config.CreateServiceContext()));
+            
+            // Use services through functional pipeline - no side effects
             </code>
             </summary>
         </member>
@@ -13788,7 +14028,7 @@
             <summary>
             Creates a service context for command execution with all required services.
             </summary>
-            <returns>A pipeline context populated with service dependencies.</returns>
+            <returns>A result containing the pipeline context or error.</returns>
         </member>
         <member name="T:Gp4Net.Services.SmartCardService">
             <summary>

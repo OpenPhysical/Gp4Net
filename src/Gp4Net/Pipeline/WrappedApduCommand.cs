@@ -1,5 +1,6 @@
 using System;
 using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 
@@ -23,19 +24,44 @@ public sealed record WrappedApduCommand : ICompleteApduCommand
     public byte[] WrappedBytes { get; }
     
     /// <summary>
-    /// Initializes a new instance of WrappedApduCommand.
+    /// Private constructor for successful creation.
+    /// </summary>
+    private WrappedApduCommand(IApduCommand originalCommand, byte[] wrappedBytes)
+    {
+        OriginalCommand = originalCommand;
+        WrappedBytes = wrappedBytes;
+    }
+
+    /// <summary>
+    /// Creates a new WrappedApduCommand with functional validation.
     /// </summary>
     /// <param name="originalCommand">The original command before wrapping.</param>
     /// <param name="wrappedBytes">The secured command bytes.</param>
-    public WrappedApduCommand(IApduCommand originalCommand, byte[] wrappedBytes)
+    /// <returns>A result containing the wrapped command or an error.</returns>
+    public static Result<WrappedApduCommand, SmartCardError> Create(
+        IApduCommand originalCommand, 
+        byte[] wrappedBytes)
     {
-        OriginalCommand = originalCommand ?? throw new ArgumentNullException(nameof(originalCommand));
-        WrappedBytes = wrappedBytes ?? throw new ArgumentNullException(nameof(wrappedBytes));
+        if (originalCommand == null)
+        {
+            return Result.Failure<WrappedApduCommand, SmartCardError>(
+                SmartCardError.InvalidArgument("Original command cannot be null"));
+        }
+
+        if (wrappedBytes == null)
+        {
+            return Result.Failure<WrappedApduCommand, SmartCardError>(
+                SmartCardError.InvalidArgument("Wrapped bytes cannot be null"));
+        }
         
         if (wrappedBytes.Length < 4)
         {
-            throw new ArgumentException("Wrapped bytes must contain at least header", nameof(wrappedBytes));
+            return Result.Failure<WrappedApduCommand, SmartCardError>(
+                SmartCardError.InvalidArgument("Wrapped bytes must contain at least header"));
         }
+
+        return Result.Success<WrappedApduCommand, SmartCardError>(
+            new WrappedApduCommand(originalCommand, wrappedBytes));
     }
 
     /// <inheritdoc />

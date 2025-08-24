@@ -241,17 +241,27 @@ public static class CardProfileLoader
         if (hasScp03 || hasAesKeys)
         {
             // Default to SCP03 i=70 for cards with SCP03 support
-            return (0x03, ScpImplementation.Scp03PseudoRandom);
+            return (0x03, ScpImplementation.Scp03I70);
         }
         else if (hasScp02)
         {
+            // Check if card explicitly supports SCP02 i=15 (prefer it over i=55)
+            var scp02Implementations = profile.CardData.Capabilities.ScpSupport
+                .Where(s => s.Protocol == "0x02")
+                .SelectMany(s => s.Implementations)
+                .ToList();
+            
+            if (scp02Implementations.Contains("0x15"))
+            {
+                return (0x02, ScpImplementation.Scp02I15);
+            }
             // Default to SCP02 i=55 for SCP02-only cards
-            return (0x02, ScpImplementation.Scp02StaticMac);
+            return (0x02, ScpImplementation.Scp02I55);
         }
         else
         {
             // Fallback to SCP02 i=15
-            return (0x02, ScpImplementation.Scp02StaticMac);
+            return (0x02, ScpImplementation.Scp02I15);
         }
     }
 

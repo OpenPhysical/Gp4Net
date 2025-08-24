@@ -18,18 +18,16 @@ namespace Gp4Net.Services;
 /// 
 /// Example usage:
 /// <code>
-/// var transport = new T0ApduTransport();
-/// var secureChannelManager = new SecureChannelManager();
+/// IApduTransport transport = new T0ApduTransport();
+/// ISecureChannelManager secureChannelManager = new SecureChannelManager();
 /// 
-/// var configResult = ServiceFactory.CreateServiceConfiguration(transport, secureChannelManager);
+/// Result&lt;ServiceConfiguration, SmartCardError&gt; configResult = ServiceFactory.CreateServiceConfiguration(
+///     cardChannel, transport, secureChannelManager);
 /// 
-/// configResult.Match(
-///     config => {
-///         var context = config.CreateServiceContext();
-///         // Use services through context...
-///     },
-///     error => Console.WriteLine($"Configuration failed: {error}")
-/// );
+/// Result&lt;IPipelineContext, SmartCardError&gt; contextResult = configResult.Bind(config =&gt; 
+///     Result.Success&lt;IPipelineContext, SmartCardError&gt;(config.CreateServiceContext()));
+/// 
+/// // Use services through functional pipeline - no side effects
 /// </code>
 /// </summary>
 public static class ServiceFactory
@@ -129,15 +127,13 @@ public record ServiceConfiguration(
     /// <summary>
     /// Creates a service context for command execution with all required services.
     /// </summary>
-    /// <returns>A pipeline context populated with service dependencies.</returns>
-    public IPipelineContext CreateServiceContext()
+    /// <returns>A result containing the pipeline context or error.</returns>
+    public Result<IPipelineContext, SmartCardError> CreateServiceContext()
     {
         return ServiceFactory.CreatePipelineContext()
-            .Match(
-                context => context
-                    .With("CardService", CardService)
-                    .With("GlobalPlatformService", GlobalPlatformService),
-                error => throw new InvalidOperationException($"Failed to create service context: {error}"));
+            .Map(context => context
+                .With("CardService", CardService)
+                .With("GlobalPlatformService", GlobalPlatformService));
     }
 }
 

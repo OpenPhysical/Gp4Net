@@ -108,33 +108,86 @@ public static class CardInfoTableBuilder
     /// </summary>
     private static IEnumerable<TableRow> BuildIsdDetails(SelectResponse isd)
     {
-        var rows = new List<TableRow> { new StatusRow("ISD", true, "Available") };
+        var statusRow = new StatusRow("ISD", true, "Available");
 
-        // Only show FCI details if available
-        if (isd.Fci != null)
-        {
-            // Build FCI rows from available data
-            if (isd.Fci.ApplicationAid != null)
-                rows.Add(new PropertyRow("ISD AID", Convert.ToHexString(isd.Fci.ApplicationAid)));
-            
-            if (isd.Fci.ApplicationLabel != null && isd.Fci.ApplicationLabel.Length > 0)
-                rows.Add(new PropertyRow("ISD Label", isd.Fci.ApplicationLabel));
-            
-            if (isd.Fci.IssuerIdentificationNumber != null)
-                rows.Add(new PropertyRow("Issuer ID Number", Convert.ToHexString(isd.Fci.IssuerIdentificationNumber)));
-            
-            if (isd.Fci.CardImageNumber != null)
-                rows.Add(new PropertyRow("Card Image Number", Convert.ToHexString(isd.Fci.CardImageNumber)));
-            
-            if (isd.Fci.DiscretionaryData != null)
-            {
-                var discretionary = SecurityDomainDataParser.Decode(isd.Fci.DiscretionaryData);
-                if (discretionary.Length > 0)
-                    rows.Add(new PropertyRow("Discretionary Data", discretionary));
-            }
-        }
+        // Build FCI rows using functional composition with ISD prefix
+        var fciRows = isd.Fci.Match(
+            fci => CreateIsdFciRows(fci),
+            () => Array.Empty<TableRow>());
+        
+        return new[] { statusRow }.Concat(fciRows);
+    }
 
-        return rows;
+    /// <summary>
+    /// Creates table rows from File Control Information (FCI) data for ISD context.
+    /// Extracts key FCI components with "ISD " prefix for proper categorization.
+    /// </summary>
+    private static IEnumerable<TableRow> CreateIsdFciRows(FileControlInformation fci)
+    {
+        // Build rows using functional composition with "ISD " prefix
+        var aidRows = new[] { new PropertyRow("ISD AID", Convert.ToHexString(fci.ApplicationAid)) };
+
+        var labelRows = fci.ApplicationLabel.Match(
+            Some: label => new[] { new PropertyRow("ISD Application Label", label) },
+            None: () => Array.Empty<TableRow>()
+        );
+
+        var priorityRows = fci.ApplicationPriorityIndicator.Match(
+            Some: priority => new[] { new PropertyRow("ISD Priority Indicator", $"0x{priority:X2}") },
+            None: () => Array.Empty<TableRow>()
+        );
+
+        var maxCmdLenRows = fci.MaxCommandDataLength.Match(
+            Some: maxLen => new[] { new PropertyRow("ISD Max Command Length", maxLen.ToString()) },
+            None: () => Array.Empty<TableRow>()
+        );
+
+        var maxRspLenRows = fci.MaxResponseDataLength.Match(
+            Some: maxLen => new[] { new PropertyRow("ISD Max Response Length", maxLen.ToString()) },
+            None: () => Array.Empty<TableRow>()
+        );
+
+        return aidRows
+            .Concat(labelRows)
+            .Concat(priorityRows)
+            .Concat(maxCmdLenRows)
+            .Concat(maxRspLenRows);
+    }
+
+    /// <summary>
+    /// Creates table rows from File Control Information (FCI) data.
+    /// Extracts key FCI components like AID, application label, and other available data.
+    /// </summary>
+    private static IEnumerable<TableRow> CreateFciRows(FileControlInformation fci)
+    {
+        // Build rows using functional composition with actual FCI properties
+        var aidRows = new[] { new PropertyRow("AID", Convert.ToHexString(fci.ApplicationAid)) };
+
+        var labelRows = fci.ApplicationLabel.Match(
+            Some: label => new[] { new PropertyRow("Application Label", label) },
+            None: () => Array.Empty<TableRow>()
+        );
+
+        var priorityRows = fci.ApplicationPriorityIndicator.Match(
+            Some: priority => new[] { new PropertyRow("Priority Indicator", $"0x{priority:X2}") },
+            None: () => Array.Empty<TableRow>()
+        );
+
+        var maxCmdLenRows = fci.MaxCommandDataLength.Match(
+            Some: maxLen => new[] { new PropertyRow("Max Command Length", maxLen.ToString()) },
+            None: () => Array.Empty<TableRow>()
+        );
+
+        var maxRspLenRows = fci.MaxResponseDataLength.Match(
+            Some: maxLen => new[] { new PropertyRow("Max Response Length", maxLen.ToString()) },
+            None: () => Array.Empty<TableRow>()
+        );
+
+        return aidRows
+            .Concat(labelRows)
+            .Concat(priorityRows)
+            .Concat(maxCmdLenRows)
+            .Concat(maxRspLenRows);
     }
 
     /// <summary>
@@ -511,12 +564,12 @@ public static class CardInfoTableBuilder
         // For SCP03 and other protocols, use explicit descriptions
         return implementation switch
         {
-            ScpImplementation.Scp03Aes128 => "AES-128",
-            ScpImplementation.Scp03Aes192 => "AES-192", 
-            ScpImplementation.Scp03Aes256 => "AES-256",
-            ScpImplementation.Scp03NoResponseMac => "AES-128 (no R-MAC)",
-            ScpImplementation.Scp03RandomChallenge => "Random card challenge",
-            ScpImplementation.Scp03PseudoRandom => "Pseudo-random card challenge",
+            ScpImplementation.Scp03I10 => "AES-128",
+            ScpImplementation.Scp03I20 => "AES-192", 
+            ScpImplementation.Scp03I30 => "AES-256",
+            ScpImplementation.Scp03I11 => "AES-128 (no R-MAC)",
+            ScpImplementation.Scp03I60 => "Random card challenge",
+            ScpImplementation.Scp03I70 => "Pseudo-random card challenge",
             _ => $"Implementation 0x{((byte)implementation):X2}"
         };
     }

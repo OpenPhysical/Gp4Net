@@ -57,12 +57,12 @@ public class Scp02ImplementationClassificationTests
         TestContext.Out.WriteLine($"Implementation {implementation} (0x{(byte)implementation:X2}) correctly classified as SCP02: {result}");
     }
 
-    [TestCase(ScpImplementation.Scp03Aes128, false, "i=10 should not be classified as SCP02 (is SCP03)")]
-    [TestCase(ScpImplementation.Scp03NoResponseMac, false, "i=11 should not be classified as SCP02 (is SCP03)")]
-    [TestCase(ScpImplementation.Scp03Aes192, false, "i=20 should not be classified as SCP02 (is SCP03)")]
-    [TestCase(ScpImplementation.Scp03Aes256, false, "i=30 should not be classified as SCP02 (is SCP03)")]
-    [TestCase(ScpImplementation.Scp03RandomChallenge, false, "i=60 should not be classified as SCP02 (is SCP03)")]
-    [TestCase(ScpImplementation.Scp03PseudoRandom, false, "i=70 should not be classified as SCP02 (is SCP03)")]
+    [TestCase(ScpImplementation.Scp03I10, false, "i=10 should not be classified as SCP02 (is SCP03)")]
+    [TestCase(ScpImplementation.Scp03I11, false, "i=11 should not be classified as SCP02 (is SCP03)")]
+    [TestCase(ScpImplementation.Scp03I20, false, "i=20 should not be classified as SCP02 (is SCP03)")]
+    [TestCase(ScpImplementation.Scp03I30, false, "i=30 should not be classified as SCP02 (is SCP03)")]
+    [TestCase(ScpImplementation.Scp03I60, false, "i=60 should not be classified as SCP02 (is SCP03)")]
+    [TestCase(ScpImplementation.Scp03I70, false, "i=70 should not be classified as SCP02 (is SCP03)")]
     public void IsScp02_WithKnownScp03Implementations_ShouldReturnFalse(
         ScpImplementation implementation, 
         bool expected, 
@@ -88,12 +88,12 @@ public class Scp02ImplementationClassificationTests
         // Arrange - SCP03 values that fall within the SCP02 range (≤ 0x7A)
         var scp03ValuesInRange = new[]
         {
-            (byte)ScpImplementation.Scp03Aes128,      // 0x10
-            (byte)ScpImplementation.Scp03NoResponseMac, // 0x11
-            (byte)ScpImplementation.Scp03Aes192,      // 0x20
-            (byte)ScpImplementation.Scp03Aes256,      // 0x30
-            (byte)ScpImplementation.Scp03RandomChallenge, // 0x60
-            (byte)ScpImplementation.Scp03PseudoRandom    // 0x70
+            (byte)ScpImplementation.Scp03I10,      // 0x10
+            (byte)ScpImplementation.Scp03I11, // 0x11
+            (byte)ScpImplementation.Scp03I20,      // 0x20
+            (byte)ScpImplementation.Scp03I30,      // 0x30
+            (byte)ScpImplementation.Scp03I60, // 0x60
+            (byte)ScpImplementation.Scp03I70    // 0x70
         };
 
         foreach (var value in scp03ValuesInRange)
@@ -170,15 +170,15 @@ public class Scp02ImplementationClassificationTests
     }
 
     /// <summary>
-    /// Tests that legacy aliases are correctly classified as SCP02.
-    /// These are important for backward compatibility.
+    /// Tests that additional SCP02 implementations are correctly classified as SCP02.
+    /// These cover the full range of defined SCP02 implementations.
     /// </summary>
-    [TestCase(ScpImplementation.Scp02StaticMac, true, "Legacy alias Scp02StaticMac should be classified as SCP02")]
-    [TestCase(ScpImplementation.Scp02CmacMult, true, "Legacy alias Scp02CmacMult should be classified as SCP02")]
-    [TestCase(ScpImplementation.Scp02CmacXor, true, "Legacy alias Scp02CmacXor should be classified as SCP02")]
-    [TestCase(ScpImplementation.Scp02ExplicitInitVector, true, "Legacy alias Scp02ExplicitInitVector should be classified as SCP02")]
-    [TestCase(ScpImplementation.Scp02ImplicitInitVector, true, "Legacy alias Scp02ImplicitInitVector should be classified as SCP02")]
-    public void IsScp02_WithLegacyAliases_ShouldReturnTrue(
+    [TestCase(ScpImplementation.Scp02I00, true, "SCP02 i=00 should be classified as SCP02")]
+    [TestCase(ScpImplementation.Scp02I15, true, "SCP02 i=15 should be classified as SCP02")]
+    [TestCase(ScpImplementation.Scp02I35, true, "SCP02 i=35 should be classified as SCP02")]
+    [TestCase(ScpImplementation.Scp02I55, true, "SCP02 i=55 should be classified as SCP02")]
+    [TestCase(ScpImplementation.Scp02I75, true, "SCP02 i=75 should be classified as SCP02")]
+    public void IsScp02_WithAdditionalScp02Implementations_ShouldReturnTrue(
         ScpImplementation implementation, 
         bool expected, 
         string description)

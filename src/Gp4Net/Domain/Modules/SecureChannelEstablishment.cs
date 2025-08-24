@@ -26,12 +26,14 @@ public static class SecureChannelEstablishment
     /// <param name="keySet">The key set to use for authentication.</param>
     /// <param name="securityLevel">The desired security level.</param>
     /// <param name="executeCommand">Function to execute APDU commands.</param>
+    /// <param name="selectedAid">The AID of the selected application (required for implicit mode with MAC over AID).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The established secure channel state or an error.</returns>
     public static async Task<Result<SecureChannelState, SmartCardError>> EstablishAsync(
         IKeySet keySet,
         SecurityLevel securityLevel,
         Func<IApduCommand, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
+        byte[] selectedAid = null,
         CancellationToken cancellationToken = default)
     {
         // Generate host challenge
@@ -84,7 +86,7 @@ public static class SecureChannelEstablishment
         }
 
         // Create secure channel state
-        return CreateSecureChannelState(protocol, context, securityLevel);
+        return CreateSecureChannelState(protocol, context, securityLevel, selectedAid);
     }
 
     /// <summary>
@@ -193,17 +195,24 @@ public static class SecureChannelEstablishment
     private static Result<SecureChannelState, SmartCardError> CreateSecureChannelState(
         ISecureChannelProtocol protocol,
         SecureChannelContext context,
-        SecurityLevel securityLevel)
+        SecurityLevel securityLevel,
+        byte[] selectedAid)
     {
         // Determine implementation parameter (SCP02 specific; 0 for SCP03)
         byte implementationParameter = context.ProtocolVersion == 0x02
             ? context.InitializeUpdateResponse.ScpParameter
             : (byte)0x00;
 
-        // Create zero-initialized MAC chaining state sized per protocol (8 for SCP02, 16 for SCP03)
-        Result<MacChainingState, SmartCardError> macChainingResult = MacChainingState.CreateZeroInitialized(
-            protocolVersion: context.ProtocolVersion,
-            implementationParameter: implementationParameter);
+        // Create MAC chaining state with appropriate ICV based on implementation requirements
+        Result<MacChainingState, SmartCardError> macChainingResult = context.ProtocolVersion == 0x02
+            ? AidMacCalculationService.CreateInitialMacChainingState(
+                selectedAid,
+                context.SessionKeys.SMac,  // SMac is the C-MAC session key per GP specification
+                (ScpImplementation)implementationParameter,
+                context.ProtocolVersion)
+            : MacChainingState.CreateZeroInitialized(
+                protocolVersion: context.ProtocolVersion,
+                implementationParameter: implementationParameter);
         
         if (macChainingResult.IsFailure)
         {
@@ -238,6 +247,20 @@ public static class SecureChannelEstablishment
         Func<IApduCommand, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
         CancellationToken cancellationToken = default)
     {
+        // First detect and select ISD to get the selected AID
+        Result<SelectResponse, SmartCardError> isdResult = 
+            await CardDiscovery.DetectAndSelectIsdAsync(executeCommand, cancellationToken);
+        
+        if (isdResult.IsFailure)
+        {
+            return Result.Failure<SecureChannelState, SmartCardError>(isdResult.Error);
+        }
+
+        // Extract AID from FCI if available, otherwise use empty AID for ISD
+        byte[] selectedAid = isdResult.Value.Fci
+            .Map(fci => fci.ApplicationAid)
+            .GetValueOrDefault([]);
+
         // Try to discover the working key set
         Result<(IKeySet KeySet, byte ProtocolVersion), SmartCardError> discoveryResult = 
             await CardDiscovery.DiscoverKeySetAsync(executeCommand, null, cancellationToken);
@@ -249,7 +272,7 @@ public static class SecureChannelEstablishment
 
         (IKeySet keySet, byte _) = discoveryResult.Value;
 
-        // Establish secure channel with discovered key set
-        return await EstablishAsync(keySet, securityLevel, executeCommand, cancellationToken);
+        // Establish secure channel with discovered key set and selected AID
+        return await EstablishAsync(keySet, securityLevel, executeCommand, selectedAid, cancellationToken);
     }
 }

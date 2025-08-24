@@ -81,7 +81,7 @@ public class CardProfileLoaderTests
 
         // SCP defaults
         _ = config.DefaultScpVersion.Should().Be(0x02);
-        _ = config.DefaultScpImplementation.Should().Be(ScpImplementation.Scp02StaticMac);
+        _ = config.DefaultScpImplementation.Should().Be(ScpImplementation.Scp02I15);
 
         // Keys
         _ = config.StaticKeys.Should().ContainKey((byte)1);
@@ -143,7 +143,7 @@ public class CardProfileLoaderTests
         _ = result.IsSuccess.Should().BeTrue();
         var config = result.Value;
         _ = config.DefaultScpVersion.Should().Be(0x03);
-        _ = config.DefaultScpImplementation.Should().Be(ScpImplementation.Scp03PseudoRandom);
+        _ = config.DefaultScpImplementation.Should().Be(ScpImplementation.Scp03I70);
         _ = config.StaticKeys[1].Should().BeOfType<Scp03KeySet>();
     }
     

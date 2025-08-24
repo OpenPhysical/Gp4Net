@@ -205,44 +205,50 @@ public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
     {
         try
         {
-            var fci = selectResponse.Fci;
-            if (fci != null)
-            {
-                if (fci.ApplicationAid != null)
+            selectResponse.Fci.Match(
+                fci =>
                 {
-                    _ = table.AddRow("ISD AID", Convert.ToHexString(fci.ApplicationAid));
-                }
-
-                if (!string.IsNullOrEmpty(fci.ApplicationLabel))
-                {
-                    _ = table.AddRow("ISD Label", fci.ApplicationLabel);
-                }
-
-                if (fci.IssuerIdentificationNumber != null)
-                {
-                    _ = table.AddRow(
-                        "Issuer ID Number",
-                        Convert.ToHexString(fci.IssuerIdentificationNumber)
-                    );
-                }
-
-                if (fci.CardImageNumber != null)
-                {
-                    _ = table.AddRow(
-                        "Card Image Number",
-                        Convert.ToHexString(fci.CardImageNumber)
-                    );
-                }
-
-                if (fci.DiscretionaryData != null)
-                {
-                    var decoded = SecurityDomainDataParser.Decode(fci.DiscretionaryData);
-                    if (!string.IsNullOrEmpty(decoded))
+                    // Add AID if present
+                    if (fci.ApplicationAid.Length > 0)
                     {
-                        _ = table.AddRow("Discretionary Data", decoded);
+                        _ = table.AddRow("ISD AID", Convert.ToHexString(fci.ApplicationAid));
                     }
-                }
-            }
+
+                    // Add label if present
+                    fci.ApplicationLabel.Match(
+                        label => { _ = table.AddRow("ISD Label", label); return true; },
+                        () => false);
+
+                    // Add issuer identification number if present
+                    if (fci.IssuerIdentificationNumber.Length > 0)
+                    {
+                        _ = table.AddRow(
+                            "Issuer ID Number",
+                            Convert.ToHexString(fci.IssuerIdentificationNumber)
+                        );
+                    }
+
+                    // Add card image number if present
+                    if (fci.CardImageNumber.Length > 0)
+                    {
+                        _ = table.AddRow(
+                            "Card Image Number",
+                            Convert.ToHexString(fci.CardImageNumber)
+                        );
+                    }
+
+                    // Add discretionary data if present
+                    if (fci.DiscretionaryData.Length > 0)
+                    {
+                        var decoded = SecurityDomainDataParser.Decode(fci.DiscretionaryData);
+                        if (decoded.Length > 0)
+                        {
+                            _ = table.AddRow("Discretionary Data", decoded);
+                        }
+                    }
+                    return true;
+                },
+                () => false);
         }
         catch (Exception ex)
         {
@@ -490,12 +496,12 @@ public class InfoCommand : IPipelineCommand<InfoCommand.Settings>
         // For SCP03 and other protocols, use explicit descriptions
         return implementation switch
         {
-            ScpImplementation.Scp03Aes128 => "AES-128",
-            ScpImplementation.Scp03Aes192 => "AES-192", 
-            ScpImplementation.Scp03Aes256 => "AES-256",
-            ScpImplementation.Scp03NoResponseMac => "AES-128 (no R-MAC)",
-            ScpImplementation.Scp03RandomChallenge => "Random card challenge",
-            ScpImplementation.Scp03PseudoRandom => "Pseudo-random card challenge",
+            ScpImplementation.Scp03I10 => "AES-128",
+            ScpImplementation.Scp03I20 => "AES-192", 
+            ScpImplementation.Scp03I30 => "AES-256",
+            ScpImplementation.Scp03I11 => "AES-128 (no R-MAC)",
+            ScpImplementation.Scp03I60 => "Random card challenge",
+            ScpImplementation.Scp03I70 => "Pseudo-random card challenge",
             _ => $"Implementation 0x{((byte)implementation):X2}"
         };
     }

@@ -78,16 +78,8 @@ public static class IseImporter
                 SmartCardError.FileNotFound());
         }
 
-        try
-        {
-            var content = File.ReadAllText(filePath);
-            return ImportFromString(store, content);
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<SecureKeyStore, SmartCardError>(
-                SmartCardError.UnexpectedError($"Failed to read ISE file: {ex.Message}", ex));
-        }
+        return Result.Try(() => File.ReadAllText(filePath), ex => SmartCardError.UnexpectedError($"Failed to read ISE file: {ex.Message}", ex))
+            .Bind(content => ImportFromString(store, content));
     }
 
     /// <summary>
@@ -293,24 +285,24 @@ public static class IseImporter
                 continue;
             }
 
-            try
+            var hexParseResult = Result.Try(() => 
             {
                 var cleanedHex = hexValue.Replace(" ", "").Replace("-", "");
-                var keyBytes = Convert.FromHexString(cleanedHex);
-                
-                entries.Add(new IseKeyEntry(
-                    KeyId: keyName,
-                    KeyValue: keyBytes,
-                    Type: keyTypeResult.Value,
-                    KeyVersion: keyVersion,
-                    Description: $"ISE imported {keyName}"
-                ));
-            }
-            catch (FormatException)
+                return Convert.FromHexString(cleanedHex);
+            }, _ => SmartCardError.InvalidArgument($"Invalid hex value for {keyName}"));
+            
+            if (hexParseResult.IsFailure)
             {
-                return Result.Failure<List<IseKeyEntry>, SmartCardError>(
-                    SmartCardError.InvalidArgument($"Invalid hex value for {keyName}"));
+                return hexParseResult.Error;
             }
+                
+            entries.Add(new IseKeyEntry(
+                KeyId: keyName,
+                KeyValue: hexParseResult.Value,
+                Type: keyTypeResult.Value,
+                KeyVersion: keyVersion,
+                Description: $"ISE imported {keyName}"
+            ));
         }
 
         if (entries.Count == 0)
@@ -332,24 +324,24 @@ public static class IseImporter
 
         for (var i = 0; i < 3; i++)
         {
-            try
+            var hexParseResult = Result.Try(() => 
             {
                 var cleanedHex = lines[i].Replace(" ", "").Replace("-", "");
-                var keyBytes = Convert.FromHexString(cleanedHex);
-                
-                entries.Add(new IseKeyEntry(
-                    KeyId: keyTypes[i].ToString(),
-                    KeyValue: keyBytes,
-                    Type: keyTypes[i],
-                    KeyVersion: 0x00,
-                    Description: $"ISE imported {keyTypes[i]} key"
-                ));
-            }
-            catch (FormatException)
+                return Convert.FromHexString(cleanedHex);
+            }, _ => SmartCardError.InvalidArgument($"Invalid hex on line {i + 1}"));
+            
+            if (hexParseResult.IsFailure)
             {
-                return Result.Failure<List<IseKeyEntry>, SmartCardError>(
-                    SmartCardError.InvalidArgument($"Invalid hex on line {i + 1}"));
+                return hexParseResult.Error;
             }
+                
+            entries.Add(new IseKeyEntry(
+                KeyId: keyTypes[i].ToString(),
+                KeyValue: hexParseResult.Value,
+                Type: keyTypes[i],
+                KeyVersion: 0x00,
+                Description: $"ISE imported {keyTypes[i]} key"
+            ));
         }
 
         return Result.Success<List<IseKeyEntry>, SmartCardError>(entries);
@@ -360,7 +352,7 @@ public static class IseImporter
     /// </summary>
     private static Result<List<IseKeyEntry>, SmartCardError> ParseSingleLineFormat(string line)
     {
-        try
+        return Result.Try(() => 
         {
             var cleanedHex = line.Replace(" ", "").Replace("-", "");
             var keyBytes = Convert.FromHexString(cleanedHex);
@@ -379,13 +371,8 @@ public static class IseImporter
                 ));
             }
 
-            return Result.Success<List<IseKeyEntry>, SmartCardError>(entries);
-        }
-        catch (FormatException)
-        {
-            return Result.Failure<List<IseKeyEntry>, SmartCardError>(
-                SmartCardError.InvalidArgument("Invalid hex string"));
-        }
+            return entries;
+        }, _ => SmartCardError.InvalidArgument("Invalid hex string"));
     }
 
     /// <summary>

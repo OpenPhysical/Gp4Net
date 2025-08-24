@@ -250,20 +250,19 @@ public static class TlvParser
     /// Converts a tag array to a numeric value for common 1-3 byte tags.
     /// </summary>
     /// <param name="tag">The tag bytes.</param>
-    /// <returns>The numeric tag value.</returns>
-    public static uint TagToNumber(byte[] tag)
+    /// <returns>A result containing the numeric tag value or an error.</returns>
+    public static Result<uint, SmartCardError> TagToNumber(byte[] tag)
     {
         if (tag == null || tag.Length == 0 || tag.Length > 4)
         {
-            throw new ArgumentException("Tag must be 1-4 bytes.", nameof(tag));
+            return Result.Failure<uint, SmartCardError>(
+                SmartCardError.InvalidArgument("Tag must be 1-4 bytes."));
         }
 
-        uint result = 0;
-        foreach (var b in tag)
-        {
-            result = (result << 8) | b;
-        }
-        return result;
+        // Functional fold operation instead of imperative foreach
+        uint result = tag.Aggregate(0u, (acc, b) => (acc << 8) | b);
+        
+        return Result.Success<uint, SmartCardError>(result);
     }
 
     /// <summary>
@@ -327,14 +326,12 @@ public class TlvObject
     }
 
     /// <summary>
-    /// Gets the tag as a numeric value (for common 1-3 byte tags).
+    /// Gets the tag as a numeric value using functional error handling.
     /// </summary>
-    public uint TagNumber
+    /// <returns>A result containing the tag number or an error.</returns>
+    public Result<uint, SmartCardError> GetTagNumber()
     {
-        get
-        {
-            return TlvParser.TagToNumber(Tag);
-        }
+        return TlvParser.TagToNumber(Tag);
     }
 
     /// <summary>

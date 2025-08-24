@@ -27,15 +27,27 @@ public static class CapInstallationOrchestrator
     /// Pure function that composes all installation steps using Result chains.
     /// </summary>
     /// <param name="traceData">Installation trace data containing command sequence.</param>
+    /// <param name="secureChannelStrategy">Strategy for secure channel establishment.</param>
     /// <param name="environment">Command execution environment.</param>
     /// <returns>Result containing installation execution results.</returns>
-    public static Result<CapInstallationResult, SmartCardError> ExecuteFromTrace(
+    public static async Task<Result<CapInstallationResult, SmartCardError>> ExecuteFromTrace(
         CapInstallationTrace traceData,
+        Security.ISecureChannelStrategy secureChannelStrategy,
         CommandProcessing.CommandEnvironment environment)
     {
-        return CapInstallationTraceLoader.ExtractCommandSequence(traceData)
-            .Bind(sequence => ExecuteInstallationSequence(sequence, environment))
-            .Map(results => CreateInstallationResult(results, traceData));
+        var sequenceResult = CapInstallationTraceLoader.ExtractCommandSequence(traceData);
+        if (sequenceResult.IsFailure)
+        {
+            return sequenceResult.Error;
+        }
+
+        var executionResult = await ExecuteInstallationSequence(sequenceResult.Value, secureChannelStrategy, environment);
+        if (executionResult.IsFailure)
+        {
+            return executionResult.Error;
+        }
+
+        return CreateInstallationResult(executionResult.Value, traceData);
     }
 
     /// <summary>
@@ -43,15 +55,27 @@ public static class CapInstallationOrchestrator
     /// Pure function for programmatic installation without trace dependency.
     /// </summary>
     /// <param name="request">Installation request parameters.</param>
+    /// <param name="secureChannelStrategy">Strategy for secure channel establishment.</param>
     /// <param name="environment">Command execution environment.</param>
     /// <returns>Result containing installation execution results.</returns>
-    public static Result<CapInstallationResult, SmartCardError> ExecuteInstallation(
+    public static async Task<Result<CapInstallationResult, SmartCardError>> ExecuteInstallation(
         CapInstallationRequest request,
+        Security.ISecureChannelStrategy secureChannelStrategy,
         CommandProcessing.CommandEnvironment environment)
     {
-        return ValidateInstallationRequest(request)
-            .Bind(_ => ExecuteInstallationWorkflow(request, environment))
-            .Map(results => CreateInstallationResult(results, request));
+        var validationResult = ValidateInstallationRequest(request);
+        if (validationResult.IsFailure)
+        {
+            return validationResult.Error;
+        }
+
+        var workflowResult = await ExecuteInstallationWorkflow(request, secureChannelStrategy, environment);
+        if (workflowResult.IsFailure)
+        {
+            return workflowResult.Error;
+        }
+
+        return CreateInstallationResult(workflowResult.Value, request);
     }
 
     /// <summary>
@@ -72,50 +96,107 @@ public static class CapInstallationOrchestrator
 
     // Private implementation methods
 
-    private static Result<InstallationStepResults, SmartCardError> ExecuteInstallationSequence(
+    private static async Task<Result<InstallationStepResults, SmartCardError>> ExecuteInstallationSequence(
         InstallationCommandSequence sequence,
+        Security.ISecureChannelStrategy secureChannelStrategy,
         CommandProcessing.CommandEnvironment environment)
     {
         environment.Logger?.LogDebug("Starting CAP installation sequence with secure channel state: {HasSecureChannel}", 
             environment.SecureChannel.HasValue);
-        
-        return ExecuteSelectStep(sequence.SelectCommand, environment)
-            .Map(selectResult => {
-                var results = InstallationStepResults.Empty(environment).AddStep(selectResult);
-                environment.Logger?.LogDebug("Completed SELECT step, secure channel state: {HasSecureChannel}", 
-                    results.Environment.SecureChannel.HasValue);
-                return results;
-            })
-            .Bind(results => ExecuteSecureChannelStep(sequence.SecureChannelSetup, results.Environment)
-                .Map(scpResults => {
-                    var updatedResults = results.AddStep(scpResults);
-                    environment.Logger?.LogDebug("Completed SECURE_CHANNEL step, secure channel established: {HasSecureChannel}", 
-                        updatedResults.Environment.SecureChannel.HasValue);
-                    return updatedResults;
-                }))
-            .Bind(results => ExecuteInstallForLoadStep(sequence.InstallForLoad, results.Environment)
-                .Map(installResults => results.AddStep(installResults)))
-            .Bind(results => ExecuteLoadSteps(sequence.LoadCommands, results.Environment)
-                .Map(loadResults => results.AddSteps(loadResults)))
-            .Bind(results => ExecuteInstallForInstallStep(sequence.InstallForInstall, results.Environment)
-                .Map(finalResults => results.AddStep(finalResults)));
+
+        // Execute SELECT step
+        var selectResult = ExecuteSelectStep(sequence.SelectCommand, environment);
+        if (selectResult.IsFailure)
+        {
+            return selectResult.Error;
+        }
+
+        var results = InstallationStepResults.Empty(environment).AddStep(selectResult.Value);
+        environment.Logger?.LogDebug("Completed SELECT step, secure channel state: {HasSecureChannel}", 
+            results.Environment.SecureChannel.HasValue);
+
+        // Execute secure channel establishment using strategy
+        var secureChannelResult = await ExecuteSecureChannelStep(sequence.SecureChannelSetup, secureChannelStrategy, results.Environment);
+        if (secureChannelResult.IsFailure)
+        {
+            return secureChannelResult.Error;
+        }
+
+        results = results.AddStep(secureChannelResult.Value);
+        environment.Logger?.LogDebug("Completed SECURE_CHANNEL step, secure channel established: {HasSecureChannel}", 
+            results.Environment.SecureChannel.HasValue);
+
+        // Execute remaining steps
+        var installForLoadResult = ExecuteInstallForLoadStep(sequence.InstallForLoad, results.Environment);
+        if (installForLoadResult.IsFailure)
+        {
+            return installForLoadResult.Error;
+        }
+
+        results = results.AddStep(installForLoadResult.Value);
+
+        var loadStepsResult = ExecuteLoadSteps(sequence.LoadCommands, results.Environment);
+        if (loadStepsResult.IsFailure)
+        {
+            return loadStepsResult.Error;
+        }
+
+        results = results.AddSteps(loadStepsResult.Value);
+
+        var installForInstallResult = ExecuteInstallForInstallStep(sequence.InstallForInstall, results.Environment);
+        if (installForInstallResult.IsFailure)
+        {
+            return installForInstallResult.Error;
+        }
+
+        return results.AddStep(installForInstallResult.Value);
     }
 
-    private static Result<InstallationStepResults, SmartCardError> ExecuteInstallationWorkflow(
+    private static async Task<Result<InstallationStepResults, SmartCardError>> ExecuteInstallationWorkflow(
         CapInstallationRequest request,
+        Security.ISecureChannelStrategy secureChannelStrategy,
         CommandProcessing.CommandEnvironment environment)
     {
-        return ExecuteIsdSelection(request.IsdAid, environment)
-            .Map(isdResult => InstallationStepResults.Empty(environment).AddStep(isdResult))
-            .Bind(results => ExecuteAuthentication(request.KeySet, results.Environment)
-                .Map(authResults => results.AddStep(authResults)))
-            .Bind(results => ExecuteInstallForLoadOperation(request.PackageAid, results.Environment)
-                .Map(installResults => results.AddStep(installResults)))
-            .Bind(results => ExecuteLoadOperations(request.CapBlocks, results.Environment)
-                .Map(loadResults => results.AddSteps(loadResults)))
-            .Bind(results => ExecuteInstallForInstallOperation(
-                request.PackageAid, request.AppletAid, request.Privileges, results.Environment)
-                .Map(finalResults => results.AddStep(finalResults)));
+        var isdResult = ExecuteIsdSelection(request.IsdAid, environment);
+        if (isdResult.IsFailure)
+        {
+            return isdResult.Error;
+        }
+
+        var results = InstallationStepResults.Empty(environment).AddStep(isdResult.Value);
+
+        var authResult = await ExecuteAuthentication(request.KeySet, secureChannelStrategy, results.Environment);
+        if (authResult.IsFailure)
+        {
+            return authResult.Error;
+        }
+
+        results = results.AddStep(authResult.Value);
+
+        var installForLoadResult = ExecuteInstallForLoadOperation(request.PackageAid, results.Environment);
+        if (installForLoadResult.IsFailure)
+        {
+            return installForLoadResult.Error;
+        }
+
+        results = results.AddStep(installForLoadResult.Value);
+
+        var loadOperationsResult = ExecuteLoadOperations(request.CapBlocks, results.Environment);
+        if (loadOperationsResult.IsFailure)
+        {
+            return loadOperationsResult.Error;
+        }
+
+        results = results.AddSteps(loadOperationsResult.Value);
+
+        var installForInstallResult = ExecuteInstallForInstallOperation(
+            request.PackageAid, request.AppletAid, request.Privileges, results.Environment);
+        if (installForInstallResult.IsFailure)
+        {
+            return installForInstallResult.Error;
+        }
+
+        return results.AddStep(installForInstallResult.Value);
     }
 
     private static Result<InstallationStepResult, SmartCardError> ExecuteSelectStep(
@@ -132,18 +213,39 @@ public static class CapInstallationOrchestrator
                 result.UpdatedEnvironment));
     }
 
-    private static Result<InstallationStepResult, SmartCardError> ExecuteSecureChannelStep(
+    private static async Task<Result<InstallationStepResult, SmartCardError>> ExecuteSecureChannelStep(
         SecureChannelCommands scpCommands,
+        Security.ISecureChannelStrategy secureChannelStrategy,
         CommandProcessing.CommandEnvironment environment)
     {
-        return ExecuteInitializeUpdate(scpCommands.InitializeUpdate, environment)
-            .Bind(initResult => ExecuteExternalAuthenticate(scpCommands.ExternalAuthenticate, initResult.Environment)
-                .Map(extAuthResult => new InstallationStepResult(
-                    "SECURE_CHANNEL",
-                    scpCommands.ExternalAuthenticate,
-                    extAuthResult.Data,
-                    extAuthResult.StatusWord,
-                    extAuthResult.UpdatedEnvironment)));
+        // Extract security level from EXTERNAL AUTHENTICATE command for strategy
+        var securityLevelResult = ParseHexCommand(scpCommands.ExternalAuthenticate.Command)
+            .Bind(ExtractSecurityLevelFromCommand);
+            
+        if (securityLevelResult.IsFailure)
+        {
+            return securityLevelResult.Error;
+        }
+
+        // Use strategy to establish secure channel
+        var secureChannelResult = await secureChannelStrategy.EstablishSecureChannel(
+            securityLevelResult.Value, 
+            environment);
+            
+        if (secureChannelResult.IsFailure)
+        {
+            return secureChannelResult.Error;
+        }
+
+        // Update environment with secure channel
+        var updatedEnvironment = environment.WithSecureChannel(secureChannelResult.Value);
+
+        return Result.Success<InstallationStepResult, SmartCardError>(new InstallationStepResult(
+            "SECURE_CHANNEL",
+            scpCommands.ExternalAuthenticate,
+            new byte[] { 0x90, 0x00 }, // Success response for secure channel establishment
+            Gp4Net.Constants.StatusWords.Success,
+            updatedEnvironment));
     }
 
     private static Result<InstallationStepResult, SmartCardError> ExecuteInstallForLoadStep(
@@ -374,18 +476,6 @@ public static class CapInstallationOrchestrator
             });
     }
 
-    private static Result<CommandProcessing.CommandResult, SmartCardError> ExecuteExternalAuthenticate(
-        TraceExchange extAuthExchange,
-        CommandProcessing.CommandEnvironment environment)
-    {
-        // Parse EXTERNAL AUTHENTICATE command from trace
-        return ParseHexCommand(extAuthExchange.Command)
-            .Bind(commandBytes => ExtractSecurityLevelFromCommand(commandBytes)
-                .Bind(securityLevel => ExtractCryptogramFromCommand(commandBytes)
-                    .Bind(cryptogram => ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, cryptogram)
-                        .Bind(extAuthCmd => ProcessCommand(extAuthCmd, environment))
-                        .Bind(result => EstablishRealSecureChannel(result, securityLevel, environment)))));
-    }
 
     private static Result<byte[], SmartCardError> ParseHexCommand(string commandHex)
     {
@@ -420,55 +510,6 @@ public static class CapInstallationOrchestrator
         return cryptogram;
     }
 
-    /// <summary>
-    /// Establishes secure channel using the SecureChannelEstablishment module.
-    /// Uses proper key derivation and cryptographic session establishment.
-    /// </summary>
-    private static Result<CommandProcessing.CommandResult, SmartCardError> EstablishRealSecureChannel(
-        CommandProcessing.CommandResult result,
-        SecurityLevel securityLevel,
-        CommandProcessing.CommandEnvironment environment)
-    {
-        environment.Logger.LogDebug("Establishing secure channel with security level: {SecurityLevel}", securityLevel);
-        
-        // Create SCP03 test key set for secure channel establishment
-        var keySet = Keys.GpTestKeys.CreateScp03TestKeySet();
-        
-        // Create command execution function that works with our environment
-        Func<Transport.IApduCommand, CancellationToken, Task<Result<Pipeline.CommandResponse, SmartCardError>>> executeCommand = 
-            async (command, cancellationToken) =>
-            {
-                var response = await environment.Transport.TransmitAsync(command, environment.Channel, cancellationToken);
-                
-                // Convert to CommandResponse format expected by SecureChannelEstablishment
-                var commandResponse = response.StatusWord == Gp4Net.Constants.StatusWords.Success 
-                    ? Pipeline.CommandResponse.Success(response.Data)
-                    : Pipeline.CommandResponse.Failure(response.StatusWord);
-                
-                return Result.Success<Pipeline.CommandResponse, SmartCardError>(commandResponse);
-            };
-        
-        // Use real secure channel establishment
-        var secureChannelTask = Modules.SecureChannelEstablishment.EstablishAsync(
-            keySet, securityLevel, executeCommand, System.Threading.CancellationToken.None);
-        
-        var secureChannelResult = secureChannelTask.GetAwaiter().GetResult();
-        
-        return secureChannelResult.Match(
-            secureChannel =>
-            {
-                environment.Logger.LogDebug("Secure channel established successfully");
-                
-                var updatedEnvironment = result.UpdatedEnvironment.WithSecureChannel(secureChannel);
-                return Result.Success<CommandProcessing.CommandResult, SmartCardError>(
-                    result with { UpdatedEnvironment = updatedEnvironment });
-            },
-            error =>
-            {
-                environment.Logger.LogError("Secure channel establishment failed: {Error}", error.Message);
-                return Result.Failure<CommandProcessing.CommandResult, SmartCardError>(error);
-            });
-    }
 
     /// <summary>
     /// Creates secure channel state using INITIALIZE UPDATE response metadata.
@@ -598,9 +639,29 @@ public static class CapInstallationOrchestrator
         byte[] isdAid, CommandProcessing.CommandEnvironment environment) =>
         SmartCardError.Unsupported("ISD selection not implemented");
 
-    private static Result<InstallationStepResult, SmartCardError> ExecuteAuthentication(
-        IKeySet keySet, CommandProcessing.CommandEnvironment environment) =>
-        SmartCardError.Unsupported("Authentication not implemented");
+    private static async Task<Result<InstallationStepResult, SmartCardError>> ExecuteAuthentication(
+        IKeySet keySet, 
+        Security.ISecureChannelStrategy secureChannelStrategy,
+        CommandProcessing.CommandEnvironment environment)
+    {
+        // Use a default security level for programmatic installation
+        var securityLevel = SecurityLevel.CMac | SecurityLevel.CEncryption;
+        
+        var secureChannelResult = await secureChannelStrategy.EstablishSecureChannel(securityLevel, environment);
+        if (secureChannelResult.IsFailure)
+        {
+            return secureChannelResult.Error;
+        }
+
+        var updatedEnvironment = environment.WithSecureChannel(secureChannelResult.Value);
+
+        return Result.Success<InstallationStepResult, SmartCardError>(new InstallationStepResult(
+            "AUTHENTICATION",
+            default, // No trace exchange for programmatic installation
+            new byte[] { 0x90, 0x00 },
+            Gp4Net.Constants.StatusWords.Success,
+            updatedEnvironment));
+    }
 
     private static Result<InstallationStepResult, SmartCardError> ExecuteInstallForLoadOperation(
         byte[] packageAid, CommandProcessing.CommandEnvironment environment) =>

@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "source": {
+      "file": "docs/traces/gp_pro_scp02_clr.log",
+      "type": "gp_pro",
+      "generated": "2025-08-22T23:57:16.598067Z",
+      "tool_version": "gp4net-unified-converter-1.0"
+    },
+    "card": {
+      "atr": "3BD518FF8191FE1FC38073C821100A",
+      "isd_aid": "A000000151000000",
+      "card_type": "GP_COMPLIANT"
+    },
+    "warnings": [],
+    "hints": {
+      "static_keys": "404142434445464748494A4B4C4D4E4F",
+      "expected_session_keys": {
+        "s_enc": "6DCE2A99BACB5207A7A96A92F114D66C",
+        "s_mac": "0D446132B168F75CD6F0A780693A4DD3",
+        "s_rmac": "4C7FE3A6B0E4F3891B701C3DE654F9B7"
+      }
+    }
+  },
+  "test_hints": {
+    "testable_operations": [
+      {
+        "name": "select",
+        "exchange_index": 0,
+        "verify": [
+          "aid"
+        ]
+      },
+      {
+        "name": "initialize_update",
+        "exchange_index": 1,
+        "verify": [
+          "key_derivation",
+          "card_cryptogram"
+        ]
+      },
+      {
+        "name": "external_authenticate",
+        "exchange_index": 2,
+        "verify": [
+          "secure_channel"
+        ]
+      }
+    ],
+    "scp_version": 2
+  },
+  "exchanges": [
+    {
+      "command": "00A4040000",
+      "response": "6F108408A000000151000000A5049F6501FF9000",
+      "description": "SELECT ISD",
+      "response_time_ms": 19
+    },
+    {
+      "command": "8050000008719426F20E23484000",
+      "response": "0000234555808320483901020011C284EC19415D17F4198ADCD5102D9000",
+      "description": "INITIALIZE UPDATE",
+      "response_time_ms": 45
+    },
+    {
+      "command": "84820000108E69F9E4D246FF369F97E807B91F631800",
+      "response": "9000",
+      "description": "EXTERNAL AUTHENTICATE - Secure messaging",
+      "response_time_ms": 25
+    },
+    {
+      "command": "80F28002024F0000",
+      "response": "E3264F08A0000001510000009F700101C5039EFE80C407A0000001515350CC08A0000001510000009000",
+      "description": "GET STATUS",
+      "response_time_ms": 19
+    },
+    {
+      "command": "80F24002024F0000",
+      "response": "6A88",
+      "description": "GET STATUS",
+      "response_time_ms": 11
+    },
+    {
+      "command": "80F21002024F0000",
+      "response": "E3254F07A00000015153509F700101CE02FFFF8408A000000151535041CC08A000000151000000E3314F0DA00000016443446F634C6974659F700101CE020100840EA00000016443446F634C69746501CC08A000000151000000E31B4F07A00000006202049F700101CE020100CC08A000000151000000E31B4F07A00000006202029F700101CE020103CC08A0000001510000009000",
+      "description": "GET STATUS",
+      "response_time_ms": 41
+    },
+    {
+      "command": "80F22002024F0000",
+      "response": "E31B4F07A00000015153509F700101CE02FFFFCC08A000000151000000E3214F0DA00000016443446F634C6974659F700101CE020100CC08A000000151000000E31B4F07A00000006202049F700101CE020100CC08A000000151000000E31B4F07A00000006202029F700101CE020103CC08A0000001510000009000",
+      "description": "GET STATUS",
+      "response_time_ms": 38
+    }
+  ],
+  "sessions": {
+    "session_1": {
+      "scp_version": 2,
+      "implementation": "i=15",
+      "key_version": 1,
+      "host_challenge": "719426F20E234840",
+      "card_challenge": "C284EC19415D",
+      "sequence_counter": "0011",
+      "key_diversification_data": "00002345558083204839",
+      "card_cryptogram": "17F4198ADCD5102D",
+      "host_cryptogram": "8E69F9E4D246FF36"
+    }
+  }
+}

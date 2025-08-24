@@ -415,21 +415,19 @@ public class GetDataResponse
             return Maybe<CardCapabilities>.None;
         }
 
-        var dataToparse = IsTlvFormat && TlvObject.HasValue ? TlvObject.Value.Value : Data;
+        byte[] dataToparse = IsTlvFormat && TlvObject.HasValue ? TlvObject.Value.Value : Data;
 
         if (dataToparse == null || dataToparse.Length == 0)
         {
             return Maybe<CardCapabilities>.None;
         }
 
-        try
-        {
-            return Maybe<CardCapabilities>.From(CardCapabilities.Parse(dataToparse));
-        }
-        catch
-        {
-            return Maybe<CardCapabilities>.None;
-        }
+        // Use functional TryParse instead of exception-based Parse
+        var parseResult = CardCapabilities.TryParse(Maybe<byte[]>.From(dataToparse));
+        
+        return parseResult.Match(
+            onSuccess: caps => Maybe<CardCapabilities>.From(caps),
+            onFailure: error => Maybe<CardCapabilities>.None);
     }
 
     /// <summary>

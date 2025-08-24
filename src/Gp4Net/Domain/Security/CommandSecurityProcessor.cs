@@ -46,6 +46,28 @@ public static class CommandSecurityProcessor
                 protocolVersion));
     }
 
+    /// <summary>
+    /// Applies command security with full MAC chaining state support including ICV encryption.
+    /// This overload supports SCP02 ICV encryption per GP Card Specification v2.3.1 Section E.3.4.
+    /// </summary>
+    public static Result<(byte[] securedCommand, SecureChannelState newState), SmartCardError> ApplyCommandSecurity(
+        IApduCommand command,
+        SecurityLevel securityLevel,
+        SessionKeys sessionKeys,
+        MacChainingState macChainingState,
+        uint encryptionCounter)
+    {
+        return SecurityValidation.ValidateCommandInputs(command, sessionKeys, [..macChainingState.ToArray()])
+            .Bind(_ => BuildCommandData(command))
+            .Bind(commandData => ProcessCommandWithIcvEncryption(
+                commandData,
+                command,
+                securityLevel,
+                sessionKeys,
+                macChainingState,
+                encryptionCounter));
+    }
+
     private static Result<(byte[] securedCommand, SecureChannelState newState), SmartCardError> ProcessCommand(
         byte[] commandData,
         IApduCommand originalCommand,
@@ -98,6 +120,55 @@ public static class CommandSecurityProcessor
         });
     }
 
+    private static Result<(byte[] securedCommand, SecureChannelState newState), SmartCardError> ProcessCommandWithIcvEncryption(
+        byte[] commandData,
+        IApduCommand originalCommand,
+        SecurityLevel securityLevel,
+        SessionKeys sessionKeys,
+        MacChainingState macChainingState,
+        uint encryptionCounter)
+    {
+        var hasData = originalCommand.Data is { Length: > 0 };
+        var newCounter = encryptionCounter;
+        var newMacChainingState = macChainingState;
+        
+        // Apply encryption if required
+        var encryptionResult = securityLevel.HasCDecryption() && hasData
+            ? ApplyEncryption(commandData, sessionKeys, encryptionCounter, macChainingState.ProtocolVersion)
+                .Map(encrypted => 
+                {
+                    newCounter = macChainingState.ProtocolVersion == ProtocolIdentifiers.Scp03 ? encryptionCounter + 1 : encryptionCounter;
+                    return encrypted;
+                })
+            : Result.Success<byte[], SmartCardError>(commandData);
+
+        return encryptionResult.Bind(encryptedData =>
+        {
+            // Apply MAC if required
+            if (securityLevel.HasCMac())
+            {
+                return ApplyMacWithIcvEncryption(encryptedData, sessionKeys, macChainingState)
+                    .Bind(macResult =>
+                    {
+                        newMacChainingState = macResult.NewMacChainingState;
+                        return CreateNewStateWithMacChaining(
+                            macResult.WrappedCommand,
+                            sessionKeys,
+                            securityLevel,
+                            newMacChainingState,
+                            newCounter);
+                    });
+            }
+
+            return CreateNewStateWithMacChaining(
+                encryptedData,
+                sessionKeys,
+                securityLevel,
+                newMacChainingState,
+                newCounter);
+        });
+    }
+
     private static Result<(byte[] securedCommand, SecureChannelState newState), SmartCardError> CreateNewState(
         byte[] securedCommand,
         SessionKeys sessionKeys,
@@ -122,6 +193,11 @@ public static class CommandSecurityProcessor
     /// Result of MAC application containing the wrapped command and new chaining value.
     /// </summary>
     private record MacResult(byte[] WrappedCommand, ImmutableArray<byte> NewMacChainingValue);
+
+    /// <summary>
+    /// Result of MAC application with full MAC chaining state including implementation parameter.
+    /// </summary>
+    private record MacResultWithState(byte[] WrappedCommand, MacChainingState NewMacChainingState);
 
     private static Result<MacResult, SmartCardError> ApplyMac(
         byte[] command,
@@ -431,5 +507,122 @@ public static class CommandSecurityProcessor
     {
         // Use ApduBuilder to get the exact command structure including Le byte if present
         return Result.Success<byte[], SmartCardError>(ApduBuilder.BuildApdu(command));
+    }
+
+    /// <summary>
+    /// Applies MAC with ICV encryption support for SCP02 implementations.
+    /// Per GP Card Specification v2.3.1 Section E.3.4.
+    /// </summary>
+    private static Result<MacResultWithState, SmartCardError> ApplyMacWithIcvEncryption(
+        byte[] command,
+        SessionKeys sessionKeys,
+        MacChainingState macChainingState)
+    {
+        if (command.Length < 4)
+        {
+            return SmartCardError.InvalidData("Command too short for MAC");
+        }
+
+        // Determine command structure
+        var (hasData, originalLc, originalLe) = ParseCommandStructure(command);
+
+        // Create MAC input according to protocol
+        var macInputResult = macChainingState.ProtocolVersion == ProtocolIdentifiers.Scp03
+            ? CreateScp03MacInput(command, hasData, originalLc)
+            : CreateScp02MacInput(command);
+
+        return macInputResult.Bind(macInput =>
+            CalculateCMacWithIcvEncryption(macInput, sessionKeys, macChainingState))
+            .Map(macCalcResult =>
+            {
+                var (mac, newChainingState) = macCalcResult;
+                
+                // Build new command with MAC
+                var macCommand = BuildMacCommand(command, mac, hasData, originalLc, originalLe);
+                
+                // Set secure messaging indicator in CLA byte (bit 2)
+                macCommand[0] |= 0x04;
+                
+                return new MacResultWithState(macCommand, newChainingState);
+            });
+    }
+
+    /// <summary>
+    /// Calculates C-MAC with ICV encryption support for SCP02.
+    /// Applies ICV encryption per GP Card Specification v2.3.1 Section E.3.4.
+    /// </summary>
+    private static Result<(byte[] mac, MacChainingState newChainingState), SmartCardError> CalculateCMacWithIcvEncryption(
+        byte[] command,
+        SessionKeys sessionKeys,
+        MacChainingState macChainingState)
+    {
+        // Determine if this is the first ICV of the session
+        var isFirstIcv = macChainingState.ToArray().All(b => b == 0);
+
+        // Apply ICV encryption if required by implementation
+        return IcvEncryptionService.ProcessIcvForMacCalculation(
+                macChainingState.ToArray(),
+                sessionKeys.SMac,
+                (ScpImplementation)macChainingState.ImplementationParameter,
+                isFirstIcv)
+            .Bind(processedIcv =>
+            {
+                // Build MAC input with processed ICV
+                var macInput = new byte[processedIcv.Length + command.Length];
+                Array.Copy(processedIcv, 0, macInput, 0, processedIcv.Length);
+                Array.Copy(command, 0, macInput, processedIcv.Length, command.Length);
+
+                if (macChainingState.ProtocolVersion == ProtocolIdentifiers.Scp03)
+                {
+                    // Calculate full 128-bit AES-CMAC
+                    var cmac = new CMac(new AesEngine(), 128);
+                    cmac.Init(new KeyParameter(sessionKeys.SMac));
+                    cmac.BlockUpdate(macInput, 0, macInput.Length);
+                    
+                    var fullMac = new byte[16];
+                    _ = cmac.DoFinal(fullMac, 0);
+
+                    // Return truncated 8-byte MAC and full 16-byte chaining value
+                    var mac = new byte[8];
+                    Array.Copy(fullMac, 0, mac, 0, 8);
+                    
+                    return MacChainingState.Create(fullMac, macChainingState.ProtocolVersion, macChainingState.ImplementationParameter)
+                        .Map(newState => (mac, newState));
+                }
+                else
+                {
+                    // SCP02 uses 3DES MAC - ISO9797Alg3Mac expects DesEngine, not DesEdeEngine
+                    var engine = new DesEngine();
+                    var desMac = new ISO9797Alg3Mac(engine);
+                    desMac.Init(new KeyParameter(sessionKeys.SMac));
+                    desMac.BlockUpdate(macInput, 0, macInput.Length);
+                    var mac = new byte[8];
+                    _ = desMac.DoFinal(mac, 0);
+                    
+                    // For SCP02, new chaining value is the MAC result
+                    return MacChainingState.Create(mac, macChainingState.ProtocolVersion, macChainingState.ImplementationParameter)
+                        .Map(newState => (mac, newState));
+                }
+            });
+    }
+
+    /// <summary>
+    /// Creates a new secure channel state with updated MAC chaining state.
+    /// </summary>
+    private static Result<(byte[] securedCommand, SecureChannelState newState), SmartCardError> CreateNewStateWithMacChaining(
+        byte[] securedCommand,
+        SessionKeys sessionKeys,
+        SecurityLevel securityLevel,
+        MacChainingState newMacChainingState,
+        uint newEncryptionCounter)
+    {
+        return SecureChannelState.Create(
+                sessionKeys,
+                securityLevel,
+                newMacChainingState.ProtocolVersion,
+                newMacChainingState.ToArray(),
+                newMacChainingState.ImplementationParameter)
+            .Bind(state => state.UpdateCounterAndMac(newEncryptionCounter, newMacChainingState))
+            .Map(updatedState => (securedCommand, updatedState));
     }
 }

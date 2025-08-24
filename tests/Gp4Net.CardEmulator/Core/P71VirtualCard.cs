@@ -105,7 +105,7 @@ public class P71VirtualCard : VirtualCard
     {
         // Use dual protocol config but default to SCP03
         var config = CardConfiguration.DualProtocol()
-            .WithScpDefaults(0x03, Gp4Net.Domain.Protocol.ScpImplementation.Scp03PseudoRandom);
+            .WithScpDefaults(0x03, Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70);
         var crypto = cryptoService ?? new CryptographicService();
         return new P71VirtualCard("P71_SCP03_Default", config, crypto, logger);
     }

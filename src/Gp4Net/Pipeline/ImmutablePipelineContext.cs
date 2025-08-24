@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 
 namespace Gp4Net.Pipeline;
 
@@ -134,13 +135,18 @@ public sealed class ImmutablePipelineContext : IPipelineContext
 public static class PipelineContextExtensions
 {
     /// <summary>
-    /// Gets a required value from the context, throwing if not found.
+    /// Gets a required value from the context using functional error handling.
     /// </summary>
-    public static T GetRequired<T>(this IPipelineContext context, string key)
+    /// <typeparam name="T">The type of value to retrieve.</typeparam>
+    /// <param name="context">The pipeline context.</param>
+    /// <param name="key">The key to look up.</param>
+    /// <returns>A result containing the value or an error if not found.</returns>
+    public static Result<T, SmartCardError> GetRequired<T>(this IPipelineContext context, string key)
     {
         return context.Get<T>(key).Match(
-            value => value,
-            () => throw new InvalidOperationException($"Required context value '{key}' not found.")
+            value => Result.Success<T, SmartCardError>(value),
+            () => Result.Failure<T, SmartCardError>(
+                SmartCardError.InvalidArgument($"Required context value '{key}' not found."))
         );
     }
 

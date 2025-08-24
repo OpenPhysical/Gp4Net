@@ -1,4 +1,6 @@
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Core.Tlv;
 using NUnit.Framework;
 
@@ -252,9 +254,17 @@ public class TlvParserTests
     public void TagToNumber_ConvertsCorrectly()
     {
         // Arrange & Act & Assert
-        _ = TlvParser.TagToNumber([0x80]).Should().Be(0x80u);
-        _ = TlvParser.TagToNumber([0x9F, 0x70]).Should().Be(0x9F70u);
-        _ = TlvParser.TagToNumber([0x9F, 0x7F, 0x2A]).Should().Be(0x9F7F2Au);
+        Result<uint, SmartCardError> result1 = TlvParser.TagToNumber([0x80]);
+        _ = result1.IsSuccess.Should().BeTrue();
+        _ = result1.Value.Should().Be(0x80u);
+
+        Result<uint, SmartCardError> result2 = TlvParser.TagToNumber([0x9F, 0x70]);
+        _ = result2.IsSuccess.Should().BeTrue();
+        _ = result2.Value.Should().Be(0x9F70u);
+
+        Result<uint, SmartCardError> result3 = TlvParser.TagToNumber([0x9F, 0x7F, 0x2A]);
+        _ = result3.IsSuccess.Should().BeTrue();
+        _ = result3.Value.Should().Be(0x9F7F2Au);
     }
 
     [Test]

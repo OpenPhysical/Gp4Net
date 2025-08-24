@@ -67,64 +67,27 @@ public sealed class KeyDerivationService : IKeyDerivationService
                 new InvalidKeyError("KeySet", "SCP03 requires Scp03KeySet"));
         }
 
-        try
-        {
-            // Get SCP i parameter for key derivation context modification
-            var iParameter = context.GetImplementationParameter();
+        // Get SCP i parameter for key derivation context modification
+        byte iParameter = context.GetImplementationParameter();
 
-            // Context is concatenation of host challenge and card challenge
-            // Per GP SCP03 v1.1.1, some implementations may modify the context based on i parameter
-            var derivationContext = context.HostChallenge.Concat(context.CardChallenge).ToArray();
+        // Context is concatenation of host challenge and card challenge
+        // Per GP SCP03 v1.1.1, some implementations may modify the context based on i parameter
+        byte[] derivationContext = context.HostChallenge.Concat(context.CardChallenge).ToArray();
 
-            _logger.LogDebug("SCP03 key derivation with i parameter: 0x{IParameter:X2}", iParameter);
+        _logger.LogDebug("SCP03 key derivation with i parameter: 0x{IParameter:X2}", iParameter);
 
-            // Determine key length based on key set
-            var keyLength = scp03KeySet.EncKey.Length * 8; // Convert to bits
+        // Determine key length based on key set
+        int keyLength = scp03KeySet.EncKey.Length * 8; // Convert to bits
 
-            // Derive each session key
-            var sEncResult = DeriveScp03Key(
-                scp03KeySet.EncKey,
-                DerivationConstants.SEnc,
-                derivationContext,
-                keyLength);
-
-            if (sEncResult.IsFailure)
-            {
-                return Result.Failure<SessionKeys, SmartCardError>(sEncResult.Error);
-            }
-
-            var sMacResult = DeriveScp03Key(
-                scp03KeySet.MacKey,
-                DerivationConstants.SMac,
-                derivationContext,
-                keyLength);
-
-            if (sMacResult.IsFailure)
-            {
-                return Result.Failure<SessionKeys, SmartCardError>(sMacResult.Error);
-            }
-
-            var sRMacResult = DeriveScp03Key(
-                scp03KeySet.MacKey,
-                DerivationConstants.SrMac,
-                derivationContext,
-                keyLength);
-
-            if (sRMacResult.IsFailure)
-            {
-                return Result.Failure<SessionKeys, SmartCardError>(sRMacResult.Error);
-            }
-
-            _logger.LogInformation("Successfully derived SCP03 session keys");
-            return Result.Success<SessionKeys, SmartCardError>(
-                new SessionKeys(sEncResult.Value, sMacResult.Value, sRMacResult.Value, scp03KeySet.DekKey));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "SCP03 key derivation failed");
-            return Result.Failure<SessionKeys, SmartCardError>(
-                new CryptographicError("SCP03 key derivation", ex.Message));
-        }
+        // Use functional composition to derive all keys
+        return DeriveScp03Key(scp03KeySet.EncKey, DerivationConstants.SEnc, derivationContext, keyLength)
+            .Bind(sEnc => DeriveScp03Key(scp03KeySet.MacKey, DerivationConstants.SMac, derivationContext, keyLength)
+                .Bind(sMac => DeriveScp03Key(scp03KeySet.MacKey, DerivationConstants.SrMac, derivationContext, keyLength)
+                    .Map(sRMac => 
+                    {
+                        _logger.LogInformation("Successfully derived SCP03 session keys");
+                        return new SessionKeys(sEnc, sMac, sRMac, scp03KeySet.DekKey);
+                    })));
     }
 
     /// <summary>
@@ -139,44 +102,46 @@ public sealed class KeyDerivationService : IKeyDerivationService
         byte[] context,
         int keyLengthBits)
     {
-        try
+        // Build the GP SCP03 key derivation structure
+        // Build the GP SCP03 v1.1.1 Section 4.1.5 structure:
+        // Label (12 bytes: 11 zeros + derivation constant) + Separator (1 byte) + L (2 bytes) + Counter (1 byte) + Context (16 bytes)
+        // Total: 32 bytes
+        // The spec says counter comes after L field, so we need to split the fixed input data
+
+        // Build fixed input data before counter
+        var dataBeforeCounter = new byte[15]; // Label + Separator + L
+        var offset = 0;
+
+        // Label (11 bytes of 0x00)
+        DerivationConstants.Scp03Label.CopyTo(dataBeforeCounter, offset);
+        offset += 11;
+
+        // Derivation constant (1 byte)
+        dataBeforeCounter[offset++] = derivationConstant;
+
+        // Separator (1 byte)
+        dataBeforeCounter[offset++] = 0x00;
+
+        // L (length in bits as 2-byte big-endian)
+        dataBeforeCounter[offset++] = (byte)(keyLengthBits >> 8);
+        dataBeforeCounter[offset++] = (byte)keyLengthBits;
+
+        // Build fixed input data after counter
+        var dataAfterCounter = new byte[16]; // Context
+        context.CopyTo(dataAfterCounter, 0);
+
+        // Determine PRF type based on key length - fail secure on unknown lengths
+        var prfTypeResult = kdk.Length switch
         {
-            // Build the GP SCP03 v1.1.1 Section 4.1.5 structure:
-            // Label (12 bytes: 11 zeros + derivation constant) + Separator (1 byte) + L (2 bytes) + Counter (1 byte) + Context (16 bytes)
-            // Total: 32 bytes
-            // The spec says counter comes after L field, so we need to split the fixed input data
-
-            // Build fixed input data before counter
-            var dataBeforeCounter = new byte[15]; // Label + Separator + L
-            var offset = 0;
-
-            // Label (11 bytes of 0x00)
-            DerivationConstants.Scp03Label.CopyTo(dataBeforeCounter, offset);
-            offset += 11;
-
-            // Derivation constant (1 byte)
-            dataBeforeCounter[offset++] = derivationConstant;
-
-            // Separator (1 byte)
-            dataBeforeCounter[offset++] = 0x00;
-
-            // L (length in bits as 2-byte big-endian)
-            dataBeforeCounter[offset++] = (byte)(keyLengthBits >> 8);
-            dataBeforeCounter[offset++] = (byte)keyLengthBits;
-
-            // Build fixed input data after counter
-            var dataAfterCounter = new byte[16]; // Context
-            context.CopyTo(dataAfterCounter, 0);
-
-            // Determine PRF type based on key length
-            var prfType = kdk.Length switch
-            {
-                16 => PrfType.CmacAes128,
-                24 => PrfType.CmacAes192,
-                32 => PrfType.CmacAes256,
-                _ => throw new ArgumentException($"Unsupported key length: {kdk.Length} bytes")
-            };
-
+            16 => Result.Success<PrfType, SmartCardError>(PrfType.CmacAes128),
+            24 => Result.Success<PrfType, SmartCardError>(PrfType.CmacAes192),
+            32 => Result.Success<PrfType, SmartCardError>(PrfType.CmacAes256),
+            _ => Result.Failure<PrfType, SmartCardError>(
+                SmartCardError.InvalidArgument($"Unsupported KDK length: {kdk.Length} bytes. Expected 16, 24, or 32 bytes."))
+        };
+        
+        return prfTypeResult.Bind(prfType =>
+        {
             // Configure KDF options for SCP03 - counter in the middle
             var options = new KdfOptions(
                 prfType: prfType,
@@ -194,12 +159,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
                 options);
 
             return Result.Success<byte[], SmartCardError>(derivedKey);
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<byte[], SmartCardError>(
-                new CryptographicError("SCP03 key derivation", ex.Message));
-        }
+        });
     }
 
     /// <summary>
@@ -218,39 +178,28 @@ public sealed class KeyDerivationService : IKeyDerivationService
         byte[] context,
         int outputLengthBits)
     {
-        try
+        // Validate inputs using type system constraints
+        if (key.Length == 0)
         {
-            // Validate inputs
-            if (key == null || key.Length == 0)
-            {
-                return Result.Failure<byte[], SmartCardError>(
-                    new NullParameterError("key"));
-            }
-
-            if (context == null || context.Length == 0)
-            {
-                return Result.Failure<byte[], SmartCardError>(
-                    new NullParameterError("context"));
-            }
-
-            if (outputLengthBits % 8 != 0 || outputLengthBits <= 0 || outputLengthBits > 256)
-            {
-                return Result.Failure<byte[], SmartCardError>(
-                    new InvalidLengthError("outputLengthBits", 8, outputLengthBits));
-            }
-
-            _logger.LogDebug("Deriving SCP03 data with constant 0x{Constant:X2}, output length {Length} bits",
-                derivationConstant, outputLengthBits);
-
-            // Use the same DeriveScp03Key method but with the specified derivation constant
-            return DeriveScp03Key(key, derivationConstant, context, outputLengthBits);
+            return Result.Failure<byte[], SmartCardError>(new InvalidKeyError("key", "Key cannot be empty"));
         }
-        catch (Exception ex)
+
+        if (context.Length == 0)
         {
-            _logger.LogError(ex, "SCP03 data derivation failed");
+            return Result.Failure<byte[], SmartCardError>(new InvalidKeyError("context", "Context cannot be empty"));
+        }
+
+        if (outputLengthBits % 8 != 0 || outputLengthBits <= 0 || outputLengthBits > 256)
+        {
             return Result.Failure<byte[], SmartCardError>(
-                new CryptographicError("SCP03 data derivation", ex.Message));
+                new InvalidLengthError("outputLengthBits", 8, outputLengthBits));
         }
+
+        _logger.LogDebug("Deriving SCP03 data with constant 0x{Constant:X2}, output length {Length} bits",
+            derivationConstant, outputLengthBits);
+
+        // Use the same DeriveScp03Key method but with the specified derivation constant
+        return DeriveScp03Key(key, derivationConstant, context, outputLengthBits);
     }
 
     /// <summary>
@@ -440,23 +389,27 @@ public sealed class KeyDerivationService : IKeyDerivationService
 
     /// <summary>
     /// Determines whether an SCP02 implementation uses derived MAC keys or static MAC keys.
-    /// Based on GlobalPlatform test vectors and real-world implementations.
+    /// Based on GlobalPlatform Card Specification v2.3.1 Section E.4.1 and live card trace data.
     /// </summary>
     /// <param name="implementation">The SCP02 implementation</param>
     /// <returns>True if MAC keys should be derived, false if they should remain static</returns>
     private static bool UsesDerivedMacKeys(ScpImplementation implementation)
     {
-        // Based on comprehensive analysis of test vectors and real card behavior:
-        // Per GP Card Spec v2.3.1 Section E.4.1, MAC keys are derived using constant 0x0101
-        // Only specific implementations use static MAC keys
+        // Per GP Card Specification v2.3.1 Section E.4.1:
+        // "Generating the Secure Channel C-MAC session keys using the Secure Channel base key or MAC key (S-MAC) 
+        // and the session keys derivation data with a constant of '0101'"
+        // All SCP02 implementations derive MAC keys from static keys using constant 0x0101
+        // This is confirmed by live card trace data from real hardware implementations
         return implementation switch
         {
-            // Only this specific implementation uses static MAC keys
-            ScpImplementation.Scp02I15 => false,  // Test vector confirms: uses static MAC
+            // All SCP02 implementations derive MAC keys per GP specification Section E.4.1
+            // Live card traces confirm this behavior for all tested implementations
+            ScpImplementation.Scp02I15 => true,   // CLR mode: derives MAC keys (confirmed by live trace data)
+            ScpImplementation.Scp02I35 => true,   // MAC mode: derives MAC keys (confirmed by live trace data)  
+            ScpImplementation.Scp02I55 => true,   // ENC mode: derives MAC keys (confirmed by live trace data)
             
-            // All other implementations use derived MAC keys
-            // This includes i=00 as confirmed by GP Pro traces
-            _ => true  // Default: derive MAC keys per specification
+            // Default: derive MAC keys per GP Card Specification v2.3.1 Section E.4.1
+            _ => true  // All implementations derive MAC keys per specification and live card behavior
         };
     }
 }

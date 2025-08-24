@@ -7,6 +7,7 @@ using System;
 using System.Text;
 using CSharpFunctionalExtensions;
 using JetBrains.Annotations;
+using System.Linq;
 
 namespace Gp4Net.Core;
 
@@ -119,14 +120,16 @@ public static class EncodingUtils
             return Result.Success<string, SmartCardError>(string.Empty);
         }
 
-        // Validate all bytes are valid ASCII (0-127)
-        for (var i = 0; i < bytes.Length; i++)
+        // Validate all bytes are valid ASCII (0-127) using functional approach
+        var invalidByteIndex = bytes.AsEnumerable().Select((b, index) => new { Byte = b, Index = index })
+            .Where(x => x.Byte > 127)
+            .Select(x => x.Index)
+            .FirstOrDefault(-1);
+            
+        if (invalidByteIndex >= 0)
         {
-            if (bytes[i] > 127)
-            {
-                return Result.Failure<string, SmartCardError>(
-                    SmartCardError.InvalidArgument($"Non-ASCII byte at position {i}: 0x{bytes[i]:X2}"));
-            }
+            return Result.Failure<string, SmartCardError>(
+                SmartCardError.InvalidArgument($"Non-ASCII byte at position {invalidByteIndex}: 0x{bytes[invalidByteIndex]:X2}"));
         }
 
         try

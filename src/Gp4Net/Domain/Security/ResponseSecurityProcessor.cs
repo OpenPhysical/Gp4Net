@@ -31,7 +31,8 @@ public static class ResponseSecurityProcessor
         SessionKeys sessionKeys,
         ImmutableArray<byte> macChainingValue,
         uint encryptionCounter,
-        byte protocolVersion)
+        byte protocolVersion,
+        ScpImplementation implementation = ScpImplementation.Scp02I15)
     {
         return SecurityValidation.ValidateResponseInputs(response, sessionKeys, macChainingValue)
             .Bind(_ => ProcessResponse(
@@ -40,7 +41,8 @@ public static class ResponseSecurityProcessor
                 sessionKeys,
                 macChainingValue,
                 encryptionCounter,
-                protocolVersion));
+                protocolVersion,
+                implementation));
     }
 
     private static Result<(byte[] processedResponse, SecureChannelState newState), SmartCardError> ProcessResponse(
@@ -49,7 +51,8 @@ public static class ResponseSecurityProcessor
         SessionKeys sessionKeys,
         ImmutableArray<byte> macChainingValue,
         uint encryptionCounter,
-        byte protocolVersion)
+        byte protocolVersion,
+        ScpImplementation implementation)
     {
         // Extract status word
         if (response.Length < 2)
@@ -70,7 +73,7 @@ public static class ResponseSecurityProcessor
 
         // Process R-MAC if present
         var macProcessedResult = securityLevel.HasRMac()
-            ? ProcessRMac(response, sessionKeys, macChainingValue, protocolVersion)
+            ? ProcessRMac(response, sessionKeys, macChainingValue, protocolVersion, implementation)
             : Result.Success<(byte[] response, ImmutableArray<byte> newChaining), SmartCardError>((response, macChainingValue));
 
         return macProcessedResult.Bind(macResult =>
@@ -97,7 +100,8 @@ public static class ResponseSecurityProcessor
         byte[] response,
         SessionKeys sessionKeys,
         ImmutableArray<byte> macChainingValue,
-        byte protocolVersion)
+        byte protocolVersion,
+        ScpImplementation implementation)
     {
         var macSize = protocolVersion == ProtocolIdentifiers.Scp03 ? 8 : 8; // Both use 8-byte MACs
 
@@ -118,7 +122,7 @@ public static class ResponseSecurityProcessor
         Array.Copy(response, response.Length - 2, responseWithoutMac, macOffset, 2); // Status word
 
         // Calculate expected MAC
-        return CalculateRMac(responseWithoutMac, sessionKeys, macChainingValue, protocolVersion)
+        return CalculateRMac(responseWithoutMac, sessionKeys, macChainingValue, protocolVersion, implementation)
             .Bind(calculatedMacResult =>
             {
                 var (calculatedMac, newChainingValue) = calculatedMacResult;
@@ -197,7 +201,8 @@ public static class ResponseSecurityProcessor
         byte[] response,
         SessionKeys sessionKeys,
         ImmutableArray<byte> macChainingValue,
-        byte protocolVersion)
+        byte protocolVersion,
+        ScpImplementation implementation)
     {
         // Build MAC input: chaining value || response
         var macInput = new byte[macChainingValue.Length + response.Length];
@@ -234,9 +239,10 @@ public static class ResponseSecurityProcessor
             _ = desMac.DoFinal(mac, 0);
             
             // For SCP02, check implementation parameter to determine if R-MAC updates chaining
-            // Most implementations (i=15, i=55) do not update chaining value for R-MAC
-            // Only i=05 updates chaining value
-            var newChainingValue = ShouldUpdateChainingAfterRMac(protocolVersion)
+            // Per GP Card Specification v2.3.1 Section 6.2.6:
+            // - i=05: R-MAC updates chaining value
+            // - i=15, i=55: R-MAC does not update chaining value
+            var newChainingValue = ShouldUpdateChainingAfterRMac(protocolVersion, implementation)
                 ? [..mac]
                 : macChainingValue;
             
@@ -279,11 +285,23 @@ public static class ResponseSecurityProcessor
         return response.Length > 2;
     }
 
-    private static bool ShouldUpdateChainingAfterRMac(byte protocolVersion)
+    /// <summary>
+    /// Determines if R-MAC should update the MAC chaining value based on SCP implementation.
+    /// Per GlobalPlatform Card Specification v2.3.1 Section 6.2.6.
+    /// </summary>
+    private static bool ShouldUpdateChainingAfterRMac(byte protocolVersion, ScpImplementation implementation)
     {
-        // For most SCP02 implementations, R-MAC does not update chaining value
-        // This would need to check the implementation parameter properly
-        // For now, assume no update (most common case)
-        return false;
+        return protocolVersion switch
+        {
+            ProtocolIdentifiers.Scp02 => implementation switch
+            {
+                ScpImplementation.Scp02I05 => true,   // i=05: R-MAC updates chaining
+                ScpImplementation.Scp02I15 => false,   // i=15: R-MAC does not update chaining
+                ScpImplementation.Scp02I55 => false,   // i=55: R-MAC does not update chaining
+                _ => false  // Default to no update for unknown implementations
+            },
+            ProtocolIdentifiers.Scp03 => false,  // SCP03: R-MAC never updates chaining
+            _ => false  // Default to no update for unknown protocols
+        };
     }
 }

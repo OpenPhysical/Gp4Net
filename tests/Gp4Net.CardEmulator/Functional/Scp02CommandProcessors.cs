@@ -480,7 +480,7 @@ public static class Scp02CommandProcessors
             return SmartCardError.InvalidArgument("SCP02 requires SCP02 key set");
 
         // Check implementation option for static vs dynamic MAC
-        var useStaticMac = state.ScpImplementation.UsesStaticMac();
+        var useStaticMac = state.ScpImplementation.HasIcvEncryption();
 
         return crypto.DeriveSessionKeys(
             state.CurrentKeys,
