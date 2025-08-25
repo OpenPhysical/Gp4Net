@@ -362,16 +362,8 @@ public sealed class KeyDerivationService : IKeyDerivationService
                         new UnsupportedImplementationError($"SCP02 cryptogram type: {context.Type}"))
                 };
             default:
-            {
-                // For other protocols, delegate to CryptogramService
-                var cryptogramService = new Gp4Net.Domain.Security.CryptogramService();
-        
-                // For non-SCP02 protocols, use the existing logic
-                return cryptogramService.CalculateCryptogram(
-                    context.Key,
-                    context.Data,
-                    GetProtocolFromContext(context));
-            }
+                return Result.Failure<byte[], SmartCardError>(
+                    SmartCardError.InvalidArgument($"Unsupported protocol version: {context.ProtocolVersion:X2}"));
         }
 
     }

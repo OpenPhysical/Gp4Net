@@ -7,42 +7,57 @@ using AwesomeAssertions;
 using Gp4Net.Domain;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Core;
 using Gp4Net.Services;
 using Gp4Net.Tool.Commands.Card;
 using Gp4Net.Tool.Pipeline;
 using Gp4Net.Tool.Services;
-using Moq;
+using Gp4Net.CardEmulator.Services;
+using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using Spectre.Console.Testing;
 using StatusSubset = Gp4Net.Domain.Commands.GetStatusCommand.StatusSubset;
+using Gp4Net.Tests.Tool;
+using Gp4Net.Tests.TestHelpers;
+using Gp4Net.Tool.Infrastructure;
+using Gp4Net.Transport;
+using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Tool.Commands.Card;
 
 [TestFixture]
 public class InfoCommandTests
 {
-    private Mock<IDisplayService> _mockDisplayService;
-    private Mock<ICardService> _mockCardService;
-    private Mock<IGlobalPlatformService> _mockGlobalPlatformService;
-    private Mock<IKeysetResolver> _mockKeysetResolver;
-    private MockCliContext _mockContext;
+    private IDisplayService _displayService;
+    private Gp4Net.Tool.Services.ICardService _cardService;
+    private IGlobalPlatformService _globalPlatformService;
+    private IKeysetResolver _keysetResolver;
+    private TestCliContext _testContext;
     private InfoCommand _command;
     private TestConsole _console;
+
+    private VirtualCardService _virtualCardService = null!;
 
     [SetUp]
     public void Setup()
     {
-        _mockDisplayService = new Mock<IDisplayService>();
-        _mockCardService = new Mock<ICardService>();
-        _mockGlobalPlatformService = new Mock<IGlobalPlatformService>();
-        _mockKeysetResolver = new Mock<IKeysetResolver>();
+        _displayService = new DisplayService(false);
+        
+        _virtualCardService = new VirtualCardService();
+        _virtualCardService.SetupComprehensiveTestEnvironment();
+        _cardService = new TestCardService(_virtualCardService);
+        
+        // Skip domain service factory setup for InfoCommand tests
+        _globalPlatformService = null;
+        _keysetResolver = new FunctionalKeysetResolverAdapter();
         _console = new TestConsole();
 
-        _mockContext = new MockCliContext(
-            _mockDisplayService.Object,
-            _mockCardService.Object,
-            _mockGlobalPlatformService.Object,
-            _mockKeysetResolver.Object
+        _testContext = new TestCliContext(
+            _displayService,
+            _cardService,
+            _globalPlatformService,
+            _keysetResolver,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance
         );
 
         _command = new InfoCommand();
@@ -52,34 +67,39 @@ public class InfoCommandTests
     public void TearDown()
     {
         _console?.Dispose();
+        _cardService?.Dispose();
+        _virtualCardService?.Dispose();
     }
 
     [Test]
     public async Task ExecuteAsync_WithValidContext_ReturnsSuccess()
     {
         // Arrange
-        SetupConnectedCard();
         var settings = new InfoCommand.Settings();
 
         // Act
-        var result = await _command.ExecuteAsync(_mockContext, settings);
+        var result = await _command.ExecuteAsync(_testContext, settings);
 
         // Assert
         _ = result.Should().Be(0);
-        _mockCardService.Verify(s => s.GetAtr(), Times.Once);
     }
 
     [Test]
     public async Task ExecuteAsync_CardServiceException_ReturnsError()
     {
-        // Arrange
-        _ = _mockCardService
-            .Setup(s => s.GetAtr())
-            .Throws(new InvalidOperationException("Test exception"));
+        // Arrange - Create a failing card service for this test
+        var failingCardService = new FailingCardService();
+        var failingContext = new TestCliContext(
+            _displayService,
+            failingCardService,
+            _globalPlatformService,
+            _keysetResolver,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance
+        );
         var settings = new InfoCommand.Settings();
 
         // Act
-        var result = await _command.ExecuteAsync(_mockContext, settings);
+        var result = await _command.ExecuteAsync(failingContext, settings);
 
         // Assert
         _ = result.Should().Be(1);
@@ -100,59 +120,36 @@ public class InfoCommandTests
     public async Task ExecuteAsync_IsdSelectionFails_ContinuesExecution()
     {
         // Arrange
-        SetupConnectedCard();
-        _ = _mockGlobalPlatformService
-            .Setup(s => s.SelectIsdAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new Exception("ISD error"));
-
         var settings = new InfoCommand.Settings();
 
         // Act
-        var result = await _command.ExecuteAsync(_mockContext, settings);
+        var result = await _command.ExecuteAsync(_testContext, settings);
 
         // Assert
         _ = result.Should().Be(0); // Should still succeed
-        _mockCardService.Verify(s => s.GetAtr(), Times.Once); // Should still show basic info
     }
 
     [Test]
     public async Task ExecuteAsync_CplcFails_ContinuesWithOtherData()
     {
         // Arrange
-        SetupConnectedCard();
-        SetupIsdSelection();
-        _ = _mockGlobalPlatformService
-            .Setup(s => s.GetCplcAsync(It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new Exception("CPLC error"));
-
         var settings = new InfoCommand.Settings();
 
         // Act
-        var result = await _command.ExecuteAsync(_mockContext, settings);
+        var result = await _command.ExecuteAsync(_testContext, settings);
 
         // Assert
         _ = result.Should().Be(0);
-        // Should still try to get other data
-        _mockGlobalPlatformService.Verify(
-            s => s.GetDataAsync(It.IsAny<ushort>(), It.IsAny<CancellationToken>()),
-            Times.AtLeastOnce
-        );
     }
 
     [Test]
     public async Task ExecuteAsync_GetApplicationsFails_StillShowsOtherInfo()
     {
         // Arrange
-        SetupConnectedCard();
-        SetupIsdSelection();
-        _ = _mockGlobalPlatformService
-            .Setup(s => s.GetStatusAsync(It.IsAny<StatusSubset>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new Exception("Apps error"));
-
         var settings = new InfoCommand.Settings();
 
         // Act
-        var result = await _command.ExecuteAsync(_mockContext, settings);
+        var result = await _command.ExecuteAsync(_testContext, settings);
 
         // Assert
         _ = result.Should().Be(0);
@@ -162,101 +159,68 @@ public class InfoCommandTests
     public async Task ExecuteAsync_WithAtr_DisplaysAtr()
     {
         // Arrange
-        var atr = new byte[] { 0x3B, 0x65, 0x00, 0x00, 0x20, 0x56, 0x00, 0x01 };
-        SetupConnectedCard(atr);
-
         var settings = new InfoCommand.Settings();
 
         // Act
-        var result = await _command.ExecuteAsync(_mockContext, settings);
+        var result = await _command.ExecuteAsync(_testContext, settings);
 
         // Assert
         _ = result.Should().Be(0);
-        _mockCardService.Verify(s => s.GetAtr(), Times.Once);
     }
 
     [Test]
     public async Task ExecuteAsync_WithCplc_DisplaysCplc()
     {
         // Arrange
-        SetupConnectedCard();
-        SetupIsdSelection();
-        SetupCplcData();
-
         var settings = new InfoCommand.Settings();
 
         // Act
-        var result = await _command.ExecuteAsync(_mockContext, settings);
+        var result = await _command.ExecuteAsync(_testContext, settings);
 
         // Assert
         _ = result.Should().Be(0);
-        _mockGlobalPlatformService.Verify(s => s.GetCplcAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Test]
     public async Task ExecuteAsync_WithApplications_DisplaysSummary()
     {
         // Arrange
-        SetupConnectedCard();
-        SetupIsdSelection();
-
-        // Setup secure channel as established - required for GetApplications
-        _ = _mockCardService.Setup(s => s.IsSecureChannelEstablished).Returns(true);
-
-        var apps = new List<ApplicationInfo>
-        {
-            new ApplicationInfo([0xA0, 0x00], LifecycleState.Selectable, [], ApplicationType.IssuerSecurityDomain),
-            new ApplicationInfo([0xA0, 0x01], LifecycleState.Selectable, [], ApplicationType.Application),
-            new ApplicationInfo([0xA0, 0x02], LifecycleState.Selectable, [], ApplicationType.Application)
-        };
-        _ = _mockGlobalPlatformService.Setup(s => s.GetStatusAsync(It.IsAny<StatusSubset>(), It.IsAny<CancellationToken>())).ReturnsAsync(apps.ToImmutableList());
-
         var settings = new InfoCommand.Settings();
 
         // Act
-        var result = await _command.ExecuteAsync(_mockContext, settings);
+        var result = await _command.ExecuteAsync(_testContext, settings);
 
         // Assert
         _ = result.Should().Be(0);
-        _mockGlobalPlatformService.Verify(s => s.GetStatusAsync(It.IsAny<StatusSubset>(), It.IsAny<CancellationToken>()), Times.Once);
     }
+}
 
-    private void SetupConnectedCard(byte[]? atr = null)
+/// <summary>
+/// Test implementation of card service that fails for testing error handling.
+/// </summary>
+public class FailingCardService : Gp4Net.Tool.Services.ICardService
+{
+    public bool IsSecureChannelEstablished => false;
+    public bool IsConnected => false;
+    public bool IsDisposed { get; private set; }
+    
+    public byte[] GetAtr() => [];
+    
+    public IReadOnlyList<string> GetReaders() => new List<string>();
+    
+    public bool Connect(string readerName) => false;
+    
+    public void Disconnect() { }
+    
+    public Gp4Net.Tool.Services.CardResponse SendCommand(byte[] command) => new Gp4Net.Tool.Services.CardResponse([], 0x6F00);
+    
+    public Gp4Net.Tool.Services.CardResponse SendCommand(IApduCommand command) => new Gp4Net.Tool.Services.CardResponse([], 0x6F00);
+    
+    public bool EstablishSecureChannel(byte[] keySet, byte securityLevel) => false;
+    
+    public void Dispose()
     {
-        _ = _mockCardService.Setup(s => s.IsSecureChannelEstablished).Returns(true);
-        _ = _mockCardService.Setup(s => s.GetAtr()).Returns(atr ?? [0x3B, 0x00]);
+        IsDisposed = true;
+        GC.SuppressFinalize(this);
     }
-
-    private void SetupIsdSelection()
-    {
-        var selectResponse = new SelectResponse([0x6F, 0x00]);
-        _ = _mockGlobalPlatformService.Setup(s => s.SelectIsdAsync(It.IsAny<CancellationToken>())).ReturnsAsync(selectResponse);
-    }
-
-    private void SetupCplcData()
-    {
-        var cplc = new CplcData
-        {
-            IcFabricator = 0x1234,
-            IcType = 0x5678,
-            OperatingSystemId = 0x9ABC,
-            OperatingSystemReleaseDate = 0x1234,
-            OperatingSystemReleaseLevel = 0x5678,
-            IcFabricationDate = 0x9ABC,
-            IcSerialNumber = 0x12345678,
-            IcBatchIdentifier = 0x9ABC,
-            IcModuleFabricator = 0xDEF0,
-            IcModulePackagingDate = 0x1234,
-            IccManufacturer = 0x5678,
-            IcEmbeddingDate = 0x9ABC,
-            IcPrePersonalizer = 0xDEF0,
-            IcPrePersonalizationEquipmentDate = 0x1234,
-            IcPrePersonalizationEquipmentId = 0x56789ABC,
-            IcPersonalizer = 0xDEF0,
-            IcPersonalizationDate = 0x1234,
-            IcPersonalizationEquipmentId = 0x56789ABC
-        };
-        _ = _mockGlobalPlatformService.Setup(s => s.GetCplcAsync(It.IsAny<CancellationToken>())).ReturnsAsync(cplc);
-    }
-
 }

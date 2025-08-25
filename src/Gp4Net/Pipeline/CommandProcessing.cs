@@ -30,6 +30,7 @@ public static class CommandProcessing
         ICardChannel Channel,
         IApduTransport Transport,
         Maybe<SecureChannelState> SecureChannel,
+        ISecureChannelService SecureChannelService,
         ILogger Logger,
         CommandOptions Options = null)
     {

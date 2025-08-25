@@ -3,7 +3,7 @@
     "source": {
       "file": "docs/traces/gp_pro_applet_uninstall.txt",
       "type": "gp_pro",
-      "generated": "2025-08-23T03:00:59.486112Z",
+      "generated": "2025-08-24T06:19:55.933907Z",
       "tool_version": "gp4net-unified-converter-1.0"
     },
     "card": {
@@ -109,13 +109,13 @@
   "sessions": {
     "session_1": {
       "scp_version": 3,
-      "implementation": "i=00",
+      "implementation": "i=70",
       "key_version": 1,
       "host_challenge": "FA4C144173EEA5DA",
-      "card_challenge": "01037081E02F9C40",
-      "sequence_counter": "81E0",
+      "card_challenge": "81E02F9C4061653A",
+      "sequence_counter": "000010",
       "key_diversification_data": "03700000000000000000",
-      "card_cryptogram": "61653AA1AEEA9F46",
+      "card_cryptogram": "A1AEEA9F46AF46B2",
       "host_cryptogram": "A1883C4B93BE2B01"
     }
   }

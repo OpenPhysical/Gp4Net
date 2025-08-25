@@ -96,28 +96,7 @@ public class KeyDerivationTests
         _ = sessionKeys1.SrMac.Should().NotEqual(sessionKeys2.SrMac);
     }
 
-    [Test]
-    public void CalculateCryptogram_Scp03_ReturnsEightBytes()
-    {
-        // Arrange
-        var key = Convert.FromHexString("404142434445464748494A4B4C4D4E4F");
-        var data = Convert.FromHexString("0102030405060708090A0B0C0D0E0F10");
-
-        // Act
-        var result = KeyDerivation.CalculateCryptogram(key, data, true);
-
-        // Assert
-        _ = result.IsSuccess.Should().BeTrue();
-        var cryptogram = result.Value;
-
-        _ = cryptogram.Length.Should().Be(8);
-        // Verify cryptogram is not all zeros (would indicate a calculation error)
-        _ = cryptogram.Should().NotEqual(new byte[8]);
-        // Verify cryptogram is deterministic - same inputs should produce same output
-        var result2 = KeyDerivation.CalculateCryptogram(key, data, true);
-        _ = result2.IsSuccess.Should().BeTrue();
-        _ = cryptogram.Should().BeEquivalentTo(result2.Value);
-    }
+    // CalculateCryptogram test removed - use type-safe CryptogramService with Scp03CryptogramParameters instead
 
     [Test]
     public void DeriveScp03SessionKeys_InvalidHostChallenge_ReturnsFailure()

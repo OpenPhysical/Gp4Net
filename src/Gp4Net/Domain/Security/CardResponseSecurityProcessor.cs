@@ -70,13 +70,11 @@ public static class CardResponseSecurityProcessor
                                 macChainingValue.CopyTo(macInput, 0);
                                 Array.Copy(data, 0, macInput, macChainingValue.Length, data.Length);
 
-                                var cmac = new CMac(new AesEngine(), 128);
-                                cmac.Init(new KeyParameter(sessionKeys.SrMac));
-                                cmac.BlockUpdate(macInput, 0, macInput.Length);
+                                var macService = new MacService();
+                                var macResult = macService.CalculateAesCmac(sessionKeys.SrMac, macInput, macLength: 16);
+                                if (macResult.IsFailure) return Result.Failure<byte[], SmartCardError>(macResult.Error);
                                 
-                                var fullMac = new byte[16];
-                                _ = cmac.DoFinal(fullMac, 0);
-                                newMacChainingValue = [..fullMac];
+                                newMacChainingValue = [..macResult.Value];
                             }
 
                             // Insert R-MAC before status word
@@ -229,18 +227,8 @@ public static class CardResponseSecurityProcessor
 
         if (protocolVersion == ProtocolIdentifiers.Scp03)
         {
-            // Calculate full 128-bit AES-CMAC for R-MAC
-            var cmac = new CMac(new AesEngine(), 128);
-            cmac.Init(new KeyParameter(sessionKeys.SrMac));
-            cmac.BlockUpdate(macInput, 0, macInput.Length);
-            
-            var fullMac = new byte[16];
-            _ = cmac.DoFinal(fullMac, 0);
-            
-            // Return truncated 8-byte MAC
-            var mac = new byte[8];
-            Array.Copy(fullMac, 0, mac, 0, 8);
-            return Result.Success<byte[], SmartCardError>(mac);
+            var macService = new MacService();
+            return macService.CalculateAesCmac(sessionKeys.SrMac, macInput, macLength: 8);
         }
         else
         {

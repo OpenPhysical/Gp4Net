@@ -8,10 +8,8 @@ using Gp4Net.Domain.Protocol;
 using Gp4Net.Services;
 using Gp4Net.Tool.Commands.Card;
 using Gp4Net.Tool.Commands.Packages;
-using Gp4Net.Tool.Commands.Script;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
-using Gp4Net.Tool.Scripting;
 using Gp4Net.Tool.Services;
 using Gp4Net.Tool.Services.CardCommunication;
 using Gp4Net.CardEmulator.Services;
@@ -91,10 +89,6 @@ public class Program
                 _ = config.AddExample(new[] { "applet", "install", "myapp.cap" });
                 _ = config.AddExample(new[] { "applet", "delete", "A000000001020304" });
                 _ = config.AddExample(new[] { "applet", "uninstall", "myapp.cap" });
-                _ = config.AddExample(new[] { "script", "run", "install.lua" });
-                _ = config.AddExample(
-                    new[] { "script", "eval", "connect(); get_status(); disconnect()" }
-                );
 
                 // Card management commands
                 _ = config.AddBranch(
@@ -136,23 +130,6 @@ public class Program
 
                 // Applet management commands are now auto-registered via CliCommandAttribute
 
-                // Script commands
-                _ = config.AddBranch(
-                    "script",
-                    script =>
-                    {
-                        script.SetDescription("Lua scripting operations");
-                        _ = script
-                            .AddCommand<ScriptCommand>("run")
-                            .WithDescription("Execute a Lua script file");
-                        _ = script
-                            .AddCommand<ReplCommand>("repl")
-                            .WithDescription("Start interactive Lua REPL");
-                        _ = script
-                            .AddCommand<EvalCommand>("eval")
-                            .WithDescription("Evaluate a Lua expression");
-                    }
-                );
 
                 // Package management commands
                 _ = config.AddBranch(
@@ -240,10 +217,8 @@ public class Program
         >();
         _ = services.AddSingleton<ISecureChannelManager, SecureChannelManager>();
 
-        // Register scripting services
-        _ = services.AddSingleton<ScriptDirectoryResolver>();
-        _ = services.AddSingleton<IScriptManager, ScriptManager>();
-        _ = services.AddSingleton<IKeysetResolver, KeysetResolver>();
+        // Register keyset resolver (functional implementation)
+        _ = services.AddSingleton<IKeysetResolver, FunctionalKeysetResolverAdapter>();
 
         // Register real card service
         _ = services.AddSingleton<WsctCardService>();

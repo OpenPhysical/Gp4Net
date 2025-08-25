@@ -10,6 +10,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
+using Gp4Net.Domain.Security;
 using Gp4Net.Tests.TestVectors;
 using NUnit.Framework;
 
@@ -122,21 +123,20 @@ public class ScpProtocolTests
         // Host cryptogram: KDF(S-MAC, derivation constant 0x01, context, 64 bits)
         var cryptogramService = new Gp4Net.Domain.Security.CryptogramService();
 
-        // Act - Calculate card cryptogram
-        var cardCryptogramResult = cryptogramService.CalculateCardCryptogram(
-            sessionMacKey, 
-            vector.HostChallenge, 
-            vector.CardChallenge, 
-            Maybe<byte[]>.None, 
-            ScpVersion.Scp03);
+        // Act - Create type-safe SCP03 parameters and calculate cryptograms
+        var keySet = new Scp03KeySet(sessionMacKey, sessionMacKey, sessionMacKey) { SMac = sessionMacKey };
         
-        // Act - Calculate host cryptogram
-        var hostCryptogramResult = cryptogramService.CalculateHostCryptogram(
-            sessionMacKey, 
-            vector.HostChallenge, 
-            vector.CardChallenge, 
-            Maybe<byte[]>.None, 
-            ScpVersion.Scp03);
+        var cardCryptogramResult = CryptogramParameters.ForScp03(
+                vector.HostChallenge,
+                vector.CardChallenge,
+                keySet)
+            .Bind(parameters => cryptogramService.CalculateCardCryptogram(parameters));
+        
+        var hostCryptogramResult = CryptogramParameters.ForScp03(
+                vector.HostChallenge,
+                vector.CardChallenge,
+                keySet)
+            .Bind(parameters => cryptogramService.CalculateHostCryptogram(parameters));
 
         // Assert
         _ = cardCryptogramResult.IsSuccess.Should().BeTrue($"Card cryptogram calculation failed for {vector.Name}: {(cardCryptogramResult.IsFailure ? cardCryptogramResult.Error.Message : "N/A")}");

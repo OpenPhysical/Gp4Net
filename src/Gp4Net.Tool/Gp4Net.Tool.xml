@@ -1834,86 +1834,6 @@
         <member name="M:Gp4Net.Tool.Commands.Packages.ScanSdkCommand.Settings.Validate">
             <inheritdoc />
         </member>
-        <member name="T:Gp4Net.Tool.Commands.Script.EvalCommand">
-            <summary>
-            Command to evaluate a Lua expression.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Script.EvalCommand.#ctor(Gp4Net.Tool.Scripting.ScriptManager)">
-            <summary>
-            Initializes a new instance of the EvalCommand class.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Script.EvalCommand.ExecuteAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Script.EvalCommand.Settings)">
-            <inheritdoc />
-        </member>
-        <member name="T:Gp4Net.Tool.Commands.Script.EvalCommand.Settings">
-            <summary>
-            Settings for the eval command.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Commands.Script.EvalCommand.Settings.Expression">
-            <summary>
-            Gets or sets the Lua expression to evaluate.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Commands.Script.EvalCommand.Settings.Verbose">
-            <summary>
-            Gets or sets whether to use verbose output.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Script.EvalCommand.Settings.Validate">
-            <inheritdoc />
-        </member>
-        <member name="T:Gp4Net.Tool.Commands.Script.ReplCommand">
-            <summary>
-            Command to start an interactive Lua REPL.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Script.ReplCommand.#ctor(Gp4Net.Tool.Scripting.ScriptManager)">
-            <summary>
-            Initializes a new instance of the ReplCommand class.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Script.ReplCommand.ExecuteAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Script.ReplCommand.Settings)">
-            <inheritdoc />
-        </member>
-        <member name="T:Gp4Net.Tool.Commands.Script.ReplCommand.Settings">
-            <summary>
-            Settings for the REPL command.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Commands.Script.ScriptCommand">
-            <summary>
-            Command to execute a Lua script file.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Script.ScriptCommand.#ctor(Gp4Net.Tool.Scripting.ScriptManager)">
-            <summary>
-            Initializes a new instance of the ScriptCommand class.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Script.ScriptCommand.ExecuteAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Script.ScriptCommand.Settings)">
-            <inheritdoc />
-        </member>
-        <member name="T:Gp4Net.Tool.Commands.Script.ScriptCommand.Settings">
-            <summary>
-            Settings for the script command.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Commands.Script.ScriptCommand.Settings.ScriptFile">
-            <summary>
-            Gets or sets the script file to execute.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Commands.Script.ScriptCommand.Settings.Verbose">
-            <summary>
-            Gets or sets whether to use verbose output.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Script.ScriptCommand.Settings.Validate">
-            <inheritdoc />
-        </member>
         <member name="T:Gp4Net.Tool.Commands.StandardCommandSettings">
             <summary>
             Standard settings for commands that don't require card operations.
@@ -2475,56 +2395,6 @@
             Gets or sets the pipeline command adapter type.
             </summary>
         </member>
-        <member name="T:Gp4Net.Tool.Pipeline.CommandTestExtensions">
-            <summary>
-            Extension methods for testing commands.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandTestExtensions.ExecuteWithMockContext``1(Gp4Net.Tool.Pipeline.IPipelineCommand{``0},``0,Gp4Net.Tool.Pipeline.MockCliContext)">
-            <summary>
-            Executes a command with a mock context for testing.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Pipeline.CommandTestExtensions.CreateMockContext(System.Boolean,System.Boolean)">
-            <summary>
-            Creates a mock context with specific configuration.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Pipeline.CommandTestResult">
-            <summary>
-            Result of a command test execution.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Pipeline.CommandTestResult.ExitCode">
-            <summary>
-            Gets or sets the exit code returned by the command.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Pipeline.CommandTestResult.Context">
-            <summary>
-            Gets or sets the mock context used during execution.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Pipeline.CommandTestResult.DisplayMessages">
-            <summary>
-            Gets or sets the display messages captured during execution.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Pipeline.CommandTestResult.MethodCalls">
-            <summary>
-            Gets or sets the method calls made to the context during execution.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Pipeline.CommandTestResult.Succeeded">
-            <summary>
-            Gets a value indicating whether the command succeeded.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Pipeline.CommandTestResult.Failed">
-            <summary>
-            Gets a value indicating whether the command failed.
-            </summary>
-        </member>
         <member name="T:Gp4Net.Tool.Pipeline.DisplayService">
             <summary>
             Default implementation of IDisplayService using Spectre.Console.
@@ -2673,46 +2543,6 @@
             Displays raw markup text.
             </summary>
         </member>
-        <member name="T:Gp4Net.Tool.Pipeline.MockCliContext">
-            <summary>
-            Mock implementation of ICliExecutionContext for testing.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Pipeline.MockCliContext.MethodCalls">
-            <summary>
-            Gets the list of method calls made to this mock.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Pipeline.MockCliContext.ShouldConnectSucceed">
-            <summary>
-            Gets or sets whether card connection should succeed.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Pipeline.MockCliContext.ShouldSecureChannelSucceed">
-            <summary>
-            Gets or sets whether secure channel establishment should succeed.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Pipeline.MockDisplayService">
-            <summary>
-            Mock implementation of IDisplayService for testing.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Pipeline.MockCardService">
-            <summary>
-            Mock implementation of ICardService for testing.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Pipeline.MockKeysetResolver">
-            <summary>
-            Mock implementation of IKeysetResolver for testing.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Pipeline.MockKeySet">
-            <summary>
-            Mock implementation of IKeySet for testing.
-            </summary>
-        </member>
         <member name="T:Gp4Net.Tool.Pipeline.PipelineCommand`1">
             <summary>
             Adapter that bridges the new pipeline architecture with Spectre.Console.Cli.
@@ -2758,411 +2588,6 @@
             </summary>
             <param name="provider">The service provider to validate.</param>
             <returns>Success if all services are registered, or an error message.</returns>
-        </member>
-        <member name="T:Gp4Net.Tool.Scripting.CryptoScriptModule">
-            <summary>
-            Provides cryptographic operations to Lua scripts.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.DesEcb(System.Byte[],System.Byte[])">
-            <summary>
-            DES ECB encryption.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.DesCbc(System.Byte[],System.Byte[],System.Byte[])">
-            <summary>
-            DES CBC encryption.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.Des3Ecb(System.Byte[],System.Byte[])">
-            <summary>
-            3DES ECB encryption.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.Des3Cbc(System.Byte[],System.Byte[],System.Byte[])">
-            <summary>
-            3DES CBC encryption.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.AesEcb(System.Byte[],System.Byte[])">
-            <summary>
-            AES ECB encryption.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.AesCbc(System.Byte[],System.Byte[],System.Byte[])">
-            <summary>
-            AES CBC encryption.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.CmacDes(System.Byte[],System.Byte[])">
-            <summary>
-            CMAC with DES.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.CmacAes(System.Byte[],System.Byte[])">
-            <summary>
-            CMAC with AES.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.Iso9797Mac(System.Byte[],System.Byte[])">
-            <summary>
-            ISO 9797-1 MAC Algorithm 3 (Retail MAC).
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.Sha1(System.Byte[])">
-            <summary>
-            SHA-1 hash.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.Sha256(System.Byte[])">
-            <summary>
-            SHA-256 hash.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.Sha384(System.Byte[])">
-            <summary>
-            SHA-384 hash.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.Sha512(System.Byte[])">
-            <summary>
-            SHA-512 hash.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.CryptoScriptModule.RandomBytes(System.Int32)">
-            <summary>
-            Generate random bytes.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Scripting.GpScriptModule">
-            <summary>
-            Provides GlobalPlatform operations to Lua scripts.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.#ctor(Gp4Net.Tool.Services.ICardService,Gp4Net.Services.IGlobalPlatformService,Microsoft.Extensions.Logging.ILogger)">
-            <summary>
-            Initializes a new instance of the GpScriptModule class.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.Connect(System.String)">
-            <summary>
-            Connects to a card reader.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.Disconnect(MoonSharp.Interpreter.Table)">
-            <summary>
-            Disconnects from the card.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.IsConnected(MoonSharp.Interpreter.Table)">
-            <summary>
-            Checks if connected to a card.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.EstablishSecureChannel(MoonSharp.Interpreter.Table,System.String,System.Byte)">
-            <summary>
-            Establishes a secure channel.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.CloseSecureChannel(MoonSharp.Interpreter.Table)">
-            <summary>
-            Closes the secure channel.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.Select(MoonSharp.Interpreter.Table,System.Byte[])">
-            <summary>
-            Selects an application.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.GetStatus(MoonSharp.Interpreter.Table,System.String)">
-            <summary>
-            Gets card status.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.GetCardInfo(MoonSharp.Interpreter.Table)">
-            <summary>
-            Gets card information.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.InstallCap(MoonSharp.Interpreter.Table,System.String,MoonSharp.Interpreter.Table)">
-            <summary>
-            Installs a CAP file.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.LoadCap(MoonSharp.Interpreter.Table,System.String,MoonSharp.Interpreter.Table)">
-            <summary>
-            Loads a CAP file (package only).
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.InstallApplet(MoonSharp.Interpreter.Table,System.Byte[],System.Byte[],MoonSharp.Interpreter.Table)">
-            <summary>
-            Installs an applet from a loaded package.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.Delete(MoonSharp.Interpreter.Table,System.Byte[],MoonSharp.Interpreter.Table)">
-            <summary>
-            Deletes an application or package.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.SetLifecycleState(MoonSharp.Interpreter.Table,System.Byte[],System.String)">
-            <summary>
-            Sets the lifecycle state of an application.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.SendApdu(MoonSharp.Interpreter.Table,System.Byte[])">
-            <summary>
-            Sends a raw APDU command.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.Sleep(System.Int32)">
-            <summary>
-            Sleeps for specified milliseconds.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.ReadFile(System.String)">
-            <summary>
-            Reads a file.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.WriteFile(System.String,System.Byte[])">
-            <summary>
-            Writes a file.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpScriptModule.ListReaders">
-            <summary>
-            Lists available readers.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Scripting.GpShellScriptParser">
-            <summary>
-            Parser for GPShell script files.
-            Converts GPShell commands to Gp4Net Lua equivalents.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ParseFile(System.String)">
-            <summary>
-            Parses a GPShell script file and returns Lua script content.
-            </summary>
-            <param name="filePath">Path to the GPShell script file.</param>
-            <returns>Lua script content.</returns>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ParseLines(System.String[])">
-            <summary>
-            Parses GPShell script lines and returns Lua script content.
-            </summary>
-            <param name="lines">GPShell script lines.</param>
-            <returns>Lua script content.</returns>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ParseCommand(System.String)">
-            <summary>
-            Parses a single GPShell command and returns the Lua equivalent.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.SplitCommand(System.String)">
-            <summary>
-            Splits a command line into parts, respecting quotes.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ParseParameters(System.Collections.Generic.List{System.String})">
-            <summary>
-            Parses command parameters into a dictionary.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ConvertSelect(System.Collections.Generic.Dictionary{System.String,System.String})">
-            <summary>
-            Converts a SELECT command.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ConvertOpenSecureChannel(System.Collections.Generic.Dictionary{System.String,System.String})">
-            <summary>
-            Converts an OPEN_SC command.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ConvertSendApdu(System.Collections.Generic.Dictionary{System.String,System.String})">
-            <summary>
-            Converts a SEND_APDU command.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.ConvertPutKey(System.Collections.Generic.Dictionary{System.String,System.String})">
-            <summary>
-            Converts a PUT_SC_KEY command.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.FormatParameters(System.Collections.Generic.Dictionary{System.String,System.String})">
-            <summary>
-            Formats parameters for generic commands.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.GpShellScriptParser.EscapeString(System.String)">
-            <summary>
-            Escapes a string for Lua.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Scripting.IScriptManager">
-            <summary>
-            Interface for managing Lua script execution and module registration.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.IScriptManager.CreateScript">
-            <summary>
-            Creates a new Lua script with all modules loaded.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.IScriptManager.ExecuteScriptFileAsync(System.String)">
-            <summary>
-            Executes a script file.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.IScriptManager.ExecuteFunction(System.String,System.Collections.Generic.Dictionary{System.String,System.Object})">
-            <summary>
-            Executes a Lua function from a script.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.IScriptManager.ExecuteScriptFunction(System.String,System.String,System.String[],System.Collections.Generic.Dictionary{System.String,System.Object})">
-            <summary>
-            Executes a specific function in a script file with arguments.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.IScriptManager.ExecuteExpression(System.String)">
-            <summary>
-            Executes a Lua expression.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.IScriptManager.StartRepl">
-            <summary>
-            Creates a Lua REPL session.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Scripting.ScriptDirectoryResolver">
-            <summary>
-            Resolves script and configuration directories based on platform conventions.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.ScriptDirectoryResolver.GetScriptSearchPaths">
-            <summary>
-            Gets the ordered list of directories to search for scripts.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.ScriptDirectoryResolver.GetConfigSearchPaths">
-            <summary>
-            Gets the ordered list of paths to search for configuration files.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.ScriptDirectoryResolver.FindScript(System.String)">
-            <summary>
-            Finds a script file in the search paths.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.ScriptDirectoryResolver.FindConfigFile">
-            <summary>
-            Finds the configuration file.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.ScriptDirectoryResolver.EnsureUserDirectories">
-            <summary>
-            Ensures the user directory structure exists.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Scripting.ScriptManager">
-            <summary>
-            Manages Lua script execution and module registration.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.ScriptManager.#ctor(Microsoft.Extensions.Logging.ILogger{Gp4Net.Tool.Scripting.ScriptManager},Gp4Net.Tool.Scripting.ScriptDirectoryResolver,Gp4Net.Tool.Services.ICardService,Gp4Net.Tool.Services.IDomainServiceFactory)">
-            <summary>
-            Initializes a new instance of the ScriptManager class.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.ScriptManager.CreateScript">
-            <summary>
-            Creates a new Lua script with all modules loaded.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.ScriptManager.ExecuteScriptFileAsync(System.String)">
-            <summary>
-            Executes a script file.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.ScriptManager.ExecuteFunction(System.String,System.Collections.Generic.Dictionary{System.String,System.Object})">
-            <summary>
-            Executes a Lua function from a script.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.ScriptManager.ExecuteScriptFunction(System.String,System.String,System.String[],System.Collections.Generic.Dictionary{System.String,System.Object})">
-            <summary>
-            Executes a specific function in a script file with arguments.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.ScriptManager.ExecuteExpression(System.String)">
-            <summary>
-            Executes a Lua expression.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.ScriptManager.StartRepl">
-            <summary>
-            Creates a Lua REPL session.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Scripting.ScriptManager.CustomScriptLoader">
-            <summary>
-            Custom script loader that searches in our directories.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Scripting.UtilityScriptModule">
-            <summary>
-            Provides utility functions to Lua scripts.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.Hex(System.String)">
-            <summary>
-            Converts a hex string to bytes.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.Bytes(System.Object)">
-            <summary>
-            Creates a byte array from various inputs.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.Concat(System.Byte[][])">
-            <summary>
-            Concatenates byte arrays.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.Sub(System.Byte[],System.Int32,System.Int32)">
-            <summary>
-            Extracts a sub-array.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.Xor(System.Byte[],System.Byte[])">
-            <summary>
-            XORs two byte arrays.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.Pad80(System.Byte[],System.Int32)">
-            <summary>
-            Applies ISO 7816-4 padding (0x80 followed by zeros).
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.HexString(System.Byte[])">
-            <summary>
-            Converts bytes to hex string.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.RandomBytes(System.Int32)">
-            <summary>
-            Generates random bytes.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.IntToBytes(System.Int32,System.Int32)">
-            <summary>
-            Converts integer to bytes (big-endian).
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Scripting.UtilityScriptModule.BytesToInt(System.Byte[])">
-            <summary>
-            Converts bytes to integer (big-endian).
-            </summary>
         </member>
         <member name="T:Gp4Net.Tool.Services.ApplicationDisplayService">
             <summary>
@@ -3593,6 +3018,108 @@
         <member name="M:Gp4Net.Tool.Services.EnvironmentValidationService.DetectCardEnvironmentAsync(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
+        <member name="T:Gp4Net.Tool.Services.FunctionalKeysetResolver">
+            <summary>
+            Pure functional keyset resolver that replaces Lua-based KeysetResolver.
+            Provides key diversification and GP test key resolution without external dependencies.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.ResolveKeyset(System.String,System.Collections.Generic.Dictionary{System.String,System.String},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},System.Byte,CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Commands.InitializeUpdateResponse})">
+            <summary>
+            Resolves a keyset using pure functional implementation instead of Lua scripts.
+            Supports GP test keys with proper diversification based on card response.
+            </summary>
+            <param name="keysetSpec">The keyset specification (only 'gp_test_keys' supported).</param>
+            <param name="keysetParams">Parameters for the keyset (unused in functional implementation).</param>
+            <param name="encKey">Explicit encryption key (overrides keyset).</param>
+            <param name="macKey">Explicit MAC key (overrides keyset).</param>
+            <param name="dekKey">Explicit DEK key (overrides keyset).</param>
+            <param name="keyVersion">The key version.</param>
+            <param name="cardResponse">Card response containing diversification data.</param>
+            <returns>Result containing the resolved keyset or error.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.ResolveBySpec(System.String,System.Byte,CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Commands.InitializeUpdateResponse})">
+            <summary>
+            Resolves keyset by specification string.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.ResolveGpTestKeys(System.Byte,CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Commands.InitializeUpdateResponse})">
+            <summary>
+            Resolves GP test keys with optional diversification based on card response.
+            This is the functional replacement for the Lua gp_test_keys.lua script.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.ApplyDiversificationIfPresent(Gp4Net.Domain.Keys.IKeySet,Gp4Net.Domain.Commands.InitializeUpdateResponse,System.Byte)">
+            <summary>
+            Applies diversification if present in the card response.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.ApplyKeyDiversification(Gp4Net.Domain.Keys.IKeySet,System.Byte[],System.Byte)">
+            <summary>
+            Applies key diversification to base GP test keys using card-specific diversification data.
+            This replaces the apply_diversification() function from Lua scripts.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.CreateDiversifiedScp02Keys(Gp4Net.Domain.Keys.Scp02KeySet,System.Byte[],System.Byte)">
+            <summary>
+            Creates diversified SCP02 keys using production key derivation logic.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.CreateDiversifiedScp03Keys(Gp4Net.Domain.Keys.Scp03KeySet,System.Byte[],System.Byte)">
+            <summary>
+            Creates diversified SCP03 keys using production key derivation logic.
+            SCP03 diversification requires AES operations and is card-specific.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.DiversifyKey(System.Byte[],System.Byte[],System.Byte)">
+            <summary>
+            Diversifies a single key using 3DES and diversification data.
+            This is the functional equivalent of key diversification in Lua scripts.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.PadToLength(System.Byte[],System.Int32)">
+            <summary>
+            Pads input data to specified length with zeros.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.CreateKeysetFromExplicitKeys(CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},System.Byte)">
+            <summary>
+            Creates a keyset from explicitly provided keys.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.ValidateAndCreateKeyset(System.Byte[],System.Byte[],System.Byte[],System.Byte)">
+            <summary>
+            Validates key lengths and creates keyset.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.ValidateKeyLength(System.Byte[],System.String)">
+            <summary>
+            Validates that a key has the correct length.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.HasExplicitKeys(CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+            <summary>
+            Checks if any explicit keys are provided.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.FunctionalKeysetResolverAdapter">
+            <summary>
+            Adapter class that implements IKeysetResolver interface using the functional implementation.
+            This allows the functional resolver to be used wherever IKeysetResolver is expected.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolverAdapter.ResolveKeyset(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Byte[],System.Byte[],System.Byte[],System.Byte,Gp4Net.Domain.Commands.InitializeUpdateResponse)">
+            <summary>
+            Resolves a keyset using the functional implementation.
+            Returns error as SmartCardError wrapped in Result pattern for proper functional handling.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.FailedKeyset">
+            <summary>
+            Failed keyset implementation that represents keyset resolution failure.
+            All operations using this keyset should fail as intended.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Tool.Services.HybridCardService">
             <summary>
             Hybrid card service that supports both real smart cards and virtual card emulators.
@@ -4013,93 +3540,6 @@
             <param name="keyVersion">The key version.</param>
             <param name="cardResponse">Optional card response for key diversification.</param>
             <returns>The resolved keyset.</returns>
-        </member>
-        <member name="T:Gp4Net.Tool.Services.JsonLuaCardService">
-            <summary>
-            Enhanced Lua card service that can load JSON trace data with rich metadata.
-            Supports operation filtering and session-aware replay.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.GetReaders">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.Connect(System.String)">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.Disconnect">
-            <inheritdoc />
-        </member>
-        <member name="P:Gp4Net.Tool.Services.JsonLuaCardService.IsConnected">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.GetAtr">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.SendCommand(System.Byte[])">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.SendCommand(Gp4Net.Transport.IApduCommand)">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.EstablishSecureChannel(System.Byte[],System.Byte)">
-            <inheritdoc />
-        </member>
-        <member name="P:Gp4Net.Tool.Services.JsonLuaCardService.IsSecureChannelEstablished">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.JsonLuaCardService.Dispose">
-            <inheritdoc />
-        </member>
-        <member name="T:Gp4Net.Tool.Services.KeysetResolver">
-            <summary>
-            Resolves keysets from script functions or explicit parameters.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.KeysetResolver.#ctor(Microsoft.Extensions.Logging.ILogger{Gp4Net.Tool.Services.KeysetResolver},Gp4Net.Tool.Scripting.IScriptManager)">
-            <summary>
-            Initializes a new instance of the KeysetResolver class.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.KeysetResolver.ResolveKeyset(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Byte[],System.Byte[],System.Byte[],System.Byte,Gp4Net.Domain.Commands.InitializeUpdateResponse)">
-            <summary>
-            Resolves a keyset from various sources.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Services.LuaVirtualCardService">
-            <summary>
-            Virtual card service that uses Lua scripts to simulate card behavior.
-            Supports URL-style reader names: lua:script.lua?trace=input.txt and parameter=value
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.GetReaders">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.Connect(System.String)">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.Disconnect">
-            <inheritdoc />
-        </member>
-        <member name="P:Gp4Net.Tool.Services.LuaVirtualCardService.IsConnected">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.GetAtr">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.SendCommand(System.Byte[])">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.SendCommand(Gp4Net.Transport.IApduCommand)">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.EstablishSecureChannel(System.Byte[],System.Byte)">
-            <inheritdoc />
-        </member>
-        <member name="P:Gp4Net.Tool.Services.LuaVirtualCardService.IsSecureChannelEstablished">
-            <inheritdoc />
-        </member>
-        <member name="M:Gp4Net.Tool.Services.LuaVirtualCardService.Dispose">
-            <inheritdoc />
         </member>
         <member name="T:Gp4Net.Tool.Services.SimpleJsonCardService">
             <summary>

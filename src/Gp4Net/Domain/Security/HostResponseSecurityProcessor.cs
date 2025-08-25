@@ -283,22 +283,11 @@ public class HostResponseSecurityProcessor : IResponseSecurityProcessor
         SessionKeys sessionKeys,
         ImmutableArray<byte> macChainingValue)
     {
-        return Result.Try(() =>
-        {
-            // Build MAC input: MAC chaining value || response data (including status word)
-            var macInput = macChainingValue.ToArray().Concat(response).ToArray();
+        // Build MAC input: MAC chaining value || response data (including status word)
+        var macInput = macChainingValue.ToArray().Concat(response).ToArray();
 
-            // Calculate AES-CMAC
-            var cmac = new CMac(new AesEngine(), 128);
-            cmac.Init(new KeyParameter(sessionKeys.SrMac));
-            cmac.BlockUpdate(macInput, 0, macInput.Length);
-            
-            var mac = new byte[16];
-            _ = cmac.DoFinal(mac, 0);
-            
-            // Return first 8 bytes as R-MAC
-            return mac.Take(8).ToArray();
-        }, ex => SmartCardError.CryptographicError($"SCP03 R-MAC calculation failed: {ex.Message}"));
+        var macService = new MacService();
+        return macService.CalculateAesCmac(sessionKeys.SrMac, macInput, macLength: 8);
     }
 
     private static Result<byte[], SmartCardError> CalculateScp02RMac(

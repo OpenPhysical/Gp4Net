@@ -185,7 +185,8 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
         // Apply C-ENCRYPTION if required
         if (securityLevel.HasCEncryption())
         {
-            var encryptResult = ApplyCommandEncryption(processedCommand, sessionKeys.SEnc);
+            // Per GP SCP03 v1.1.1 Section 6.2.3: Command encryption counter starts at 0 for first command in session
+            var encryptResult = ApplyCommandEncryption(processedCommand, sessionKeys.SEnc, chainingValue, 0);
             if (encryptResult.IsFailure)
             {
                 return encryptResult.Error;
@@ -320,7 +321,11 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
     
     // Helper methods
     
-    private static Result<byte[], SmartCardError> ApplyCommandEncryption(byte[] command, byte[] sEncKey)
+    private static Result<byte[], SmartCardError> ApplyCommandEncryption(
+        byte[] command, 
+        byte[] sEncKey, 
+        byte[] chainingValue, 
+        uint encryptionCounter)
     {
         if (command.Length <= 5) // No data to encrypt
         {
@@ -341,10 +346,10 @@ public sealed class Scp03ProtocolService : IScpProtocolService<Scp03ProtocolServ
         return CryptographicOperations.ApplyPkcs7Padding(dataToEncrypt, 16)
             .Bind(paddedData =>
             {
-                // For SCP03 C-ENC, IV is derived from encryption counter
-                // This is a simplified implementation - real implementation would use proper counter
-                var iv = new byte[16]; // Simplified - should be counter-based
-                return CryptographicOperations.EncryptAesCbc(sEncKey, iv, paddedData);
+                // For SCP03 C-ENC, IV is derived from encryption counter per GP SCP03 v1.1.1 Section 6.2.3
+                // Use proper counter-based IV derivation as specified in the protocol
+                return Scp03ProtocolImpl.CreateEncryptionIv(chainingValue, encryptionCounter)
+                    .Bind(iv => CryptographicOperations.EncryptAesCbc(sEncKey, iv, paddedData));
             })
             .Map(encryptedData =>
             {

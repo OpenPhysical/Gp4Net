@@ -33,14 +33,14 @@ public static class FunctionComposition
                 if (cmdResult.Data.Length > 0 && cmdResult.Metadata?.SecureChannelWrapped == true)
                 {
                     // First processor wrapped the command, create WrappedApduCommand for subsequent processors
-                    Result<WrappedApduCommand, SmartCardError> wrappedResult = 
-                        WrappedApduCommand.Create(command, cmdResult.Data);
+                    var wrappedResult = WrappedApduCommand.Create(command, cmdResult.Data);
                     
                     if (wrappedResult.IsFailure)
                     {
                         return Result.Failure<CommandResult, SmartCardError>(wrappedResult.Error);
                     }
                     
+                    // Safe access after success check
                     commandForSecond = wrappedResult.Value;
                 }
                 

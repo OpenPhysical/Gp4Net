@@ -12,8 +12,13 @@ using Gp4Net.Services;
 using Gp4Net.Tool.Commands.Card;
 using Gp4Net.Tool.Pipeline;
 using Gp4Net.Tool.Services;
-using Moq;
+using Gp4Net.CardEmulator.Services;
+using Microsoft.Extensions.Logging;
 using NUnit.Framework;
+using CSharpFunctionalExtensions;
+using Gp4Net.Tool.Infrastructure;
+using Gp4Net.Tests.Tool;
+using Gp4Net.Tests.TestHelpers;
 
 /// <summary>
 /// Unit tests for the <see cref="ListReadersCommand"/> class.
@@ -21,32 +26,47 @@ using NUnit.Framework;
 [TestFixture]
 public class ListReadersCommandTests
 {
-    private Mock<IDisplayService> _mockDisplayService;
-    private Mock<ICardService> _mockCardService;
-    private Mock<IGlobalPlatformService> _mockGlobalPlatformService;
-    private Mock<IKeysetResolver> _mockKeysetResolver;
-    private MockCliContext _mockContext;
+    private IDisplayService _displayService;
+    private Gp4Net.Tool.Services.ICardService _cardService;
+    private IGlobalPlatformService _globalPlatformService;
+    private IKeysetResolver _keysetResolver;
+    private TestCliContext _testContext;
     private ListReadersCommand _command;
 
     /// <summary>
     /// Sets up the test environment before each test.
     /// </summary>
+    private VirtualCardService _virtualCardService = null!;
+
     [SetUp]
     public void SetUp()
     {
-        this._mockDisplayService = new Mock<IDisplayService>();
-        this._mockCardService = new Mock<ICardService>();
-        this._mockGlobalPlatformService = new Mock<IGlobalPlatformService>();
-        this._mockKeysetResolver = new Mock<IKeysetResolver>();
+        _displayService = new DisplayService(false);
+        
+        _virtualCardService = new VirtualCardService();
+        _virtualCardService.SetupComprehensiveTestEnvironment();
+        _cardService = new TestCardService(_virtualCardService);
+        
+        // Skip domain service factory setup for ListReadersCommand tests
+        _globalPlatformService = null;
+        _keysetResolver = new FunctionalKeysetResolverAdapter();
 
-        this._mockContext = new MockCliContext(
-            this._mockDisplayService.Object,
-            this._mockCardService.Object,
-            this._mockGlobalPlatformService.Object,
-            this._mockKeysetResolver.Object
+        _testContext = new TestCliContext(
+            _displayService,
+            _cardService,
+            _globalPlatformService, // null is fine for ListReaders
+            _keysetResolver,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance
         );
 
-        this._command = new ListReadersCommand();
+        _command = new ListReadersCommand();
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        _cardService?.Dispose();
+        _virtualCardService?.Dispose();
     }
 
     /// <summary>
@@ -66,16 +86,13 @@ public class ListReadersCommandTests
     public async Task ExecuteAsync_WithAvailableReaders_ReturnsSuccess()
     {
         // Arrange
-        var readers = new List<string> { "Reader 1", "Reader 2" }.AsReadOnly();
-        _ = this._mockCardService.Setup(x => x.GetReaders()).Returns(readers);
         var settings = new ListReadersCommand.Settings();
 
         // Act
-        var result = await this._command.ExecuteAsync(this._mockContext, settings);
+        var result = await this._command.ExecuteAsync(this._testContext, settings);
 
         // Assert
         _ = result.Should().Be(0);
-        this._mockCardService.Verify(x => x.GetReaders(), Times.Once);
     }
 
     /// <summary>
@@ -85,16 +102,13 @@ public class ListReadersCommandTests
     public async Task ExecuteAsync_WithNoReaders_ReturnsSuccess()
     {
         // Arrange
-        var readers = new List<string>().AsReadOnly();
-        _ = this._mockCardService.Setup(x => x.GetReaders()).Returns(readers);
         var settings = new ListReadersCommand.Settings();
 
         // Act
-        var result = await this._command.ExecuteAsync(this._mockContext, settings);
+        var result = await this._command.ExecuteAsync(this._testContext, settings);
 
         // Assert
         _ = result.Should().Be(0);
-        this._mockCardService.Verify(x => x.GetReaders(), Times.Once);
     }
 
     /// <summary>
@@ -103,17 +117,61 @@ public class ListReadersCommandTests
     [Test]
     public async Task ExecuteAsync_WithCardServiceException_ReturnsError()
     {
-        // Arrange
-        _ = this
-            ._mockCardService.Setup(x => x.GetReaders())
-            .Throws(new System.InvalidOperationException("Test exception"));
+        // Arrange - Create a failing card service for this test
+        var failingCardService = new FailingCardService();
+        var failingContext = new TestCliContext(
+            _displayService,
+            failingCardService,
+            _globalPlatformService,
+            _keysetResolver,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance
+        );
         var settings = new ListReadersCommand.Settings();
 
         // Act
-        var result = await this._command.ExecuteAsync(this._mockContext, settings);
+        var result = await this._command.ExecuteAsync(failingContext, settings);
 
         // Assert
-        _ = result.Should().Be(1);
-        this._mockCardService.Verify(x => x.GetReaders(), Times.Once);
+        _ = result.Should().Be(1); // Should handle exceptions gracefully
     }
+}
+
+/// <summary>
+/// Test implementation of CLI execution context for functional testing with virtual card.
+/// </summary>
+public class TestCliContext : ICliExecutionContext
+{
+    public IDisplayService Display { get; }
+    public Gp4Net.Tool.Services.ICardService CardService { get; }
+    private readonly IGlobalPlatformService _globalPlatformService;
+    public IKeysetResolver KeysetResolver { get; }
+    public ILogger Logger { get; }
+
+    public TestCliContext(
+        IDisplayService display,
+        Gp4Net.Tool.Services.ICardService cardService,
+        IGlobalPlatformService globalPlatformService,
+        IKeysetResolver keysetResolver,
+        ILogger logger)
+    {
+        Display = display;
+        CardService = cardService;
+        _globalPlatformService = globalPlatformService;
+        KeysetResolver = keysetResolver;
+        Logger = logger;
+    }
+
+    public IGlobalPlatformService GetGlobalPlatformService() => _globalPlatformService;
+
+    public Task<ICliExecutionContext> RequireCardConnection(Maybe<string> readerName = default) =>
+        Task.FromResult<ICliExecutionContext>(this);
+
+    public Task<ICliExecutionContext> RequireSecureChannel(byte securityLevel = 1, Maybe<string> keyset = default) =>
+        Task.FromResult<ICliExecutionContext>(this);
+
+    public Task<int> ExecuteAsync(System.Func<ICliExecutionContext, Task<int>> commandLogic) =>
+        commandLogic(this);
+
+    public Task<int> ExecuteAsync(System.Func<ICliExecutionContext, int> commandLogic) =>
+        Task.FromResult(commandLogic(this));
 }

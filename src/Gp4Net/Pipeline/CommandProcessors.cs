@@ -68,56 +68,45 @@ public static class CommandProcessors
 
         var secureChannelState = environment.SecureChannel.Value;
 
-        // Build command bytes
-        var commandBytes = GetCommandBytes(command);
+        // Apply secure channel wrapping using SecureChannelService with proper functional handling
+        return Task.FromResult(
+            environment.SecureChannelService.WrapCommand(command, secureChannelState)
+                .Bind(wrapResult =>
+                {
+                    var (wrappedBytes, newState) = wrapResult;
+                    
+                    // Log wrapped bytes from service for troubleshooting
+                    environment.Logger.LogDebug("SecureChannelService returned {ByteCount} wrapped bytes: {WrappedBytes}",
+                        wrappedBytes.Length, Convert.ToHexString(wrappedBytes));
 
-        // Apply secure channel wrapping using CommandSecurityProcessor
-        var wrapResult = Domain.Security.CommandSecurityProcessor.ApplyCommandSecurity(
-            command,
-            secureChannelState.SecurityLevel,
-            secureChannelState.SessionKeys,
-            secureChannelState.MacChaining.Value,
-            secureChannelState.EncryptionCounter,
-            secureChannelState.ProtocolVersion);
+                    return WrappedApduCommand.Create(command, wrappedBytes)
+                        .Map(wrappedCommand =>
+                        {
+                            // Update environment with new secure channel state and wrapped command
+                            var newEnvironment = environment.WithSecureChannel(newState);
 
-        if (wrapResult.IsFailure)
-        {
-            environment.Logger.LogError("Failed to wrap command with secure channel: {Error}",
-                wrapResult.Error.Message);
-            return Task.FromResult(Result.Failure<CommandResult, SmartCardError>(wrapResult.Error));
-        }
+                            // Log the transformation
+                            if (environment.EffectiveOptions.EnableLogging)
+                            {
+                                environment.Logger.LogDebug(
+                                    "Applied secure channel wrapping: {OriginalLength} → {WrappedLength} bytes",
+                                    ApduBuilder.BuildApdu(command).Length,
+                                    wrappedBytes.Length);
+                            }
 
-        (byte[] wrappedBytes, SecureChannelState newState) = wrapResult.Value;
+                            // Create metadata indicating secure channel wrapping was applied
+                            var metadata = new CommandMetadata(SecureChannelWrapped: true);
 
-        // Create wrapped command that carries the secured bytes
-        Result<WrappedApduCommand, SmartCardError> wrappedCommandResult = 
-            WrappedApduCommand.Create(command, wrappedBytes);
-            
-        if (wrappedCommandResult.IsFailure)
-        {
-            return Task.FromResult(Result.Failure<CommandResult, SmartCardError>(wrappedCommandResult.Error));
-        }
-
-        WrappedApduCommand wrappedCommand = wrappedCommandResult.Value;
-
-        // Update environment with new secure channel state
-        CommandEnvironment newEnvironment = environment.WithSecureChannel(newState);
-
-        // Log the transformation
-        if (environment.EffectiveOptions.EnableLogging)
-        {
-            environment.Logger.LogDebug(
-                "Wrapped command with secure channel: CLA {OriginalCla:X2} -> {WrappedCla:X2}, Length {OriginalLength} -> {WrappedLength}",
-                command.Cla, wrappedCommand.Cla, commandBytes.Length, wrappedBytes.Length);
-        }
-
-        // Store wrapped command in context for ExecuteTransport to use
-        var metadata = new CommandMetadata(
-            SecureChannelWrapped: true);
-
-        // Return success but with empty data - the actual response will come from ExecuteTransport
-        return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
-            CommandResult.Success([], Constants.StatusWords.Success, newEnvironment, metadata)));
+                            // Return wrapped bytes in Data field as expected by pipeline architecture
+                            // FunctionComposition will create WrappedApduCommand from this data
+                            return CommandResult.Success(wrappedBytes, Constants.StatusWords.Success, newEnvironment, metadata);
+                        });
+                })
+                .MapError(error =>
+                {
+                    environment.Logger.LogError("Secure channel wrapping failed: {Error}", error.Message);
+                    return error;
+                }));
     };
 
     /// <summary>
@@ -138,6 +127,8 @@ public static class CommandProcessors
             {
                 commandBytes = wrapped.WrappedBytes;
                 commandToSend = wrapped; // WrappedApduCommand implements ICompleteApduCommand
+                
+                environment.Logger.LogDebug("Using wrapped command: {ByteCount} bytes", commandBytes.Length);
             }
             else
             {
@@ -564,11 +555,14 @@ public static class CommandProcessors
     /// </summary>
     private static bool RequiresSecureChannel(IApduCommand command, CommandEnvironment environment)
     {
-        // Commands that never require secure channel
-        if (command is SelectCommand or InitializeUpdateCommand)
+        // Commands that never require secure channel per GP specification:
+        // - SELECT: Used to establish application context
+        // - INITIALIZE UPDATE: Starts secure channel establishment (runs before channel exists)
+        // - EXTERNAL AUTHENTICATE: Completes secure channel establishment (validates but doesn't require existing channel)
+        if (command is SelectCommand or InitializeUpdateCommand or ExternalAuthenticateCommand)
             return false;
 
-        // Check command options
+        // Check command options for all other commands
         return environment.EffectiveOptions.RequiresSecureChannel;
     }
 

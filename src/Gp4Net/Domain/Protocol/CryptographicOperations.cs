@@ -171,20 +171,6 @@ public static class CryptographicOperations
     }
 
     /// <summary>
-    /// Calculates 3DES-MAC (ISO 9797-1 Algorithm 3) over the provided data.
-    /// DEPRECATED: Use CalculateFull3DesMac or CalculateRetailMac instead.
-    /// </summary>
-    /// <param name="key">The 3DES key (16 or 24 bytes).</param>
-    /// <param name="data">The data to calculate MAC over.</param>
-    /// <returns>The 8-byte 3DES-MAC.</returns>
-    [Obsolete("Use CalculateFull3DesMac for cryptograms or CalculateRetailMac for C-MAC/R-MAC")]
-    public static Result<byte[], SmartCardError> Calculate3DesMac(byte[] key, byte[] data)
-    {
-        // For backwards compatibility, delegate to centralized MacService
-        return _macService.Calculate3DesMac(key, data, 8);
-    }
-
-    /// <summary>
     /// Encrypts data using AES-CBC with ISO7816-4 padding.
     /// Uses BouncyCastle's PaddedBufferedBlockCipher for integrated padding and encryption.
     /// </summary>

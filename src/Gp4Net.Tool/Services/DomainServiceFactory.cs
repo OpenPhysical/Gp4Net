@@ -83,10 +83,17 @@ public class DomainServiceFactory : IDomainServiceFactory, ISingletonService
             
         // Create the command environment with all explicit dependencies
         var logger = new LoggerWrapper<SmartCardService>(_logger);
+        
+        // Create secure channel service with functional composition
+        var commandProcessor = new Gp4Net.Domain.Security.CommandSecurityProcessorAdapter();
+        var responseProcessor = new Gp4Net.Domain.Security.ResponseSecurityProcessorAdapter();
+        var secureChannelService = new Gp4Net.Domain.Security.SecureChannelService(commandProcessor, responseProcessor);
+        
         var environment = new CommandEnvironment(
             channel,
             transport,
             Maybe<SecureChannelState>.None,
+            secureChannelService,
             logger);
             
         // Create the command processor pipeline using pure function composition

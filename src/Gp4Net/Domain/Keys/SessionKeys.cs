@@ -4,6 +4,8 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Org.BouncyCastle.Utilities;
 
 namespace Gp4Net.Domain.Keys;
@@ -48,6 +50,34 @@ public class SessionKeys : IDisposable
         SMac = sMac;
         SrMac = sRMac;
         Dek = dek;
+    }
+
+    /// <summary>
+    /// Creates session keys with functional validation using Maybe<T> patterns.
+    /// </summary>
+    /// <param name="sEnc">The session encryption key.</param>
+    /// <param name="sMac">The session MAC key.</param>
+    /// <param name="sRMac">The session R-MAC key.</param>
+    /// <param name="dek">The data encryption key (optional).</param>
+    /// <returns>A Result containing the SessionKeys or an error.</returns>
+    public static Result<SessionKeys, SmartCardError> Create(byte[] sEnc, byte[] sMac, byte[] sRMac, byte[] dek = null)
+    {
+        return Maybe<byte[]>.From(sEnc)
+            .ToResult(SmartCardError.InvalidArgument("S-ENC key cannot be null"))
+            .Bind(encKey => encKey.Length > 0 
+                ? Result.Success<byte[], SmartCardError>(encKey)
+                : Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidArgument("S-ENC key cannot be empty")))
+            .Bind(_ => Maybe<byte[]>.From(sMac)
+                .ToResult(SmartCardError.InvalidArgument("S-MAC key cannot be null")))
+            .Bind(macKey => macKey.Length > 0 
+                ? Result.Success<byte[], SmartCardError>(macKey)
+                : Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidArgument("S-MAC key cannot be empty")))
+            .Bind(_ => Maybe<byte[]>.From(sRMac)
+                .ToResult(SmartCardError.InvalidArgument("S-RMAC key cannot be null")))
+            .Bind(rMacKey => rMacKey.Length > 0 
+                ? Result.Success<byte[], SmartCardError>(rMacKey)
+                : Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidArgument("S-RMAC key cannot be empty")))
+            .Map(_ => new SessionKeys(sEnc, sMac, sRMac, dek));
     }
 
     /// <summary>

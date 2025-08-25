@@ -6,7 +6,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gp4Net.Tests", "tests\Gp4Ne
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gp4Net.Tool", "src\Gp4Net.Tool\Gp4Net.Tool.csproj", "{BC75E479-5724-4B87-BF9E-1B42540157C3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gp4Net.CardEmulator", "tests\Gp4Net.CardEmulator\Gp4Net.CardEmulator.csproj", "{F3BE1704-3FBB-45CA-B4C1-31FD5D77F04E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gp4Net.CardEmulator", "src\Gp4Net.CardEmulator\Gp4Net.CardEmulator.csproj", "{F3BE1704-3FBB-45CA-B4C1-31FD5D77F04E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

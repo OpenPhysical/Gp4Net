@@ -211,22 +211,18 @@ public static class ResponseSecurityProcessor
 
         if (protocolVersion == ProtocolIdentifiers.Scp03)
         {
-            // Calculate full 128-bit AES-CMAC
-            var cmac = new CMac(new AesEngine(), 128);
-            cmac.Init(new KeyParameter(sessionKeys.SrMac));
-            cmac.BlockUpdate(macInput, 0, macInput.Length);
+            var macService = new MacService();
             
-            var fullMac = new byte[16];
-            _ = cmac.DoFinal(fullMac, 0);
-
-            // Return truncated 8-byte MAC and full 16-byte chaining value
-            var mac = new byte[8];
-            Array.Copy(fullMac, 0, mac, 0, 8);
+            return macService.CalculateAesCmac(sessionKeys.SrMac, macInput, macLength: 16)
+                .Map(fullMac =>
+                {
+                    // Return truncated 8-byte MAC and full 16-byte chaining value
+                    var mac = new byte[8];
+                    Array.Copy(fullMac, 0, mac, 0, 8);
             
-            // For SCP03, R-MAC does not update chaining value
-            return Result.Success<(byte[], ImmutableArray<byte>), SmartCardError>(
-                (mac, macChainingValue)
-            );
+                    // For SCP03, R-MAC does not update chaining value
+                    return (mac, macChainingValue);
+                });
         }
         else
         {

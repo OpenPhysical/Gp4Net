@@ -292,21 +292,18 @@ public static class CommandSecurityProcessor
 
         if (protocolVersion == ProtocolIdentifiers.Scp03)
         {
-            // Calculate full 128-bit AES-CMAC
-            var cmac = new CMac(new AesEngine(), 128);
-            cmac.Init(new KeyParameter(sessionKeys.SMac));
-            cmac.BlockUpdate(macInput, 0, macInput.Length);
+            var macService = new MacService();
             
-            var fullMac = new byte[16];
-            _ = cmac.DoFinal(fullMac, 0);
-
-            // Return truncated 8-byte MAC and full 16-byte chaining value
-            var mac = new byte[8];
-            Array.Copy(fullMac, 0, mac, 0, 8);
-            
-            return Result.Success<(byte[], ImmutableArray<byte>), SmartCardError>(
-                (mac, [..fullMac])
-            );
+            // Calculate full 16-byte AES-CMAC and return both truncated and full MAC
+            return macService.CalculateAesCmac(sessionKeys.SMac, macInput, macLength: 16)
+                .Map(fullMac => 
+                {
+                    // Return truncated 8-byte MAC and full 16-byte chaining value
+                    var mac = new byte[8];
+                    Array.Copy(fullMac, 0, mac, 0, 8);
+                    
+                    return (mac, fullMac.ToImmutableArray());
+                });
         }
         else
         {
@@ -574,20 +571,19 @@ public static class CommandSecurityProcessor
 
                 if (macChainingState.ProtocolVersion == ProtocolIdentifiers.Scp03)
                 {
-                    // Calculate full 128-bit AES-CMAC
-                    var cmac = new CMac(new AesEngine(), 128);
-                    cmac.Init(new KeyParameter(sessionKeys.SMac));
-                    cmac.BlockUpdate(macInput, 0, macInput.Length);
+                    var macService = new MacService();
                     
-                    var fullMac = new byte[16];
-                    _ = cmac.DoFinal(fullMac, 0);
-
-                    // Return truncated 8-byte MAC and full 16-byte chaining value
-                    var mac = new byte[8];
-                    Array.Copy(fullMac, 0, mac, 0, 8);
-                    
-                    return MacChainingState.Create(fullMac, macChainingState.ProtocolVersion, macChainingState.ImplementationParameter)
-                        .Map(newState => (mac, newState));
+                    // Calculate full 16-byte AES-CMAC and return both truncated and full MAC
+                    return macService.CalculateAesCmac(sessionKeys.SMac, macInput, macLength: 16)
+                        .Bind(fullMac =>
+                        {
+                            // Return truncated 8-byte MAC and full 16-byte chaining value
+                            var mac = new byte[8];
+                            Array.Copy(fullMac, 0, mac, 0, 8);
+                            
+                            return MacChainingState.Create(fullMac, macChainingState.ProtocolVersion, macChainingState.ImplementationParameter)
+                                .Map(newState => (mac, newState));
+                        });
                 }
                 else
                 {

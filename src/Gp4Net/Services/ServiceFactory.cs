@@ -64,11 +64,17 @@ public static class ServiceFactory
         // Create a logger (can be NullLogger if not provided)
         var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<SmartCardService>.Instance;
         
+        // Create secure channel service with functional composition
+        var commandProcessor = new CommandSecurityProcessorAdapter();
+        var responseProcessor = new ResponseSecurityProcessorAdapter();
+        var secureChannelService = new SecureChannelService(commandProcessor, responseProcessor);
+        
         // Create command environment
         var environment = new CommandEnvironment(
             channel,
             transport,
             Maybe<SecureChannelState>.None,
+            secureChannelService,
             logger);
             
         // Create command processor

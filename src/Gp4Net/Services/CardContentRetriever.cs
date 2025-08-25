@@ -64,7 +64,7 @@ public class CardContentRetriever
         }
 
         // Establish secure channel
-        var secureChannelResult = await EstablishSecureChannelWithAutoDetection(keySet);
+        var secureChannelResult = await EstablishSecureChannelWithAutoDetection(Maybe<IKeySet>.From(keySet));
         if (secureChannelResult.IsFailure)
         {
             return Result.Failure<CardContent, SmartCardError>(secureChannelResult.Error);
@@ -80,41 +80,36 @@ public class CardContentRetriever
     /// <summary>
     /// Establishes secure channel with SCP auto-detection and default key handling.
     /// </summary>
-    private async Task<Result<bool, SmartCardError>> EstablishSecureChannelWithAutoDetection(IKeySet keySet)
+    private async Task<Result<bool, SmartCardError>> EstablishSecureChannelWithAutoDetection(Maybe<IKeySet> keySet)
     {
-        // Use GP test keys if no key set provided
-        var effectiveKeySet = keySet ?? CreateDefaultTestKeySet();
-
-        _logger.LogDebug("Establishing secure channel with auto-detection");
-        
-        // Convert IKeySet to KeySet for GlobalPlatformService
-        return await ConvertToKeySet(effectiveKeySet)
-            .Bind(async keySetForGp =>
+        return await keySet.Match(
+            async ks =>
             {
-                var secureChannelResult = await _gpService.EstablishSecureChannelAsync(
-                    keySetForGp,
-                    SecurityLevel.CMac);
+                _logger.LogDebug("Establishing secure channel with auto-detection");
+                
+                return await ConvertToKeySet(ks)
+                    .Bind(async keySetForGp =>
+                    {
+                        var secureChannelResult = await _gpService.EstablishSecureChannelAsync(
+                            keySetForGp,
+                            SecurityLevel.CMac);
 
-                if (secureChannelResult.IsSuccess)
-                {
-                    _logger.LogInformation("Secure channel established successfully");
-                    return Result.Success<bool, SmartCardError>(true);
-                }
-                else
-                {
-                    _logger.LogWarning("Failed to establish secure channel: {Error}", secureChannelResult.Error.Message);
-                    return Result.Failure<bool, SmartCardError>(secureChannelResult.Error);
-                }
-            });
+                        if (secureChannelResult.IsSuccess)
+                        {
+                            _logger.LogInformation("Secure channel established successfully");
+                            return Result.Success<bool, SmartCardError>(true);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Failed to establish secure channel: {Error}", secureChannelResult.Error.Message);
+                            return Result.Failure<bool, SmartCardError>(secureChannelResult.Error);
+                        }
+                    });
+            },
+            () => Task.FromResult(Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("Key set is required for secure channel establishment"))));
     }
 
-    /// <summary>
-    /// Creates a default SCP02 test key set for auto-detection scenarios.
-    /// </summary>
-    private static IKeySet CreateDefaultTestKeySet()
-    {
-        return GpTestKeys.CreateScp02TestKeySet();
-    }
 
     /// <summary>
     /// Converts IKeySet to KeySet for GlobalPlatformService compatibility.

@@ -6,9 +6,9 @@ using Gp4Net.Transport;
 namespace Gp4Net.Tests.TestHelpers;
 
 /// <summary>
-/// Mock card channel for testing.
+/// Test card channel for functional testing.
 /// </summary>
-public class MockCardChannel : ICardChannel
+public class TestCardChannel : ICardChannel
 {
     public bool IsOpen { get; private set; } = true;
     public TransportProtocol Protocol
@@ -24,7 +24,7 @@ public class MockCardChannel : ICardChannel
         CancellationToken cancellationToken = default
     )
     {
-        // Return a mock success response
+        // Return a success response for functional tests
         return Task.FromResult(new byte[] { 0x90, 0x00 });
     }
 
@@ -40,9 +40,9 @@ public class MockCardChannel : ICardChannel
 }
 
 /// <summary>
-/// Mock APDU transport for testing.
+/// Test APDU transport for functional testing.
 /// </summary>
-public class MockApduTransport : IApduTransport
+public class TestApduTransport : IApduTransport
 {
     public TransportProtocol Protocol
     {
@@ -79,11 +79,11 @@ public class MockApduTransport : IApduTransport
         CancellationToken cancellationToken = default
     )
     {
-        // Return a mock success response
+        // Return a success response for functional tests
         return Task.FromResult(new ApduResponse([], StatusWords.Success));
     }
 
-    public static void Dispose()
+    public void Dispose()
     {
         // Nothing to dispose
     }

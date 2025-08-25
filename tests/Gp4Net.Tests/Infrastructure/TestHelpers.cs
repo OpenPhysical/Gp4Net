@@ -66,10 +66,16 @@ public static class TestCommandProcessing
         ICardChannel channel,
         IApduTransport transport)
     {
+        // Create secure channel service for testing
+        var commandProcessor = new Gp4Net.Domain.Security.CommandSecurityProcessorAdapter();
+        var responseProcessor = new Gp4Net.Domain.Security.ResponseSecurityProcessorAdapter();
+        var secureChannelService = new Gp4Net.Domain.Security.SecureChannelService(commandProcessor, responseProcessor);
+        
         return new CommandEnvironment(
             channel,
             transport,
             Maybe<Gp4Net.Domain.Security.SecureChannelState>.None,
+            secureChannelService,
             NullLogger.Instance);
     }
 }

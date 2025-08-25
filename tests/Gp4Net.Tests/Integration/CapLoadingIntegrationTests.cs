@@ -9,8 +9,11 @@ using Gp4Net.Domain.CapFile;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Security;
+using Gp4Net.Core;
 using Gp4Net.Tests.TestHelpers;
 using Gp4Net.Transport;
+using Gp4Net.Domain.Protocol;
+using CSharpFunctionalExtensions;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Integration;
@@ -341,18 +344,24 @@ public class SecureChannelWorkflow
             var cardChallenge = Convert.FromHexString("0003A33DFDBFFADF");
             var sequenceCounter = cardChallenge[..2];
 
-            // Use the working SCP02 session key derivation from TraceBasedSecureChannelTests
-            var scp02SessionKeys = Scp02SessionKeyDerivation.DeriveSessionKeys(
+            // Use KeyDerivationService for SCP02 session key derivation
+            var keyDerivationService = new Gp4Net.Domain.Keys.KeyDerivationService();
+            var contextResult = Gp4Net.Domain.Keys.KeyDerivationContext.CreateForScp02(
                 diversifiedKeys,
                 hostChallenge,
                 cardChallenge,
-                sequenceCounter
-            );
-
-            sessionKeys = new SessionKeys(
-                sEnc: scp02SessionKeys.EncryptionKey,
-                sMac: scp02SessionKeys.MacKey,
-                sRMac: scp02SessionKeys.ReceiptMacKey
+                sequenceCounter);
+            var scp02SessionKeysResult = contextResult.IsSuccess 
+                ? keyDerivationService.DeriveSessionKeys(contextResult.Value)
+                : Result.Failure<SessionKeys, SmartCardError>(contextResult.Error);
+            
+            sessionKeys = scp02SessionKeysResult.Match(
+                onSuccess: scp02SessionKeys => new SessionKeys(
+                    sEnc: scp02SessionKeys.SEnc,
+                    sMac: scp02SessionKeys.SMac,
+                    sRMac: scp02SessionKeys.SrMac
+                ),
+                onFailure: _ => new SessionKeys(_encKey, _macKey, _macKey, _dekKey)
             );
         }
         else

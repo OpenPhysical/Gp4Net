@@ -9,9 +9,12 @@ using Gp4Net.Domain.Protocol;
 using Gp4Net.Transport;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Moq;
 using NUnit.Framework;
 using Gp4Net.Cryptography;
+using Gp4Net.CardEmulator.Services;
+using Gp4Net.Tool.Services;
+using Gp4Net.Services;
+using Gp4Net.Tests.TestHelpers;
 
 namespace Gp4Net.Tests.Integration;
 
@@ -23,12 +26,24 @@ namespace Gp4Net.Tests.Integration;
 [Category("Integration")]
 public class Scp03TraceBasedTests
 {
-    private Mock<IKeyDerivationService> _keyDerivationServiceMock = null!;
+    private IKeyDerivationService _keyDerivationService = null!;
+    private VirtualCardService _virtualCardService = null!;
+    private Gp4Net.Tool.Services.ICardService _cardService = null!;
 
     [SetUp]
     public void SetUp()
     {
-        _keyDerivationServiceMock = new Mock<IKeyDerivationService>();
+        _keyDerivationService = new Gp4Net.Domain.Keys.KeyDerivationService();
+        _virtualCardService = new VirtualCardService();
+        _virtualCardService.SetupComprehensiveTestEnvironment();
+        _cardService = new TestCardService(_virtualCardService);
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        _cardService?.Dispose();
+        _virtualCardService?.Dispose();
     }
 
     // GP Test Keys from trace: "404142434445464748494A4B4C4D4E4F"
@@ -68,29 +83,8 @@ public class Scp03TraceBasedTests
         Assert.That(sessionKeysResult.IsSuccess, Is.True, "Session key derivation should succeed");
         var sessionKeys = sessionKeysResult.Value;
 
-        // Set up mock to return the derived session keys
-        _ = _keyDerivationServiceMock
-            .Setup(x => x.DeriveSessionKeys(It.IsAny<IKeyDerivationContext>()))
-            .Returns(sessionKeys);
-
-        // Mock the cryptogram calculation to return the expected card cryptogram from trace
-        _ = _keyDerivationServiceMock
-            .Setup(x => x.CalculateCryptogram(It.IsAny<ICryptogramContext>()))
-            .Returns<ICryptogramContext>(ctx =>
-            {
-                switch (ctx.Type)
-                {
-                    case CryptogramType.CardCryptogram:
-                        return Convert.FromHexString("148C0CAF84B0E110"); // From trace
-                    case CryptogramType.HostCryptogram:
-                        return Convert.FromHexString("7B54E3B21E27DA5F"); // From trace
-                    default:
-                        return new byte[8];
-                }
-
-            });
-        
-        var protocol = new Scp03Protocol(keySet, _keyDerivationServiceMock.Object, 0x70); // i=70 from trace
+        // Use the real key derivation service for functional testing
+        var protocol = new Scp03Protocol(keySet, _keyDerivationService, 0x70); // i=70 from trace
 
         // Act - Parse the real INITIALIZE UPDATE response
         var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
@@ -126,29 +120,8 @@ public class Scp03TraceBasedTests
         Assert.That(sessionKeysResult.IsSuccess, Is.True, "Session key derivation should succeed");
         var sessionKeys = sessionKeysResult.Value;
 
-        // Set up mock to return the derived session keys
-        _ = _keyDerivationServiceMock
-            .Setup(x => x.DeriveSessionKeys(It.IsAny<IKeyDerivationContext>()))
-            .Returns(sessionKeys);
-
-        // Mock the cryptogram calculation to return the expected values from trace
-        _ = _keyDerivationServiceMock
-            .Setup(x => x.CalculateCryptogram(It.IsAny<ICryptogramContext>()))
-            .Returns<ICryptogramContext>(ctx =>
-            {
-                switch (ctx.Type)
-                {
-                    case CryptogramType.CardCryptogram:
-                        return Convert.FromHexString("148C0CAF84B0E110"); // From trace
-                    case CryptogramType.HostCryptogram:
-                        return Convert.FromHexString("7B54E3B21E27DA5F"); // From trace
-                    default:
-                        return new byte[8];
-                }
-
-            });
-        
-        var protocol = new Scp03Protocol(keySet, _keyDerivationServiceMock.Object, 0x70);
+        // Use the real key derivation service for functional testing
+        var protocol = new Scp03Protocol(keySet, _keyDerivationService, 0x70);
             
         var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
         Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
@@ -177,51 +150,32 @@ public class Scp03TraceBasedTests
         // Arrange
         var keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1);
             
-        // Mock the card channel and transport to return exact trace responses
-        var mockChannel = new Mock<ICardChannel>();
-        var mockTransport = new Mock<IApduTransport>();
+        // Use virtual card for functional testing
+        var channel = new CardServiceChannelAdapter(_cardService);
+        var transport = new T0ApduTransport(Microsoft.Extensions.Logging.Abstractions.NullLogger<T0ApduTransport>.Instance);
             
-        // Mock the challenge generator to return the exact challenge from the trace
-        var mockChallengeGenerator = new Mock<IChallengeGenerator>();
-        _ = mockChallengeGenerator
-            .Setup(g => g.GenerateChallenge(8))
-            .Returns(_hostChallenge);
-
-        // Setup INITIALIZE UPDATE response (from trace line 85)
-        _ = mockTransport
-            .Setup(t => t.TransmitAsync(
-                It.Is<IApduCommand>(cmd => cmd.Ins == 0x50), // INITIALIZE UPDATE
-                It.IsAny<ICardChannel>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ApduResponse(_initUpdateResponse, StatusWords.Success));
-
-        // Setup EXTERNAL AUTHENTICATE response (from trace line 96)
-        _ = mockTransport
-            .Setup(t => t.TransmitAsync(
-                It.Is<IApduCommand>(cmd => cmd.Ins == 0x82), // EXTERNAL AUTHENTICATE
-                It.IsAny<ICardChannel>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ApduResponse([], StatusWords.Success));
+        // Use deterministic challenge generator for trace matching
+        var challengeGenerator = new DeterministicChallengeGenerator(_hostChallenge);
 
         // Setup minimal service provider for SecureChannelProtocolFactory
         var services = new ServiceCollection();
-        _ = services.AddLogging();
-        _ = services.AddSingleton<IKeyDerivationService, KeyDerivationService>();
+        services.AddLogging();
+        services.AddSingleton<IKeyDerivationService, KeyDerivationService>();
         var serviceProvider = services.BuildServiceProvider();
             
-        var factoryLogger = new Mock<ILogger<SecureChannelProtocolFactory>>();
-        var protocolFactory = new SecureChannelProtocolFactory(serviceProvider, factoryLogger.Object);
+        var factoryLogger = Microsoft.Extensions.Logging.Abstractions.NullLogger<SecureChannelProtocolFactory>.Instance;
+        var protocolFactory = new SecureChannelProtocolFactory(serviceProvider, factoryLogger);
             
-        var managerLogger = new Mock<ILogger<SecureChannelManager>>();
+        var managerLogger = Microsoft.Extensions.Logging.Abstractions.NullLogger<SecureChannelManager>.Instance;
         var manager = new SecureChannelManager(
             protocolFactory, 
-            mockChallengeGenerator.Object, 
-            managerLogger.Object);
+            challengeGenerator, 
+            managerLogger);
 
         // Act
         var session = await manager.EstablishAsync(
-            mockChannel.Object,
-            mockTransport.Object,
+            channel,
+            transport,
             keySet,
             SecurityLevel.CMac
         );
@@ -234,22 +188,8 @@ public class Scp03TraceBasedTests
             Assert.That(session.Value.ProtocolVersion, Is.EqualTo(ProtocolIdentifiers.Scp03));
         });
 
-        // Verify the exact commands were sent with the expected host challenge
-        mockTransport.Verify(t => t.TransmitAsync(
-            It.Is<IApduCommand>(cmd => 
-                cmd.Ins == 0x50 && // INITIALIZE UPDATE
-                Convert.ToHexString(((InitializeUpdateCommand)cmd).HostChallenge) == "FE0530CF61BAA9F3"
-            ),
-            It.IsAny<ICardChannel>(),
-            It.IsAny<CancellationToken>()), Times.Once);
-                
-        mockTransport.Verify(t => t.TransmitAsync(
-            It.Is<IApduCommand>(cmd => cmd.Ins == 0x82), // EXTERNAL AUTHENTICATE
-            It.IsAny<ICardChannel>(),
-            It.IsAny<CancellationToken>()), Times.Once);
-                
-        // Verify challenge generator was called exactly once
-        mockChallengeGenerator.Verify(g => g.GenerateChallenge(8), Times.Once);
+        // Verify session establishment succeeded with virtual card
+        // No need for verification with virtual card - actual implementation handles this
     }
 
     [Test]

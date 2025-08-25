@@ -389,7 +389,7 @@ public class Scp03Protocol : SecureChannelProtocolBase
         // and length of 64 bits (8 bytes) for the cryptogram
         return DeriveScp03Cryptogram(
             sessionKeys.SMac,
-            DerivationConstants.HostCryptogram,
+            Gp4Net.Constants.DerivationConstants.HostCryptogram,
             context,
             64  // 64 bits = 8 bytes for cryptogram
         );
@@ -417,7 +417,7 @@ public class Scp03Protocol : SecureChannelProtocolBase
         var offset = 0;
 
         // Label (11 bytes of 0x00 followed by derivation constant)
-        Array.Copy(DerivationConstants.Scp03Label, 0, fixedInputBeforeCounter, offset, 11);
+        Array.Copy(Gp4Net.Constants.DerivationConstants.Scp03Label, 0, fixedInputBeforeCounter, offset, 11);
         offset += 11;
         fixedInputBeforeCounter[offset++] = derivationConstant;
 

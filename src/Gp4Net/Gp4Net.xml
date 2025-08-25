@@ -1768,15 +1768,6 @@
             <param name="implicitChannel">Whether to use implicit channel mode.</param>
             <returns>The derived session keys or an error.</returns>
         </member>
-        <member name="M:Gp4Net.Cryptography.KeyDerivation.CalculateCryptogram(System.Byte[],System.Byte[],System.Boolean)">
-            <summary>
-            Calculates a cryptogram for authentication.
-            </summary>
-            <param name="key">The key to use for cryptogram calculation.</param>
-            <param name="data">The data to calculate cryptogram over.</param>
-            <param name="isScp03">Whether to use SCP03 (AES) or SCP02 (3DES).</param>
-            <returns>The cryptogram (8 bytes) or an error.</returns>
-        </member>
         <member name="T:Gp4Net.Domain.ApplicationInfo">
             <summary>
             Immutable record representing information about an application on a smart card.
@@ -2384,16 +2375,29 @@
             Parses the response and prepares for secure channel establishment.
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.EstablishSecureChannelFromMetadata(Gp4Net.Pipeline.CommandProcessing.CommandResult,Gp4Net.Domain.SecurityLevel)">
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.EstablishSecureChannelFromMetadata(Gp4Net.Pipeline.CommandProcessing.CommandResult,Gp4Net.Domain.SecurityLevel,Gp4Net.Domain.Keys.IKeySet,System.Byte[])">
             <summary>
             Creates secure channel state using INITIALIZE UPDATE response metadata.
-            Simulates complete secure channel establishment for testing.
+            Establishes proper secure channel with derived session keys per GP Card Specification v2.3.1 Section F.2.
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.CreateMockSecureChannelState(Gp4Net.Domain.Commands.InitializeUpdateResponse,Gp4Net.Domain.SecurityLevel)">
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.CreateKeyDerivationContext(Gp4Net.Domain.Commands.InitializeUpdateResponse,Gp4Net.Domain.Keys.IKeySet,System.Byte[],System.Byte[])">
             <summary>
-            Creates a secure channel state for testing purposes.
-            Uses SCP03 test keys for session derivation.
+            Creates a key derivation context for session key derivation per GP specifications.
+            Supports both SCP02 and SCP03 protocols with proper parameter handling.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.GetScpImplementation(System.Byte,System.Byte)">
+            <summary>
+            Maps SCP ID and implementation parameter to ScpImplementation enum.
+            Uses the same logic as the existing protocol handlers.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.CreateInitialMacChainingValue(Gp4Net.Domain.Commands.InitializeUpdateResponse)">
+            <summary>
+            Creates initial MAC chaining value per GP Card Specification requirements.
+            For SCP02: Uses encrypted ICV per Section E.4.2.
+            For SCP03: Uses zero-initialized value per Section 6.2.4.
             </summary>
         </member>
         <member name="M:Gp4Net.Domain.CapFile.CapInstallationOrchestrator.ProcessCommandAsync(Gp4Net.Transport.IApduCommand,Gp4Net.Pipeline.CommandProcessing.CommandEnvironment)">
@@ -8425,6 +8429,12 @@
             Represents a set of SCP02 static keys (3DES).
             </summary>
         </member>
+        <member name="P:Gp4Net.Domain.Keys.Scp02KeySet.SEnc">
+            <summary>
+            Gets the session encryption key (S-ENC) for cryptogram calculations.
+            Required for type-safe cryptogram parameter validation.
+            </summary>
+        </member>
         <member name="M:Gp4Net.Domain.Keys.Scp02KeySet.#ctor(System.Byte[],System.Byte[],System.Byte[],System.Byte,System.Byte)">
             <summary>
             Private constructor for successful creation.
@@ -8444,6 +8454,12 @@
         <member name="T:Gp4Net.Domain.Keys.Scp03KeySet">
             <summary>
             Represents a set of SCP03 static keys (AES).
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Domain.Keys.Scp03KeySet.SMac">
+            <summary>
+            Gets the session MAC key (S-MAC) for cryptogram calculations.
+            Required for type-safe cryptogram parameter validation.
             </summary>
         </member>
         <member name="M:Gp4Net.Domain.Keys.Scp03KeySet.#ctor(System.Byte[],System.Byte[],System.Byte[],System.Byte,System.Byte)">
@@ -8774,6 +8790,7 @@
             <param name="sRMac">The session R-MAC key.</param>
             <param name="dek">The data encryption key (optional).</param>
         </member>
+        <!-- Badly formed XML comment ignored for member "M:Gp4Net.Domain.Keys.SessionKeys.Create(System.Byte[],System.Byte[],System.Byte[],System.Byte[])" -->
         <member name="M:Gp4Net.Domain.Keys.SessionKeys.Clear">
             <summary>
             Clears all cryptographic keys from memory.
@@ -9667,15 +9684,6 @@
             <param name="key">The 3DES key (16 or 24 bytes).</param>
             <param name="data">The data to calculate MAC over.</param>
             <returns>The 8-byte MAC.</returns>
-        </member>
-        <member name="M:Gp4Net.Domain.Protocol.CryptographicOperations.Calculate3DesMac(System.Byte[],System.Byte[])">
-            <summary>
-            Calculates 3DES-MAC (ISO 9797-1 Algorithm 3) over the provided data.
-            DEPRECATED: Use CalculateFull3DesMac or CalculateRetailMac instead.
-            </summary>
-            <param name="key">The 3DES key (16 or 24 bytes).</param>
-            <param name="data">The data to calculate MAC over.</param>
-            <returns>The 8-byte 3DES-MAC.</returns>
         </member>
         <member name="M:Gp4Net.Domain.Protocol.CryptographicOperations.EncryptAesCbcWithPadding(System.Byte[],System.Byte[],System.Byte[])">
             <summary>
@@ -11768,102 +11776,135 @@
         <member name="M:Gp4Net.Domain.Security.CommandSecurityProcessorAdapter.ApplyCommandSecurity(Gp4Net.Transport.IApduCommand,Gp4Net.Domain.SecurityLevel,Gp4Net.Domain.Keys.SessionKeys,System.Collections.Immutable.ImmutableArray{System.Byte},System.UInt32,System.Byte)">
             <inheritdoc />
         </member>
+        <member name="T:Gp4Net.Domain.Security.Scp02CryptogramParameters">
+            <summary>
+            Protocol-specific parameters for SCP02 cryptogram calculations.
+            Makes invalid states unrepresentable - sequence counter is always present and validated.
+            Card challenge is always 6 bytes as required by SCP02 specification.
+            All byte arrays are guaranteed to be the correct length through validated construction.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.Scp02CryptogramParameters.#ctor(System.Byte[],System.Byte[],System.Byte[],Gp4Net.Domain.Keys.Scp02KeySet)">
+            <summary>
+            Protocol-specific parameters for SCP02 cryptogram calculations.
+            Makes invalid states unrepresentable - sequence counter is always present and validated.
+            Card challenge is always 6 bytes as required by SCP02 specification.
+            All byte arrays are guaranteed to be the correct length through validated construction.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.Scp02CryptogramParameters.Create(System.Byte[],System.Byte[],System.Byte[],CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Keys.Scp02KeySet})">
+            <summary>
+            Creates SCP02 cryptogram parameters with validation.
+            Per GP Card Specification v2.3.1 Section E.4.2, SCP02 cryptograms use S-ENC session key.
+            </summary>
+            <param name="hostChallenge">8-byte host challenge.</param>
+            <param name="cardChallenge">6-byte card challenge (random part).</param>
+            <param name="sequenceCounter">2-byte sequence counter.</param>
+            <param name="keys">SCP02 key set containing S-ENC key for cryptogram calculation.</param>
+            <returns>Validated SCP02 parameters or an error.</returns>
+        </member>
+        <member name="T:Gp4Net.Domain.Security.Scp03CryptogramParameters">
+            <summary>
+            Protocol-specific parameters for SCP03 cryptogram calculations.
+            Makes invalid states unrepresentable - no sequence counter can be passed.
+            Card challenge is always 8 bytes as required by SCP03 specification.
+            All byte arrays are guaranteed to be the correct length through validated construction.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.Scp03CryptogramParameters.#ctor(System.Byte[],System.Byte[],Gp4Net.Domain.Keys.Scp03KeySet)">
+            <summary>
+            Protocol-specific parameters for SCP03 cryptogram calculations.
+            Makes invalid states unrepresentable - no sequence counter can be passed.
+            Card challenge is always 8 bytes as required by SCP03 specification.
+            All byte arrays are guaranteed to be the correct length through validated construction.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.Scp03CryptogramParameters.Create(System.Byte[],System.Byte[],CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Keys.Scp03KeySet})">
+            <summary>
+            Creates SCP03 cryptogram parameters with validation.
+            Per GP SCP03 v1.1.1 Section 6.2.2.2, SCP03 cryptograms use S-MAC session key.
+            </summary>
+            <param name="hostChallenge">8-byte host challenge.</param>
+            <param name="cardChallenge">8-byte card challenge.</param>
+            <param name="keys">SCP03 key set containing S-MAC key for cryptogram calculation.</param>
+            <returns>Validated SCP03 parameters or an error.</returns>
+        </member>
+        <member name="T:Gp4Net.Domain.Security.CryptogramParameters">
+            <summary>
+            Factory methods for creating cryptogram parameters with validation.
+            Provides convenient API while maintaining type safety.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.CryptogramParameters.ForScp02(System.Byte[],System.Byte[],System.Byte[],Gp4Net.Domain.Keys.Scp02KeySet)">
+            <summary>
+            Creates SCP02 cryptogram parameters with full validation.
+            </summary>
+            <param name="hostChallenge">8-byte host challenge.</param>
+            <param name="cardChallenge">6-byte SCP02 card challenge.</param>
+            <param name="sequenceCounter">2-byte sequence counter.</param>
+            <param name="keys">SCP02 key set.</param>
+            <returns>Validated SCP02 parameters or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.CryptogramParameters.ForScp03(System.Byte[],System.Byte[],Gp4Net.Domain.Keys.Scp03KeySet)">
+            <summary>
+            Creates SCP03 cryptogram parameters with full validation.
+            </summary>
+            <param name="hostChallenge">8-byte host challenge.</param>
+            <param name="cardChallenge">8-byte SCP03 card challenge.</param>
+            <param name="keys">SCP03 key set.</param>
+            <returns>Validated SCP03 parameters or an error.</returns>
+        </member>
         <member name="T:Gp4Net.Domain.Security.CryptogramService">
             <summary>
-            Service for calculating cryptographic authentication values (cryptograms) according to GlobalPlatform specifications.
-            Implements proper cryptogram calculation for SCP02 and SCP03 protocols.
+            The one and only cryptogram service. Uses type-safe parameters to make invalid states unrepresentable.
             Per GP SCP03 v1.1.1 Section 6.2.2: SCP03 cryptograms use data derivation scheme (KDF).
             Per GP Card Spec v2.3.1 Section E.4.2: SCP02 cryptograms use Full 3DES MAC.
             </summary>
         </member>
-        <member name="M:Gp4Net.Domain.Security.CryptogramService.#ctor(Microsoft.Extensions.Logging.ILogger{Gp4Net.Domain.Security.CryptogramService},Gp4Net.Domain.Keys.KeyDerivationService)">
+        <member name="M:Gp4Net.Domain.Security.CryptogramService.#ctor(CSharpFunctionalExtensions.Maybe{Microsoft.Extensions.Logging.ILogger{Gp4Net.Domain.Security.CryptogramService}},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Security.MacService})">
             <summary>
-            Initializes a new instance of the <see cref="T:Gp4Net.Domain.Security.CryptogramService"/> class.
+            Initializes the cryptogram service with required dependencies.
             </summary>
-            <param name="logger">Optional logger instance.</param>
-            <param name="keyDerivationService">Optional key derivation service. If null, creates a new instance.</param>
+            <param name="logger">Logger instance.</param>
+            <param name="macService">MAC service for cryptogram calculations.</param>
         </member>
-        <member name="M:Gp4Net.Domain.Security.CryptogramService.CalculateCardCryptogram(System.Byte[],System.Byte[],System.Byte[],CSharpFunctionalExtensions.Maybe{System.Byte[]},Gp4Net.Constants.ScpVersion)">
+        <member name="M:Gp4Net.Domain.Security.CryptogramService.CalculateCardCryptogram(Gp4Net.Domain.Security.Scp02CryptogramParameters)">
             <summary>
-            Calculates a card cryptogram for the specified protocol.
-            Per GP SCP03 v1.1.1 Section 6.2.2.2: SCP03 uses data derivation scheme with S-MAC key.
-            Per GP Card Spec v2.3.1 Section E.4.2.1: SCP02 uses Full 3DES MAC with S-ENC key.
-            </summary>
-            <param name="key">The MAC key to use for cryptogram calculation.</param>
-            <param name="hostChallenge">The host challenge (8 bytes).</param>
-            <param name="cardChallenge">The card challenge (8 bytes).</param>
-            <param name="sequenceCounter">The sequence counter (SCP02 only).</param>
-            <param name="protocol">The SCP protocol version.</param>
-            <returns>The calculated card cryptogram (8 bytes) or an error.</returns>
-        </member>
-        <member name="M:Gp4Net.Domain.Security.CryptogramService.CalculateHostCryptogram(System.Byte[],System.Byte[],System.Byte[],CSharpFunctionalExtensions.Maybe{System.Byte[]},Gp4Net.Constants.ScpVersion)">
-            <summary>
-            Calculates a host cryptogram for the specified protocol.
-            Per GP SCP03 v1.1.1 Section 6.2.2.3: SCP03 uses data derivation scheme with S-MAC key.
-            Per GP Card Spec v2.3.1 Section E.4.2.2: SCP02 uses Full 3DES MAC with S-ENC key.
-            </summary>
-            <param name="key">The MAC key to use for cryptogram calculation.</param>
-            <param name="hostChallenge">The host challenge (8 bytes).</param>
-            <param name="cardChallenge">The card challenge (8 bytes).</param>
-            <param name="sequenceCounter">The sequence counter (SCP02 only).</param>
-            <param name="protocol">The SCP protocol version.</param>
-            <returns>The calculated host cryptogram (8 bytes) or an error.</returns>
-        </member>
-        <member name="M:Gp4Net.Domain.Security.CryptogramService.CalculateCryptogram(System.Byte[],System.Byte[],Gp4Net.Constants.ScpVersion)">
-            <summary>
-            Calculates a generic cryptogram using the specified protocol and data.
-            This is a lower-level method for custom cryptogram calculations.
-            NOTE: For SCP03 authentication cryptograms, use CalculateCardCryptogram/CalculateHostCryptogram instead,
-            as they properly use the data derivation scheme per GP SCP03 v1.1.1 Section 6.2.2.
-            </summary>
-            <param name="key">The key to use for cryptogram calculation.</param>
-            <param name="data">The data to authenticate.</param>
-            <param name="protocol">The SCP protocol version.</param>
-            <returns>The calculated cryptogram or an error.</returns>
-        </member>
-        <member name="M:Gp4Net.Domain.Security.CryptogramService.CalculateScp02CardCryptogram(System.Byte[],System.Byte[],System.Byte[],CSharpFunctionalExtensions.Maybe{System.Byte[]})">
-            <summary>
-            Calculates SCP02 card cryptogram using 3DES-CBC-MAC.
-            Per GlobalPlatform Card Specification v2.3.1 Section E.4.2.1.
+            Calculates SCP02 card cryptogram.
+            Per GP Card Specification v2.3.1 Section E.4.2.1: Uses Full 3DES MAC (ISO 9797-1 Algorithm 1).
             Data format: Host Challenge (8) || Sequence Counter (2) || Card Challenge (6) || Padding.
             </summary>
+            <param name="parameters">Validated SCP02 parameters.</param>
+            <returns>8-byte card cryptogram.</returns>
         </member>
-        <member name="M:Gp4Net.Domain.Security.CryptogramService.CalculateScp02HostCryptogram(System.Byte[],System.Byte[],System.Byte[],CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+        <member name="M:Gp4Net.Domain.Security.CryptogramService.CalculateCardCryptogram(Gp4Net.Domain.Security.Scp03CryptogramParameters)">
             <summary>
-            Calculates SCP02 host cryptogram using 3DES-CBC-MAC.
-            Per GlobalPlatform Card Specification v2.3.1 Section E.4.2.2.
+            Calculates SCP03 card cryptogram.
+            Per GP SCP03 v1.1.1 Section 6.2.2.2: Uses data derivation scheme with S-MAC key.
+            </summary>
+            <param name="parameters">Validated SCP03 parameters.</param>
+            <returns>8-byte card cryptogram.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.CryptogramService.CalculateHostCryptogram(Gp4Net.Domain.Security.Scp02CryptogramParameters)">
+            <summary>
+            Calculates SCP02 host cryptogram.
+            Per GP Card Specification v2.3.1 Section E.4.2.2: Uses Full 3DES MAC (ISO 9797-1 Algorithm 1).
             Data format: Sequence Counter (2) || Card Challenge (6) || Host Challenge (8) || Padding.
             </summary>
+            <param name="parameters">Validated SCP02 parameters.</param>
+            <returns>8-byte host cryptogram.</returns>
         </member>
-        <member name="M:Gp4Net.Domain.Security.CryptogramService.CalculateScp03CardCryptogram(System.Byte[],System.Byte[],System.Byte[])">
+        <member name="M:Gp4Net.Domain.Security.CryptogramService.CalculateHostCryptogram(Gp4Net.Domain.Security.Scp03CryptogramParameters)">
             <summary>
-            Calculates SCP03 card cryptogram using data derivation scheme.
-            Per GlobalPlatform SCP03 v1.1.1 Section 6.2.2.2:
-            "The card cryptogram (8 bytes) is calculated using the data derivation scheme defined in section 4.1.5
-            with the session key S-MAC and the derivation constant set to 'card authentication cryptogram generation'."
-            Derivation constant: 0x00, Context: Host Challenge (8) || Card Challenge (8), Length: 0x0040 (64 bits).
+            Calculates SCP03 host cryptogram.
+            Per GP SCP03 v1.1.1 Section 6.2.2.3: Uses data derivation scheme with S-MAC key.
             </summary>
+            <param name="parameters">Validated SCP03 parameters.</param>
+            <returns>8-byte host cryptogram.</returns>
         </member>
-        <member name="M:Gp4Net.Domain.Security.CryptogramService.CalculateScp03HostCryptogram(System.Byte[],System.Byte[],System.Byte[])">
+        <member name="M:Gp4Net.Domain.Security.CryptogramService.CalculateScp03DataDerivation(System.Byte[],System.Byte[],System.Byte,System.Int32)">
             <summary>
-            Calculates SCP03 host cryptogram using data derivation scheme.
-            Per GlobalPlatform SCP03 v1.1.1 Section 6.2.2.3:
-            "The host cryptogram (8 bytes) is calculated using the data derivation scheme defined in section 4.1.5
-            with the session key S-MAC and the derivation constant set to 'host authentication cryptogram generation'."
-            Derivation constant: 0x01, Context: Host Challenge (8) || Card Challenge (8), Length: 0x0040 (64 bits).
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Domain.Security.CryptogramService.CalculateAesCmac(System.Byte[],System.Byte[])">
-            <summary>
-            Calculates AES-CMAC using BouncyCastle.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Domain.Security.CryptogramService.Calculate3DesCbcMac(System.Byte[],System.Byte[])">
-            <summary>
-            Calculates Full 3DES MAC for SCP02 cryptograms.
-            Per GlobalPlatform Card Specification v2.3.1 Section B.1.2.1 "Full Triple DES":
-            "The result of the last encryption with the Triple DES key is the MAC."
-            Used specifically for SCP02 cryptograms as specified in Section E.4.2.
+            SCP03 data derivation scheme per GP SCP03 v1.1.1 Section 6.2.2.
             </summary>
         </member>
         <member name="T:Gp4Net.Domain.Security.GenericSecurityProcessor`1">
@@ -12272,6 +12313,33 @@
             <param name="chainingState">The current MAC chaining state.</param>
             <returns>The calculated R-MAC and potentially updated chaining state.</returns>
         </member>
+        <member name="T:Gp4Net.Domain.Security.MacUsage">
+            <summary>
+            Defines the specific usage context for MAC calculations.
+            Different SCP protocols and operations require different MAC algorithms.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Security.MacUsage.Command">
+            <summary>
+            Command MAC (C-MAC) for APDU commands.
+            SCP02: Uses Retail MAC (ISO 9797-1 Algorithm 3).
+            SCP03: Uses AES-CMAC (NIST 800-38B).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Security.MacUsage.Response">
+            <summary>
+            Response MAC (R-MAC) for APDU responses.
+            SCP02: Uses Retail MAC (ISO 9797-1 Algorithm 3).
+            SCP03: Uses AES-CMAC (NIST 800-38B).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Domain.Security.MacUsage.Cryptogram">
+            <summary>
+            Authentication cryptograms (card/host cryptograms).
+            SCP02: Uses Full 3DES MAC (ISO 9797-1 Algorithm 1).
+            SCP03: Uses AES-CMAC with data derivation scheme.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Domain.Security.MacService">
             <summary>
             Centralized service for MAC (Message Authentication Code) calculations.
@@ -12285,25 +12353,51 @@
             </summary>
             <param name="logger">The logger instance. If null, uses NullLogger.</param>
         </member>
-        <member name="M:Gp4Net.Domain.Security.MacService.CalculateMac(System.Byte[],System.Byte[],Gp4Net.Constants.ScpVersion,System.Int32)">
+        <member name="M:Gp4Net.Domain.Security.MacService.CalculateMac(System.Byte[],System.Byte[],Gp4Net.Constants.ScpVersion,Gp4Net.Domain.Security.MacUsage,System.Int32)">
             <summary>
-            Calculates a MAC using the appropriate algorithm based on the protocol.
+            Calculates a MAC using the appropriate algorithm based on the protocol and usage context.
+            Automatically routes to the correct algorithm per GlobalPlatform specifications.
             </summary>
             <param name="key">The MAC key.</param>
             <param name="data">The data to calculate MAC over.</param>
             <param name="protocol">The secure channel protocol version.</param>
+            <param name="usage">The specific usage context (Command, Response, or Cryptogram).</param>
             <param name="macLength">The desired MAC length in bytes (default is 8).</param>
             <returns>The calculated MAC or an error.</returns>
         </member>
-        <member name="M:Gp4Net.Domain.Security.MacService.Calculate3DesMac(System.Byte[],System.Byte[],System.Int32)">
+        <member name="M:Gp4Net.Domain.Security.MacService.Calculate3DesRetailMac(System.Byte[],System.Byte[],System.Int32)">
             <summary>
-            Calculates a 3DES MAC using ISO 9797-1 MAC Algorithm 3.
-            Per GlobalPlatform Card Specification v2.3.1 Section B.1.2.2 "Retail MAC":
-            "The Retail MAC is also known as the Single DES Plus Final Triple DES MAC"
+            Calculates a 3DES MAC using ISO 9797-1 MAC Algorithm 3 (Retail MAC).
+            Per GlobalPlatform Card Specification v2.3.1 Section B.1.2.2 "Single DES Plus Final Triple DES MAC":
+            "This is also known as the Retail MAC. It is as defined in [ISO 9797-1] as MAC Algorithm 3."
             Used for SCP02 C-MAC and R-MAC generation as specified in Section E.4.3.
             </summary>
             <param name="key">The 3DES key (16 or 24 bytes).</param>
             <param name="data">The data to calculate MAC over.</param>
+            <param name="macLength">The desired MAC length in bytes.</param>
+            <returns>The calculated MAC or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.MacService.Calculate3DesMac(System.Byte[],System.Byte[],System.Int32)">
+            <summary>
+            Backward compatibility wrapper for the old Calculate3DesMac method.
+            Routes to Calculate3DesRetailMac (ISO 9797-1 Algorithm 3) for existing code.
+            </summary>
+            <param name="key">The 3DES key (16 or 24 bytes).</param>
+            <param name="data">The data to calculate MAC over.</param>
+            <param name="macLength">The desired MAC length in bytes.</param>
+            <returns>The calculated MAC or an error.</returns>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.MacService.Calculate3DesFullMac(System.Byte[],System.Byte[],System.Int32)">
+            <summary>
+            Calculates a 3DES MAC using ISO 9797-1 MAC Algorithm 1 (Full Triple DES MAC).
+            Per GlobalPlatform Card Specification v2.3.1 Section B.1.2.1 "Full Triple DES MAC":
+            "The full triple DES MAC is as defined in [ISO 9797-1] as MAC Algorithm 1, with initial 
+            transformation 1 and output transformation 1, without truncation, and with Triple DES 
+            taking the place of the block cipher."
+            Used for SCP02 authentication cryptogram calculations as specified in Section E.4.2.
+            </summary>
+            <param name="key">The 3DES key (16 or 24 bytes).</param>
+            <param name="data">The data to calculate MAC over (must be padded to 8-byte blocks).</param>
             <param name="macLength">The desired MAC length in bytes.</param>
             <returns>The calculated MAC or an error.</returns>
         </member>
@@ -12370,6 +12464,15 @@
             Determines if R-MAC should update the MAC chaining value based on SCP implementation.
             Per GlobalPlatform Card Specification v2.3.1 Section 6.2.6.
             </summary>
+        </member>
+        <member name="T:Gp4Net.Domain.Security.ResponseSecurityProcessorAdapter">
+            <summary>
+            Adapter that implements IResponseSecurityProcessor by delegating to the static ResponseSecurityProcessor.
+            This allows dependency injection while maintaining the functional static implementation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Domain.Security.ResponseSecurityProcessorAdapter.ApplyResponseSecurity(System.Byte[],Gp4Net.Domain.SecurityLevel,Gp4Net.Domain.Keys.SessionKeys,System.Collections.Immutable.ImmutableArray{System.Byte},System.UInt32,System.Byte)">
+            <inheritdoc />
         </member>
         <member name="T:Gp4Net.Domain.Security.SecureChannelPhase">
             <summary>
@@ -12981,7 +13084,7 @@
             Immutable environment containing all dependencies for command processing.
             </summary>
         </member>
-        <member name="M:Gp4Net.Pipeline.CommandProcessing.CommandEnvironment.#ctor(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Security.SecureChannelState},Microsoft.Extensions.Logging.ILogger,Gp4Net.Pipeline.CommandOptions)">
+        <member name="M:Gp4Net.Pipeline.CommandProcessing.CommandEnvironment.#ctor(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Security.SecureChannelState},Gp4Net.Domain.Security.ISecureChannelService,Microsoft.Extensions.Logging.ILogger,Gp4Net.Pipeline.CommandOptions)">
             <summary>
             Immutable environment containing all dependencies for command processing.
             </summary>
@@ -13603,14 +13706,9 @@
             <param name="cancellationToken">Cancellation token.</param>
             <returns>Complete card content or error.</returns>
         </member>
-        <member name="M:Gp4Net.Services.CardContentRetriever.EstablishSecureChannelWithAutoDetection(Gp4Net.Domain.Keys.IKeySet)">
+        <member name="M:Gp4Net.Services.CardContentRetriever.EstablishSecureChannelWithAutoDetection(CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Keys.IKeySet})">
             <summary>
             Establishes secure channel with SCP auto-detection and default key handling.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Services.CardContentRetriever.CreateDefaultTestKeySet">
-            <summary>
-            Creates a default SCP02 test key set for auto-detection scenarios.
             </summary>
         </member>
         <member name="M:Gp4Net.Services.CardContentRetriever.ConvertToKeySet(Gp4Net.Domain.Keys.IKeySet)">

@@ -60,16 +60,5 @@ public static class KeyDerivation
     }
 
 
-    /// <summary>
-    /// Calculates a cryptogram for authentication.
-    /// </summary>
-    /// <param name="key">The key to use for cryptogram calculation.</param>
-    /// <param name="data">The data to calculate cryptogram over.</param>
-    /// <param name="isScp03">Whether to use SCP03 (AES) or SCP02 (3DES).</param>
-    /// <returns>The cryptogram (8 bytes) or an error.</returns>
-    public static Result<byte[], SmartCardError> CalculateCryptogram(byte[] key, byte[] data, bool isScp03)
-    {
-        var protocol = isScp03 ? ScpVersion.Scp03 : ScpVersion.Scp02;
-        return _cryptogramService.CalculateCryptogram(key, data, protocol);
-    }
+    // CalculateCryptogram method removed - use type-safe CryptogramService with Scp02CryptogramParameters/Scp03CryptogramParameters instead
 }

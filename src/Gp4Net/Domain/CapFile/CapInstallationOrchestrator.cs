@@ -4,7 +4,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
@@ -513,61 +515,112 @@ public static class CapInstallationOrchestrator
 
     /// <summary>
     /// Creates secure channel state using INITIALIZE UPDATE response metadata.
-    /// Simulates complete secure channel establishment for testing.
+    /// Establishes proper secure channel with derived session keys per GP Card Specification v2.3.1 Section F.2.
     /// </summary>
     private static Result<CommandProcessing.CommandResult, SmartCardError> EstablishSecureChannelFromMetadata(
         CommandProcessing.CommandResult result,
-        SecurityLevel securityLevel)
+        SecurityLevel securityLevel,
+        IKeySet keySet,
+        byte[] hostChallenge)
     {
-        // Legacy method - now superseded by EstablishMockSecureChannelForTesting
-        // Kept for potential future use with real key derivation
-        
         return result.Metadata.InitializeUpdateResponse.Match(
             initResponse =>
             {
-                // Create a mock secure channel state for testing
-                // In real implementation, this would derive session keys and establish proper crypto
-                var mockSecureChannelState = CreateMockSecureChannelState(initResponse, securityLevel);
+                // Derive proper session keys using real key derivation per GP specifications
+                var keyDerivationService = new Domain.Keys.KeyDerivationService();
+                var secureChannelService = new Domain.Security.SecureChannelService(
+                    new Domain.Security.CommandSecurityProcessorAdapter(),
+                    new Domain.Security.HostResponseSecurityProcessor());
                 
-                return mockSecureChannelState.Match(
-                    secureChannel =>
+                // Create key derivation context based on SCP protocol
+                var derivationContext = CreateKeyDerivationContext(
+                    initResponse, keySet, hostChallenge, initResponse.CardChallenge);
+                
+                return keyDerivationService.DeriveSessionKeys(derivationContext)
+                    .Bind(sessionKeys =>
                     {
-                        var updatedEnvironment = result.UpdatedEnvironment.WithSecureChannel(secureChannel);
-                        return Result.Success<CommandProcessing.CommandResult, SmartCardError>(
-                            result with { UpdatedEnvironment = updatedEnvironment });
-                    },
-                    () => Result.Success<CommandProcessing.CommandResult, SmartCardError>(result));
+                        // Create initial MAC chaining value per GP specification
+                        var initialMacChaining = CreateInitialMacChainingValue(initResponse);
+                        
+                        // Establish secure channel with derived keys
+                        return secureChannelService.EstablishChannel(
+                            sessionKeys,
+                            securityLevel,
+                            initResponse.ScpId,
+                            initialMacChaining,
+                            initResponse.ScpParameter);
+                    })
+                    .Map(secureChannelState =>
+                    {
+                        var updatedEnvironment = result.UpdatedEnvironment.WithSecureChannel(secureChannelState);
+                        return result with { UpdatedEnvironment = updatedEnvironment };
+                    });
             },
             () => Result.Success<CommandProcessing.CommandResult, SmartCardError>(result));
     }
 
     /// <summary>
-    /// Creates a secure channel state for testing purposes.
-    /// Uses SCP03 test keys for session derivation.
+    /// Creates a key derivation context for session key derivation per GP specifications.
+    /// Supports both SCP02 and SCP03 protocols with proper parameter handling.
     /// </summary>
-    private static Maybe<SecureChannelState> CreateMockSecureChannelState(
-        InitializeUpdateResponse initResponse, 
-        SecurityLevel securityLevel)
+    private static IKeyDerivationContext CreateKeyDerivationContext(
+        InitializeUpdateResponse initResponse,
+        IKeySet keySet,
+        byte[] hostChallenge,
+        byte[] cardChallenge)
     {
-        var keyData = Keys.GpTestKeys.StandardTestKey;
-        var sessionKeys = new SessionKeys(
-            sEnc: keyData,
-            sMac: keyData,
-            sRMac: keyData,
-            dek: keyData);
+        // Map SCP ID and parameter to proper ScpImplementation enum value
+        var implementation = GetScpImplementation(initResponse.ScpId, initResponse.ScpParameter);
+        
+        return new KeyDerivationContext(
+            Protocol: (ScpVersion)initResponse.ScpId,
+            KeySet: keySet,
+            HostChallenge: hostChallenge,
+            CardChallenge: cardChallenge,
+            SequenceCounter: Maybe<byte[]>.None, // Not needed for key derivation
+            Implementation: implementation.Match(
+                impl => Maybe<Domain.Protocol.ScpImplementation>.From(impl),
+                () => Maybe<Domain.Protocol.ScpImplementation>.None));
+    }
 
-        return MacChainingState.CreateZeroInitialized(
-                protocolVersion: initResponse.ScpId,
-                implementationParameter: initResponse.ScpParameter)
-            .Match(
-                macChaining => Maybe<SecureChannelState>.From(new SecureChannelState(
-                    SessionKeys: sessionKeys,
-                    SecurityLevel: securityLevel,
-                    ProtocolVersion: initResponse.ScpId,
-                    MacChaining: macChaining,
-                    EncryptionCounter: 0,
-                    SessionId: [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])),
-                _ => Maybe<SecureChannelState>.None);
+    /// <summary>
+    /// Maps SCP ID and implementation parameter to ScpImplementation enum.
+    /// Uses the same logic as the existing protocol handlers.
+    /// </summary>
+    private static Maybe<Domain.Protocol.ScpImplementation> GetScpImplementation(byte scpId, byte parameter)
+    {
+        return scpId switch
+        {
+            0x02 => Domain.Protocol.Scp02Protocol.GetScp02Implementation(parameter)
+                .Match(impl => Maybe<Domain.Protocol.ScpImplementation>.From(impl),
+                       _ => Maybe<Domain.Protocol.ScpImplementation>.None),
+            0x03 => parameter switch
+            {
+                0x11 => Maybe<Domain.Protocol.ScpImplementation>.From(Domain.Protocol.ScpImplementation.Scp03I11),
+                0x60 => Maybe<Domain.Protocol.ScpImplementation>.From(Domain.Protocol.ScpImplementation.Scp03I60),
+                0x70 => Maybe<Domain.Protocol.ScpImplementation>.From(Domain.Protocol.ScpImplementation.Scp03I70),
+                _ => Maybe<Domain.Protocol.ScpImplementation>.From(Domain.Protocol.ScpImplementation.Scp03I70) // Default
+            },
+            _ => Maybe<Domain.Protocol.ScpImplementation>.None
+        };
+    }
+
+    /// <summary>
+    /// Creates initial MAC chaining value per GP Card Specification requirements.
+    /// For SCP02: Uses encrypted ICV per Section E.4.2.
+    /// For SCP03: Uses zero-initialized value per Section 6.2.4.
+    /// </summary>
+    private static byte[] CreateInitialMacChainingValue(InitializeUpdateResponse initResponse)
+    {
+        // Per GP Card Specification v2.3.1:
+        // - SCP02: ICV is derived from encrypted sequence counter
+        // - SCP03: ICV starts as zero-initialized 16-byte array
+        return initResponse.ScpId switch
+        {
+            0x02 => initResponse.CardChallenge.Take(8).ToArray(), // Use card challenge for SCP02 ICV
+            0x03 => new byte[16], // Zero-initialized for SCP03
+            _ => new byte[16] // Default to zero-initialized for unknown protocols
+        };
     }
 
     private static Result<CapInstallationRequest, SmartCardError> ValidateInstallationRequest(

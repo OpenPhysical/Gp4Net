@@ -103,26 +103,23 @@ public class SmartCardService : ISmartCardService
     /// <inheritdoc/>
     public Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context)
     {
-        // Extract values from context to build new environment
-        var channel = context.Get<ICardChannel>("CardChannel");
-        var transport = context.Get<IApduTransport>("ApduTransport");
+        // Extract values from context to build new environment using functional composition
+        var channelResult = context.Get<ICardChannel>("CardChannel")
+            .ToResult(SmartCardError.InvalidArgument("Context must contain CardChannel"));
+        var transportResult = context.Get<IApduTransport>("ApduTransport")
+            .ToResult(SmartCardError.InvalidArgument("Context must contain ApduTransport"));
         var secureChannel = context.Get<SecureChannelState>("SecureChannelSession");
         
-        if (!channel.HasValue || !transport.HasValue)
-        {
-            return Result.Failure<ISmartCardService, SmartCardError>(
-                SmartCardError.InvalidArgument("Context must contain CardChannel and ApduTransport"));
-        }
-        
-        var newEnvironment = new CommandEnvironment(
-            channel.Value,
-            transport.Value,
-            secureChannel,
-            _logger,
-            _environment.Options);
-            
-        return Result.Success<ISmartCardService, SmartCardError>(
-            new SmartCardService(newEnvironment, _processor, _logger));
+        return channelResult
+            .Bind(channel => transportResult
+                .Map(transport => new CommandEnvironment(
+                    channel,
+                    transport,
+                    secureChannel,
+                    _environment.SecureChannelService,
+                    _logger,
+                    _environment.Options)))
+            .Map(newEnvironment => (ISmartCardService)new SmartCardService(newEnvironment, _processor, _logger));
     }
 
     /// <inheritdoc/>

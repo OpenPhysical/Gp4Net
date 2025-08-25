@@ -105,7 +105,13 @@ public class ChainFixInstallationTests : TraceBasedTestBase
     {
         // Test that our virtual card can handle the installation sequence
         // Use trace-compliant configuration that matches gp_pro_install_scp03.json expectations
-        var virtualCard = VirtualCardTestBuilder.ForTrace(ChainFixTraceFile);
+        var virtualCard = VirtualCardTestBuilder.ForTrace(ChainFixTraceFile).Match(
+            onSuccess: card => card,
+            onFailure: error =>
+            {
+                Assert.Fail($"Failed to create virtual card for trace: {error}");
+                return VirtualCardTestBuilder.P71Card(); // Never reached due to Assert.Fail
+            });
         var environment = CreateTestEnvironment(virtualCard);
         
         var sequenceResult = CapInstallationTraceLoader.ExtractCommandSequence(_traceData!);
@@ -251,10 +257,16 @@ public class ChainFixInstallationTests : TraceBasedTestBase
         var transport = new VirtualCardTransport(virtualCard);
         var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
         
+        // Create secure channel service for testing
+        var commandProcessor = new Gp4Net.Domain.Security.CommandSecurityProcessorAdapter();
+        var responseProcessor = new Gp4Net.Domain.Security.ResponseSecurityProcessorAdapter();
+        var secureChannelService = new Gp4Net.Domain.Security.SecureChannelService(commandProcessor, responseProcessor);
+        
         return new CommandProcessing.CommandEnvironment(
             channel,
             transport,
             Maybe<Gp4Net.Domain.Security.SecureChannelState>.None,
+            secureChannelService,
             logger,
             Gp4Net.Pipeline.CommandOptions.Default);
     }
@@ -270,10 +282,16 @@ public class ChainFixInstallationTests : TraceBasedTestBase
         var transport = new TraceBasedCardTransport(CardService);
         var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
         
+        // Create secure channel service for testing
+        var commandProcessor = new Gp4Net.Domain.Security.CommandSecurityProcessorAdapter();
+        var responseProcessor = new Gp4Net.Domain.Security.ResponseSecurityProcessorAdapter();
+        var secureChannelService = new Gp4Net.Domain.Security.SecureChannelService(commandProcessor, responseProcessor);
+        
         return new CommandProcessing.CommandEnvironment(
             channel,
             transport,
             Maybe<Gp4Net.Domain.Security.SecureChannelState>.None,
+            secureChannelService,
             logger,
             Gp4Net.Pipeline.CommandOptions.Default);
     }
@@ -328,7 +346,9 @@ public class ChainFixInstallationTests : TraceBasedTestBase
 }
 
 /// <summary>
-/// Transport implementation that processes commands through virtual card.
+/// Transport implementation that processes commands through virtual card and synchronizes secure channel state.
+/// Implements proper GP architecture by maintaining secure channel state consistency between 
+/// virtual card and pipeline environment.
 /// </summary>
 public class VirtualCardTransport : Gp4Net.Transport.IApduTransport
 {
@@ -343,6 +363,25 @@ public class VirtualCardTransport : Gp4Net.Transport.IApduTransport
     public int MaxCommandDataLength => 255;
     public int MaxResponseDataLength => 255;
     public bool SupportsExtendedLength => false;
+
+    /// <summary>
+    /// Gets the current secure channel state from virtual card for pipeline synchronization.
+    /// </summary>
+    public Maybe<Gp4Net.Domain.Security.SecureChannelState> GetCurrentSecureChannelState()
+    {
+        return _virtualCard.CurrentState.SecureChannel;
+    }
+
+    /// <summary>
+    /// Creates updated environment with current virtual card secure channel state.
+    /// </summary>
+    public Gp4Net.Pipeline.CommandProcessing.CommandEnvironment CreateUpdatedEnvironment(Gp4Net.Pipeline.CommandProcessing.CommandEnvironment originalEnvironment)
+    {
+        var currentSecureChannelState = GetCurrentSecureChannelState();
+        
+        // If secure channel state changed, create new environment with updated state
+        return originalEnvironment with { SecureChannel = currentSecureChannelState };
+    }
 
     public async Task<Gp4Net.Transport.ApduResponse> TransmitAsync(
         Gp4Net.Transport.IApduCommand command, 
@@ -365,9 +404,9 @@ public class VirtualCardTransport : Gp4Net.Transport.IApduTransport
             ? new byte[] { (byte)command.Data.Length }.Concat(command.Data)
             : Enumerable.Empty<byte>();
             
-        var leSection = command.ExpectedResponseLength.HasValue
-            ? new byte[] { command.ExpectedResponseLength.Value == 256 ? (byte)0x00 : (byte)command.ExpectedResponseLength.Value }
-            : Enumerable.Empty<byte>();
+        var leSection = command.ExpectedResponseLength.Match(
+            expectedLength => new byte[] { expectedLength == 256 ? (byte)0x00 : (byte)expectedLength },
+            () => Enumerable.Empty<byte>());
             
         return header.Concat(dataSection).Concat(leSection).ToArray();
     }
@@ -465,9 +504,9 @@ public class TraceBasedCardTransport : Gp4Net.Transport.IApduTransport
             ? new byte[] { (byte)command.Data.Length }.Concat(command.Data)
             : Enumerable.Empty<byte>();
             
-        var leSection = command.ExpectedResponseLength.HasValue
-            ? new byte[] { command.ExpectedResponseLength.Value == 256 ? (byte)0x00 : (byte)command.ExpectedResponseLength.Value }
-            : Enumerable.Empty<byte>();
+        var leSection = command.ExpectedResponseLength.Match(
+            expectedLength => new byte[] { expectedLength == 256 ? (byte)0x00 : (byte)expectedLength },
+            () => Enumerable.Empty<byte>());
             
         return header.Concat(dataSection).Concat(leSection).ToArray();
     }

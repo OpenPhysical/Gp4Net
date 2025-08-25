@@ -119,11 +119,19 @@ public abstract class KeySet : IKeySet
 public class Scp02KeySet : KeySet
 {
     /// <summary>
+    /// Gets the session encryption key (S-ENC) for cryptogram calculations.
+    /// Required for type-safe cryptogram parameter validation.
+    /// </summary>
+    public byte[] SEnc { get; init; }
+    
+    /// <summary>
     /// Private constructor for successful creation.
     /// </summary>
     private Scp02KeySet(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
         : base(keyVersion, keyId, encKey, macKey, dekKey)
     {
+        // Default to static ENC key if no session key provided
+        SEnc = encKey;
     }
 
     /// <summary>
@@ -171,11 +179,19 @@ public class Scp02KeySet : KeySet
 public class Scp03KeySet : KeySet
 {
     /// <summary>
+    /// Gets the session MAC key (S-MAC) for cryptogram calculations.
+    /// Required for type-safe cryptogram parameter validation.
+    /// </summary>
+    public byte[] SMac { get; init; }
+    
+    /// <summary>
     /// Private constructor for successful creation.
     /// </summary>
     public Scp03KeySet(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
         : base(keyVersion, keyId, encKey, macKey, dekKey)
     {
+        // Default to static MAC key if no session key provided
+        SMac = macKey;
     }
 
     /// <summary>

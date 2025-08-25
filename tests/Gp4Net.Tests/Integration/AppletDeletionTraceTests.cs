@@ -4,7 +4,6 @@ using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
 using NUnit.Framework;
-using Moq;
 using Gp4Net.Cryptography;
 
 namespace Gp4Net.Tests.Integration;
@@ -16,12 +15,12 @@ namespace Gp4Net.Tests.Integration;
 [Category("Integration")]
 public class AppletDeletionTraceTests
 {
-    private Mock<IKeyDerivationService> _keyDerivationServiceMock = null!;
+    private IKeyDerivationService _keyDerivationService = null!;
 
     [SetUp]
     public void SetUp()
     {
-        _keyDerivationServiceMock = new Mock<IKeyDerivationService>();
+        _keyDerivationService = new KeyDerivationService();
     }
 
     // From GP Pro trace
@@ -95,7 +94,7 @@ public class AppletDeletionTraceTests
     {
         // Arrange
         var keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1);
-        var protocol = new Scp03Protocol(keySet, _keyDerivationServiceMock.Object, 0x70);
+        var protocol = new Scp03Protocol(keySet, _keyDerivationService, 0x70);
         var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
         Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
         var response = responseResult.Value;
@@ -140,29 +139,9 @@ public class AppletDeletionTraceTests
             128
         );
 
-        _ = _keyDerivationServiceMock
-            .Setup(x => x.DeriveSessionKeys(It.IsAny<IKeyDerivationContext>()))
-            .Returns(sessionKeys.Value);
-
-        // Mock cryptogram calculation - return expected card cryptogram
-        _ = _keyDerivationServiceMock
-            .Setup(x => x.CalculateCryptogram(It.IsAny<ICryptogramContext>()))
-            .Returns<ICryptogramContext>(ctx =>
-            {
-                switch (ctx.Type)
-                {
-                    case CryptogramType.CardCryptogram:
-                        // Return the expected card cryptogram from the trace
-                        return Convert.FromHexString("A1AEEA9F46AF46B2");
-                    case CryptogramType.HostCryptogram:
-                        // Return the expected host cryptogram
-                        return Convert.FromHexString("A1883C4B93BE2B01");
-                    default:
-                        return new byte[8];
-                }
-            });
+        // Use real key derivation service for functional testing
             
-        var protocol = new Scp03Protocol(keySet, _keyDerivationServiceMock.Object, 0x70);
+        var protocol = new Scp03Protocol(keySet, _keyDerivationService, 0x70);
         var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
         Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
         var response = responseResult.Value;
