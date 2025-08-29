@@ -1,8 +1,10 @@
 using System;
 using System.IO;
-using System.Linq;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
+using Gp4Net.CardEmulator.Functional;
 using Gp4Net.CardEmulator.Profiles;
+using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
 using NUnit.Framework;
@@ -63,16 +65,16 @@ public class CardProfileLoaderTests
         ""0x00C1"": ""C1020004""
       }
     }";
-    
+
     [Test]
     public void LoadFromJson_WithValidP71Profile_ReturnsConfiguration()
     {
         // Act
-        var result = CardProfileLoader.LoadFromJson(SampleP71Profile);
+        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(SampleP71Profile);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var config = result.Value;
+        CardConfiguration? config = result.Value;
 
         // Basic properties
         _ = config.CardType.Should().Be("Test P71D321 card");
@@ -85,19 +87,19 @@ public class CardProfileLoaderTests
 
         // Keys
         _ = config.StaticKeys.Should().ContainKey((byte)1);
-        var keySet = config.StaticKeys[1];
+        IKeySet keySet = config.StaticKeys[1];
         _ = keySet.Should().BeOfType<Scp02KeySet>();
 
         // Data objects
         _ = config.DefaultDataObjects.Should().ContainKey((ushort)0x9F7F);
         _ = config.DefaultDataObjects.Should().ContainKey((ushort)0x00C1);
     }
-    
+
     [Test]
     public void LoadFromJson_WithScp03Profile_DeterminesCorrectDefaults()
     {
         // Arrange
-        var scp03Profile = @"
+        string scp03Profile = @"
         {
           ""cardProfile"": {
             ""name"": ""SCP03_Card"",
@@ -135,75 +137,75 @@ public class CardProfileLoaderTests
             }
           }
         }";
-        
+
         // Act
-        var result = CardProfileLoader.LoadFromJson(scp03Profile);
+        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(scp03Profile);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var config = result.Value;
+        CardConfiguration? config = result.Value;
         _ = config.DefaultScpVersion.Should().Be(0x03);
         _ = config.DefaultScpImplementation.Should().Be(ScpImplementation.Scp03I70);
         _ = config.StaticKeys[1].Should().BeOfType<Scp03KeySet>();
     }
-    
+
     [Test]
     public void LoadFromJson_WithInvalidJson_ReturnsFailure()
     {
         // Arrange
-        var invalidJson = "{ invalid json }";
-        
+        string invalidJson = "{ invalid json }";
+
         // Act
-        var result = CardProfileLoader.LoadFromJson(invalidJson);
+        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(invalidJson);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Message.Should().Contain("Invalid JSON format");
     }
-    
+
     [Test]
     public void LoadFromJson_WithMissingRequiredFields_ReturnsFailure()
     {
         // Arrange
-        var incompleteJson = @"
+        string incompleteJson = @"
         {
           ""cardProfile"": {
             ""name"": ""Incomplete""
           }
         }";
-        
+
         // Act
-        var result = CardProfileLoader.LoadFromJson(incompleteJson);
+        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(incompleteJson);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
     }
-    
+
     [Test]
     public void LoadFromJson_WithInvalidHexString_ReturnsFailure()
     {
         // Arrange
-        var badHexJson = @"
+        string badHexJson = @"
         {
           ""cardData"": {
             ""atr"": ""NOT_HEX"",
             ""isdAid"": ""A000000151000000""
           }
         }";
-        
+
         // Act
-        var result = CardProfileLoader.LoadFromJson(badHexJson);
+        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(badHexJson);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Message.Should().Contain("ATR must have even number of hex digits");
     }
-    
+
     [Test]
     public void LoadFromJson_WithInvalidKeyVersion_ReturnsFailure()
     {
         // Arrange
-        var badKeyJson = @"
+        string badKeyJson = @"
         {
           ""cardData"": {
             ""atr"": ""3BD518FF8191FE1FC38073C821100A"",
@@ -221,20 +223,20 @@ public class CardProfileLoaderTests
             }
           }
         }";
-        
+
         // Act
-        var result = CardProfileLoader.LoadFromJson(badKeyJson);
+        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(badKeyJson);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Message.Should().Contain("Invalid key version");
     }
-    
+
     [Test]
     public void LoadFromJson_WithUnknownKeyType_ReturnsFailure()
     {
         // Arrange
-        var unknownKeyTypeJson = @"
+        string unknownKeyTypeJson = @"
         {
           ""cardData"": {
             ""atr"": ""3BD518FF8191FE1FC38073C821100A"",
@@ -252,30 +254,30 @@ public class CardProfileLoaderTests
             }
           }
         }";
-        
+
         // Act
-        var result = CardProfileLoader.LoadFromJson(unknownKeyTypeJson);
+        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(unknownKeyTypeJson);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Message.Should().Contain("Unknown key set type");
     }
-    
+
     [Test]
     public void LoadFromFile_WithValidFile_ReturnsConfiguration()
     {
         // Arrange
-        var tempFile = Path.GetTempFileName();
+        string tempFile = Path.GetTempFileName();
         try
         {
             File.WriteAllText(tempFile, SampleP71Profile);
-            
+
             // Act
-            var result = CardProfileLoader.LoadFromFile(tempFile);
+            Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromFile(tempFile);
 
             // Assert
             _ = result.IsSuccess.Should().BeTrue();
-            var config = result.Value;
+            CardConfiguration? config = result.Value;
             _ = config.CardType.Should().Be("Test P71D321 card");
         }
         finally
@@ -283,63 +285,63 @@ public class CardProfileLoaderTests
             File.Delete(tempFile);
         }
     }
-    
+
     [Test]
     public void LoadFromFile_WithNonExistentFile_ReturnsFailure()
     {
         // Arrange
-        var nonExistentFile = Path.Combine(Path.GetTempPath(), "non_existent_profile.json");
-        
+        string nonExistentFile = Path.Combine(Path.GetTempPath(), "non_existent_profile.json");
+
         // Act
-        var result = CardProfileLoader.LoadFromFile(nonExistentFile);
+        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromFile(nonExistentFile);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Message.Should().Contain("Profile file not found");
     }
-    
+
     [Test]
     public void LoadFromFile_WithNullPath_ReturnsFailure()
     {
         // Act
-        var result = CardProfileLoader.LoadFromFile(null!);
+        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromFile(null!);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Message.Should().Contain("JSON path cannot be null or empty");
     }
-    
+
     [Test]
     public void LoadFromJson_WithSpacesInHex_ParsesCorrectly()
     {
         // Arrange
-        var jsonWithSpaces = @"
+        string jsonWithSpaces = @"
         {
           ""cardData"": {
             ""atr"": ""3B D5 18 FF 81 91 FE 1F C3 80 73 C8 21 10 0A"",
             ""isdAid"": ""A0 00 00 01 51 00 00 00""
           }
         }";
-        
+
         // Act
-        var result = CardProfileLoader.LoadFromJson(jsonWithSpaces);
+        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(jsonWithSpaces);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var config = result.Value;
+        CardConfiguration? config = result.Value;
         _ = config.Atr.Should().BeEquivalentTo(Convert.FromHexString("3BD518FF8191FE1FC38073C821100A"));
         _ = config.IsdAid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
     }
-    
+
     [Test]
     public void LoadFromJson_SupportedInstructions_ContainsStandardGpCommands()
     {
         // Act
-        var result = CardProfileLoader.LoadFromJson(SampleP71Profile);
+        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(SampleP71Profile);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var config = result.Value;
+        CardConfiguration? config = result.Value;
         _ = config.SupportedInstructions.Should().Contain(0xA4); // SELECT
         _ = config.SupportedInstructions.Should().Contain(0x50); // INITIALIZE UPDATE
         _ = config.SupportedInstructions.Should().Contain(0x82); // EXTERNAL AUTHENTICATE

@@ -3,11 +3,9 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using CSharpFunctionalExtensions;
-using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
 
 namespace Gp4Net.Tests.Integration;
@@ -28,8 +26,8 @@ public static class TraceBasedTestGenerator
     /// <returns>Collection of generated test cases with coverage analysis.</returns>
     public static Result<GeneratedTestSuite, SmartCardError> GenerateTestsForCoverage(string testDirectory)
     {
-        var traceDirectory = Path.Combine(testDirectory, TRACE_DIRECTORY);
-        
+        string traceDirectory = Path.Combine(testDirectory, TRACE_DIRECTORY);
+
         if (!Directory.Exists(traceDirectory))
         {
             return Result.Failure<GeneratedTestSuite, SmartCardError>(
@@ -48,23 +46,23 @@ public static class TraceBasedTestGenerator
     {
         try
         {
-            var traceFiles = Directory.GetFiles(traceDirectory, "*.json", SearchOption.AllDirectories);
-            
-            var analysisResults = traceFiles
+            string[] traceFiles = Directory.GetFiles(traceDirectory, "*.json", SearchOption.AllDirectories);
+
+            ImmutableList<TraceFileAnalysis> analysisResults = traceFiles
                 .Select(LoadAndAnalyzeTrace)
                 .Where(result => result.IsSuccess)
                 .Select(result => result.Value)
                 .ToImmutableList();
 
-            var allOperations = analysisResults
+            ImmutableHashSet<string> allOperations = analysisResults
                 .SelectMany(analysis => analysis.AvailableOperations)
                 .ToImmutableHashSet();
 
-            var allProtocols = analysisResults
+            ImmutableHashSet<string> allProtocols = analysisResults
                 .SelectMany(analysis => analysis.SupportedProtocols)
                 .ToImmutableHashSet();
 
-            var complexityScores = analysisResults
+            ImmutableDictionary<string, int> complexityScores = analysisResults
                 .ToImmutableDictionary(analysis => analysis.FilePath, analysis => analysis.ComplexityScore);
 
             return Result.Success<TraceAnalysis, SmartCardError>(new TraceAnalysis(
@@ -88,8 +86,8 @@ public static class TraceBasedTestGenerator
     {
         try
         {
-            var json = File.ReadAllText(filePath);
-            var trace = JsonSerializer.Deserialize<TraceData>(json, new JsonSerializerOptions
+            string json = File.ReadAllText(filePath);
+            TraceData? trace = JsonSerializer.Deserialize<TraceData>(json, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
                 DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -103,15 +101,15 @@ public static class TraceBasedTestGenerator
 
             trace.FilePath = filePath;
 
-            var operations = trace.Exchanges != null 
+            ImmutableHashSet<string> operations = trace.Exchanges != null
                 ? ExtractOperationsFromExchanges(trace.Exchanges)
                 : ImmutableHashSet<string>.Empty;
-            
-            var protocols = trace.Sessions != null
+
+            ImmutableHashSet<string> protocols = trace.Sessions != null
                 ? ExtractProtocolsFromSessions(trace.Sessions)
                 : ImmutableHashSet<string>.Empty;
-                
-            var complexityScore = CalculateTraceComplexity(operations, protocols);
+
+            int complexityScore = CalculateTraceComplexity(operations, protocols);
 
             return Result.Success<TraceFileAnalysis, SmartCardError>(new TraceFileAnalysis(
                 filePath,
@@ -157,8 +155,8 @@ public static class TraceBasedTestGenerator
     /// </summary>
     private static int CalculateTraceComplexity(ImmutableHashSet<string> operations, ImmutableHashSet<string> protocols)
     {
-        var operationScore = operations.Sum(GetOperationComplexity);
-        var protocolScore = protocols.Sum(GetProtocolComplexity);
+        int operationScore = operations.Sum(GetOperationComplexity);
+        int protocolScore = protocols.Sum(GetProtocolComplexity);
         return operationScore + protocolScore;
     }
 
@@ -237,13 +235,13 @@ public static class TraceBasedTestGenerator
         try
         {
             // Priority 1: Core operations that must be covered for 50% target
-            var coreOperations = new[] { "SELECT", "INITIALIZE_UPDATE", "EXTERNAL_AUTHENTICATE", "GET_STATUS" };
-            var coreProtocols = new[] { "SCP02", "SCP03" };
+            string[] coreOperations = ["SELECT", "INITIALIZE_UPDATE", "EXTERNAL_AUTHENTICATE", "GET_STATUS"];
+            string[] coreProtocols = ["SCP02", "SCP03"];
 
-            var coreTestCases = GenerateCoreTestCases(analysis, coreOperations, coreProtocols);
-            var complexTestCases = GenerateComplexTestCases(analysis);
+            ImmutableList<GeneratedTestCase> coreTestCases = GenerateCoreTestCases(analysis, coreOperations, coreProtocols);
+            ImmutableList<GeneratedTestCase> complexTestCases = GenerateComplexTestCases(analysis);
 
-            var allTestCases = coreTestCases.Concat(complexTestCases).ToImmutableList();
+            ImmutableList<GeneratedTestCase> allTestCases = coreTestCases.Concat(complexTestCases).ToImmutableList();
 
             return Result.Success<ImmutableList<GeneratedTestCase>, SmartCardError>(allTestCases);
         }
@@ -258,8 +256,8 @@ public static class TraceBasedTestGenerator
     /// Generates core test cases for essential operation/protocol combinations.
     /// </summary>
     private static ImmutableList<GeneratedTestCase> GenerateCoreTestCases(
-        TraceAnalysis analysis, 
-        string[] coreOperations, 
+        TraceAnalysis analysis,
+        string[] coreOperations,
         string[] coreProtocols)
     {
         return coreOperations
@@ -285,8 +283,8 @@ public static class TraceBasedTestGenerator
     /// </summary>
     private static ImmutableList<GeneratedTestCase> GenerateComplexTestCases(TraceAnalysis analysis)
     {
-        var complexOperations = new[] { "INSTALL", "DELETE", "LOAD" };
-        
+        string[] complexOperations = ["INSTALL", "DELETE", "LOAD"];
+
         return complexOperations
             .Where(operation => analysis.AllOperations.Contains(operation))
             .Select(operation => FindBestTraceForOperation(analysis, operation, "SCP02")
@@ -309,13 +307,13 @@ public static class TraceBasedTestGenerator
     /// </summary>
     private static Maybe<TraceFileAnalysis> FindBestTraceForOperation(TraceAnalysis analysis, string operation, string protocol)
     {
-        var candidates = analysis.TraceFiles
-            .Where(trace => trace.AvailableOperations.Contains(operation) && 
+        ImmutableList<TraceFileAnalysis> candidates = analysis.TraceFiles
+            .Where(trace => trace.AvailableOperations.Contains(operation) &&
                            trace.SupportedProtocols.Contains(protocol))
             .OrderByDescending(trace => trace.ComplexityScore)
             .ToImmutableList();
 
-        return candidates.Any() 
+        return candidates.Any()
             ? Maybe<TraceFileAnalysis>.From(candidates.First())
             : Maybe<TraceFileAnalysis>.None;
     }
@@ -344,15 +342,15 @@ public static class TraceBasedTestGenerator
     private static double CalculateExpectedCoverage(ImmutableList<GeneratedTestCase> testCases)
     {
         // Define all possible critical paths for GlobalPlatform
-        var allCriticalPaths = new[]
-        {
+        string[] allCriticalPaths =
+        [
             "SELECT", "INITIALIZE_UPDATE_SCP02", "INITIALIZE_UPDATE_SCP03",
             "EXTERNAL_AUTHENTICATE_SCP02", "EXTERNAL_AUTHENTICATE_SCP03",
             "GET_STATUS_SCP02", "GET_STATUS_SCP03",
             "INSTALL_SCP02", "DELETE_SCP02", "LOAD_SCP02"
-        };
+        ];
 
-        var coveredPaths = testCases
+        int coveredPaths = testCases
             .Select(tc => $"{tc.Operation}_{tc.Protocol}")
             .Distinct()
             .Count(path => allCriticalPaths.Any(critical => critical.Contains(path.Split('_')[0])));
@@ -415,7 +413,7 @@ public record GeneratedTestSuite(
     /// </summary>
     public string GenerateReport()
     {
-        var reportLines = new[]
+        IEnumerable<string> reportLines = new[]
         {
             "=== Generated Test Suite Report ===",
             $"Total Test Cases: {TestCases.Count}",

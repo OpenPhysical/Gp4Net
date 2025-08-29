@@ -28,10 +28,10 @@ public class SecureSessionKeysTests
     [SetUp]
     public void SetUp()
     {
-        this._testSEnc = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
-        this._testSMac = [0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18];
-        this._testSrMac = [0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28];
-        this._testDek = [0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38];
+        _testSEnc = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+        _testSMac = [0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18];
+        _testSrMac = [0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28];
+        _testDek = [0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38];
     }
 
     /// <summary>
@@ -42,11 +42,11 @@ public class SecureSessionKeysTests
     {
         // Act
         using (
-            var sessionKeys = new SecureSessionKeys(
-                this._testSEnc,
-                this._testSMac,
-                this._testSrMac,
-                this._testDek
+            SecureSessionKeys sessionKeys = new SecureSessionKeys(
+                _testSEnc,
+                _testSMac,
+                _testSrMac,
+                _testDek
             )
         )
         {
@@ -63,10 +63,10 @@ public class SecureSessionKeysTests
     {
         // Act
         using (
-            var sessionKeys = new SecureSessionKeys(
-                this._testSEnc,
-                this._testSMac,
-                this._testSrMac,
+            SecureSessionKeys sessionKeys = new SecureSessionKeys(
+                _testSEnc,
+                _testSMac,
+                _testSrMac,
                 dek: null
             )
         )
@@ -84,15 +84,15 @@ public class SecureSessionKeysTests
     {
         // Arrange
         using (
-            var sessionKeys = new SecureSessionKeys(
-                this._testSEnc,
-                this._testSMac,
-                this._testSrMac,
-                this._testDek
+            SecureSessionKeys sessionKeys = new SecureSessionKeys(
+                _testSEnc,
+                _testSMac,
+                _testSrMac,
+                _testDek
             )
         )
         {
-            var executed = false;
+            bool executed = false;
             byte[]? receivedKey = null;
 
             // Act
@@ -105,7 +105,7 @@ public class SecureSessionKeysTests
 
             // Assert
             _ = executed.Should().BeTrue();
-            _ = receivedKey.Should().BeEquivalentTo(this._testSEnc);
+            _ = receivedKey.Should().BeEquivalentTo(_testSEnc);
         }
     }
 
@@ -117,16 +117,16 @@ public class SecureSessionKeysTests
     {
         // Arrange
         using (
-            var sessionKeys = new SecureSessionKeys(
-                this._testSEnc,
-                this._testSMac,
-                this._testSrMac,
-                this._testDek
+            SecureSessionKeys sessionKeys = new SecureSessionKeys(
+                _testSEnc,
+                _testSMac,
+                _testSrMac,
+                _testDek
             )
         )
         {
             // Act
-            var result = sessionKeys.UseSMac(key => key.Length);
+            int result = sessionKeys.UseSMac(key => key.Length);
 
             // Assert
             _ = result.Should().Be(8);
@@ -141,15 +141,15 @@ public class SecureSessionKeysTests
     {
         // Arrange
         using (
-            var sessionKeys = new SecureSessionKeys(
-                this._testSEnc,
-                this._testSMac,
-                this._testSrMac,
+            SecureSessionKeys sessionKeys = new SecureSessionKeys(
+                _testSEnc,
+                _testSMac,
+                _testSrMac,
                 null
             )
         )
         {
-            var executed = false;
+            bool executed = false;
             byte[]? receivedKey = null;
 
             // Act
@@ -173,22 +173,22 @@ public class SecureSessionKeysTests
     {
         // Arrange
         using (
-            var secureKeys = new SecureSessionKeys(
-                this._testSEnc,
-                this._testSMac,
-                this._testSrMac,
-                this._testDek
+            SecureSessionKeys secureKeys = new SecureSessionKeys(
+                _testSEnc,
+                _testSMac,
+                _testSrMac,
+                _testDek
             )
         )
         {
             // Act
-            var legacyKeys = secureKeys.ToSessionKeys();
+            SessionKeys? legacyKeys = secureKeys.ToSessionKeys();
 
             // Assert
-            _ = legacyKeys.SEnc.Should().BeEquivalentTo(this._testSEnc);
-            _ = legacyKeys.SMac.Should().BeEquivalentTo(this._testSMac);
-            _ = legacyKeys.SrMac.Should().BeEquivalentTo(this._testSrMac);
-            _ = legacyKeys.Dek.Should().BeEquivalentTo(this._testDek);
+            _ = legacyKeys.SEnc.Should().BeEquivalentTo(_testSEnc);
+            _ = legacyKeys.SMac.Should().BeEquivalentTo(_testSMac);
+            _ = legacyKeys.SrMac.Should().BeEquivalentTo(_testSrMac);
+            _ = legacyKeys.Dek.Should().BeEquivalentTo(_testDek);
         }
     }
 
@@ -199,27 +199,27 @@ public class SecureSessionKeysTests
     public void AfterDispose_OperationsThrow()
     {
         // Arrange
-        var sessionKeys = new SecureSessionKeys(
-            this._testSEnc,
-            this._testSMac,
-            this._testSrMac,
-            this._testDek
+        SecureSessionKeys sessionKeys = new SecureSessionKeys(
+            _testSEnc,
+            _testSMac,
+            _testSrMac,
+            _testDek
         );
         sessionKeys.Dispose();
 
         // Act & Assert
-        var act1 = () => sessionKeys.UseSEnc(k => { });
+        Action act1 = () => sessionKeys.UseSEnc(k => { });
         _ = act1.Should().ThrowExactly<ObjectDisposedException>();
-            
-        var act2 = () => sessionKeys.UseSMac(k => { });
+
+        Action act2 = () => sessionKeys.UseSMac(k => { });
         _ = act2.Should().ThrowExactly<ObjectDisposedException>();
-            
-        var act3 = () => sessionKeys.UseSrMac(k => { });
+
+        Action act3 = () => sessionKeys.UseSrMac(k => { });
         _ = act3.Should().ThrowExactly<ObjectDisposedException>();
-            
-        var act4 = () => sessionKeys.UseDek(k => { });
+
+        Action act4 = () => sessionKeys.UseDek(k => { });
         _ = act4.Should().ThrowExactly<ObjectDisposedException>();
-            
+
         Action act5 = () => sessionKeys.ToSessionKeys();
         _ = act5.Should().ThrowExactly<ObjectDisposedException>();
     }
@@ -231,12 +231,12 @@ public class SecureSessionKeysTests
     public void Constructor_MakesDefensiveCopies()
     {
         // Arrange
-        var originalSEnc = new byte[] { 0x01, 0x02, 0x03, 0x04 };
-        var originalSMac = new byte[] { 0x11, 0x12, 0x13, 0x14 };
-        var originalSrMac = new byte[] { 0x21, 0x22, 0x23, 0x24 };
+        byte[] originalSEnc = [0x01, 0x02, 0x03, 0x04];
+        byte[] originalSMac = [0x11, 0x12, 0x13, 0x14];
+        byte[] originalSrMac = [0x21, 0x22, 0x23, 0x24];
 
         using (
-            var sessionKeys = new SecureSessionKeys(
+            SecureSessionKeys sessionKeys = new SecureSessionKeys(
                 originalSEnc,
                 originalSMac,
                 originalSrMac,

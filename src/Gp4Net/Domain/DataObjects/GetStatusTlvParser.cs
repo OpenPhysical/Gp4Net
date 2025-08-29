@@ -43,15 +43,15 @@ public static class GetStatusTlvParser
 
         try
         {
-            var tlvObjects = TlvParser.ParseAll(responseData);
-            var applications = ImmutableList.CreateBuilder<ApplicationInfo>();
+            IReadOnlyList<TlvObject> tlvObjects = TlvParser.ParseAll(responseData);
+            ImmutableList<ApplicationInfo>.Builder applications = ImmutableList.CreateBuilder<ApplicationInfo>();
 
-            foreach (var tlv in tlvObjects)
+            foreach (TlvObject tlv in tlvObjects)
             {
-                var tagNumber = tlv.GetTagNumber();
+                Result<uint, SmartCardError> tagNumber = tlv.GetTagNumber();
                 if (tagNumber.IsSuccess && tagNumber.Value == TAG_GP_REGISTRY_DATA)
                 {
-                    var appResult = ParseApplicationFromRegistryData(tlv);
+                    Result<ApplicationInfo, SmartCardError> appResult = ParseApplicationFromRegistryData(tlv);
                     if (appResult.IsSuccess)
                     {
                         applications.Add(appResult.Value);
@@ -85,17 +85,17 @@ public static class GetStatusTlvParser
 
         try
         {
-            var tlvObjects = TlvParser.ParseAll(responseData);
-            var loadFiles = ImmutableList.CreateBuilder<ExecutableLoadFile>();
+            IReadOnlyList<TlvObject> tlvObjects = TlvParser.ParseAll(responseData);
+            ImmutableList<ExecutableLoadFile>.Builder loadFiles = ImmutableList.CreateBuilder<ExecutableLoadFile>();
 
-            foreach (var tlv in tlvObjects)
+            foreach (TlvObject tlv in tlvObjects)
             {
-                var tagResult = tlv.GetTagNumber();
+                Result<uint, SmartCardError> tagResult = tlv.GetTagNumber();
                 if (tagResult.IsFailure) continue; // Skip invalid tags
-                
+
                 if (tagResult.Value == TAG_GP_REGISTRY_DATA)
                 {
-                    var loadFileResult = ParseLoadFileFromRegistryData(tlv);
+                    Result<ExecutableLoadFile, SmartCardError> loadFileResult = ParseLoadFileFromRegistryData(tlv);
                     if (loadFileResult.IsSuccess)
                     {
                         loadFiles.Add(loadFileResult.Value);
@@ -118,18 +118,18 @@ public static class GetStatusTlvParser
     /// </summary>
     private static Result<ApplicationInfo, SmartCardError> ParseApplicationFromRegistryData(TlvObject registryTlv)
     {
-        var nestedTlvs = registryTlv.ParseNestedTlv();
-        
+        IReadOnlyList<TlvObject> nestedTlvs = registryTlv.ParseNestedTlv();
+
         // Extract required fields
-        var aidTlv = Maybe<TlvObject>.None;
-        var lifecycleTlv = Maybe<TlvObject>.None;
-        var privilegesTlv = Maybe<TlvObject>.None;
-        
-        foreach (var tlv in nestedTlvs)
+        Maybe<TlvObject> aidTlv = Maybe<TlvObject>.None;
+        Maybe<TlvObject> lifecycleTlv = Maybe<TlvObject>.None;
+        Maybe<TlvObject> privilegesTlv = Maybe<TlvObject>.None;
+
+        foreach (TlvObject tlv in nestedTlvs)
         {
-            var tagResult = tlv.GetTagNumber();
+            Result<uint, SmartCardError> tagResult = tlv.GetTagNumber();
             if (tagResult.IsFailure) continue;
-            
+
             switch (tagResult.Value)
             {
                 case TAG_AID:
@@ -157,24 +157,24 @@ public static class GetStatusTlvParser
         }
 
         // Parse lifecycle state
-        var lifecycleState = ParseLifecycleState(lifecycleTlv.Value.Value);
+        Result<LifecycleState, SmartCardError> lifecycleState = ParseLifecycleState(lifecycleTlv.Value.Value);
         if (lifecycleState.IsFailure)
         {
             return Result.Failure<ApplicationInfo, SmartCardError>(lifecycleState.Error);
         }
 
         // Parse privileges - use empty array if not present
-        var privilegesData = privilegesTlv.HasValue ? privilegesTlv.Value.Value : [];
-        var privileges = ParsePrivileges(privilegesData);
+        byte[] privilegesData = privilegesTlv.HasValue ? privilegesTlv.Value.Value : [];
+        ImmutableList<Privilege> privileges = ParsePrivileges(privilegesData);
 
         // Determine application type from privileges
-        var appType = DetermineApplicationType(privileges);
+        ApplicationType appType = DetermineApplicationType(privileges);
 
         // Extract optional fields
-        var associatedSecurityDomain = Maybe<byte[]>.None;
-        foreach (var tlv in nestedTlvs)
+        Maybe<byte[]> associatedSecurityDomain = Maybe<byte[]>.None;
+        foreach (TlvObject tlv in nestedTlvs)
         {
-            var tagResult = tlv.GetTagNumber();
+            Result<uint, SmartCardError> tagResult = tlv.GetTagNumber();
             if (tagResult.IsSuccess && tagResult.Value == TAG_ASSOCIATED_SECURITY_DOMAIN)
             {
                 associatedSecurityDomain = Maybe<byte[]>.From((byte[])tlv.Value.Clone());
@@ -197,11 +197,11 @@ public static class GetStatusTlvParser
     /// </summary>
     private static Result<ExecutableLoadFile, SmartCardError> ParseLoadFileFromRegistryData(TlvObject registryTlv)
     {
-        var nestedTlvs = registryTlv.ParseNestedTlv();
-        
+        IReadOnlyList<TlvObject> nestedTlvs = registryTlv.ParseNestedTlv();
+
         // Extract required fields using functional approach
-        var aidTlvMaybe = FindTlvByTag(nestedTlvs, (ushort)TAG_AID);
-        var lifecycleTlvMaybe = FindTlvByTag(nestedTlvs, (ushort)TAG_LIFECYCLE_STATE);
+        Maybe<TlvObject> aidTlvMaybe = FindTlvByTag(nestedTlvs, (ushort)TAG_AID);
+        Maybe<TlvObject> lifecycleTlvMaybe = FindTlvByTag(nestedTlvs, (ushort)TAG_LIFECYCLE_STATE);
 
         if (aidTlvMaybe.HasNoValue)
         {
@@ -214,40 +214,40 @@ public static class GetStatusTlvParser
             return Result.Failure<ExecutableLoadFile, SmartCardError>(
                 SmartCardError.InvalidData("Lifecycle state (tag 9F70) not found in registry data"));
         }
-        
-        var aidTlv = aidTlvMaybe.Value;
-        var lifecycleTlv = lifecycleTlvMaybe.Value;
+
+        TlvObject aidTlv = aidTlvMaybe.Value;
+        TlvObject lifecycleTlv = lifecycleTlvMaybe.Value;
 
         // Parse lifecycle state
-        var lifecycleState = ParseLifecycleState(lifecycleTlv.Value);
+        Result<LifecycleState, SmartCardError> lifecycleState = ParseLifecycleState(lifecycleTlv.Value);
         if (lifecycleState.IsFailure)
         {
             return Result.Failure<ExecutableLoadFile, SmartCardError>(lifecycleState.Error);
         }
 
         // Parse version if available
-        var versionTlvMaybe = FindTlvByTag(nestedTlvs, (ushort)TAG_LOAD_FILE_VERSION);
-        var version = versionTlvMaybe.HasValue 
+        Maybe<TlvObject> versionTlvMaybe = FindTlvByTag(nestedTlvs, (ushort)TAG_LOAD_FILE_VERSION);
+        Maybe<string> version = versionTlvMaybe.HasValue
             ? Maybe<string>.From(ParseVersionString(versionTlvMaybe.Value.Value))
             : Maybe<string>.None;
 
         // Parse executable modules
-        var moduleTlvs = nestedTlvs.Where(t => 
+        IEnumerable<TlvObject> moduleTlvs = nestedTlvs.Where(t =>
         {
-            var tagResult = t.GetTagNumber();
+            Result<uint, SmartCardError> tagResult = t.GetTagNumber();
             return tagResult.IsSuccess && tagResult.Value == (ushort)TAG_EXECUTABLE_MODULE_AID;
         });
-        var modules = ImmutableList.CreateBuilder<ExecutableModule>();
-        
-        foreach (var moduleTlv in moduleTlvs)
+        ImmutableList<ExecutableModule>.Builder modules = ImmutableList.CreateBuilder<ExecutableModule>();
+
+        foreach (TlvObject moduleTlv in moduleTlvs)
         {
             modules.Add(new ExecutableModule(
                 Aid: (byte[])moduleTlv.Value.Clone()));
         }
 
         // Extract associated security domain
-        var associatedSdTlvMaybe = FindTlvByTag(nestedTlvs, (ushort)TAG_ASSOCIATED_SECURITY_DOMAIN);
-        var associatedSecurityDomain = associatedSdTlvMaybe.HasValue 
+        Maybe<TlvObject> associatedSdTlvMaybe = FindTlvByTag(nestedTlvs, (ushort)TAG_ASSOCIATED_SECURITY_DOMAIN);
+        Maybe<byte[]> associatedSecurityDomain = associatedSdTlvMaybe.HasValue
             ? Maybe<byte[]>.From((byte[])associatedSdTlvMaybe.Value.Value.Clone())
             : Maybe<byte[]>.None;
 
@@ -271,8 +271,8 @@ public static class GetStatusTlvParser
                 SmartCardError.InvalidData("Lifecycle state value is empty"));
         }
 
-        var stateValue = stateBytes[0];
-        var lifecycleState = stateValue switch
+        byte stateValue = stateBytes[0];
+        LifecycleState lifecycleState = stateValue switch
         {
             0x01 => LifecycleState.Loaded,
             0x03 => LifecycleState.Installed,
@@ -297,13 +297,13 @@ public static class GetStatusTlvParser
             return ImmutableList<Privilege>.Empty;
         }
 
-        var privileges = ImmutableList.CreateBuilder<Privilege>();
+        ImmutableList<Privilege>.Builder privileges = ImmutableList.CreateBuilder<Privilege>();
 
         // Parse first byte of privileges per GP specification (byte 0 = bits 7-0)
         if (privilegeBytes.Length >= 1)
         {
-            var byte1 = privilegeBytes[0];
-            
+            byte byte1 = privilegeBytes[0];
+
             if ((byte1 & 0x80) != 0) privileges.Add(Privilege.SecurityDomain);
             if ((byte1 & 0x40) != 0) privileges.Add(Privilege.DapVerification);
             if ((byte1 & 0x20) != 0) privileges.Add(Privilege.DelegatedManagement);
@@ -317,7 +317,7 @@ public static class GetStatusTlvParser
         // Parse second byte if present (byte 1 = bits 15-8)
         if (privilegeBytes.Length >= 2)
         {
-            var byte2 = privilegeBytes[1];
+            byte byte2 = privilegeBytes[1];
             if ((byte2 & 0x80) != 0) privileges.Add(Privilege.AuthorizedManagement);
             if ((byte2 & 0x40) != 0) privileges.Add(Privilege.TokenVerification);
             if ((byte2 & 0x20) != 0) privileges.Add(Privilege.GlobalDelete);
@@ -331,7 +331,7 @@ public static class GetStatusTlvParser
         // Third byte (byte 2 = bits 23-16) reserved for application-specific privileges
         if (privilegeBytes.Length >= 3)
         {
-            var byte3 = privilegeBytes[2];
+            byte byte3 = privilegeBytes[2];
             if ((byte3 & 0x01) != 0) privileges.Add(Privilege.MandatedDapVerification);
         }
 
@@ -381,7 +381,7 @@ public static class GetStatusTlvParser
                 return Convert.ToHexString(versionBytes);
         }
     }
-    
+
     /// <summary>
     /// Finds a TLV object by tag number using functional approach.
     /// </summary>
@@ -390,9 +390,9 @@ public static class GetStatusTlvParser
     /// <returns>Maybe containing the found TLV object.</returns>
     private static Maybe<TlvObject> FindTlvByTag(IEnumerable<TlvObject> tlvObjects, ushort targetTag)
     {
-        foreach (var tlv in tlvObjects)
+        foreach (TlvObject tlv in tlvObjects)
         {
-            var tagResult = tlv.GetTagNumber();
+            Result<uint, SmartCardError> tagResult = tlv.GetTagNumber();
             if (tagResult.IsSuccess && tagResult.Value == targetTag)
             {
                 return Maybe<TlvObject>.From(tlv);

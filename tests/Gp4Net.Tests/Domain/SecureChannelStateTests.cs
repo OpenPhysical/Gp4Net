@@ -5,6 +5,7 @@
 
 using System;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain;
@@ -24,7 +25,7 @@ public class SecureChannelStateTests
     [SetUp]
     public void SetUp()
     {
-        var testKeys = new SessionKeys(
+        SessionKeys testKeys = new SessionKeys(
             new byte[16], // S-ENC
             new byte[16], // S-MAC
             new byte[16], // S-RMAC
@@ -43,22 +44,22 @@ public class SecureChannelStateTests
     [Test]
     public void Create_ValidParameters_CreatesState()
     {
-        var macChainingState = MacChainingState.Create(_macChainingValue, ProtocolIdentifiers.Scp03, 0x00);
+        Result<MacChainingState, SmartCardError> macChainingState = MacChainingState.Create(_macChainingValue, ScpVersion.Scp03, 0x00);
         _ = macChainingState.IsSuccess.Should().BeTrue();
 
-        var result = SecureChannelState.Create(
+        Result<SecureChannelState, SmartCardError> result = SecureChannelState.Create(
             _sessionKeys,
             SecurityLevel.CMac,
-            ProtocolIdentifiers.Scp03,
+            ScpVersion.Scp03,
             _macChainingValue,
             0x00 // implementation parameter
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        var state = result.Value;
+        SecureChannelState? state = result.Value;
 
         _ = state.SecurityLevel.Should().Be(SecurityLevel.CMac);
-        _ = state.ProtocolVersion.Should().Be(ProtocolIdentifiers.Scp03);
+        _ = state.ProtocolVersion.Should().Be(ScpVersion.Scp03);
         _ = state.SessionKeys.Should().Be(_sessionKeys);
         _ = state.EncryptionCounter.Should().Be(0);
         _ = state.SessionId.Should().NotBeEmpty();
@@ -71,34 +72,34 @@ public class SecureChannelStateTests
     [Test]
     public void Create_EmptyMacChaining_ReturnsFailure()
     {
-        var result = SecureChannelState.Create(
+        Result<SecureChannelState, SmartCardError> result = SecureChannelState.Create(
             _sessionKeys,
             SecurityLevel.CMac,
-            ProtocolIdentifiers.Scp03,
+            ScpVersion.Scp03,
             [],
             0x00 // implementation parameter
         );
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<InvalidLengthError>();
-        var lengthError = (InvalidLengthError)result.Error;
+        InvalidLengthError? lengthError = (InvalidLengthError)result.Error;
         _ = lengthError.Expected.Should().Be(16); // SCP03 expects 16 bytes
     }
 
     [Test]
     public void IncrementEncryptionCounter_ReturnsNewStateWithIncrementedCounter()
     {
-        var result = SecureChannelState.Create(
+        Result<SecureChannelState, SmartCardError> result = SecureChannelState.Create(
             _sessionKeys,
             SecurityLevel.CMac,
-            ProtocolIdentifiers.Scp03,
+            ScpVersion.Scp03,
             _macChainingValue,
             0x00 // implementation parameter
         );
         _ = result.IsSuccess.Should().BeTrue();
-        var state = result.Value;
+        SecureChannelState? state = result.Value;
 
-        var newState = state.IncrementEncryptionCounter();
+        SecureChannelState? newState = state.IncrementEncryptionCounter();
 
         _ = newState.EncryptionCounter.Should().Be(1);
         _ = newState.SessionKeys.Should().Be(_sessionKeys);
@@ -111,25 +112,25 @@ public class SecureChannelStateTests
     [Test]
     public void UpdateMacChaining_ValidMacState_ReturnsNewState()
     {
-        var result = SecureChannelState.Create(
+        Result<SecureChannelState, SmartCardError> result = SecureChannelState.Create(
             _sessionKeys,
             SecurityLevel.CMac,
-            ProtocolIdentifiers.Scp03,
+            ScpVersion.Scp03,
             _macChainingValue,
             0x00 // implementation parameter
         );
         _ = result.IsSuccess.Should().BeTrue();
-        var state = result.Value;
+        SecureChannelState? state = result.Value;
 
-        var newMacChaining = new byte[16];
+        byte[] newMacChaining = new byte[16];
         Array.Fill(newMacChaining, (byte)0xFF);
-        var newMacState = MacChainingState.Create(newMacChaining, ProtocolIdentifiers.Scp03, 0x00);
+        Result<MacChainingState, SmartCardError> newMacState = MacChainingState.Create(newMacChaining, ScpVersion.Scp03, 0x00);
         _ = newMacState.IsSuccess.Should().BeTrue();
 
-        var updateResult = state.UpdateMacChaining(newMacState.Value);
+        Result<SecureChannelState, SmartCardError> updateResult = state.UpdateMacChaining(newMacState.Value);
 
         _ = updateResult.IsSuccess.Should().BeTrue();
-        var newState = updateResult.Value;
+        SecureChannelState? newState = updateResult.Value;
 
         _ = newState.MacChaining.Value.Should().Equal(newMacChaining);
         _ = newState.SessionKeys.Should().Be(_sessionKeys);
@@ -141,17 +142,17 @@ public class SecureChannelStateTests
     [Test]
     public void UpdateMacChaining_NullMacState_ReturnsFailure()
     {
-        var result = SecureChannelState.Create(
+        Result<SecureChannelState, SmartCardError> result = SecureChannelState.Create(
             _sessionKeys,
             SecurityLevel.CMac,
-            ProtocolIdentifiers.Scp03,
+            ScpVersion.Scp03,
             _macChainingValue,
             0x00 // implementation parameter
         );
         _ = result.IsSuccess.Should().BeTrue();
-        var state = result.Value;
+        SecureChannelState? state = result.Value;
 
-        var updateResult = state.UpdateMacChaining(null!);
+        Result<SecureChannelState, SmartCardError> updateResult = state.UpdateMacChaining(null!);
 
         _ = updateResult.IsFailure.Should().BeTrue();
         _ = updateResult.Error.Should().BeOfType<SmartCardError>();
@@ -162,27 +163,27 @@ public class SecureChannelStateTests
     [Test]
     public void UpdateCounterAndMac_ValidParameters_UpdatesBoth()
     {
-        var result = SecureChannelState.Create(
+        Result<SecureChannelState, SmartCardError> result = SecureChannelState.Create(
             _sessionKeys,
             SecurityLevel.CMac,
-            ProtocolIdentifiers.Scp03,
+            ScpVersion.Scp03,
             _macChainingValue,
             0x00 // implementation parameter
         );
         _ = result.IsSuccess.Should().BeTrue();
-        var state = result.Value;
+        SecureChannelState? state = result.Value;
 
-        var newMacChaining = new byte[16];
+        byte[] newMacChaining = new byte[16];
         Array.Fill(newMacChaining, (byte)0xAA);
-        var newMacState = MacChainingState.Create(newMacChaining, ProtocolIdentifiers.Scp03, 0x00);
+        Result<MacChainingState, SmartCardError> newMacState = MacChainingState.Create(newMacChaining, ScpVersion.Scp03, 0x00);
         _ = newMacState.IsSuccess.Should().BeTrue();
-        
-        var newCounter = 42u;
 
-        var updateResult = state.UpdateCounterAndMac(newCounter, newMacState.Value);
+        uint newCounter = 42u;
+
+        Result<SecureChannelState, SmartCardError> updateResult = state.UpdateCounterAndMac(newCounter, newMacState.Value);
 
         _ = updateResult.IsSuccess.Should().BeTrue();
-        var newState = updateResult.Value;
+        SecureChannelState? newState = updateResult.Value;
 
         _ = newState.EncryptionCounter.Should().Be(newCounter);
         _ = newState.MacChaining.Value.Should().Equal(newMacChaining);
@@ -196,19 +197,19 @@ public class SecureChannelStateTests
     [Test]
     public void ImmutableStatePattern_EnsuresImmutability()
     {
-        var result = SecureChannelState.Create(
+        Result<SecureChannelState, SmartCardError> result = SecureChannelState.Create(
             _sessionKeys,
             SecurityLevel.CMac,
-            ProtocolIdentifiers.Scp03,
+            ScpVersion.Scp03,
             _macChainingValue,
             0x00 // implementation parameter
         );
         _ = result.IsSuccess.Should().BeTrue();
-        var originalState = result.Value;
+        SecureChannelState? originalState = result.Value;
 
         // Perform multiple operations
-        var state1 = originalState.IncrementEncryptionCounter();
-        var state2 = state1.IncrementEncryptionCounter();
+        SecureChannelState? state1 = originalState.IncrementEncryptionCounter();
+        SecureChannelState? state2 = state1.IncrementEncryptionCounter();
 
         // Verify each state is independent
         _ = originalState.EncryptionCounter.Should().Be(0);

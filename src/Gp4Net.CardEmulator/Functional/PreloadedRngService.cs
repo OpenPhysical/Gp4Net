@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -51,7 +50,7 @@ public class PreloadedRngService : IRngService
     /// <returns>A result containing the RNG service or an error.</returns>
     public static Result<PreloadedRngService, SmartCardError> Create(IEnumerable<byte[]> entropyChunks)
     {
-        var concatenated = entropyChunks.SelectMany(chunk => chunk).ToArray();
+        byte[] concatenated = entropyChunks.SelectMany(chunk => chunk).ToArray();
         return Create(concatenated);
     }
 
@@ -83,7 +82,7 @@ public class PreloadedRngService : IRngService
             return SmartCardError.InvalidArgument($"Repetitions must be positive: {repetitions}");
         }
 
-        var entropy = Enumerable.Range(0, repetitions)
+        byte[] entropy = Enumerable.Range(0, repetitions)
             .SelectMany(_ => pattern)
             .ToArray();
 
@@ -100,7 +99,7 @@ public class PreloadedRngService : IRngService
 
         if (length == 0)
         {
-            return Result.Success<byte[], SmartCardError>(new byte[0]);
+            return Result.Success<byte[], SmartCardError>([]);
         }
 
         if (_position + length > _entropyBuffer.Count)
@@ -109,7 +108,7 @@ public class PreloadedRngService : IRngService
                 $"Insufficient entropy: requested {length} bytes, but only {_entropyBuffer.Count - _position} bytes remaining");
         }
 
-        var result = _entropyBuffer
+        byte[] result = _entropyBuffer
             .Skip(_position)
             .Take(length)
             .ToArray();

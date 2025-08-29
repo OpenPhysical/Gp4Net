@@ -48,7 +48,7 @@ public static class CplcDateParser
     /// <returns>Formatted date string or indication of invalid date.</returns>
     public static string FormatDate(ushort cplcDate)
     {
-        var date = ParseDate(cplcDate);
+        Maybe<DateTime> date = ParseDate(cplcDate);
         if (date.HasValue)
         {
             return date.Value.ToString("yyyy-MM-dd");
@@ -84,7 +84,7 @@ public static class CplcDateParser
             throw new ArgumentException("Date cannot be before January 1, 2000", nameof(date));
         }
 
-        var days = (date - BaseDate).Days;
+        int days = (date - BaseDate).Days;
         if (days > 0xFFFE) // Reserve 0xFFFF for invalid
         {
             throw new ArgumentException(
@@ -104,7 +104,7 @@ public static class CplcDateParser
     /// <returns>Formatted string for display.</returns>
     public static string FormatDateField(string fieldName, ushort dateValue)
     {
-        var dateStr = FormatDate(dateValue);
+        string dateStr = FormatDate(dateValue);
         return $"{fieldName}: {dateValue:X4} {dateStr}";
     }
 }

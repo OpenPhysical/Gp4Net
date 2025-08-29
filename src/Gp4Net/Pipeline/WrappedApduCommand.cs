@@ -17,12 +17,12 @@ public sealed record WrappedApduCommand : ICompleteApduCommand
     /// The original unwrapped command.
     /// </summary>
     public IApduCommand OriginalCommand { get; }
-    
+
     /// <summary>
     /// The complete wrapped command bytes including security.
     /// </summary>
     public byte[] WrappedBytes { get; }
-    
+
     /// <summary>
     /// Private constructor for successful creation.
     /// </summary>
@@ -39,7 +39,7 @@ public sealed record WrappedApduCommand : ICompleteApduCommand
     /// <param name="wrappedBytes">The secured command bytes.</param>
     /// <returns>A result containing the wrapped command or an error.</returns>
     public static Result<WrappedApduCommand, SmartCardError> Create(
-        IApduCommand originalCommand, 
+        IApduCommand originalCommand,
         byte[] wrappedBytes)
     {
         if (originalCommand == null)
@@ -53,7 +53,7 @@ public sealed record WrappedApduCommand : ICompleteApduCommand
             return Result.Failure<WrappedApduCommand, SmartCardError>(
                 SmartCardError.InvalidArgument("Wrapped bytes cannot be null"));
         }
-        
+
         if (wrappedBytes.Length < 4)
         {
             return Result.Failure<WrappedApduCommand, SmartCardError>(
@@ -91,28 +91,28 @@ public sealed record WrappedApduCommand : ICompleteApduCommand
                     return [];
             }
 
-            var lc = WrappedBytes[4];
+            byte lc = WrappedBytes[4];
             switch (lc)
             {
                 case 0 when WrappedBytes.Length > 6:
-                {
-                    // Extended length
-                    var extendedLc = (WrappedBytes[5] << 8) | WrappedBytes[6];
-                    if (WrappedBytes.Length >= 7 + extendedLc)
                     {
-                        var data = new byte[extendedLc];
-                        Array.Copy(WrappedBytes, 7, data, 0, extendedLc);
+                        // Extended length
+                        int extendedLc = (WrappedBytes[5] << 8) | WrappedBytes[6];
+                        if (WrappedBytes.Length >= 7 + extendedLc)
+                        {
+                            byte[] data = new byte[extendedLc];
+                            Array.Copy(WrappedBytes, 7, data, 0, extendedLc);
+                            return data;
+                        }
+                        break;
+                    }
+                case > 0 when WrappedBytes.Length >= 5 + lc:
+                    {
+                        // Standard length
+                        byte[] data = new byte[lc];
+                        Array.Copy(WrappedBytes, 5, data, 0, lc);
                         return data;
                     }
-                    break;
-                }
-                case > 0 when WrappedBytes.Length >= 5 + lc:
-                {
-                    // Standard length
-                    var data = new byte[lc];
-                    Array.Copy(WrappedBytes, 5, data, 0, lc);
-                    return data;
-                }
             }
 
             return [];
@@ -125,13 +125,13 @@ public sealed record WrappedApduCommand : ICompleteApduCommand
         get
         {
             if (WrappedBytes.Length <= 4) return Maybe<int>.None;
-            
-            var hasData = Data.Length > 0;
-            
+
+            bool hasData = Data.Length > 0;
+
             if (hasData)
             {
-                var lc = WrappedBytes[4];
-                var dataEndIndex = lc == 0 ? 7 + ((WrappedBytes[5] << 8) | WrappedBytes[6]) : 5 + lc;
+                byte lc = WrappedBytes[4];
+                int dataEndIndex = lc == 0 ? 7 + ((WrappedBytes[5] << 8) | WrappedBytes[6]) : 5 + lc;
                 if (WrappedBytes.Length > dataEndIndex)
                 {
                     return Maybe<int>.From(WrappedBytes[dataEndIndex] == 0 ? 256 : WrappedBytes[dataEndIndex]);
@@ -141,7 +141,7 @@ public sealed record WrappedApduCommand : ICompleteApduCommand
             {
                 return Maybe<int>.From(WrappedBytes[4] == 0 ? 256 : WrappedBytes[4]);
             }
-            
+
             return Maybe<int>.None;
         }
     }

@@ -104,7 +104,7 @@ public enum ApplicationType : byte
     /// Load file (package).
     /// </summary>
     LoadFile = 0x01,
-        
+
     /// <summary>
     /// Executable load file.
     /// </summary>

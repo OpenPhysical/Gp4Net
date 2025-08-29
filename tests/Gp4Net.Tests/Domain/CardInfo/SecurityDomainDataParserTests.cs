@@ -12,10 +12,10 @@ public class SecurityDomainDataParserTests
     public void Decode_WithA5Tag_ParsesMaxApduSize()
     {
         // Arrange - A5 tag with 9F65 (Max APDU size = 255)
-        var data = Convert.FromHexString("A5089F650200FF9F6E0107");
+        byte[] data = Convert.FromHexString("A5089F650200FF9F6E0107");
 
         // Act
-        var result = SecurityDomainDataParser.Decode(data);
+        string? result = SecurityDomainDataParser.Decode(data);
 
         // Assert
         _ = result.Should().Contain("Max APDU: 255 bytes");
@@ -25,10 +25,10 @@ public class SecurityDomainDataParserTests
     public void Decode_WithA5Tag_ParsesLifecycleState()
     {
         // Arrange - A5 tag with 9F6E (Lifecycle = Selectable)
-        var data = Convert.FromHexString("A5049F6E0107");
+        byte[] data = Convert.FromHexString("A5049F6E0107");
 
         // Act
-        var result = SecurityDomainDataParser.Decode(data);
+        string? result = SecurityDomainDataParser.Decode(data);
 
         // Assert
         _ = result.Should().Contain("Lifecycle: Selectable");
@@ -38,10 +38,10 @@ public class SecurityDomainDataParserTests
     public void Decode_WithMultipleTags_ParsesAllValues()
     {
         // Arrange - A5 tag with both Max APDU and Lifecycle
-        var data = Convert.FromHexString("A50A9F650200FF9F6E010F");
+        byte[] data = Convert.FromHexString("A50A9F650200FF9F6E010F");
 
         // Act
-        var result = SecurityDomainDataParser.Decode(data);
+        string? result = SecurityDomainDataParser.Decode(data);
 
         // Assert
         _ = result.Should().Contain("Max APDU: 255 bytes");
@@ -58,10 +58,10 @@ public class SecurityDomainDataParserTests
     public void Decode_RecognizesAllLifecycleStates(string stateHex, string expectedState)
     {
         // Arrange
-        var data = Convert.FromHexString($"A5049F6E01{stateHex}");
+        byte[] data = Convert.FromHexString($"A5049F6E01{stateHex}");
 
         // Act
-        var result = SecurityDomainDataParser.Decode(data);
+        string? result = SecurityDomainDataParser.Decode(data);
 
         // Assert
         _ = result.Should().Contain($"Lifecycle: {expectedState}");
@@ -71,10 +71,10 @@ public class SecurityDomainDataParserTests
     public void Decode_WithUnknownLifecycleState_ShowsHexValue()
     {
         // Arrange - Unknown lifecycle state 0xAB
-        var data = Convert.FromHexString("A5049F6E01AB");
+        byte[] data = Convert.FromHexString("A5049F6E01AB");
 
         // Act
-        var result = SecurityDomainDataParser.Decode(data);
+        string? result = SecurityDomainDataParser.Decode(data);
 
         // Assert
         _ = result.Should().Contain("Lifecycle: 0xAB");
@@ -84,10 +84,10 @@ public class SecurityDomainDataParserTests
     public void Decode_WithUnknownTag_ShowsTagAndValue()
     {
         // Arrange - Unknown tag 9F99
-        var data = Convert.FromHexString("A5069F9903112233");
+        byte[] data = Convert.FromHexString("A5069F9903112233");
 
         // Act
-        var result = SecurityDomainDataParser.Decode(data);
+        string? result = SecurityDomainDataParser.Decode(data);
 
         // Assert
         _ = result.Should().Contain("Tag 9F99: 112233");
@@ -97,10 +97,10 @@ public class SecurityDomainDataParserTests
     public void Decode_WithNonA5Tag_ReturnsHexString()
     {
         // Arrange - Data not starting with A5
-        var data = Convert.FromHexString("B5041122");
+        byte[] data = Convert.FromHexString("B5041122");
 
         // Act
-        var result = SecurityDomainDataParser.Decode(data);
+        string? result = SecurityDomainDataParser.Decode(data);
 
         // Assert
         _ = result.Should().BeEquivalentTo("B5041122");
@@ -110,10 +110,10 @@ public class SecurityDomainDataParserTests
     public void Decode_WithEmptyData_ReturnsEmptyString()
     {
         // Arrange
-        var data = Array.Empty<byte>();
+        byte[] data = [];
 
         // Act
-        var result = SecurityDomainDataParser.Decode(data);
+        string? result = SecurityDomainDataParser.Decode(data);
 
         // Assert
         _ = result.Should().BeEquivalentTo(string.Empty);
@@ -123,7 +123,7 @@ public class SecurityDomainDataParserTests
     public void Decode_WithNullData_ReturnsEmptyString()
     {
         // Act
-        var result = SecurityDomainDataParser.Decode(null);
+        string? result = SecurityDomainDataParser.Decode(null);
 
         // Assert
         _ = result.Should().BeEquivalentTo(string.Empty);
@@ -133,10 +133,10 @@ public class SecurityDomainDataParserTests
     public void Decode_WithMalformedTlv_ReturnsHexString()
     {
         // Arrange - A5 with invalid length
-        var data = Convert.FromHexString("A5FF112233");
+        byte[] data = Convert.FromHexString("A5FF112233");
 
         // Act
-        var result = SecurityDomainDataParser.Decode(data);
+        string? result = SecurityDomainDataParser.Decode(data);
 
         // Assert
         _ = result.Should().BeEquivalentTo("A5FF112233");

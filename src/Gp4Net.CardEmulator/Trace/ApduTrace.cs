@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.CardEmulator.Core;
 
 namespace Gp4Net.CardEmulator.Trace;
@@ -103,13 +105,24 @@ public class ApduExchange
     }
 
     /// <summary>
-    /// Initializes a new instance of the ApduExchange class.
+    /// Private constructor for ApduExchange class.
+    /// Use Create factory method instead.
     /// </summary>
-    public ApduExchange(byte[] command, ApduResponse? response = null)
+    private ApduExchange(byte[] command, Maybe<ApduResponse> response)
     {
-        Command = command ?? throw new ArgumentNullException(nameof(command));
-        Response = response;
+        Command = command;
+        Response = response.Match(r => r, () => null);
         Timestamp = DateTime.UtcNow;
+    }
+    
+    /// <summary>
+    /// Creates a new ApduExchange instance with validation.
+    /// </summary>
+    public static Result<ApduExchange, SmartCardError> Create(byte[] command, Maybe<ApduResponse> response = default)
+    {
+        return Maybe<byte[]>.From(command)
+            .ToResult(SmartCardError.InvalidArgument("Command cannot be null"))
+            .Map(cmd => new ApduExchange(cmd, response));
     }
 
     /// <summary>
@@ -128,7 +141,7 @@ public class ApduExchange
         if (Response == null)
             return "No response";
 
-        var data =
+        string data =
             Response.Data is { Length: > 0 }
                 ? BitConverter.ToString(Response.Data).Replace("-", " ") + " "
                 : "";

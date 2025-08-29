@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
-using Gp4Net.Core;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Core.Tlv;
@@ -47,30 +46,30 @@ public static class TlvParser
 
         try
         {
-            var offset = startOffset;
+            int offset = startOffset;
 
             // Parse tag
-            var tagMaybe = ParseTag(data, ref offset);
+            Maybe<byte[]> tagMaybe = ParseTag(data, ref offset);
             if (!tagMaybe.HasValue || offset >= data.Length)
             {
                 return Maybe<TlvObject>.None;
             }
 
             // Parse length
-            var lengthMaybe = ParseLength(data, ref offset);
+            Maybe<int> lengthMaybe = ParseLength(data, ref offset);
             if (!lengthMaybe.HasValue || offset + lengthMaybe.Value > data.Length)
             {
                 return Maybe<TlvObject>.None;
             }
 
             // Extract value - additional safety check before array allocation
-            var length = lengthMaybe.Value;
+            int length = lengthMaybe.Value;
             if (length < 0 || length > TlvConstants.MaxTlvValueSize)
             {
                 return Maybe<TlvObject>.None;
             }
 
-            var value = new byte[length];
+            byte[] value = new byte[length];
             if (length > 0)
             {
                 Array.Copy(data, offset, value, 0, length);
@@ -92,17 +91,17 @@ public static class TlvParser
     /// <returns>A collection of parsed TLV objects.</returns>
     public static IReadOnlyList<TlvObject> ParseAll(byte[] data)
     {
-        var result = new List<TlvObject>();
+        List<TlvObject> result = [];
 
         if (data == null || data.Length == 0)
         {
             return result;
         }
 
-        var offset = 0;
+        int offset = 0;
         while (offset < data.Length)
         {
-            var tlvMaybe = ParseSingle(data, offset, out var consumed);
+            Maybe<TlvObject> tlvMaybe = ParseSingle(data, offset, out int consumed);
             if (!tlvMaybe.HasValue || consumed == 0)
             {
                 break;
@@ -128,8 +127,8 @@ public static class TlvParser
             return Maybe<TlvObject>.None;
         }
 
-        var allTlv = ParseAll(data);
-        var found = allTlv.FirstOrDefault(tlv => tlv.Tag.SequenceEqual(tag));
+        IReadOnlyList<TlvObject> allTlv = ParseAll(data);
+        TlvObject found = allTlv.FirstOrDefault(tlv => tlv.Tag.SequenceEqual(tag));
         return found != null ? Maybe<TlvObject>.From(found) : Maybe<TlvObject>.None;
     }
 
@@ -165,7 +164,7 @@ public static class TlvParser
             return Maybe<byte[]>.None;
         }
 
-        var tagBytes = new List<byte> { data[offset++] };
+        List<byte> tagBytes = [data[offset++]];
 
         // Check if this is a multi-byte tag
         if (
@@ -196,7 +195,7 @@ public static class TlvParser
             return Maybe<int>.None;
         }
 
-        var firstByte = data[offset++];
+        byte firstByte = data[offset++];
 
         // GP Card Specification v2.3.1: GP-specific extension where 0x80 alone means length 128
         // References: Install Token, Make Selectable Token, Extradition Token, Registry Update Token sections
@@ -214,7 +213,7 @@ public static class TlvParser
         }
 
         // Long form
-        var lengthBytes = firstByte & TlvConstants.LengthBytesMask;
+        int lengthBytes = firstByte & TlvConstants.LengthBytesMask;
         if (lengthBytes == 0 || offset + lengthBytes > data.Length)
         {
             return Maybe<int>.None;
@@ -226,8 +225,8 @@ public static class TlvParser
             return Maybe<int>.None;
         }
 
-        var length = 0;
-        for (var i = 0; i < lengthBytes; i++)
+        int length = 0;
+        for (int i = 0; i < lengthBytes; i++)
         {
             // Security check: Detect integer overflow before it happens
             if (length > (int.MaxValue >> 8))
@@ -261,7 +260,7 @@ public static class TlvParser
 
         // Functional fold operation instead of imperative foreach
         uint result = tag.Aggregate(0u, (acc, b) => (acc << 8) | b);
-        
+
         return Result.Success<uint, SmartCardError>(result);
     }
 
@@ -356,11 +355,11 @@ public class TlvObject
         if (tag is null)
             return Result.Failure<TlvObject, SmartCardError>(
                 new NullParameterError("tag"));
-        
+
         if (value is null)
             return Result.Failure<TlvObject, SmartCardError>(
                 new NullParameterError("value"));
-        
+
         return Result.Success<TlvObject, SmartCardError>(new TlvObject(tag, value));
     }
 
@@ -394,7 +393,7 @@ public class TlvObject
         }
 
         uint result = 0;
-        foreach (var b in Value)
+        foreach (byte b in Value)
         {
             result = (result << 8) | b;
         }

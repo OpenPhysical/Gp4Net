@@ -1,138 +1,187 @@
 using System;
-using Gp4Net.Tool.Services;
+using System.Collections.Generic;
+using System.Linq;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
+using Gp4Net.Pipeline;
 
 namespace Gp4Net.Tests.TestBuilders;
 
 /// <summary>
-/// Builder pattern for creating CardResponse instances for testing.
+/// Builder pattern for creating CommandResponse instances for testing.
+/// Preserves all original functionality while adapting to new CommandResponse type.
 /// </summary>
-public class CardResponseBuilder
+public class CommandResponseBuilder
 {
-    private byte[] _data = [];
-    private ushort _statusWord = 0x9000;
+    private readonly byte[] _data;
+    private readonly StatusWord _statusWord;
+    private readonly IPipelineContext _context;
+    private readonly IReadOnlyDictionary<string, object> _metadata;
+
+    /// <summary>
+    /// Initializes a new CommandResponseBuilder with default values.
+    /// </summary>
+    public CommandResponseBuilder()
+    {
+        _data = [];
+        _statusWord = 0x9000;
+        _context = ImmutablePipelineContext.Empty;
+        _metadata = new Dictionary<string, object>();
+    }
+
+    private CommandResponseBuilder(
+        byte[] data,
+        StatusWord statusWord,
+        IPipelineContext context,
+        IReadOnlyDictionary<string, object> metadata)
+    {
+        _data = data;
+        _statusWord = statusWord;
+        _context = context;
+        _metadata = metadata;
+    }
 
     /// <summary>
     /// Sets the response data.
     /// </summary>
-    public CardResponseBuilder WithData(params byte[] data)
+    public CommandResponseBuilder WithData(params byte[] data)
     {
-        _data = data;
-        return this;
+        return new CommandResponseBuilder(data, _statusWord, _context, _metadata);
     }
 
     /// <summary>
     /// Sets the response data from a hex string.
     /// </summary>
-    public CardResponseBuilder WithDataFromHex(string hexData)
+    public CommandResponseBuilder WithDataFromHex(string hexData)
     {
-        _data = ConvertFromHexString(hexData);
-        return this;
+        return Maybe<string>.From(hexData)
+            .Where(hex => !string.IsNullOrWhiteSpace(hex))
+            .Bind(hex => ConvertFromHexString(hex).ToMaybe())
+            .Match(
+                data => new CommandResponseBuilder(data, _statusWord, _context, _metadata),
+                () => new CommandResponseBuilder([], _statusWord, _context, _metadata));
     }
 
     /// <summary>
     /// Sets the status word.
     /// </summary>
-    public CardResponseBuilder WithStatusWord(ushort statusWord)
+    public CommandResponseBuilder WithStatusWord(ushort statusWord)
     {
-        _statusWord = statusWord;
-        return this;
+        return new CommandResponseBuilder(_data, statusWord, _context, _metadata);
     }
 
     /// <summary>
     /// Sets the status word from SW1 and SW2 bytes.
     /// </summary>
-    public CardResponseBuilder WithStatusBytes(byte sw1, byte sw2)
+    public CommandResponseBuilder WithStatusBytes(byte sw1, byte sw2)
     {
-        _statusWord = (ushort)((sw1 << 8) | sw2);
-        return this;
+        ushort statusWord = (ushort)((sw1 << 8) | sw2);
+        return new CommandResponseBuilder(_data, statusWord, _context, _metadata);
     }
 
     /// <summary>
     /// Sets a success status (90 00).
     /// </summary>
-    public CardResponseBuilder WithSuccessStatus()
+    public CommandResponseBuilder WithSuccessStatus()
     {
-        _statusWord = 0x9000;
-        return this;
+        return new CommandResponseBuilder(_data, 0x9000, _context, _metadata);
     }
 
     /// <summary>
     /// Sets a warning status (62 XX or 63 XX).
     /// </summary>
-    public CardResponseBuilder WithWarningStatus(byte sw2 = 0x00)
+    public CommandResponseBuilder WithWarningStatus(byte sw2 = 0x00)
     {
-        _statusWord = (ushort)(0x6200 | sw2);
-        return this;
+        ushort statusWord = (ushort)(0x6200 | sw2);
+        return new CommandResponseBuilder(_data, statusWord, _context, _metadata);
     }
 
     /// <summary>
     /// Sets an error status (6X XX where X > 3).
     /// </summary>
-    public CardResponseBuilder WithErrorStatus(byte sw1 = 0x6A, byte sw2 = 0x82)
+    public CommandResponseBuilder WithErrorStatus(byte sw1 = 0x6A, byte sw2 = 0x82)
     {
-        _statusWord = (ushort)((sw1 << 8) | sw2);
-        return this;
+        ushort statusWord = (ushort)((sw1 << 8) | sw2);
+        return new CommandResponseBuilder(_data, statusWord, _context, _metadata);
     }
 
     /// <summary>
     /// Sets a "more data available" status (61 XX).
     /// </summary>
-    public CardResponseBuilder WithMoreDataAvailable(byte remainingBytes)
+    public CommandResponseBuilder WithMoreDataAvailable(byte remainingBytes)
     {
-        _statusWord = (ushort)(0x6100 | remainingBytes);
-        return this;
+        ushort statusWord = (ushort)(0x6100 | remainingBytes);
+        return new CommandResponseBuilder(_data, statusWord, _context, _metadata);
     }
 
     /// <summary>
     /// Sets a security status not satisfied error (69 82).
     /// </summary>
-    public CardResponseBuilder WithSecurityNotSatisfied()
+    public CommandResponseBuilder WithSecurityNotSatisfied()
     {
-        _statusWord = 0x6982;
-        return this;
+        return new CommandResponseBuilder(_data, 0x6982, _context, _metadata);
     }
 
     /// <summary>
     /// Sets an authentication failed error (63 00).
     /// </summary>
-    public CardResponseBuilder WithAuthenticationFailed()
+    public CommandResponseBuilder WithAuthenticationFailed()
     {
-        _statusWord = 0x6300;
-        return this;
+        return new CommandResponseBuilder(_data, 0x6300, _context, _metadata);
     }
 
     /// <summary>
-    /// Builds the CardResponse instance.
+    /// Sets the pipeline context.
     /// </summary>
-    public CardResponse Build()
+    public CommandResponseBuilder WithContext(IPipelineContext context)
     {
-        return new CardResponse(_data, _statusWord);
+        return new CommandResponseBuilder(_data, _statusWord, context, _metadata);
     }
 
     /// <summary>
-    /// Implicit conversion to CardResponse.
+    /// Adds metadata to the response.
     /// </summary>
-    public static implicit operator CardResponse(CardResponseBuilder builder)
+    public CommandResponseBuilder WithMetadata(string key, object value)
+    {
+        Dictionary<string, object> newMetadata = new Dictionary<string, object>(_metadata)
+        {
+            [key] = value
+        };
+        return new CommandResponseBuilder(_data, _statusWord, _context, newMetadata);
+    }
+
+    /// <summary>
+    /// Builds the CommandResponse instance.
+    /// </summary>
+    public CommandResponse Build()
+    {
+        return new CommandResponse(_data, _statusWord, _context, _metadata);
+    }
+
+    /// <summary>
+    /// Implicit conversion to CommandResponse.
+    /// </summary>
+    public static implicit operator CommandResponse(CommandResponseBuilder builder)
     {
         return builder.Build();
     }
 
-    private static byte[] ConvertFromHexString(string hex)
+    private static Result<byte[], string> ConvertFromHexString(string hex)
     {
-        // Remove spaces and convert to uppercase
-        hex = hex.Replace(" ", "").Replace("-", "").ToUpperInvariant();
+        // Remove spaces and convert to uppercase using functional approach
+        string cleanedHex = hex.Replace(" ", "").Replace("-", "").ToUpperInvariant();
 
-        // Ensure even length
-        if (hex.Length % 2 != 0)
+        // Validate even length
+        if (cleanedHex.Length % 2 != 0)
         {
-            throw new ArgumentException("Hex string must have even length");
+            return Result.Failure<byte[], string>("Hex string must have even length");
         }
 
-        var bytes = new byte[hex.Length / 2];
-        for (var i = 0; i < bytes.Length; i++)
-        {
-            bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
-        }
-        return bytes;
+        // Convert using functional approach with Result wrapping
+        return Result.Try(() =>
+            Enumerable.Range(0, cleanedHex.Length / 2)
+                .Select(i => Convert.ToByte(cleanedHex.Substring(i * 2, 2), 16))
+                .ToArray(),
+            ex => $"Invalid hex format: {ex.Message}");
     }
 }

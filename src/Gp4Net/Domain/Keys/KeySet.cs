@@ -123,7 +123,7 @@ public class Scp02KeySet : KeySet
     /// Required for type-safe cryptogram parameter validation.
     /// </summary>
     public byte[] SEnc { get; init; }
-    
+
     /// <summary>
     /// Private constructor for successful creation.
     /// </summary>
@@ -145,15 +145,15 @@ public class Scp02KeySet : KeySet
     /// <returns>A Result containing the KeySet or an error.</returns>
     public static Result<Scp02KeySet, SmartCardError> Create(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
     {
-        var encKeyValidation = ValidateKey(encKey, nameof(encKey));
+        Result<bool, SmartCardError> encKeyValidation = ValidateKey(encKey, nameof(encKey));
         if (encKeyValidation.IsFailure) return Result.Failure<Scp02KeySet, SmartCardError>(encKeyValidation.Error);
-        
-        var macKeyValidation = ValidateKey(macKey, nameof(macKey));
+
+        Result<bool, SmartCardError> macKeyValidation = ValidateKey(macKey, nameof(macKey));
         if (macKeyValidation.IsFailure) return Result.Failure<Scp02KeySet, SmartCardError>(macKeyValidation.Error);
-        
-        var dekKeyValidation = ValidateKey(dekKey, nameof(dekKey));
+
+        Result<bool, SmartCardError> dekKeyValidation = ValidateKey(dekKey, nameof(dekKey));
         if (dekKeyValidation.IsFailure) return Result.Failure<Scp02KeySet, SmartCardError>(dekKeyValidation.Error);
-        
+
         return Result.Success<Scp02KeySet, SmartCardError>(new Scp02KeySet(encKey, macKey, dekKey, keyVersion, keyId));
     }
 
@@ -183,7 +183,7 @@ public class Scp03KeySet : KeySet
     /// Required for type-safe cryptogram parameter validation.
     /// </summary>
     public byte[] SMac { get; init; }
-    
+
     /// <summary>
     /// Private constructor for successful creation.
     /// </summary>
@@ -205,18 +205,18 @@ public class Scp03KeySet : KeySet
     /// <returns>A Result containing the KeySet or an error.</returns>
     public static Result<Scp03KeySet, SmartCardError> Create(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
     {
-        var encKeyValidation = ValidateKey(encKey, nameof(encKey));
+        Result<bool, SmartCardError> encKeyValidation = ValidateKey(encKey, nameof(encKey));
         if (encKeyValidation.IsFailure) return Result.Failure<Scp03KeySet, SmartCardError>(encKeyValidation.Error);
-        
-        var macKeyValidation = ValidateKey(macKey, nameof(macKey));
+
+        Result<bool, SmartCardError> macKeyValidation = ValidateKey(macKey, nameof(macKey));
         if (macKeyValidation.IsFailure) return Result.Failure<Scp03KeySet, SmartCardError>(macKeyValidation.Error);
-        
-        var dekKeyValidation = ValidateKey(dekKey, nameof(dekKey));
+
+        Result<bool, SmartCardError> dekKeyValidation = ValidateKey(dekKey, nameof(dekKey));
         if (dekKeyValidation.IsFailure) return Result.Failure<Scp03KeySet, SmartCardError>(dekKeyValidation.Error);
-        
-        var lengthMatchValidation = ValidateKeyLengthsMatch(encKey, macKey, dekKey);
+
+        Result<bool, SmartCardError> lengthMatchValidation = ValidateKeyLengthsMatch(encKey, macKey, dekKey);
         if (lengthMatchValidation.IsFailure) return Result.Failure<Scp03KeySet, SmartCardError>(lengthMatchValidation.Error);
-        
+
         return Result.Success<Scp03KeySet, SmartCardError>(new Scp03KeySet(encKey, macKey, dekKey, keyVersion, keyId));
     }
 

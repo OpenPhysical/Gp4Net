@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain;
@@ -18,7 +19,7 @@ public class ApplicationStatusParsingTests
 {
     private static CommandResponse MakeResponse(string hexData)
     {
-        var data = Convert.FromHexString(hexData.Replace(" ", string.Empty));
+        byte[] data = Convert.FromHexString(hexData.Replace(" ", string.Empty));
         return new CommandResponse(
             data,
             StatusWords.Success,
@@ -32,14 +33,14 @@ public class ApplicationStatusParsingTests
         // From docs/traces/gp_pro_list_success.txt: response to 84F28002 ...
         const string resp = "E3264F08A0000001510000009F700101C5039EFE80C407A0000001515350CC08A000000151000000";
 
-        var r = MakeResponse(resp);
-        var parsed = ResponseParser.ParseGetStatusResponse(r);
+        CommandResponse r = MakeResponse(resp);
+        Result<ImmutableList<ApplicationInfo>, SmartCardError> parsed = ResponseParser.ParseGetStatusResponse(r);
 
         _ = parsed.IsSuccess.Should().BeTrue();
-        var list = parsed.Value;
+        ImmutableList<ApplicationInfo>? list = parsed.Value;
 
         // Should include ISD AID with lifecycle (0x01) and privileges (C5: 03 9E FE)
-        var isd = list.FirstOrDefault(static x => Convert.ToHexString(x.Aid) == "A000000151000000");
+        ApplicationInfo? isd = list.FirstOrDefault(static x => Convert.ToHexString(x.Aid) == "A000000151000000");
         _ = isd.Should().NotBeNull();
         _ = isd!.LifecycleState.Should().Be(LifecycleState.Loaded);
         _ = isd.Privileges.Should().NotBeEmpty();

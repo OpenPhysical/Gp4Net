@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -15,62 +16,62 @@ public class ChipInfo
     /// Gets or sets the IC fabricator/manufacturer.
     /// </summary>
     public IcFabricator Manufacturer { get; set; }
-    
+
     /// <summary>
     /// Gets or sets the specific chip type/model.
     /// </summary>
     public IcType ChipType { get; set; }
-    
+
     /// <summary>
     /// Gets or sets the chip platform family.
     /// </summary>
     public ChipPlatform Platform { get; set; }
-    
+
     /// <summary>
     /// Gets or sets the memory configuration for P71 chips.
     /// </summary>
     public Maybe<P71MemoryConfiguration> MemoryConfig { get; set; }
-    
+
     /// <summary>
     /// Gets or sets the security architecture name.
     /// </summary>
     public string Architecture { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// Gets or sets the list of security certifications.
     /// </summary>
     public ImmutableList<SecurityCertification> Certifications { get; set; } = ImmutableList<SecurityCertification>.Empty;
-    
+
     /// <summary>
     /// Gets or sets the cryptographic capabilities.
     /// </summary>
     public CryptoCapabilities CryptoCapabilities { get; set; }
-    
+
     /// <summary>
     /// Gets or sets the security features.
     /// </summary>
     public SecurityFeatures SecurityFeatures { get; set; }
-    
+
     /// <summary>
     /// Gets or sets the operating system identifier.
     /// </summary>
     public OperatingSystemId OperatingSystem { get; set; }
-    
+
     /// <summary>
     /// Gets or sets the Java Card version if applicable.
     /// </summary>
     public Maybe<string> JavaCardVersion { get; set; }
-    
+
     /// <summary>
     /// Gets or sets the GlobalPlatform version if applicable.
     /// </summary>
     public Maybe<string> GlobalPlatformVersion { get; set; }
-    
+
     /// <summary>
     /// Gets or sets the JCOP version if applicable.
     /// </summary>
     public Maybe<string> JcopVersion { get; set; }
-    
+
     /// <summary>
     /// Creates chip information from CPLC data.
     /// </summary>
@@ -78,10 +79,10 @@ public class ChipInfo
     /// <returns>Chip information derived from CPLC data.</returns>
     public static ChipInfo FromCplcData(CplcData cplc)
     {
-        var info = new ChipInfo
+        ChipInfo info = new ChipInfo
         {
-            Manufacturer = Enum.IsDefined(typeof(IcFabricator), cplc.IcFabricator) 
-                ? (IcFabricator)cplc.IcFabricator 
+            Manufacturer = Enum.IsDefined(typeof(IcFabricator), cplc.IcFabricator)
+                ? (IcFabricator)cplc.IcFabricator
                 : IcFabricator.Unknown,
             ChipType = Enum.IsDefined(typeof(IcType), cplc.IcType)
                 ? (IcType)cplc.IcType
@@ -90,7 +91,7 @@ public class ChipInfo
                 ? (OperatingSystemId)cplc.OperatingSystemId
                 : OperatingSystemId.Unknown
         };
-        
+
         // Determine platform and capabilities based on chip type
         switch (info.ChipType)
         {
@@ -106,26 +107,26 @@ public class ChipInfo
                 info.SecurityFeatures = SecurityFeatures.P71D321Standard;
                 info.MemoryConfig = P71MemoryConfiguration.P71D351; // Default, should be determined from actual config
                 break;
-                
+
             case IcType.P61:
             case IcType.P60:
                 info.Platform = ChipPlatform.SmartMX2;
                 info.Architecture = "IntegralSecurity";
                 info.Certifications = ImmutableList.Create(SecurityCertification.CommonCriteriaEAL5Plus);
                 break;
-                
+
             case IcType.P5CD081:
             case IcType.P5CD041:
                 info.Platform = ChipPlatform.SmartMX;
                 info.Architecture = "IntegralSecurity";
                 info.Certifications = ImmutableList.Create(SecurityCertification.CommonCriteriaEAL5Plus);
                 break;
-                
+
             default:
                 info.Platform = ChipPlatform.Unknown;
                 break;
         }
-        
+
         // Determine OS-specific information
         switch (info.OperatingSystem)
         {
@@ -134,46 +135,46 @@ public class ChipInfo
                 info.JavaCardVersion = "3.0.5";
                 info.GlobalPlatformVersion = "2.3.1";
                 break;
-                
+
             case OperatingSystemId.JCOP3:
                 info.JcopVersion = "3";
                 info.JavaCardVersion = "3.0.4";
                 info.GlobalPlatformVersion = "2.2.1";
                 break;
-                
+
             case OperatingSystemId.JCOP242:
                 info.JcopVersion = "2.4.2";
                 info.JavaCardVersion = "2.2.2";
                 info.GlobalPlatformVersion = "2.1.1";
                 break;
-                
+
             case OperatingSystemId.JCOP241:
                 info.JcopVersion = "2.4.1";
                 info.JavaCardVersion = "2.2.2";
                 info.GlobalPlatformVersion = "2.1.1";
                 break;
         }
-        
+
         return info;
     }
-    
+
     /// <summary>
     /// Gets a human-readable description of the chip.
     /// </summary>
     /// <returns>Formatted chip description.</returns>
     public string GetDescription()
     {
-        var parts = new[]
+        IEnumerable<string> parts = new[]
         {
             Manufacturer != IcFabricator.Unknown ? Manufacturer.ToString() : null,
             Platform != ChipPlatform.Unknown ? Platform.ToString() : null,
             ChipType != IcType.Unknown ? ChipType.ToString() : null,
             MemoryConfig.HasValue ? GetMemoryDescription() : null
         }.Where(p => !string.IsNullOrEmpty(p));
-        
+
         return string.Join(" ", parts);
     }
-    
+
     /// <summary>
     /// Gets a description of the memory configuration.
     /// </summary>
@@ -192,7 +193,7 @@ public class ChipInfo
             None: () => "Unknown memory configuration"
         );
     }
-    
+
     /// <summary>
     /// Gets a formatted string of security certifications.
     /// </summary>
@@ -201,7 +202,7 @@ public class ChipInfo
     {
         if (!Certifications.Any())
             return "None";
-            
+
         return string.Join(", ", Certifications.Select(c => c switch
         {
             SecurityCertification.CommonCriteriaEAL4Plus => "CC EAL4+",
@@ -214,30 +215,30 @@ public class ChipInfo
             _ => c.ToString()
         }));
     }
-    
+
     /// <summary>
     /// Gets the operating system description including version information.
     /// </summary>
     /// <returns>Operating system description.</returns>
     public string GetOperatingSystemDescription()
     {
-        var parts = new[]
+        IEnumerable<string> parts = new[]
         {
             JcopVersion.Match(v => $"JCOP {v}", () => null),
             JavaCardVersion.Match(v => $"Java Card {v}", () => null),
             GlobalPlatformVersion.Match(v => $"GP {v}", () => null)
         }.Where(p => p != null);
-        
+
         return string.Join(" / ", parts);
     }
-    
+
     /// <summary>
     /// Gets a summary of cryptographic capabilities.
     /// </summary>
     /// <returns>Crypto capabilities summary.</returns>
     public string GetCryptoSummary()
     {
-        var capabilities = new[]
+        IEnumerable<string> capabilities = new[]
         {
             CryptoCapabilities.HasFlag(CryptoCapabilities.TripleDES) ? "3DES" : null,
             CryptoCapabilities.HasFlag(CryptoCapabilities.AES256) ? "AES-128/192/256" :
@@ -249,7 +250,7 @@ public class ChipInfo
             CryptoCapabilities.HasFlag(CryptoCapabilities.ECC521) ? "ECC P-256/384/521" :
             CryptoCapabilities.HasFlag(CryptoCapabilities.ECC256) ? "ECC P-256" : null
         }.Where(c => c != null);
-        
+
         return string.Join(", ", capabilities);
     }
 }

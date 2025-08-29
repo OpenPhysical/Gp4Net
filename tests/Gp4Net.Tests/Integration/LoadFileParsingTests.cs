@@ -9,7 +9,6 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Modules;
 using Gp4Net.Pipeline;
 using Gp4Net.Transport;
@@ -23,7 +22,7 @@ public class LoadFileParsingTests
 {
     private static CommandResponse MakeResponse(string hexData)
     {
-        var data = Convert.FromHexString(hexData.Replace(" ", string.Empty));
+        byte[] data = Convert.FromHexString(hexData.Replace(" ", string.Empty));
         return new CommandResponse(
             data,
             StatusWords.Success,
@@ -46,19 +45,19 @@ public class LoadFileParsingTests
             "E31B4F07A00000006202049F700101CE020100CC08A000000151000000" +
             "E31B4F07A00000006202029F700101CE020103CC08A000000151000000";
 
-        var response = MakeResponse(respHex);
-        var exec = ResponseExecutor(response);
+        CommandResponse response = MakeResponse(respHex);
+        Func<IApduCommand, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> exec = ResponseExecutor(response);
 
-        var result = await CardStatusRetriever.GetExecutableLoadFilesWithModulesAsync(exec);
+        Result<ImmutableList<ExecutableLoadFile>, SmartCardError> result = await CardStatusRetriever.GetExecutableLoadFilesWithModulesAsync(exec);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var elfs = result.Value;
+        ImmutableList<ExecutableLoadFile>? elfs = result.Value;
 
         // Expect at least 4 entries
         _ = elfs.Count.Should().BeGreaterThanOrEqualTo(4);
 
         // SSD creation package
-        var ssdPkg = elfs.FirstOrDefault(e => Convert.ToHexString(e.Aid) == "A0000001515350");
+        ExecutableLoadFile? ssdPkg = elfs.FirstOrDefault(e => Convert.ToHexString(e.Aid) == "A0000001515350");
         _ = ssdPkg.Should().NotBeNull();
         _ = ssdPkg!.LifecycleState.Should().Be(LifecycleState.Loaded);
         _ = ssdPkg.VersionString.Should().Be("255.255");
@@ -79,17 +78,17 @@ public class LoadFileParsingTests
             "E31B4F07A00000006202049F700101CE020100CC08A000000151000000" +
             "E31B4F07A00000006202029F700101CE020103CC08A000000151000000";
 
-        var response = MakeResponse(respHex);
-        var exec = ResponseExecutor(response);
+        CommandResponse response = MakeResponse(respHex);
+        Func<IApduCommand, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> exec = ResponseExecutor(response);
 
-        var result = await CardStatusRetriever.GetExecutableLoadFilesAsync(exec);
+        Result<ImmutableList<ExecutableLoadFile>, SmartCardError> result = await CardStatusRetriever.GetExecutableLoadFilesAsync(exec);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var elfs = result.Value;
+        ImmutableList<ExecutableLoadFile>? elfs = result.Value;
         _ = elfs.Count.Should().BeGreaterThanOrEqualTo(4);
 
         // DocLite package
-        var docLite = elfs.FirstOrDefault(e => Convert.ToHexString(e.Aid) == "A00000016443446F634C697465");
+        ExecutableLoadFile? docLite = elfs.FirstOrDefault(e => Convert.ToHexString(e.Aid) == "A00000016443446F634C697465");
         _ = docLite.Should().NotBeNull();
         _ = docLite!.VersionString.Should().Be("1.0");
         _ = docLite.LifecycleState.Should().Be(LifecycleState.Loaded);

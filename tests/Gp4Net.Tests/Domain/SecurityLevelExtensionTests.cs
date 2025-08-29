@@ -17,50 +17,50 @@ public class SecurityLevelExtensionTests
     public void HasCMac_WithCMacFlag_ReturnsTrue()
     {
         // Arrange
-        var level = SecurityLevel.CMac;
+        SecurityLevel level = SecurityLevel.CMac;
 
         // Act & Assert
-        level.HasCMac().Should().BeTrue();
+        _ = level.HasCMac().Should().BeTrue();
     }
 
-    [Test] 
+    [Test]
     public void HasCMac_WithoutCMacFlag_ReturnsFalse()
     {
         // Arrange
-        var level = SecurityLevel.RMac;
+        SecurityLevel level = SecurityLevel.RMac;
 
         // Act & Assert
-        level.HasCMac().Should().BeFalse();
+        _ = level.HasCMac().Should().BeFalse();
     }
 
     [Test]
     public void HasCDecryption_WithCDecryptionFlag_ReturnsTrue()
     {
         // Arrange
-        var level = SecurityLevel.CDecryption;
+        SecurityLevel level = SecurityLevel.CDecryption;
 
         // Act & Assert  
-        level.HasCDecryption().Should().BeTrue();
+        _ = level.HasCDecryption().Should().BeTrue();
     }
 
     [Test]
     public void HasCDecryption_WithOnlyCMacFlag_ReturnsFalse()
     {
         // Arrange - C-MAC alone doesn't imply C-DECRYPTION
-        var level = SecurityLevel.CMac;
+        SecurityLevel level = SecurityLevel.CMac;
 
         // Act & Assert
-        level.HasCDecryption().Should().BeFalse();
+        _ = level.HasCDecryption().Should().BeFalse();
     }
 
     [Test]
     public void HasCEncryption_WithCEncryptionFlag_ReturnsTrue()
     {
         // Arrange
-        var level = SecurityLevel.CEncryption;
+        SecurityLevel level = SecurityLevel.CEncryption;
 
         // Act & Assert
-        level.HasCEncryption().Should().BeTrue();
+        _ = level.HasCEncryption().Should().BeTrue();
     }
 
     [Test]
@@ -68,139 +68,139 @@ public class SecurityLevelExtensionTests
     {
         // Arrange - CDecryption (0x03) includes CEncryption bit (0x02) 
         // GP Card Specification v2.3.1: CDecryption is a composite flag including encryption capability
-        var level = SecurityLevel.CDecryption;
+        SecurityLevel level = SecurityLevel.CDecryption;
 
         // Act & Assert - CDecryption includes the encryption bit, so this should be true
-        level.HasCEncryption().Should().BeTrue();
+        _ = level.HasCEncryption().Should().BeTrue();
     }
 
     [Test]
     public void HasCEncryption_And_HasCDecryption_Should_Have_Correct_Relationships()
     {
         // Arrange - Test the correct relationships between flags
-        var encryptionOnly = SecurityLevel.CEncryption;      // 0x02 - just encryption
-        var decryptionComposite = SecurityLevel.CDecryption; // 0x03 - MAC + encryption
+        SecurityLevel encryptionOnly = SecurityLevel.CEncryption;      // 0x02 - just encryption
+        SecurityLevel decryptionComposite = SecurityLevel.CDecryption; // 0x03 - MAC + encryption
 
         // Act & Assert
         // CEncryption (0x02) should only have encryption, not full decryption capability
-        encryptionOnly.HasCEncryption().Should().BeTrue();
-        encryptionOnly.HasCDecryption().Should().BeFalse();  // Needs both MAC (0x01) and encryption (0x02)
-        
+        _ = encryptionOnly.HasCEncryption().Should().BeTrue();
+        _ = encryptionOnly.HasCDecryption().Should().BeFalse();  // Needs both MAC (0x01) and encryption (0x02)
+
         // CDecryption (0x03) should have both capabilities  
-        decryptionComposite.HasCDecryption().Should().BeTrue();   // Has both MAC and encryption bits
-        decryptionComposite.HasCEncryption().Should().BeTrue();   // Includes encryption bit (0x02)
-        decryptionComposite.HasCMac().Should().BeTrue();          // Includes MAC bit (0x01)
+        _ = decryptionComposite.HasCDecryption().Should().BeTrue();   // Has both MAC and encryption bits
+        _ = decryptionComposite.HasCEncryption().Should().BeTrue();   // Includes encryption bit (0x02)
+        _ = decryptionComposite.HasCMac().Should().BeTrue();          // Includes MAC bit (0x01)
     }
 
-    [Test] 
+    [Test]
     public void HasCDecryption_Should_Require_Both_CMac_And_Decryption_Bits()
     {
         // Arrange - CDecryption = 0x03 = CMac (0x01) + Decryption (0x02)
-        var cMacOnly = SecurityLevel.CMac;           // 0x01
-        var encryptionOnly = SecurityLevel.CEncryption; // 0x02  
-        var combined = SecurityLevel.CDecryption;         // 0x03
+        SecurityLevel cMacOnly = SecurityLevel.CMac;           // 0x01
+        SecurityLevel encryptionOnly = SecurityLevel.CEncryption; // 0x02  
+        SecurityLevel combined = SecurityLevel.CDecryption;         // 0x03
 
         // Act & Assert
-        cMacOnly.HasCDecryption().Should().BeFalse();
-        encryptionOnly.HasCDecryption().Should().BeFalse();
-        combined.HasCDecryption().Should().BeTrue();
+        _ = cMacOnly.HasCDecryption().Should().BeFalse();
+        _ = encryptionOnly.HasCDecryption().Should().BeFalse();
+        _ = combined.HasCDecryption().Should().BeTrue();
     }
 
     [Test]
     public void HasRMac_WithRMacFlag_ReturnsTrue()
     {
         // Arrange
-        var level = SecurityLevel.RMac;
+        SecurityLevel level = SecurityLevel.RMac;
 
         // Act & Assert
-        level.HasRMac().Should().BeTrue();
+        _ = level.HasRMac().Should().BeTrue();
     }
 
     [Test]
     public void HasREncryption_WithREncryptionFlag_ReturnsTrue()
     {
         // Arrange
-        var level = SecurityLevel.REncryption;
+        SecurityLevel level = SecurityLevel.REncryption;
 
         // Act & Assert
-        level.HasREncryption().Should().BeTrue();
+        _ = level.HasREncryption().Should().BeTrue();
     }
 
     [Test]
     public void Combine_Should_Union_Flags()
     {
         // Arrange
-        var level1 = SecurityLevel.CMac;
-        var level2 = SecurityLevel.RMac;
+        SecurityLevel level1 = SecurityLevel.CMac;
+        SecurityLevel level2 = SecurityLevel.RMac;
 
         // Act
-        var combined = level1.Combine(level2);
+        SecurityLevel combined = level1.Combine(level2);
 
         // Assert
-        combined.HasCMac().Should().BeTrue();
-        combined.HasRMac().Should().BeTrue();
-        combined.HasCDecryption().Should().BeFalse();
-        combined.HasCEncryption().Should().BeFalse();
+        _ = combined.HasCMac().Should().BeTrue();
+        _ = combined.HasRMac().Should().BeTrue();
+        _ = combined.HasCDecryption().Should().BeFalse();
+        _ = combined.HasCEncryption().Should().BeFalse();
     }
 
     [Test]
     public void Remove_Should_Clear_Specified_Flags()
     {
         // Arrange
-        var level = SecurityLevel.CDecryption | SecurityLevel.RMac;
+        SecurityLevel level = SecurityLevel.CDecryption | SecurityLevel.RMac;
 
         // Act
-        var result = level.Remove(SecurityLevel.RMac);
+        SecurityLevel result = level.Remove(SecurityLevel.RMac);
 
         // Assert
-        result.HasCDecryption().Should().BeTrue();
-        result.HasRMac().Should().BeFalse();
+        _ = result.HasCDecryption().Should().BeTrue();
+        _ = result.HasRMac().Should().BeFalse();
     }
 
     [Test]
     public void HasSecureMessaging_WithAnyFlag_ReturnsTrue()
     {
         // Arrange & Act & Assert
-        SecurityLevel.CMac.HasSecureMessaging().Should().BeTrue();
-        SecurityLevel.CEncryption.HasSecureMessaging().Should().BeTrue();
-        SecurityLevel.CDecryption.HasSecureMessaging().Should().BeTrue();
-        SecurityLevel.RMac.HasSecureMessaging().Should().BeTrue();
-        SecurityLevel.REncryption.HasSecureMessaging().Should().BeTrue();
+        _ = SecurityLevel.CMac.HasSecureMessaging().Should().BeTrue();
+        _ = SecurityLevel.CEncryption.HasSecureMessaging().Should().BeTrue();
+        _ = SecurityLevel.CDecryption.HasSecureMessaging().Should().BeTrue();
+        _ = SecurityLevel.RMac.HasSecureMessaging().Should().BeTrue();
+        _ = SecurityLevel.REncryption.HasSecureMessaging().Should().BeTrue();
     }
 
     [Test]
     public void HasSecureMessaging_WithNone_ReturnsFalse()
     {
         // Arrange
-        var level = SecurityLevel.None;
+        SecurityLevel level = SecurityLevel.None;
 
         // Act & Assert
-        level.HasSecureMessaging().Should().BeFalse();
+        _ = level.HasSecureMessaging().Should().BeFalse();
     }
 
     [Test]
     public void ToDescription_Should_Return_Correct_Descriptions()
     {
         // Act & Assert
-        SecurityLevel.None.ToDescription().Should().Be("No security");
-        SecurityLevel.CMac.ToDescription().Should().Be("C-MAC");
-        SecurityLevel.CEncryption.ToDescription().Should().Be("C-ENCRYPTION");
-        SecurityLevel.CDecryption.ToDescription().Should().Be("C-MAC + C-DECRYPTION");
-        SecurityLevel.RMac.ToDescription().Should().Be("R-MAC");
-        SecurityLevel.REncryption.ToDescription().Should().Be("R-ENCRYPTION");
+        _ = SecurityLevel.None.ToDescription().Should().Be("No security");
+        _ = SecurityLevel.CMac.ToDescription().Should().Be("C-MAC");
+        _ = SecurityLevel.CEncryption.ToDescription().Should().Be("C-ENCRYPTION");
+        _ = SecurityLevel.CDecryption.ToDescription().Should().Be("C-MAC + C-DECRYPTION");
+        _ = SecurityLevel.RMac.ToDescription().Should().Be("R-MAC");
+        _ = SecurityLevel.REncryption.ToDescription().Should().Be("R-ENCRYPTION");
     }
 
     [Test]
     public void ToDescription_WithCombinedFlags_ReturnsHexFormat()
     {
         // Arrange
-        var combined = SecurityLevel.CMac | SecurityLevel.RMac;
+        SecurityLevel combined = SecurityLevel.CMac | SecurityLevel.RMac;
 
         // Act
-        var description = combined.ToDescription();
+        string? description = combined.ToDescription();
 
         // Assert
-        description.Should().Be("Combined security level: 11");
+        _ = description.Should().Be("Combined security level: 11");
     }
 
     [Test]
@@ -208,20 +208,20 @@ public class SecurityLevelExtensionTests
     {
         // This test specifically validates that the original bug is fixed
         // Original bug: HasCEncryption() incorrectly checked CDecryption flag
-        
+
         // Before the fix, both methods returned the same result (both checked CDecryption)
         // After the fix, they should check different flags and return different results for some inputs
-        
-        var encryptionOnly = SecurityLevel.CEncryption; // 0x02
-        var macOnly = SecurityLevel.CMac;               // 0x01
-        
+
+        SecurityLevel encryptionOnly = SecurityLevel.CEncryption; // 0x02
+        SecurityLevel macOnly = SecurityLevel.CMac;               // 0x01
+
         // These should be different - proving the methods check different flags
-        encryptionOnly.HasCEncryption().Should().BeTrue();   // Checks CEncryption (0x02)
-        encryptionOnly.HasCDecryption().Should().BeFalse();  // Checks CDecryption (0x03)
-        
-        macOnly.HasCEncryption().Should().BeFalse();         // Checks CEncryption (0x02) 
-        macOnly.HasCDecryption().Should().BeFalse();         // Checks CDecryption (0x03)
-        
+        _ = encryptionOnly.HasCEncryption().Should().BeTrue();   // Checks CEncryption (0x02)
+        _ = encryptionOnly.HasCDecryption().Should().BeFalse();  // Checks CDecryption (0x03)
+
+        _ = macOnly.HasCEncryption().Should().BeFalse();         // Checks CEncryption (0x02) 
+        _ = macOnly.HasCDecryption().Should().BeFalse();         // Checks CDecryption (0x03)
+
         // This proves they're checking different flags and the bug is fixed
     }
 
@@ -232,7 +232,7 @@ public class SecurityLevelExtensionTests
     [Test]
     public void SecurityLevel_Flag_Relationships_Should_Be_Consistent([Values(
         SecurityLevel.None,
-        SecurityLevel.CMac, 
+        SecurityLevel.CMac,
         SecurityLevel.CEncryption,
         SecurityLevel.CDecryption,
         SecurityLevel.RMac,
@@ -242,25 +242,25 @@ public class SecurityLevelExtensionTests
     )] SecurityLevel level)
     {
         // Act
-        var hasCMac = level.HasCMac();
-        var hasCEncryption = level.HasCEncryption();
-        var hasCDecryption = level.HasCDecryption();
-        var hasRMac = level.HasRMac();
-        var hasREncryption = level.HasREncryption();
+        bool hasCMac = level.HasCMac();
+        bool hasCEncryption = level.HasCEncryption();
+        bool hasCDecryption = level.HasCDecryption();
+        bool hasRMac = level.HasRMac();
+        bool hasREncryption = level.HasREncryption();
 
         // Assert - Basic flag consistency
         if ((level & SecurityLevel.CMac) != 0)
-            hasCMac.Should().BeTrue();
+            _ = hasCMac.Should().BeTrue();
         else
-            hasCMac.Should().BeFalse();
+            _ = hasCMac.Should().BeFalse();
 
         if ((level & SecurityLevel.CEncryption) != 0)
-            hasCEncryption.Should().BeTrue();
-        
+            _ = hasCEncryption.Should().BeTrue();
+
         // CDecryption requires BOTH CMac and CEncryption bits (0x03 = 0x01 | 0x02)
         if ((level & SecurityLevel.CDecryption) == SecurityLevel.CDecryption)
-            hasCDecryption.Should().BeTrue();
+            _ = hasCDecryption.Should().BeTrue();
         else
-            hasCDecryption.Should().BeFalse();
+            _ = hasCDecryption.Should().BeFalse();
     }
 }

@@ -41,12 +41,12 @@ public class SecureRngService : IRngService
 
         if (length == 0)
         {
-            return Result.Success<byte[], SmartCardError>(new byte[0]);
+            return Result.Success<byte[], SmartCardError>([]);
         }
 
         return Result.Try(() =>
         {
-            var bytes = new byte[length];
+            byte[] bytes = new byte[length];
             _secureRandom.NextBytes(bytes);
             return bytes;
         },

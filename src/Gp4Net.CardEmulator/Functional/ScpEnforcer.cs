@@ -1,9 +1,7 @@
-using System;
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
-using Gp4Net.Domain.Security;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Functional;
@@ -87,7 +85,7 @@ public static class ScpEnforcer
         byte instruction, byte[] commandData)
     {
         // GP Appendix E.1.2 - Command-specific security requirements
-        var requirements = new SecurityLevelRequirements(
+        SecurityLevelRequirements requirements = new SecurityLevelRequirements(
             RequiresSecureChannel: !SecurityRequirements.OpenAccessCommands.Contains(instruction),
             RequiresCommandMac: SecurityRequirements.CommandMacRequiredCommands.Contains(instruction),
             RequiresCommandEncryption: SecurityRequirements.CommandEncryptionRequiredCommands.Contains(instruction),
@@ -96,7 +94,7 @@ public static class ScpEnforcer
         );
 
         // Special cases based on command parameters per GP Appendix E.1.3
-        var enhancedRequirements = ApplyCommandSpecificRules(instruction, commandData, requirements);
+        SecurityLevelRequirements enhancedRequirements = ApplyCommandSpecificRules(instruction, commandData, requirements);
 
         return Result.Success<SecurityLevelRequirements, SmartCardError>(enhancedRequirements);
     }
@@ -161,7 +159,7 @@ public static class ScpEnforcer
         if (commandData.Length < 4) return baseRequirements;
 
         // Extract P1P2 (data object identifier)
-        var dataObjectId = (ushort)((commandData[2] << 8) | commandData[3]);
+        ushort dataObjectId = (ushort)((commandData[2] << 8) | commandData[3]);
 
         return dataObjectId switch
         {
@@ -228,17 +226,17 @@ public static class ScpEnforcer
         CommandSecurityContext context)
     {
         // ISD is always implicitly selected and can always handle INITIALIZE UPDATE
-        var selectedApp = context.CardState.CurrentlySelectedApplication;
+        Maybe<VirtualApplication> selectedApp = context.CardState.CurrentlySelectedApplication;
         
         // Use functional pattern matching approach
-        return selectedApp.HasValue
-            ? selectedApp.GetValueOrDefault().Privileges.HasFlag(ApplicationPrivileges.SecurityDomain)
+        return selectedApp.Match(
+            Some: app => app.Privileges.HasFlag(ApplicationPrivileges.SecurityDomain)
                 ? Result.Success<CommandSecurityContext, SmartCardError>(context)
                 : Result.Failure<CommandSecurityContext, SmartCardError>(
                     SmartCardError.ConditionsNotSatisfied()
                         .WithContext("Instruction", "INITIALIZE UPDATE")
-                        .WithContext("Requirement", "Selected application must have SecurityDomain privileges per GP Card Spec v2.3.1"))
-            : Result.Success<CommandSecurityContext, SmartCardError>(context); // No app selected = ISD implicitly selected
+                        .WithContext("Requirement", "Selected application must have SecurityDomain privileges per GP Card Spec v2.3.1")),
+            None: () => Result.Success<CommandSecurityContext, SmartCardError>(context)); // No app selected = ISD implicitly selected
     }
 
     /// <summary>
@@ -266,7 +264,7 @@ public static class ScpEnforcer
         if (!context.SecurityRequirements.RequiresSecureChannel)
             return Result.Success<CommandSecurityContext, SmartCardError>(context);
 
-        var currentLevel = context.CardState.SecurityLevel;
+        byte currentLevel = context.CardState.SecurityLevel;
         
         // Check C-MAC requirement
         if (context.SecurityRequirements.RequiresCommandMac && !HasCommandMac(currentLevel))
@@ -303,7 +301,7 @@ public static class ScpEnforcer
     /// </summary>
     private static Result<bool, SmartCardError> ValidateMacStructure(byte[] command, byte scpVersion)
     {
-        var expectedMacLength = scpVersion switch
+        int expectedMacLength = scpVersion switch
         {
             0x02 => 8,  // SCP02 uses 8-byte MAC per GP Card Spec v2.3.1 Section E.4  
             0x03 => 16, // SCP03 uses 16-byte AES-CMAC per GP SCP03 v1.1.1 Section 6.2.4

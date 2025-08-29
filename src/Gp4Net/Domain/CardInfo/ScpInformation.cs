@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using Gp4Net.Domain.Protocol;
@@ -22,7 +21,7 @@ public record ScpInformation
     {
         Protocols = protocols ?? [];
     }
-    
+
     /// <summary>
     /// Gets a formatted string representation of the SCP support.
     /// </summary>
@@ -51,12 +50,12 @@ public record ScpProtocolInfo
     /// Gets the SCP protocol version (e.g., 2 for SCP02, 3 for SCP03).
     /// </summary>
     public byte Version { get; }
-    
+
     /// <summary>
     /// Gets the implementation options for this protocol.
     /// </summary>
     public IReadOnlyList<ScpImplementation> ImplementationOptions { get; }
-    
+
     /// <summary>
     /// Initializes a new instance of ScpProtocolInfo.
     /// </summary>
@@ -65,7 +64,7 @@ public record ScpProtocolInfo
         Version = version;
         ImplementationOptions = implementationOptions ?? [];
     }
-    
+
     /// <summary>
     /// Gets a short string representation suitable for single-line display.
     /// </summary>
@@ -75,11 +74,11 @@ public record ScpProtocolInfo
         {
             return FormatScpVersion(Version);
         }
-        
-        var options = string.Join(" ", ImplementationOptions.OrderBy(opt => (byte)opt).Select(opt => $"i={(byte)opt:X2}"));
+
+        string options = string.Join(" ", ImplementationOptions.OrderBy(opt => (byte)opt).Select(opt => $"i={(byte)opt:X2}"));
         return $"{FormatScpVersion(Version)} ({options})";
     }
-    
+
     /// <summary>
     /// Gets a detailed string representation with descriptions.
     /// </summary>
@@ -89,18 +88,18 @@ public record ScpProtocolInfo
         {
             return FormatScpVersion(Version);
         }
-        
-        var lines = new List<string> { $"{FormatScpVersion(Version)}:" };
-        
-        foreach (var option in ImplementationOptions.OrderBy(opt => (byte)opt))
+
+        List<string> lines = [$"{FormatScpVersion(Version)}:"];
+
+        foreach (ScpImplementation option in ImplementationOptions.OrderBy(opt => (byte)opt))
         {
-            var description = GetImplementationDescription(option);
+            string description = GetImplementationDescription(option);
             lines.Add($"  - i={(byte)option:X2}: {description}");
         }
-        
+
         return string.Join("\n", lines);
     }
-    
+
     /// <summary>
     /// Gets a human-readable description for an SCP implementation option.
     /// </summary>
@@ -111,12 +110,12 @@ public record ScpProtocolInfo
         {
             return implementation.GetDescription();
         }
-        
+
         // For SCP03 and other protocols, use explicit descriptions
         return implementation switch
         {
             ScpImplementation.Scp03I10 => "AES-128",
-            ScpImplementation.Scp03I20 => "AES-192", 
+            ScpImplementation.Scp03I20 => "AES-192",
             ScpImplementation.Scp03I30 => "AES-256",
             ScpImplementation.Scp03I11 => "AES-128 (no R-MAC)",
             ScpImplementation.Scp03I60 => "Random card challenge",
@@ -124,7 +123,7 @@ public record ScpProtocolInfo
             _ => $"Unknown implementation 0x{((byte)implementation):X2}"
         };
     }
-    
+
     /// <summary>
     /// Formats SCP version number for display.
     /// </summary>

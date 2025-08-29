@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
 
@@ -16,148 +15,148 @@ public enum ScpImplementation : byte
     // SCP02 Implementation Options (Complete)
     // Based on bitmap structure from GP Card Spec v2.3.1 Table E-1
     // ==========================================
-    
+
     /// <summary>
     /// SCP02 i=00: Implicit mode, modified APDU, zero ICV, no ICV encryption, 1 base key, unspecified challenge, no R-MAC
     /// Bitmap: 00000000 (b1=0, b2=0, b3=0, b4=0, b5=0, b6=0, b7=0)
     /// </summary>
     Scp02I00 = 0x00,
-    
+
     /// <summary>
     /// SCP02 i=02: Implicit mode, unmodified APDU, zero ICV, no ICV encryption, 1 base key, unspecified challenge, no R-MAC
     /// Bitmap: 00000010 (b1=0, b2=1, b3=0, b4=0, b5=0, b6=0, b7=0)
     /// </summary>
     Scp02I02 = 0x02,
-    
+
     /// <summary>
     /// SCP02 i=04: Explicit mode, modified APDU, zero ICV, no ICV encryption, 1 base key, unspecified challenge, no R-MAC
     /// Bitmap: 00000100 (b1=0, b2=0, b3=1, b4=0, b5=0, b6=0, b7=0)
     /// </summary>
     Scp02I04 = 0x04,
-    
+
     /// <summary>
     /// SCP02 i=05: Explicit mode, modified APDU, zero ICV, no ICV encryption, 3 keys, unspecified challenge, no R-MAC
     /// Bitmap: 00000101 (b1=1, b2=0, b3=1, b4=0, b5=0, b6=0, b7=0)
     /// </summary>
     Scp02I05 = 0x05,
-    
+
     /// <summary>
     /// SCP02 i=0A: Implicit mode, unmodified APDU, MAC over AID, no ICV encryption, 1 base key, unspecified challenge, no R-MAC
     /// Bitmap: 00001010 (b1=0, b2=1, b3=0, b4=1, b5=0, b6=0, b7=0)
     /// </summary>
     Scp02I0A = 0x0A,
-    
+
     /// <summary>
     /// SCP02 i=14: Explicit mode, modified APDU, zero ICV, ICV encryption, 1 base key, unspecified challenge, no R-MAC
     /// Bitmap: 00010100 (b1=0, b2=0, b3=1, b4=0, b5=1, b6=0, b7=0)
     /// </summary>
     Scp02I14 = 0x14,
-    
+
     /// <summary>
     /// SCP02 i=15: Explicit mode, modified APDU, zero ICV, ICV encryption, 3 keys, unspecified challenge, no R-MAC
     /// Bitmap: 00010101 (b1=1, b2=0, b3=1, b4=0, b5=1, b6=0, b7=0)
     /// Most common SCP02 implementation (CLR mode)
     /// </summary>
     Scp02I15 = 0x15,
-    
+
     /// <summary>
     /// SCP02 i=1A: Implicit mode, unmodified APDU, MAC over AID, ICV encryption, 1 base key, unspecified challenge, no R-MAC
     /// Bitmap: 00011010 (b1=0, b2=1, b3=0, b4=1, b5=1, b6=0, b7=0)
     /// </summary>
     Scp02I1A = 0x1A,
-    
+
     /// <summary>
     /// SCP02 i=24: Explicit mode, modified APDU, zero ICV, no ICV encryption, 1 base key, unspecified challenge, R-MAC support
     /// Bitmap: 00100100 (b1=0, b2=0, b3=1, b4=0, b5=0, b6=1, b7=0)
     /// </summary>
     Scp02I24 = 0x24,
-    
+
     /// <summary>
     /// SCP02 i=25: Explicit mode, modified APDU, zero ICV, no ICV encryption, 3 keys, unspecified challenge, R-MAC support
     /// Bitmap: 00100101 (b1=1, b2=0, b3=1, b4=0, b5=0, b6=1, b7=0)
     /// </summary>
     Scp02I25 = 0x25,
-    
+
     /// <summary>
     /// SCP02 i=2A: Implicit mode, unmodified APDU, MAC over AID, no ICV encryption, 1 base key, unspecified challenge, R-MAC support
     /// Bitmap: 00101010 (b1=0, b2=1, b3=0, b4=1, b5=0, b6=1, b7=0)
     /// </summary>
     Scp02I2A = 0x2A,
-    
+
     /// <summary>
     /// SCP02 i=34: Explicit mode, modified APDU, zero ICV, ICV encryption, 1 base key, unspecified challenge, R-MAC support
     /// Bitmap: 00110100 (b1=0, b2=0, b3=1, b4=0, b5=1, b6=1, b7=0)
     /// </summary>
     Scp02I34 = 0x34,
-    
+
     /// <summary>
     /// SCP02 i=35: Explicit mode, modified APDU, zero ICV, ICV encryption, 3 keys, unspecified challenge, R-MAC support
     /// Bitmap: 00110101 (b1=1, b2=0, b3=1, b4=0, b5=1, b6=1, b7=0)
     /// CLR mode with R-MAC support (MAC mode)
     /// </summary>
     Scp02I35 = 0x35,
-    
+
     /// <summary>
     /// SCP02 i=3A: Implicit mode, unmodified APDU, MAC over AID, ICV encryption, 1 base key, unspecified challenge, R-MAC support
     /// Bitmap: 00111010 (b1=0, b2=1, b3=0, b4=1, b5=1, b6=1, b7=0)
     /// </summary>
     Scp02I3A = 0x3A,
-    
+
     /// <summary>
     /// SCP02 i=44: Explicit mode, modified APDU, zero ICV, no ICV encryption, 1 base key, well-known challenge, no R-MAC
     /// Bitmap: 01000100 (b1=0, b2=0, b3=1, b4=0, b5=0, b6=0, b7=1)
     /// </summary>
     Scp02I44 = 0x44,
-    
+
     /// <summary>
     /// SCP02 i=45: Explicit mode, modified APDU, zero ICV, no ICV encryption, 3 keys, well-known challenge, no R-MAC
     /// Bitmap: 01000101 (b1=1, b2=0, b3=1, b4=0, b5=0, b6=0, b7=1)
     /// </summary>
     Scp02I45 = 0x45,
-    
+
     /// <summary>
     /// SCP02 i=4A: Implicit mode, unmodified APDU, MAC over AID, no ICV encryption, 1 base key, well-known challenge, no R-MAC
     /// Bitmap: 01001010 (b1=0, b2=1, b3=0, b4=1, b5=0, b6=0, b7=1)
     /// </summary>
     Scp02I4A = 0x4A,
-    
+
     /// <summary>
     /// SCP02 i=54: Explicit mode, modified APDU, zero ICV, ICV encryption, 1 base key, well-known challenge, no R-MAC
     /// Bitmap: 01010100 (b1=0, b2=0, b3=1, b4=0, b5=1, b6=0, b7=1)
     /// </summary>
     Scp02I54 = 0x54,
-    
+
     /// <summary>
     /// SCP02 i=55: Explicit mode, modified APDU, zero ICV, ICV encryption, 3 keys, well-known challenge, no R-MAC
     /// Bitmap: 01010101 (b1=1, b2=0, b3=1, b4=0, b5=1, b6=0, b7=1)
     /// CLR mode with well-known challenge (ENC mode)
     /// </summary>
     Scp02I55 = 0x55,
-    
+
     /// <summary>
     /// SCP02 i=64: Explicit mode, modified APDU, zero ICV, no ICV encryption, 1 base key, well-known challenge, R-MAC support
     /// Bitmap: 01100100 (b1=0, b2=0, b3=1, b4=0, b5=0, b6=1, b7=1)
     /// </summary>
     Scp02I64 = 0x64,
-    
+
     /// <summary>
     /// SCP02 i=65: Explicit mode, modified APDU, zero ICV, no ICV encryption, 3 keys, well-known challenge, R-MAC support
     /// Bitmap: 01100101 (b1=1, b2=0, b3=1, b4=0, b5=0, b6=1, b7=1)
     /// </summary>
     Scp02I65 = 0x65,
-    
+
     /// <summary>
     /// SCP02 i=6A: Implicit mode, unmodified APDU, MAC over AID, no ICV encryption, 1 base key, well-known challenge, R-MAC support
     /// Bitmap: 01101010 (b1=0, b2=1, b3=0, b4=1, b5=0, b6=1, b7=1)
     /// </summary>
     Scp02I6A = 0x6A,
-    
+
     /// <summary>
     /// SCP02 i=74: Explicit mode, modified APDU, zero ICV, ICV encryption, 1 base key, well-known challenge, R-MAC support
     /// Bitmap: 01110100 (b1=0, b2=0, b3=1, b4=0, b5=1, b6=1, b7=1)
     /// </summary>
     Scp02I74 = 0x74,
-    
+
     /// <summary>
     /// SCP02 i=75: Explicit mode, modified APDU, zero ICV, ICV encryption, 3 keys, well-known challenge, R-MAC support
     /// Bitmap: 01110101 (b1=1, b2=0, b3=1, b4=0, b5=1, b6=1, b7=1)
@@ -165,53 +164,53 @@ public enum ScpImplementation : byte
     /// GP Pro has bugs with this mode, but our implementation is correct
     /// </summary>
     Scp02I75 = 0x75,
-    
+
     /// <summary>
     /// SCP02 i=7A: Implicit mode, unmodified APDU, MAC over AID, ICV encryption, 1 base key, well-known challenge, R-MAC support
     /// Bitmap: 01111010 (b1=0, b2=1, b3=0, b4=1, b5=1, b6=1, b7=1)
     /// </summary>
     Scp02I7A = 0x7A,
-    
+
     // ==========================================
     // SCP03 Implementation Options
     // ==========================================
-    
+
     /// <summary>
     /// SCP03 i=10: AES with 128-bit keys
     /// Standard SCP03 implementation
     /// </summary>
     Scp03I10 = 0x10,
-    
+
     /// <summary>
     /// SCP03 i=11: AES with 128-bit keys, no response MAC
     /// Per GlobalPlatform SCP03 v1.1.1 Section 6.2.5
     /// Response MAC calculation and verification is disabled
     /// </summary>
     Scp03I11 = 0x11,
-    
+
     /// <summary>
     /// SCP03 i=20: AES with 192-bit keys
     /// </summary>
     Scp03I20 = 0x20,
-    
+
     /// <summary>
     /// SCP03 i=30: AES with 256-bit keys
     /// </summary>
     Scp03I30 = 0x30,
-    
+
     /// <summary>
     /// SCP03 i=60: AES with 128-bit keys, random card challenge
     /// Per GlobalPlatform SCP03 v1.1.1 Section 6.2.1
     /// Card generates truly random challenge instead of pseudo-random
     /// </summary>
     Scp03I60 = 0x60,
-    
+
     /// <summary>
     /// SCP03 i=70: AES with 128-bit keys, pseudo-random card challenge
     /// Card challenge derived using KDF instead of random
     /// </summary>
     Scp03I70 = 0x70,
-    
+
 }
 
 /// <summary>
@@ -304,20 +303,21 @@ public static class Scp02ImplementationFeatures
     /// <returns>A detailed description string</returns>
     public static string GetDescription(this ScpImplementation impl)
     {
-        var features = new List<string>();
-        
-        features.Add(impl.IsExplicitMode() ? "Explicit" : "Implicit");
-        features.Add(impl.UsesModifiedApdu() ? "Modified APDU" : "Unmodified APDU");
-        features.Add(impl.Uses3Keys() ? "3 Keys" : "1 Base Key");
-        
+        List<string> features =
+        [
+            impl.IsExplicitMode() ? "Explicit" : "Implicit",
+            impl.UsesModifiedApdu() ? "Modified APDU" : "Unmodified APDU",
+            impl.Uses3Keys() ? "3 Keys" : "1 Base Key"
+        ];
+
         if (impl.HasIcvEncryption()) features.Add("ICV Encryption");
         if (impl.HasRMacSupport()) features.Add("R-MAC");
         if (impl.UsesWellKnownChallenge()) features.Add("Well-known Challenge");
         if (impl.HasMacOverAid()) features.Add("MAC over AID");
-        
+
         return $"i={((byte)impl):X2}: {string.Join(", ", features)}";
     }
-    
+
     /// <summary>
     /// Gets the specific alias for common implementations.
     /// </summary>
@@ -328,7 +328,7 @@ public static class Scp02ImplementationFeatures
         return impl switch
         {
             ScpImplementation.Scp02I15 => "CLR",
-            ScpImplementation.Scp02I35 => "MAC", 
+            ScpImplementation.Scp02I35 => "MAC",
             ScpImplementation.Scp02I55 => "ENC",
             ScpImplementation.Scp02I75 => "RENC",
             ScpImplementation.Scp02I1A => "IMPLICIT",
@@ -346,8 +346,8 @@ public static class Scp02ImplementationFeatures
     /// <returns>True if this is an SCP02 implementation, false otherwise</returns>
     public static bool IsScp02(this ScpImplementation impl)
     {
-        var value = (byte)impl;
-        
+        byte value = (byte)impl;
+
         // Check if this value is defined as an SCP02 implementation in the enum
         // Only accept explicitly defined SCP02 values, not just any value in range
         return value switch
@@ -378,12 +378,12 @@ public static class Scp02ImplementationFeatures
             0x74 => true, // Scp02I74
             0x75 => true, // Scp02I75
             0x7A => true, // Scp02I7A
-            
+
             // All other values are not SCP02 (including SCP03 and undefined values)
             _ => false
         };
     }
-    
+
     /// <summary>
     /// Determines if this is an SCP03 implementation.
     /// </summary>
@@ -391,11 +391,11 @@ public static class Scp02ImplementationFeatures
     /// <returns>True if this is an SCP03 implementation, false otherwise</returns>
     public static bool IsScp03(this ScpImplementation impl)
     {
-        var value = (byte)impl;
+        byte value = (byte)impl;
         // SCP03: i=10, 11, 20, 30, 60, 70
         return value is 0x10 or 0x11 or 0x20 or 0x30 or 0x60 or 0x70;
     }
-    
+
     /// <summary>
     /// Gets the AES key length in bits for SCP03 implementations.
     /// </summary>
@@ -403,7 +403,7 @@ public static class Scp02ImplementationFeatures
     /// <returns>Key length in bits, or 0 if not SCP03</returns>
     public static int GetAesKeyLength(this ScpImplementation impl)
     {
-        var value = (byte)impl;
+        byte value = (byte)impl;
         return (value & 0xF0) switch
         {
             0x10 => 128, // SCP03 AES-128
@@ -413,5 +413,5 @@ public static class Scp02ImplementationFeatures
             _ => 0       // Not an SCP03 implementation
         };
     }
-    
+
 }

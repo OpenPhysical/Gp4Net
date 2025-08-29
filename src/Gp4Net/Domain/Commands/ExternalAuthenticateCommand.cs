@@ -6,6 +6,7 @@
 using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Core.Functional;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 
@@ -72,32 +73,27 @@ public class ExternalAuthenticateCommand : BaseApduCommand
         byte[] mac
     )
     {
-        if (hostCryptogram == null)
-        {
-            return Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
-                SmartCardError.InvalidArgument("Host cryptogram cannot be null"));
-        }
+        return Maybe<byte[]>.From(hostCryptogram).Match(
+            Some: hostCrypto => Maybe<byte[]>.From(mac).Match(
+                Some: macValue => ValidateAndCreateWithMac(securityLevel, hostCrypto, macValue),
+                None: () => SmartCardError.InvalidArgument("MAC cannot be null")),
+            None: () => SmartCardError.InvalidArgument("Host cryptogram cannot be null"));
+    }
 
-        if (mac == null)
-        {
-            return Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
-                SmartCardError.InvalidArgument("MAC cannot be null"));
-        }
-
+    private static Result<ExternalAuthenticateCommand, SmartCardError> ValidateAndCreateWithMac(
+        SecurityLevel securityLevel, byte[] hostCryptogram, byte[] mac)
+    {
         if (hostCryptogram.Length != 8)
         {
-            return Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
-                SmartCardError.InvalidArgument($"Host cryptogram must be 8 bytes, got {hostCryptogram.Length}"));
+            return SmartCardError.InvalidArgument($"Host cryptogram must be 8 bytes, got {hostCryptogram.Length}");
         }
 
         if (mac.Length != 8)
         {
-            return Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
-                SmartCardError.InvalidArgument($"MAC must be 8 bytes, got {mac.Length}"));
+            return SmartCardError.InvalidArgument($"MAC must be 8 bytes, got {mac.Length}");
         }
 
-        return Result.Success<ExternalAuthenticateCommand, SmartCardError>(
-            new ExternalAuthenticateCommand(securityLevel, hostCryptogram, mac));
+        return new ExternalAuthenticateCommand(securityLevel, hostCryptogram, mac);
     }
 
     /// <summary>
@@ -111,20 +107,59 @@ public class ExternalAuthenticateCommand : BaseApduCommand
         byte[] hostCryptogram
     )
     {
-        if (hostCryptogram == null)
+        return Maybe<byte[]>.From(hostCryptogram).Match(
+            Some: hostCrypto => ValidateAndCreateWithoutMac(securityLevel, hostCrypto),
+            None: () => SmartCardError.InvalidArgument("Host cryptogram cannot be null"));
+    }
+
+    /// <summary>
+    /// Creates a new ExternalAuthenticateCommand from raw command data.
+    /// </summary>
+    /// <param name="commandData">The command data (host cryptogram + security level).</param>
+    /// <returns>A result containing the command or an error.</returns>
+    public static Result<ExternalAuthenticateCommand, SmartCardError> Create(byte[] commandData)
+    {
+        return Maybe<byte[]>.From(commandData).Match(
+            Some: data => ParseCommandData(data),
+            None: () => SmartCardError.InvalidArgument("Command data cannot be null"));
+    }
+
+    private static Result<ExternalAuthenticateCommand, SmartCardError> ParseCommandData(byte[] commandData)
+    {
+        if (commandData.Length < 9)
         {
-            return Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
-                SmartCardError.InvalidArgument("Host cryptogram cannot be null"));
+            return SmartCardError.InvalidArgument($"Command data must be at least 9 bytes (8-byte cryptogram + 1-byte security level), got {commandData.Length}");
         }
 
+        byte[] hostCryptogram = commandData[..8];
+        byte securityLevelByte = commandData[8];
+
+        return securityLevelByte.ToEnum<SecurityLevel>()
+            .MapError(SmartCardError.InvalidArgument)
+            .Bind(securityLevel =>
+            {
+                // Check if there's MAC data (additional bytes beyond cryptogram + security level)
+                if (commandData.Length > 9)
+                {
+                    byte[] mac = commandData[9..];
+                    return CreateWithMac(securityLevel, hostCryptogram, mac);
+                }
+                else
+                {
+                    return CreateWithoutMac(securityLevel, hostCryptogram);
+                }
+            });
+    }
+
+    private static Result<ExternalAuthenticateCommand, SmartCardError> ValidateAndCreateWithoutMac(
+        SecurityLevel securityLevel, byte[] hostCryptogram)
+    {
         if (hostCryptogram.Length != 8)
         {
-            return Result.Failure<ExternalAuthenticateCommand, SmartCardError>(
-                SmartCardError.InvalidArgument($"Host cryptogram must be 8 bytes, got {hostCryptogram.Length}"));
+            return SmartCardError.InvalidArgument($"Host cryptogram must be 8 bytes, got {hostCryptogram.Length}");
         }
 
-        return Result.Success<ExternalAuthenticateCommand, SmartCardError>(
-            new ExternalAuthenticateCommand(securityLevel, hostCryptogram, []));
+        return new ExternalAuthenticateCommand(securityLevel, hostCryptogram, []);
     }
 
     /// <inheritdoc />
@@ -132,7 +167,9 @@ public class ExternalAuthenticateCommand : BaseApduCommand
     {
         get
         {
-            return ClassByte;
+            // CLA=0x84 only when MAC is applied (secure messaging)
+            // CLA=0x00 when no MAC (no secure messaging)
+            return Mac.Length > 0 ? ClassByte : (byte)0x00;
         }
     }
 
@@ -173,7 +210,7 @@ public class ExternalAuthenticateCommand : BaseApduCommand
                 return HostCryptogram;
             }
 
-            var data = new byte[HostCryptogram.Length + Mac.Length];
+            byte[] data = new byte[HostCryptogram.Length + Mac.Length];
             Array.Copy(HostCryptogram, 0, data, 0, HostCryptogram.Length);
             Array.Copy(Mac, 0, data, HostCryptogram.Length, Mac.Length);
             return data;

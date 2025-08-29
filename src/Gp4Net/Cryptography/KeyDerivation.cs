@@ -1,5 +1,4 @@
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Security;
@@ -49,9 +48,9 @@ public static class KeyDerivation
         bool implicitChannel = false)
     {
         // Create dummy challenges for SCP02 (not used in key derivation but needed for context)
-        var hostChallenge = new byte[8];
-        var cardChallenge = new byte[6];
-        
+        byte[] hostChallenge = new byte[8];
+        byte[] cardChallenge = new byte[6];
+
         return _keyDerivationService.DeriveSessionKeys(
             keySet,
             hostChallenge,

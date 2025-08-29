@@ -76,7 +76,7 @@ public class ApduCommand
             default:
             {
                 // Case 3 or 4: Data present
-                var lc = rawBytes[4];
+                byte lc = rawBytes[4];
 
                 if (rawBytes.Length == 5 + lc)
                 {

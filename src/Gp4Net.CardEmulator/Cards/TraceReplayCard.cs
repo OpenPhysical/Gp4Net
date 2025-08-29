@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Trace;
+using Gp4Net.Core;
 using ApduResponse = Gp4Net.CardEmulator.Core.ApduResponse;
 
 namespace Gp4Net.CardEmulator.Cards;

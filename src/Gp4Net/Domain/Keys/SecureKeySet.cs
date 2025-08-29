@@ -32,10 +32,10 @@ public sealed class SecureKeySet : IDisposable
     /// <param name="dekKey">The data encryption key.</param>
     public SecureKeySet(byte keyVersion, byte[] encKey, byte[] macKey, byte[] dekKey)
     {
-        this.KeyVersion = keyVersion;
-        this._encKey = new SecureKeyStorage(encKey);
-        this._macKey = new SecureKeyStorage(macKey);
-        this._dekKey = new SecureKeyStorage(dekKey);
+        KeyVersion = keyVersion;
+        _encKey = new SecureKeyStorage(encKey);
+        _macKey = new SecureKeyStorage(macKey);
+        _dekKey = new SecureKeyStorage(dekKey);
     }
 
     /// <summary>
@@ -54,8 +54,8 @@ public sealed class SecureKeySet : IDisposable
     /// <param name="action">The action to execute with the key.</param>
     public void UseEncKey(Action<byte[]> action)
     {
-        this.ThrowIfDisposed();
-        this._encKey.UseKey(action);
+        ThrowIfDisposed();
+        _encKey.UseKey(action);
     }
 
     /// <summary>
@@ -66,8 +66,8 @@ public sealed class SecureKeySet : IDisposable
     /// <returns>The result of the function.</returns>
     public T UseEncKey<T>(Func<byte[], T> func)
     {
-        this.ThrowIfDisposed();
-        return this._encKey.UseKey(func);
+        ThrowIfDisposed();
+        return _encKey.UseKey(func);
     }
 
     /// <summary>
@@ -76,8 +76,8 @@ public sealed class SecureKeySet : IDisposable
     /// <param name="action">The action to execute with the key.</param>
     public void UseMacKey(Action<byte[]> action)
     {
-        this.ThrowIfDisposed();
-        this._macKey.UseKey(action);
+        ThrowIfDisposed();
+        _macKey.UseKey(action);
     }
 
     /// <summary>
@@ -88,8 +88,8 @@ public sealed class SecureKeySet : IDisposable
     /// <returns>The result of the function.</returns>
     public T UseMacKey<T>(Func<byte[], T> func)
     {
-        this.ThrowIfDisposed();
-        return this._macKey.UseKey(func);
+        ThrowIfDisposed();
+        return _macKey.UseKey(func);
     }
 
     /// <summary>
@@ -98,8 +98,8 @@ public sealed class SecureKeySet : IDisposable
     /// <param name="action">The action to execute with the key.</param>
     public void UseDekKey(Action<byte[]> action)
     {
-        this.ThrowIfDisposed();
-        this._dekKey.UseKey(action);
+        ThrowIfDisposed();
+        _dekKey.UseKey(action);
     }
 
     /// <summary>
@@ -110,8 +110,8 @@ public sealed class SecureKeySet : IDisposable
     /// <returns>The result of the function.</returns>
     public T UseDekKey<T>(Func<byte[], T> func)
     {
-        this.ThrowIfDisposed();
-        return this._dekKey.UseKey(func);
+        ThrowIfDisposed();
+        return _dekKey.UseKey(func);
     }
 
     /// <summary>
@@ -120,12 +120,12 @@ public sealed class SecureKeySet : IDisposable
     /// <returns>A KeySet object with copies of the keys.</returns>
     public Scp02KeySet ToScp02KeySet()
     {
-        this.ThrowIfDisposed();
+        ThrowIfDisposed();
         return Scp02KeySet.Create(
-            this._encKey.GetKeyCopy(),
-            this._macKey.GetKeyCopy(),
-            this._dekKey.GetKeyCopy(),
-            this.KeyVersion
+            _encKey.GetKeyCopy(),
+            _macKey.GetKeyCopy(),
+            _dekKey.GetKeyCopy(),
+            KeyVersion
         ).Match(
             onSuccess: keySet => keySet,
             onFailure: error => throw new InvalidOperationException(error.Message));
@@ -137,12 +137,12 @@ public sealed class SecureKeySet : IDisposable
     /// <returns>A KeySet object with copies of the keys.</returns>
     public Scp03KeySet ToScp03KeySet()
     {
-        this.ThrowIfDisposed();
+        ThrowIfDisposed();
         return Scp03KeySet.Create(
-            this._encKey.GetKeyCopy(),
-            this._macKey.GetKeyCopy(),
-            this._dekKey.GetKeyCopy(),
-            this.KeyVersion
+            _encKey.GetKeyCopy(),
+            _macKey.GetKeyCopy(),
+            _dekKey.GetKeyCopy(),
+            KeyVersion
         ).Match(
             onSuccess: keySet => keySet,
             onFailure: error => throw new InvalidOperationException(error.Message));
@@ -153,17 +153,17 @@ public sealed class SecureKeySet : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (!this._isDisposed)
+        if (!_isDisposed)
         {
-            this._encKey?.Dispose();
-            this._macKey?.Dispose();
-            this._dekKey?.Dispose();
-            this._isDisposed = true;
+            _encKey?.Dispose();
+            _macKey?.Dispose();
+            _dekKey?.Dispose();
+            _isDisposed = true;
         }
     }
 
     private void ThrowIfDisposed()
     {
-        ObjectDisposedException.ThrowIf(this._isDisposed, this);
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
     }
 }

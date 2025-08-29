@@ -19,13 +19,13 @@ public class WsctCardChannelWrapper : ICardChannelWrapper
     /// <param name="context">The WSCT card context.</param>
     /// <param name="readerName">The reader name.</param>
     /// <param name="shareMode">The share mode.</param>
-    public WsctCardChannelWrapper(CardContext context, string readerName, WSCT.Wrapper.ShareMode shareMode)
+    public WsctCardChannelWrapper(CardContext context, string readerName, ShareMode shareMode)
     {
         _channel = new CardChannel(context, readerName);
     }
 
     /// <inheritdoc />
-    public ErrorCode Connect(WSCT.Wrapper.ShareMode shareMode, WSCT.Wrapper.Protocol protocol)
+    public ErrorCode Connect(ShareMode shareMode, Protocol protocol)
     {
         return _channel.Connect(shareMode, protocol);
     }

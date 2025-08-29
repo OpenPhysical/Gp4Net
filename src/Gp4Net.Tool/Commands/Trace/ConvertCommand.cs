@@ -71,18 +71,18 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
 
         AnsiConsole.MarkupLine($"[green]Converting {settings.Format} trace:[/] {settings.InputFile}");
 
-        var converter = new TraceConverter();
-        var traceData = await converter.ConvertAsync(settings.InputFile, settings.Format, settings.Verbose);
+        TraceConverter converter = new TraceConverter();
+        TraceData traceData = await converter.ConvertAsync(settings.InputFile, settings.Format, settings.Verbose);
 
         // Ensure output directory exists
-        var outputDir = Path.GetDirectoryName(settings.OutputFile);
+        string outputDir = Path.GetDirectoryName(settings.OutputFile);
         if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
         {
             _ = Directory.CreateDirectory(outputDir);
         }
 
         // Write JSON with pretty formatting
-        var options = new JsonSerializerOptions
+        JsonSerializerOptions options = new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -98,7 +98,7 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
 
     private static void DisplaySummary(TraceData traceData)
     {
-        var table = new Table();
+        Table table = new Table();
         _ = table.AddColumn("Property");
         _ = table.AddColumn("Value");
 
@@ -114,7 +114,7 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
         if (traceData.Operations.Any())
         {
             AnsiConsole.MarkupLine("\n[bold]Detected Operations:[/]");
-            foreach (var op in traceData.Operations)
+            foreach (KeyValuePair<string, Operation> op in traceData.Operations)
             {
                 AnsiConsole.MarkupLine($"  • [cyan]{op.Key}:[/] {op.Value.Description} (exchanges {op.Value.StartExchange}-{op.Value.EndExchange})");
             }
@@ -123,7 +123,7 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
         if (traceData.UsageExamples.Any())
         {
             AnsiConsole.MarkupLine("\n[bold]Usage Examples:[/]");
-            foreach (var example in traceData.UsageExamples)
+            foreach (UsageExample example in traceData.UsageExamples)
             {
                 AnsiConsole.MarkupLine($"  • [yellow]{example.Description}:[/]");
                 AnsiConsole.MarkupLine($"    [dim]{example.Command}[/]");
@@ -286,7 +286,7 @@ public class TraceConverter
     public async Task<TraceData> ConvertAsync(string inputFile, string format, bool verbose = false)
     {
         // Parse trace based on format
-        var exchanges = format.ToLower() switch
+        List<Exchange> exchanges = format.ToLower() switch
         {
             "gp_pro" => await ParseGpProTraceAsync(inputFile, verbose),
             "gpshell" => await ParseGpShellTraceAsync(inputFile, verbose),
@@ -299,14 +299,14 @@ public class TraceConverter
         }
 
         // Detect operations
-        var operations = _operationDetector.AnalyzeTrace(exchanges);
+        Dictionary<string, Operation> operations = _operationDetector.AnalyzeTrace(exchanges);
         if (verbose)
         {
             AnsiConsole.MarkupLine($"[dim]Detected operations: {string.Join(", ", operations.Keys)}[/]");
         }
 
         // Analyze sessions
-        var sessions = _sessionAnalyzer.DetectSessions(exchanges);
+        List<SessionMetadata> sessions = _sessionAnalyzer.DetectSessions(exchanges);
         if (verbose)
         {
             AnsiConsole.MarkupLine($"[dim]Detected {sessions.Count} session(s)[/]");
@@ -316,11 +316,11 @@ public class TraceConverter
         LinkOperationsToSessions(operations, sessions);
 
         // Extract metadata
-        var metadata = _metadataExtractor.ExtractAll(exchanges, inputFile, format);
+        TraceMetadata metadata = _metadataExtractor.ExtractAll(exchanges, inputFile, format);
         metadata.Sessions = sessions;
 
         // Generate usage examples
-        var usageExamples = UsageExampleGenerator.GenerateExamples(operations);
+        List<UsageExample> usageExamples = UsageExampleGenerator.GenerateExamples(operations);
 
         return new TraceData
         {
@@ -333,17 +333,17 @@ public class TraceConverter
 
     private async Task<List<Exchange>> ParseGpProTraceAsync(string filename, bool verbose)
     {
-        var exchanges = new List<Exchange>();
-        var commandPattern = new Regex(@"^A>> T=\d+ \([\d+]+\) ([0-9A-F\s]+)$");
-        var responsePattern = new Regex(@"^A<< \([\d+]+\) \((\d+)ms\) ([0-9A-F\s]+)$");
+        List<Exchange> exchanges = [];
+        Regex commandPattern = new Regex(@"^A>> T=\d+ \([\d+]+\) ([0-9A-F\s]+)$");
+        Regex responsePattern = new Regex(@"^A<< \([\d+]+\) \((\d+)ms\) ([0-9A-F\s]+)$");
 
         string currentCommand = null;
-        var currentLine = 0;
+        int currentLine = 0;
 
-        var lines = await File.ReadAllLinesAsync(filename);
-        for (var lineNum = 0; lineNum < lines.Length; lineNum++)
+        string[] lines = await File.ReadAllLinesAsync(filename);
+        for (int lineNum = 0; lineNum < lines.Length; lineNum++)
         {
-            var line = lines[lineNum].Trim();
+            string line = lines[lineNum].Trim();
 
             // Skip empty lines and comments
             if (string.IsNullOrEmpty(line) || line.StartsWith('#') || line.StartsWith('[') || line.StartsWith("WARNING:"))
@@ -352,7 +352,7 @@ public class TraceConverter
             }
 
             // Try to match command
-            var cmdMatch = commandPattern.Match(line);
+            Match cmdMatch = commandPattern.Match(line);
             if (cmdMatch.Success)
             {
                 currentCommand = cmdMatch.Groups[1].Value.Trim().Replace(" ", "").ToUpper();
@@ -361,13 +361,13 @@ public class TraceConverter
             }
 
             // Try to match response
-            var respMatch = responsePattern.Match(line);
+            Match respMatch = responsePattern.Match(line);
             if (respMatch.Success && currentCommand != null)
             {
-                var responseTime = int.Parse(respMatch.Groups[1].Value);
-                var responseData = respMatch.Groups[2].Value.Trim().Replace(" ", "").ToUpper();
+                int responseTime = int.Parse(respMatch.Groups[1].Value);
+                string responseData = respMatch.Groups[2].Value.Trim().Replace(" ", "").ToUpper();
 
-                var exchange = CreateExchange(exchanges.Count + 1, currentCommand, responseData, responseTime, currentLine);
+                Exchange exchange = CreateExchange(exchanges.Count + 1, currentCommand, responseData, responseTime, currentLine);
                 exchanges.Add(exchange);
 
                 currentCommand = null;
@@ -380,20 +380,20 @@ public class TraceConverter
 
     private async Task<List<Exchange>> ParseGpShellTraceAsync(string filename, bool verbose)
     {
-        var exchanges = new List<Exchange>();
-        var sendPattern = new Regex(@"Command --> ([0-9A-F\s]+)");
-        var recvPattern = new Regex(@"Response <-- ([0-9A-F\s]+)");
+        List<Exchange> exchanges = [];
+        Regex sendPattern = new Regex(@"Command --> ([0-9A-F\s]+)");
+        Regex recvPattern = new Regex(@"Response <-- ([0-9A-F\s]+)");
 
         string currentCommand = null;
-        var currentLine = 0;
+        int currentLine = 0;
 
-        var lines = await File.ReadAllLinesAsync(filename);
-        for (var lineNum = 0; lineNum < lines.Length; lineNum++)
+        string[] lines = await File.ReadAllLinesAsync(filename);
+        for (int lineNum = 0; lineNum < lines.Length; lineNum++)
         {
-            var line = lines[lineNum].Trim();
+            string line = lines[lineNum].Trim();
 
             // Try to match command
-            var sendMatch = sendPattern.Match(line);
+            Match sendMatch = sendPattern.Match(line);
             if (sendMatch.Success)
             {
                 currentCommand = sendMatch.Groups[1].Value.Trim().Replace(" ", "").ToUpper();
@@ -402,12 +402,12 @@ public class TraceConverter
             }
 
             // Try to match response
-            var recvMatch = recvPattern.Match(line);
+            Match recvMatch = recvPattern.Match(line);
             if (recvMatch.Success && currentCommand != null)
             {
-                var responseData = recvMatch.Groups[1].Value.Trim().Replace(" ", "").ToUpper();
+                string responseData = recvMatch.Groups[1].Value.Trim().Replace(" ", "").ToUpper();
 
-                var exchange = CreateExchange(exchanges.Count + 1, currentCommand, responseData, 20, currentLine);
+                Exchange exchange = CreateExchange(exchanges.Count + 1, currentCommand, responseData, 20, currentLine);
                 exchanges.Add(exchange);
 
                 currentCommand = null;
@@ -420,9 +420,9 @@ public class TraceConverter
 
     private Exchange CreateExchange(int index, string command, string response, int responseTime, int sourceLine)
     {
-        var description = ApduAnalyzer.GetCommandDescription(command);
-        var secureMessaging = ApduAnalyzer.IsSecureMessaging(command);
-        var scpData = ApduAnalyzer.ExtractScpData(command, response, description);
+        string description = ApduAnalyzer.GetCommandDescription(command);
+        bool secureMessaging = ApduAnalyzer.IsSecureMessaging(command);
+        ScpData scpData = ApduAnalyzer.ExtractScpData(command, response, description);
 
         return new Exchange
         {
@@ -443,12 +443,12 @@ public class TraceConverter
     private static void LinkOperationsToSessions(Dictionary<string, Operation> operations, List<SessionMetadata> sessions)
     {
         // Simple implementation: assign operations to sessions based on session operations list
-        foreach (var kvp in operations)
+        foreach (KeyValuePair<string, Operation> kvp in operations)
         {
-            var operation = kvp.Value;
-            var operationName = kvp.Key;
+            Operation operation = kvp.Value;
+            string operationName = kvp.Key;
 
-            foreach (var session in sessions)
+            foreach (SessionMetadata session in sessions)
             {
                 if (session.Operations.Contains(operationName))
                 {
@@ -496,36 +496,36 @@ public class ApduAnalyzer
             return "UNKNOWN";
         }
 
-        var ins = commandHex.Substring(2, 2);
+        string ins = commandHex.Substring(2, 2);
 
-        if (CommandDescriptions.TryGetValue(ins, out var baseDesc))
+        if (CommandDescriptions.TryGetValue(ins, out string baseDesc))
         {
             switch (ins)
             {
                 // Special handling for GET DATA
                 case "CA" when commandHex.Length >= 8:
-                {
-                    var tag = commandHex.Substring(4, 4);
-                    if (GetDataTags.TryGetValue(tag, out var tagDesc))
                     {
-                        return $"GET {tagDesc}";
-                    }
+                        string tag = commandHex.Substring(4, 4);
+                        if (GetDataTags.TryGetValue(tag, out string tagDesc))
+                        {
+                            return $"GET {tagDesc}";
+                        }
 
-                    return $"GET DATA (tag {tag})";
-                }
+                        return $"GET DATA (tag {tag})";
+                    }
 
                 // Special handling for INSTALL
                 case "E6" when commandHex.Length >= 6:
-                {
-                    var p1 = commandHex.Substring(4, 2);
-                    return p1 switch
                     {
-                        "02" => "INSTALL [for load]",
-                        "04" => "INSTALL [for install and make selectable]",
-                        "0C" => "INSTALL [for install]",
-                        _ => $"INSTALL (P1={p1})"
-                    };
-                }
+                        string p1 = commandHex.Substring(4, 2);
+                        return p1 switch
+                        {
+                            "02" => "INSTALL [for load]",
+                            "04" => "INSTALL [for install and make selectable]",
+                            "0C" => "INSTALL [for install]",
+                            _ => $"INSTALL (P1={p1})"
+                        };
+                    }
                 default:
                     return baseDesc;
             }
@@ -542,14 +542,14 @@ public class ApduAnalyzer
             return false;
         }
 
-        var cla = Convert.ToByte(commandHex.Substring(0, 2), 16);
+        byte cla = Convert.ToByte(commandHex.Substring(0, 2), 16);
         return (cla & 0x04) != 0;
     }
 
     public static ScpData ExtractScpData(string commandHex, string responseHex, string description)
     {
-        var scpData = new ScpData();
-        var hasData = false;
+        ScpData scpData = new ScpData();
+        bool hasData = false;
 
         if (description.Contains("INITIALIZE UPDATE"))
         {
@@ -563,7 +563,7 @@ public class ApduAnalyzer
             // Extract data from response
             if (responseHex.Length >= 66 && responseHex.EndsWith("9000"))
             {
-                var responseData = responseHex.Substring(0, responseHex.Length - 4);
+                string responseData = responseHex.Substring(0, responseHex.Length - 4);
                 if (responseData.Length >= 64)
                 {
                     scpData.KeyVersion = Convert.ToInt32(responseData.Substring(20, 2), 16);
@@ -661,31 +661,31 @@ public class OperationDetector
     {
         // First pass: detect all operations
         DetectAllOperations(exchanges);
-        
+
         // Second pass: merge and refine operations
-        var mergedOperations = MergeOperations();
-        
+        Dictionary<string, Operation> mergedOperations = MergeOperations();
+
         // Third pass: assign exchanges to operations
         AssignExchangesToOperations(exchanges, mergedOperations);
-        
+
         return mergedOperations;
     }
 
     private void DetectAllOperations(List<Exchange> exchanges)
     {
         _detectedOperations.Clear();
-        
-        for (var i = 0; i < exchanges.Count; i++)
+
+        for (int i = 0; i < exchanges.Count; i++)
         {
-            var exchange = exchanges[i];
-            var detectedOp = DetectOperationType(exchange);
-            
+            Exchange exchange = exchanges[i];
+            string detectedOp = DetectOperationType(exchange);
+
             if (detectedOp != "unknown")
             {
                 // For LOAD operations, group consecutive ones immediately
                 if (detectedOp == "load_blocks" && _detectedOperations.Count > 0)
                 {
-                    var lastOp = _detectedOperations[_detectedOperations.Count - 1];
+                    DetectedOperation lastOp = _detectedOperations[_detectedOperations.Count - 1];
                     if (lastOp.Type == "load_blocks" && lastOp.EndIndex == i - 1)
                     {
                         // Extend the existing LOAD operation
@@ -698,7 +698,7 @@ public class OperationDetector
                         continue;
                     }
                 }
-                
+
                 _detectedOperations.Add(new DetectedOperation
                 {
                     Type = detectedOp,
@@ -709,31 +709,31 @@ public class OperationDetector
             }
         }
     }
-    
+
     private Dictionary<string, Operation> MergeOperations()
     {
-        var operations = new Dictionary<string, Operation>();
-        
+        Dictionary<string, Operation> operations = new Dictionary<string, Operation>();
+
         // Handle operations that require specific sequences
         MergeSequentialOperations("secure_channel_establish", ["INITIALIZE UPDATE", "EXTERNAL AUTHENTICATE"]);
-        
+
         // Create operations from detected operations
-        for (var i = 0; i < _detectedOperations.Count; i++)
+        for (int i = 0; i < _detectedOperations.Count; i++)
         {
-            var detectedOp = _detectedOperations[i];
-            
+            DetectedOperation detectedOp = _detectedOperations[i];
+
             // Check if this operation is part of an existing operation (by checking overlap)
-            var existingOp = operations.Values.FirstOrDefault(op => 
-                op.StartExchange - 1 <= detectedOp.EndIndex && 
+            Operation existingOp = operations.Values.FirstOrDefault(op =>
+                op.StartExchange - 1 <= detectedOp.EndIndex &&
                 op.EndExchange - 1 >= detectedOp.StartIndex);
-                
+
             if (existingOp != null)
             {
                 continue; // Skip if already part of another operation
             }
 
             // Create operation
-            var opName = GetUniqueOperationName(detectedOp.Type);
+            string opName = GetUniqueOperationName(detectedOp.Type);
             operations[opName] = new Operation
             {
                 Description = GetOperationDescription(detectedOp.Type),
@@ -744,23 +744,23 @@ public class OperationDetector
                 ExpectedCli = OperationPatterns.GetValueOrDefault(detectedOp.Type)?.CliTemplate ?? "gp4net unknown"
             };
         }
-        
+
         return operations;
     }
-    
+
     private void MergeSequentialOperations(string operationType, string[] requiredCommands)
     {
-        var i = 0;
+        int i = 0;
         while (i < _detectedOperations.Count)
         {
-            var sequenceStart = -1;
-            var sequenceEnd = -1;
-            var foundCommands = new List<string>();
-            
+            int sequenceStart = -1;
+            int sequenceEnd = -1;
+            List<string> foundCommands = [];
+
             // Look for the start of the sequence
-            for (var j = i; j < _detectedOperations.Count && j < i + 10; j++) // Look ahead up to 10 exchanges
+            for (int j = i; j < _detectedOperations.Count && j < i + 10; j++) // Look ahead up to 10 exchanges
             {
-                var op = _detectedOperations[j];
+                DetectedOperation op = _detectedOperations[j];
                 if (requiredCommands.Any(cmd => op.Commands.Any(c => c.Contains(cmd))))
                 {
                     if (sequenceStart == -1)
@@ -770,54 +770,54 @@ public class OperationDetector
 
                     sequenceEnd = j;
                     foundCommands.AddRange(op.Commands);
-                    
+
                     // Check if we have all required commands
                     if (requiredCommands.All(cmd => foundCommands.Any(c => c.Contains(cmd))))
                     {
                         // Merge into a single operation
-                        var mergedOp = new DetectedOperation
+                        DetectedOperation mergedOp = new DetectedOperation
                         {
                             Type = operationType,
                             StartIndex = _detectedOperations[sequenceStart].StartIndex,
                             EndIndex = _detectedOperations[sequenceEnd].EndIndex,
                             Commands = foundCommands.Distinct().ToList()
                         };
-                        
+
                         // Replace the original operations
-                        for (var k = sequenceEnd; k >= sequenceStart; k--)
+                        for (int k = sequenceEnd; k >= sequenceStart; k--)
                         {
                             _detectedOperations.RemoveAt(k);
                         }
                         _detectedOperations.Insert(sequenceStart, mergedOp);
-                        
+
                         i = sequenceStart + 1;
                         break;
                     }
                 }
             }
-            
+
             if (sequenceStart == -1)
             {
                 i++;
             }
         }
     }
-    
+
     private void AssignExchangesToOperations(List<Exchange> exchanges, Dictionary<string, Operation> operations)
     {
-        foreach (var exchange in exchanges)
+        foreach (Exchange exchange in exchanges)
         {
             exchange.Operation = "";
             exchange.StepInOperation = 0;
         }
-        
-        foreach (var kvp in operations)
+
+        foreach (KeyValuePair<string, Operation> kvp in operations)
         {
-            var opName = kvp.Key;
-            var operation = kvp.Value;
-            
-            var stepCounter = 1;
-            for (var i = operation.StartExchange - 1; i < operation.EndExchange && i < exchanges.Count; i++)
+            string opName = kvp.Key;
+            Operation operation = kvp.Value;
+
+            int stepCounter = 1;
+            for (int i = operation.StartExchange - 1; i < operation.EndExchange && i < exchanges.Count; i++)
             {
                 exchanges[i].Operation = opName;
                 exchanges[i].StepInOperation = stepCounter++;
@@ -827,11 +827,11 @@ public class OperationDetector
 
     private static string DetectOperationType(Exchange exchange)
     {
-        var description = exchange.Description;
+        string description = exchange.Description;
 
-        foreach (var kvp in OperationPatterns)
+        foreach (KeyValuePair<string, OperationPattern> kvp in OperationPatterns)
         {
-            var pattern = kvp.Value;
+            OperationPattern pattern = kvp.Value;
             if (pattern.Indicators.Any(indicator => description.Contains(indicator)))
             {
                 return kvp.Key;
@@ -840,7 +840,7 @@ public class OperationDetector
 
         return "unknown";
     }
-    
+
     private class DetectedOperation
     {
         public string Type { get; set; } = "";
@@ -896,10 +896,10 @@ public class SessionAnalyzer
 
     public List<SessionMetadata> DetectSessions(List<Exchange> exchanges)
     {
-        var sessions = new List<SessionMetadata>();
+        List<SessionMetadata> sessions = [];
         SessionMetadata currentSession = null;
 
-        foreach (var exchange in exchanges)
+        foreach (Exchange exchange in exchanges)
         {
             // Detect new session start
             if (exchange.Description.Contains("INITIALIZE UPDATE"))
@@ -930,10 +930,10 @@ public class SessionAnalyzer
 
     private SessionMetadata CreateSessionFromInitUpdate(Exchange exchange)
     {
-        var sessionId = $"session_{_sessionCounter}";
+        string sessionId = $"session_{_sessionCounter}";
         _sessionCounter++;
 
-        var scpData = exchange.ScpData;
+        ScpData scpData = exchange.ScpData;
         DerivationData derivationData = null;
 
         if (scpData != null)
@@ -999,9 +999,9 @@ public class MetadataExtractor
 
     private CardInfo ExtractCardInfo(List<Exchange> exchanges)
     {
-        var atr = "3BD518FF8191FE1FC38073C821100A"; // Default ATR
-        var isdAid = FindIsdAid(exchanges);
-        var cplcData = FindCplcData(exchanges);
+        string atr = "3BD518FF8191FE1FC38073C821100A"; // Default ATR
+        string isdAid = FindIsdAid(exchanges);
+        CplcData cplcData = FindCplcData(exchanges);
 
         return new CardInfo
         {
@@ -1014,7 +1014,7 @@ public class MetadataExtractor
 
     private static string FindIsdAid(List<Exchange> exchanges)
     {
-        foreach (var exchange in exchanges)
+        foreach (Exchange exchange in exchanges)
         {
             if (exchange.Description.Contains("SELECT") && exchange.Response.StartsWith("6F"))
             {
@@ -1030,15 +1030,15 @@ public class MetadataExtractor
 
     private static CplcData FindCplcData(List<Exchange> exchanges)
     {
-        foreach (var exchange in exchanges)
+        foreach (Exchange exchange in exchanges)
         {
             if (exchange.Description.Contains("GET CPLC") && exchange.Response.Length > 20)
             {
-                var responseData = exchange.Response;
+                string responseData = exchange.Response;
                 if (responseData.StartsWith("9F7F") && responseData.EndsWith("9000"))
                 {
                     // Parse CPLC data
-                    var cplcHex = responseData.Substring(6, responseData.Length - 10); // Remove tag+length and SW
+                    string cplcHex = responseData.Substring(6, responseData.Length - 10); // Remove tag+length and SW
                     if (cplcHex.Length >= 42) // Minimum CPLC length
                     {
                         return new CplcData
@@ -1072,10 +1072,10 @@ public class UsageExampleGenerator
 {
     public static List<UsageExample> GenerateExamples(Dictionary<string, Operation> operations)
     {
-        var examples = new List<UsageExample>();
+        List<UsageExample> examples = [];
 
         // Single operation examples
-        foreach (var kvp in operations)
+        foreach (KeyValuePair<string, Operation> kvp in operations)
         {
             examples.Add(new UsageExample
             {
@@ -1085,10 +1085,10 @@ public class UsageExampleGenerator
         }
 
         // Workflow examples
-        var opNames = operations.Keys.ToList();
+        List<string> opNames = operations.Keys.ToList();
 
         // Install workflow
-        var installOps = opNames.Where(op => op.Contains("install") || op.Contains("secure_channel") || op == "info").ToList();
+        List<string> installOps = opNames.Where(op => op.Contains("install") || op.Contains("secure_channel") || op == "info").ToList();
         if (installOps.Count > 1)
         {
             examples.Add(new UsageExample

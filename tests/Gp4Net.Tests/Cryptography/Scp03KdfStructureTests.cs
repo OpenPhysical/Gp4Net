@@ -6,7 +6,9 @@
 using System;
 using System.Reflection;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
+using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
 using NUnit.Framework;
@@ -27,7 +29,7 @@ public class Scp03KdfStructureTests
         // Counter || Label || 0x00 || Derivation Constant || 0x00 || L || Context
 
         // Use reflection to access the private DeriveScp03Key method for testing
-        var method = typeof(KeyDerivationService).GetMethod(
+        MethodInfo? method = typeof(KeyDerivationService).GetMethod(
             "DeriveScp03Key",
             BindingFlags.NonPublic | BindingFlags.Instance
         );
@@ -35,11 +37,11 @@ public class Scp03KdfStructureTests
         _ = method.Should().NotBeNull("Could not find DeriveScp03Key method");
 
         // Test parameters
-        var kdk = new byte[16];
+        byte[] kdk = new byte[16];
         Array.Fill(kdk, (byte)0x40);
         // Test parameters (unused but documented for clarity)
         // var derivationConstant = DerivationConstants.SEnc;
-        var context = new byte[16]; // host challenge || card challenge
+        byte[] context = new byte[16]; // host challenge || card challenge
         Array.Fill(context, (byte)0x01);
         // var keyLengthBits = 128;
 
@@ -66,11 +68,11 @@ public class Scp03KdfStructureTests
     public void Scp03Label_IsAllZeros()
     {
         // Verify that the SCP03 label is 11 bytes of zeros
-        var label = DerivationConstants.Scp03Label;
+        byte[]? label = DerivationConstants.Scp03Label;
 
         _ = label.Length.Should().Be(11);
 
-        foreach (var b in label)
+        foreach (byte b in label)
         {
             _ = b.Should().Be(0x00, "All bytes in SCP03 label should be 0x00");
         }
@@ -80,19 +82,19 @@ public class Scp03KdfStructureTests
     public void DeriveScp03SessionKeys_ProducesThreeDifferentKeys()
     {
         // Arrange
-        var kdk = new byte[16];
+        byte[] kdk = new byte[16];
         Array.Fill(kdk, (byte)0xFF);
 
-        var keySet = new Gp4Net.Domain.Keys.Scp03KeySet(encKey: kdk, macKey: kdk, dekKey: kdk);
+        Scp03KeySet keySet = new Scp03KeySet(encKey: kdk, macKey: kdk, dekKey: kdk);
 
-        var hostChallenge = new byte[8];
+        byte[] hostChallenge = new byte[8];
         Array.Fill(hostChallenge, (byte)0xAA);
 
-        var cardChallenge = new byte[8];
+        byte[] cardChallenge = new byte[8];
         Array.Fill(cardChallenge, (byte)0xBB);
 
         // Act
-        var result = KeyDerivation.DeriveScp03SessionKeys(
+        Result<SessionKeys, SmartCardError> result = KeyDerivation.DeriveScp03SessionKeys(
             keySet,
             hostChallenge,
             cardChallenge,
@@ -101,7 +103,7 @@ public class Scp03KdfStructureTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var sessionKeys = result.Value;
+        SessionKeys? sessionKeys = result.Value;
 
         // All three keys should be different due to different derivation constants
         _ = sessionKeys.SEnc.Should()
@@ -116,23 +118,23 @@ public class Scp03KdfStructureTests
     public void DeriveScp03SessionKeys_SameInputs_ProducesSameOutputs()
     {
         // Test deterministic behavior
-        var keySet = new Gp4Net.Domain.Keys.Scp03KeySet(
+        Scp03KeySet keySet = new Scp03KeySet(
             encKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
             macKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
             dekKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F")
         );
 
-        var hostChallenge = Convert.FromHexString("0102030405060708");
-        var cardChallenge = Convert.FromHexString("0807060504030201");
+        byte[] hostChallenge = Convert.FromHexString("0102030405060708");
+        byte[] cardChallenge = Convert.FromHexString("0807060504030201");
 
         // Act - derive keys twice
-        var result1 = KeyDerivation.DeriveScp03SessionKeys(
+        Result<SessionKeys, SmartCardError> result1 = KeyDerivation.DeriveScp03SessionKeys(
             keySet,
             hostChallenge,
             cardChallenge,
             128
         );
-        var result2 = KeyDerivation.DeriveScp03SessionKeys(
+        Result<SessionKeys, SmartCardError> result2 = KeyDerivation.DeriveScp03SessionKeys(
             keySet,
             hostChallenge,
             cardChallenge,
@@ -143,8 +145,8 @@ public class Scp03KdfStructureTests
         _ = result1.IsSuccess.Should().BeTrue();
         _ = result2.IsSuccess.Should().BeTrue();
 
-        var sessionKeys1 = result1.Value;
-        var sessionKeys2 = result2.Value;
+        SessionKeys? sessionKeys1 = result1.Value;
+        SessionKeys? sessionKeys2 = result2.Value;
 
         _ = sessionKeys1.SEnc.Should()
             .Equal(sessionKeys2.SEnc, "S-ENC should be deterministic");

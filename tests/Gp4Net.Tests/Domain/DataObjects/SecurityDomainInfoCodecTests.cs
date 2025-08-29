@@ -5,6 +5,7 @@
 
 using System;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.DataObjects;
 using NUnit.Framework;
@@ -17,7 +18,7 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Encode_CompleteSecurityDomainInfo_ProducesExpectedFormat()
     {
-        var sdInfo = new SecurityDomainInfo
+        SecurityDomainInfo sdInfo = new SecurityDomainInfo
         {
             Oid = Convert.FromHexString("A000000151000000"), // GP OID
             SecurityDomainAid = Convert.FromHexString("4F08A000000151000000"), // AID with length
@@ -25,11 +26,11 @@ public class SecurityDomainInfoCodecTests
             LifeCycleData = Convert.FromHexString("07")
         };
 
-        var encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
+        Result<byte[], SmartCardError> encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
 
         // Assert encoding succeeded
         _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
-        var encoded = encodedResult.Value;
+        byte[]? encoded = encodedResult.Value;
 
         _ = encoded.Should().NotBeEmpty();
         _ = encoded[0].Should().Be(0xC1, "first byte should be tag 0xC1");
@@ -49,16 +50,16 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Encode_MinimalSecurityDomainInfo_ProducesValidFormat()
     {
-        var sdInfo = new SecurityDomainInfo
+        SecurityDomainInfo sdInfo = new SecurityDomainInfo
         {
             Oid = Convert.FromHexString("A000000151")
         };
 
-        var encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
+        Result<byte[], SmartCardError> encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
 
         // Assert encoding succeeded
         _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
-        var encoded = encodedResult.Value;
+        byte[]? encoded = encodedResult.Value;
 
         _ = encoded.Should().NotBeEmpty();
         _ = encoded[0].Should().Be(0xC1);
@@ -71,18 +72,18 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Decode_ValidSecurityDomainInfo_ReturnsCorrectStructure()
     {
-        var testData = new byte[]
-        {
+        byte[] testData =
+        [
             0xC1, 0x13, // Tag and length (19 bytes)
             0x9F, 0x70, 0x08, 0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x00, // OID
             0xC5, 0x03, 0x01, 0x02, 0x03, // Image data
             0xC4, 0x01, 0x07 // Lifecycle data
-        };
+        ];
 
-        var result = SecurityDomainInfoCodec.Decode(testData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(testData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var sdInfo = result.Value;
+        SecurityDomainInfo? sdInfo = result.Value;
 
         _ = sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
         _ = sdInfo.ImageData.Should().BeEquivalentTo(new byte[] { 0x01, 0x02, 0x03 });
@@ -92,17 +93,17 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Decode_WithSecurityDomainAid_ParsesCorrectly()
     {
-        var testData = new byte[]
-        {
+        byte[] testData =
+        [
             0xC1, 0x0F, // Tag and length (15 bytes)
             0x9F, 0x70, 0x05, 0xA0, 0x00, 0x00, 0x01, 0x51, // OID
             0x4F, 0x05, 0xA0, 0x00, 0x00, 0x01, 0x51 // Security Domain AID
-        };
+        ];
 
-        var result = SecurityDomainInfoCodec.Decode(testData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(testData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var sdInfo = result.Value;
+        SecurityDomainInfo? sdInfo = result.Value;
 
         _ = sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
         _ = sdInfo.SecurityDomainAid.Should().NotBeNull();
@@ -113,9 +114,9 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Decode_InvalidTag_ReturnsError()
     {
-        var invalidData = new byte[] { 0xC2, 0x03, 0x01, 0x02, 0x03 }; // Wrong tag
+        byte[] invalidData = [0xC2, 0x03, 0x01, 0x02, 0x03]; // Wrong tag
 
-        var result = SecurityDomainInfoCodec.Decode(invalidData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(invalidData);
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
@@ -126,23 +127,23 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Decode_ExtendedLength_HandlesCorrectly()
     {
-        var testData = new byte[]
-        {
+        byte[] testData =
+        [
             0xC1, 0x81, 0x08, // Tag with extended length (8 bytes content)
             0x9F, 0x70, 0x05, 0xA0, 0x00, 0x00, 0x01, 0x51 // OID only
-        };
+        ];
 
-        var result = SecurityDomainInfoCodec.Decode(testData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(testData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var sdInfo = result.Value;
+        SecurityDomainInfo? sdInfo = result.Value;
         _ = sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
     }
 
     [Test]
     public void RoundTrip_PreservesAllData()
     {
-        var original = new SecurityDomainInfo
+        SecurityDomainInfo original = new SecurityDomainInfo
         {
             Oid = Convert.FromHexString("A000000151000000"),
             SecurityDomainAid = Convert.FromHexString("4F08A000000151000000"),
@@ -150,13 +151,13 @@ public class SecurityDomainInfoCodecTests
             LifeCycleData = Convert.FromHexString("0F")
         };
 
-        var encodedResult = SecurityDomainInfoCodec.Encode(original);
+        Result<byte[], SmartCardError> encodedResult = SecurityDomainInfoCodec.Encode(original);
         _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
-        var encoded = encodedResult.Value;
-        var decoded = SecurityDomainInfoCodec.Decode(encoded);
+        byte[]? encoded = encodedResult.Value;
+        Result<SecurityDomainInfo, SmartCardError> decoded = SecurityDomainInfoCodec.Decode(encoded);
 
         _ = decoded.IsSuccess.Should().BeTrue();
-        var result = decoded.Value;
+        SecurityDomainInfo? result = decoded.Value;
 
         _ = result.Oid.Should().BeEquivalentTo(original.Oid);
         _ = result.SecurityDomainAid.Should().BeEquivalentTo(original.SecurityDomainAid);
@@ -167,13 +168,13 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Encode_EmptySecurityDomainInfo_ProducesMinimalStructure()
     {
-        var sdInfo = new SecurityDomainInfo();
+        SecurityDomainInfo sdInfo = new SecurityDomainInfo();
 
-        var encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
+        Result<byte[], SmartCardError> encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
 
         // Assert encoding succeeded
         _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
-        var encoded = encodedResult.Value;
+        byte[]? encoded = encodedResult.Value;
 
         _ = encoded.Should().NotBeEmpty();
         _ = encoded[0].Should().Be(0xC1);
@@ -184,12 +185,12 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Decode_EmptySecurityDomainInfo_ReturnsEmptyStructure()
     {
-        var emptyData = new byte[] { 0xC1, 0x00 }; // Tag with zero length
+        byte[] emptyData = [0xC1, 0x00]; // Tag with zero length
 
-        var result = SecurityDomainInfoCodec.Decode(emptyData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(emptyData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var sdInfo = result.Value;
+        SecurityDomainInfo? sdInfo = result.Value;
         _ = sdInfo.Oid.Should().BeNull();
         _ = sdInfo.SecurityDomainAid.Should().BeNull();
         _ = sdInfo.ImageData.Should().BeNull();
@@ -199,16 +200,16 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Decode_OnlyOid_ParsesCorrectly()
     {
-        var testData = new byte[]
-        {
+        byte[] testData =
+        [
             0xC1, 0x08, // Tag and length
             0x9F, 0x70, 0x05, 0xA0, 0x00, 0x00, 0x01, 0x51 // OID only
-        };
+        ];
 
-        var result = SecurityDomainInfoCodec.Decode(testData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(testData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var sdInfo = result.Value;
+        SecurityDomainInfo? sdInfo = result.Value;
 
         _ = sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
         _ = sdInfo.SecurityDomainAid.Should().BeNull();
@@ -219,32 +220,32 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Decode_MalformedOidTag_HandlesGracefully()
     {
-        var testData = new byte[]
-        {
+        byte[] testData =
+        [
             0xC1, 0x03, // Tag and length (3 bytes)
             0x9F, 0x70, 0x00 // OID with zero length
-        };
+        ];
 
-        var result = SecurityDomainInfoCodec.Decode(testData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(testData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var sdInfo = result.Value;
+        SecurityDomainInfo? sdInfo = result.Value;
         _ = sdInfo.Oid.Should().BeNull(); // Should not set zero-length OID
     }
 
     [Test]
     public void Encode_OnlyImageData_ProducesValidStructure()
     {
-        var sdInfo = new SecurityDomainInfo
+        SecurityDomainInfo sdInfo = new SecurityDomainInfo
         {
             ImageData = Convert.FromHexString("ABCDEF")
         };
 
-        var encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
+        Result<byte[], SmartCardError> encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
 
         // Assert encoding succeeded
         _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
-        var encoded = encodedResult.Value;
+        byte[]? encoded = encodedResult.Value;
 
         _ = encoded.Should().NotBeEmpty();
         _ = encoded[0].Should().Be(0xC1);
@@ -256,17 +257,17 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Decode_UnknownTags_IgnoresGracefully()
     {
-        var testData = new byte[]
-        {
+        byte[] testData =
+        [
             0xC1, 0x0C, // Tag and length (12 bytes)
             0x9F, 0x70, 0x05, 0xA0, 0x00, 0x00, 0x01, 0x51, // OID
             0xC6, 0x02, 0xFF, 0xFE // Unknown tag with data
-        };
+        ];
 
-        var result = SecurityDomainInfoCodec.Decode(testData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(testData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var sdInfo = result.Value;
+        SecurityDomainInfo? sdInfo = result.Value;
         _ = sdInfo.Oid.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
         // Unknown tag should be handled as potential AID data
         _ = sdInfo.SecurityDomainAid.Should().NotBeNull();

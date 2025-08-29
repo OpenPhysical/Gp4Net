@@ -1,4 +1,3 @@
-using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
@@ -18,7 +17,7 @@ public sealed class SetStatusCommand : BaseApduCommand
     {
         _p1 = p1;
         _p2 = p2;
-        _data = data ?? [];
+        _data = Maybe<byte[]>.From(data).GetValueOrDefault([]);
     }
 
     /// <inheritdoc/>
@@ -47,11 +46,13 @@ public sealed class SetStatusCommand : BaseApduCommand
     /// <returns>The command or an error.</returns>
     public static Result<SetStatusCommand, SmartCardError> Create(byte[] aid, byte p1)
     {
-        if (aid == null)
-        {
-            return Result.Failure<SetStatusCommand, SmartCardError>(
-                SmartCardError.InvalidArgument("AID cannot be null"));
-        }
+        return Maybe<byte[]>.From(aid).Match(
+            Some: aidValue => CreateSetStatusCommand(aidValue, p1),
+            None: () => SmartCardError.InvalidArgument("AID cannot be null"));
+    }
+
+    private static Result<SetStatusCommand, SmartCardError> CreateSetStatusCommand(byte[] aid, byte p1)
+    {
 
         // P2 is always 0x00 for SET STATUS
         byte p2 = 0x00;
@@ -59,8 +60,7 @@ public sealed class SetStatusCommand : BaseApduCommand
         // For card-level operations (empty AID), we send a zero-length data field
         byte[] data = aid.Length > 0 ? aid : [];
 
-        return Result.Success<SetStatusCommand, SmartCardError>(
-            new SetStatusCommand(p1, p2, data));
+        return new SetStatusCommand(p1, p2, data);
     }
 
     /// <summary>
@@ -70,14 +70,11 @@ public sealed class SetStatusCommand : BaseApduCommand
     /// <returns>The command or an error.</returns>
     public static Result<SetStatusCommand, SmartCardError> CreateForMakeSelectable(byte[] aid)
     {
-        if (aid == null || aid.Length == 0)
-        {
-            return Result.Failure<SetStatusCommand, SmartCardError>(
-                SmartCardError.InvalidArgument("AID is required for make selectable"));
-        }
-
-        // P1=0x07 for make selectable
-        return Create(aid, 0x07);
+        return Maybe<byte[]>.From(aid).Match(
+            Some: aidValue => aidValue.Length == 0
+                ? SmartCardError.InvalidArgument("AID is required for make selectable")
+                : Create(aidValue, 0x07),
+            None: () => SmartCardError.InvalidArgument("AID is required for make selectable"));
     }
 
     /// <summary>
@@ -87,14 +84,11 @@ public sealed class SetStatusCommand : BaseApduCommand
     /// <returns>The command or an error.</returns>
     public static Result<SetStatusCommand, SmartCardError> CreateForLock(byte[] aid)
     {
-        if (aid == null || aid.Length == 0)
-        {
-            return Result.Failure<SetStatusCommand, SmartCardError>(
-                SmartCardError.InvalidArgument("AID is required for lock"));
-        }
-
-        // P1=0x83 for lock
-        return Create(aid, 0x83);
+        return Maybe<byte[]>.From(aid).Match(
+            Some: aidValue => aidValue.Length == 0
+                ? SmartCardError.InvalidArgument("AID is required for lock")
+                : Create(aidValue, 0x83),
+            None: () => SmartCardError.InvalidArgument("AID is required for lock"));
     }
 
     /// <summary>

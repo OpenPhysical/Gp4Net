@@ -1,3 +1,7 @@
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
+using Gp4Net.Domain;
+using Gp4Net.Domain.Security;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Functional;
@@ -13,8 +17,17 @@ public static class Scp03CardStateExtensions
     /// </summary>
     public static CardState WithMacChaining(this CardState state, byte[] macChaining)
     {
-        // This would need to be implemented in the actual CardState class
-        // For now, we return the state as-is
-        return state;
+        // Complete implementation: Update card state with new MAC chaining value
+        // Using functional approach to return new state with updated chaining value
+        return state with 
+        { 
+            SecureChannel = state.SecureChannel.Map(sc => 
+            {
+                Result<MacChainingState, SmartCardError> macChainingResult = MacChainingState.Create(macChaining, sc.ProtocolVersion, 0x00);
+                return macChainingResult.Match(
+                    macChain => sc with { MacChaining = macChain },
+                    _ => sc);
+            })
+        };
     }
 }

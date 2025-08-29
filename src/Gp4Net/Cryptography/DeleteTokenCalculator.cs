@@ -1,7 +1,7 @@
-using System;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Org.BouncyCastle.Crypto.Macs;
 
 namespace Gp4Net.Cryptography;
 
@@ -45,9 +45,11 @@ public static class DeleteTokenCalculator
         }
 
         // Step 1: build TLV for object to delete (AID)
-        var body = new List<byte>();
-        body.Add(0x4F); // tag for AID
-        body.Add((byte)aid.Length);
+        List<byte> body =
+        [
+            0x4F, // tag for AID
+            (byte)aid.Length
+        ];
         body.AddRange(aid);
         // Add optional TLV (B6 etc) if present
         if (optionalTlv.HasValue && optionalTlv.Value.Length > 0)
@@ -56,19 +58,21 @@ public static class DeleteTokenCalculator
         }
 
         // Step 2: build BER-TLV length for body (L or 0x81 L or 0x82 LL)
-        var berLength = EncodeBerLength(body.Count);
+        byte[] berLength = EncodeBerLength(body.Count);
 
         // Step 3: input buffer: P1||P2||length(BER) || TLV [4F... aid] [more TLVs]
-        var input = new List<byte>();
-        input.Add(p1); // DELETE P1
-        input.Add(p2); // DELETE P2
+        List<byte> input =
+        [
+            p1, // DELETE P1
+            p2 // DELETE P2
+        ];
         input.AddRange(berLength); // Length of body
         input.AddRange(body); // TLVs
 
         // Step 4: CMAC use
-        var cmac = new Org.BouncyCastle.Crypto.Macs.CMac(new Org.BouncyCastle.Crypto.Engines.AesEngine(), 128);
+        CMac cmac = new Org.BouncyCastle.Crypto.Macs.CMac(new Org.BouncyCastle.Crypto.Engines.AesEngine(), 128);
         cmac.Init(new Org.BouncyCastle.Crypto.Parameters.KeyParameter(macKey));
-        var mac = new byte[16];
+        byte[] mac = new byte[16];
         cmac.BlockUpdate(input.ToArray(), 0, input.Count);
         _ = cmac.DoFinal(mac, 0);
         return Result.Success<byte[], SmartCardError>(mac);

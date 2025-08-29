@@ -25,9 +25,9 @@ public class PackageRegistry
     /// </summary>
     public PackageRegistry()
     {
-        Result<(ImmutableDictionary<string, PackageInfo> packages, ImmutableDictionary<string, PackageInfo> aidLookup), SmartCardError> result = 
+        Result<(ImmutableDictionary<string, PackageInfo> packages, ImmutableDictionary<string, PackageInfo> aidLookup), SmartCardError> result =
             LoadPackageDatabase();
-        
+
         if (result.IsSuccess)
         {
             _packages = result.Value.packages.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
@@ -60,7 +60,7 @@ public class PackageRegistry
     /// <returns>True if the AID was resolved, false otherwise.</returns>
     public bool TryResolveAid(byte[] aid, out PackageInfo packageInfo)
     {
-        var aidHex = Convert.ToHexString(aid).ToUpper();
+        string aidHex = Convert.ToHexString(aid).ToUpper();
         return TryResolveAid(aidHex, out packageInfo);
     }
 
@@ -99,14 +99,14 @@ public class PackageRegistry
         Assembly assembly = Assembly.GetExecutingAssembly();
         string resourceName = "Gp4Net.Data.known-packages.json";
 
-        var streamMaybe = Maybe<Stream>.From(assembly.GetManifestResourceStream(resourceName));
+        Maybe<Stream> streamMaybe = Maybe<Stream>.From(assembly.GetManifestResourceStream(resourceName));
         if (streamMaybe.HasNoValue)
         {
             return Result.Failure<(ImmutableDictionary<string, PackageInfo>, ImmutableDictionary<string, PackageInfo>), SmartCardError>(
                 SmartCardError.InvalidArgument($"Could not find embedded resource: {resourceName}"));
         }
-        
-        using var stream = streamMaybe.Value;
+
+        using Stream stream = streamMaybe.Value;
 
         using StreamReader reader = new StreamReader(stream);
         string json = reader.ReadToEnd();
@@ -116,14 +116,14 @@ public class PackageRegistry
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         };
 
-        var databaseMaybe = Maybe<PackageDatabase>.From(JsonSerializer.Deserialize<PackageDatabase>(json, options));
+        Maybe<PackageDatabase> databaseMaybe = Maybe<PackageDatabase>.From(JsonSerializer.Deserialize<PackageDatabase>(json, options));
         if (databaseMaybe.HasNoValue || databaseMaybe.Value.Packages.Count == 0)
         {
             return Result.Failure<(ImmutableDictionary<string, PackageInfo>, ImmutableDictionary<string, PackageInfo>), SmartCardError>(
                 SmartCardError.InvalidArgument("Invalid package database format"));
         }
-        
-        var database = databaseMaybe.Value;
+
+        PackageDatabase database = databaseMaybe.Value;
 
         // Functional transformation to immutable collections
         ImmutableDictionary<string, PackageInfo> packages = database.Packages

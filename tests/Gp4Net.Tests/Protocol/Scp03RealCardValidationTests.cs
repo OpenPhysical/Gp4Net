@@ -6,6 +6,8 @@
 using System;
 using System.Linq;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
@@ -36,21 +38,21 @@ public class Scp03RealCardValidationTests
     public void SCP03_InitializeUpdateParsing_WithRealCardResponse_ParsesCorrectly(Scp03RealCardTestVector vector)
     {
         // Test parsing of real INITIALIZE UPDATE response
-        var responseData = vector.InitializeUpdateResponse.Take(vector.InitializeUpdateResponse.Length - 2).ToArray(); // Remove SW1SW2
-        
+        byte[] responseData = vector.InitializeUpdateResponse.Take(vector.InitializeUpdateResponse.Length - 2).ToArray(); // Remove SW1SW2
+
         // Debug: Print the actual data
         Console.WriteLine($"Full response: {Convert.ToHexString(vector.InitializeUpdateResponse)}");
         Console.WriteLine($"Response data (without SW): {Convert.ToHexString(responseData)}");
         Console.WriteLine($"Expected KDD: {Convert.ToHexString(vector.KDD)}");
         Console.WriteLine($"Expected SCP Version: 0x{vector.ScpVersion:X2}");
         Console.WriteLine($"Expected Implementation Option: 0x{vector.ImplementationOption:X2}");
-        
-        var responseResult = InitializeUpdateResponse.Parse(responseData);
+
+        Result<InitializeUpdateResponse, SmartCardError> responseResult = InitializeUpdateResponse.Parse(responseData);
 
         // Assert parsing succeeded
         _ = responseResult.IsSuccess.Should().BeTrue($"Failed to parse INITIALIZE UPDATE response for {vector.Name}");
-        var response = responseResult.Value;
-        
+        InitializeUpdateResponse? response = responseResult.Value;
+
         Console.WriteLine($"Parsed KDD: {Convert.ToHexString(response.KeyDiversificationData)}");
         Console.WriteLine($"Parsed ScpId: 0x{response.ScpId:X2}");
         Console.WriteLine($"Parsed ScpParameter: 0x{response.ScpParameter:X2}");
@@ -67,12 +69,12 @@ public class Scp03RealCardValidationTests
         _ = response.ScpParameter.Should().Be(vector.ImplementationOption,
             $"Implementation option parsing failed for {vector.Name}");
     }
-    
+
     [Test]
     public void SCP03_RealCardVector_DataIntegrity_AllFieldsPopulated()
     {
         // Validate that our real card test vector has all required data
-        var vector = Scp03RealCardTestVectors.P71_SCP03_Session;
+        Scp03RealCardTestVector vector = Scp03RealCardTestVectors.P71_SCP03_Session;
 
         _ = vector.Name.Should().NotBeNullOrEmpty();
         _ = vector.Description.Should().NotBeNullOrEmpty();
@@ -94,12 +96,12 @@ public class Scp03RealCardValidationTests
         _ = vector.ExternalAuthenticateCommand.Should().NotBeEmpty();
         _ = vector.ExternalAuthenticateResponse.Should().NotBeEmpty();
     }
-    
+
     [Test]
     public void SCP03_RealCardVector_P71_SupportsExpectedCapabilities()
     {
         // Validate P71 card capabilities match expected values from trace
-        var vector = Scp03RealCardTestVectors.P71_SCP03_Session;
+        Scp03RealCardTestVector vector = Scp03RealCardTestVectors.P71_SCP03_Session;
 
         _ = vector.SupportedSCPVersions.Should().Contain("i=70",
             "P71 card should support SCP03 i=70");

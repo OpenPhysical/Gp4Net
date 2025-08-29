@@ -1,8 +1,10 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
-using Spectre.Console;
 
 namespace Gp4Net.Tool.Commands.Card;
 
@@ -22,12 +24,15 @@ public class ListReadersCommand : IPipelineCommand<ListReadersCommand.Settings>
         {
             return await context
                 .WithVerbose(settings.Verbose)
-                .ExecuteAsync(ctx =>
+                .ExecuteAsync(async ctx =>
                 {
-                    var readers = ctx.CardService.GetReaders();
+                    Result<string[], SmartCardError> readersResult = await ctx.CardService.GetReadersAsync();
+                    string[] readers = readersResult.Match(
+                        success => success,
+                        error => []);
 
                     // Build semantic rows using pure functional composition
-                    var semanticRows = ReaderTableBuilder.BuildReaderRows(
+                    List<ReaderTableBuilder.ReaderRow> semanticRows = ReaderTableBuilder.BuildReaderRows(
                         readers,
                         showSummary: true
                     ).ToList();
@@ -39,12 +44,12 @@ public class ListReadersCommand : IPipelineCommand<ListReadersCommand.Settings>
                         return 0;
                     }
 
-                    ctx.Display.Success($"Found {readers.Count} card reader(s):");
+                    ctx.Display.Success($"Found {readers.Length} card reader(s):");
 
                     // Render using semantic table renderer
                     ReaderTableRenderer.RenderToTable(semanticRows);
                     ReaderTableRenderer.RenderPostTableRows(semanticRows);
-                    
+
                     return 0;
                 });
         }

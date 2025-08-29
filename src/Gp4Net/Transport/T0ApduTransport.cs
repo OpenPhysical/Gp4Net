@@ -76,12 +76,12 @@ public class T0ApduTransport : IApduTransport
         }
 
         // Build APDU according to T=0 rules
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[] apdu = ApduBuilder.BuildApdu(command);
 
         _logger.LogDebug("T=0 Transmit: {Apdu}", BitConverter.ToString(apdu));
 
         // Send command
-        var response = await channel
+        byte[] response = await channel
             .TransmitAsync(apdu, cancellationToken)
             .ConfigureAwait(false);
 
@@ -109,11 +109,11 @@ public class T0ApduTransport : IApduTransport
             throw new InvalidOperationException("Response too short");
         }
 
-        var sw1 = response[response.Length - 2];
-        var sw2 = response[response.Length - 1];
-        var statusWord = (ushort)((sw1 << 8) | sw2);
+        byte sw1 = response[response.Length - 2];
+        byte sw2 = response[response.Length - 1];
+        ushort statusWord = (ushort)((sw1 << 8) | sw2);
 
-        var data = new byte[response.Length - 2];
+        byte[] data = new byte[response.Length - 2];
         if (data.Length > 0)
         {
             Array.Copy(response, 0, data, 0, data.Length);
@@ -123,41 +123,41 @@ public class T0ApduTransport : IApduTransport
         {
             // Handle T=0 specific status words
             case 0x61:
-            {
-                // More data available, send GET RESPONSE
-                var remainingData = await GetResponseAsync(sw2, channel, cancellationToken)
-                    .ConfigureAwait(false);
-
-                // Security check: Validate combined data size before allocation
-                var totalLength = data.Length + remainingData.Data.Length;
-                if (totalLength > ApduConstants.MaxTotalResponseSize)
                 {
-                    throw new InvalidOperationException(
-                        $"Combined response size ({totalLength}) exceeds maximum ({ApduConstants.MaxTotalResponseSize})");
+                    // More data available, send GET RESPONSE
+                    ApduResponse remainingData = await GetResponseAsync(sw2, channel, cancellationToken)
+                        .ConfigureAwait(false);
+
+                    // Security check: Validate combined data size before allocation
+                    int totalLength = data.Length + remainingData.Data.Length;
+                    if (totalLength > ApduConstants.MaxTotalResponseSize)
+                    {
+                        throw new InvalidOperationException(
+                            $"Combined response size ({totalLength}) exceeds maximum ({ApduConstants.MaxTotalResponseSize})");
+                    }
+
+                    // Combine data
+                    byte[] combinedData = new byte[totalLength];
+                    Array.Copy(data, 0, combinedData, 0, data.Length);
+                    Array.Copy(
+                        remainingData.Data,
+                        0,
+                        combinedData,
+                        data.Length,
+                        remainingData.Data.Length
+                    );
+
+                    return new ApduResponse(combinedData, remainingData.StatusWord);
                 }
-
-                // Combine data
-                var combinedData = new byte[totalLength];
-                Array.Copy(data, 0, combinedData, 0, data.Length);
-                Array.Copy(
-                    remainingData.Data,
-                    0,
-                    combinedData,
-                    data.Length,
-                    remainingData.Data.Length
-                );
-
-                return new ApduResponse(combinedData, remainingData.StatusWord);
-            }
             case 0x6C when command.ExpectedResponseLength.HasValue:
-            {
-                // Wrong Le, retry with correct length
-                _logger.LogDebug("Wrong Le, retrying with Le={Le}", sw2);
+                {
+                    // Wrong Le, retry with correct length
+                    _logger.LogDebug("Wrong Le, retrying with Le={Le}", sw2);
 
-                var retryCommand = new ApduCommandWrapper(command, sw2);
-                return await TransmitAsync(retryCommand, channel, cancellationToken)
-                    .ConfigureAwait(false);
-            }
+                    ApduCommandWrapper retryCommand = new ApduCommandWrapper(command, sw2);
+                    return await TransmitAsync(retryCommand, channel, cancellationToken)
+                        .ConfigureAwait(false);
+                }
             default:
                 return new ApduResponse(data, statusWord);
         }
@@ -170,10 +170,10 @@ public class T0ApduTransport : IApduTransport
         CancellationToken cancellationToken
     )
     {
-        var allData = new List<byte>();
-        var currentLength = length;
-        var chainCount = 0;
-        var totalSize = 0;
+        List<byte> allData = [];
+        byte currentLength = length;
+        int chainCount = 0;
+        int totalSize = 0;
         ushort finalStatusWord = 0;
 
         // Iterative approach to prevent stack overflow from malicious cards
@@ -187,12 +187,12 @@ public class T0ApduTransport : IApduTransport
             }
 
             // GET RESPONSE: CLA=00 INS=C0 P1=00 P2=00 Le=currentLength
-            var getResponse = new byte[] { 0x00, 0xC0, 0x00, 0x00, currentLength };
+            byte[] getResponse = [0x00, 0xC0, 0x00, 0x00, currentLength];
 
-            _logger.LogDebug("T=0 GET RESPONSE for {Length} bytes (chain {ChainCount})", 
+            _logger.LogDebug("T=0 GET RESPONSE for {Length} bytes (chain {ChainCount})",
                 currentLength == 0 ? 256 : currentLength, chainCount);
 
-            var response = await channel
+            byte[] response = await channel
                 .TransmitAsync(getResponse, cancellationToken)
                 .ConfigureAwait(false);
 
@@ -201,12 +201,12 @@ public class T0ApduTransport : IApduTransport
                 throw new InvalidOperationException("GET RESPONSE failed");
             }
 
-            var sw1 = response[response.Length - 2];
-            var sw2 = response[response.Length - 1];
+            byte sw1 = response[response.Length - 2];
+            byte sw2 = response[response.Length - 1];
             finalStatusWord = (ushort)((sw1 << 8) | sw2);
 
             // Extract data portion
-            var dataLength = response.Length - 2;
+            int dataLength = response.Length - 2;
             if (dataLength > 0)
             {
                 // Security check: Prevent memory exhaustion from excessive response data
@@ -217,7 +217,7 @@ public class T0ApduTransport : IApduTransport
                 }
 
                 // Add data to accumulator
-                for (var i = 0; i < dataLength; i++)
+                for (int i = 0; i < dataLength; i++)
                 {
                     allData.Add(response[i]);
                 }

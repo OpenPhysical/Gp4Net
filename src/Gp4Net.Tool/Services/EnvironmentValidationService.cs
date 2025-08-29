@@ -77,19 +77,19 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         try
         {
             // Detect card environment
-            var cardEnvResult = await DetectCardEnvironmentAsync(channel, transport, cancellationToken);
+            Result<CardEnvironment, SmartCardError> cardEnvResult = await DetectCardEnvironmentAsync(channel, transport, cancellationToken);
             if (cardEnvResult.IsFailure)
             {
                 return Result.Failure<EnvironmentValidationResult, SmartCardError>(cardEnvResult.Error);
             }
 
-            var cardEnvironment = cardEnvResult.Value;
-            var isTestKeySet = IsTestKeySet(keySet);
+            CardEnvironment cardEnvironment = cardEnvResult.Value;
+            bool isTestKeySet = IsTestKeySet(keySet);
 
             // Analyze safety of the combination
-            var (isSafe, message, warnings) = AnalyzeSafety(cardEnvironment, isTestKeySet);
+            (bool isSafe, string message, string[] warnings) = AnalyzeSafety(cardEnvironment, isTestKeySet);
 
-            var result = new EnvironmentValidationResult(
+            EnvironmentValidationResult result = new EnvironmentValidationResult(
                 isSafe,
                 cardEnvironment,
                 isTestKeySet,
@@ -121,9 +121,9 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         ArgumentNullException.ThrowIfNull(keySet);
 
         // Check if any of the keys match well-known test keys
-        var keyBytes = new[] { keySet.EncKey, keySet.MacKey, keySet.DekKey };
-            
-        foreach (var key in keyBytes)
+        byte[][] keyBytes = [keySet.EncKey, keySet.MacKey, keySet.DekKey];
+
+        foreach (byte[] key in keyBytes)
         {
             if (key != null && WellKnownTestKeys.Any(testKey => testKey.SequenceEqual(key)))
             {
@@ -153,10 +153,10 @@ public class EnvironmentValidationService : IEnvironmentValidationService
             }
 
             // Try to get CPLC data to identify card type
-            var cplcResult = await GetCplcDataAsync(channel, transport, cancellationToken);
+            Result<byte[], SmartCardError> cplcResult = await GetCplcDataAsync(channel, transport, cancellationToken);
             if (cplcResult.IsSuccess)
             {
-                var environment = AnalyzeCplcData(cplcResult.Value);
+                CardEnvironment environment = AnalyzeCplcData(cplcResult.Value);
                 if (environment != CardEnvironment.Unknown)
                 {
                     return Result.Success<CardEnvironment, SmartCardError>(environment);
@@ -164,7 +164,7 @@ public class EnvironmentValidationService : IEnvironmentValidationService
             }
 
             // Fallback: analyze card behavior patterns
-            var behaviorEnvironment = await AnalyzeCardBehaviorAsync(channel, transport, cancellationToken);
+            CardEnvironment behaviorEnvironment = await AnalyzeCardBehaviorAsync(channel, transport, cancellationToken);
             return Result.Success<CardEnvironment, SmartCardError>(behaviorEnvironment);
         }
         catch (Exception ex)
@@ -177,9 +177,9 @@ public class EnvironmentValidationService : IEnvironmentValidationService
     private static bool IsVirtualCard(ICardChannel channel)
     {
         // Check if the channel implementation suggests a virtual card
-        var channelType = channel.GetType().Name;
-        return channelType.Contains("Virtual") || 
-               channelType.Contains("Mock") || 
+        string channelType = channel.GetType().Name;
+        return channelType.Contains("Virtual") ||
+               channelType.Contains("Mock") ||
                channelType.Contains("Trace") ||
                channelType.Contains("Emulator");
     }
@@ -193,13 +193,13 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         try
         {
             // GET DATA for CPLC (Card Production Life Cycle) - tag 9F7F
-            var commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardProductionLifeCycle);
+            Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardProductionLifeCycle);
             if (commandResult.IsFailure)
             {
                 return Result.Failure<byte[], SmartCardError>(commandResult.Error);
             }
-                
-            var response = await transport.TransmitAsync(commandResult.Value, channel, cancellationToken);
+
+            ApduResponse response = await transport.TransmitAsync(commandResult.Value, channel, cancellationToken);
 
             if (response.IsSuccess && response.Data.Length > 0)
             {
@@ -223,11 +223,11 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         try
         {
             // Convert CPLC data to string for analysis
-            var cplcString = Convert.ToHexString(cplcData);
-            var cplcText = System.Text.Encoding.ASCII.GetString(cplcData.Where(b => b is >= 32 and <= 126).ToArray());
+            string cplcString = Convert.ToHexString(cplcData);
+            string cplcText = System.Text.Encoding.ASCII.GetString(cplcData.Where(b => b is >= 32 and <= 126).ToArray());
 
             // Check for production indicators
-            if (ProductionCardIndicators.Any(indicator => 
+            if (ProductionCardIndicators.Any(indicator =>
                     cplcString.Contains(indicator, StringComparison.OrdinalIgnoreCase) ||
                     cplcText.Contains(indicator, StringComparison.OrdinalIgnoreCase)))
             {
@@ -235,7 +235,7 @@ public class EnvironmentValidationService : IEnvironmentValidationService
             }
 
             // Check for test indicators
-            if (TestCardIndicators.Any(indicator => 
+            if (TestCardIndicators.Any(indicator =>
                     cplcString.Contains(indicator, StringComparison.OrdinalIgnoreCase) ||
                     cplcText.Contains(indicator, StringComparison.OrdinalIgnoreCase)))
             {
@@ -259,14 +259,14 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         try
         {
             // Try SELECT ISD (Issuer Security Domain)
-            var selectResult = SelectCommand.Create(GpTestKeys.TestAids.IsdAid);
+            Result<SelectCommand, SmartCardError> selectResult = SelectCommand.Create(GpTestKeys.TestAids.IsdAid);
             if (selectResult.IsFailure)
             {
                 return CardEnvironment.Test;
             }
-                
-            var selectCmd = selectResult.Value;
-            var response = await transport.TransmitAsync(selectCmd, channel, cancellationToken);
+
+            SelectCommand selectCmd = selectResult.Value;
+            ApduResponse response = await transport.TransmitAsync(selectCmd, channel, cancellationToken);
 
             if (!response.IsSuccess)
             {

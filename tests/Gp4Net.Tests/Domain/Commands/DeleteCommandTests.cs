@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using NUnit.Framework;
@@ -18,14 +21,14 @@ public class DeleteCommandTests
     public void CreateForApplication_WithValidAid_ReturnsSuccessResult()
     {
         // Arrange
-        var aid = Convert.FromHexString("A000000003000000");
+        byte[] aid = Convert.FromHexString("A000000003000000");
 
         // Act
-        var result = DeleteCommand.CreateForApplication(aid, deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication(aid, deleteRelated: false);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var command = result.Value;
+        DeleteCommand? command = result.Value;
         _ = command.Type.Should().Be(DeleteCommand.DeleteType.DeleteObjectOnly);
         _ = command.Target.Should().Be(DeleteCommand.DeleteTarget.ByAid);
         _ = command.Aids.Should().HaveCount(1);
@@ -37,14 +40,14 @@ public class DeleteCommandTests
     public void CreateForApplication_WithDeleteRelated_SetsCorrectParameters()
     {
         // Arrange
-        var aid = Convert.FromHexString("A000000003000000");
+        byte[] aid = Convert.FromHexString("A000000003000000");
 
         // Act
-        var result = DeleteCommand.CreateForApplication(aid, deleteRelated: true);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication(aid, deleteRelated: true);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var command = result.Value;
+        DeleteCommand? command = result.Value;
         _ = command.Type.Should().Be(DeleteCommand.DeleteType.DeleteObjectAndRelated);
         _ = command.Target.Should().Be(DeleteCommand.DeleteTarget.WithRelated);
         _ = command.P1.Should().Be(0x00); // Delete object and related
@@ -55,15 +58,15 @@ public class DeleteCommandTests
     public void CreateForApplication_WithDeletionToken_IncludesToken()
     {
         // Arrange
-        var aid = Convert.FromHexString("A000000003000000");
-        var deletionToken = Convert.FromHexString("20EEDD243F094FAD");
+        byte[] aid = Convert.FromHexString("A000000003000000");
+        byte[] deletionToken = Convert.FromHexString("20EEDD243F094FAD");
 
         // Act
-        var result = DeleteCommand.CreateForApplication(aid, deleteRelated: true, deletionToken);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication(aid, deleteRelated: true, deletionToken);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var command = result.Value;
+        DeleteCommand? command = result.Value;
         _ = command.DeletionToken.HasValue.Should().BeTrue();
         _ = command.DeletionToken.Value.Should().BeEquivalentTo(deletionToken);
     }
@@ -72,7 +75,7 @@ public class DeleteCommandTests
     public void CreateForApplication_WithNullAid_ReturnsFailure()
     {
         // Act
-        var result = DeleteCommand.CreateForApplication(null!, deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication(null!, deleteRelated: false);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -83,7 +86,7 @@ public class DeleteCommandTests
     public void CreateForApplication_WithEmptyAid_ReturnsFailure()
     {
         // Act
-        var result = DeleteCommand.CreateForApplication([], deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication([], deleteRelated: false);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -94,14 +97,14 @@ public class DeleteCommandTests
     public void CreateForPackage_WithValidAid_ReturnsSuccessResult()
     {
         // Arrange
-        var packageAid = Convert.FromHexString("A000000003080000");
+        byte[] packageAid = Convert.FromHexString("A000000003080000");
 
         // Act
-        var result = DeleteCommand.CreateForPackage(packageAid, deleteRelated: true);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForPackage(packageAid, deleteRelated: true);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var command = result.Value;
+        DeleteCommand? command = result.Value;
         _ = command.Aids[0].Should().BeEquivalentTo(packageAid);
     }
 
@@ -109,21 +112,21 @@ public class DeleteCommandTests
     public void CreateForApplications_WithMultipleAids_ReturnsSuccessResult()
     {
         // Arrange
-        var aids = new[]
-        {
+        byte[][] aids =
+        [
             Convert.FromHexString("A000000003000000"),
             Convert.FromHexString("A000000003000001"),
             Convert.FromHexString("A000000003000002")
-        };
+        ];
 
         // Act
-        var result = DeleteCommand.CreateForApplications(aids, deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplications(aids, deleteRelated: false);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var command = result.Value;
+        DeleteCommand? command = result.Value;
         _ = command.Aids.Should().HaveCount(3);
-        for (var i = 0; i < aids.Length; i++)
+        for (int i = 0; i < aids.Length; i++)
         {
             _ = command.Aids[i].Should().BeEquivalentTo(aids[i]);
         }
@@ -133,7 +136,7 @@ public class DeleteCommandTests
     public void CreateForApplications_WithNullList_ReturnsFailure()
     {
         // Act
-        var result = DeleteCommand.CreateForApplications(null!, deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplications(null!, deleteRelated: false);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -144,7 +147,7 @@ public class DeleteCommandTests
     public void CreateForApplications_WithEmptyList_ReturnsFailure()
     {
         // Act
-        var result = DeleteCommand.CreateForApplications(Array.Empty<byte[]>(), deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplications(Array.Empty<byte[]>(), deleteRelated: false);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -155,7 +158,7 @@ public class DeleteCommandTests
     public void CreateForApplications_WithNullAidInList_ReturnsFailure()
     {
         // Arrange
-        var aids = new byte[][]
+        byte[][] aids = new byte[][]
         {
             Convert.FromHexString("A000000003000000"),
             null!,
@@ -163,7 +166,7 @@ public class DeleteCommandTests
         };
 
         // Act
-        var result = DeleteCommand.CreateForApplications(aids, deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplications(aids, deleteRelated: false);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -178,11 +181,11 @@ public class DeleteCommandTests
         byte keyVersion = 0x73;
 
         // Act
-        var result = DeleteCommand.CreateForKey(keyIdentifier, keyVersion);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForKey(keyIdentifier, keyVersion);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var command = result.Value;
+        DeleteCommand? command = result.Value;
         _ = command.Type.Should().Be(DeleteCommand.DeleteType.DeleteObjectOnly);
         _ = command.Target.Should().Be(DeleteCommand.DeleteTarget.ByAid);
         _ = command.Aids.Should().HaveCount(1);
@@ -193,12 +196,12 @@ public class DeleteCommandTests
     public void ToApdu_ForSingleAid_GeneratesCorrectStructure()
     {
         // Arrange
-        var aid = Convert.FromHexString("A000000003000000");
-        var commandResult = DeleteCommand.CreateForApplication(aid, deleteRelated: false);
-        var command = commandResult.Value;
+        byte[] aid = Convert.FromHexString("A000000003000000");
+        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(aid, deleteRelated: false);
+        DeleteCommand? command = commandResult.Value;
 
         // Act
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         _ = apdu[0].Should().Be(0x80); // CLA
@@ -216,13 +219,13 @@ public class DeleteCommandTests
     public void ToApdu_WithDeletionToken_AppendsTokenDirectly()
     {
         // Arrange
-        var aid = Convert.FromHexString("A000000003000000");
-        var deletionToken = Convert.FromHexString("20EEDD243F094FAD");
-        var commandResult = DeleteCommand.CreateForApplication(aid, deleteRelated: true, deletionToken);
-        var command = commandResult.Value;
+        byte[] aid = Convert.FromHexString("A000000003000000");
+        byte[] deletionToken = Convert.FromHexString("20EEDD243F094FAD");
+        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(aid, deleteRelated: true, deletionToken);
+        DeleteCommand? command = commandResult.Value;
 
         // Act
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         _ = apdu[0].Should().Be(0x80); // CLA
@@ -230,7 +233,7 @@ public class DeleteCommandTests
         _ = apdu[2].Should().Be(0x00); // P1 (delete object and related)
         _ = apdu[3].Should().Be(0x80); // P2 (with related)
 
-        var expectedLc = 2 + aid.Length + deletionToken.Length; // 4F<len><AID><token>
+        int expectedLc = 2 + aid.Length + deletionToken.Length; // 4F<len><AID><token>
         _ = apdu[4].Should().Be((byte)expectedLc);
 
         // Verify AID TLV
@@ -239,7 +242,7 @@ public class DeleteCommandTests
         _ = apdu.Skip(7).Take(aid.Length).Should().BeEquivalentTo(aid);
 
         // Verify deletion token is appended directly (no TLV wrapper)
-        var tokenOffset = 7 + aid.Length;
+        int tokenOffset = 7 + aid.Length;
         _ = apdu.Skip(tokenOffset).Take(deletionToken.Length).Should().BeEquivalentTo(deletionToken);
     }
 
@@ -247,29 +250,29 @@ public class DeleteCommandTests
     public void ToApdu_ForMultipleAids_ConcatenatesAllAids()
     {
         // Arrange
-        var aids = new[]
-        {
+        byte[][] aids =
+        [
             Convert.FromHexString("A00000030800001000"), // 9 bytes
             Convert.FromHexString("A0000003080000"), // 7 bytes
             Convert.FromHexString("A000000308") // 5 bytes
-        };
-        var commandResult = DeleteCommand.CreateForApplications(aids);
-        var command = commandResult.Value;
+        ];
+        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplications(aids);
+        DeleteCommand? command = commandResult.Value;
 
         // Act
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
-        var totalAidLength = aids.Sum(aid => aid.Length); // 9 + 7 + 5 = 21
-        var expectedLc = 2 + totalAidLength; // 4F<len><all AIDs>
+        int totalAidLength = aids.Sum(aid => aid.Length); // 9 + 7 + 5 = 21
+        int expectedLc = 2 + totalAidLength; // 4F<len><all AIDs>
 
         _ = apdu[4].Should().Be((byte)expectedLc); // Lc
         _ = apdu[5].Should().Be(0x4F); // AID tag
         _ = apdu[6].Should().Be((byte)totalAidLength); // Total length of all AIDs
 
         // Verify all AIDs are concatenated
-        var offset = 7;
-        foreach (var aid in aids)
+        int offset = 7;
+        foreach (byte[] aid in aids)
         {
             _ = apdu.Skip(offset).Take(aid.Length).Should().BeEquivalentTo(aid);
             offset += aid.Length;
@@ -280,16 +283,16 @@ public class DeleteCommandTests
     public void ToApdu_DoesNotIncludeLeByte()
     {
         // Arrange
-        var aid = Convert.FromHexString("A000000003000000");
-        var commandResult = DeleteCommand.CreateForApplication(aid);
-        var command = commandResult.Value;
+        byte[] aid = Convert.FromHexString("A000000003000000");
+        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(aid);
+        DeleteCommand? command = commandResult.Value;
 
         // Act
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         // Total length should be: 5 (header) + Lc value
-        var expectedLength = 5 + apdu[4];
+        int expectedLength = 5 + apdu[4];
         _ = apdu.Length.Should().Be(expectedLength);
         // No LE byte at the end
     }
@@ -298,12 +301,12 @@ public class DeleteCommandTests
     public void Data_Property_ReturnsCorrectTlvStructure()
     {
         // Arrange
-        var aid = Convert.FromHexString("A000000003000000");
-        var commandResult = DeleteCommand.CreateForApplication(aid);
-        var command = commandResult.Value;
+        byte[] aid = Convert.FromHexString("A000000003000000");
+        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(aid);
+        DeleteCommand? command = commandResult.Value;
 
         // Act
-        var data = command.Data;
+        byte[]? data = command.Data;
 
         // Assert
         _ = data.Should().NotBeNull();
@@ -316,11 +319,11 @@ public class DeleteCommandTests
     public void DeleteResponse_Parse_WithNoConfirmationData()
     {
         // Arrange
-        var responseData = new byte[] { 0x00 }; // Length of delete confirmation = 0
-        var statusWord = (ushort)0x9000;
+        byte[] responseData = [0x00]; // Length of delete confirmation = 0
+        ushort statusWord = (ushort)0x9000;
 
         // Act
-        var response = DeleteResponse.Parse(responseData, statusWord);
+        DeleteResponse? response = DeleteResponse.Parse(responseData, statusWord);
 
         // Assert
         _ = response.IsSuccessful.Should().BeTrue();
@@ -332,17 +335,17 @@ public class DeleteCommandTests
     public void DeleteResponse_Parse_WithDeletionReceipt()
     {
         // Arrange
-        var deletedAid = Convert.FromHexString("A000000003000000");
-        var responseData = new byte[]
+        byte[] deletedAid = Convert.FromHexString("A000000003000000");
+        byte[] responseData = new byte[]
         {
             0x0A, // Length of delete confirmation (2 + 8)
             0x4F, // AID tag
             0x08, // AID length (8 bytes)
         }.Concat(deletedAid).ToArray();
-        var statusWord = (ushort)0x9000;
+        ushort statusWord = (ushort)0x9000;
 
         // Act
-        var response = DeleteResponse.Parse(responseData, statusWord);
+        DeleteResponse? response = DeleteResponse.Parse(responseData, statusWord);
 
         // Assert
         _ = response.IsSuccessful.Should().BeTrue();
@@ -355,11 +358,11 @@ public class DeleteCommandTests
     public void DeleteResponse_Parse_WithExtendedLength()
     {
         // Arrange
-        var responseData = new byte[] { 0x81, 0x80 }; // Extended length: 128 bytes
-        var statusWord = (ushort)0x9000;
+        byte[] responseData = [0x81, 0x80]; // Extended length: 128 bytes
+        ushort statusWord = (ushort)0x9000;
 
         // Act
-        var response = DeleteResponse.Parse(responseData, statusWord);
+        DeleteResponse? response = DeleteResponse.Parse(responseData, statusWord);
 
         // Assert
         _ = response.IsSuccessful.Should().BeTrue();
@@ -370,8 +373,8 @@ public class DeleteCommandTests
     public void DeleteResponse_GetResultDescription_MapsStatusWords()
     {
         // Arrange
-        var testCases = new[]
-        {
+        (ushort, string)[] testCases =
+        [
             ((ushort)0x9000, "Deletion successful"),
             ((ushort)0x6A80, "Incorrect data or AID not found"),
             ((ushort)0x6A82, "Application not found"),
@@ -379,13 +382,13 @@ public class DeleteCommandTests
             ((ushort)0x6A88, "Referenced data not found"),
             ((ushort)0x6F00, "Generic failure during deletion"),
             ((ushort)0x1234, "Unknown error: 1234") // Unknown status
-        };
+        ];
 
-        foreach (var (statusWord, expectedDescription) in testCases)
+        foreach ((ushort statusWord, string expectedDescription) in testCases)
         {
             // Act
-            var response = new DeleteResponse([], statusWord);
-            var description = response.GetResultDescription();
+            DeleteResponse response = new DeleteResponse([], statusWord);
+            string? description = response.GetResultDescription();
 
             // Assert
             _ = description.Should().Be(expectedDescription);
@@ -396,14 +399,14 @@ public class DeleteCommandTests
     public void DeleteCommand_IsImmutable()
     {
         // Arrange
-        var aid = Convert.FromHexString("A000000003000000");
-        var commandResult = DeleteCommand.CreateForApplication(aid);
-        var command = commandResult.Value;
-        var originalAids = command.Aids.ToArray();
+        byte[] aid = Convert.FromHexString("A000000003000000");
+        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(aid);
+        DeleteCommand? command = commandResult.Value;
+        byte[][] originalAids = command.Aids.ToArray();
 
         // Act - Attempt to modify the returned AID list
         // This should not affect the command's internal state
-        var externalAids = command.Aids;
+        IReadOnlyList<byte[]>? externalAids = command.Aids;
         // Can't modify because it's IReadOnlyList
 
         // Assert
@@ -415,8 +418,8 @@ public class DeleteCommandTests
     public void DeletionReceipt_CreatesDefensiveCopy()
     {
         // Arrange
-        var aid = Convert.FromHexString("A000000003000000");
-        var receipt = new DeletionReceipt(aid, true);
+        byte[] aid = Convert.FromHexString("A000000003000000");
+        DeletionReceipt receipt = new DeletionReceipt(aid, true);
 
         // Act - Modify original array
         aid[0] = 0xFF;

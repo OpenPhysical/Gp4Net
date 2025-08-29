@@ -31,12 +31,12 @@ public enum LifecycleState : byte
     /// Locked state - application is locked.
     /// </summary>
     Locked = 0x7F,
-        
+
     /// <summary>
     /// Terminated state - application is terminated.
     /// </summary>
     Terminated = 0xFF,
-        
+
     /// <summary>
     /// Unknown state.
     /// </summary>

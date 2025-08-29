@@ -1,5 +1,7 @@
 using System;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using NUnit.Framework;
 
@@ -13,14 +15,14 @@ public class DataObjectParserTests
     public void ParseRawDataObject_WithColonSeparator_ParsesCorrectly()
     {
         // Arrange
-        var dataObject = "9F70:040102";
+        string dataObject = "9F70:040102";
 
         // Act
-        var result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var (tag, data) = result.Value;
+        (ushort tag, byte[] data) = result.Value;
         _ = tag.Should().Be(0x9F70);
         _ = data.Should().BeEquivalentTo(new byte[] { 0x04, 0x01, 0x02 });
     }
@@ -29,14 +31,14 @@ public class DataObjectParserTests
     public void ParseRawDataObject_WithEqualsSeparator_ParsesCorrectly()
     {
         // Arrange
-        var dataObject = "9F70=040102";
+        string dataObject = "9F70=040102";
 
         // Act
-        var result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var (tag, data) = result.Value;
+        (ushort tag, byte[] data) = result.Value;
         _ = tag.Should().Be(0x9F70);
         _ = data.Should().BeEquivalentTo(new byte[] { 0x04, 0x01, 0x02 });
     }
@@ -45,14 +47,14 @@ public class DataObjectParserTests
     public void ParseRawDataObject_WithLongData_ParsesCorrectly()
     {
         // Arrange
-        var dataObject = "DF21:112233445566778899AABBCCDDEEFF00";
+        string dataObject = "DF21:112233445566778899AABBCCDDEEFF00";
 
         // Act
-        var result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var (tag, data) = result.Value;
+        (ushort tag, byte[] data) = result.Value;
         _ = tag.Should().Be(0xDF21);
         _ = data.Length.Should().Be(16);
         _ = data[0].Should().Be(0x11);
@@ -63,14 +65,14 @@ public class DataObjectParserTests
     public void ParseRawDataObject_WithSingleByteTag_ParsesCorrectly()
     {
         // Arrange
-        var dataObject = "C0:01020304";
+        string dataObject = "C0:01020304";
 
         // Act
-        var result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var (tag, data) = result.Value;
+        (ushort tag, byte[] data) = result.Value;
         _ = tag.Should().Be(0x00C0);
         _ = data.Should().BeEquivalentTo(new byte[] { 0x01, 0x02, 0x03, 0x04 });
     }
@@ -79,14 +81,14 @@ public class DataObjectParserTests
     public void ParseRawDataObject_WithEmptyData_ParsesCorrectly()
     {
         // Arrange
-        var dataObject = "9F70:";
+        string dataObject = "9F70:";
 
         // Act
-        var result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var (tag, data) = result.Value;
+        (ushort tag, byte[] data) = result.Value;
         _ = tag.Should().Be(0x9F70);
         _ = data.Should().BeEmpty();
     }
@@ -97,7 +99,7 @@ public class DataObjectParserTests
     public void ParseRawDataObject_WithEmptyInput_ReturnsFailure(string dataObject)
     {
         // Act
-        var result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -109,9 +111,9 @@ public class DataObjectParserTests
     {
         // Testing null input by passing null directly - this is a test boundary
         string? dataObject = null;
-        
+
         // Act
-        var result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -126,7 +128,7 @@ public class DataObjectParserTests
     public void ParseRawDataObject_WithInvalidFormat_ReturnsFailure(string dataObject)
     {
         // Act
-        var result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -140,7 +142,7 @@ public class DataObjectParserTests
     public void ParseRawDataObject_WithInvalidHexTag_ReturnsFailure(string dataObject)
     {
         // Act
-        var result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -154,7 +156,7 @@ public class DataObjectParserTests
     public void ParseRawDataObject_WithOddHexData_ReturnsFailure(string dataObject)
     {
         // Act
-        var result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -169,12 +171,12 @@ public class DataObjectParserTests
     public void ValidateDataObject_WithValidTag_ReturnsTrue(string dataObject, ushort expectedTag)
     {
         // Arrange
-        var result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
         _ = result.IsSuccess.Should().BeTrue();
-        var (tag, data) = result.Value;
+        (ushort tag, byte[] data) = result.Value;
 
         // Act
-        var isValid = DataObjectParser.ValidateDataObject(tag, data);
+        bool isValid = DataObjectParser.ValidateDataObject(tag, data);
 
         // Assert
         _ = isValid.Should().BeTrue();
@@ -186,10 +188,10 @@ public class DataObjectParserTests
     {
         // Arrange
         ushort tag = 0x0000;
-        var data = new byte[] { 0x01, 0x02 };
+        byte[] data = [0x01, 0x02];
 
         // Act
-        var isValid = DataObjectParser.ValidateDataObject(tag, data);
+        bool isValid = DataObjectParser.ValidateDataObject(tag, data);
 
         // Assert
         _ = isValid.Should().BeFalse();
@@ -203,7 +205,7 @@ public class DataObjectParserTests
         byte[]? data = null;
 
         // Act
-        var isValid = DataObjectParser.ValidateDataObject(tag, data);
+        bool isValid = DataObjectParser.ValidateDataObject(tag, data);
 
         // Assert
         _ = isValid.Should().BeFalse();
@@ -214,10 +216,10 @@ public class DataObjectParserTests
     {
         // Arrange
         ushort tag = 0x9F70;
-        var data = Array.Empty<byte>();
+        byte[] data = [];
 
         // Act
-        var isValid = DataObjectParser.ValidateDataObject(tag, data);
+        bool isValid = DataObjectParser.ValidateDataObject(tag, data);
 
         // Assert
         _ = isValid.Should().BeTrue(); // Empty data is allowed for some tags
@@ -231,11 +233,11 @@ public class DataObjectParserTests
     public void ParseRawDataObject_IsCaseInsensitive(string dataObject)
     {
         // Act
-        var result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var (tag, data) = result.Value;
+        (ushort tag, byte[] data) = result.Value;
         _ = tag.Should().BeGreaterThan(0);
         _ = data.Should().NotBeNull();
     }

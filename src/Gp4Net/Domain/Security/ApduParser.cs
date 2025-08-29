@@ -1,6 +1,6 @@
 using System;
+using System.Collections.Generic;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using JetBrains.Annotations;
 
@@ -27,11 +27,11 @@ public static class ApduParser
                 SmartCardError.InvalidData("Secured command too short"));
         }
 
-        var cla = securedCommand[0];
-        var ins = securedCommand[1];
-        var p1 = securedCommand[2];
-        var p2 = securedCommand[3];
-        var lc = securedCommand[4];
+        byte cla = securedCommand[0];
+        byte ins = securedCommand[1];
+        byte p1 = securedCommand[2];
+        byte p2 = securedCommand[3];
+        byte lc = securedCommand[4];
 
         if (securedCommand.Length < 5 + lc)
         {
@@ -40,7 +40,7 @@ public static class ApduParser
         }
 
         // Extract data field (contains original data + MAC)
-        var dataField = new byte[lc];
+        byte[] dataField = new byte[lc];
         Array.Copy(securedCommand, 5, dataField, 0, lc);
 
         // Parse data field to separate original data from MAC
@@ -53,7 +53,7 @@ public static class ApduParser
             // Last 8 bytes are typically the MAC
             mac = new byte[8];
             Array.Copy(dataField, dataField.Length - 8, mac, 0, 8);
-            
+
             // Remaining bytes are original data
             originalData = new byte[dataField.Length - 8];
             Array.Copy(dataField, 0, originalData, 0, originalData.Length);
@@ -73,44 +73,6 @@ public static class ApduParser
             new ParsedSecuredCommand(cla, ins, p1, p2, originalData, mac, le));
     }
 
-    /// <summary>
-    /// Builds MAC input data for command MAC calculation.
-    /// Formats input according to protocol-specific requirements.
-    /// </summary>
-    /// <param name="parsedCommand">The parsed secured command.</param>
-    /// <param name="protocolVersion">The SCP protocol version.</param>
-    /// <returns>The formatted MAC input data.</returns>
-    public static byte[] BuildMacInput(ParsedSecuredCommand parsedCommand, byte protocolVersion)
-    {
-        if (protocolVersion == ProtocolIdentifiers.Scp03)
-        {
-            // SCP03 MAC input: fixed CLA (0x84) + INS + P1 + P2 + modified Lc + data
-            var macInput = new System.Collections.Generic.List<byte>
-            {
-                0x84, // Fixed CLA for SCP03 MAC calculation
-                parsedCommand.Ins,
-                parsedCommand.P1,
-                parsedCommand.P2,
-                (byte)(parsedCommand.Data.Length + 8) // Modified Lc for MAC calculation
-            };
-            macInput.AddRange(parsedCommand.Data);
-            return macInput.ToArray();
-        }
-        else
-        {
-            // SCP02 MAC input: original CLA + INS + P1 + P2 + modified Lc + data
-            var macInput = new System.Collections.Generic.List<byte>
-            {
-                parsedCommand.Cla,
-                parsedCommand.Ins,
-                parsedCommand.P1,
-                parsedCommand.P2,
-                (byte)(parsedCommand.Data.Length + 8) // Modified Lc for MAC calculation
-            };
-            macInput.AddRange(parsedCommand.Data);
-            return macInput.ToArray();
-        }
-    }
 
     /// <summary>
     /// Builds an original (unprotected) command APDU from parsed components.
@@ -125,19 +87,19 @@ public static class ApduParser
     /// <returns>The reconstructed original command bytes.</returns>
     public static byte[] BuildOriginalCommand(byte cla, byte ins, byte p1, byte p2, byte[] data, byte? le)
     {
-        var command = new System.Collections.Generic.List<byte> { cla, ins, p1, p2 };
-        
+        List<byte> command = [cla, ins, p1, p2];
+
         if (data.Length > 0)
         {
             command.Add((byte)data.Length);
             command.AddRange(data);
         }
-        
+
         if (le.HasValue)
         {
             command.Add(le.Value);
         }
-        
+
         return command.ToArray();
     }
 }

@@ -53,7 +53,7 @@ public class SessionKeys : IDisposable
     }
 
     /// <summary>
-    /// Creates session keys with functional validation using Maybe<T> patterns.
+    /// Creates session keys with functional validation using Maybe&lt;T&gt; patterns.
     /// </summary>
     /// <param name="sEnc">The session encryption key.</param>
     /// <param name="sMac">The session MAC key.</param>
@@ -64,17 +64,17 @@ public class SessionKeys : IDisposable
     {
         return Maybe<byte[]>.From(sEnc)
             .ToResult(SmartCardError.InvalidArgument("S-ENC key cannot be null"))
-            .Bind(encKey => encKey.Length > 0 
+            .Bind(encKey => encKey.Length > 0
                 ? Result.Success<byte[], SmartCardError>(encKey)
                 : Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidArgument("S-ENC key cannot be empty")))
             .Bind(_ => Maybe<byte[]>.From(sMac)
                 .ToResult(SmartCardError.InvalidArgument("S-MAC key cannot be null")))
-            .Bind(macKey => macKey.Length > 0 
+            .Bind(macKey => macKey.Length > 0
                 ? Result.Success<byte[], SmartCardError>(macKey)
                 : Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidArgument("S-MAC key cannot be empty")))
             .Bind(_ => Maybe<byte[]>.From(sRMac)
                 .ToResult(SmartCardError.InvalidArgument("S-RMAC key cannot be null")))
-            .Bind(rMacKey => rMacKey.Length > 0 
+            .Bind(rMacKey => rMacKey.Length > 0
                 ? Result.Success<byte[], SmartCardError>(rMacKey)
                 : Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidArgument("S-RMAC key cannot be empty")))
             .Map(_ => new SessionKeys(sEnc, sMac, sRMac, dek));

@@ -1,209 +1,35 @@
 using System;
 using CSharpFunctionalExtensions;
-using JetBrains.Annotations;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
+using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Keys;
 
 /// <summary>
-/// Provides GlobalPlatform test keys for development and testing purposes.
-/// These are the standard test keys defined in the GlobalPlatform specification.
+/// Provides standard GlobalPlatform test keys (404142434445464748494A4B4C4D4E4F) for testing.
+/// Only provides the standard test key - no zero keys, no FF keys, no card-specific diversification.
+/// This is a pure test utility for development and testing scenarios.
 /// </summary>
 [PublicAPI]
 public static class GpTestKeys
 {
     /// <summary>
-    /// The standard GP test key (40414243...4E4F).
-    /// This is the well-known test key used in GlobalPlatform testing.
+    /// The standard GP test key (404142434445464748494A4B4C4D4E4F).
+    /// This is the only test key provided - no zero keys or FF keys.
     /// </summary>
     public static readonly byte[] StandardTestKey = Convert.FromHexString(
         "404142434445464748494A4B4C4D4E4F"
     );
 
     /// <summary>
-    /// Alternative GP test key (all zeros).
-    /// Sometimes used in development environments.
+    /// Gets the standard GP test key set for the given protocol version.
+    /// Always returns the same test key (404142...4F) for ENC, MAC, and DEK.
     /// </summary>
-    public static readonly byte[] ZeroTestKey = new byte[16];
-
-    /// <summary>
-    /// Alternative GP test key (all 0xFF).
-    /// Used in some test environments.
-    /// </summary>
-    public static readonly byte[] AllOnesTestKey =
-    [
-        0xFF,
-        0xFF,
-        0xFF,
-        0xFF,
-        0xFF,
-        0xFF,
-        0xFF,
-        0xFF,
-        0xFF,
-        0xFF,
-        0xFF,
-        0xFF,
-        0xFF,
-        0xFF,
-        0xFF,
-        0xFF
-    ];
-
-    /// <summary>
-    /// Creates an SCP02 key set using the standard GP test keys.
-    /// </summary>
-    /// <param name="keyVersion">The key version (default: 0x00).</param>
-    /// <returns>The SCP02 test key set.</returns>
-    public static Scp02KeySet CreateScp02TestKeySet(byte keyVersion = 0x00)
-    {
-        return Scp02KeySet.Create(
-            encKey: (byte[])StandardTestKey.Clone(),
-            macKey: (byte[])StandardTestKey.Clone(),
-            dekKey: (byte[])StandardTestKey.Clone(),
-            keyVersion: keyVersion
-        ).Match(
-            onSuccess: keySet => keySet,
-            onFailure: error => throw new InvalidOperationException($"Failed to create SCP02 test key set: {error.Message}"));
-    }
-
-    /// <summary>
-    /// Creates an SCP03 key set using the standard GP test keys.
-    /// </summary>
-    /// <param name="keyVersion">The key version (default: 0x00).</param>
-    /// <returns>The SCP03 test key set.</returns>
-    public static Scp03KeySet CreateScp03TestKeySet(byte keyVersion = 0x00)
-    {
-        return Scp03KeySet.Create(
-            encKey: (byte[])StandardTestKey.Clone(),
-            macKey: (byte[])StandardTestKey.Clone(),
-            dekKey: (byte[])StandardTestKey.Clone(),
-            keyVersion: keyVersion
-        ).Match(
-            onSuccess: keySet => keySet,
-            onFailure: error => throw new InvalidOperationException($"Failed to create SCP03 test key set: {error.Message}"));
-    }
-
-    /// <summary>
-    /// Creates an SCP02 key set using zero test keys.
-    /// </summary>
-    /// <param name="keyVersion">The key version (default: 0x00).</param>
-    /// <returns>The SCP02 zero key set.</returns>
-    public static Scp02KeySet CreateScp02ZeroKeySet(byte keyVersion = 0x00)
-    {
-        return Scp02KeySet.Create(
-            encKey: (byte[])ZeroTestKey.Clone(),
-            macKey: (byte[])ZeroTestKey.Clone(),
-            dekKey: (byte[])ZeroTestKey.Clone(),
-            keyVersion: keyVersion
-        ).Match(
-            onSuccess: keySet => keySet,
-            onFailure: error => throw new InvalidOperationException($"Failed to create SCP02 zero key set: {error.Message}"));
-    }
-
-    /// <summary>
-    /// Creates an SCP03 key set using zero test keys.
-    /// </summary>
-    /// <param name="keyVersion">The key version (default: 0x00).</param>
-    /// <returns>The SCP03 zero key set.</returns>
-    public static Scp03KeySet CreateScp03ZeroKeySet(byte keyVersion = 0x00)
-    {
-        return Scp03KeySet.Create(
-            encKey: (byte[])ZeroTestKey.Clone(),
-            macKey: (byte[])ZeroTestKey.Clone(),
-            dekKey: (byte[])ZeroTestKey.Clone(),
-            keyVersion: keyVersion
-        ).Match(
-            onSuccess: keySet => keySet,
-            onFailure: error => throw new InvalidOperationException($"Failed to create SCP03 zero key set: {error.Message}"));
-    }
-
-    /// <summary>
-    /// Creates an SCP02 key set using custom keys.
-    /// </summary>
-    /// <param name="encKey">The encryption key (16 or 24 bytes).</param>
-    /// <param name="macKey">The MAC key (16 or 24 bytes).</param>
-    /// <param name="dekKey">The DEK key (16 or 24 bytes).</param>
-    /// <param name="keyVersion">The key version (default: 0x00).</param>
-    /// <returns>The SCP02 custom key set.</returns>
-    public static Scp02KeySet CreateScp02CustomKeySet(
-        byte[] encKey,
-        byte[] macKey,
-        byte[] dekKey,
-        byte keyVersion = 0x00
-    )
-    {
-        return Scp02KeySet.Create(encKey, macKey, dekKey, keyVersion)
-            .Match(
-                onSuccess: keySet => keySet,
-                onFailure: error => throw new InvalidOperationException($"Failed to create SCP02 custom key set: {error.Message}"));
-    }
-
-    /// <summary>
-    /// Creates an SCP03 key set using custom keys.
-    /// </summary>
-    /// <param name="encKey">The encryption key (16, 24, or 32 bytes).</param>
-    /// <param name="macKey">The MAC key (16, 24, or 32 bytes).</param>
-    /// <param name="dekKey">The DEK key (16, 24, or 32 bytes).</param>
-    /// <param name="keyVersion">The key version (default: 0x00).</param>
-    /// <returns>The SCP03 custom key set.</returns>
-    public static Scp03KeySet CreateScp03CustomKeySet(
-        byte[] encKey,
-        byte[] macKey,
-        byte[] dekKey,
-        byte keyVersion = 0x00
-    )
-    {
-        return Scp03KeySet.Create(encKey, macKey, dekKey, keyVersion)
-            .Match(
-                onSuccess: keySet => keySet,
-                onFailure: error => throw new InvalidOperationException($"Failed to create SCP03 custom key set: {error.Message}"));
-    }
-
-    /// <summary>
-    /// Creates a key set from a hex string.
-    /// Uses the same key for ENC, MAC, and DEK.
-    /// </summary>
-    /// <param name="hexKey">The hex string representation of the key.</param>
     /// <param name="protocolVersion">The protocol version (SCP02 or SCP03).</param>
     /// <param name="keyVersion">The key version (default: 0x00).</param>
-    /// <returns>The key set.</returns>
-    public static Result<IKeySet, SmartCardError> CreateFromHex(
-        string hexKey,
-        byte protocolVersion,
-        byte keyVersion = 0x00
-    )
-    {
-        if (string.IsNullOrWhiteSpace(hexKey))
-        {
-            return SmartCardError.InvalidArgument("Hex key cannot be null or empty.");
-        }
-
-        try
-        {
-            var key = Convert.FromHexString(hexKey);
-
-            return protocolVersion switch
-            {
-                0x02 => Scp02KeySet.Create(key, key, key, keyVersion).Map(ks => (IKeySet)ks),
-                0x03 => Scp03KeySet.Create(key, key, key, keyVersion).Map(ks => (IKeySet)ks),
-                _ => SmartCardError.InvalidArgument($"Unsupported protocol version: {protocolVersion:X2}")
-            };
-        }
-        catch (FormatException ex)
-        {
-            return SmartCardError.InvalidArgument($"Invalid hex string: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Gets the appropriate test key set for the given protocol version.
-    /// Uses standard GP test keys.
-    /// </summary>
-    /// <param name="protocolVersion">The protocol version.</param>
-    /// <param name="keyVersion">The key version (default: 0x00).</param>
-    /// <returns>The test key set.</returns>
+    /// <returns>The standard test key set.</returns>
     public static Result<IKeySet, SmartCardError> GetTestKeySet(byte protocolVersion, byte keyVersion = 0x00)
     {
         return protocolVersion switch
@@ -220,19 +46,84 @@ public static class GpTestKeys
                 (byte[])StandardTestKey.Clone(),
                 keyVersion
             ).Map(ks => (IKeySet)ks),
-            _ => SmartCardError.InvalidArgument($"Unsupported protocol version: {protocolVersion:X2}")
+            _ => Result.Failure<IKeySet, SmartCardError>(
+                SmartCardError.InvalidArgument($"Unsupported protocol version: {protocolVersion:X2}"))
         };
     }
 
     /// <summary>
-    /// Gets the diversified GP test key set based on the card's INITIALIZE UPDATE response.
-    /// This replaces the Lua-based key diversification logic.
+    /// Gets the standard GP test key set for the given protocol version using ScpVersion enum.
+    /// Always returns the same test key (404142...4F) for ENC, MAC, and DEK.
     /// </summary>
-    /// <param name="cardResponse">The INITIALIZE UPDATE response containing diversification data.</param>
-    /// <returns>The diversified key set or an error.</returns>
-    public static Result<IKeySet, SmartCardError> GetDiversifiedTestKeySet(InitializeUpdateResponse cardResponse)
+    /// <param name="protocolVersion">The protocol version.</param>
+    /// <param name="keyVersion">The key version (default: 0x00).</param>
+    /// <returns>The standard test key set.</returns>
+    public static Result<IKeySet, SmartCardError> GetTestKeySet(ScpVersion protocolVersion, byte keyVersion = 0x00)
     {
-        return GpTestKeyProvider.GetDiversifiedTestKeys(cardResponse);
+        return protocolVersion switch
+        {
+            ScpVersion.Scp02 => Scp02KeySet.Create(
+                (byte[])StandardTestKey.Clone(),
+                (byte[])StandardTestKey.Clone(),
+                (byte[])StandardTestKey.Clone(),
+                keyVersion
+            ).Map(ks => (IKeySet)ks),
+            ScpVersion.Scp03 => Scp03KeySet.Create(
+                (byte[])StandardTestKey.Clone(),
+                (byte[])StandardTestKey.Clone(),
+                (byte[])StandardTestKey.Clone(),
+                keyVersion
+            ).Map(ks => (IKeySet)ks),
+            _ => Result.Failure<IKeySet, SmartCardError>(
+                SmartCardError.InvalidArgument($"Unsupported protocol version: {protocolVersion}"))
+        };
+    }
+
+    /// <summary>
+    /// Gets the standard GP test key set for the given card response.
+    /// Uses the response only for protocol/version info - always returns standard test keys.
+    /// </summary>
+    /// <param name="cardResponse">The INITIALIZE UPDATE response (optional).</param>
+    /// <returns>The standard test key set.</returns>
+    public static Result<IKeySet, SmartCardError> GetTestKeys(Maybe<InitializeUpdateResponse> cardResponse)
+    {
+        return cardResponse.Match(
+            response => response.ScpId.Match(
+                scpVersion => GetTestKeySet(scpVersion, response.KeyVersion),
+                () => GetTestKeySet(ScpVersion.Scp02, 0x00) // Default to SCP02 v00 if ScpId is not available
+            ),
+            () => GetTestKeySet(ScpVersion.Scp02, 0x00) // Default to SCP02 v00
+        );
+    }
+
+    /// <summary>
+    /// Creates an SCP02 test key set using the standard GP test keys.
+    /// </summary>
+    /// <param name="keyVersion">The key version (default: 0x00).</param>
+    /// <returns>The SCP02 test key set.</returns>
+    public static Result<Scp02KeySet, SmartCardError> CreateScp02TestKeySet(byte keyVersion = 0x00)
+    {
+        return Scp02KeySet.Create(
+            (byte[])StandardTestKey.Clone(),
+            (byte[])StandardTestKey.Clone(),
+            (byte[])StandardTestKey.Clone(),
+            keyVersion
+        );
+    }
+
+    /// <summary>
+    /// Creates an SCP03 test key set using the standard GP test keys.
+    /// </summary>
+    /// <param name="keyVersion">The key version (default: 0x00).</param>
+    /// <returns>The SCP03 test key set.</returns>
+    public static Result<Scp03KeySet, SmartCardError> CreateScp03TestKeySet(byte keyVersion = 0x00)
+    {
+        return Scp03KeySet.Create(
+            (byte[])StandardTestKey.Clone(),
+            (byte[])StandardTestKey.Clone(),
+            (byte[])StandardTestKey.Clone(),
+            keyVersion
+        );
     }
 
     /// <summary>

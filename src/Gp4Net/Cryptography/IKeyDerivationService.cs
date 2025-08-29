@@ -64,8 +64,8 @@ public interface IKeyDerivationContext
     /// <summary>
     /// Gets the SCP implementation details.
     /// </summary>
-    Maybe<Gp4Net.Domain.Protocol.ScpImplementation> Implementation { get; }
-    
+    Maybe<Domain.Protocol.ScpImplementation> Implementation { get; }
+
     /// <summary>
     /// Gets the implementation parameter value for use in derivation.
     /// </summary>
@@ -109,11 +109,21 @@ public enum CryptogramType
     /// Card cryptogram for authentication.
     /// </summary>
     CardCryptogram,
+    
+    /// <summary>
+    /// Card cryptogram for authentication (alias for compatibility).
+    /// </summary>
+    Card = CardCryptogram,
 
     /// <summary>
     /// Host cryptogram for authentication.
     /// </summary>
     HostCryptogram,
+    
+    /// <summary>
+    /// Host cryptogram for authentication (alias for compatibility).
+    /// </summary>
+    Host = HostCryptogram,
 
     /// <summary>
     /// Command MAC (C-MAC).

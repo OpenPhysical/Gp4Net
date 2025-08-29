@@ -17,13 +17,13 @@ public static class ReaderTableRenderer
     /// <param name="rows">Sequence of semantic reader rows</param>
     public static void RenderToTable(IEnumerable<ReaderTableBuilder.ReaderRow> rows)
     {
-        var table = CreateTable();
-        
-        foreach (var row in rows)
+        Table table = CreateTable();
+
+        foreach (ReaderTableBuilder.ReaderRow row in rows)
         {
             RenderSemanticRow(table, row);
         }
-        
+
         AnsiConsole.Write(table);
     }
 
@@ -33,7 +33,7 @@ public static class ReaderTableRenderer
     /// <param name="rows">Sequence of semantic reader rows</param>
     public static void RenderToConsole(IEnumerable<ReaderTableBuilder.ReaderRow> rows)
     {
-        foreach (var row in rows)
+        foreach (ReaderTableBuilder.ReaderRow row in rows)
         {
             switch (row)
             {
@@ -41,14 +41,14 @@ public static class ReaderTableRenderer
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine($"[bold]{title}[/]");
                     break;
-                    
+
                 case ReaderTableBuilder.SummaryRow(var message):
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine($"[dim]{message}[/]");
                     break;
-                    
+
                 case ReaderTableBuilder.InfoRow(var message, var severity):
-                    var color = severity switch
+                    string color = severity switch
                     {
                         "warning" => "yellow",
                         "error" => "red",
@@ -57,7 +57,7 @@ public static class ReaderTableRenderer
                     };
                     AnsiConsole.MarkupLine($"[{color}]{message}[/]");
                     break;
-                    
+
                 case ReaderTableBuilder.ReaderDataRow dataRow:
                     // For console output, display as a simple line
                     AnsiConsole.MarkupLine($"{dataRow.Index}: {dataRow.Name}");
@@ -71,12 +71,12 @@ public static class ReaderTableRenderer
     /// </summary>
     private static Table CreateTable()
     {
-        var table = new Table();
+        Table table = new Table();
 
         // Reader table columns
         _ = table.AddColumn("Index");
         _ = table.AddColumn("Reader Name");
-        
+
         return table;
     }
 
@@ -90,7 +90,7 @@ public static class ReaderTableRenderer
             case ReaderTableBuilder.ReaderDataRow(var index, var name, var status):
                 _ = table.AddRow(index, name);
                 break;
-                
+
             case ReaderTableBuilder.SectionHeaderRow(var title):
                 // Add empty row before section header for spacing
                 if (table.Rows.Count > 0)
@@ -101,11 +101,11 @@ public static class ReaderTableRenderer
                 // Add header row with bold formatting
                 _ = table.AddRow($"[bold]{title}[/]", "");
                 break;
-                
+
             case ReaderTableBuilder.SummaryRow(var message):
                 // Summary rows are typically displayed separately after the table
                 break;
-                
+
             case ReaderTableBuilder.InfoRow(var message, var severity):
                 // Info rows are typically displayed separately
                 break;
@@ -117,9 +117,9 @@ public static class ReaderTableRenderer
     /// </summary>
     public static void RenderPostTableRows(IEnumerable<ReaderTableBuilder.ReaderRow> rows)
     {
-        var postTableRows = rows.Where(r => r is ReaderTableBuilder.SummaryRow or ReaderTableBuilder.InfoRow);
-        
-        foreach (var row in postTableRows)
+        IEnumerable<ReaderTableBuilder.ReaderRow> postTableRows = rows.Where(r => r is ReaderTableBuilder.SummaryRow or ReaderTableBuilder.InfoRow);
+
+        foreach (ReaderTableBuilder.ReaderRow row in postTableRows)
         {
             switch (row)
             {
@@ -127,12 +127,12 @@ public static class ReaderTableRenderer
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine($"[dim]{message}[/]");
                     break;
-                    
+
                 case ReaderTableBuilder.InfoRow(var message, var severity):
-                    var color = severity switch
+                    string color = severity switch
                     {
                         "warning" => "yellow",
-                        "error" => "red", 
+                        "error" => "red",
                         "success" => "green",
                         _ => "blue"
                     };

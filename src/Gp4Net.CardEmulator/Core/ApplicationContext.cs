@@ -10,31 +10,26 @@ namespace Gp4Net.CardEmulator.Core;
 /// Immutable representation of a Security Domain on a virtual card.
 /// Security Domains can establish secure channels and manage applications according to GP Section 7.
 /// </summary>
+/// <param name="Aid">The Application Identifier.</param>
+/// <param name="Name">The security domain name.</param>
+/// <param name="Type">The security domain type.</param>
+/// <param name="State">The current application state.</param>
+/// <param name="Privileges">The application privileges.</param>
+/// <param name="AssociatedSecurityDomainAid">AID of the associated Security Domain. Self-reference (same as Aid) indicates root of hierarchy.</param>
+/// <param name="CurrentAuthentication">Current authentication state for this Security Domain's secure channel sessions.</param>
+/// <param name="CurrentSecurityLevel">Current cryptographic security level if a secure channel is active.</param>
+/// <param name="Keys">Key sets available to this Security Domain, indexed by key version.</param>
+/// <param name="DataObjects">Data objects managed by this Security Domain.</param>
 public record VirtualSecurityDomain(
     ImmutableArray<byte> Aid,
     string Name,
     SecurityDomainType Type,
     ApplicationState State,
     ApplicationPrivileges Privileges,
-    /// <summary>
-    /// AID of the associated Security Domain. Self-reference (same as Aid) indicates root of hierarchy.
-    /// </summary>
     Maybe<ImmutableArray<byte>> AssociatedSecurityDomainAid,
-    /// <summary>
-    /// Current authentication state for this Security Domain's secure channel sessions.
-    /// </summary>
     AuthenticationState CurrentAuthentication,
-    /// <summary>
-    /// Current cryptographic security level if a secure channel is active.
-    /// </summary>
-    Maybe<Gp4Net.Domain.SecurityLevel> CurrentSecurityLevel,
-    /// <summary>
-    /// Key sets available to this Security Domain, indexed by key version.
-    /// </summary>
-    ImmutableDictionary<byte, Gp4Net.Domain.Keys.IKeySet> Keys,
-    /// <summary>
-    /// Data objects managed by this Security Domain.
-    /// </summary>
+    Maybe<Domain.SecurityLevel> CurrentSecurityLevel,
+    ImmutableDictionary<byte, Domain.Keys.IKeySet> Keys,
     ImmutableDictionary<string, byte[]> DataObjects
 )
 {
@@ -43,7 +38,7 @@ public record VirtualSecurityDomain(
     /// </summary>
     public static VirtualSecurityDomain CreateIsd()
     {
-        var emptyAid = ImmutableArray<byte>.Empty;
+        ImmutableArray<byte> emptyAid = ImmutableArray<byte>.Empty;
         return new VirtualSecurityDomain(
             emptyAid, // ISD has empty AID
             "Issuer Security Domain",
@@ -52,8 +47,8 @@ public record VirtualSecurityDomain(
             ApplicationPrivileges.SecurityDomain | ApplicationPrivileges.CardManager,
             Maybe<ImmutableArray<byte>>.From(emptyAid), // Self-associated
             AuthenticationState.None,
-            Maybe<Gp4Net.Domain.SecurityLevel>.None,
-            ImmutableDictionary<byte, Gp4Net.Domain.Keys.IKeySet>.Empty,
+            Maybe<Domain.SecurityLevel>.None,
+            ImmutableDictionary<byte, Domain.Keys.IKeySet>.Empty,
             ImmutableDictionary<string, byte[]>.Empty
         );
     }
@@ -75,8 +70,8 @@ public record VirtualSecurityDomain(
             privileges,
             Maybe<ImmutableArray<byte>>.From(associatedSecurityDomainAid),
             AuthenticationState.None,
-            Maybe<Gp4Net.Domain.SecurityLevel>.None,
-            ImmutableDictionary<byte, Gp4Net.Domain.Keys.IKeySet>.Empty,
+            Maybe<Domain.SecurityLevel>.None,
+            ImmutableDictionary<byte, Domain.Keys.IKeySet>.Empty,
             ImmutableDictionary<string, byte[]>.Empty
         );
     }
@@ -86,7 +81,7 @@ public record VirtualSecurityDomain(
     /// </summary>
     public VirtualSecurityDomain WithAuthentication(
         AuthenticationState authState,
-        Maybe<Gp4Net.Domain.SecurityLevel> securityLevel = default)
+        Maybe<Domain.SecurityLevel> securityLevel = default)
     {
         return this with 
         { 
@@ -116,7 +111,7 @@ public record VirtualSecurityDomain(
     /// </summary>
     public Maybe<byte[]> GetDataObject(string tag)
     {
-        return DataObjects.TryGetValue(tag, out var data) 
+        return DataObjects.TryGetValue(tag, out byte[]? data) 
             ? Maybe<byte[]>.From(data)
             : Maybe<byte[]>.None;
     }
@@ -138,14 +133,17 @@ public record VirtualSecurityDomain(
 /// <summary>
 /// Immutable representation of an application installed on a virtual card.
 /// </summary>
+/// <param name="Aid">The Application Identifier.</param>
+/// <param name="Name">The application name.</param>
+/// <param name="State">The current application state.</param>
+/// <param name="Privileges">The application privileges.</param>
+/// <param name="AssociatedSecurityDomainAid">AID of the Security Domain this application is associated with.</param>
+/// <param name="DataObjects">Data objects managed by this application.</param>
 public record VirtualApplication(
     ImmutableArray<byte> Aid,
     string Name,
     ApplicationState State,
     ApplicationPrivileges Privileges,
-    /// <summary>
-    /// AID of the Security Domain this application is associated with.
-    /// </summary>
     ImmutableArray<byte> AssociatedSecurityDomainAid,
     ImmutableDictionary<string, byte[]> DataObjects
 )
@@ -178,7 +176,7 @@ public record VirtualApplication(
 
     public Maybe<byte[]> GetDataObject(string tag)
     {
-        return DataObjects.TryGetValue(tag, out var data) 
+        return DataObjects.TryGetValue(tag, out byte[]? data) 
             ? Maybe<byte[]>.From(data)
             : Maybe<byte[]>.None;
     }
@@ -262,23 +260,14 @@ public enum SecurityDomainType : byte
 /// Immutable selection context for virtual cards supporting full GlobalPlatform hierarchy.
 /// Tracks Security Domains, Applications, their associations, and current selection state.
 /// </summary>
+/// <param name="SecurityDomains">Security Domains on the card, indexed by AID hex string.</param>
+/// <param name="Applications">Applications on the card, indexed by AID hex string.</param>
+/// <param name="SelectedEntityKey">Key of currently selected entity (Security Domain or Application AID hex string). Empty string represents ISD selection.</param>
+/// <param name="SelectionHistory">History of selected entities for next occurrence selection logic.</param>
 public record ApplicationSelectionContext(
-    /// <summary>
-    /// Security Domains on the card, indexed by AID hex string.
-    /// </summary>
     ImmutableDictionary<string, VirtualSecurityDomain> SecurityDomains,
-    /// <summary>
-    /// Applications on the card, indexed by AID hex string.
-    /// </summary>
     ImmutableDictionary<string, VirtualApplication> Applications,
-    /// <summary>
-    /// Key of currently selected entity (Security Domain or Application AID hex string).
-    /// Empty string represents ISD selection.
-    /// </summary>
     Maybe<string> SelectedEntityKey,
-    /// <summary>
-    /// History of selected entities for next occurrence selection logic.
-    /// </summary>
     ImmutableList<string> SelectionHistory
 )
 {
@@ -291,13 +280,13 @@ public record ApplicationSelectionContext(
 
     public static ApplicationSelectionContext WithIsd()
     {
-        var isd = VirtualSecurityDomain.CreateIsd();
+        VirtualSecurityDomain isd = VirtualSecurityDomain.CreateIsd();
         const string isdKey = ""; // ISD uses empty string key (empty AID)
         
-        var securityDomainsBuilder = ImmutableDictionary.CreateBuilder<string, VirtualSecurityDomain>();
+        ImmutableDictionary<string, VirtualSecurityDomain>.Builder securityDomainsBuilder = ImmutableDictionary.CreateBuilder<string, VirtualSecurityDomain>();
         securityDomainsBuilder.Add(isdKey, isd);
         
-        var historyBuilder = ImmutableList.CreateBuilder<string>();
+        ImmutableList<string>.Builder historyBuilder = ImmutableList.CreateBuilder<string>();
         historyBuilder.Add(isdKey);
         
         return new ApplicationSelectionContext(
@@ -313,8 +302,8 @@ public record ApplicationSelectionContext(
     /// </summary>
     private Maybe<VirtualSecurityDomain> GetSecurityDomainByAid(ImmutableArray<byte> aid)
     {
-        var aidString = aid.IsEmpty ? "" : Convert.ToHexString(aid.ToArray());
-        return SecurityDomains.TryGetValue(aidString, out var sd)
+        string aidString = aid.IsEmpty ? "" : Convert.ToHexString(aid.ToArray());
+        return SecurityDomains.TryGetValue(aidString, out VirtualSecurityDomain? sd)
             ? Maybe<VirtualSecurityDomain>.From(sd)
             : Maybe<VirtualSecurityDomain>.None;
     }
@@ -324,7 +313,7 @@ public record ApplicationSelectionContext(
     /// </summary>
     public Maybe<VirtualApplication> SelectedApplication =>
         SelectedEntityKey.Bind(key => 
-            Applications.TryGetValue(key, out var app) 
+            Applications.TryGetValue(key, out VirtualApplication? app) 
                 ? Maybe<VirtualApplication>.From(app)
                 : Maybe<VirtualApplication>.None);
 
@@ -343,7 +332,7 @@ public record ApplicationSelectionContext(
                 SmartCardError.InvalidArgument("Application AID cannot be empty"));
         }
 
-        var aidString = Convert.ToHexString(aid.ToArray());
+        string aidString = Convert.ToHexString(aid.ToArray());
         
         if (Applications.ContainsKey(aidString) || SecurityDomains.ContainsKey(aidString))
         {
@@ -358,8 +347,8 @@ public record ApplicationSelectionContext(
                 SmartCardError.ReferencedDataNotFound());
         }
 
-        var application = VirtualApplication.Create(aid, name, associatedSecurityDomainAid, privileges);
-        var applicationsBuilder = Applications.ToBuilder();
+        VirtualApplication application = VirtualApplication.Create(aid, name, associatedSecurityDomainAid, privileges);
+        ImmutableDictionary<string, VirtualApplication>.Builder applicationsBuilder = Applications.ToBuilder();
         applicationsBuilder.Add(aidString, application);
 
         return Result.Success<ApplicationSelectionContext, SmartCardError>(
@@ -377,9 +366,9 @@ public record ApplicationSelectionContext(
             return SelectIsd();
         }
 
-        var aidString = Convert.ToHexString(aid.ToArray());
+        string aidString = Convert.ToHexString(aid.ToArray());
         
-        if (!Applications.TryGetValue(aidString, out var application))
+        if (!Applications.TryGetValue(aidString, out VirtualApplication? application))
         {
             return Result.Failure<ApplicationSelectionContext, SmartCardError>(
                 SmartCardError.FileNotFound());
@@ -391,7 +380,7 @@ public record ApplicationSelectionContext(
                 SmartCardError.ConditionsNotSatisfied());
         }
 
-        var historyBuilder = SelectionHistory.ToBuilder();
+        ImmutableList<string>.Builder historyBuilder = SelectionHistory.ToBuilder();
         historyBuilder.Add(aidString);
         
         return Result.Success<ApplicationSelectionContext, SmartCardError>(
@@ -414,7 +403,7 @@ public record ApplicationSelectionContext(
                 SmartCardError.FileNotFound());
         }
 
-        var historyBuilder = SelectionHistory.ToBuilder();
+        ImmutableList<string>.Builder historyBuilder = SelectionHistory.ToBuilder();
         historyBuilder.Add(isdKey);
         
         return Result.Success<ApplicationSelectionContext, SmartCardError>(
@@ -431,16 +420,16 @@ public record ApplicationSelectionContext(
         ImmutableArray<byte> aid, 
         ApplicationState newState)
     {
-        var aidString = aid.IsEmpty ? "ISD" : Convert.ToHexString(aid.ToArray());
+        string aidString = aid.IsEmpty ? "ISD" : Convert.ToHexString(aid.ToArray());
         
-        if (!Applications.TryGetValue(aidString, out var application))
+        if (!Applications.TryGetValue(aidString, out VirtualApplication? application))
         {
             return Result.Failure<ApplicationSelectionContext, SmartCardError>(
                 SmartCardError.ReferencedDataNotFound());
         }
 
-        var updatedApplication = application.WithState(newState);
-        var newApplications = Applications.SetItem(aidString, updatedApplication);
+        VirtualApplication updatedApplication = application.WithState(newState);
+        ImmutableDictionary<string, VirtualApplication> newApplications = Applications.SetItem(aidString, updatedApplication);
 
         return Result.Success<ApplicationSelectionContext, SmartCardError>(
             this with { Applications = newApplications });
@@ -457,7 +446,7 @@ public record ApplicationSelectionContext(
                 SmartCardError.InvalidArgument("Cannot delete ISD"));
         }
 
-        var aidString = Convert.ToHexString(aid.ToArray());
+        string aidString = Convert.ToHexString(aid.ToArray());
         
         if (!Applications.ContainsKey(aidString))
         {
@@ -465,8 +454,8 @@ public record ApplicationSelectionContext(
                 SmartCardError.ReferencedDataNotFound());
         }
 
-        var newApplications = Applications.Remove(aidString);
-        var newSelectedKey = SelectedEntityKey.Match(
+        ImmutableDictionary<string, VirtualApplication> newApplications = Applications.Remove(aidString);
+        Maybe<string> newSelectedKey = SelectedEntityKey.Match(
             selected => selected == aidString ? Maybe<string>.None : SelectedEntityKey,
             () => Maybe<string>.None);
 
@@ -517,7 +506,7 @@ public record ApplicationSelectionContext(
             return "No selections made";
         }
 
-        var historyItems = SelectionHistory
+        ImmutableList<string> historyItems = SelectionHistory
             .Select((key, index) => $"  {index + 1}. {key}")
             .ToImmutableList();
 

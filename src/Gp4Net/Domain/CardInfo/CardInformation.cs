@@ -1,5 +1,4 @@
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 
 namespace Gp4Net.Domain.CardInfo;
@@ -54,7 +53,7 @@ public record CardInformation(
     /// Indicates whether the card has any meaningful data populated.
     /// Used to validate that card information gathering was successful.
     /// </summary>
-    public bool HasAnyData => Atr.HasValue || Cplc.HasValue || Capabilities.HasValue || 
+    public bool HasAnyData => Atr.HasValue || Cplc.HasValue || Capabilities.HasValue ||
                              KeyInfo.HasValue || CardData.HasValue || ScpInfo.HasValue;
 
     /// <summary>
@@ -62,7 +61,7 @@ public record CardInformation(
     /// Per GP Card Specification, SCP support can be determined from either
     /// Card Capabilities or Diversification Data.
     /// </summary>
-    public bool HasSecureChannelCapabilities => 
+    public bool HasSecureChannelCapabilities =>
         Capabilities.Map(c => c.ScpOptions.Count > 0).GetValueOrDefault(false) ||
         ScpInfo.Map(s => s.Protocols.Count > 0).GetValueOrDefault(false);
 
@@ -81,7 +80,7 @@ public record CardInformation(
     /// Per GP Card Specification v2.3.1 Section E.2.1.1.
     /// </summary>
     public Maybe<string> GlobalPlatformVersion =>
-        CardData.Bind(cd => cd.GlobalPlatformVersionFromOid) 
+        CardData.Bind(cd => cd.GlobalPlatformVersionFromOid)
         .Or(() => CardData.Bind(cd => cd.GlobalPlatformVersion.Map(v => v.ToString())));
 
     /// <summary>

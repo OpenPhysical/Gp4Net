@@ -254,17 +254,34 @@ public class GetStatusCommand : IApduCommand
     }
 
     /// <summary>
+    /// Validates search criteria for AID format and length.
+    /// </summary>
+    /// <param name="searchCriteria">The search criteria to validate.</param>
+    /// <returns>Maybe containing SmartCardError if validation fails, or None if valid.</returns>
+    private static Maybe<SmartCardError> ValidateSearchCriteria(byte[] searchCriteria)
+    {
+        // If it looks like a raw AID (not TLV), validate length
+        if (searchCriteria[0] != 0x4F && searchCriteria.Length is < 5 or > 16)
+        {
+            return Maybe<SmartCardError>.From(
+                SmartCardError.InvalidArgument("Search criteria AID must be between 5 and 16 bytes.")
+            );
+        }
+        return Maybe<SmartCardError>.None;
+    }
+
+    /// <summary>
     /// Converts this command to an APDU byte array.
     /// </summary>
     /// <returns>The APDU command bytes.</returns>
     public byte[] ToApdu()
     {
-        var dataLength = SearchCriteria?.Length ?? 0;
+        int dataLength = SearchCriteria?.Length ?? 0;
 
         if (dataLength > 0)
         {
             // Case 4: Has data and expects response (CLA INS P1 P2 Lc Data Le)
-            var apdu = new byte[5 + dataLength + 1];
+            byte[] apdu = new byte[5 + dataLength + 1];
             apdu[0] = Cla;
             apdu[1] = Ins;
             apdu[2] = (byte)Subset;
@@ -363,8 +380,8 @@ public class ApplicationStatusEntry
 /// Represents the response to a GET STATUS command.
 /// </summary>
 [PublicAPI]
-    public class GetStatusResponse
-    {
+public class GetStatusResponse
+{
     /// <summary>
     /// Gets the list of application status entries.
     /// </summary>
@@ -384,96 +401,93 @@ public class ApplicationStatusEntry
     /// </summary>
     /// <param name="response">The response data (excluding status word).</param>
     /// <returns>A Result containing either the parsed response or an error.</returns>
-        public static Result<GetStatusResponse, SmartCardError> Parse(byte[] response)
+    public static Result<GetStatusResponse, SmartCardError> Parse(byte[] response)
+    {
+        return Maybe<byte[]>.From(response).Match(
+            Some: responseValue => ParseTlv(responseValue),
+            None: () => SmartCardError.InvalidArgument("Response data cannot be null")
+        );
+    }
+
+    private static Result<GetStatusResponse, SmartCardError> ParseTlv(byte[] response)
+    {
+        try
         {
-            if (response == null)
+            IReadOnlyList<TlvObject> tlvs = TlvParser.ParseAll(response);
+            List<ApplicationStatusEntry> entries = [];
+
+            foreach (TlvObject t in tlvs)
             {
-                return SmartCardError.InvalidArgument("Response data cannot be null");
-            }
-
-            // Spec-aligned TLV-only parsing (Table 11-36). No legacy formats.
-            return ParseTlv(response);
-        }
-
-        private static Result<GetStatusResponse, SmartCardError> ParseTlv(byte[] response)
-        {
-            try
-            {
-                var tlvs = Gp4Net.Core.Tlv.TlvParser.ParseAll(response);
-                var entries = new List<ApplicationStatusEntry>();
-
-                foreach (var t in tlvs)
+                // Per GP Table 11-36, all responses MUST use E3 containers. All traced cards comply.
+                Result<uint, SmartCardError> tagResult = t.GetTagNumber();
+                if (tagResult.IsFailure || tagResult.Value != 0xE3)
                 {
-                    // Per GP Table 11-36, all responses MUST use E3 containers. All traced cards comply.
-                    var tagResult = t.GetTagNumber();
-                    if (tagResult.IsFailure || tagResult.Value != 0xE3)
-                    {
-                        continue; // Skip non-E3 entries - specification violation
-                    }
-
-                    var children = t.ParseNestedTlv().ToList();
-                    // Find required TLVs using functional approach
-                    var aidTlvMaybe = Maybe<TlvObject>.None;
-                    var lcTlvMaybe = Maybe<TlvObject>.None;
-                    var privTlvMaybe = Maybe<TlvObject>.None;
-                    var elfTlvMaybe = Maybe<TlvObject>.None;
-                    
-                    foreach (var child in children)
-                    {
-                        var childTagResult = child.GetTagNumber();
-                        if (childTagResult.IsFailure) continue;
-                        
-                        switch (childTagResult.Value)
-                        {
-                            case 0x4F:
-                                aidTlvMaybe = Maybe<TlvObject>.From(child);
-                                break;
-                            case 0x9F70:
-                                lcTlvMaybe = Maybe<TlvObject>.From(child);
-                                break;
-                            case 0xC5:
-                                privTlvMaybe = Maybe<TlvObject>.From(child);
-                                break;
-                            case 0xC4:
-                                elfTlvMaybe = Maybe<TlvObject>.From(child);
-                                break;
-                        }
-                    }
-
-                    if (aidTlvMaybe.HasNoValue || lcTlvMaybe.HasNoValue)
-                    {
-                        // Insufficient data for an entry; skip
-                        continue;
-                    }
-                    
-                    var aidTlv = aidTlvMaybe.Value;
-                    var lcTlv = lcTlvMaybe.Value;
-
-                    var aid = aidTlv.Value;
-                    if (lcTlv.Value.Length == 0)
-                    {
-                        continue;
-                    }
-                    var lc = lcTlv.Value[0];
-                    if (!IsValidLifecycleState(lc))
-                    {
-                        return SmartCardError.InvalidResponse($"Invalid lifecycle state: 0x{lc:X2}");
-                    }
-
-                    var priv = privTlvMaybe.HasValue ? privTlvMaybe.Value.Value : [];
-                    var elf = elfTlvMaybe.HasValue ? elfTlvMaybe.Value.Value : [];
-                    entries.Add(new ApplicationStatusEntry(aid, (ApplicationStatusEntry.LifecycleState)lc, priv, elf));
+                    continue; // Skip non-E3 entries - specification violation
                 }
 
-                return new GetStatusResponse(entries);
-            }
-            catch
-            {
-                return SmartCardError.InvalidResponse("Failed to parse GET STATUS TLV response");
-            }
-        }
+                List<TlvObject> children = t.ParseNestedTlv().ToList();
+                // Find required TLVs using functional approach
+                Maybe<TlvObject> aidTlvMaybe = Maybe<TlvObject>.None;
+                Maybe<TlvObject> lcTlvMaybe = Maybe<TlvObject>.None;
+                Maybe<TlvObject> privTlvMaybe = Maybe<TlvObject>.None;
+                Maybe<TlvObject> elfTlvMaybe = Maybe<TlvObject>.None;
 
-        // No legacy parser: GET STATUS responses must be TLV per Table 11-36/11-37.
+                foreach (TlvObject child in children)
+                {
+                    Result<uint, SmartCardError> childTagResult = child.GetTagNumber();
+                    if (childTagResult.IsFailure) continue;
+
+                    switch (childTagResult.Value)
+                    {
+                        case 0x4F:
+                            aidTlvMaybe = Maybe<TlvObject>.From(child);
+                            break;
+                        case 0x9F70:
+                            lcTlvMaybe = Maybe<TlvObject>.From(child);
+                            break;
+                        case 0xC5:
+                            privTlvMaybe = Maybe<TlvObject>.From(child);
+                            break;
+                        case 0xC4:
+                            elfTlvMaybe = Maybe<TlvObject>.From(child);
+                            break;
+                    }
+                }
+
+                if (aidTlvMaybe.HasNoValue || lcTlvMaybe.HasNoValue)
+                {
+                    // Insufficient data for an entry; skip
+                    continue;
+                }
+
+                TlvObject aidTlv = aidTlvMaybe.Value;
+                TlvObject lcTlv = lcTlvMaybe.Value;
+
+                byte[] aid = aidTlv.Value;
+                if (lcTlv.Value.Length == 0)
+                {
+                    continue;
+                }
+                byte lc = lcTlv.Value[0];
+                if (!IsValidLifecycleState(lc))
+                {
+                    return SmartCardError.InvalidResponse($"Invalid lifecycle state: 0x{lc:X2}");
+                }
+
+                byte[] priv = privTlvMaybe.HasValue ? privTlvMaybe.Value.Value : [];
+                byte[] elf = elfTlvMaybe.HasValue ? elfTlvMaybe.Value.Value : [];
+                entries.Add(new ApplicationStatusEntry(aid, (ApplicationStatusEntry.LifecycleState)lc, priv, elf));
+            }
+
+            return new GetStatusResponse(entries);
+        }
+        catch
+        {
+            return SmartCardError.InvalidResponse("Failed to parse GET STATUS TLV response");
+        }
+    }
+
+    // No legacy parser: GET STATUS responses must be TLV per Table 11-36/11-37.
 
     /// <summary>
     /// Validates if the provided lifecycle state value is valid.

@@ -1,5 +1,6 @@
 using System.Linq;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
 using NUnit.Framework;
@@ -13,24 +14,24 @@ public class KeyInformationTemplateTests
     public void Parse_WithSingleKey_ParsesCorrectly()
     {
         // Arrange - Single key with 3DES
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0xC0,
             0x04, // Tag C0, length 4
             0x01, // Key ID = 1
             0x01, // Key version = 1
             0x82, // 3DES-3KEY
             0xFF // Not available
-        };
+        ];
 
         // Act
-        var template = KeyInformationTemplate.Parse(data);
+        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(data);
 
         // Assert
         _ = template.IsSuccess.Should().BeTrue();
         _ = template.Value.Keys.Should().HaveCount(1);
 
-        var key = template.Value.Keys.First();
+        KeyEntry? key = template.Value.Keys.First();
         _ = key.KeyId.Should().Be(1);
         _ = key.KeyVersion.Should().Be(1);
         _ = key.KeyTypes.Should().HaveCount(2);
@@ -43,21 +44,21 @@ public class KeyInformationTemplateTests
     public void Parse_WithAesKey_ParsesCorrectly()
     {
         // Arrange - AES key
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0xC0,
             0x03, // Tag C0, length 3
             0x10, // Key ID = 16
             0x02, // Key version = 2
             0x88 // AES
-        };
+        ];
 
         // Act
-        var template = KeyInformationTemplate.Parse(data);
+        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(data);
 
         // Assert
         _ = template.Should().NotBeNull();
-        var key = template.Value.Keys.First();
+        KeyEntry? key = template.Value.Keys.First();
         _ = key.KeyId.Should().Be(16);
         _ = key.KeyVersion.Should().Be(2);
         _ = key.PrimaryKeyType.Should().Be(KeyType.Aes);
@@ -68,8 +69,8 @@ public class KeyInformationTemplateTests
     public void Parse_WithMultipleKeyTypes_ParsesAllTypes()
     {
         // Arrange - Key supporting multiple types
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0xC0,
             0x05, // Tag C0, length 5
             0x20, // Key ID = 32
@@ -77,13 +78,13 @@ public class KeyInformationTemplateTests
             0x80, // DES
             0x81, // 3DES-2KEY
             0x82 // 3DES-3KEY
-        };
+        ];
 
         // Act
-        var template = KeyInformationTemplate.Parse(data);
+        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(data);
 
         // Assert
-        var key = template.Value.Keys.First();
+        KeyEntry? key = template.Value.Keys.First();
         _ = key.KeyTypes.Should().HaveCount(3);
         _ = key.KeyTypes.Should().Contain(KeyType.Des);
         _ = key.KeyTypes.Should().Contain(KeyType.TripleDes2Key);
@@ -96,8 +97,8 @@ public class KeyInformationTemplateTests
     public void Parse_RealWorldExample_ParsesCorrectly()
     {
         // Arrange - Real world example from trace
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0xE0,
             0x1A, // Tag E0, length 26
             0xC0,
@@ -124,10 +125,10 @@ public class KeyInformationTemplateTests
             0x01,
             0x88,
             0xFF // Key 2, version 1, AES
-        };
+        ];
 
         // Act - Parse the value inside E0 tag
-        var template = KeyInformationTemplate.Parse(data[2..]);
+        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(data[2..]);
 
         // Assert
         _ = template.Value.Keys.Should().HaveCount(4);
@@ -147,7 +148,7 @@ public class KeyInformationTemplateTests
         _ = template.Value.Keys[3].KeyVersion.Should().Be(1);
 
         // All are AES keys
-        foreach (var key in template.Value.Keys)
+        foreach (KeyEntry? key in template.Value.Keys)
         {
             _ = key.PrimaryKeyType.Should().Be(KeyType.Aes);
         }
@@ -157,18 +158,18 @@ public class KeyInformationTemplateTests
     public void KeyEntry_ToString_FormatsCorrectly()
     {
         // Arrange
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0xC0,
             0x03,
             0x01,
             0x02,
             0x88 // Key 1, version 2, AES
-        };
+        ];
 
         // Act
-        var template = KeyInformationTemplate.Parse(data);
-        var output = template.Value.Keys.First().ToString();
+        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(data);
+        string? output = template.Value.Keys.First().ToString();
 
         // Assert
         _ = output.Should().Contain("Version: 2 (0x02)");
@@ -181,8 +182,8 @@ public class KeyInformationTemplateTests
     public void KeyInformationTemplate_ToString_FormatsCorrectly()
     {
         // Arrange
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0xC0,
             0x04,
             0x01,
@@ -195,11 +196,11 @@ public class KeyInformationTemplateTests
             0x01,
             0x88,
             0xFF
-        };
+        ];
 
         // Act
-        var template = KeyInformationTemplate.Parse(data);
-        var output = template.ToString();
+        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(data);
+        string? output = template.ToString();
 
         // Assert
         _ = output.Should().Contain("Key Information Template:");
@@ -225,10 +226,10 @@ public class KeyInformationTemplateTests
     public void Parse_EmptyData_ReturnsFailure()
     {
         // Arrange
-        var emptyData = new byte[0];
+        byte[] emptyData = [];
 
         // Act
-        var result = KeyInformationTemplate.Parse(emptyData);
+        Result<KeyInformationTemplate, SmartCardError> result = KeyInformationTemplate.Parse(emptyData);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -240,16 +241,16 @@ public class KeyInformationTemplateTests
     public void Parse_ShortKeyData_HandlesGracefully()
     {
         // Arrange - Key data too short (less than 3 bytes)
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0xC0,
             0x02, // Tag C0, length 2
             0x01,
             0x01 // Only ID and version, no type
-        };
+        ];
 
         // Act
-        var template = KeyInformationTemplate.Parse(data);
+        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(data);
 
         // Assert
         _ = template.Value.Keys.Should().BeEmpty(); // Should not add incomplete key

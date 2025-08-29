@@ -34,7 +34,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
                 $"[cyan]Scanning Oracle Java Card SDKs at: {Markup.Escape(settings.SdkPath)}[/]"
             );
 
-            var mappings = await ScanForPackageMappingsAsync(settings.SdkPath);
+            Dictionary<string, PackageInfo> mappings = await ScanForPackageMappingsAsync(settings.SdkPath);
 
             AnsiConsole.MarkupLine($"[green]Found {mappings.Count} package mappings[/]");
 
@@ -67,7 +67,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         string sdkPath
     )
     {
-        var mappings = new Dictionary<string, PackageInfo>();
+        Dictionary<string, PackageInfo> mappings = new Dictionary<string, PackageInfo>();
 
         AnsiConsole
             .Status()
@@ -75,23 +75,23 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
                 "Scanning .exp files...",
                 ctx =>
                 {
-                    var expFiles = Directory.GetFiles(
+                    string[] expFiles = Directory.GetFiles(
                         sdkPath,
                         "*.exp",
                         SearchOption.AllDirectories
                     );
                     AnsiConsole.MarkupLine($"[dim]Found {expFiles.Length} .exp files[/]");
 
-                    foreach (var expFile in expFiles)
+                    foreach (string expFile in expFiles)
                     {
                         _ = ctx.Status($"Processing {Path.GetFileName(expFile)}...");
 
                         try
                         {
-                            var packageInfo = ParseExpFile(expFile);
+                            PackageInfo packageInfo = ParseExpFile(expFile);
                             if (packageInfo != null)
                             {
-                                var aidHex = Convert.ToHexString(packageInfo.Aid).ToUpper();
+                                string aidHex = Convert.ToHexString(packageInfo.Aid).ToUpper();
                                 if (!mappings.ContainsKey(aidHex))
                                 {
                                     mappings[aidHex] = packageInfo;
@@ -116,24 +116,24 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
 
     private static PackageInfo ParseExpFile(string expFilePath)
     {
-        var fileBytes = File.ReadAllBytes(expFilePath);
-        var relativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), expFilePath);
+        byte[] fileBytes = File.ReadAllBytes(expFilePath);
+        string relativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), expFilePath);
 
         // Extract SDK version from path (e.g., jc221_kit -> jc221)
-        var sdkVersion = ExtractSdkVersionFromPath(expFilePath);
+        string sdkVersion = ExtractSdkVersionFromPath(expFilePath);
 
         // Look for package name pattern in the file
-        var packageName = ExtractPackageNameFromPath(expFilePath);
+        string packageName = ExtractPackageNameFromPath(expFilePath);
         if (string.IsNullOrEmpty(packageName))
         {
             return null;
         }
 
         // Find the last occurrence of the package name in the file
-        var packageNameBytes = System.Text.Encoding.UTF8.GetBytes(
+        byte[] packageNameBytes = System.Text.Encoding.UTF8.GetBytes(
             packageName.Replace('.', '/')
         );
-        var lastIndex = FindLastOccurrence(fileBytes, packageNameBytes);
+        int lastIndex = FindLastOccurrence(fileBytes, packageNameBytes);
 
         if (lastIndex == -1)
         {
@@ -141,7 +141,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         }
 
         // Skip the package name and 4 bytes as per jcalgscan documentation
-        var dataStart = lastIndex + packageNameBytes.Length + 4;
+        int dataStart = lastIndex + packageNameBytes.Length + 4;
 
         if (dataStart + 3 >= fileBytes.Length)
         {
@@ -151,16 +151,16 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         try
         {
             // Parse: minor_version(1) major_version(1) aid_length(1) aid(aid_length)
-            var minorVersion = fileBytes[dataStart];
-            var majorVersion = fileBytes[dataStart + 1];
-            var aidLength = fileBytes[dataStart + 2];
+            byte minorVersion = fileBytes[dataStart];
+            byte majorVersion = fileBytes[dataStart + 1];
+            byte aidLength = fileBytes[dataStart + 2];
 
             if (dataStart + 3 + aidLength > fileBytes.Length)
             {
                 return null;
             }
 
-            var aid = new byte[aidLength];
+            byte[] aid = new byte[aidLength];
             Array.Copy(fileBytes, dataStart + 3, aid, 0, aidLength);
 
             return new PackageInfo
@@ -184,9 +184,9 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
     {
         // Extract SDK version from path like: external/oracle_javacard_sdks/jc221_kit/...
         // Returns: jc221 (removes _kit suffix)
-        var parts = expFilePath.Replace('\\', '/').Split('/');
+        string[] parts = expFilePath.Replace('\\', '/').Split('/');
 
-        foreach (var part in parts)
+        foreach (string part in parts)
         {
             if (part.StartsWith("jc") && part.EndsWith("_kit"))
             {
@@ -206,22 +206,22 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
     {
         // Extract package name from path structure
         // e.g., javacard\framework\javacard\framework.exp -> javacard.framework
-        var parts = expFilePath.Replace('\\', '/').Split('/');
+        string[] parts = expFilePath.Replace('\\', '/').Split('/');
 
         // Look for patterns like: api_export_files/javacard/framework/javacard/framework.exp
-        for (var i = 0; i < parts.Length - 1; i++)
+        for (int i = 0; i < parts.Length - 1; i++)
         {
             if (parts[i] == "api_export_files" && i + 2 < parts.Length)
             {
                 // Take the next parts as package components
-                var packageParts = new List<string>();
-                for (var j = i + 1; j < parts.Length - 1; j++)
+                List<string> packageParts = [];
+                for (int j = i + 1; j < parts.Length - 1; j++)
                 {
                     packageParts.Add(parts[j]);
                 }
 
                 // Determine the full package name with proper prefix
-                var packageName = string.Join('.', packageParts);
+                string packageName = string.Join('.', packageParts);
 
                 // Add proper prefixes based on the package structure
                 if (
@@ -264,7 +264,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         }
 
         // Fallback: use filename without extension
-        var filename = Path.GetFileNameWithoutExtension(expFilePath);
+        string filename = Path.GetFileNameWithoutExtension(expFilePath);
 
         // Apply prefix mapping for fallback cases too
         return filename switch
@@ -278,10 +278,10 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
 
     private static int FindLastOccurrence(byte[] haystack, byte[] needle)
     {
-        for (var i = haystack.Length - needle.Length; i >= 0; i--)
+        for (int i = haystack.Length - needle.Length; i >= 0; i--)
         {
-            var found = true;
-            for (var j = 0; j < needle.Length; j++)
+            bool found = true;
+            for (int j = 0; j < needle.Length; j++)
             {
                 if (haystack[i + j] != needle[j])
                 {
@@ -302,29 +302,29 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         string outputPath
     )
     {
-        var options = new JsonSerializerOptions
+        JsonSerializerOptions options = new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         };
 
         // Load existing data if file exists
-        var existingData = new Dictionary<string, object>();
-        var existingPackages = new Dictionary<string, object>();
+        Dictionary<string, object> existingData = new Dictionary<string, object>();
+        Dictionary<string, object> existingPackages = new Dictionary<string, object>();
 
         if (File.Exists(outputPath))
         {
             try
             {
-                var existingJson = await File.ReadAllTextAsync(outputPath);
-                var existingDoc = JsonDocument.Parse(existingJson);
+                string existingJson = await File.ReadAllTextAsync(outputPath);
+                JsonDocument existingDoc = JsonDocument.Parse(existingJson);
 
                 // Preserve existing non-package data
-                foreach (var element in existingDoc.RootElement.EnumerateObject())
+                foreach (JsonProperty element in existingDoc.RootElement.EnumerateObject())
                 {
                     if (element.Name != "packages")
                     {
-                        var deserializedValue = JsonSerializer.Deserialize<object>(
+                        object deserializedValue = JsonSerializer.Deserialize<object>(
                             element.Value.GetRawText(),
                             options
                         );
@@ -336,9 +336,9 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
                     else
                     {
                         // Load existing packages
-                        foreach (var pkg in element.Value.EnumerateObject())
+                        foreach (JsonProperty pkg in element.Value.EnumerateObject())
                         {
-                            var deserializedPackage = JsonSerializer.Deserialize<object>(
+                            object deserializedPackage = JsonSerializer.Deserialize<object>(
                                 pkg.Value.GetRawText(),
                                 options
                             );
@@ -360,8 +360,8 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         }
 
         // Merge new packages with existing ones (new ones take precedence)
-        var allPackages = new Dictionary<string, object>(existingPackages);
-        foreach (var mapping in mappings)
+        Dictionary<string, object> allPackages = new Dictionary<string, object>(existingPackages);
+        foreach (KeyValuePair<string, PackageInfo> mapping in mappings)
         {
             allPackages[mapping.Key] = new
             {
@@ -376,18 +376,18 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         }
 
         // Create final JSON structure
-        var jsonData = new Dictionary<string, object>(existingData)
+        Dictionary<string, object> jsonData = new Dictionary<string, object>(existingData)
         {
             ["generatedAt"] = DateTime.UtcNow,
             ["packageCount"] = allPackages.Count,
             ["packages"] = allPackages,
         };
 
-        var json = JsonSerializer.Serialize(jsonData, options);
+        string json = JsonSerializer.Serialize(jsonData, options);
         await File.WriteAllTextAsync(outputPath, json);
 
-        var newCount = mappings.Count;
-        var totalCount = allPackages.Count;
+        int newCount = mappings.Count;
+        int totalCount = allPackages.Count;
         AnsiConsole.MarkupLine(
             $"[dim]Added {newCount} new mappings, total: {totalCount} packages[/]"
         );
@@ -395,7 +395,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
 
     private static void DisplayPackageMappings(Dictionary<string, PackageInfo> mappings)
     {
-        var table = new Table()
+        Table table = new Table()
             .AddColumn("Package AID")
             .AddColumn("Package Name")
             .AddColumn("Version")
@@ -403,7 +403,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
             .AddColumn("Source File");
 
         foreach (
-            var mapping in mappings.OrderBy(m => m.Value.SdkVersion).ThenBy(m => m.Value.Name)
+            KeyValuePair<string, PackageInfo> mapping in mappings.OrderBy(m => m.Value.SdkVersion).ThenBy(m => m.Value.Name)
         )
         {
             _ = table.AddRow(

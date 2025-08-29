@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
@@ -84,11 +83,11 @@ public static class SecurityValidation
             return false;
         }
 
-        var sw = (ushort)((response[response.Length - 2] << 8) | response[response.Length - 1]);
-        
+        ushort sw = (ushort)((response[response.Length - 2] << 8) | response[response.Length - 1]);
+
         // Per GP spec: R-MAC only for success and warning status words
-        return sw == StatusWords.Success || 
-               (sw & 0xFF00) == 0x6200 || 
+        return sw == StatusWords.Success ||
+               (sw & 0xFF00) == 0x6200 ||
                (sw & 0xFF00) == 0x6300;
     }
 

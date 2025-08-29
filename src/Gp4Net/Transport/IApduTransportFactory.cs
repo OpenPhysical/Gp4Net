@@ -27,13 +27,13 @@ public interface IApduTransportFactory
 [PublicAPI]
 public class ApduTransportFactory : IApduTransportFactory
 {
-    private readonly Microsoft.Extensions.Logging.ILoggerFactory _loggerFactory;
+    private readonly ILoggerFactory _loggerFactory;
 
     /// <summary>
     /// Initializes a new instance of ApduTransportFactory.
     /// </summary>
     /// <param name="loggerFactory">The logger factory.</param>
-    public ApduTransportFactory(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory)
+    public ApduTransportFactory(ILoggerFactory loggerFactory)
     {
         _loggerFactory = loggerFactory;
     }

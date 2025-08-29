@@ -70,26 +70,26 @@ public class OpenPhysicalId
         }
 
         // Remove all dashes and validate that all characters are digits
-        var digitsOnly = opid.Replace("-", "");
+        string digitsOnly = opid.Replace("-", "");
         if (digitsOnly.Length < 5 || !digitsOnly.All(char.IsDigit))
         {
             return false;
         }
 
         // Extract IIN (first 4 digits), format indicator (5th digit), and CIN (remaining)
-        var iin = digitsOnly.Substring(0, 4);
-        if (!int.TryParse(digitsOnly.Substring(4, 1), out var formatIndicator))
+        string iin = digitsOnly.Substring(0, 4);
+        if (!int.TryParse(digitsOnly.Substring(4, 1), out int formatIndicator))
         {
             return false;
         }
 
         // Validate format indicator
-        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out var format))
+        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out OpidFormat format))
         {
             return false;
         }
 
-        var cin = digitsOnly.Substring(5);
+        string cin = digitsOnly.Substring(5);
 
         // Validate that the total digit count matches the expected count for this format
         if (digitsOnly.Length != format.GetExpectedDigitCount())
@@ -143,19 +143,19 @@ public class OpenPhysicalId
         }
 
         // Reconstruct the full digit string to determine format
-        var fullDigits = iin + cin;
+        string fullDigits = iin + cin;
         if (fullDigits.Length < 5)
         {
             return false;
         }
 
         // Extract format indicator
-        if (!int.TryParse(fullDigits.Substring(4, 1), out var formatIndicator))
+        if (!int.TryParse(fullDigits.Substring(4, 1), out int formatIndicator))
         {
             return false;
         }
 
-        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out var format))
+        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out OpidFormat format))
         {
             return false;
         }
@@ -167,7 +167,7 @@ public class OpenPhysicalId
         }
 
         // Extract the actual CIN (everything after the format indicator)
-        var actualCin = fullDigits.Substring(5);
+        string actualCin = fullDigits.Substring(5);
 
         result = new OpenPhysicalId(iin, actualCin, format);
         return true;
@@ -180,7 +180,7 @@ public class OpenPhysicalId
     public string ToDisplayFormat()
     {
         // Reconstruct the full digit string
-        var fullDigits = Iin + (int)Format + Cin;
+        string fullDigits = Iin + (int)Format + Cin;
 
         // Apply the appropriate dash pattern based on format
         return Format switch

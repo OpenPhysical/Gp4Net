@@ -30,41 +30,41 @@ public static class KeyInfoTemplateCodec
         if (keyInfo is null)
             return Result.Failure<byte[], SmartCardError>(
                 SmartCardError.InvalidArgument("KeyInfo cannot be null"));
-            
-        using var stream = new MemoryStream();
-            
+
+        using MemoryStream stream = new MemoryStream();
+
         // Tag 0xE0 for key information template
         stream.WriteByte(0xE0);
-            
+
         // Calculate content length
-        var contentStream = new MemoryStream();
-            
+        MemoryStream contentStream = new MemoryStream();
+
         // Key version number (C0)
         if (keyInfo.KeyVersionNumber.HasValue)
         {
             WriteTlv(contentStream, 0xC0, [keyInfo.KeyVersionNumber.Value]);
         }
-            
+
         // Key identifier (C1)
         if (keyInfo.KeyIdentifier.HasValue)
         {
             WriteTlv(contentStream, 0xC1, [keyInfo.KeyIdentifier.Value]);
         }
-            
+
         // Key types and lengths (C2)
         if (keyInfo.KeyTypesAndLengths.Count > 0)
         {
-            var keyData = new byte[keyInfo.KeyTypesAndLengths.Count * 2];
-            var index = 0;
-            foreach (var keyType in keyInfo.KeyTypesAndLengths)
+            byte[] keyData = new byte[keyInfo.KeyTypesAndLengths.Count * 2];
+            int index = 0;
+            foreach (KeyTypeAndLength keyType in keyInfo.KeyTypesAndLengths)
             {
                 keyData[index++] = keyType.Type;
                 keyData[index++] = keyType.Length;
             }
             WriteTlv(contentStream, 0xC2, keyData);
         }
-            
-        var content = contentStream.ToArray();
+
+        byte[] content = contentStream.ToArray();
 
         switch (content.Length)
         {
@@ -80,13 +80,13 @@ public static class KeyInfoTemplateCodec
                 return Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidData("Key information template too large for encoding"));
         }
-            
+
         // Write content
         stream.Write(content, 0, content.Length);
-            
+
         return Result.Success<byte[], SmartCardError>(stream.ToArray());
     }
-        
+
     /// <summary>
     /// Decodes key information template from binary format.
     /// </summary>
@@ -97,34 +97,34 @@ public static class KeyInfoTemplateCodec
         if (data is null)
             return Result.Failure<KeyInfoTemplate, SmartCardError>(
                 SmartCardError.InvalidArgument("Data cannot be null"));
-            
+
         // Parse the outer TLV structure
-        var outerTlvMaybe = TlvParser.ParseSingle(data);
+        Maybe<TlvObject> outerTlvMaybe = TlvParser.ParseSingle(data);
         if (!outerTlvMaybe.HasValue)
         {
             return SmartCardError.InvalidData("Invalid key information template format - no outer TLV found");
         }
-        
-        var tagResult = outerTlvMaybe.Value.GetTagNumber();
+
+        Result<uint, SmartCardError> tagResult = outerTlvMaybe.Value.GetTagNumber();
         if (tagResult.IsFailure || tagResult.Value != 0xE0)
         {
             return SmartCardError.InvalidData("Invalid key information template format - expected tag 0xE0");
         }
-        
-        var outerTlv = outerTlvMaybe.Value;
-            
+
+        TlvObject outerTlv = outerTlvMaybe.Value;
+
         try
         {
-            var keyInfo = new KeyInfoTemplate();
-                
+            KeyInfoTemplate keyInfo = new KeyInfoTemplate();
+
             // Parse all TLV elements within the key information data
-            var elements = TlvParser.ParseAll(outerTlv.Value);
-                
-            foreach (var element in elements)
+            IReadOnlyList<TlvObject> elements = TlvParser.ParseAll(outerTlv.Value);
+
+            foreach (TlvObject element in elements)
             {
-                var tagNumberResult = element.GetTagNumber();
+                Result<uint, SmartCardError> tagNumberResult = element.GetTagNumber();
                 if (tagNumberResult.IsFailure) continue;
-                
+
                 switch (tagNumberResult.Value)
                 {
                     case 0xC0: // Key version number
@@ -133,14 +133,14 @@ public static class KeyInfoTemplateCodec
                             keyInfo.KeyVersionNumber = element.Value[0];
                         }
                         break;
-                            
+
                     case 0xC1: // Key identifier
                         if (element.Length == 1)
                         {
                             keyInfo.KeyIdentifier = element.Value[0];
                         }
                         break;
-                            
+
                     case 0xC2: // Key types and lengths
                         if (element.Value is { Length: >= 2 })
                         {
@@ -157,13 +157,13 @@ public static class KeyInfoTemplateCodec
                             }
                         }
                         break;
-                        
+
                     default:
                         // Unknown tags are ignored for forward compatibility
                         break;
                 }
             }
-                
+
             return keyInfo;
         }
         catch (Exception ex)
@@ -171,7 +171,7 @@ public static class KeyInfoTemplateCodec
             return SmartCardError.InvalidData($"Failed to parse key information template: {ex.Message}");
         }
     }
-    
+
     private static void WriteTlv(Stream stream, byte tag, byte[] value)
     {
         stream.WriteByte(tag);
@@ -189,11 +189,11 @@ public static class KeyInfoTemplateCodec
             default:
                 throw new ArgumentException($"Value too long for simple TLV encoding: {value.Length} bytes");
         }
-        
+
         stream.Write(value, 0, value.Length);
     }
 }
-    
+
 /// <summary>
 /// Represents GlobalPlatform key information template.
 /// </summary>
@@ -204,18 +204,18 @@ public class KeyInfoTemplate
     /// Key version number.
     /// </summary>
     public Maybe<byte> KeyVersionNumber { get; set; } = Maybe<byte>.None;
-        
+
     /// <summary>
     /// Key identifier.
     /// </summary>
     public Maybe<byte> KeyIdentifier { get; set; } = Maybe<byte>.None;
-        
+
     /// <summary>
     /// Key types and their lengths.
     /// </summary>
     public List<KeyTypeAndLength> KeyTypesAndLengths { get; set; } = [];
 }
-    
+
 /// <summary>
 /// Represents a key type and its length.
 /// </summary>
@@ -226,7 +226,7 @@ public class KeyTypeAndLength
     /// Key type identifier.
     /// </summary>
     public byte Type { get; set; }
-        
+
     /// <summary>
     /// Key length in bytes.
     /// </summary>

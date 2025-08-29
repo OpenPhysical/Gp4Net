@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using CSharpFunctionalExtensions;
 using Spectre.Console;
 
 namespace Gp4Net.Tool.Commands.Applet;
@@ -19,13 +18,13 @@ public static class ApplicationTableRenderer
     /// <param name="showExtended">Whether to include extended columns</param>
     public static void RenderToTable(IEnumerable<ApplicationTableBuilder.ApplicationRow> rows, bool showExtended = false)
     {
-        var table = CreateTable(showExtended);
-        
-        foreach (var row in rows)
+        Table table = CreateTable(showExtended);
+
+        foreach (ApplicationTableBuilder.ApplicationRow row in rows)
         {
             RenderSemanticRow(table, row, showExtended);
         }
-        
+
         AnsiConsole.Write(table);
     }
 
@@ -35,7 +34,7 @@ public static class ApplicationTableRenderer
     /// <param name="rows">Sequence of semantic application rows</param>
     public static void RenderToConsole(IEnumerable<ApplicationTableBuilder.ApplicationRow> rows)
     {
-        foreach (var row in rows)
+        foreach (ApplicationTableBuilder.ApplicationRow row in rows)
         {
             switch (row)
             {
@@ -43,14 +42,14 @@ public static class ApplicationTableRenderer
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine($"[bold]{title}[/]");
                     break;
-                    
+
                 case ApplicationTableBuilder.SummaryRow(var message):
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine($"[dim]{message}[/]");
                     break;
-                    
+
                 case ApplicationTableBuilder.InfoRow(var message, var severity):
-                    var color = severity switch
+                    string color = severity switch
                     {
                         "warning" => "yellow",
                         "error" => "red",
@@ -59,11 +58,11 @@ public static class ApplicationTableRenderer
                     };
                     AnsiConsole.MarkupLine($"[{color}]{message}[/]");
                     break;
-                    
+
                 case ApplicationTableBuilder.ApplicationDataRow dataRow:
                     // For console output, display as a simple line
-                    var version = dataRow.Version.GetValueOrDefault("");
-                    var versionDisplay = !string.IsNullOrEmpty(version) ? $" v{version}" : "";
+                    string version = dataRow.Version.GetValueOrDefault("");
+                    string versionDisplay = !string.IsNullOrEmpty(version) ? $" v{version}" : "";
                     AnsiConsole.MarkupLine($"{dataRow.Type} {dataRow.Aid}{versionDisplay} - {dataRow.State}");
                     break;
             }
@@ -75,21 +74,21 @@ public static class ApplicationTableRenderer
     /// </summary>
     private static Table CreateTable(bool showExtended)
     {
-        var table = new Table();
+        Table table = new Table();
 
         // Basic columns
         _ = table.AddColumn("Type");
         _ = table.AddColumn("AID");
         _ = table.AddColumn("State");
         _ = table.AddColumn("Privileges");
-        
+
         // Extended columns
         if (showExtended)
         {
             _ = table.AddColumn("Version");
             _ = table.AddColumn("Assoc. SD");
         }
-        
+
         return table;
     }
 
@@ -101,8 +100,8 @@ public static class ApplicationTableRenderer
         switch (row)
         {
             case ApplicationTableBuilder.ApplicationDataRow(var type, var aid, var state, var privileges, var version, var associatedSd):
-                var columns = new List<string> { type, aid, state, privileges };
-                
+                List<string> columns = [type, aid, state, privileges];
+
                 if (showExtended)
                 {
                     columns.Add(version.GetValueOrDefault("-"));
@@ -111,17 +110,17 @@ public static class ApplicationTableRenderer
 
                 _ = table.AddRow(columns.ToArray());
                 break;
-                
+
             case ApplicationTableBuilder.SectionHeaderRow(var title):
                 // Add empty row before section header for spacing
                 if (table.Rows.Count > 0)
                 {
-                    var emptyCols = Enumerable.Repeat("", table.Columns.Count).ToArray();
+                    string[] emptyCols = Enumerable.Repeat("", table.Columns.Count).ToArray();
                     _ = table.AddRow(emptyCols);
                 }
-                
+
                 // Add header row with bold formatting
-                var headerCols = new string[table.Columns.Count];
+                string[] headerCols = new string[table.Columns.Count];
                 headerCols[0] = $"[bold]{title}[/]";
                 for (int i = 1; i < headerCols.Length; i++)
                 {
@@ -129,11 +128,11 @@ public static class ApplicationTableRenderer
                 }
                 _ = table.AddRow(headerCols);
                 break;
-                
+
             case ApplicationTableBuilder.SummaryRow(var message):
                 // Summary rows are typically displayed separately after the table
                 break;
-                
+
             case ApplicationTableBuilder.InfoRow(var message, var severity):
                 // Info rows are typically displayed separately
                 break;
@@ -145,9 +144,9 @@ public static class ApplicationTableRenderer
     /// </summary>
     public static void RenderPostTableRows(IEnumerable<ApplicationTableBuilder.ApplicationRow> rows)
     {
-        var postTableRows = rows.Where(r => r is ApplicationTableBuilder.SummaryRow or ApplicationTableBuilder.InfoRow);
-        
-        foreach (var row in postTableRows)
+        IEnumerable<ApplicationTableBuilder.ApplicationRow> postTableRows = rows.Where(r => r is ApplicationTableBuilder.SummaryRow or ApplicationTableBuilder.InfoRow);
+
+        foreach (ApplicationTableBuilder.ApplicationRow row in postTableRows)
         {
             switch (row)
             {
@@ -155,12 +154,12 @@ public static class ApplicationTableRenderer
                     AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine($"[dim]{message}[/]");
                     break;
-                    
+
                 case ApplicationTableBuilder.InfoRow(var message, var severity):
-                    var color = severity switch
+                    string color = severity switch
                     {
                         "warning" => "yellow",
-                        "error" => "red", 
+                        "error" => "red",
                         "success" => "green",
                         _ => "blue"
                     };

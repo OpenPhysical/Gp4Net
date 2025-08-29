@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
@@ -51,20 +52,21 @@ public class GlobalPlatformServiceTests
     [Test]
     public async Task SelectIsdAsync_WithSuccessfulResponse_ReturnsSelectResponse()
     {
-        var expectedResponse = new byte[] {
+        byte[] expectedResponse =
+        [
             0x6F, 0x10, 0x84, 0x08, 0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
             0xA5, 0x04, 0x9F, 0x65, 0x01, 0x0F
-        };
+        ];
         _testCardService.SetNextResponse(expectedResponse);
 
-        var result = await _service.SelectIsdAsync();
+        Result<SelectResponse, SmartCardError> result = await _service.SelectIsdAsync();
 
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            var response = result.Value;
+            SelectResponse? response = result.Value;
             _ = response.Fci.HasValue.Should().BeTrue();
-            var aid = response.Fci.Map(fci => fci.ApplicationAid).GetValueOrDefault(Array.Empty<byte>());
+            byte[]? aid = response.Fci.Map(fci => fci.ApplicationAid).GetValueOrDefault([]);
             _ = aid.Should().Equal(new byte[] { 0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00 });
         }
     }
@@ -74,7 +76,7 @@ public class GlobalPlatformServiceTests
     {
         _testCardService.SetNextError(SmartCardError.CardError("Card not found"));
 
-        var result = await _service.SelectIsdAsync();
+        Result<SelectResponse, SmartCardError> result = await _service.SelectIsdAsync();
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().NotBeNull();
@@ -88,17 +90,19 @@ public class GlobalPlatformServiceTests
     {
         // GET STATUS response format per GP Table 11-36: E3 container with nested TLVs
         // Based on real card traces - all cards use E3 containers exactly as specified
-        var statusResponse = new byte[] {
+        byte[] statusResponse =
+        [
+
             // E3 container
             0xE3, 0x0F, // E3 tag, length 15
             // Nested TLVs per Table 11-36
             0x4F, 0x08, 0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, // AID
             0x9F, 0x70, 0x01, 0x07, // Lifecycle state (selectable)
             0xC5, 0x01, 0x00        // Privileges (1 byte)
-        };
+        ];
         _testCardService.SetNextResponse(statusResponse);
 
-        var result = await _service.GetStatusAsync(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
+        Result<ImmutableList<ApplicationInfo>, SmartCardError> result = await _service.GetStatusAsync(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Should().NotBeEmpty();
@@ -110,7 +114,7 @@ public class GlobalPlatformServiceTests
     {
         _testCardService.SetNextResponse([]);
 
-        var result = await _service.GetStatusAsync(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
+        Result<ImmutableList<ApplicationInfo>, SmartCardError> result = await _service.GetStatusAsync(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Should().BeEmpty();
@@ -120,10 +124,10 @@ public class GlobalPlatformServiceTests
     public async Task GetStatusAsync_WithInvalidTlv_ReturnsError()
     {
         // Invalid response - AID length too large
-        var invalidResponse = new byte[] { 0xFF };
+        byte[] invalidResponse = [0xFF];
         _testCardService.SetNextResponse(invalidResponse);
 
-        var result = await _service.GetStatusAsync(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
+        Result<ImmutableList<ApplicationInfo>, SmartCardError> result = await _service.GetStatusAsync(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Should().BeEmpty(); // Parser handles invalid data gracefully by returning empty list
@@ -133,12 +137,13 @@ public class GlobalPlatformServiceTests
     public async Task GetDataAsync_WithValidTag_ReturnsData()
     {
         ushort tag = 0x0066;
-        var dataResponse = new byte[] {
+        byte[] dataResponse =
+        [
             0x66, 0x04, 0x73, 0xD0, 0x00, 0x01
-        };
+        ];
         _testCardService.SetNextResponse(dataResponse);
 
-        var result = await _service.GetDataAsync(tag);
+        Result<byte[], SmartCardError> result = await _service.GetDataAsync(tag);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Should().Equal(new byte[] { 0x66, 0x04, 0x73, 0xD0, 0x00, 0x01 });
@@ -150,11 +155,12 @@ public class GlobalPlatformServiceTests
         // This test verifies that the service properly coordinates with the secure channel manager
         // It doesn't test cryptographic validation, which is covered in protocol-specific tests
 
-        var keySet = GpTestKeys.CreateScp03TestKeySet(keyVersion: 0x01);
+        Result<Scp03KeySet, SmartCardError> keySet = GpTestKeys.CreateScp03TestKeySet(keyVersion: 0x01);
 
         // Set up a mock INITIALIZE UPDATE response that will fail cryptogram verification
         // This is expected - the test verifies service coordination, not crypto
-        var initUpdateResponse = new byte[] {
+        byte[] initUpdateResponse =
+        [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Key diversification data (8 bytes)
             0x00, 0x00,                                       // Key diversification data (2 bytes) = 10 total
             0x01,                                             // Key version (1 byte)
@@ -163,10 +169,10 @@ public class GlobalPlatformServiceTests
             0x00, 0x00, 0x00,                               // Sequence counter (3 bytes)
             0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, // Card challenge (8 bytes)
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  // Card cryptogram (8 bytes)
-        };
+        ];
         _testCardService.SetNextResponse(initUpdateResponse);
 
-        var result = await _service.EstablishSecureChannelAsync(keySet, SecurityLevel.CMac);
+        Result<SecureChannelState, SmartCardError> result = await _service.EstablishSecureChannelAsync(keySet, SecurityLevel.CMac);
 
         // The result will be failure due to invalid cryptogram, which is expected
         // This test verifies that the service properly handles the secure channel flow
@@ -179,12 +185,12 @@ public class GlobalPlatformServiceTests
     [Test]
     public async Task InstallCapFileAsync_WithValidCapFile_ReturnsNotImplemented()
     {
-        var capFileData = new byte[] { 0x01, 0x02, 0x03 };
-        var options = new InstallOptions();
+        byte[] capFileData = [0x01, 0x02, 0x03];
+        InstallOptions options = new InstallOptions();
 
         // Set up context with a secure channel session
-        var keySet = GpTestKeys.CreateScp03TestKeySet(keyVersion: 0x01);
-        var sessionKeys = new SessionKeys(
+        Result<Scp03KeySet, SmartCardError> keySet = GpTestKeys.CreateScp03TestKeySet(keyVersion: 0x01);
+        SessionKeys sessionKeys = new SessionKeys(
             new byte[16], // S-ENC
             new byte[16], // S-MAC
             new byte[16]  // S-RMAC
@@ -197,13 +203,13 @@ public class GlobalPlatformServiceTests
             0x00 // implementation parameter
         );
         _ = testSessionResult.IsSuccess.Should().BeTrue();
-        var updatedServiceResult = _testCardService.WithContextValue(
+        Result<ISmartCardService, SmartCardError> updatedServiceResult = _testCardService.WithContextValue(
             ContextKeys.SecureChannelSession, testSessionResult.Value);
         _ = updatedServiceResult.IsSuccess.Should().BeTrue();
         _testCardService = (TestSmartCardService)updatedServiceResult.Value;
         _service = new GlobalPlatformService(_testCardService, _testSecureChannelManager, _logger);
 
-        var result = await _service.InstallCapFileAsync(capFileData, options);
+        Result<InstallationResult, SmartCardError> result = await _service.InstallCapFileAsync(capFileData, options);
 
         // The implementation should reject invalid CAP file format
         _ = result.IsFailure.Should().BeTrue();
@@ -214,10 +220,10 @@ public class GlobalPlatformServiceTests
     [Test]
     public async Task DeleteApplicationAsync_WithValidAid_ReturnsSuccess()
     {
-        var aid = new byte[] { 0xA0, 0x00, 0x00, 0x00, 0x03, 0x53, 0x50, 0x41 };
+        byte[] aid = [0xA0, 0x00, 0x00, 0x00, 0x03, 0x53, 0x50, 0x41];
         _testCardService.SetNextResponse([]);
 
-        var result = await _service.DeleteApplicationAsync(aid, deleteRelated: true);
+        Result<bool, SmartCardError> result = await _service.DeleteApplicationAsync(aid, deleteRelated: true);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Should().BeTrue();
@@ -226,10 +232,10 @@ public class GlobalPlatformServiceTests
     [Test]
     public async Task DeleteApplicationAsync_WithCardError_ReturnsError()
     {
-        var aid = new byte[] { 0xA0, 0x00, 0x00, 0x00, 0x03, 0x53, 0x50, 0x41 };
+        byte[] aid = [0xA0, 0x00, 0x00, 0x00, 0x03, 0x53, 0x50, 0x41];
         _testCardService.SetNextError(SmartCardError.SecurityError("Authentication failed"));
 
-        var result = await _service.DeleteApplicationAsync(aid, deleteRelated: false);
+        Result<bool, SmartCardError> result = await _service.DeleteApplicationAsync(aid, deleteRelated: false);
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
@@ -240,15 +246,16 @@ public class GlobalPlatformServiceTests
     public async Task GetDataAsync_ForKeyInformation_ReturnsKeyInfo()
     {
         ushort keyInfoTag = 0x00E0;
-        var keyInfoResponse = new byte[] {
+        byte[] keyInfoResponse =
+        [
             0xE0, 0x12,
                 0xC0, 0x04, 0x11, 0x01, 0x03, 0x70,
                 0xC0, 0x04, 0x12, 0x01, 0x03, 0x70,
                 0xC0, 0x04, 0x13, 0x01, 0x03, 0x70
-        };
+        ];
         _testCardService.SetNextResponse(keyInfoResponse);
 
-        var result = await _service.GetDataAsync(keyInfoTag);
+        Result<byte[], SmartCardError> result = await _service.GetDataAsync(keyInfoTag);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Should().Equal(keyInfoResponse); // GetDataAsync returns full response data
@@ -314,15 +321,15 @@ public class GlobalPlatformServiceTests
             if (context is null)
                 return Result.Failure<ISmartCardService, SmartCardError>(
                     SmartCardError.InvalidArgument("Context cannot be null"));
-            
-            var newService = new TestSmartCardService();
+
+            TestSmartCardService newService = new TestSmartCardService();
             newService._context = context;
-            foreach (var response in _responses)
+            foreach (CommandResponse response in _responses)
             {
                 newService._responses.Enqueue(response);
             }
 
-            foreach (var error in _errors)
+            foreach (SmartCardError error in _errors)
             {
                 newService._errors.Enqueue(error);
             }
@@ -332,8 +339,46 @@ public class GlobalPlatformServiceTests
 
         public Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value)
         {
-            var newContext = _context.With(key, value);
+            IPipelineContext? newContext = _context.With(key, value);
             return WithContext(newContext);
+        }
+
+        public async Task<Result<bool, SmartCardError>> IsConnectedAsync(CancellationToken cancellationToken = default)
+        {
+            return await Task.FromResult(Result.Success<bool, SmartCardError>(true));
+        }
+
+        public async Task<Result<byte[], SmartCardError>> GetAtrAsync(CancellationToken cancellationToken = default)
+        {
+            return await Task.FromResult(Result.Success<byte[], SmartCardError>([0x3B, 0x00]));
+        }
+
+        public async Task<Result<string[], SmartCardError>> GetReadersAsync(CancellationToken cancellationToken = default)
+        {
+            return await Task.FromResult(Result.Success<string[], SmartCardError>(["Test Reader"]));
+        }
+
+        public async Task<Result<bool, SmartCardError>> IsSecureChannelEstablishedAsync(CancellationToken cancellationToken = default)
+        {
+            return await Task.FromResult(Result.Success<bool, SmartCardError>(true));
+        }
+
+        public async Task<Result<CommandResponse, SmartCardError>> SendCommandAsync(
+            byte[] command, 
+            CancellationToken cancellationToken = default)
+        {
+            if (_errors.Count > 0)
+            {
+                return await Task.FromResult(Result.Failure<CommandResponse, SmartCardError>(_errors.Dequeue()));
+            }
+
+            if (_responses.Count > 0)
+            {
+                return await Task.FromResult(Result.Success<CommandResponse, SmartCardError>(_responses.Dequeue()));
+            }
+
+            return await Task.FromResult(Result.Failure<CommandResponse, SmartCardError>(
+                SmartCardError.CommunicationError("No response configured")));
         }
 
         public void Dispose()
@@ -344,9 +389,9 @@ public class GlobalPlatformServiceTests
     }
 
     /// <summary>
-    /// Test implementation of ISecureChannelManager for functional testing.
+    /// Test implementation of ISecureChannelService for functional testing.
     /// </summary>
-    private class TestSecureChannelManager : ISecureChannelManager
+    private class TestSecureChannelService : ISecureChannelService
     {
         private Gp4Net.Domain.Security.SecureChannelState? _nextSession;
 

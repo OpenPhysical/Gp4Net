@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -26,8 +27,8 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
             return UnitResult.Failure(SmartCardError.InvalidArgument("Sequence counter must be 2 or 3 bytes"));
         }
 
-        var counterKey = Convert.ToHexString(sequenceCounter);
-        var keyCounters = _seenCounters.GetOrAdd(keyVersion, _ => new ConcurrentDictionary<string, bool>());
+        string counterKey = Convert.ToHexString(sequenceCounter);
+        ConcurrentDictionary<string, bool> keyCounters = _seenCounters.GetOrAdd(keyVersion, _ => new ConcurrentDictionary<string, bool>());
 
         if (keyCounters.ContainsKey(counterKey))
         {
@@ -47,8 +48,8 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
             return UnitResult.Failure(SmartCardError.InvalidArgument("Sequence counter must be 2 or 3 bytes"));
         }
 
-        var counterKey = Convert.ToHexString(sequenceCounter);
-        var keyCounters = _seenCounters.GetOrAdd(keyVersion, _ => new ConcurrentDictionary<string, bool>());
+        string counterKey = Convert.ToHexString(sequenceCounter);
+        ConcurrentDictionary<string, bool> keyCounters = _seenCounters.GetOrAdd(keyVersion, _ => new ConcurrentDictionary<string, bool>());
 
         if (!keyCounters.TryAdd(counterKey, true))
         {
@@ -56,19 +57,19 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
         }
 
         // Per GP spec: sequence counter should increment, so we can validate ordering
-        var counterValue = (sequenceCounter[0] << 16) | (sequenceCounter[1] << 8) | sequenceCounter[2];
-        
+        int counterValue = (sequenceCounter[0] << 16) | (sequenceCounter[1] << 8) | sequenceCounter[2];
+
         // Optional: Remove old counters that are significantly lower than current to prevent memory growth
         // This is safe because counters must increment
         if (keyCounters.Count > 100) // Arbitrary threshold
         {
-            var keysToRemove = keyCounters.Keys
+            List<string> keysToRemove = keyCounters.Keys
                 .Select(k => (key: k, value: ParseCounterValue(k)))
                 .Where(kv => kv.value < counterValue - 50) // Keep last 50 counters
                 .Select(kv => kv.key)
                 .ToList();
 
-            foreach (var key in keysToRemove)
+            foreach (string key in keysToRemove)
             {
                 _ = keyCounters.TryRemove(key, out _);
             }
@@ -86,7 +87,7 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
 
     private static int ParseCounterValue(string hexCounter)
     {
-        var bytes = Convert.FromHexString(hexCounter);
+        byte[] bytes = Convert.FromHexString(hexCounter);
         return (bytes[0] << 16) | (bytes[1] << 8) | bytes[2];
     }
 }

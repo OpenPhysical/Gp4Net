@@ -38,14 +38,14 @@ public class Scp02IcvEncryptionTests
     [TestCase(ScpImplementation.Scp02I04, false)]  // No ICV encryption
     [TestCase(ScpImplementation.Scp02I05, false)]  // No ICV encryption
     public void Scp02_Implementation_Should_Correctly_Identify_ICV_Encryption_Requirement(
-        ScpImplementation implementation, 
+        ScpImplementation implementation,
         bool expectedIcvEncryption)
     {
         // Act - Check implementation feature flags
-        var hasIcvEncryption = implementation.HasIcvEncryption();
+        bool hasIcvEncryption = implementation.HasIcvEncryption();
 
         // Assert - GP Card Spec v2.3.1 Table E-1: bit b5 (0x10) indicates ICV encryption
-        hasIcvEncryption.Should().Be(expectedIcvEncryption, 
+        _ = hasIcvEncryption.Should().Be(expectedIcvEncryption,
             $"Implementation {implementation.GetAlias()} (i={((byte)implementation):X2}) should " +
             $"{(expectedIcvEncryption ? "have" : "not have")} ICV encryption per GP Table E-1");
     }
@@ -59,28 +59,29 @@ public class Scp02IcvEncryptionTests
     public void Scp02_Should_Use_First_Half_Of_CMac_Key_For_ICV_Encryption()
     {
         // Arrange - Test data per GP specification requirements
-        var cMacSessionKey = new byte[]
-        {
+        byte[] cMacSessionKey =
+        [
+
             // First half (8 bytes) - used for ICV encryption per GP Section E.3.4
             0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
             // Second half (8 bytes) - not used for ICV encryption
             0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10
-        };
-        
-        var icvToEncrypt = new byte[] { 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88 };
-        var expectedFirstHalf = cMacSessionKey.Take(8).ToArray();
+        ];
+
+        byte[] icvToEncrypt = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
+        byte[] expectedFirstHalf = cMacSessionKey.Take(8).ToArray();
 
         // Act - Extract first half for ICV encryption
-        var extractedKey = ExtractIcvEncryptionKey(cMacSessionKey);
+        byte[] extractedKey = ExtractIcvEncryptionKey(cMacSessionKey);
 
         // Assert - GP Section E.3.4 compliance
-        extractedKey.Length.Should().Be(8, "ICV encryption key should be 8 bytes (first half of C-MAC key)");
-        extractedKey.Should().BeEquivalentTo(expectedFirstHalf, 
+        _ = extractedKey.Length.Should().Be(8, "ICV encryption key should be 8 bytes (first half of C-MAC key)");
+        _ = extractedKey.Should().BeEquivalentTo(expectedFirstHalf,
             "GP Section E.3.4: ICV encryption uses first half of C-MAC session key");
-        
+
         // Verify it's NOT the second half
-        var secondHalf = cMacSessionKey.Skip(8).Take(8).ToArray();
-        extractedKey.Should().NotBeEquivalentTo(secondHalf, 
+        byte[] secondHalf = cMacSessionKey.Skip(8).Take(8).ToArray();
+        _ = extractedKey.Should().NotBeEquivalentTo(secondHalf,
             "ICV encryption must use first half, not second half of C-MAC key");
     }
 
@@ -93,24 +94,24 @@ public class Scp02IcvEncryptionTests
     public void Scp02_Should_Not_Encrypt_First_ICV_Of_Session()
     {
         // Arrange
-        var implementation = ScpImplementation.Scp02I15; // CLR mode with ICV encryption
-        var initialIcv = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }; // Zero ICV
-        var cMacKey = new byte[]
-        {
+        ScpImplementation implementation = ScpImplementation.Scp02I15; // CLR mode with ICV encryption
+        byte[] initialIcv = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]; // Zero ICV
+        byte[] cMacKey =
+        [
             0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
             0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10
-        };
+        ];
 
         // Act - Process first ICV (should not be encrypted)
-        var firstIcvResult = ProcessIcvForMacCalculation(initialIcv, cMacKey, implementation, isFirstIcv: true);
+        Result<byte[], SmartCardError> firstIcvResult = ProcessIcvForMacCalculation(initialIcv, cMacKey, implementation, isFirstIcv: true);
 
         // Assert - GP Section E.3.4: First ICV is not encrypted
-        firstIcvResult.IsSuccess.Should().BeTrue("First ICV processing should succeed");
-        
-        firstIcvResult.Match(
+        _ = firstIcvResult.IsSuccess.Should().BeTrue("First ICV processing should succeed");
+
+        _ = firstIcvResult.Match(
             processedIcv =>
             {
-                processedIcv.Should().BeEquivalentTo(initialIcv, 
+                _ = processedIcv.Should().BeEquivalentTo(initialIcv,
                     "GP Section E.3.4: First ICV of session is not encrypted");
                 return Result.Success();
             },
@@ -129,26 +130,26 @@ public class Scp02IcvEncryptionTests
     public void Scp02_Should_Encrypt_ICV_Before_Subsequent_CMac_Calculations()
     {
         // Arrange
-        var implementation = ScpImplementation.Scp02I15; // CLR mode with ICV encryption
-        var previousCMac = new byte[] { 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88 };
-        var cMacKey = new byte[]
-        {
+        ScpImplementation implementation = ScpImplementation.Scp02I15; // CLR mode with ICV encryption
+        byte[] previousCMac = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
+        byte[] cMacKey =
+        [
             0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
             0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10
-        };
+        ];
 
         // Act - Process subsequent ICV (should be encrypted)
-        var subsequentIcvResult = ProcessIcvForMacCalculation(previousCMac, cMacKey, implementation, isFirstIcv: false);
+        Result<byte[], SmartCardError> subsequentIcvResult = ProcessIcvForMacCalculation(previousCMac, cMacKey, implementation, isFirstIcv: false);
 
         // Assert - GP Section E.3.4: Subsequent ICVs are encrypted
-        subsequentIcvResult.IsSuccess.Should().BeTrue("Subsequent ICV processing should succeed");
-        
-        subsequentIcvResult.Match(
+        _ = subsequentIcvResult.IsSuccess.Should().BeTrue("Subsequent ICV processing should succeed");
+
+        _ = subsequentIcvResult.Match(
             processedIcv =>
             {
-                processedIcv.Should().NotBeEquivalentTo(previousCMac, 
+                _ = processedIcv.Should().NotBeEquivalentTo(previousCMac,
                     "GP Section E.3.4: ICV should be encrypted before use in subsequent C-MAC calculation");
-                processedIcv.Length.Should().Be(8, "Processed ICV should remain 8 bytes");
+                _ = processedIcv.Length.Should().Be(8, "Processed ICV should remain 8 bytes");
                 return Result.Success();
             },
             error =>
@@ -172,25 +173,25 @@ public class Scp02IcvEncryptionTests
     public void Scp02_Should_Not_Encrypt_ICV_For_Non_Encryption_Implementations(ScpImplementation implementation)
     {
         // Arrange
-        implementation.HasIcvEncryption().Should().BeFalse("Test should only include non-ICV-encryption implementations");
-        
-        var previousCMac = new byte[] { 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88 };
-        var cMacKey = new byte[]
-        {
+        _ = implementation.HasIcvEncryption().Should().BeFalse("Test should only include non-ICV-encryption implementations");
+
+        byte[] previousCMac = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
+        byte[] cMacKey =
+        [
             0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
             0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10
-        };
+        ];
 
         // Act - Process ICV (should not be encrypted for non-encryption implementations)
-        var icvResult = ProcessIcvForMacCalculation(previousCMac, cMacKey, implementation, isFirstIcv: false);
+        Result<byte[], SmartCardError> icvResult = ProcessIcvForMacCalculation(previousCMac, cMacKey, implementation, isFirstIcv: false);
 
         // Assert
-        icvResult.IsSuccess.Should().BeTrue("ICV processing should succeed");
-        
-        icvResult.Match(
+        _ = icvResult.IsSuccess.Should().BeTrue("ICV processing should succeed");
+
+        _ = icvResult.Match(
             processedIcv =>
             {
-                processedIcv.Should().BeEquivalentTo(previousCMac, 
+                _ = processedIcv.Should().BeEquivalentTo(previousCMac,
                     "Non-ICV-encryption implementations should not modify the ICV");
                 return Result.Success();
             },
@@ -210,9 +211,9 @@ public class Scp02IcvEncryptionTests
     }
 
     private static Result<byte[], SmartCardError> ProcessIcvForMacCalculation(
-        byte[] icv, 
-        byte[] cMacKey, 
-        ScpImplementation implementation, 
+        byte[] icv,
+        byte[] cMacKey,
+        ScpImplementation implementation,
         bool isFirstIcv)
     {
         // GP Section E.3.4: First ICV is not encrypted
@@ -228,10 +229,10 @@ public class Scp02IcvEncryptionTests
         }
 
         // GP Section E.3.4: Encrypt ICV with first half of C-MAC key using single DES
-        var encryptionKey = ExtractIcvEncryptionKey(cMacKey);
-        
+        byte[] encryptionKey = ExtractIcvEncryptionKey(cMacKey);
+
         // Simulate single DES encryption (simplified for testing)
-        var encryptedIcv = icv.Zip(encryptionKey, (icvByte, keyByte) => (byte)(icvByte ^ keyByte))
+        byte[] encryptedIcv = icv.Zip(encryptionKey, (icvByte, keyByte) => (byte)(icvByte ^ keyByte))
                              .ToArray();
 
         return Result.Success<byte[], SmartCardError>(encryptedIcv);

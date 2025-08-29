@@ -44,7 +44,7 @@ public class WsctCardContextWrapper : ICardContextWrapper
     /// <inheritdoc />
     public ICardChannelWrapper CreateCardChannel(string readerName)
     {
-        return new WsctCardChannelWrapper(_context, readerName, WSCT.Wrapper.ShareMode.Exclusive);
+        return new WsctCardChannelWrapper(_context, readerName, ShareMode.Exclusive);
     }
 
     /// <inheritdoc />

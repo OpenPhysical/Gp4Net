@@ -8,9 +8,11 @@ using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
 using Gp4Net.Pipeline;
+using Gp4Net.Services;
 using Gp4Net.Transport;
 using static Gp4Net.Pipeline.CommandProcessing;
 using Microsoft.Extensions.Logging.Abstractions;
+using SecureChannelService = Gp4Net.Domain.Security.SecureChannelService;
 
 namespace Gp4Net.Tests.Infrastructure;
 
@@ -29,18 +31,18 @@ public static class TestCommandProcessing
             try
             {
                 // Basic test implementation - just execute the command
-                var response = await environment.Transport.TransmitAsync(
-                    command, 
-                    environment.Channel, 
+                ApduResponse? response = await environment.Transport.TransmitAsync(
+                    command,
+                    environment.Channel,
                     cancellationToken);
-                    
+
                 // Build APDU bytes for metadata
-                var commandBytes = ApduBuilder.BuildApdu(command);
-                var responseBytes = new byte[response.Data.Length + 2];
+                byte[]? commandBytes = ApduBuilder.BuildApdu(command);
+                byte[] responseBytes = new byte[response.Data.Length + 2];
                 Array.Copy(response.Data, 0, responseBytes, 0, response.Data.Length);
                 responseBytes[responseBytes.Length - 2] = (byte)(response.StatusWord >> 8);
                 responseBytes[responseBytes.Length - 1] = (byte)(response.StatusWord & 0xFF);
-                
+
                 return Result.Success<CommandResult, SmartCardError>(new CommandResult(
                     response.Data,
                     response.StatusWord,
@@ -58,7 +60,7 @@ public static class TestCommandProcessing
             }
         };
     }
-    
+
     /// <summary>
     /// Creates a test command environment.
     /// </summary>
@@ -67,10 +69,8 @@ public static class TestCommandProcessing
         IApduTransport transport)
     {
         // Create secure channel service for testing
-        var commandProcessor = new Gp4Net.Domain.Security.CommandSecurityProcessorAdapter();
-        var responseProcessor = new Gp4Net.Domain.Security.ResponseSecurityProcessorAdapter();
-        var secureChannelService = new Gp4Net.Domain.Security.SecureChannelService(commandProcessor, responseProcessor);
-        
+        SecureChannelService secureChannelService = new Gp4Net.Domain.Security.SecureChannelService();
+
         return new CommandEnvironment(
             channel,
             transport,
@@ -115,23 +115,23 @@ public class TestApduTransport : IApduTransport
         CancellationToken cancellationToken = default)
     {
         // Build APDU bytes manually from IApduCommand properties
-        var commandBytes = new List<byte> { command.Cla, command.Ins, command.P1, command.P2 };
-            
+        List<byte> commandBytes = [command.Cla, command.Ins, command.P1, command.P2];
+
         if (command.Data is { Length: > 0 })
         {
             commandBytes.Add((byte)command.Data.Length);
             commandBytes.AddRange(command.Data);
         }
-            
+
         if (command.ExpectedResponseLength.HasValue)
         {
             commandBytes.Add((byte)(command.ExpectedResponseLength.Value == 0 ? 256 : command.ExpectedResponseLength.Value));
         }
-            
+
         // Delegate to the channel's transmit method
-        var response = await channel.TransmitAsync(commandBytes.ToArray(), cancellationToken);
-        var statusWord = (ushort)((response[response.Length - 2] << 8) | response[response.Length - 1]);
-        var data = response.Length > 2 ? response[..^2] : [];
+        byte[]? response = await channel.TransmitAsync(commandBytes.ToArray(), cancellationToken);
+        ushort statusWord = (ushort)((response[response.Length - 2] << 8) | response[response.Length - 1]);
+        byte[] data = response.Length > 2 ? response[..^2] : [];
         return new ApduResponse(data, statusWord);
     }
 }
@@ -172,38 +172,46 @@ public class TestSecureChannelManager : ISecureChannelManager
 
 /// <summary>
 /// Test implementation of card channel adapter for trace-based services.
+/// Preserves all original functionality while adapting to ISmartCardService.
 /// </summary>
 public class TestCardServiceChannelAdapter : ICardChannel
 {
-    private readonly Gp4Net.Tool.Services.ICardService _cardService;
+    private readonly Maybe<ISmartCardService> _smartCardService;
 
-    public TestCardServiceChannelAdapter(Gp4Net.Tool.Services.ICardService cardService)
+    public TestCardServiceChannelAdapter(ISmartCardService smartCardService)
     {
-        _cardService = cardService ?? throw new ArgumentNullException(nameof(cardService));
+        _smartCardService = Maybe<ISmartCardService>.From(smartCardService);
     }
 
-    public TransportProtocol Protocol
+    public TransportProtocol Protocol => TransportProtocol.T0;
+
+    public bool IsOpen => 
+        _smartCardService
+            .Bind(service => service.IsSecureChannelEstablishedAsync().Result.ToMaybe())
+            .GetValueOrDefault(false);
+
+    public async Task<byte[]> TransmitAsync(byte[] command, CancellationToken cancellationToken = default)
     {
-        get
-        {
-            return TransportProtocol.T0;
-        }
-    }
-    public bool IsOpen
-    {
-        get
-        {
-            return _cardService.IsSecureChannelEstablished;
-        }
+        return await _smartCardService
+            .ToResult("Smart card service not available")
+            .Bind(async service =>
+            {
+                Result<CommandResponse, SmartCardError> commandResult = await service.SendCommandAsync(command, cancellationToken);
+                return commandResult.Match(
+                    response => Result.Success(ConstructResponseBytes(response)),
+                    error => Result.Failure<byte[]>($"Command failed: {error.Message}"));
+            })
+            .Match(
+                success => Task.FromResult(success),
+                error => Task.FromResult(new byte[] { 0x6F, 0x00 })); // Generic error response
     }
 
-    public Task<byte[]> TransmitAsync(byte[] command, CancellationToken cancellationToken = default)
+    private static byte[] ConstructResponseBytes(CommandResponse response)
     {
-        var response = _cardService.SendCommand(command);
-        var responseBytes = new byte[response.Data.Length + 2];
+        byte[] responseBytes = new byte[response.Data.Length + 2];
         response.Data.CopyTo(responseBytes, 0);
         responseBytes[responseBytes.Length - 2] = (byte)(response.StatusWord >> 8); // SW1
         responseBytes[responseBytes.Length - 1] = (byte)(response.StatusWord & 0xFF); // SW2
-        return Task.FromResult(responseBytes);
+        return responseBytes;
     }
 }

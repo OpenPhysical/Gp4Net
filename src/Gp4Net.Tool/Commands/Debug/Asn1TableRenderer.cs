@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Spectre.Console;
 
@@ -17,7 +16,7 @@ public static class Asn1TableRenderer
     /// <param name="rows">Sequence of semantic ASN.1 rows</param>
     public static void RenderToConsole(IEnumerable<Asn1TableBuilder.Asn1Row> rows)
     {
-        foreach (var row in rows)
+        foreach (Asn1TableBuilder.Asn1Row row in rows)
         {
             RenderSemanticRow(row);
         }
@@ -31,21 +30,21 @@ public static class Asn1TableRenderer
         switch (row)
         {
             case Asn1TableBuilder.Asn1DataRow(var depth, var offset, var typeInfo, var value, var rawBytes):
-                var indent = new string(' ', depth * 2);
-                
+                string indent = new string(' ', depth * 2);
+
                 // Build the main line with offset and type info
-                var mainLine = string.IsNullOrEmpty(offset) 
+                string mainLine = string.IsNullOrEmpty(offset)
                     ? $"{indent}{FormatTypeInfo(typeInfo)}"
                     : $"{indent}[cyan]{offset}[/] {FormatTypeInfo(typeInfo)}";
-                    
+
                 AnsiConsole.MarkupLine(mainLine);
-                
+
                 // Show raw bytes if available
                 if (rawBytes.HasValue)
                 {
                     AnsiConsole.MarkupLine($"{indent}  [dim]{rawBytes.Value}[/]");
                 }
-                
+
                 // Show value if available
                 if (value.HasValue)
                 {
@@ -54,17 +53,17 @@ public static class Asn1TableRenderer
                 break;
 
             case Asn1TableBuilder.ContainerHeaderRow(var depth, var containerType, var elementCount):
-                var containerIndent = new string(' ', depth * 2);
+                string containerIndent = new string(' ', depth * 2);
                 AnsiConsole.MarkupLine($"{containerIndent}  [blue]{containerType} with {elementCount} elements:[/]");
                 break;
 
             case Asn1TableBuilder.ElementHeaderRow(var depth, var elementIndex, var description):
-                var elementIndent = new string(' ', depth * 2);
+                string elementIndent = new string(' ', depth * 2);
                 AnsiConsole.MarkupLine($"{elementIndent}[dim]{description}[/]");
                 break;
 
             case Asn1TableBuilder.NestedAsn1HeaderRow(var depth, var message):
-                var nestedIndent = new string(' ', depth * 2);
+                string nestedIndent = new string(' ', depth * 2);
                 AnsiConsole.MarkupLine($"{nestedIndent}[magenta]{message}[/]");
                 break;
 
@@ -73,7 +72,7 @@ public static class Asn1TableRenderer
                 break;
 
             case Asn1TableBuilder.InfoRow(var message, var severity):
-                var color = severity switch
+                string color = severity switch
                 {
                     "warning" => "yellow",
                     "error" => "red",
@@ -93,16 +92,16 @@ public static class Asn1TableRenderer
     {
         // Parse the type info to apply proper coloring
         // Format: "Universal DerSequence (tag=30, constructed=True, length=123)"
-        
-        var parts = typeInfo.Split(' ', 3);
+
+        string[] parts = typeInfo.Split(' ', 3);
         if (parts.Length < 2)
         {
             return $"[white]{typeInfo}[/]";
         }
 
-        var tagClass = parts[0];
-        var typeName = parts[1];
-        var details = parts.Length > 2 ? parts[2] : "";
+        string tagClass = parts[0];
+        string typeName = parts[1];
+        string details = parts.Length > 2 ? parts[2] : "";
 
         return $"[white]{tagClass}[/] [green]{typeName}[/] {details}";
     }
@@ -112,17 +111,17 @@ public static class Asn1TableRenderer
     /// </summary>
     public static void RenderToTable(IEnumerable<Asn1TableBuilder.Asn1Row> rows)
     {
-        var table = new Table();
+        Table table = new Table();
         _ = table.AddColumn("Offset");
         _ = table.AddColumn("Type");
         _ = table.AddColumn("Value");
 
-        foreach (var row in rows)
+        foreach (Asn1TableBuilder.Asn1Row row in rows)
         {
             switch (row)
             {
                 case Asn1TableBuilder.Asn1DataRow(var depth, var offset, var typeInfo, var value, var rawBytes):
-                    var indent = new string(' ', depth * 2);
+                    string indent = new string(' ', depth * 2);
                     _ = table.AddRow(
                         offset,
                         $"{indent}{StripMarkup(typeInfo)}",
@@ -131,14 +130,14 @@ public static class Asn1TableRenderer
                     break;
 
                 case Asn1TableBuilder.ContainerHeaderRow(var depth, var containerType, var elementCount):
-                    var containerIndent = new string(' ', depth * 2);
+                    string containerIndent = new string(' ', depth * 2);
                     _ = table.AddRow(
                         "",
                         $"{containerIndent}{containerType}",
                         $"{elementCount} elements"
                     );
                     break;
-                    
+
                 case Asn1TableBuilder.SummaryRow(var summaryMessage):
                 case Asn1TableBuilder.InfoRow(var infoMessage, var severity):
                     // Skip summary/info rows in table format
@@ -160,14 +159,14 @@ public static class Asn1TableRenderer
         }
 
         // Simple markup removal - replace [color]text[/] with text
-        var result = text;
+        string result = text;
         while (true)
         {
-            var start = result.IndexOf('[');
-            var end = result.IndexOf(']', start + 1);
+            int start = result.IndexOf('[');
+            int end = result.IndexOf(']', start + 1);
             if (start == -1 || end == -1) break;
-            
-            var tag = result.Substring(start, end - start + 1);
+
+            string tag = result.Substring(start, end - start + 1);
             if (tag == "[/]")
             {
                 result = result.Remove(start, tag.Length);
@@ -177,7 +176,7 @@ public static class Asn1TableRenderer
                 result = result.Remove(start, tag.Length);
             }
         }
-        
+
         return result;
     }
 }

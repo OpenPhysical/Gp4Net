@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -88,7 +87,7 @@ public class CardCapabilities
     public static Result<CardCapabilities, SmartCardError> TryParse(Maybe<byte[]> data)
     {
         return data.Match(
-            Some: bytes => bytes.Length == 0 
+            Some: bytes => bytes.Length == 0
                 ? Result.Failure<CardCapabilities, SmartCardError>(SmartCardError.InvalidData("Capabilities data cannot be empty"))
                 : TryParseFromBytes(bytes),
             None: () => Result.Failure<CardCapabilities, SmartCardError>(SmartCardError.InvalidData("Capabilities data cannot be null"))
@@ -99,7 +98,7 @@ public class CardCapabilities
     {
         return Result.Try(() =>
         {
-            var capabilities = new CardCapabilities(data);
+            CardCapabilities capabilities = new CardCapabilities(data);
 
             // Parse DER structure using functional composition
             TlvParser.ParseAll(data)
@@ -112,9 +111,9 @@ public class CardCapabilities
 
     private static void ProcessTlvObject(CardCapabilities capabilities, TlvObject element)
     {
-        var tagNumber = element.GetTagNumber();
+        Result<uint, SmartCardError> tagNumber = element.GetTagNumber();
         if (tagNumber.IsFailure) return;
-        
+
         switch (tagNumber.Value)
         {
             case 0xA0: // SCP options
@@ -151,15 +150,15 @@ public class CardCapabilities
     {
         // Parse according to Table H-6: SCP Information
         byte scpType = 0;
-        var supportedOptions = Maybe<byte[]>.None;
-        var supportedKeys = Maybe<byte[]>.None;
+        Maybe<byte[]> supportedOptions = Maybe<byte[]>.None;
+        Maybe<byte[]> supportedKeys = Maybe<byte[]>.None;
 
-        foreach (var element in TlvParser.ParseAll(data))
+        foreach (TlvObject element in TlvParser.ParseAll(data))
         {
-            var tagNumber = element.GetTagNumber();
-        if (tagNumber.IsFailure) return;
-        
-        switch (tagNumber.Value)
+            Result<uint, SmartCardError> tagNumber = element.GetTagNumber();
+            if (tagNumber.IsFailure) return;
+
+            switch (tagNumber.Value)
             {
                 case 0x80: // SCP type
                     if (element.Value.Length > 0)
@@ -191,8 +190,8 @@ public class CardCapabilities
                             {
                                 if (keys.Length > 0)
                                 {
-                                    var keyLengthsBuilder = ImmutableList.CreateBuilder<int>();
-                                    var keyByte = keys[0];
+                                    ImmutableList<int>.Builder keyLengthsBuilder = ImmutableList.CreateBuilder<int>();
+                                    byte keyByte = keys[0];
                                     if ((keyByte & 0x01) != 0)
                                     {
                                         keyLengthsBuilder.Add(128);
@@ -217,8 +216,8 @@ public class CardCapabilities
                     }
 
                     // Each byte in supportedOptions represents one supported implementation parameter
-                    var scpOptionsBuilder = ScpOptions.ToBuilder();
-                    foreach (var option in options)
+                    ImmutableList<ScpOption>.Builder scpOptionsBuilder = ScpOptions.ToBuilder();
+                    foreach (byte option in options)
                     {
                         scpOptionsBuilder.Add(
                             new ScpOption(
@@ -242,10 +241,11 @@ public class CardCapabilities
         if (scpId == 0x03)
         {
             return supportedKeys.Match(
-                Some: keys => {
+                Some: keys =>
+                {
                     if (keys.Length > 0)
                     {
-                        var keyByte = keys[0];
+                        byte keyByte = keys[0];
                         // Multiple key lengths can be supported
                         if ((keyByte & 0x04) != 0)
                         {
@@ -318,11 +318,11 @@ public class CardCapabilities
             return;
         }
 
-        var suitesBuilder = ImmutableList.CreateBuilder<CipherSuite>();
+        ImmutableList<CipherSuite>.Builder suitesBuilder = ImmutableList.CreateBuilder<CipherSuite>();
 
-        for (var i = 0; i < data.Length; i++)
+        for (int i = 0; i < data.Length; i++)
         {
-            var suite = ParseCipherSuiteByte(data[i]);
+            CipherSuite suite = ParseCipherSuiteByte(data[i]);
             if (suite != CipherSuite.Unknown)
             {
                 suitesBuilder.Add(suite);
@@ -364,19 +364,19 @@ public class CardCapabilities
     /// </summary>
     public override string ToString()
     {
-        var sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         _ = sb.AppendLine("Card Capabilities:");
 
         // SCP options - group by SCP type
-        var scpGroups = ScpOptions.GroupBy(o => o.ScpId);
-        foreach (var group in scpGroups)
+        IEnumerable<IGrouping<byte, ScpOption>> scpGroups = ScpOptions.GroupBy(o => o.ScpId);
+        foreach (IGrouping<byte, ScpOption> group in scpGroups)
         {
-            var scpId = group.Key;
-            var options = string.Join(" ", group.Select(o => $"i={o.Implementation:X2}"));
+            byte scpId = group.Key;
+            string options = string.Join(" ", group.Select(o => $"i={o.Implementation:X2}"));
 
             // Get key lengths from the dedicated dictionary if available
-            var keyLengthStr = "";
-            if (SupportedKeyLengths.TryGetValue(scpId, out var lengths) && lengths.Count > 0)
+            string keyLengthStr = "";
+            if (SupportedKeyLengths.TryGetValue(scpId, out ImmutableList<int> lengths) && lengths.Count > 0)
             {
                 keyLengthStr = " with " + string.Join(" ", lengths.Select(k => $"AES-{k}"));
             }
@@ -402,9 +402,9 @@ public class CardCapabilities
         }
 
         // Cipher suites
-        foreach (var kvp in CipherSuites.OrderBy(x => x.Key))
+        foreach (KeyValuePair<CipherUsage, ImmutableList<CipherSuite>> kvp in CipherSuites.OrderBy(x => x.Key))
         {
-            var cipherNames = string.Join(", ", kvp.Value.Select(c => c.ToFriendlyString()));
+            string cipherNames = string.Join(", ", kvp.Value.Select(c => c.ToFriendlyString()));
             _ = sb.AppendLine(
                 $"Supported {GetCipherUsageDescription(kvp.Key)} ciphers: {cipherNames}"
             );
@@ -590,7 +590,7 @@ public record SecurityDomainPrivileges(
 
     public override string ToString()
     {
-        var privs = new List<string>();
+        List<string> privs = [];
 
         if (SecurityDomain)
         {
@@ -752,7 +752,7 @@ public record ApplicationPrivileges(
 
     public override string ToString()
     {
-        var privs = new List<string>();
+        List<string> privs = [];
 
         if (CardLock)
         {
@@ -798,7 +798,7 @@ public record SupportedAlgorithms(
 {
     public string GetHashAlgorithms()
     {
-        var algs = new List<string>();
+        List<string> algs = [];
 
         if ((HashAlgorithms & 0x01) != 0)
         {

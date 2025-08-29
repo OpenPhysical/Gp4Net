@@ -16,7 +16,7 @@ public static class TlvTableRenderer
     /// <param name="rows">Sequence of semantic TLV rows</param>
     public static void RenderToConsole(IEnumerable<TlvTableBuilder.TlvRow> rows)
     {
-        foreach (var row in rows)
+        foreach (TlvTableBuilder.TlvRow row in rows)
         {
             RenderSemanticRow(row);
         }
@@ -30,25 +30,25 @@ public static class TlvTableRenderer
         switch (row)
         {
             case TlvTableBuilder.TlvDataRow(var elementIndex, var depth, var tagInfo, var lengthInfo, var content, var asciiContent, var rawBytes):
-                var indent = new string(' ', depth * 2);
-                
+                string indent = new string(' ', depth * 2);
+
                 // Main element info
                 AnsiConsole.MarkupLine($"{indent}[cyan]Element {elementIndex}[/]: [white]{tagInfo}[/]");
                 AnsiConsole.MarkupLine($"{indent}  Length: {lengthInfo}");
-                
+
                 // Content display
                 if (content.HasValue)
                 {
-                    var contentColor = content.Value.Contains("(empty)") ? "dim" : "yellow";
+                    string contentColor = content.Value.Contains("(empty)") ? "dim" : "yellow";
                     AnsiConsole.MarkupLine($"{indent}  [{contentColor}]{content.Value}[/]");
                 }
-                
+
                 // ASCII content if available
                 if (asciiContent.HasValue)
                 {
                     AnsiConsole.MarkupLine($"{indent}  [dim]{asciiContent.Value}[/]");
                 }
-                
+
                 // Raw bytes if available
                 if (rawBytes.HasValue)
                 {
@@ -57,12 +57,12 @@ public static class TlvTableRenderer
                 break;
 
             case TlvTableBuilder.NestedTlvHeaderRow(var depth, var message):
-                var nestedIndent = new string(' ', depth * 2);
+                string nestedIndent = new string(' ', depth * 2);
                 AnsiConsole.MarkupLine($"{nestedIndent}[magenta]{message}[/]");
                 break;
 
             case TlvTableBuilder.TagInterpretationRow(var depth, var interpretation):
-                var interpIndent = new string(' ', depth * 2);
+                string interpIndent = new string(' ', depth * 2);
                 AnsiConsole.MarkupLine($"{interpIndent}[green]{interpretation}[/]");
                 break;
 
@@ -71,7 +71,7 @@ public static class TlvTableRenderer
                 break;
 
             case TlvTableBuilder.InfoRow(var message, var severity):
-                var color = severity switch
+                string color = severity switch
                 {
                     "warning" => "yellow",
                     "error" => "red",
@@ -89,18 +89,18 @@ public static class TlvTableRenderer
     /// </summary>
     public static void RenderToTable(IEnumerable<TlvTableBuilder.TlvRow> rows)
     {
-        var table = new Table();
+        Table table = new Table();
         _ = table.AddColumn("Element");
         _ = table.AddColumn("Tag");
         _ = table.AddColumn("Length");
         _ = table.AddColumn("Content");
 
-        foreach (var row in rows)
+        foreach (TlvTableBuilder.TlvRow row in rows)
         {
             switch (row)
             {
                 case TlvTableBuilder.TlvDataRow(var elementIndex, var depth, var tagInfo, var lengthInfo, var content, var asciiContent, var rawBytes):
-                    var indent = new string(' ', depth * 2);
+                    string indent = new string(' ', depth * 2);
                     _ = table.AddRow(
                         $"{indent}{elementIndex}",
                         StripMarkup(tagInfo),
@@ -110,7 +110,7 @@ public static class TlvTableRenderer
                     break;
 
                 case TlvTableBuilder.NestedTlvHeaderRow(var depth, var message):
-                    var nestedIndent = new string(' ', depth * 2);
+                    string nestedIndent = new string(' ', depth * 2);
                     _ = table.AddRow(
                         "",
                         $"{nestedIndent}Nested TLV",
@@ -120,7 +120,7 @@ public static class TlvTableRenderer
                     break;
 
                 case TlvTableBuilder.TagInterpretationRow(var depth, var interpretation):
-                    var interpIndent = new string(' ', depth * 2);
+                    string interpIndent = new string(' ', depth * 2);
                     _ = table.AddRow(
                         "",
                         $"{interpIndent}Interpretation",
@@ -128,7 +128,7 @@ public static class TlvTableRenderer
                         StripMarkup(interpretation)
                     );
                     break;
-                    
+
                 case TlvTableBuilder.SummaryRow(var summaryMessage):
                 case TlvTableBuilder.InfoRow(var infoMessage, var severity):
                     // Skip summary/info rows in table format
@@ -150,14 +150,14 @@ public static class TlvTableRenderer
         }
 
         // Simple markup removal - replace [color]text[/] with text
-        var result = text;
+        string result = text;
         while (true)
         {
-            var start = result.IndexOf('[');
-            var end = result.IndexOf(']', start + 1);
+            int start = result.IndexOf('[');
+            int end = result.IndexOf(']', start + 1);
             if (start == -1 || end == -1) break;
-            
-            var tag = result.Substring(start, end - start + 1);
+
+            string tag = result.Substring(start, end - start + 1);
             if (tag == "[/]")
             {
                 result = result.Remove(start, tag.Length);
@@ -167,7 +167,7 @@ public static class TlvTableRenderer
                 result = result.Remove(start, tag.Length);
             }
         }
-        
+
         return result;
     }
 }

@@ -25,7 +25,7 @@ public sealed record KeyDerivationContext(
     byte[] HostChallenge,
     byte[] CardChallenge,
     Maybe<byte[]> SequenceCounter,
-    Maybe<Gp4Net.Domain.Protocol.ScpImplementation> Implementation) : IKeyDerivationContext
+    Maybe<ScpImplementation> Implementation) : IKeyDerivationContext
 {
     /// <summary>
     /// Creates a key derivation context for SCP02 with validation.
@@ -42,7 +42,7 @@ public sealed record KeyDerivationContext(
         byte[] hostChallenge,
         byte[] cardChallenge,
         byte[] sequenceCounter,
-        Gp4Net.Domain.Protocol.ScpImplementation implementation = Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15)
+        ScpImplementation implementation = ScpImplementation.Scp02I15)
     {
         // Validate key set type
         if (keySet is not Scp02KeySet)
@@ -86,7 +86,7 @@ public sealed record KeyDerivationContext(
                 CloneArray(hostChallenge),
                 CloneArray(cardChallenge),
                 Maybe<byte[]>.From(CloneArray(sequenceCounter)),
-                Maybe<Gp4Net.Domain.Protocol.ScpImplementation>.From(implementation)));
+                Maybe<ScpImplementation>.From(implementation)));
     }
 
     /// <summary>
@@ -102,7 +102,7 @@ public sealed record KeyDerivationContext(
         IKeySet keySet,
         byte[] hostChallenge,
         byte[] cardChallenge,
-        Maybe<Gp4Net.Domain.Protocol.ScpImplementation> implementation = default)
+        Maybe<ScpImplementation> implementation = default)
     {
         // Validate key set type
         if (keySet is not Scp03KeySet)
@@ -126,8 +126,8 @@ public sealed record KeyDerivationContext(
         }
 
         // Use default implementation if not provided
-        var actualImplementation = implementation.HasNoValue 
-            ? Maybe<Gp4Net.Domain.Protocol.ScpImplementation>.From(Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70)
+        Maybe<ScpImplementation> actualImplementation = implementation.HasNoValue
+            ? Maybe<ScpImplementation>.From(ScpImplementation.Scp03I70)
             : implementation;
 
         // Validate implementation is SCP03
@@ -161,26 +161,26 @@ public sealed record KeyDerivationContext(
         byte[] hostChallenge,
         byte[] cardChallenge,
         Maybe<byte[]> sequenceCounter = default,
-        Maybe<Gp4Net.Domain.Protocol.ScpImplementation> implementation = default)
+        Maybe<ScpImplementation> implementation = default)
     {
         return keySet switch
         {
             Scp02KeySet => sequenceCounter.HasValue
                 ? CreateForScp02(
-                    keySet, 
-                    hostChallenge, 
-                    cardChallenge, 
+                    keySet,
+                    hostChallenge,
+                    cardChallenge,
                     sequenceCounter.Value,
-                    implementation.GetValueOrDefault(Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15))
+                    implementation.GetValueOrDefault(ScpImplementation.Scp02I15))
                 : Result.Failure<KeyDerivationContext, SmartCardError>(
                     SmartCardError.InvalidArgument("SCP02 requires sequence counter")),
-                    
+
             Scp03KeySet => CreateForScp03(
-                keySet, 
-                hostChallenge, 
+                keySet,
+                hostChallenge,
                 cardChallenge,
                 implementation),
-                
+
             _ => Result.Failure<KeyDerivationContext, SmartCardError>(
                 SmartCardError.InvalidArgument($"Unsupported key set type: {keySet.GetType().Name}"))
         };
@@ -194,15 +194,15 @@ public sealed record KeyDerivationContext(
     {
         // For the new bitmap-based enum, the byte value IS the implementation parameter
         return (byte)Implementation.GetValueOrDefault(
-            Protocol == ScpVersion.Scp02 
-                ? Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15 
-                : Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70);
+            Protocol == ScpVersion.Scp02
+                ? ScpImplementation.Scp02I15
+                : ScpImplementation.Scp03I70);
     }
 
     /// <summary>
     /// Validates if the implementation is valid for SCP02.
     /// </summary>
-    private static bool IsValidScp02Implementation(Gp4Net.Domain.Protocol.ScpImplementation implementation)
+    private static bool IsValidScp02Implementation(ScpImplementation implementation)
     {
         // Use the extension method that properly validates SCP02 implementations
         return implementation.IsScp02();
@@ -211,7 +211,7 @@ public sealed record KeyDerivationContext(
     /// <summary>
     /// Validates if the implementation is valid for SCP03.
     /// </summary>
-    private static bool IsValidScp03Implementation(Gp4Net.Domain.Protocol.ScpImplementation implementation)
+    private static bool IsValidScp03Implementation(ScpImplementation implementation)
     {
         // Use the extension method that properly validates SCP03 implementations
         return implementation.IsScp03();

@@ -1,4 +1,5 @@
 using System;
+using Gp4Net.Domain;
 using JetBrains.Annotations;
 using Spectre.Console;
 
@@ -50,12 +51,9 @@ public class DisplayService : IDisplayService
         AnsiConsole.WriteException(exception);
     }
 
-    public void CardInfo(byte[] atr)
+    public void CardInfo(Atr atr)
     {
-        if (atr != null)
-        {
-            AnsiConsole.MarkupLine($"[green]Card ATR:[/] {Convert.ToHexString(atr)}");
-        }
+        AnsiConsole.MarkupLine($"[green]Card ATR:[/] {atr}");
     }
 
     public void Markup(string markup)

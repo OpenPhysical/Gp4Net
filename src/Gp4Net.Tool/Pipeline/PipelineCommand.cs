@@ -29,13 +29,13 @@ public class PipelineCommand<TSettings> : AsyncCommand<TSettings>
     }
 
     public override async Task<int> ExecuteAsync(
-        Spectre.Console.Cli.CommandContext context,
+        CommandContext context,
         TSettings settings
     )
     {
         try
         {
-            var isVerbose = IsVerboseEnabled(settings);
+            bool isVerbose = IsVerboseEnabled(settings);
 
             // Dynamically add console appender for verbose logging if needed
             VerboseLoggingHelper.EnableVerboseLogging(isVerbose);
@@ -60,7 +60,7 @@ public class PipelineCommand<TSettings> : AsyncCommand<TSettings>
     /// </summary>
     private static bool IsVerboseEnabled(TSettings settings)
     {
-        var verboseProperty = typeof(TSettings).GetProperty(
+        PropertyInfo verboseProperty = typeof(TSettings).GetProperty(
             "Verbose",
             BindingFlags.Public | BindingFlags.Instance
         );

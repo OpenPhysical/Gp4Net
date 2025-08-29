@@ -21,7 +21,7 @@ public interface IGlobalPlatformService
     /// Gets the current smart card service with proper secure channel context.
     /// </summary>
     ISmartCardService CardService { get; }
-    
+
     /// <summary>
     /// Selects the Issuer Security Domain (ISD).
     /// </summary>
@@ -31,7 +31,7 @@ public interface IGlobalPlatformService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Establishes a secure channel with the card.
+    /// Establishes a secure channel with the card using a resolved keyset.
     /// </summary>
     /// <param name="keySet">The key set to use.</param>
     /// <param name="securityLevel">The security level to establish.</param>
@@ -39,6 +39,38 @@ public interface IGlobalPlatformService
     /// <returns>The secure channel state.</returns>
     Task<Result<SecureChannelState, SmartCardError>> EstablishSecureChannelAsync(
         KeySet keySet,
+        SecurityLevel securityLevel = SecurityLevel.CMac,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Establishes a secure channel with the card using a named keyset specification.
+    /// </summary>
+    /// <param name="keysetName">The keyset name (e.g., 'gp_test_keys').</param>
+    /// <param name="securityLevel">The security level to establish.</param>
+    /// <param name="keyVersion">The key version to use.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The secure channel state.</returns>
+    Task<Result<SecureChannelState, SmartCardError>> EstablishSecureChannelAsync(
+        string keysetName,
+        SecurityLevel securityLevel = SecurityLevel.CMac,
+        byte keyVersion = 0x01,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Establishes a secure channel with the card using explicit keys.
+    /// </summary>
+    /// <param name="encKey">Encryption key (hex string).</param>
+    /// <param name="macKey">MAC key (hex string).</param>
+    /// <param name="dekKey">DEK key (hex string).</param>
+    /// <param name="keyVersion">The key version to use.</param>
+    /// <param name="securityLevel">The security level to establish.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The secure channel state.</returns>
+    Task<Result<SecureChannelState, SmartCardError>> EstablishSecureChannelAsync(
+        string encKey,
+        string macKey,
+        string dekKey,
+        byte keyVersion,
         SecurityLevel securityLevel = SecurityLevel.CMac,
         CancellationToken cancellationToken = default);
 
@@ -61,7 +93,7 @@ public interface IGlobalPlatformService
     /// <returns>The installation result.</returns>
     Task<Result<InstallationResult, SmartCardError>> InstallCapFileAsync(
         byte[] capFileData,
-        InstallOptions options = null,
+        Maybe<InstallOptions> options = default,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -117,6 +149,14 @@ public interface IGlobalPlatformService
         byte[] aid,
         LifecycleState state,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets comprehensive card information including CPLC and reader details.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Structured card information for display.</returns>
+    Task<Result<CardInformation, SmartCardError>> GetCardInfoAsync(
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -125,4 +165,15 @@ public interface IGlobalPlatformService
 public record InstallOptions(
     bool InstallApplets = true,
     bool MakeSelectable = true,
-    byte[] InstallParameters = null);
+    Maybe<byte[]> InstallParameters = default);
+
+/// <summary>
+/// Comprehensive card information for display purposes.
+/// Pure data structure with no formatting logic.
+/// </summary>
+public record CardInformation(
+    Maybe<CplcData> Cplc,
+    Maybe<SelectResponse> IsdInfo,
+    string ReaderName,
+    Maybe<string> Atr = default,
+    Maybe<byte[]> HistoricalBytes = default);

@@ -1,9 +1,7 @@
-using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Functional;
 using Gp4Net.CardEmulator.Profiles;
 using Gp4Net.Core;
-using Gp4Net.Domain.Security;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -50,8 +48,8 @@ public class P71VirtualCard : VirtualCard
         return CardProfileLoader.LoadFromFile(jsonPath)
             .Map(config =>
             {
-                var crypto = cryptoService ?? new CryptographicService();
-                var profileName = System.IO.Path.GetFileNameWithoutExtension(jsonPath);
+                CryptographicService crypto = cryptoService ?? new CryptographicService();
+                string profileName = System.IO.Path.GetFileNameWithoutExtension(jsonPath);
                 return new P71VirtualCard(profileName, config, crypto, logger);
             });
     }
@@ -73,7 +71,7 @@ public class P71VirtualCard : VirtualCard
         return CardProfileLoader.LoadFromJson(json)
             .Map(config =>
             {
-                var crypto = cryptoService ?? new CryptographicService();
+                CryptographicService crypto = cryptoService ?? new CryptographicService();
                 return new P71VirtualCard(profileName, config, crypto, logger);
             });
     }
@@ -88,8 +86,8 @@ public class P71VirtualCard : VirtualCard
         CryptographicService? cryptoService = null,
         ILogger<P71VirtualCard>? logger = null)
     {
-        var config = CardConfiguration.P71();
-        var crypto = cryptoService ?? new CryptographicService();
+        CardConfiguration config = CardConfiguration.P71();
+        CryptographicService crypto = cryptoService ?? new CryptographicService();
         return new P71VirtualCard("P71_SCP02_Default", config, crypto, logger);
     }
     
@@ -104,9 +102,9 @@ public class P71VirtualCard : VirtualCard
         ILogger<P71VirtualCard>? logger = null)
     {
         // Use dual protocol config but default to SCP03
-        var config = CardConfiguration.DualProtocol()
-            .WithScpDefaults(0x03, Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70);
-        var crypto = cryptoService ?? new CryptographicService();
+        CardConfiguration config = CardConfiguration.DualProtocol()
+            .WithScpDefaults(0x03, Domain.Protocol.ScpImplementation.Scp03I70);
+        CryptographicService crypto = cryptoService ?? new CryptographicService();
         return new P71VirtualCard("P71_SCP03_Default", config, crypto, logger);
     }
 }

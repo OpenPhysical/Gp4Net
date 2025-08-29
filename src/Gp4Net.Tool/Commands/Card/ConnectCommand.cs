@@ -1,8 +1,12 @@
 using System;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
+using Gp4Net.Core;
+using Gp4Net.Domain.Commands;
+using Gp4Net.Services;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
+using Spectre.Console.Cli;
 
 namespace Gp4Net.Tool.Commands.Card;
 
@@ -32,23 +36,23 @@ public class ConnectCommand : IPipelineCommand<ConnectCommand.Settings>
         context.Display.Success("Successfully connected to card");
 
         // Try to select ISD and get basic card information
-        var gpService = context.GetGlobalPlatformService();
-        var selectResult = await gpService.SelectIsdAsync();
+        IGlobalPlatformService gpService = context.GetGlobalPlatformService();
+        Result<SelectResponse, SmartCardError> selectResult = await gpService.SelectIsdAsync();
 
         if (selectResult.IsSuccess)
         {
-            var response = selectResult.Value;
+            SelectResponse response = selectResult.Value;
             context.Display.Success("✓ ISD successfully selected");
-            
+
             // Display FCI information using functional pattern
-            response.Fci.Match(
-                fci => 
+            _ = response.Fci.Match(
+                fci =>
                 {
                     if (fci.ApplicationAid.Length > 0)
                     {
                         context.Display.Info($"ISD AID: {Convert.ToHexString(fci.ApplicationAid)}");
                     }
-                    
+
                     if (fci.CardData.Length > 0)
                     {
                         context.Display.Verbose($"Card data: {Convert.ToHexString(fci.CardData)}");
@@ -56,7 +60,7 @@ public class ConnectCommand : IPipelineCommand<ConnectCommand.Settings>
                     return true;
                 },
                 () => false);
-            
+
             // Display raw response data in verbose mode
             if (response.RawData.Length > 0)
             {
@@ -67,7 +71,7 @@ public class ConnectCommand : IPipelineCommand<ConnectCommand.Settings>
         {
             context.Display.Warning($"Could not select ISD: {selectResult.Error.Message}");
         }
-        
+
         // Connection is still considered successful even if ISD selection fails
         return Result.Success<bool, string>(true);
     }
@@ -75,7 +79,7 @@ public class ConnectCommand : IPipelineCommand<ConnectCommand.Settings>
     /// <summary>
     /// Settings for the connect command.
     /// </summary>
-    public class Settings : BaseCommandSettings
+    public class Settings : CommandSettings
     {
         // Connect command doesn't require secure channel by default
     }

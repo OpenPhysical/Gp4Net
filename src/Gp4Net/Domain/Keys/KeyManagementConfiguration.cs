@@ -141,7 +141,7 @@ public sealed class KeyLifecycleManager
     public static Result<KeyLifecycleManager, SmartCardError> Create(
         KeyManagementConfiguration config = null)
     {
-        var configuration = config ?? KeyManagementConfiguration.Default;
+        KeyManagementConfiguration configuration = config ?? KeyManagementConfiguration.Default;
 
         return SecureKeyStore.Create()
             .Map(store => new KeyLifecycleManager(
@@ -159,7 +159,7 @@ public sealed class KeyLifecycleManager
         KeyPurpose purpose)
     {
         // Validate key
-        var validationResult = _config.ValidateKey(keyData, purpose.ToString());
+        Result<bool, string> validationResult = _config.ValidateKey(keyData, purpose.ToString());
         if (validationResult.IsFailure)
         {
             return Result.Failure<KeyLifecycleManager, SmartCardError>(
@@ -170,14 +170,14 @@ public sealed class KeyLifecycleManager
         return _keyStore.AddKey(keyId, keyData)
             .Map(newStore =>
             {
-                var metadata = new KeyMetadata(
+                KeyMetadata metadata = new KeyMetadata(
                     keyId,
                     purpose,
                     DateTime.UtcNow,
                     0,
                     DateTime.UtcNow);
 
-                var newMetadata = _metadata.Add(keyId, metadata);
+                ImmutableDictionary<string, KeyMetadata> newMetadata = _metadata.Add(keyId, metadata);
                 return new KeyLifecycleManager(_config, newStore, newMetadata);
             });
     }
@@ -189,7 +189,7 @@ public sealed class KeyLifecycleManager
         string keyId,
         Func<byte[], Result<T, SmartCardError>> operation)
     {
-        if (!_metadata.TryGetValue(keyId, out var metadata))
+        if (!_metadata.TryGetValue(keyId, out KeyMetadata metadata))
         {
             return Result.Failure<(T, KeyLifecycleManager), SmartCardError>(
                 SmartCardError.InvalidArgument($"Key '{keyId}' not found"));
@@ -214,14 +214,14 @@ public sealed class KeyLifecycleManager
             .Map(result =>
             {
                 // Update metadata
-                var updatedMetadata = metadata with
+                KeyMetadata updatedMetadata = metadata with
                 {
                     UsageCount = metadata.UsageCount + 1,
                     LastUsedUtc = DateTime.UtcNow
                 };
 
-                var newMetadata = _metadata.SetItem(keyId, updatedMetadata);
-                var newManager = new KeyLifecycleManager(_config, _keyStore, newMetadata);
+                ImmutableDictionary<string, KeyMetadata> newMetadata = _metadata.SetItem(keyId, updatedMetadata);
+                KeyLifecycleManager newManager = new KeyLifecycleManager(_config, _keyStore, newMetadata);
 
                 return (result, newManager);
             });
@@ -232,7 +232,7 @@ public sealed class KeyLifecycleManager
     /// </summary>
     public bool IsKeyValid(string keyId)
     {
-        if (!_metadata.TryGetValue(keyId, out var metadata))
+        if (!_metadata.TryGetValue(keyId, out KeyMetadata metadata))
         {
             return false;
         }
@@ -247,7 +247,7 @@ public sealed class KeyLifecycleManager
             return false;
         }
 
-        var keyAge = DateTime.UtcNow - metadata.CreatedUtc;
+        TimeSpan keyAge = DateTime.UtcNow - metadata.CreatedUtc;
         if (keyAge.TotalMinutes > _config.KeyLifetimeMinutes)
         {
             return false;
@@ -261,7 +261,7 @@ public sealed class KeyLifecycleManager
     /// </summary>
     public Maybe<KeyAuditInfo> GetKeyAuditInfo(string keyId)
     {
-        return _metadata.TryGetValue(keyId, out var metadata)
+        return _metadata.TryGetValue(keyId, out KeyMetadata metadata)
             ? Maybe<KeyAuditInfo>.From(new KeyAuditInfo(
                 metadata.KeyId,
                 metadata.Purpose,
@@ -274,7 +274,7 @@ public sealed class KeyLifecycleManager
 
     private bool IsRotationRequired(KeyMetadata metadata)
     {
-        var age = DateTime.UtcNow - metadata.CreatedUtc;
+        TimeSpan age = DateTime.UtcNow - metadata.CreatedUtc;
         return age.TotalDays >= _config.KeyRotationIntervalDays;
     }
 

@@ -200,7 +200,7 @@ public class CapFileStructure
                 SmartCardError.InvalidData("CAP file data is too short to be valid"));
         }
 
-        if (!(capFileData[0] == 0x50 && capFileData[1] == 0x4B && 
+        if (!(capFileData[0] == 0x50 && capFileData[1] == 0x4B &&
               capFileData[2] == 0x03 && capFileData[3] == 0x04))
         {
             return Result.Failure<CapFileStructure, SmartCardError>(
@@ -210,7 +210,7 @@ public class CapFileStructure
 
         try
         {
-            var result = ParseZipFormat(capFileData);
+            CapFileStructure result = ParseZipFormat(capFileData);
             return Result.Success<CapFileStructure, SmartCardError>(result);
         }
         catch (InvalidDataException ex)
@@ -232,11 +232,11 @@ public class CapFileStructure
     /// <returns>The parsed CAP file structure.</returns>
     private static CapFileStructure ParseZipFormat(byte[] capFileData)
     {
-        using var zipStream = new MemoryStream(capFileData);
-        using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+        using MemoryStream zipStream = new MemoryStream(capFileData);
+        using ZipArchive archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
 
-        var components = new List<CapComponent>();
-        var applets = new List<AppletInfo>();
+        List<CapComponent> components = [];
+        List<AppletInfo> applets = [];
         byte[] packageAid = null;
         CapVersion? packageVersion = null;
         CapVersion? capFileVersion = null;
@@ -244,7 +244,7 @@ public class CapFileStructure
         ManifestInfo manifest = null;
 
         // Component name to tag mapping
-        var componentMapping = new Dictionary<string, byte>
+        Dictionary<string, byte> componentMapping = new Dictionary<string, byte>
         {
             ["Header.cap"] = ComponentTags.Header,
             ["Directory.cap"] = ComponentTags.Directory,
@@ -261,30 +261,30 @@ public class CapFileStructure
         };
 
         // Find and parse component files and manifest
-        foreach (var entry in archive.Entries)
+        foreach (ZipArchiveEntry entry in archive.Entries)
         {
-            var fileName = Path.GetFileName(entry.FullName);
+            string fileName = Path.GetFileName(entry.FullName);
 
             // Parse manifest file
             if (entry.FullName == "META-INF/MANIFEST.MF")
             {
-                using var entryStream = entry.Open();
-                using var reader = new StreamReader(entryStream);
-                var manifestContent = reader.ReadToEnd();
+                using Stream entryStream = entry.Open();
+                using StreamReader reader = new StreamReader(entryStream);
+                string manifestContent = reader.ReadToEnd();
                 manifest = ManifestInfo.Parse(manifestContent);
                 continue;
             }
 
-            if (componentMapping.TryGetValue(fileName, out var expectedTag))
+            if (componentMapping.TryGetValue(fileName, out byte expectedTag))
             {
-                using var entryStream = entry.Open();
-                using var memoryStream = new MemoryStream();
+                using Stream entryStream = entry.Open();
+                using MemoryStream memoryStream = new MemoryStream();
                 entryStream.CopyTo(memoryStream);
-                var fileData = memoryStream.ToArray();
+                byte[] fileData = memoryStream.ToArray();
 
                 // Parse the component from the file data (includes tag + size + data)
-                using var componentStream = new MemoryStream(fileData);
-                var component = CapComponent.Parse(componentStream);
+                using MemoryStream componentStream = new MemoryStream(fileData);
+                CapComponent component = CapComponent.Parse(componentStream);
 
                 // Verify tag matches expected
                 if (component.Tag != expectedTag)
@@ -300,25 +300,25 @@ public class CapFileStructure
                 {
                     // Extract package information from header component
                     case ComponentTags.Header:
-                    {
-                        var header = HeaderComponent.Parse(component.Data);
-                        packageAid = header.PackageAid;
-                        packageVersion = header.PackageVersion;
-                        capFileVersion = new CapVersion(
-                            header.CapFileMajorVersion,
-                            header.CapFileMinorVersion
-                        );
-                        headerFlags = header.Flags;
-                        break;
-                    }
+                        {
+                            HeaderComponent header = HeaderComponent.Parse(component.Data);
+                            packageAid = header.PackageAid;
+                            packageVersion = header.PackageVersion;
+                            capFileVersion = new CapVersion(
+                                header.CapFileMajorVersion,
+                                header.CapFileMinorVersion
+                            );
+                            headerFlags = header.Flags;
+                            break;
+                        }
 
                     // Extract applet information from applet component
                     case ComponentTags.Applet:
-                    {
-                        var appletComponent = AppletComponent.Parse(component.Data);
-                        applets.AddRange(appletComponent.Applets);
-                        break;
-                    }
+                        {
+                            AppletComponent appletComponent = AppletComponent.Parse(component.Data);
+                            applets.AddRange(appletComponent.Applets);
+                            break;
+                        }
                 }
 
             }
@@ -362,11 +362,11 @@ public class CapFileStructure
             ComponentTags.Descriptor
         ];
 
-        var componentDict = Components.ToDictionary(c => c.Tag, c => c);
+        Dictionary<byte, CapComponent> componentDict = Components.ToDictionary(c => c.Tag, c => c);
 
-        foreach (var tag in loadOrder)
+        foreach (byte tag in loadOrder)
         {
-            if (componentDict.TryGetValue(tag, out var component))
+            if (componentDict.TryGetValue(tag, out CapComponent component))
             {
                 yield return component;
             }
@@ -379,9 +379,9 @@ public class CapFileStructure
     /// <returns>The binary CAP file data.</returns>
     public byte[] ToBinaryFormat()
     {
-        var binaryData = new List<byte>();
+        List<byte> binaryData = [];
 
-        foreach (var component in GetLoadingComponents())
+        foreach (CapComponent component in GetLoadingComponents())
         {
             // Add component tag
             binaryData.Add(component.Tag);
@@ -404,23 +404,23 @@ public class CapFileStructure
     /// <returns>The list of load blocks.</returns>
     public IList<LoadBlock> CreateLoadBlocks(int maxBlockSize = 255)
     {
-        var blocks = new List<LoadBlock>();
+        List<LoadBlock> blocks = [];
         byte blockNumber = 0;
 
-        foreach (var component in GetLoadingComponents())
+        foreach (CapComponent component in GetLoadingComponents())
         {
-            var componentData = component.Data;
-            var offset = 0;
+            byte[] componentData = component.Data;
+            int offset = 0;
 
             while (offset < componentData.Length)
             {
-                var remainingBytes = componentData.Length - offset;
-                var blockSize = Math.Min(remainingBytes, maxBlockSize);
-                var blockData = new byte[blockSize];
+                int remainingBytes = componentData.Length - offset;
+                int blockSize = Math.Min(remainingBytes, maxBlockSize);
+                byte[] blockData = new byte[blockSize];
 
                 Array.Copy(componentData, offset, blockData, 0, blockSize);
 
-                var isLastBlock =
+                bool isLastBlock =
                     (offset + blockSize >= componentData.Length)
                     && component == GetLoadingComponents().Last();
 
@@ -481,7 +481,7 @@ public class CapComponent
             );
         }
 
-        var tagByte = stream.ReadByte();
+        int tagByte = stream.ReadByte();
         if (tagByte == -1)
         {
             throw new InvalidDataException(
@@ -489,7 +489,7 @@ public class CapComponent
             );
         }
 
-        var tag = (byte)tagByte;
+        byte tag = (byte)tagByte;
 
         // Read size (2 bytes, big-endian)
         if (stream.Position + 1 >= stream.Length)
@@ -499,8 +499,8 @@ public class CapComponent
             );
         }
 
-        var sizeHighByte = stream.ReadByte();
-        var sizeLowByte = stream.ReadByte();
+        int sizeHighByte = stream.ReadByte();
+        int sizeLowByte = stream.ReadByte();
         if (sizeHighByte == -1 || sizeLowByte == -1)
         {
             throw new InvalidDataException(
@@ -508,9 +508,9 @@ public class CapComponent
             );
         }
 
-        var sizeHigh = (byte)sizeHighByte;
-        var sizeLow = (byte)sizeLowByte;
-        var size = (ushort)((sizeHigh << 8) | sizeLow);
+        byte sizeHigh = (byte)sizeHighByte;
+        byte sizeLow = (byte)sizeLowByte;
+        ushort size = (ushort)((sizeHigh << 8) | sizeLow);
 
         // Check if we have enough data left in the stream
         if (stream.Position + size > stream.Length)
@@ -521,8 +521,8 @@ public class CapComponent
         }
 
         // Read component data
-        var data = new byte[size];
-        var bytesRead = stream.Read(data, 0, size);
+        byte[] data = new byte[size];
+        int bytesRead = stream.Read(data, 0, size);
         if (bytesRead != size)
         {
             throw new InvalidDataException(
@@ -667,7 +667,7 @@ internal class HeaderComponent
             throw new InvalidDataException("Invalid header component data.");
         }
 
-        var offset = 0;
+        int offset = 0;
 
         // Check for magic number (4 bytes: 0xDECAFFED)
         if (
@@ -682,19 +682,19 @@ internal class HeaderComponent
         }
 
         // Read CAP file minor version (1 byte)
-        var capMinorVersion = data[offset++];
+        byte capMinorVersion = data[offset++];
 
         // Read CAP file major version (1 byte)
-        var capMajorVersion = data[offset++];
+        byte capMajorVersion = data[offset++];
 
         // Read flags (1 byte)
-        var flags = data[offset++];
+        byte flags = data[offset++];
 
         // Skip package info (2 bytes - package name length and reserved)
         offset += 2;
 
         // Read package AID length
-        var packageAidLength = data[offset++];
+        byte packageAidLength = data[offset++];
 
         if (offset + packageAidLength > data.Length)
         {
@@ -703,7 +703,7 @@ internal class HeaderComponent
             );
         }
 
-        var packageAid = new byte[packageAidLength];
+        byte[] packageAid = new byte[packageAidLength];
         Array.Copy(data, offset, packageAid, 0, packageAidLength);
         offset += packageAidLength;
 
@@ -744,8 +744,8 @@ internal class AppletComponent
 
     public static AppletComponent Parse(byte[] data)
     {
-        var applets = new List<AppletInfo>();
-        var offset = 0;
+        List<AppletInfo> applets = [];
+        int offset = 0;
 
         // Read count
         if (data.Length < 1)
@@ -753,9 +753,9 @@ internal class AppletComponent
             return new AppletComponent(applets);
         }
 
-        var count = data[offset++];
+        byte count = data[offset++];
 
-        for (var i = 0; i < count; i++)
+        for (int i = 0; i < count; i++)
         {
             if (offset >= data.Length)
             {
@@ -763,19 +763,19 @@ internal class AppletComponent
             }
 
             // Read AID length
-            var aidLength = data[offset++];
+            byte aidLength = data[offset++];
             if (offset + aidLength + 2 > data.Length)
             {
                 break;
             }
 
             // Read AID
-            var aid = new byte[aidLength];
+            byte[] aid = new byte[aidLength];
             Array.Copy(data, offset, aid, 0, aidLength);
             offset += aidLength;
 
             // Read install method offset
-            var installMethodOffset = (ushort)((data[offset] << 8) | data[offset + 1]);
+            ushort installMethodOffset = (ushort)((data[offset] << 8) | data[offset + 1]);
             offset += 2;
 
             applets.Add(new AppletInfo(aid, installMethodOffset));
@@ -858,15 +858,15 @@ public class ManifestInfo
     /// <returns>The parsed manifest information.</returns>
     public static ManifestInfo Parse(string manifestContent)
     {
-        var lines = manifestContent.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        var properties = new Dictionary<string, string>();
+        string[] lines = manifestContent.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Dictionary<string, string> properties = new Dictionary<string, string>();
 
         string currentKey = null;
         string currentValue = null;
 
-        foreach (var line in lines)
+        foreach (string line in lines)
         {
-            var trimmedLine = line.Trim();
+            string trimmedLine = line.Trim();
             if (
                 string.IsNullOrEmpty(trimmedLine)
                 || trimmedLine.StartsWith("Manifest-Version")
@@ -890,7 +890,7 @@ public class ManifestInfo
                 }
 
                 // Parse new property
-                var colonIndex = trimmedLine.IndexOf(':');
+                int colonIndex = trimmedLine.IndexOf(':');
                 if (colonIndex > 0)
                 {
                     currentKey = trimmedLine.Substring(0, colonIndex).Trim();
@@ -906,15 +906,15 @@ public class ManifestInfo
         }
 
         // Extract imported packages
-        var importedPackages = new List<ImportedPackage>();
-        for (var i = 1; i <= 10; i++) // Check up to 10 imported packages
+        List<ImportedPackage> importedPackages = [];
+        for (int i = 1; i <= 10; i++) // Check up to 10 imported packages
         {
-            var aidKey = $"Java-Card-Imported-Package-{i}-AID";
-            var versionKey = $"Java-Card-Imported-Package-{i}-Version";
+            string aidKey = $"Java-Card-Imported-Package-{i}-AID";
+            string versionKey = $"Java-Card-Imported-Package-{i}-Version";
 
             if (
-                properties.TryGetValue(aidKey, out var aidValue)
-                && properties.TryGetValue(versionKey, out var versionValue)
+                properties.TryGetValue(aidKey, out string aidValue)
+                && properties.TryGetValue(versionKey, out string versionValue)
             )
             {
                 importedPackages.Add(new ImportedPackage(aidValue, versionValue));

@@ -33,22 +33,15 @@ public static class CardProfileLoader
                 SmartCardError.InvalidArgument("JSON path cannot be null or empty"));
         }
 
-        try
-        {
-            if (!File.Exists(jsonPath))
-            {
-                return Result.Failure<CardConfiguration, SmartCardError>(
-                    SmartCardError.InvalidArgument($"Profile file not found: {jsonPath}"));
-            }
-
-            var json = File.ReadAllText(jsonPath);
-            return LoadFromJson(json);
-        }
-        catch (Exception ex)
+        if (!File.Exists(jsonPath))
         {
             return Result.Failure<CardConfiguration, SmartCardError>(
-                SmartCardError.InvalidData($"Failed to read profile file: {ex.Message}"));
+                SmartCardError.InvalidArgument($"Profile file not found: {jsonPath}"));
         }
+
+        return Result.Try(() => File.ReadAllText(jsonPath),
+            ex => SmartCardError.InvalidData($"Failed to read profile file: {ex.Message}"))
+            .Bind(LoadFromJson);
     }
 
     /// <summary>
@@ -64,81 +57,57 @@ public static class CardProfileLoader
                 SmartCardError.InvalidArgument("JSON content cannot be null or empty"));
         }
 
-        try
+        JsonSerializerOptions options = new JsonSerializerOptions
         {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                ReadCommentHandling = JsonCommentHandling.Skip
-            };
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = JsonCommentHandling.Skip
+        };
 
-            var profile = JsonSerializer.Deserialize<CardProfile>(json, options);
-            
-            // Handle null from JsonSerializer at system boundary
-            return profile == null
-                ? Result.Failure<CardConfiguration, SmartCardError>(
-                    SmartCardError.InvalidData("Failed to deserialize JSON profile"))
-                : BuildConfiguration(profile);
-        }
-        catch (JsonException ex)
-        {
-            return Result.Failure<CardConfiguration, SmartCardError>(
-                SmartCardError.InvalidData($"Invalid JSON format: {ex.Message}"));
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<CardConfiguration, SmartCardError>(
-                SmartCardError.InvalidData($"Failed to load profile: {ex.Message}"));
-        }
+        return Result.Try(() => JsonSerializer.Deserialize<CardProfile>(json, options),
+                ex => ex is JsonException
+                    ? SmartCardError.InvalidData($"Invalid JSON format: {ex.Message}")
+                    : SmartCardError.InvalidData($"Failed to load profile: {ex.Message}"))
+            .Bind(profile => Maybe<CardProfile>.From(profile)
+                .ToResult(SmartCardError.InvalidData("Failed to deserialize JSON profile"))
+                .Bind(BuildConfiguration));
     }
 
     private static Result<CardConfiguration, SmartCardError> BuildConfiguration(CardProfile profile)
     {
-        try
-        {
-            // Parse ATR
-            var atrResult = ParseHexString(profile.CardData.Atr, "ATR");
-            if (atrResult.IsFailure)
-                return Result.Failure<CardConfiguration, SmartCardError>(atrResult.Error);
+        // Parse ATR
+        return ParseHexString(profile.CardData.Atr, "ATR")
+            .Bind(atrBytes =>
+                // Parse ISD AID
+                ParseHexString(profile.CardData.IsdAid, "ISD AID")
+                    .Bind(isdAidBytes =>
+                        // Build static keys
+                        BuildStaticKeys(profile.StaticKeys)
+                            .Bind(staticKeys =>
+                                // Build default data objects
+                                BuildDataObjects(profile)
+                                    .Map(dataObjects =>
+                                    {
+                                        // Determine SCP version and implementation
+                                        (byte scpVersion, ScpImplementation scpImplementation) = DetermineScpDefaults(profile);
 
-            // Parse ISD AID
-            var isdAidResult = ParseHexString(profile.CardData.IsdAid, "ISD AID");
-            if (isdAidResult.IsFailure)
-                return Result.Failure<CardConfiguration, SmartCardError>(isdAidResult.Error);
+                                        CardConfiguration config = new CardConfiguration(
+                                            Atr: atrBytes,
+                                            IsdAid: isdAidBytes,
+                                            StaticKeys: staticKeys,
+                                            DefaultDataObjects: dataObjects,
+                                            SupportedInstructions: BuildSupportedInstructions(),
+                                            CardType: string.IsNullOrEmpty(profile.ProfileInfo.Description) 
+                                                ? "Custom Card" 
+                                                : profile.ProfileInfo.Description,
+                                            DefaultScpVersion: scpVersion,
+                                            DefaultScpImplementation: scpImplementation
+                                        );
 
-            // Build static keys
-            var staticKeysResult = BuildStaticKeys(profile.StaticKeys);
-            if (staticKeysResult.IsFailure)
-                return Result.Failure<CardConfiguration, SmartCardError>(staticKeysResult.Error);
-
-            // Build default data objects
-            var dataObjectsResult = BuildDataObjects(profile);
-            if (dataObjectsResult.IsFailure)
-                return Result.Failure<CardConfiguration, SmartCardError>(dataObjectsResult.Error);
-
-            // Determine SCP version and implementation
-            var (scpVersion, scpImplementation) = DetermineScpDefaults(profile);
-
-            var config = new CardConfiguration(
-                Atr: atrResult.Value,
-                IsdAid: isdAidResult.Value,
-                StaticKeys: staticKeysResult.Value,
-                DefaultDataObjects: dataObjectsResult.Value,
-                SupportedInstructions: BuildSupportedInstructions(),
-                CardType: string.IsNullOrEmpty(profile.ProfileInfo.Description) 
-                    ? "Custom Card" 
-                    : profile.ProfileInfo.Description,
-                DefaultScpVersion: scpVersion,
-                DefaultScpImplementation: scpImplementation
+                                        return config;
+                                    })
+                            )
+                    )
             );
-
-            return Result.Success<CardConfiguration, SmartCardError>(config);
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<CardConfiguration, SmartCardError>(
-                SmartCardError.InvalidData($"Failed to build configuration: {ex.Message}"));
-        }
     }
 
     private static Result<ImmutableDictionary<byte, IKeySet>, SmartCardError> BuildStaticKeys(
@@ -150,17 +119,17 @@ public static class CardProfileLoader
                 ImmutableDictionary<byte, IKeySet>.Empty);
         }
 
-        var builder = ImmutableDictionary.CreateBuilder<byte, IKeySet>();
+        ImmutableDictionary<byte, IKeySet>.Builder builder = ImmutableDictionary.CreateBuilder<byte, IKeySet>();
 
-        foreach (var kvp in staticKeys)
+        foreach (KeyValuePair<string, KeySetProfile> kvp in staticKeys)
         {
-            if (!byte.TryParse(kvp.Key, out var keyVersion))
+            if (!byte.TryParse(kvp.Key, out byte keyVersion))
             {
                 return Result.Failure<ImmutableDictionary<byte, IKeySet>, SmartCardError>(
                     SmartCardError.InvalidData($"Invalid key version: {kvp.Key}"));
             }
 
-            var keySetResult = BuildKeySet(kvp.Value, keyVersion);
+            Result<IKeySet, SmartCardError> keySetResult = BuildKeySet(kvp.Value, keyVersion);
             if (keySetResult.IsFailure)
                 return Result.Failure<ImmutableDictionary<byte, IKeySet>, SmartCardError>(keySetResult.Error);
 
@@ -174,15 +143,15 @@ public static class CardProfileLoader
     {
         // Keys is now non-nullable, no need to check
 
-        var encResult = ParseHexString(profile.Keys.Enc, "ENC key");
+        Result<byte[], SmartCardError> encResult = ParseHexString(profile.Keys.Enc, "ENC key");
         if (encResult.IsFailure)
             return Result.Failure<IKeySet, SmartCardError>(encResult.Error);
 
-        var macResult = ParseHexString(profile.Keys.Mac, "MAC key");
+        Result<byte[], SmartCardError> macResult = ParseHexString(profile.Keys.Mac, "MAC key");
         if (macResult.IsFailure)
             return Result.Failure<IKeySet, SmartCardError>(macResult.Error);
 
-        var dekResult = ParseHexString(profile.Keys.Dek, "DEK key");
+        Result<byte[], SmartCardError> dekResult = ParseHexString(profile.Keys.Dek, "DEK key");
         if (dekResult.IsFailure)
             return Result.Failure<IKeySet, SmartCardError>(dekResult.Error);
 
@@ -199,10 +168,10 @@ public static class CardProfileLoader
 
     private static Result<ImmutableDictionary<ushort, byte[]>, SmartCardError> BuildDataObjects(CardProfile profile)
     {
-        var builder = ImmutableDictionary.CreateBuilder<ushort, byte[]>();
+        ImmutableDictionary<ushort, byte[]>.Builder builder = ImmutableDictionary.CreateBuilder<ushort, byte[]>();
 
         // Add fixed data objects from profile
-        foreach (var kvp in profile.DataObjects)
+        foreach (KeyValuePair<string, string> kvp in profile.DataObjects)
             {
                 if (!kvp.Key.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
                 {
@@ -210,7 +179,7 @@ public static class CardProfileLoader
                         SmartCardError.InvalidData($"Data object tag must be in hex format: {kvp.Key}"));
                 }
 
-                if (!ushort.TryParse(kvp.Key[2..], System.Globalization.NumberStyles.HexNumber, null, out var tag))
+                if (!ushort.TryParse(kvp.Key[2..], System.Globalization.NumberStyles.HexNumber, null, out ushort tag))
                 {
                     return Result.Failure<ImmutableDictionary<ushort, byte[]>, SmartCardError>(
                         SmartCardError.InvalidData($"Invalid data object tag: {kvp.Key}"));
@@ -218,7 +187,7 @@ public static class CardProfileLoader
 
                 if (!string.IsNullOrEmpty(kvp.Value))
                 {
-                    var dataResult = ParseHexString(kvp.Value, $"Data object {kvp.Key}");
+                    Result<byte[], SmartCardError> dataResult = ParseHexString(kvp.Value, $"Data object {kvp.Key}");
                     if (dataResult.IsFailure)
                         return Result.Failure<ImmutableDictionary<ushort, byte[]>, SmartCardError>(dataResult.Error);
 
@@ -232,11 +201,11 @@ public static class CardProfileLoader
     private static (byte scpVersion, ScpImplementation scpImplementation) DetermineScpDefaults(CardProfile profile)
     {
         // Check if card has SCP03 support
-        var hasScp03 = profile.CardData.Capabilities.ScpSupport.Any(s => s.Protocol == "0x03");
-        var hasScp02 = profile.CardData.Capabilities.ScpSupport.Any(s => s.Protocol == "0x02");
+        bool hasScp03 = profile.CardData.Capabilities.ScpSupport.Any(s => s.Protocol == "0x03");
+        bool hasScp02 = profile.CardData.Capabilities.ScpSupport.Any(s => s.Protocol == "0x02");
 
         // Determine based on key type
-        var hasAesKeys = profile.CardData.KeyInfo.Any(k => k.Type == "AES");
+        bool hasAesKeys = profile.CardData.KeyInfo.Any(k => k.Type == "AES");
 
         if (hasScp03 || hasAesKeys)
         {
@@ -246,7 +215,7 @@ public static class CardProfileLoader
         else if (hasScp02)
         {
             // Check if card explicitly supports SCP02 i=15 (prefer it over i=55)
-            var scp02Implementations = profile.CardData.Capabilities.ScpSupport
+            List<string> scp02Implementations = profile.CardData.Capabilities.ScpSupport
                 .Where(s => s.Protocol == "0x02")
                 .SelectMany(s => s.Implementations)
                 .ToList();
@@ -292,25 +261,18 @@ public static class CardProfileLoader
                 SmartCardError.InvalidData($"{fieldName} cannot be null or empty"));
         }
 
-        try
-        {
-            // Remove any spaces or dashes
-            var cleaned = hex.Replace(" ", "").Replace("-", "");
-            
-            // Ensure even number of characters
-            if (cleaned.Length % 2 != 0)
-            {
-                return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidData($"{fieldName} must have even number of hex digits"));
-            }
-
-            return Result.Success<byte[], SmartCardError>(Convert.FromHexString(cleaned));
-        }
-        catch (Exception ex)
+        // Remove any spaces or dashes
+        string cleaned = hex.Replace(" ", "").Replace("-", "");
+        
+        // Ensure even number of characters
+        if (cleaned.Length % 2 != 0)
         {
             return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidData($"Failed to parse {fieldName}: {ex.Message}"));
+                SmartCardError.InvalidData($"{fieldName} must have even number of hex digits"));
         }
+
+        return Result.Try(() => Convert.FromHexString(cleaned),
+            ex => SmartCardError.InvalidData($"Failed to parse {fieldName}: {ex.Message}"));
     }
 }
 
@@ -346,7 +308,7 @@ internal class CardDataProfile
     public string IsdAid { get; set; } = string.Empty;
     public CplcProfile Cplc { get; set; } = new();
     public CapabilitiesProfile Capabilities { get; set; } = new();
-    public List<KeyInfoProfile> KeyInfo { get; set; } = new();
+    public List<KeyInfoProfile> KeyInfo { get; set; } = [];
 }
 
 internal class CplcProfile
@@ -358,13 +320,13 @@ internal class CplcProfile
 
 internal class CapabilitiesProfile
 {
-    public List<ScpSupportProfile> ScpSupport { get; set; } = new();
+    public List<ScpSupportProfile> ScpSupport { get; set; } = [];
 }
 
 internal class ScpSupportProfile
 {
     public string Protocol { get; set; } = string.Empty;
-    public List<string> Implementations { get; set; } = new();
+    public List<string> Implementations { get; set; } = [];
 }
 
 internal class KeyInfoProfile

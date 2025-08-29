@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.CardEmulator.Functional;
 using JetBrains.Annotations;
 
@@ -72,25 +75,27 @@ public class VirtualCardReader
     /// Inserts a virtual card into the reader.
     /// </summary>
     /// <param name="card">The virtual card to insert.</param>
-    public void InsertCard(IVirtualCard card)
+    public UnitResult<SmartCardError> InsertCard(IVirtualCard card)
     {
-        ArgumentNullException.ThrowIfNull(card);
-
-        if (_insertedCard != null)
-            throw new InvalidOperationException("A card is already inserted");
-
-        _insertedCard = card;
-        card.Reset();
+        return Maybe<IVirtualCard>.From(card)
+            .ToResult(SmartCardError.InvalidArgument("Card cannot be null"))
+            .Bind(validCard => _insertedCard is not null
+                ? Result.Failure<bool, SmartCardError>(SmartCardError.InvalidArgument("A card is already inserted"))
+                : Result.Success<bool, SmartCardError>(true))
+            .Tap(_ => _insertedCard = card)
+            .Bind(_ => card.Reset())
+;
     }
 
     /// <summary>
     /// Removes the virtual card from the reader.
     /// </summary>
-    public void RemoveCard()
+    public UnitResult<SmartCardError> RemoveCard()
     {
-        _insertedCard?.Reset();
+        UnitResult<SmartCardError> resetResult = _insertedCard?.Reset() ?? UnitResult.Success<SmartCardError>();
         _insertedCard = null;
         _connected = false;
+        return resetResult;
     }
 
     /// <summary>
@@ -109,9 +114,10 @@ public class VirtualCardReader
     /// <summary>
     /// Disconnects from the card.
     /// </summary>
-    public void Disconnect()
+    public UnitResult<SmartCardError> Disconnect()
     {
         _connected = false;
+        return UnitResult.Success<SmartCardError>();
     }
 
     /// <summary>
@@ -163,20 +169,24 @@ public class VirtualReaderManager
     /// Adds a virtual reader to the manager.
     /// </summary>
     /// <param name="reader">The virtual reader to add.</param>
-    public void AddReader(VirtualCardReader reader)
+    public UnitResult<SmartCardError> AddReader(VirtualCardReader reader)
     {
-        ArgumentNullException.ThrowIfNull(reader);
-
-        _readers[reader.ReaderName] = reader;
+        return Maybe<VirtualCardReader>.From(reader)
+            .ToResult(SmartCardError.InvalidArgument("Reader cannot be null"))
+            .Tap(r => _readers[r.ReaderName] = r)
+            .Map(_ => UnitResult.Success<SmartCardError>());
     }
 
     /// <summary>
     /// Removes a virtual reader from the manager.
     /// </summary>
     /// <param name="readerName">The name of the reader to remove.</param>
-    public void RemoveReader(string readerName)
+    public UnitResult<SmartCardError> RemoveReader(string readerName)
     {
-        _readers.Remove(readerName);
+        return Maybe<string>.From(readerName)
+            .ToResult(SmartCardError.InvalidArgument("Reader name cannot be null"))
+            .Tap(name => _readers.Remove(name))
+            .Map(_ => UnitResult.Success<SmartCardError>());
     }
 
     /// <summary>
@@ -186,20 +196,29 @@ public class VirtualReaderManager
     /// <returns>The virtual reader, or null if not found.</returns>
     public VirtualCardReader? GetReader(string readerName)
     {
-        _readers.TryGetValue(readerName, out var reader);
+        _readers.TryGetValue(readerName, out VirtualCardReader? reader);
         return reader;
     }
 
     /// <summary>
     /// Clears all virtual readers.
     /// </summary>
-    public void Clear()
+    public UnitResult<SmartCardError> Clear()
     {
-        foreach (var reader in _readers.Values)
-        {
-            reader.RemoveCard();
-        }
+        // Remove cards from all readers and collect any errors
+        IReadOnlyList<UnitResult<SmartCardError>> results = _readers.Values
+            .Select(reader => reader.RemoveCard())
+            .ToArray();
+
+        UnitResult<SmartCardError> firstError = results
+            .Where(result => result.IsFailure)
+            .Cast<UnitResult<SmartCardError>>()
+            .Aggregate(
+                UnitResult.Success<SmartCardError>(),
+                (first, current) => first.IsFailure ? first : current);
+
         _readers.Clear();
+        return firstError;
     }
 
     /// <summary>
@@ -210,8 +229,8 @@ public class VirtualReaderManager
     {
         const string readerName = "Virtual P71 Reader 00 00";
 
-        var reader = new VirtualCardReader(readerName);
-        var p71Card = VirtualCardTestBuilder.P71Card();
+        VirtualCardReader reader = new VirtualCardReader(readerName);
+        VirtualCard p71Card = VirtualCardTestBuilder.P71Card();
 
         reader.InsertCard(p71Card);
         AddReader(reader);

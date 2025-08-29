@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
@@ -12,11 +14,10 @@ using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using Gp4Net.Tool.Services;
 using Gp4Net.Tool.Services.CardCommunication;
-using Gp4Net.CardEmulator.Services;
-using Gp4Net.Pipeline;
 using Gp4Net.Transport;
 using log4net;
 using log4net.Config;
+using log4net.Repository;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
@@ -41,10 +42,10 @@ public class Program
         try
         {
             // Configure log4net (file logging only)
-            var logRepository = LogManager.GetRepository(
+            ILoggerRepository logRepository = LogManager.GetRepository(
                 Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly()
             );
-            var configFile = new FileInfo("log4net.config");
+            FileInfo configFile = new FileInfo("log4net.config");
             if (configFile.Exists)
             {
                 _ = XmlConfigurator.Configure(logRepository, configFile);
@@ -52,30 +53,29 @@ public class Program
             // Note: Intentionally not calling BasicConfigurator to avoid console output
 
             // Create service collection and configure DI
-            var services = new ServiceCollection();
+            ServiceCollection services = new ServiceCollection();
             ConfigureServices(services);
 
             // Build service provider to initialize CardServiceProvider
-            var serviceProvider = services.BuildServiceProvider();
-            
+            ServiceProvider serviceProvider = services.BuildServiceProvider();
+
             // Validate critical service registrations
-            var validationResult = ValidateServiceRegistrations(serviceProvider);
+            Result<bool> validationResult = ValidateServiceRegistrations(serviceProvider);
             if (validationResult.IsFailure)
             {
                 AnsiConsole.MarkupLine($"[red]Startup Error: {validationResult.Error}[/]");
                 return 1;
             }
-            
-            var cardService = serviceProvider.GetRequiredService<Tool.Services.ICardService>();
-            CardServiceProvider.SetCardService(cardService);
+
+            // CardServiceProvider is no longer needed - functional context handles service provision
 
             // Create command app with DI
-            var app = new CommandApp(new TypeRegistrar(services));
+            CommandApp app = new CommandApp(new TypeRegistrar(services));
             app.Configure(config =>
             {
                 _ = config.SetApplicationName("gp4net");
                 _ = config.SetApplicationVersion("1.0.0");
-                    
+
                 // Auto-register commands with CliCommandAttribute
                 config.RegisterCliCommands(services);
 
@@ -98,29 +98,31 @@ public class Program
                         card.SetDescription("Smart card operations");
                         // Use new pipeline commands where available
                         _ = card.AddCommand<
-                                PipelineCommand<Commands.Card.ListReadersCommand.Settings>
+                                PipelineCommand<ListReadersCommand.Settings>
                             >("list-readers")
                             .WithDescription("List available card readers");
                         _ = card.AddCommand<
-                                PipelineCommand<Commands.Card.ConnectCommand.Settings>
+                                PipelineCommand<ConnectCommand.Settings>
                             >("connect")
                             .WithDescription("Connect to a smart card");
                         _ = card.AddCommand<
-                                PipelineCommand<Commands.Card.InfoCommand.Settings>
+                                PipelineCommand<InfoCommand.Settings>
                             >("info")
                             .WithDescription("Display detailed card information");
                         _ = card.AddCommand<TestSecureChannelCommand>("test-sc")
                             .WithDescription("Test secure channel establishment");
-                        _ = card.AddCommand<KeysChangeCommand>("change-keys")
+                        _ = card.AddCommand<
+                                PipelineCommand<KeysChangeCommand.Settings>
+                            >("change-keys")
                             .WithDescription("Change cryptographic keys on the card (WARNING: This permanently modifies card keys)");
                         _ = card.AddCommand<
-                                PipelineCommand<Commands.Card.GetIsdDataCommand.Settings>
+                                PipelineCommand<GetIsdDataCommand.Settings>
                             >("get-data")
                             .WithDescription(
                                 "Retrieve data objects from the card (IIN, CIN, OPID, etc.)"
                             );
                         _ = card.AddCommand<
-                                PipelineCommand<Commands.Card.PutIsdDataCommand.Settings>
+                                PipelineCommand<PutIsdDataCommand.Settings>
                             >("put-data")
                             .WithDescription(
                                 "Write data objects to the card (IIN, CIN, OPID, etc.)"
@@ -220,49 +222,31 @@ public class Program
         // Register keyset resolver (functional implementation)
         _ = services.AddSingleton<IKeysetResolver, FunctionalKeysetResolverAdapter>();
 
-        // Register real card service
-        _ = services.AddSingleton<WsctCardService>();
-            
-        // Register virtual card services
-        _ = services.AddSingleton<VirtualCardService>(provider => 
-        {
-            var virtualService = new VirtualCardService();
-            virtualService.SetupComprehensiveTestEnvironment(); // Setup all card types
-            return virtualService;
-        });
-        _ = services.AddSingleton<VirtualCardServiceAdapter>();
-            
-        // Register hybrid card service as the main ICardService
-        _ = services.AddSingleton<Tool.Services.ICardService, HybridCardService>(provider =>
-        {
-            var realCardService = provider.GetRequiredService<WsctCardService>();
-            var virtualCardService = provider.GetRequiredService<VirtualCardServiceAdapter>();
-            var logger = provider.GetRequiredService<ILogger<HybridCardService>>();
-            return new HybridCardService(realCardService, virtualCardService, logger);
-        });
-            
+        // Register functional smart card service
+        _ = services.AddSingleton<ISmartCardService, SmartCardService>();
+
         // Register domain service factory
         _ = services.AddSingleton<IDomainServiceFactory, DomainServiceFactory>();
         _ = services.AddSingleton<PackageRegistry>();
-        
+
         // SmartCardService is now created by DomainServiceFactory with functional composition
-        
+
         // GlobalPlatformService is now created by DomainServiceFactory with functional composition
         // No need to register it in DI since it's created per-connection
 
         // Register pipeline services
         _ = services.AddSingleton<IDisplayService>(provider => new DisplayService(false));
-        _ = services.AddScoped<Gp4Net.Tool.Pipeline.ICliExecutionContext>(provider => 
+        _ = services.AddScoped<ICliExecutionContext>(provider =>
         {
-            var display = provider.GetRequiredService<IDisplayService>();
-            var cardService = provider.GetRequiredService<Tool.Services.ICardService>();
+            IDisplayService display = provider.GetRequiredService<IDisplayService>();
+            ISmartCardService smartCardService = provider.GetRequiredService<ISmartCardService>();
             var domainServiceFactory = provider.GetRequiredService<IDomainServiceFactory>();
-            var keysetResolver = provider.GetRequiredService<IKeysetResolver>();
-                
-            var logger = provider.GetService<ILogger<Pipeline.CliContext>>();
-            return new Pipeline.CliContext(display, cardService, domainServiceFactory, keysetResolver, logger);
+            IKeysetResolver keysetResolver = provider.GetRequiredService<IKeysetResolver>();
+
+            ILogger<CliContext> logger = provider.GetService<ILogger<CliContext>>();
+            return new CliContext(display, smartCardService, domainServiceFactory, keysetResolver, logger);
         });
-            
+
         // Command pipeline is now implemented as pure function composition
 
         // Register new pipeline commands automatically
@@ -284,7 +268,7 @@ public class Program
 
         Logger.Debug("Services configured");
     }
-    
+
     /// <summary>
     /// Validates that all critical services are properly registered in the DI container.
     /// </summary>
@@ -292,24 +276,25 @@ public class Program
     /// <returns>Success if all services are registered, or an error message.</returns>
     private static CSharpFunctionalExtensions.Result<bool> ValidateServiceRegistrations(ServiceProvider provider)
     {
-        var criticalServices = new[]
-        {
+        Type[] criticalServices =
+        [
+
             // IGlobalPlatformService is created by DomainServiceFactory, not DI
-            typeof(Tool.Services.ICardService),
+            typeof(ISmartCardService),
             typeof(IKeysetResolver),
             typeof(ISecureChannelManager),
             typeof(IApduTransportFactory),
             typeof(ISecureChannelProtocolFactory),
             typeof(IDomainServiceFactory)
-        };
-        
-        var missingServices = new System.Collections.Generic.List<string>();
-        
-        foreach (var serviceType in criticalServices)
+        ];
+
+        List<string> missingServices = [];
+
+        foreach (Type serviceType in criticalServices)
         {
             try
             {
-                var service = provider.GetService(serviceType);
+                object service = provider.GetService(serviceType);
                 if (service == null)
                 {
                     missingServices.Add(serviceType.Name);
@@ -320,15 +305,15 @@ public class Program
                 missingServices.Add($"{serviceType.Name} (Error: {ex.Message})");
             }
         }
-        
+
         if (missingServices.Count > 0)
         {
-            var errorMessage = $"Missing critical service registrations: {string.Join(", ", missingServices)}. " +
-                              "Check Program.cs ConfigureServices method.";
+            string errorMessage = $"Missing critical service registrations: {string.Join(", ", missingServices)}. " +
+                                  "Check Program.cs ConfigureServices method.";
             Logger.Error(errorMessage);
             return CSharpFunctionalExtensions.Result.Failure<bool>(errorMessage);
         }
-        
+
         Logger.Debug("All critical services validated successfully");
         return CSharpFunctionalExtensions.Result.Success(true);
     }

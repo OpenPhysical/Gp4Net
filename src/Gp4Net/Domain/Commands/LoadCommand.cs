@@ -171,7 +171,7 @@ public class LoadCommand : IApduCommand
     /// </summary>
     private byte[] GetCommandData()
     {
-        var data = new List<byte>();
+        List<byte> data = [];
 
         if (IsFirstBlock)
         {
@@ -179,7 +179,7 @@ public class LoadCommand : IApduCommand
             data.Add(CapDataTag);
 
             // Encode length (up to 3 bytes for length field)
-            var totalSize = TotalCapSize!.Value;
+            uint totalSize = TotalCapSize!.Value;
             switch (totalSize)
             {
                 case <= 0x7F:
@@ -261,8 +261,8 @@ public class LoadCommand : IApduCommand
         }
 
         uint? totalCapSize = blockNumber == 0 ? (uint)data.Length : null;
-            
-        var command = new LoadCommand(blockNumber, data, isLastBlock, totalCapSize);
+
+        LoadCommand command = new LoadCommand(blockNumber, data, isLastBlock, totalCapSize);
         return Result.Success<LoadCommand, SmartCardError>(command);
     }
 
@@ -296,30 +296,30 @@ public class LoadCommand : IApduCommand
                     "Block size must be between 1 and 255 bytes."));
         }
 
-        var commands = new List<LoadCommand>();
-        var totalSize = (uint)capFileData.Length;
-        var offset = 0;
+        List<LoadCommand> commands = [];
+        uint totalSize = (uint)capFileData.Length;
+        int offset = 0;
         byte blockNumber = 0;
 
         while (offset < capFileData.Length)
         {
-            var remainingBytes = capFileData.Length - offset;
-            var effectiveBlockSize = maxBlockSize;
-                
+            int remainingBytes = capFileData.Length - offset;
+            int effectiveBlockSize = maxBlockSize;
+
             // For first block, account for TLV header overhead
             if (blockNumber == 0)
             {
-                var tlvHeaderSize = CalculateTlvHeaderSize(totalSize);
+                int tlvHeaderSize = CalculateTlvHeaderSize(totalSize);
                 effectiveBlockSize = Math.Max(1, maxBlockSize - tlvHeaderSize);
             }
-                
-            var blockSize = Math.Min(remainingBytes, effectiveBlockSize);
-            var blockData = new byte[blockSize];
+
+            int blockSize = Math.Min(remainingBytes, effectiveBlockSize);
+            byte[] blockData = new byte[blockSize];
 
             Array.Copy(capFileData, offset, blockData, 0, blockSize);
 
-            var isFinalBlock = offset + blockSize >= capFileData.Length;
-            var totalCapSize = blockNumber == 0 ? totalSize : (uint?)null;
+            bool isFinalBlock = offset + blockSize >= capFileData.Length;
+            uint? totalCapSize = blockNumber == 0 ? totalSize : (uint?)null;
 
             commands.Add(new LoadCommand(blockNumber, blockData, isFinalBlock, totalCapSize));
 
@@ -338,7 +338,7 @@ public class LoadCommand : IApduCommand
     private static int CalculateTlvHeaderSize(uint totalSize)
     {
         // C4 tag (1 byte) + length encoding
-        var tagSize = 1;
+        int tagSize = 1;
 
         switch (totalSize)
         {
@@ -374,7 +374,7 @@ public class LoadCommand : IApduCommand
 
         try
         {
-            var binaryData = capFile.ToBinaryFormat();
+            byte[] binaryData = capFile.ToBinaryFormat();
             return CreateFromCapFile(binaryData, maxBlockSize);
         }
         catch (Exception ex)
@@ -390,7 +390,7 @@ public class LoadCommand : IApduCommand
     /// <returns>The APDU command bytes.</returns>
     public byte[] ToApdu()
     {
-        var data = new List<byte>();
+        List<byte> data = [];
 
         if (IsFirstBlock)
         {
@@ -398,7 +398,7 @@ public class LoadCommand : IApduCommand
             data.Add(CapDataTag);
 
             // Encode length (up to 3 bytes for length field)
-            var totalSize = TotalCapSize!.Value;
+            uint totalSize = TotalCapSize!.Value;
             switch (totalSize)
             {
                 case <= 0x7F:
@@ -433,14 +433,14 @@ public class LoadCommand : IApduCommand
         data.AddRange(Data);
 
         // Build APDU
-        var apdu = new List<byte>
-        {
+        List<byte> apdu =
+        [
             Cla,
             Ins,
             (byte)Type,
             BlockNumber,
-            (byte)data.Count, // Lc
-        };
+            (byte)data.Count // Lc
+        ];
 
         apdu.AddRange(data);
         apdu.Add(0x00); // Le
@@ -555,13 +555,13 @@ public static class CapFileLoader
         try
         {
             // Try to parse the CAP file structure
-            var capFileResult = CapFile.CapFileStructure.Parse(capFileData);
+            Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(capFileData);
             if (capFileResult.IsFailure)
             {
                 return false;
             }
-            
-            var capFile = capFileResult.Value;
+
+            CapFileStructure capFile = capFileResult.Value;
 
             // Basic validation checks
             return capFile.PackageAid.Length > 0

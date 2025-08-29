@@ -1,8 +1,11 @@
 using System;
 using System.ComponentModel;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Tool.Services;
+using Gp4Net.Services;
+using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -13,75 +16,80 @@ namespace Gp4Net.Tool.Commands.Applet;
 /// Command to manage application lifecycle states.
 /// </summary>
 [PublicAPI]
-public class LifecycleCommand : BaseCommand<LifecycleCommand.Settings>
+public class LifecycleCommand : IPipelineCommand<LifecycleCommand.Settings>
 {
-    /// <summary>
-    /// Initializes a new instance of the LifecycleCommand class.
-    /// </summary>
-    public LifecycleCommand(
-        ICardService cardService,
-        IDomainServiceFactory domainServiceFactory,
-        IKeysetResolver keysetResolver
-    )
-        : base(cardService, domainServiceFactory, keysetResolver) { }
-
     /// <summary>
     /// Executes the lifecycle command to change an application's lifecycle state.
     /// </summary>
-    /// <param name="context">The command context.</param>
+    /// <param name="context">The CLI execution context.</param>
     /// <param name="settings">The command settings.</param>
     /// <returns>0 if successful, 1 if failed.</returns>
-    protected override Task<int> ExecuteCommandAsync(CommandContext context, Settings settings)
+    public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
     {
-        if (!EnsureCardConnection(settings))
+        return await context.ExecuteAsync(async ctx =>
         {
-            return Task.FromResult(1);
-        }
-
-        try
-        {
-            var aid = Convert.FromHexString(settings.Aid);
-
-            AnsiConsole.MarkupLine($"[cyan]Setting lifecycle state for: {settings.Aid}[/]");
-            AnsiConsole.MarkupLine($"[cyan]New state: {settings.State}[/]");
-
-            if (!settings.NoCardInfo)
-            {
-                DisplayCardInfo();
-            }
-
-            if (!settings.Force)
-            {
-                if (
-                    !AnsiConsole.Confirm(
-                        $"Set lifecycle state of {settings.Aid} to {settings.State}?"
-                    )
-                )
+            Result<bool, SmartCardError> result = await ValidateSettings(settings)
+                .Bind(_ => 
                 {
-                    AnsiConsole.MarkupLine("[yellow]Operation cancelled[/]");
-                    return Task.FromResult(0);
-                }
-            }
+                    ctx.Display.Info($"Setting lifecycle state for: {settings.Aid}");
+                    ctx.Display.Info($"New state: {settings.State}");
+                    return Result.Success<bool, SmartCardError>(true);
+                })
+                .Bind(_ => ConfirmOperation(ctx, settings))
+                .Bind(_ => PerformLifecycleChange(ctx, settings));
+            
+            return result.Match(
+                success => 0,
+                error =>
+                {
+                    ctx.Display.Error($"Lifecycle change failed: {error.Message}");
+                    return 1;
+                });
+        });
+    }
 
-            // TODO: Implement SetLifecycleState in functional IGlobalPlatformService
-            AnsiConsole.MarkupLine("[yellow]Lifecycle state changes not yet implemented in functional architecture[/]");
-            return Task.FromResult(1);
-        }
-        catch (Exception ex)
+    private static Result<bool, SmartCardError> ValidateSettings(Settings settings)
+    {
+        return Result.Try(() => Convert.FromHexString(settings.Aid), 
+                ex => $"Invalid AID format: {ex.Message}")
+            .MapError(SmartCardError.InvalidArgument)
+            .Map(_ => true);
+    }
+
+    private static Result<bool, SmartCardError> ConfirmOperation(ICliExecutionContext context, Settings settings)
+    {
+        if (settings.Force)
         {
-            AnsiConsole.MarkupLine($"[red]Error setting lifecycle state: {ex.Message}[/]");
-            if (settings.Verbose)
-            {
-                AnsiConsole.WriteException(ex);
-            }
-            return Task.FromResult(1);
+            return Result.Success<bool, SmartCardError>(true);
         }
+
+        bool confirmed = AnsiConsole.Confirm($"Set lifecycle state of {settings.Aid} to {settings.State}?");
+        return confirmed
+            ? Result.Success<bool, SmartCardError>(true)
+            : Result.Failure<bool, SmartCardError>(SmartCardError.OperationCancelled("User cancelled operation"));
+    }
+
+    private static async Task<Result<bool, SmartCardError>> PerformLifecycleChange(ICliExecutionContext context, Settings settings)
+    {
+        byte[] aid = Convert.FromHexString(settings.Aid);
+        context.Display.Info("Executing lifecycle state change...");
+        
+        IGlobalPlatformService gpService = context.GetGlobalPlatformService();
+        Result<bool, SmartCardError> result = await gpService.SetLifecycleStateAsync(aid, settings.State);
+        
+        return result.Match(
+            success =>
+            {
+                context.Display.Success($"Lifecycle state changed successfully to {settings.State}");
+                return Result.Success<bool, SmartCardError>(true);
+            },
+            error => Result.Failure<bool, SmartCardError>(error));
     }
 
     /// <summary>
     /// Settings for the lifecycle command.
     /// </summary>
-    public class Settings : BaseCommandSettings
+    public class Settings : CommandSettings
     {
         /// <summary>
         /// Gets or sets the AID of the application.
@@ -124,7 +132,7 @@ public class LifecycleCommand : BaseCommand<LifecycleCommand.Settings>
                 return ValidationResult.Error("AID must be a valid hex string");
             }
 
-            if (!Enum.IsDefined(typeof(Gp4Net.Domain.LifecycleState), State))
+            if (!Enum.IsDefined(typeof(LifecycleState), State))
             {
                 return ValidationResult.Error("Invalid lifecycle state");
             }

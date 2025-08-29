@@ -1,5 +1,6 @@
 using System;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
@@ -13,14 +14,14 @@ public class StoreDataCommandTests
     public void Create_WithValidData_CreatesCommand()
     {
         // Arrange
-        var data = new byte[] { 0x01, 0x02, 0x03 };
+        byte[] data = [0x01, 0x02, 0x03];
 
         // Act
-        var result = StoreDataCommand.Create(data);
+        Result<StoreDataCommand, SmartCardError> result = StoreDataCommand.Create(data);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var command = result.Value;
+        StoreDataCommand? command = result.Value;
         _ = command.StructureFormat.Should().Be(StoreDataCommand.DataStructureFormat.Plain);
         _ = command.Block.Should().Be(StoreDataCommand.BlockFormat.FirstOrOnly);
         _ = command.StoreData.Should().BeEquivalentTo(data);
@@ -30,7 +31,7 @@ public class StoreDataCommandTests
     public void Create_WithNullData_ReturnsError()
     {
         // Act
-        var result = StoreDataCommand.Create(null!);
+        Result<StoreDataCommand, SmartCardError> result = StoreDataCommand.Create(null!);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -41,13 +42,13 @@ public class StoreDataCommandTests
     public void ToApdu_WithPlainData_ReturnsCorrectApdu()
     {
         // Arrange
-        var data = new byte[] { 0x01, 0x02, 0x03 };
-        var result = StoreDataCommand.Create(data);
+        byte[] data = [0x01, 0x02, 0x03];
+        Result<StoreDataCommand, SmartCardError> result = StoreDataCommand.Create(data);
         _ = result.IsSuccess.Should().BeTrue();
-        var command = result.Value;
+        StoreDataCommand? command = result.Value;
 
         // Act
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         _ = apdu.Should().BeEquivalentTo(new byte[] { 0x80, 0xE2, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03 });
@@ -57,12 +58,12 @@ public class StoreDataCommandTests
     public void ToApdu_WithDgiFormat_ReturnsCorrectApdu()
     {
         // Arrange - Use CreateDefaultKeyVersionCommand which creates DGI format
-        var result = StoreDataCommand.CreateDefaultKeyVersionCommand(0x01);
+        Result<StoreDataCommand, SmartCardError> result = StoreDataCommand.CreateDefaultKeyVersionCommand(0x01);
         _ = result.IsSuccess.Should().BeTrue();
-        var command = result.Value;
+        StoreDataCommand? command = result.Value;
 
         // Act
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         _ = apdu[0].Should().Be(0x80); // CLA
@@ -81,15 +82,15 @@ public class StoreDataCommandTests
         byte keyVersion = 0x01;
 
         // Act
-        var result = StoreDataCommand.CreateDefaultKeyVersionCommand(keyVersion);
+        Result<StoreDataCommand, SmartCardError> result = StoreDataCommand.CreateDefaultKeyVersionCommand(keyVersion);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var command = result.Value;
+        StoreDataCommand? command = result.Value;
         _ = command.StructureFormat.Should().Be(StoreDataCommand.DataStructureFormat.Dgi);
         _ = command.Block.Should().Be(StoreDataCommand.BlockFormat.FirstOrOnly);
 
-        var data = command.StoreData;
+        byte[]? data = command.StoreData;
         _ = data.Should().BeEquivalentTo(new byte[] { 0x7F, 0x0D, 0x01, 0x01 });
     }
 
@@ -97,14 +98,14 @@ public class StoreDataCommandTests
     public void IApduCommand_Properties_ReturnCorrectValues()
     {
         // Arrange
-        var result = StoreDataCommand.CreateWithFormat(
+        Result<StoreDataCommand, SmartCardError> result = StoreDataCommand.CreateWithFormat(
             StoreDataCommand.DataStructureFormat.BerTlv,
             StoreDataCommand.BlockFormat.MoreBlocks,
             [0x01]
         );
         _ = result.IsSuccess.Should().BeTrue();
-        var command = result.Value;
-        var iapdu = (IApduCommand)command;
+        StoreDataCommand? command = result.Value;
+        IApduCommand? iapdu = (IApduCommand)command;
 
         // Assert
         _ = iapdu.Cla.Should().Be(0x80);
@@ -121,12 +122,12 @@ public class StoreDataCommandTests
     public void ToString_ReturnsStoreData()
     {
         // Arrange
-        var result = StoreDataCommand.Create([0x01]);
+        Result<StoreDataCommand, SmartCardError> result = StoreDataCommand.Create([0x01]);
         _ = result.IsSuccess.Should().BeTrue();
-        var command = result.Value;
+        StoreDataCommand? command = result.Value;
 
         // Act
-        var str = command.ToString();
+        string? str = command.ToString();
 
         // Assert
         _ = str.Should().BeEquivalentTo("STORE DATA");
@@ -136,10 +137,10 @@ public class StoreDataCommandTests
     public void StoreDataResponse_Parse_ReturnsSuccessfulResponse()
     {
         // Arrange
-        var responseData = Array.Empty<byte>();
+        byte[] responseData = [];
 
         // Act
-        var response = StoreDataResponse.Parse(responseData);
+        StoreDataResponse? response = StoreDataResponse.Parse(responseData);
 
         // Assert
         _ = response.Success.Should().BeTrue();

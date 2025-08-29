@@ -16,11 +16,11 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithNullData_ReturnsFailure()
     {
-        var result = SelectResponse.Parse(null);
+        Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(null);
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<InvalidDataError>();
-        var error = (InvalidDataError)result.Error;
+        InvalidDataError? error = (InvalidDataError)result.Error;
         _ = error.Field.Should().Be("Response");
         _ = error.Reason.Should().Be("cannot be null");
     }
@@ -28,12 +28,12 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithEmptyData_ReturnsSuccessWithNullFci()
     {
-        var result = SelectResponse.Parse([]);
+        Result<SelectResponse, SmartCardError> result = SelectResponse.Parse([]);
 
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            var response = result.Value;
+            SelectResponse? response = result.Value;
             _ = response.RawData.Should().BeEmpty();
             _ = response.Fci.HasValue.Should().BeFalse();
         }
@@ -42,14 +42,14 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithNonFciData_ReturnsSuccessWithNullFci()
     {
-        var nonFciData = Convert.FromHexString("9F7F2A47900000");
+        byte[] nonFciData = Convert.FromHexString("9F7F2A47900000");
 
-        var result = SelectResponse.Parse(nonFciData);
+        Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(nonFciData);
 
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            var response = result.Value;
+            SelectResponse? response = result.Value;
             _ = response.RawData.Should().BeEquivalentTo(nonFciData);
             _ = response.Fci.HasValue.Should().BeFalse();
         }
@@ -58,17 +58,17 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithSimpleFci_ParsesCorrectly()
     {
-        var fciData = Convert.FromHexString("6F108408A000000151000000A5049F6501FF");
+        byte[] fciData = Convert.FromHexString("6F108408A000000151000000A5049F6501FF");
 
-        var result = SelectResponse.Parse(fciData);
+        Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(fciData);
 
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            var response = result.Value;
-            var aid = response.Fci.Map(fci => fci.ApplicationAid).GetValueOrDefault(Array.Empty<byte>());
+            SelectResponse? response = result.Value;
+            byte[]? aid = response.Fci.Map(fci => fci.ApplicationAid).GetValueOrDefault([]);
             _ = aid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
-            
+
             response.Fci.Match(
                 fci => fci.MaxCommandDataLength.Match(
                     value => value.Should().Be(255),
@@ -80,7 +80,7 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithComplexFci_ParsesAllFields()
     {
-        var tlvBuilder = new TlvTestBuilder();
+        TlvTestBuilder tlvBuilder = new TlvTestBuilder();
         tlvBuilder.Add(0x6F, builder =>
         {
             builder.Add(0x84, Convert.FromHexString("A0000000030000")); // AID
@@ -97,27 +97,28 @@ public class SelectResponseTests
             builder.Add(0xBF0C, [0xDE, 0xF0]); // Discretionary Data
         });
 
-        var fciData = tlvBuilder.Build();
-        var result = SelectResponse.Parse(fciData);
+        byte[] fciData = tlvBuilder.Build();
+        Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(fciData);
 
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            var response = result.Value;
+            SelectResponse? response = result.Value;
             _ = response.Fci.HasValue.Should().BeTrue();
-            response.Fci.Match(
-                fci => {
+            _ = response.Fci.Match(
+                fci =>
+                {
                     _ = fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A0000000030000"));
-                    fci.ApplicationLabel.Match(
+                    _ = fci.ApplicationLabel.Match(
                         label => { _ = label.Should().Be("ISD"); return true; },
                         () => { _ = false.Should().BeTrue("ApplicationLabel should have a value"); return false; });
-                    fci.ApplicationPriorityIndicator.Match(
+                    _ = fci.ApplicationPriorityIndicator.Match(
                         value => { _ = value.Should().Be(0x01); return true; },
                         () => { _ = false.Should().BeTrue("ApplicationPriorityIndicator should have a value"); return false; });
-                    fci.MaxCommandDataLength.Match(
+                    _ = fci.MaxCommandDataLength.Match(
                         value => { _ = value.Should().Be(256); return true; },
                         () => { _ = false.Should().BeTrue("MaxCommandDataLength should have a value"); return false; });
-                    fci.MaxResponseDataLength.Match(
+                    _ = fci.MaxResponseDataLength.Match(
                         value => { _ = value.Should().Be(512); return true; },
                         () => { _ = false.Should().BeTrue("MaxResponseDataLength should have a value"); return false; });
                     _ = fci.IssuerIdentificationNumber.Should().BeEquivalentTo(new byte[] { 0x12, 0x34 });
@@ -133,7 +134,7 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithSingleByteMaxLengths_ParsesCorrectly()
     {
-        var tlvBuilder = new TlvTestBuilder();
+        TlvTestBuilder tlvBuilder = new TlvTestBuilder();
         tlvBuilder.Add(0x6F, builder =>
         {
             builder.Add(0x84, Convert.FromHexString("A000000151000000"));
@@ -144,20 +145,21 @@ public class SelectResponseTests
             });
         });
 
-        var fciData = tlvBuilder.Build();
-        var result = SelectResponse.Parse(fciData);
+        byte[] fciData = tlvBuilder.Build();
+        Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(fciData);
 
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            var response = result.Value;
+            SelectResponse? response = result.Value;
             _ = response.Fci.HasValue.Should().BeTrue();
-            response.Fci.Match(
-                fci => {
-                    fci.MaxCommandDataLength.Match(
+            _ = response.Fci.Match(
+                fci =>
+                {
+                    _ = fci.MaxCommandDataLength.Match(
                         value => { _ = value.Should().Be(255); return true; },
                         () => { _ = false.Should().BeTrue("MaxCommandDataLength should have a value"); return false; });
-                    fci.MaxResponseDataLength.Match(
+                    _ = fci.MaxResponseDataLength.Match(
                         value => { _ = value.Should().Be(128); return true; },
                         () => { _ = false.Should().BeTrue("MaxResponseDataLength should have a value"); return false; });
                     return true;
@@ -169,24 +171,25 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithEmptyApplicationLabel_ParsesCorrectly()
     {
-        var tlvBuilder = new TlvTestBuilder();
+        TlvTestBuilder tlvBuilder = new TlvTestBuilder();
         tlvBuilder.Add(0x6F, builder =>
         {
             builder.Add(0x84, Convert.FromHexString("A000000151000000"));
             builder.Add(0x50, []); // Empty label
         });
 
-        var fciData = tlvBuilder.Build();
-        var result = SelectResponse.Parse(fciData);
+        byte[] fciData = tlvBuilder.Build();
+        Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(fciData);
 
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            var response = result.Value;
+            SelectResponse? response = result.Value;
             _ = response.Fci.HasValue.Should().BeTrue();
-            response.Fci.Match(
-                fci => {
-                    fci.ApplicationLabel.Match(
+            _ = response.Fci.Match(
+                fci =>
+                {
+                    _ = fci.ApplicationLabel.Match(
                         label => { _ = label.Should().Be(""); return true; },
                         () => { _ = false.Should().BeTrue("ApplicationLabel should have a value"); return false; });
                     return true;
@@ -198,23 +201,24 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithEmptyPriorityIndicator_HandlesGracefully()
     {
-        var tlvBuilder = new TlvTestBuilder();
+        TlvTestBuilder tlvBuilder = new TlvTestBuilder();
         tlvBuilder.Add(0x6F, builder =>
         {
             builder.Add(0x84, Convert.FromHexString("A000000151000000"));
             builder.Add(0x87, []); // Empty priority
         });
 
-        var fciData = tlvBuilder.Build();
-        var result = SelectResponse.Parse(fciData);
+        byte[] fciData = tlvBuilder.Build();
+        Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(fciData);
 
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            var response = result.Value;
+            SelectResponse? response = result.Value;
             _ = response.Fci.HasValue.Should().BeTrue();
-            response.Fci.Match(
-                fci => {
+            _ = response.Fci.Match(
+                fci =>
+                {
                     _ = fci.ApplicationPriorityIndicator.HasValue.Should().BeFalse();
                     return true;
                 },
@@ -225,23 +229,24 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithPdolTag_IgnoresItGracefully()
     {
-        var tlvBuilder = new TlvTestBuilder();
+        TlvTestBuilder tlvBuilder = new TlvTestBuilder();
         tlvBuilder.Add(0x6F, builder =>
         {
             builder.Add(0x84, Convert.FromHexString("A000000151000000"));
             builder.Add(0x9F38, [0x9F, 0x66, 0x02]); // PDOL
         });
 
-        var fciData = tlvBuilder.Build();
-        var result = SelectResponse.Parse(fciData);
+        byte[] fciData = tlvBuilder.Build();
+        Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(fciData);
 
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            var response = result.Value;
+            SelectResponse? response = result.Value;
             _ = response.Fci.HasValue.Should().BeTrue();
-            response.Fci.Match(
-                fci => {
+            _ = response.Fci.Match(
+                fci =>
+                {
                     _ = fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
                     return true;
                 },
@@ -253,14 +258,14 @@ public class SelectResponseTests
     public void Parse_WithMalformedFci_ReturnsSuccessWithNullFci()
     {
         // Create intentionally malformed FCI data
-        var malformedData = new byte[] { 0x6F, 0x10, 0x84, 0xFF }; // Length mismatch
+        byte[] malformedData = [0x6F, 0x10, 0x84, 0xFF]; // Length mismatch
 
-        var result = SelectResponse.Parse(malformedData);
+        Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(malformedData);
 
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            var response = result.Value;
+            SelectResponse? response = result.Value;
             _ = response.Fci.HasValue.Should().BeFalse();
             _ = response.RawData.Should().BeEquivalentTo(malformedData);
         }
@@ -269,14 +274,14 @@ public class SelectResponseTests
     [Test]
     public void ParseWithFci_CallsParseMethod()
     {
-        var fciData = Convert.FromHexString("6F108408A000000151000000A5049F6501FF");
+        byte[] fciData = Convert.FromHexString("6F108408A000000151000000A5049F6501FF");
 
-        var result = SelectResponse.ParseWithFci(fciData);
+        Result<SelectResponse, SmartCardError> result = SelectResponse.ParseWithFci(fciData);
 
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            var response = result.Value;
+            SelectResponse? response = result.Value;
             _ = response.Fci.HasValue.Should().BeTrue();
         }
     }
@@ -284,8 +289,8 @@ public class SelectResponseTests
     [Test]
     public void Constructor_ClonesRawData()
     {
-        var originalData = new byte[] { 0x01, 0x02, 0x03 };
-        var response = new SelectResponse(originalData);
+        byte[] originalData = [0x01, 0x02, 0x03];
+        SelectResponse response = new SelectResponse(originalData);
 
         originalData[0] = 0xFF;
 
@@ -295,24 +300,24 @@ public class SelectResponseTests
     [Test]
     public void Constructor_WithFci_StoresBoth()
     {
-        var rawData = new byte[] { 0x01, 0x02, 0x03 };
-        var fci = new FileControlInformation(
+        byte[] rawData = [0x01, 0x02, 0x03];
+        FileControlInformation fci = new FileControlInformation(
             applicationAid: Convert.FromHexString("A000000151000000"),
             applicationLabel: string.Empty,
             applicationPriorityIndicator: Maybe<byte>.None,
             maxCommandDataLength: Maybe<ushort>.None,
             maxResponseDataLength: Maybe<ushort>.None,
-            issuerIdentificationNumber: Array.Empty<byte>(),
-            cardImageNumber: Array.Empty<byte>(),
-            cardData: Array.Empty<byte>(),
-            discretionaryData: Array.Empty<byte>()
+            issuerIdentificationNumber: [],
+            cardImageNumber: [],
+            cardData: [],
+            discretionaryData: []
         );
 
-        var response = new SelectResponse(rawData, fci);
+        SelectResponse response = new SelectResponse(rawData, fci);
 
         _ = response.RawData.Should().BeEquivalentTo(rawData);
         _ = response.Fci.HasValue.Should().BeTrue();
-        var actualFci = response.Fci.GetValueOrDefault();
+        FileControlInformation? actualFci = response.Fci.GetValueOrDefault();
         _ = actualFci.Should().BeEquivalentTo(fci);
     }
 }
@@ -323,17 +328,17 @@ public class FileControlInformationTests
     [Test]
     public void Constructor_WithAllParameters_StoresCorrectly()
     {
-        var aid = Convert.FromHexString("A000000151000000");
-        var label = "Test App";
-        var priority = (byte)0x01;
-        var maxCommand = (ushort)255;
-        var maxResponse = (ushort)256;
-        var issuerNumber = new byte[] { 0x12, 0x34 };
-        var cardImage = new byte[] { 0x56, 0x78 };
-        var cardData = new byte[] { 0x9A, 0xBC };
-        var discretionaryData = new byte[] { 0xDE, 0xF0 };
+        byte[] aid = Convert.FromHexString("A000000151000000");
+        string label = "Test App";
+        byte priority = (byte)0x01;
+        ushort maxCommand = (ushort)255;
+        ushort maxResponse = (ushort)256;
+        byte[] issuerNumber = [0x12, 0x34];
+        byte[] cardImage = [0x56, 0x78];
+        byte[] cardData = [0x9A, 0xBC];
+        byte[] discretionaryData = [0xDE, 0xF0];
 
-        var fci = new FileControlInformation(
+        FileControlInformation fci = new FileControlInformation(
             applicationAid: aid,
             applicationLabel: label,
             applicationPriorityIndicator: priority,
@@ -359,16 +364,16 @@ public class FileControlInformationTests
     [Test]
     public void Constructor_WithNullParameters_HandlesCorrectly()
     {
-        var fci = new FileControlInformation(
-            applicationAid: Array.Empty<byte>(),
+        FileControlInformation fci = new FileControlInformation(
+            applicationAid: [],
             applicationLabel: null!,
             applicationPriorityIndicator: Maybe<byte>.None,
             maxCommandDataLength: Maybe<ushort>.None,
             maxResponseDataLength: Maybe<ushort>.None,
-            issuerIdentificationNumber: Array.Empty<byte>(),
-            cardImageNumber: Array.Empty<byte>(),
-            cardData: Array.Empty<byte>(),
-            discretionaryData: Array.Empty<byte>()
+            issuerIdentificationNumber: [],
+            cardImageNumber: [],
+            cardData: [],
+            discretionaryData: []
         );
 
         _ = fci.ApplicationAid.Should().BeEmpty();
@@ -385,13 +390,13 @@ public class FileControlInformationTests
     [Test]
     public void Constructor_ClonesArrays()
     {
-        var aid = Convert.FromHexString("A000000151000000");
-        var issuerNumber = new byte[] { 0x12, 0x34 };
-        var cardImage = new byte[] { 0x56, 0x78 };
-        var cardData = new byte[] { 0x9A, 0xBC };
-        var discretionaryData = new byte[] { 0xDE, 0xF0 };
+        byte[] aid = Convert.FromHexString("A000000151000000");
+        byte[] issuerNumber = [0x12, 0x34];
+        byte[] cardImage = [0x56, 0x78];
+        byte[] cardData = [0x9A, 0xBC];
+        byte[] discretionaryData = [0xDE, 0xF0];
 
-        var fci = new FileControlInformation(
+        FileControlInformation fci = new FileControlInformation(
             applicationAid: aid,
             applicationLabel: string.Empty,
             applicationPriorityIndicator: Maybe<byte>.None,
@@ -430,7 +435,7 @@ public class FileControlInformationTests
     [Test]
     public void Constructor_WithEmptyArrays_HandlesCorrectly()
     {
-        var fci = new FileControlInformation(
+        FileControlInformation fci = new FileControlInformation(
             applicationAid: [],
             applicationLabel: string.Empty,
             applicationPriorityIndicator: Maybe<byte>.None,

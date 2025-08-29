@@ -44,16 +44,16 @@ public class KeyInformationTemplate
             );
         }
 
-        var template = new KeyInformationTemplate(data);
+        KeyInformationTemplate template = new KeyInformationTemplate(data);
 
         // Check if data starts with E0 tag and extract the content
-        var contentToParse = data;
+        byte[] contentToParse = data;
         if (data.Length >= 2 && data[0] == 0xE0)
         {
             // This is an E0 tag, extract its content
-            var offset = 1;
-            var length = 0;
-                
+            int offset = 1;
+            int length = 0;
+
             if ((data[1] & 0x80) == 0)
             {
                 // Short form length
@@ -63,17 +63,17 @@ public class KeyInformationTemplate
             else
             {
                 // Long form length
-                var lenLength = data[1] & 0x7F;
+                int lenLength = data[1] & 0x7F;
                 if (lenLength is > 0 and <= 4 && 2 + lenLength <= data.Length)
                 {
                     offset = 2;
-                    for (var i = 0; i < lenLength; i++)
+                    for (int i = 0; i < lenLength; i++)
                     {
                         length = (length << 8) | data[offset++];
                     }
                 }
             }
-                
+
             if (length > 0 && offset + length <= data.Length)
             {
                 contentToParse = new byte[length];
@@ -82,11 +82,11 @@ public class KeyInformationTemplate
         }
 
         // Parse the content for C0 tags
-        var elements = TlvParser.ParseAll(contentToParse).ToList();
-            
-        foreach (var element in elements)
+        List<TlvObject> elements = TlvParser.ParseAll(contentToParse).ToList();
+
+        foreach (TlvObject element in elements)
         {
-            var tagNumber = element.GetTagNumber();
+            Result<uint, SmartCardError> tagNumber = element.GetTagNumber();
             if (tagNumber.IsSuccess && tagNumber.Value == 0xC0) // Key Information Data
             {
                 template.ParseKeyInformationData(element.Value);
@@ -103,13 +103,13 @@ public class KeyInformationTemplate
             return;
         }
 
-        var keyEntry = new KeyEntry { KeyId = data[0], KeyVersion = data[1] };
+        KeyEntry keyEntry = new KeyEntry { KeyId = data[0], KeyVersion = data[1] };
 
         // Parse key types starting from byte 2
         // The format is: ID, Version, KeyType1, KeyType2, KeyType3, ...
-        for (var i = 2; i < data.Length; i++)
+        for (int i = 2; i < data.Length; i++)
         {
-            var keyType = ParseKeyType(data[i]);
+            KeyType keyType = ParseKeyType(data[i]);
             if (keyType != KeyType.Unknown)
             {
                 keyEntry.KeyTypes.Add(keyType);
@@ -147,10 +147,10 @@ public class KeyInformationTemplate
     /// </summary>
     public override string ToString()
     {
-        var sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         _ = sb.AppendLine("Key Information Template:");
 
-        foreach (var key in Keys)
+        foreach (KeyEntry key in Keys)
         {
             _ = sb.AppendLine(key.ToString());
         }
@@ -219,10 +219,10 @@ public class KeyEntry
     /// </summary>
     public override string ToString()
     {
-        var keyTypeStr = PrimaryKeyType.ToFriendlyString();
-        var lengthStr = KeyLength > 0 ? $"length: {KeyLength / 8} ({keyTypeStr})" : keyTypeStr;
+        string keyTypeStr = PrimaryKeyType.ToFriendlyString();
+        string lengthStr = KeyLength > 0 ? $"length: {KeyLength / 8} ({keyTypeStr})" : keyTypeStr;
 
-        return $"Version: {KeyVersion} (0x{KeyVersion:X2}) ID: {KeyId} (0x{KeyId:X2}) type: {keyTypeStr, -12} {lengthStr}";
+        return $"Version: {KeyVersion} (0x{KeyVersion:X2}) ID: {KeyId} (0x{KeyId:X2}) type: {keyTypeStr,-12} {lengthStr}";
     }
 }
 

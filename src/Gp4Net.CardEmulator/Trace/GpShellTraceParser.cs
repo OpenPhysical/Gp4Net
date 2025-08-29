@@ -1,4 +1,5 @@
 using System;
+using CSharpFunctionalExtensions;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -68,7 +69,7 @@ public class GpShellTraceParser
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"Trace file not found: {filePath}");
 
-        var content = File.ReadAllText(filePath);
+        string content = File.ReadAllText(filePath);
         return ParseString(content);
     }
 
@@ -80,15 +81,15 @@ public class GpShellTraceParser
         if (string.IsNullOrWhiteSpace(traceContent))
             throw new ArgumentException("Trace content cannot be empty", nameof(traceContent));
 
-        var trace = new ApduTrace { Metadata = { Source = "gpshell" } };
+        ApduTrace trace = new ApduTrace { Metadata = { Source = "gpshell" } };
 
-        var lines = traceContent.Split(
+        string[] lines = traceContent.Split(
             ['\r', '\n'],
             StringSplitOptions.RemoveEmptyEntries
         );
-        var state = new ParserState();
+        ParserState state = new ParserState();
 
-        foreach (var line in lines)
+        foreach (string line in lines)
         {
             ProcessLine(line, trace, state);
         }
@@ -97,7 +98,9 @@ public class GpShellTraceParser
         if (state.PendingCommand != null)
         {
             // Add command without response (might be last command in trace)
-            trace.AddExchange(new ApduExchange(state.PendingCommand, null));
+            var exchangeResult = ApduExchange.Create(state.PendingCommand, Maybe<ApduResponse>.None);
+            if (exchangeResult.IsSuccess)
+                trace.AddExchange(exchangeResult.Value);
         }
 
         return trace;
@@ -105,7 +108,7 @@ public class GpShellTraceParser
 
     private void ProcessLine(string line, ApduTrace trace, ParserState state)
     {
-        var trimmedLine = line.Trim();
+        string trimmedLine = line.Trim();
 
         // Skip empty lines and comments
         if (
@@ -118,7 +121,7 @@ public class GpShellTraceParser
         }
 
         // Check for ATR
-        var atrMatch = AtrPattern.Match(trimmedLine);
+        Match atrMatch = AtrPattern.Match(trimmedLine);
         if (atrMatch.Success)
         {
             trace.Atr = ParseHexString(atrMatch.Groups[1].Value);
@@ -126,7 +129,7 @@ public class GpShellTraceParser
         }
 
         // Check for reader name
-        var readerMatch = ReaderPattern.Match(trimmedLine);
+        Match readerMatch = ReaderPattern.Match(trimmedLine);
         if (readerMatch.Success)
         {
             trace.Metadata.ReaderName = readerMatch.Groups[1].Value.Trim();
@@ -134,12 +137,12 @@ public class GpShellTraceParser
         }
 
         // Check for command
-        var commandMatch = CommandPatterns.Match(trimmedLine);
+        Match commandMatch = CommandPatterns.Match(trimmedLine);
         if (commandMatch.Success)
         {
             // Find first non-empty group (skip group 0 which is full match)
             string? hexData = null;
-            for (var i = 1; i < commandMatch.Groups.Count; i++)
+            for (int i = 1; i < commandMatch.Groups.Count; i++)
             {
                 if (
                     commandMatch.Groups[i].Success
@@ -156,7 +159,9 @@ public class GpShellTraceParser
                 // If we have a pending command, add it without response
                 if (state.PendingCommand != null)
                 {
-                    trace.AddExchange(new ApduExchange(state.PendingCommand, null));
+                    var exchangeResult = ApduExchange.Create(state.PendingCommand, Maybe<ApduResponse>.None);
+                    if (exchangeResult.IsSuccess)
+                        trace.AddExchange(exchangeResult.Value);
                 }
 
                 state.PendingCommand = ParseHexString(hexData);
@@ -166,12 +171,12 @@ public class GpShellTraceParser
         }
 
         // Check for response
-        var responseMatch = ResponsePatterns.Match(trimmedLine);
+        Match responseMatch = ResponsePatterns.Match(trimmedLine);
         if (responseMatch.Success)
         {
             // Find first non-empty group
             string? hexData = null;
-            for (var i = 1; i < responseMatch.Groups.Count; i++)
+            for (int i = 1; i < responseMatch.Groups.Count; i++)
             {
                 if (
                     responseMatch.Groups[i].Success
@@ -191,26 +196,28 @@ public class GpShellTraceParser
                 if (hexData.Replace(" ", "").Length == 4)
                 {
                     // Just SW, no data
-                    var sw = Convert.ToUInt16(hexData.Replace(" ", ""), 16);
+                    ushort sw = Convert.ToUInt16(hexData.Replace(" ", ""), 16);
                     response = new ApduResponse([], sw);
                 }
                 else
                 {
                     // Full response with data
-                    var responseBytes = ParseHexString(hexData);
+                    byte[] responseBytes = ParseHexString(hexData);
                     response = ParseResponse(responseBytes);
                 }
 
                 // If we have a pending command, create exchange
                 if (state.PendingCommand != null)
                 {
-                    trace.AddExchange(new ApduExchange(state.PendingCommand, response));
+                    var exchangeResult = ApduExchange.Create(state.PendingCommand, Maybe<ApduResponse>.From(response));
+                    if (exchangeResult.IsSuccess)
+                        trace.AddExchange(exchangeResult.Value);
                     state.PendingCommand = null;
                 }
                 else if (state.PartialResponse != null)
                 {
                     // Handle multi-line responses
-                    var fullData = CombineArrays(state.PartialResponse, response.Data);
+                    byte[] fullData = CombineArrays(state.PartialResponse, response.Data);
                     response = new ApduResponse(fullData, response.StatusWord);
 
                     if (state.LastExchange != null)
@@ -227,7 +234,7 @@ public class GpShellTraceParser
         // Check if this might be continuation of previous data
         if (IsHexLine(trimmedLine))
         {
-            var hexData = ParseHexString(trimmedLine);
+            byte[] hexData = ParseHexString(trimmedLine);
 
             if (state.PendingCommand != null)
             {
@@ -253,8 +260,8 @@ public class GpShellTraceParser
             throw new FormatException($"Hex string has odd length: {hex}");
         }
 
-        var bytes = new byte[hex.Length / 2];
-        for (var i = 0; i < bytes.Length; i++)
+        byte[] bytes = new byte[hex.Length / 2];
+        for (int i = 0; i < bytes.Length; i++)
         {
             bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
         }
@@ -271,13 +278,13 @@ public class GpShellTraceParser
         }
 
         // Extract SW from last 2 bytes
-        var sw = (ushort)(
+        ushort sw = (ushort)(
             (responseBytes[responseBytes.Length - 2] << 8)
             | responseBytes[responseBytes.Length - 1]
         );
 
         // Extract data (everything except SW)
-        var data = new byte[responseBytes.Length - 2];
+        byte[] data = new byte[responseBytes.Length - 2];
         if (data.Length > 0)
         {
             Array.Copy(responseBytes, 0, data, 0, data.Length);
@@ -289,14 +296,14 @@ public class GpShellTraceParser
     private static bool IsHexLine(string line)
     {
         // Check if line contains only hex characters, spaces, and common separators
-        var cleaned = Regex.Replace(line, @"[\s\-:,]", "");
+        string cleaned = Regex.Replace(line, @"[\s\-:,]", "");
         return !string.IsNullOrEmpty(cleaned)
                && cleaned.All(c => "0123456789ABCDEFabcdef".Contains(c));
     }
 
     private static byte[] CombineArrays(byte[] first, byte[] second)
     {
-        var result = new byte[first.Length + second.Length];
+        byte[] result = new byte[first.Length + second.Length];
         Array.Copy(first, 0, result, 0, first.Length);
         Array.Copy(second, 0, result, first.Length, second.Length);
         return result;

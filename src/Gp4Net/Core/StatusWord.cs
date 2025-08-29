@@ -145,7 +145,7 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
     /// <returns>The status word with description if known.</returns>
     public string ToDescriptiveString()
     {
-        var description = _value switch
+        string description = _value switch
         {
             0x9000 => "Success",
             0x6982 => "Security Status Not Satisfied",

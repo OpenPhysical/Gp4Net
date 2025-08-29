@@ -14,14 +14,14 @@ public static class TestContextHelper
     public static string GetProjectRootDirectory()
     {
         // Navigate up from test assembly to find project root
-        var currentDir = Directory.GetCurrentDirectory();
-        var dir = new DirectoryInfo(currentDir);
-        
+        string currentDir = Directory.GetCurrentDirectory();
+        DirectoryInfo? dir = new DirectoryInfo(currentDir);
+
         while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Gp4Net.sln")))
         {
             dir = dir.Parent;
         }
-        
+
         return dir?.FullName ?? throw new InvalidOperationException("Could not find project root directory with Gp4Net.sln");
     }
 

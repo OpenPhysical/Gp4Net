@@ -12,7 +12,6 @@ namespace Gp4Net.Tool.Commands.Card;
 /// </summary>
 public static class ReaderTableBuilder
 {
-    #region Semantic Row Types
 
     /// <summary>
     /// Base type for all reader display rows, enabling type-safe UI composition.
@@ -43,8 +42,6 @@ public static class ReaderTableBuilder
     /// </summary>
     public record InfoRow(string Message, string Severity = "info") : ReaderRow;
 
-    #endregion
-
     /// <summary>
     /// Main entry point to build all reader information rows using functional composition.
     /// Returns semantic row types that can be rendered by any UI framework.
@@ -63,7 +60,7 @@ public static class ReaderTableBuilder
         }
 
         // Build reader data rows
-        for (var i = 0; i < readers.Count; i++)
+        for (int i = 0; i < readers.Count; i++)
         {
             yield return new ReaderDataRow(
                 Index: i.ToString(),
@@ -98,10 +95,7 @@ public static class ReaderTableBuilder
     /// </summary>
     public static string ToCsv(IReadOnlyList<string> readers)
     {
-        var lines = new List<string>
-        {
-            "Index,Name,Status"
-        };
+        List<string> lines = ["Index,Name,Status"];
 
         lines.AddRange(readers.Select((reader, index) =>
             $"{index},\"{reader}\",Available"

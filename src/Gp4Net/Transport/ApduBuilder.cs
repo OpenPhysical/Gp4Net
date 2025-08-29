@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
-using Gp4Net.Core;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Transport;
@@ -27,15 +26,15 @@ public static class ApduBuilder
             return completeCommand.GetCompleteApdu();
         }
 
-        var apduBytes = new List<byte> { command.Cla, command.Ins, command.P1, command.P2 };
+        List<byte> apduBytes = [command.Cla, command.Ins, command.P1, command.P2];
 
-        var hasData = command.Data.Length > 0;
-        var hasExpectedLength = command.ExpectedResponseLength.HasValue;
+        bool hasData = command.Data.Length > 0;
+        bool hasExpectedLength = command.ExpectedResponseLength.HasValue;
 
         if (hasData)
         {
             // Security check: Validate data length against APDU limits
-            var dataLength = command.Data.Length;
+            int dataLength = command.Data.Length;
             if (dataLength > ApduConstants.MaxApduDataLength)
             {
                 throw new ArgumentException(
@@ -72,15 +71,15 @@ public static class ApduBuilder
                 // Short length format
                 apduBytes.Add((byte)dataLength);
             }
-            
+
             // Add data
             apduBytes.AddRange(command.Data);
         }
 
         if (hasExpectedLength)
         {
-            var expectedLength = command.ExpectedResponseLength.Value;
-            
+            int expectedLength = command.ExpectedResponseLength.Value;
+
             // Security check: Validate expected response length
             if (expectedLength > ApduConstants.MaxExtendedLength)
             {
@@ -88,7 +87,7 @@ public static class ApduBuilder
                     $"Expected response length ({expectedLength}) exceeds maximum ({ApduConstants.MaxExtendedLength})",
                     nameof(command));
             }
-            
+
             if (command.IsExtendedLength && expectedLength > 255)
             {
                 // Security check: Ensure length fits in 16 bits for extended format
@@ -105,7 +104,7 @@ public static class ApduBuilder
                     // Need to add 00 prefix for extended length when no data
                     apduBytes.Add(0x00);
                 }
-                
+
                 apduBytes.Add((byte)(expectedLength >> 8));
                 apduBytes.Add((byte)(expectedLength & 0xFF));
             }
@@ -140,7 +139,7 @@ public static class ApduBuilder
     /// <returns>The APDU byte array.</returns>
     public static byte[] BuildApdu(byte cla, byte ins, byte p1, byte p2, byte[] data = null, Maybe<int> le = default)
     {
-        var command = new SimpleApduCommand(cla, ins, p1, p2, data, le);
+        SimpleApduCommand command = new SimpleApduCommand(cla, ins, p1, p2, data, le);
         return BuildApdu(command);
     }
 

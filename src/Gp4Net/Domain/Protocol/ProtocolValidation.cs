@@ -6,6 +6,7 @@
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
+using Gp4Net.Core.Functional;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Protocol;
@@ -61,12 +62,11 @@ public static class ProtocolValidation
     /// <param name="responseScpId">The SCP ID from the response.</param>
     /// <param name="expectedProtocol">The expected protocol version.</param>
     /// <returns>Success if valid, error if invalid.</returns>
-    public static Result ValidateProtocolVersion(byte responseScpId, byte expectedProtocol)
+    public static Result ValidateProtocolVersion(Maybe<ScpVersion> responseScpId, ScpVersion expectedProtocol)
     {
-        var actualProtocol = (byte)(responseScpId & ProtocolIdentifiers.ProtocolMask);
-        return actualProtocol == expectedProtocol
-            ? Result.Success()
-            : Result.Failure(SmartCardError.InvalidResponse($"Expected {expectedProtocol:X2} but received {actualProtocol:X2}").Message);
+        return responseScpId == expectedProtocol
+            ? Result.Failure($"Expected {expectedProtocol:X2} but received {responseScpId:X2}")
+            : Result.Success();
     }
 
     /// <summary>

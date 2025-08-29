@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Immutable;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
@@ -27,7 +28,7 @@ public class Scp02SecurityProcessorTests
             new byte[16], // S-RMAC
             new byte[16]  // S-DEK
         );
-        _macChainingValue = [..new byte[8]]; // SCP02 MAC chaining value (8 bytes)
+        _macChainingValue = [.. new byte[8]]; // SCP02 MAC chaining value (8 bytes)
     }
 
     [TearDown]
@@ -40,8 +41,8 @@ public class Scp02SecurityProcessorTests
     public void ApplyCommandSecurity_WithCMac_ReturnsSecuredCommand()
     {
         // Create a GET DATA command
-        var command = GetDataCommand.Create(0x9F7F).Value;
-        
+        GetDataCommand? command = GetDataCommand.Create(0x9F7F).Value;
+
         var result = Scp02SecurityProcessor.ApplyCommandSecurity(
             command,
             SecurityLevel.CMac,
@@ -67,8 +68,8 @@ public class Scp02SecurityProcessorTests
     [Test]
     public void ApplyCommandSecurity_WithCMacAndCEncryption_ReturnsEncryptedAndMacedCommand()
     {
-        var command = GetDataCommand.Create(0x9F7F).Value;
-        
+        GetDataCommand? command = GetDataCommand.Create(0x9F7F).Value;
+
         var result = Scp02SecurityProcessor.ApplyCommandSecurity(
             command,
             SecurityLevel.CMac | SecurityLevel.CDecryption,
@@ -91,8 +92,8 @@ public class Scp02SecurityProcessorTests
     [Test]
     public void ApplyResponseSecurity_WithRMac_VerifiesResponseMac()
     {
-        var response = new byte[] { 0x90, 0x00 };
-        
+        byte[] response = [0x90, 0x00];
+
         var result = Scp02SecurityProcessor.ApplyResponseSecurity(
             response,
             SecurityLevel.RMac,
@@ -112,24 +113,24 @@ public class Scp02SecurityProcessorTests
     [Test]
     public void ProcessInitializeUpdate_WithValidScp02Response_CreatesSecureChannelContext()
     {
-        var response = CreateTestScp02InitializeUpdateResponse();
-        var hostChallenge = new byte[8] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
-        var keySet = Scp02KeySet.Create(
+        InitializeUpdateResponse response = CreateTestScp02InitializeUpdateResponse();
+        byte[] hostChallenge = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+        Scp02KeySet? keySet = Scp02KeySet.Create(
             new byte[16], // ENC key (3DES uses 16-byte keys)
             new byte[16], // MAC key
             new byte[16]  // DEK key
         ).Value;
-        
+
         var result = Scp02SecurityProcessor.ProcessInitializeUpdate(
-            response, 
-            hostChallenge, 
+            response,
+            hostChallenge,
             keySet,
             0x15 // Use i=15 for this test
         );
-        
+
         if (result.IsSuccess)
         {
-            _ = result.Value.ProtocolVersion.Should().Be(0x02);
+            _ = result.Value.ScpVersion.Should().Be(0x02);
         }
         // Failure is expected until full implementation
     }
@@ -144,25 +145,25 @@ public class Scp02SecurityProcessorTests
     public void ProcessInitializeUpdate_WithInvalidHostChallengeLength_ShouldFailHard()
     {
         // Arrange
-        var response = CreateTestScp02InitializeUpdateResponse();
-        var keySet = Scp02KeySet.Create(
+        InitializeUpdateResponse response = CreateTestScp02InitializeUpdateResponse();
+        Scp02KeySet? keySet = Scp02KeySet.Create(
             new byte[16], new byte[16], new byte[16]
         ).Value;
-        
-        var testCases = new[]
-        {
+
+        (byte[], string)[] testCases =
+        [
             ([], "Empty host challenge"),
             (new byte[4], "4-byte host challenge"),
             (new byte[12], "12-byte host challenge"),
             (new byte[16], "16-byte host challenge")
-        };
-        
-        foreach (var (invalidChallenge, description) in testCases)
+        ];
+
+        foreach ((byte[] invalidChallenge, string description) in testCases)
         {
             // Act
             var result = Scp02SecurityProcessor.ProcessInitializeUpdate(
-                response, 
-                invalidChallenge, 
+                response,
+                invalidChallenge,
                 keySet,
                 0x15
             );
@@ -170,9 +171,9 @@ public class Scp02SecurityProcessorTests
             // Assert
             _ = result.IsFailure.Should().BeTrue($"{description} should be rejected");
             _ = result.Error.Should().BeOfType<InvalidLengthError>();
-            var lengthError = (InvalidLengthError)result.Error;
+            InvalidLengthError? lengthError = (InvalidLengthError)result.Error;
             _ = lengthError.Expected.Should().Be(8);
-            
+
             TestContext.Out.WriteLine($"✓ {description} correctly rejected: {result.Error.Message}");
         }
     }
@@ -184,20 +185,20 @@ public class Scp02SecurityProcessorTests
     public void ProcessInitializeUpdate_WithInvalidImplementationParameter_ShouldFailHard()
     {
         // Arrange
-        var response = CreateTestScp02InitializeUpdateResponse();
-        var hostChallenge = new byte[8] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
-        var keySet = Scp02KeySet.Create(
+        InitializeUpdateResponse response = CreateTestScp02InitializeUpdateResponse();
+        byte[] hostChallenge = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+        Scp02KeySet? keySet = Scp02KeySet.Create(
             new byte[16], new byte[16], new byte[16]
         ).Value;
-        
-        var invalidImplementations = new byte[] { 0x01, 0x03, 0x06, 0x99, 0xFF };
-        
-        foreach (var invalidImpl in invalidImplementations)
+
+        byte[] invalidImplementations = [0x01, 0x03, 0x06, 0x99, 0xFF];
+
+        foreach (byte invalidImpl in invalidImplementations)
         {
             // Act
             var result = Scp02SecurityProcessor.ProcessInitializeUpdate(
-                response, 
-                hostChallenge, 
+                response,
+                hostChallenge,
                 keySet,
                 invalidImpl
             );
@@ -206,7 +207,7 @@ public class Scp02SecurityProcessorTests
             _ = result.IsFailure.Should().BeTrue($"Invalid implementation i={invalidImpl:X2} should be rejected");
             _ = result.Error.Should().BeOfType<UnsupportedImplementationError>();
             _ = result.Error.Message.Should().Contain($"i={invalidImpl:X2}", $"Error should identify invalid implementation i={invalidImpl:X2}");
-            
+
             TestContext.Out.WriteLine($"✓ Invalid implementation i={invalidImpl:X2} correctly rejected: {result.Error.Message}");
         }
     }
@@ -215,9 +216,9 @@ public class Scp02SecurityProcessorTests
     [Test]
     public void ApplyCommandSecurity_WrongMacChainingSize_ReturnsFailure()
     {
-        var command = GetDataCommand.Create(0x9F7F).Value;
-        var wrongSizeMacChaining = new byte[16].ToImmutableArray(); // SCP02 needs 8 bytes, not 16
-        
+        GetDataCommand? command = GetDataCommand.Create(0x9F7F).Value;
+        ImmutableArray<byte> wrongSizeMacChaining = [..new byte[16]]; // SCP02 needs 8 bytes, not 16
+
         var result = Scp02SecurityProcessor.ApplyCommandSecurity(
             command,
             SecurityLevel.CMac,
@@ -228,7 +229,7 @@ public class Scp02SecurityProcessorTests
 
         _ = result.IsFailure.Should().BeTrue("SCP02 MAC chaining value must be exactly 8 bytes");
         _ = result.Error.Should().BeOfType<InvalidLengthError>();
-        var lengthError = (InvalidLengthError)result.Error;
+        InvalidLengthError? lengthError = (InvalidLengthError)result.Error;
         _ = lengthError.Expected.Should().Be(8);
     }
 
@@ -242,9 +243,9 @@ public class Scp02SecurityProcessorTests
     public void ApplyCommandSecurity_WithEmptyMacChainingValue_ShouldFailHard()
     {
         // Arrange
-        var command = GetDataCommand.Create(0x9F7F).Value;
-        var emptyMacChaining = new byte[0].ToImmutableArray();
-        
+        GetDataCommand? command = GetDataCommand.Create(0x9F7F).Value;
+        ImmutableArray<byte> emptyMacChaining = [..new byte[0]];
+
         // Act
         var result = Scp02SecurityProcessor.ApplyCommandSecurity(
             command,
@@ -264,9 +265,9 @@ public class Scp02SecurityProcessorTests
     public void ApplyCommandSecurity_WithInvalidSecurityLevel_ShouldFailHard()
     {
         // Arrange
-        var command = GetDataCommand.Create(0x9F7F).Value;
-        var invalidSecurityLevel = (SecurityLevel)0xFF; // Invalid enum value
-        
+        GetDataCommand? command = GetDataCommand.Create(0x9F7F).Value;
+        SecurityLevel invalidSecurityLevel = (SecurityLevel)0xFF; // Invalid enum value
+
         // Act
         var result = Scp02SecurityProcessor.ApplyCommandSecurity(
             command,
@@ -275,7 +276,7 @@ public class Scp02SecurityProcessorTests
             _macChainingValue,
             0u
         );
-        
+
         // Assert - Should either fail hard or handle gracefully
         // The exact behavior depends on implementation but should not crash
         if (result.IsFailure)
@@ -294,9 +295,9 @@ public class Scp02SecurityProcessorTests
     {
         // SCP02 and SCP03 have different MAC chaining behaviors
         // This test ensures we're using the right chaining value size
-        
-        var command = GetDataCommand.Create(0x9F7F).Value;
-        
+
+        GetDataCommand? command = GetDataCommand.Create(0x9F7F).Value;
+
         var scp02Result = Scp02SecurityProcessor.ApplyCommandSecurity(
             command,
             SecurityLevel.CMac,
@@ -304,8 +305,8 @@ public class Scp02SecurityProcessorTests
             _macChainingValue, // 8 bytes
             0u
         );
-        
-        var scp03MacChaining = new byte[16].ToImmutableArray(); // 16 bytes
+
+        ImmutableArray<byte> scp03MacChaining = [..new byte[16]]; // 16 bytes
         var scp03Result = Scp03SecurityProcessor.ApplyCommandSecurity(
             command,
             SecurityLevel.CMac,
@@ -317,7 +318,7 @@ public class Scp02SecurityProcessorTests
         // Both should work with their respective chaining value sizes
         _ = scp02Result.IsSuccess.Should().BeTrue();
         _ = scp03Result.IsSuccess.Should().BeTrue();
-        
+
         // Results should differ due to different MAC calculations
         var scp02State = scp02Result.Value.newState;
         var scp03State = scp03Result.Value.newState;
@@ -337,40 +338,40 @@ public class Scp02SecurityProcessorTests
         // - Card challenge: 6 bytes
         // - Card cryptogram: 8 bytes
         // - Sequence counter: 2 bytes
-        var responseData = new byte[29];
-        var offset = 0;
-        
+        byte[] responseData = new byte[29];
+        int offset = 0;
+
         // Key diversification data (10 bytes)
         Array.Fill(responseData, (byte)0x00, offset, 10);
         offset += 10;
-        
+
         // Key version (1 byte)
         responseData[offset++] = 0x01;
-        
+
         // SCP ID (1 byte) - SCP02
         responseData[offset++] = 0x02;
-        
+
         // Implementation parameter (1 byte)
         responseData[offset++] = 0x15;
-        
+
         // Card challenge (6 bytes for SCP02)
         for (int i = 0; i < 6; i++)
         {
             responseData[offset++] = (byte)(0x11 + i);
         }
-        
+
         // Card cryptogram (8 bytes)
         Array.Fill(responseData, (byte)0xAA, offset, 8);
         offset += 8;
-        
+
         // Sequence counter (2 bytes for SCP02)
         responseData[offset++] = 0x00;
         responseData[offset++] = 0x01;
-        
+
         // Verify we used exactly 29 bytes
         System.Diagnostics.Debug.Assert(offset == 29, "SCP02 response should be exactly 29 bytes");
-        
-        var parseResult = InitializeUpdateResponse.Parse(responseData);
+
+        Result<InitializeUpdateResponse, SmartCardError> parseResult = InitializeUpdateResponse.Parse(responseData);
         if (!parseResult.IsSuccess)
             throw new InvalidOperationException($"Failed to create test INITIALIZE UPDATE response: {parseResult.Error}");
         return parseResult.Value;

@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
@@ -11,6 +11,9 @@ using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Security;
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
+using Org.BouncyCastle.Crypto.Engines;
+using Org.BouncyCastle.Crypto.Macs;
+using Org.BouncyCastle.Crypto.Modes;
 using static Gp4Net.Pipeline.CommandProcessing;
 
 namespace Gp4Net.Pipeline;
@@ -27,10 +30,10 @@ public static class CommandProcessors
     {
         if (!environment.EffectiveOptions.EnableLogging)
             return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
-                CommandResult.Success([], Constants.StatusWords.Success, environment)));
+                CommandResult.Success([], StatusWords.Success, environment)));
 
-        var commandName = command.GetType().Name;
-        var commandBytes = GetCommandBytes(command);
+        string commandName = command.GetType().Name;
+        byte[] commandBytes = GetCommandBytes(command);
 
         environment.Logger.LogDebug(
             "Executing command {CommandName}: {CommandBytes}",
@@ -38,7 +41,7 @@ public static class CommandProcessors
             Convert.ToHexString(commandBytes));
 
         return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
-            CommandResult.Success([], Constants.StatusWords.Success, environment)));
+            CommandResult.Success([], StatusWords.Success, environment)));
     };
 
     /// <summary>
@@ -50,7 +53,7 @@ public static class CommandProcessors
         if (!RequiresSecureChannel(command, environment))
         {
             return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
-                CommandResult.Success([], Constants.StatusWords.Success, environment)));
+                CommandResult.Success([], StatusWords.Success, environment)));
         }
 
         // Check if secure channel is available
@@ -63,18 +66,18 @@ public static class CommandProcessors
             }
 
             return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
-                CommandResult.Success([], Constants.StatusWords.Success, environment)));
+                CommandResult.Success([], StatusWords.Success, environment)));
         }
 
-        var secureChannelState = environment.SecureChannel.Value;
+        SecureChannelState secureChannelState = environment.SecureChannel.Value;
 
         // Apply secure channel wrapping using SecureChannelService with proper functional handling
         return Task.FromResult(
             environment.SecureChannelService.WrapCommand(command, secureChannelState)
                 .Bind(wrapResult =>
                 {
-                    var (wrappedBytes, newState) = wrapResult;
-                    
+                    (byte[] wrappedBytes, SecureChannelState newState) = wrapResult;
+
                     // Log wrapped bytes from service for troubleshooting
                     environment.Logger.LogDebug("SecureChannelService returned {ByteCount} wrapped bytes: {WrappedBytes}",
                         wrappedBytes.Length, Convert.ToHexString(wrappedBytes));
@@ -83,7 +86,7 @@ public static class CommandProcessors
                         .Map(wrappedCommand =>
                         {
                             // Update environment with new secure channel state and wrapped command
-                            var newEnvironment = environment.WithSecureChannel(newState);
+                            CommandEnvironment newEnvironment = environment.WithSecureChannel(newState);
 
                             // Log the transformation
                             if (environment.EffectiveOptions.EnableLogging)
@@ -95,11 +98,11 @@ public static class CommandProcessors
                             }
 
                             // Create metadata indicating secure channel wrapping was applied
-                            var metadata = new CommandMetadata(SecureChannelWrapped: true);
+                            CommandMetadata metadata = new CommandMetadata(SecureChannelWrapped: true);
 
                             // Return wrapped bytes in Data field as expected by pipeline architecture
                             // FunctionComposition will create WrappedApduCommand from this data
-                            return CommandResult.Success(wrappedBytes, Constants.StatusWords.Success, newEnvironment, metadata);
+                            return CommandResult.Success(wrappedBytes, StatusWords.Success, newEnvironment, metadata);
                         });
                 })
                 .MapError(error =>
@@ -114,7 +117,7 @@ public static class CommandProcessors
     /// </summary>
     public static CommandProcessor ExecuteTransport = async (command, environment, cancellationToken) =>
     {
-        var stopwatch = Stopwatch.StartNew();
+        Stopwatch stopwatch = Stopwatch.StartNew();
 
         try
         {
@@ -127,7 +130,7 @@ public static class CommandProcessors
             {
                 commandBytes = wrapped.WrappedBytes;
                 commandToSend = wrapped; // WrappedApduCommand implements ICompleteApduCommand
-                
+
                 environment.Logger.LogDebug("Using wrapped command: {ByteCount} bytes", commandBytes.Length);
             }
             else
@@ -144,7 +147,7 @@ public static class CommandProcessors
             }
 
             // Execute via transport
-            var response = await environment.Transport.TransmitAsync(
+            ApduResponse response = await environment.Transport.TransmitAsync(
                 commandToSend,
                 environment.Channel,
                 cancellationToken);
@@ -152,22 +155,22 @@ public static class CommandProcessors
             stopwatch.Stop();
 
             // Combine response bytes for metadata
-            var responseBytes = CombineResponseBytes(response.Data, response.StatusWord);
+            byte[] responseBytes = CombineResponseBytes(response.Data, response.StatusWord);
 
-            var metadata = new CommandMetadata(
+            CommandMetadata metadata = new CommandMetadata(
                 ExecutionTime: stopwatch.Elapsed,
                 TransmittedBytes: commandBytes,
                 ReceivedBytes: responseBytes);
 
-            var transportResult = CommandResult.Success(response.Data, response.StatusWord, environment, metadata);
-            
+            CommandResult transportResult = CommandResult.Success(response.Data, response.StatusWord, environment, metadata);
+
             // Apply secure channel response unwrapping if needed
             if (environment.SecureChannel.HasValue)
             {
-                var unwrapper = CreateSecureChannelResponseUnwrapper(environment);
+                Func<CommandResult, Result<CommandResult, SmartCardError>> unwrapper = CreateSecureChannelResponseUnwrapper(environment);
                 return unwrapper(transportResult);
             }
-            
+
             return Result.Success<CommandResult, SmartCardError>(transportResult);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -190,7 +193,7 @@ public static class CommandProcessors
         // that will be applied after ExecuteTransport returns the response
         CommandMetadata metadata = new(SecureChannelUnwrapped: false);
         return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
-            CommandResult.Success([], Constants.StatusWords.Success, environment, metadata)));
+            CommandResult.Success([], StatusWords.Success, environment, metadata)));
     };
 
     /// <summary>
@@ -207,14 +210,14 @@ public static class CommandProcessors
                 return Result.Success<CommandResult, SmartCardError>(result);
             }
 
-            var channelState = environment.SecureChannel.Value;
-            
+            SecureChannelState channelState = environment.SecureChannel.Value;
+
             // Combine response data and status word for unwrapping
-            var responseBytes = CombineResponseBytes(result.Data, result.StatusWord);
-            
+            byte[] responseBytes = CombineResponseBytes(result.Data, result.StatusWord);
+
             // Unwrap the complete response
-            var unwrapResult = UnwrapSecureChannelResponse(responseBytes, channelState);
-            
+            Result<byte[], SmartCardError> unwrapResult = UnwrapSecureChannelResponse(responseBytes, channelState);
+
             return unwrapResult.Match(
                 unwrappedData =>
                 {
@@ -224,11 +227,11 @@ public static class CommandProcessors
                         return Result.Failure<CommandResult, SmartCardError>(
                             SmartCardError.CryptographicError("Unwrapped response too short"));
                     }
-                    
-                    var unwrappedStatusWord = (ushort)((unwrappedData[^2] << 8) | unwrappedData[^1]);
-                    var unwrappedResponseData = unwrappedData[..^2];
-                    
-                    var metadata = new CommandMetadata(SecureChannelUnwrapped: true);
+
+                    ushort unwrappedStatusWord = (ushort)((unwrappedData[^2] << 8) | unwrappedData[^1]);
+                    byte[] unwrappedResponseData = unwrappedData[..^2];
+
+                    CommandMetadata metadata = new CommandMetadata(SecureChannelUnwrapped: true);
                     return Result.Success<CommandResult, SmartCardError>(
                         CommandResult.Success(unwrappedResponseData, unwrappedStatusWord, result.UpdatedEnvironment, metadata));
                 },
@@ -243,7 +246,7 @@ public static class CommandProcessors
     /// <param name="channelState">The secure channel state containing keys and counters.</param>
     /// <returns>A result containing the decrypted response or an error.</returns>
     private static Result<byte[], SmartCardError> UnwrapSecureChannelResponse(
-        byte[] encryptedResponse, 
+        byte[] encryptedResponse,
         SecureChannelState channelState)
     {
         if (encryptedResponse == null || encryptedResponse.Length == 0)
@@ -252,16 +255,16 @@ public static class CommandProcessors
         }
 
         // Implement proper SCP02/SCP03 response unwrapping based on protocol version
-        if (channelState.ProtocolVersion == (byte)ScpVersion.Scp02)
+        if (channelState.ProtocolVersion == ScpVersion.Scp02)
         {
             return UnwrapScp02Response(encryptedResponse, channelState);
         }
-        
-        if (channelState.ProtocolVersion == (byte)ScpVersion.Scp03)
+
+        if (channelState.ProtocolVersion == ScpVersion.Scp03)
         {
             return UnwrapScp03Response(encryptedResponse, channelState);
         }
-        
+
         return Result.Failure<byte[], SmartCardError>(
             new UnsupportedProtocolError($"Unsupported SCP version: {channelState.ProtocolVersion}"));
     }
@@ -287,7 +290,7 @@ public static class CommandProcessors
         if ((channelState.SecurityLevel & SecurityLevel.RMac) == 0)
         {
             // No unwrapping needed - return data + status word
-            var noUnwrapResult = new byte[responseData.Length + statusWord.Length];
+            byte[] noUnwrapResult = new byte[responseData.Length + statusWord.Length];
             Array.Copy(responseData, 0, noUnwrapResult, 0, responseData.Length);
             Array.Copy(statusWord, 0, noUnwrapResult, responseData.Length, statusWord.Length);
             return Result.Success<byte[], SmartCardError>(noUnwrapResult);
@@ -319,7 +322,7 @@ public static class CommandProcessors
                     return DecryptScp02ResponseData(dataWithoutMac, channelState)
                         .Map(decryptedData =>
                         {
-                            var result = new byte[decryptedData.Length + statusWord.Length];
+                            byte[] result = new byte[decryptedData.Length + statusWord.Length];
                             Array.Copy(decryptedData, 0, result, 0, decryptedData.Length);
                             Array.Copy(statusWord, 0, result, decryptedData.Length, statusWord.Length);
                             return result;
@@ -327,7 +330,7 @@ public static class CommandProcessors
                 }
 
                 // Return data + status word
-                var result = new byte[dataWithoutMac.Length + statusWord.Length];
+                byte[] result = new byte[dataWithoutMac.Length + statusWord.Length];
                 Array.Copy(dataWithoutMac, 0, result, 0, dataWithoutMac.Length);
                 Array.Copy(statusWord, 0, result, dataWithoutMac.Length, statusWord.Length);
                 return Result.Success<byte[], SmartCardError>(result);
@@ -347,7 +350,7 @@ public static class CommandProcessors
                 SmartCardError.InvalidArgument("Response too short for SCP03 unwrapping"));
         }
 
-        // Extract status word (last 2 bytes)  
+        // Extract status word (last 2 bytes)
         byte[] statusWord = encryptedResponse[^2..];
         byte[] responseData = encryptedResponse[..^2];
 
@@ -355,7 +358,7 @@ public static class CommandProcessors
         if ((channelState.SecurityLevel & SecurityLevel.RMac) == 0)
         {
             // No unwrapping needed - return data + status word
-            var noUnwrapResult = new byte[responseData.Length + statusWord.Length];
+            byte[] noUnwrapResult = new byte[responseData.Length + statusWord.Length];
             Array.Copy(responseData, 0, noUnwrapResult, 0, responseData.Length);
             Array.Copy(statusWord, 0, noUnwrapResult, responseData.Length, statusWord.Length);
             return Result.Success<byte[], SmartCardError>(noUnwrapResult);
@@ -387,7 +390,7 @@ public static class CommandProcessors
                     return DecryptScp03ResponseData(dataWithoutMac, channelState)
                         .Map(decryptedData =>
                         {
-                            var result = new byte[decryptedData.Length + statusWord.Length];
+                            byte[] result = new byte[decryptedData.Length + statusWord.Length];
                             Array.Copy(decryptedData, 0, result, 0, decryptedData.Length);
                             Array.Copy(statusWord, 0, result, decryptedData.Length, statusWord.Length);
                             return result;
@@ -395,7 +398,7 @@ public static class CommandProcessors
                 }
 
                 // Return data + status word
-                var result = new byte[dataWithoutMac.Length + statusWord.Length];
+                byte[] result = new byte[dataWithoutMac.Length + statusWord.Length];
                 Array.Copy(dataWithoutMac, 0, result, 0, dataWithoutMac.Length);
                 Array.Copy(statusWord, 0, result, dataWithoutMac.Length, statusWord.Length);
                 return Result.Success<byte[], SmartCardError>(result);
@@ -410,21 +413,21 @@ public static class CommandProcessors
     {
         // Construct MAC data: response data + status word
         byte[] macData = responseData.Concat(statusWord).ToArray();
-        
+
         // Calculate expected MAC using SRMac key
         // Implementation uses BouncyCastle Triple-DES CBC-MAC
-        var desEngine = new Org.BouncyCastle.Crypto.Engines.DesEngine();
-        var mac = new Org.BouncyCastle.Crypto.Macs.CbcBlockCipherMac(desEngine);
-        
+        DesEngine desEngine = new Org.BouncyCastle.Crypto.Engines.DesEngine();
+        CbcBlockCipherMac mac = new Org.BouncyCastle.Crypto.Macs.CbcBlockCipherMac(desEngine);
+
         // Initialize with SRMac key from session keys
         mac.Init(new Org.BouncyCastle.Crypto.Parameters.KeyParameter(channelState.SessionKeys.SrMac));
-        
+
         mac.BlockUpdate(macData, 0, macData.Length);
         byte[] calculatedMac = new byte[mac.GetMacSize()];
-        mac.DoFinal(calculatedMac, 0);
-        
+        _ = mac.DoFinal(calculatedMac, 0);
+
         // Compare MACs using constant-time comparison
-        var isValid = calculatedMac.SequenceEqual(receivedMac);
+        bool isValid = calculatedMac.SequenceEqual(receivedMac);
         return Result.Success<bool, SmartCardError>(isValid);
     }
 
@@ -434,22 +437,22 @@ public static class CommandProcessors
     private static Result<bool, SmartCardError> VerifyScp03ResponseMac(
         byte[] responseData, byte[] receivedMac, byte[] statusWord, SecureChannelState channelState)
     {
-        // Construct MAC data: response data + status word  
+        // Construct MAC data: response data + status word
         byte[] macData = responseData.Concat(statusWord).ToArray();
-        
+
         // Calculate expected MAC using SRMac key with AES-CMAC
-        var aesEngine = new Org.BouncyCastle.Crypto.Engines.AesEngine();
-        var cmac = new Org.BouncyCastle.Crypto.Macs.CMac(aesEngine);
-        
+        AesEngine aesEngine = new Org.BouncyCastle.Crypto.Engines.AesEngine();
+        CMac cmac = new Org.BouncyCastle.Crypto.Macs.CMac(aesEngine);
+
         // Initialize with SRMac key from session keys
         cmac.Init(new Org.BouncyCastle.Crypto.Parameters.KeyParameter(channelState.SessionKeys.SrMac));
-        
+
         cmac.BlockUpdate(macData, 0, macData.Length);
         byte[] calculatedMac = new byte[cmac.GetMacSize()];
-        cmac.DoFinal(calculatedMac, 0);
-        
+        _ = cmac.DoFinal(calculatedMac, 0);
+
         // Compare MACs using constant-time comparison
-        var isValid = calculatedMac.SequenceEqual(receivedMac);
+        bool isValid = calculatedMac.SequenceEqual(receivedMac);
         return Result.Success<bool, SmartCardError>(isValid);
     }
 
@@ -463,23 +466,23 @@ public static class CommandProcessors
         {
             return Result.Success<byte[], SmartCardError>([]);
         }
-        
-        var desEngine = new Org.BouncyCastle.Crypto.Engines.DesEdeEngine();
-        var cipher = new Org.BouncyCastle.Crypto.Modes.CbcBlockCipher(desEngine);
-        
+
+        DesEdeEngine desEngine = new Org.BouncyCastle.Crypto.Engines.DesEdeEngine();
+        CbcBlockCipher cipher = new Org.BouncyCastle.Crypto.Modes.CbcBlockCipher(desEngine);
+
         // Initialize cipher for decryption with SEnc key
         cipher.Init(false, new Org.BouncyCastle.Crypto.Parameters.KeyParameter(channelState.SessionKeys.SEnc));
-        
+
         byte[] decryptedData = new byte[encryptedData.Length];
         int processedBytes = 0;
-        
+
         // Process data in blocks
         for (int i = 0; i < encryptedData.Length; i += cipher.GetBlockSize())
         {
             int blockSize = Math.Min(cipher.GetBlockSize(), encryptedData.Length - i);
             processedBytes += cipher.ProcessBlock(encryptedData, i, decryptedData, processedBytes);
         }
-        
+
         return Result.Success<byte[], SmartCardError>(decryptedData);
     }
 
@@ -493,23 +496,23 @@ public static class CommandProcessors
         {
             return Result.Success<byte[], SmartCardError>([]);
         }
-        
-        var aesEngine = new Org.BouncyCastle.Crypto.Engines.AesEngine();
-        var cipher = new Org.BouncyCastle.Crypto.Modes.CbcBlockCipher(aesEngine);
-        
+
+        AesEngine aesEngine = new Org.BouncyCastle.Crypto.Engines.AesEngine();
+        CbcBlockCipher cipher = new Org.BouncyCastle.Crypto.Modes.CbcBlockCipher(aesEngine);
+
         // Initialize cipher for decryption with SEnc key
         cipher.Init(false, new Org.BouncyCastle.Crypto.Parameters.KeyParameter(channelState.SessionKeys.SEnc));
-        
+
         byte[] decryptedData = new byte[encryptedData.Length];
         int processedBytes = 0;
-        
+
         // Process data in blocks
         for (int i = 0; i < encryptedData.Length; i += cipher.GetBlockSize())
         {
             int blockSize = Math.Min(cipher.GetBlockSize(), encryptedData.Length - i);
             processedBytes += cipher.ProcessBlock(encryptedData, i, decryptedData, processedBytes);
         }
-        
+
         return Result.Success<byte[], SmartCardError>(decryptedData);
     }
 
@@ -520,17 +523,17 @@ public static class CommandProcessors
     {
         if (!environment.EffectiveOptions.EnableLogging)
         {
-            var metadata = new CommandMetadata(ResponseLogged: true);
+            CommandMetadata metadata = new CommandMetadata(ResponseLogged: true);
             return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
-                CommandResult.Success([], Constants.StatusWords.Success, environment, metadata)));
+                CommandResult.Success([], StatusWords.Success, environment, metadata)));
         }
 
         // This would log the response from previous processors
         environment.Logger.LogDebug("Command completed");
 
-        var logMetadata = new CommandMetadata(ResponseLogged: true);
+        CommandMetadata logMetadata = new CommandMetadata(ResponseLogged: true);
         return Task.FromResult(Result.Success<CommandResult, SmartCardError>(
-            CommandResult.Success([], Constants.StatusWords.Success, environment, logMetadata)));
+            CommandResult.Success([], StatusWords.Success, environment, logMetadata)));
     };
 
     /// <summary>
@@ -539,13 +542,13 @@ public static class CommandProcessors
     /// </summary>
     public static CommandProcessor CreatePipeline(bool enableLogging = true, bool enableSecureChannel = true)
     {
-        var processors = new[]
-        {
+        CommandProcessor[] processors =
+        [
             enableLogging ? LogCommand : FunctionComposition.Identity,
             enableSecureChannel ? WrapSecureChannel : FunctionComposition.Identity,
             ExecuteTransport, // Now includes secure channel unwrapping
             enableLogging ? LogResponse : FunctionComposition.Identity
-        };
+        ];
 
         return FunctionComposition.ComposeMany(processors);
     }
@@ -571,13 +574,13 @@ public static class CommandProcessors
     /// </summary>
     private static byte[] GetCommandBytes(IApduCommand command)
     {
-        var buffer = new System.Collections.Generic.List<byte>
-        {
+        List<byte> buffer =
+        [
             command.Cla,
             command.Ins,
             command.P1,
             command.P2
-        };
+        ];
 
         if (command.Data?.Length > 0)
         {
@@ -596,7 +599,7 @@ public static class CommandProcessors
 
         if (command.ExpectedResponseLength.HasValue)
         {
-            var le = command.ExpectedResponseLength.Value;
+            int le = command.ExpectedResponseLength.Value;
             switch (le)
             {
                 case 0:
@@ -620,7 +623,7 @@ public static class CommandProcessors
     /// </summary>
     private static byte[] CombineResponseBytes(byte[] data, ushort statusWord)
     {
-        var combined = new byte[data.Length + 2];
+        byte[] combined = new byte[data.Length + 2];
         Array.Copy(data, 0, combined, 0, data.Length);
         combined[^2] = (byte)(statusWord >> 8);
         combined[^1] = (byte)(statusWord & 0xFF);

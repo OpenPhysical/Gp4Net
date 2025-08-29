@@ -1,8 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
-using Gp4Net.Core.Tlv;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console;
@@ -52,18 +52,18 @@ public class ParseTlvCommand : IPipelineCommand<ParseTlvCommand.Settings>
             }
 
             // Clean up hex string
-            var cleanHex = settings.HexData.Replace(" ", "").Replace("-", "").Replace(":", "");
-                
+            string cleanHex = settings.HexData.Replace(" ", "").Replace("-", "").Replace(":", "");
+
             if (cleanHex.Length % 2 != 0)
             {
                 context.Display.Error("Hex string must have even number of characters");
                 return Task.FromResult(1);
             }
 
-            var data = Convert.FromHexString(cleanHex);
+            byte[] data = Convert.FromHexString(cleanHex);
 
             // Build semantic rows using pure functional composition
-            var semanticRows = TlvTableBuilder.BuildTlvRows(
+            List<TlvTableBuilder.TlvRow> semanticRows = TlvTableBuilder.BuildTlvRows(
                 data,
                 showBytes: settings.ShowBytes,
                 showOffsets: settings.ShowOffsets,
@@ -74,7 +74,7 @@ public class ParseTlvCommand : IPipelineCommand<ParseTlvCommand.Settings>
             switch (settings.Format.ToLowerInvariant())
             {
                 case "json":
-                    var json = TlvTableBuilder.ToJson(semanticRows);
+                    string json = TlvTableBuilder.ToJson(semanticRows);
                     AnsiConsole.WriteLine(json);
                     break;
 

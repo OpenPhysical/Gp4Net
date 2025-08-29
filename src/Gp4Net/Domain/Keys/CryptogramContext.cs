@@ -1,3 +1,4 @@
+using Gp4Net.Constants;
 using Gp4Net.Cryptography;
 using JetBrains.Annotations;
 
@@ -12,7 +13,13 @@ namespace Gp4Net.Domain.Keys;
 /// <param name="Type">The cryptogram type.</param>
 [PublicAPI]
 public sealed record CryptogramContext(
-    byte ProtocolVersion,
+    ScpVersion ProtocolVersionEnum,
     byte[] Key,
     byte[] Data,
-    CryptogramType Type) : ICryptogramContext;
+    CryptogramType Type) : ICryptogramContext
+{
+    /// <summary>
+    /// Gets the protocol version as byte to match interface.
+    /// </summary>
+    public byte ProtocolVersion => (byte)ProtocolVersionEnum;
+}

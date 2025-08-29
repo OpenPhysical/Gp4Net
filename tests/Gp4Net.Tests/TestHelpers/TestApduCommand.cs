@@ -70,10 +70,10 @@ public class TestApduCommand : IApduCommand
             throw new ArgumentException("APDU must be at least 4 bytes long", nameof(apduBytes));
         }
 
-        var cla = apduBytes[0];
-        var ins = apduBytes[1];
-        var p1 = apduBytes[2];
-        var p2 = apduBytes[3];
+        byte cla = apduBytes[0];
+        byte ins = apduBytes[1];
+        byte p1 = apduBytes[2];
+        byte p2 = apduBytes[3];
 
         byte[]? data = null;
         Maybe<int> expectedResponseLength = Maybe<int>.None;
@@ -84,37 +84,37 @@ public class TestApduCommand : IApduCommand
                 // Case 1: No data, no Le
                 break;
             case 5:
-            {
-                // Case 2: No data, Le present
-                var le = apduBytes[4];
-                expectedResponseLength = Maybe<int>.From(le == 0 ? 256 : le);
-                break;
-            }
-            default:
-            {
-                // Case 3 or 4: Data present
-                var lc = apduBytes[4];
-
-                if (apduBytes.Length == 5 + lc)
                 {
-                    // Case 3: Data present, no Le
-                    data = new byte[lc];
-                    Array.Copy(apduBytes, 5, data, 0, lc);
-                }
-                else if (apduBytes.Length == 5 + lc + 1)
-                {
-                    // Case 4: Data present, Le present
-                    data = new byte[lc];
-                    Array.Copy(apduBytes, 5, data, 0, lc);
-                    var le = apduBytes[5 + lc];
+                    // Case 2: No data, Le present
+                    byte le = apduBytes[4];
                     expectedResponseLength = Maybe<int>.From(le == 0 ? 256 : le);
+                    break;
                 }
-                else
+            default:
                 {
-                    throw new ArgumentException("Invalid APDU format", nameof(apduBytes));
+                    // Case 3 or 4: Data present
+                    byte lc = apduBytes[4];
+
+                    if (apduBytes.Length == 5 + lc)
+                    {
+                        // Case 3: Data present, no Le
+                        data = new byte[lc];
+                        Array.Copy(apduBytes, 5, data, 0, lc);
+                    }
+                    else if (apduBytes.Length == 5 + lc + 1)
+                    {
+                        // Case 4: Data present, Le present
+                        data = new byte[lc];
+                        Array.Copy(apduBytes, 5, data, 0, lc);
+                        byte le = apduBytes[5 + lc];
+                        expectedResponseLength = Maybe<int>.From(le == 0 ? 256 : le);
+                    }
+                    else
+                    {
+                        throw new ArgumentException("Invalid APDU format", nameof(apduBytes));
+                    }
+                    break;
                 }
-                break;
-            }
         }
 
         return new TestApduCommand(cla, ins, p1, p2, data, expectedResponseLength);

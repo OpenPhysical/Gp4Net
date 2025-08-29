@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
@@ -100,7 +100,7 @@ public static class CardDiscovery
         }
 
         Result<CommandResponse, SmartCardError> response = await executeCommand(selectResult.Value, cancellationToken);
-        
+
         if (response.IsSuccess)
         {
             Result<SelectResponse, SmartCardError> parseResult = ResponseParser.ParseSelectResponse(response.Value);
@@ -132,41 +132,16 @@ public static class CardDiscovery
         }
 
         Result<CommandResponse, SmartCardError> response = await executeCommand(selectResult.Value, cancellationToken);
-        
+
         return response.IsSuccess
             ? ResponseParser.ParseSelectResponse(response.Value)
             : Result.Failure<SelectResponse, SmartCardError>(response.Error);
     }
 
     /// <summary>
-    /// Attempts to determine the correct key set for a card through trial.
-    /// Useful for cards where the key set is unknown.
-    /// </summary>
-    /// <param name="executeCommand">Function to execute APDU commands.</param>
-    /// <param name="possibleKeySets">List of key sets to try.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The first working key set and protocol version, or an error.</returns>
-    public static async Task<Result<(IKeySet KeySet, byte ProtocolVersion), SmartCardError>> DiscoverKeySetAsync(
-        Func<IApduCommand, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
-        ImmutableList<IKeySet> possibleKeySets,
-        CancellationToken cancellationToken = default)
-    {
-        ImmutableList<IKeySet> keySetsToTry = possibleKeySets == null || possibleKeySets.Count == 0
-            ? ImmutableList.Create<IKeySet>(
-                GpTestKeys.CreateScp02TestKeySet(),
-                GpTestKeys.CreateScp03TestKeySet())
-            : possibleKeySets;
-
-        // Generate host challenge for testing
-        byte[] hostChallenge = CryptographyHelpers.GenerateHostChallenge();
-
-        return await TryKeySetsRecursively(keySetsToTry, 0, hostChallenge, executeCommand, cancellationToken);
-    }
-
-    /// <summary>
     /// Recursively tries key sets until one succeeds.
     /// </summary>
-    private static async Task<Result<(IKeySet KeySet, byte ProtocolVersion), SmartCardError>> TryKeySetsRecursively(
+    private static async Task<Result<(IKeySet KeySet, ScpVersion ProtocolVersion), SmartCardError>> TryKeySetsRecursively(
         ImmutableList<IKeySet> keySets,
         int index,
         byte[] hostChallenge,
@@ -175,31 +150,33 @@ public static class CardDiscovery
     {
         if (index >= keySets.Count)
         {
-            return Result.Failure<(IKeySet, byte), SmartCardError>(
+            return Result.Failure<(IKeySet, ScpVersion), SmartCardError>(
                 SmartCardError.SecurityError("Failed to discover working key set"));
         }
 
         IKeySet keySet = keySets[index];
-        Result<InitializeUpdateCommand, SmartCardError> cmdResult = 
+        Result<InitializeUpdateCommand, SmartCardError> cmdResult =
             CommandFactory.CreateInitializeUpdateCommand(keySet.KeyVersion, keySet.KeyId, hostChallenge);
-        
+
         if (cmdResult.IsFailure)
         {
             return await TryKeySetsRecursively(keySets, index + 1, hostChallenge, executeCommand, cancellationToken);
         }
 
-        Result<CommandResponse, SmartCardError> response = 
+        Result<CommandResponse, SmartCardError> response =
             await executeCommand(cmdResult.Value, cancellationToken);
-        
+
         if (response.IsSuccess && response.Value.IsSuccess)
         {
-            Result<InitializeUpdateResponse, SmartCardError> parseResult = 
+            Result<InitializeUpdateResponse, SmartCardError> parseResult =
                 ResponseParser.ParseInitializeUpdateResponse(response.Value);
-            
+
             if (parseResult.IsSuccess)
             {
-                byte protocolVersion = parseResult.Value.ScpId;
-                return Result.Success<(IKeySet, byte), SmartCardError>((keySet, protocolVersion));
+                Maybe<ScpVersion> protocolVersion = parseResult.Value.ScpId;
+                return protocolVersion
+                    .ToResult(SmartCardError.InvalidArgument("Could not determine SCP protocol version"))
+                    .Map(version => (keySet, version));
             }
         }
 

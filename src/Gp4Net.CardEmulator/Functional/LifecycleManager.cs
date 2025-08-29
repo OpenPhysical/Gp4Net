@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -57,7 +56,7 @@ public static class LifecycleManager
         byte currentState, byte newState, string context = "")
     {
         // GP Section 5.1.2 - Valid application lifecycle transitions
-        var validTransitions = GetValidApplicationTransitions(currentState);
+        ImmutableHashSet<byte> validTransitions = GetValidApplicationTransitions(currentState);
         
         if (!validTransitions.Contains(newState))
         {
@@ -75,7 +74,7 @@ public static class LifecycleManager
         byte currentState, byte newState, string context = "")
     {
         // GP Section 5.2.2 - Valid load file lifecycle transitions
-        var validTransitions = GetValidLoadFileTransitions(currentState);
+        ImmutableHashSet<byte> validTransitions = GetValidLoadFileTransitions(currentState);
         
         if (!validTransitions.Contains(newState))
         {
@@ -100,7 +99,7 @@ public static class LifecycleManager
                 SmartCardError.InvalidArgument("Invalid initial application lifecycle state"));
         }
 
-        var application = new InstalledApplication(
+        InstalledApplication application = new InstalledApplication(
             Aid: aid,
             ExecutableModuleAid: executableModuleAid,
             LifeCycleState: lifeCycleState,
@@ -124,7 +123,7 @@ public static class LifecycleManager
                 SmartCardError.InvalidArgument("Invalid initial load file lifecycle state"));
         }
 
-        var loadFile = new LoadFile(
+        LoadFile loadFile = new LoadFile(
             Aid: aid,
             SecurityDomainAid: securityDomainAid,
             LifeCycleState: lifeCycleState,
@@ -226,7 +225,7 @@ public static class LifecycleManager
     public static Result<CardState, SmartCardError> UpdateApplicationLifecycle(
         CardState state, string applicationKey, byte newLifecycleState)
     {
-        if (!state.Applications.TryGetValue(applicationKey, out var application))
+        if (!state.Applications.TryGetValue(applicationKey, out InstalledApplication? application))
         {
             return Result.Failure<CardState, SmartCardError>(
                 SmartCardError.ReferencedDataNotFound());
@@ -245,9 +244,9 @@ public static class LifecycleManager
     public static Result<CardState, SmartCardError> UpdateLoadFileLifecycle(
         CardState state, byte[] loadFileAid, byte newLifecycleState)
     {
-        // Find matching load file index using explicit validation
-        var matchingLoadFiles = state.LoadFiles
-            .Select((lf, index) => new { LoadFile = lf, Index = index })
+        // Find matching load file index using explicit validation  
+        (LoadFile LoadFile, int Index)[] matchingLoadFiles = state.LoadFiles
+            .Select((lf, index) => (LoadFile: lf, Index: index))
             .Where(x => x.LoadFile.Aid.SequenceEqual(loadFileAid))
             .ToArray();
 
@@ -257,8 +256,8 @@ public static class LifecycleManager
                 SmartCardError.ReferencedDataNotFound());
         }
 
-        var loadFileIndex = matchingLoadFiles.First().Index;
-        var loadFile = state.LoadFiles[loadFileIndex];
+        int loadFileIndex = matchingLoadFiles.First().Index;
+        LoadFile loadFile = state.LoadFiles[loadFileIndex];
         
         return TransitionLoadFileState(loadFile, newLifecycleState)
             .Map(updatedLoadFile => state with 

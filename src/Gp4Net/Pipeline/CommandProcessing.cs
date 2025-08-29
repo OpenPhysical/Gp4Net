@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Security;
 using Gp4Net.Transport;
@@ -80,7 +81,7 @@ public static class CommandProcessing
         /// <summary>
         /// Checks if the command was successful.
         /// </summary>
-        public bool IsSuccess => StatusWord == Constants.StatusWords.Success || 
+        public bool IsSuccess => StatusWord == Constants.StatusWords.Success ||
                                 (StatusWord & 0xFF00) == 0x6100;
     }
 

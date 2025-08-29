@@ -53,13 +53,13 @@ public static class EncodingUtils
         try
         {
             // Use UTF-8 decoder with strict validation
-            var decoder = Encoding.UTF8.GetDecoder();
+            Decoder decoder = Encoding.UTF8.GetDecoder();
             decoder.Fallback = DecoderFallback.ExceptionFallback; // Throw on invalid sequences
 
-            var chars = new char[Encoding.UTF8.GetMaxCharCount(bytes.Length)];
-            var charCount = decoder.GetChars(bytes, 0, bytes.Length, chars, 0, true);
+            char[] chars = new char[Encoding.UTF8.GetMaxCharCount(bytes.Length)];
+            int charCount = decoder.GetChars(bytes, 0, bytes.Length, chars, 0, true);
 
-            var result = new string(chars, 0, charCount);
+            string result = new string(chars, 0, charCount);
 
             // Security check: Reject strings with embedded null characters
             if (result.Contains('\0'))
@@ -69,7 +69,7 @@ public static class EncodingUtils
             }
 
             // Security check: Validate reasonable character ranges (optional but recommended)
-            foreach (var c in result)
+            foreach (char c in result)
             {
                 // Reject control characters except common whitespace
                 if (char.IsControl(c) && c != '\t' && c != '\n' && c != '\r')
@@ -121,11 +121,11 @@ public static class EncodingUtils
         }
 
         // Validate all bytes are valid ASCII (0-127) using functional approach
-        var invalidByteIndex = bytes.AsEnumerable().Select((b, index) => new { Byte = b, Index = index })
+        int invalidByteIndex = bytes.AsEnumerable().Select((b, index) => new { Byte = b, Index = index })
             .Where(x => x.Byte > 127)
             .Select(x => x.Index)
             .FirstOrDefault(-1);
-            
+
         if (invalidByteIndex >= 0)
         {
             return Result.Failure<string, SmartCardError>(
@@ -134,7 +134,7 @@ public static class EncodingUtils
 
         try
         {
-            var result = Encoding.ASCII.GetString(bytes);
+            string result = Encoding.ASCII.GetString(bytes);
 
             // Security check: Reject embedded nulls
             if (result.Contains('\0'))
@@ -152,25 +152,4 @@ public static class EncodingUtils
         }
     }
 
-    /// <summary>
-    /// Safely decodes hex string with validation.
-    /// Useful for debugging and logging binary data safely.
-    /// </summary>
-    /// <param name="bytes">The bytes to convert to hex.</param>
-    /// <returns>Hex string representation.</returns>
-    public static string SafeToHexString(byte[] bytes)
-    {
-        if (bytes == null || bytes.Length == 0)
-        {
-            return string.Empty;
-        }
-
-        // Prevent excessive memory usage for very large byte arrays
-        if (bytes.Length > MaxTextLength / 2) // Each byte becomes 2 hex chars
-        {
-            return $"[{bytes.Length} bytes - too large to display]";
-        }
-
-        return Convert.ToHexString(bytes);
-    }
 }

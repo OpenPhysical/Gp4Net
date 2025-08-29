@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Core.Tlv;
+using Gp4Net.Tool.Common;
 
 namespace Gp4Net.Tool.Commands.Debug;
 
@@ -14,12 +17,11 @@ namespace Gp4Net.Tool.Commands.Debug;
 /// </summary>
 public static class TlvTableBuilder
 {
-    #region Semantic Row Types
 
     /// <summary>
-    /// Base type for all TLV display rows, enabling type-safe UI composition.
+    /// Base type for all TLV display rows, inheriting from semantic row system.
     /// </summary>
-    public abstract record TlvRow;
+    public abstract record TlvRow : SemanticTableBuilder.SemanticRow;
 
     /// <summary>
     /// Row displaying TLV element information.
@@ -60,8 +62,6 @@ public static class TlvTableBuilder
     /// </summary>
     public record InfoRow(string Message, string Severity = "info") : TlvRow;
 
-    #endregion
-
     /// <summary>
     /// Main entry point to build TLV parsing rows using functional composition.
     /// Returns semantic row types that can be rendered by any UI framework.
@@ -86,7 +86,7 @@ public static class TlvTableBuilder
         yield return new SummaryRow($"Parsing {data.Length} bytes of TLV data:");
         yield return new InfoRow($"Raw hex: {Convert.ToHexString(data)}", "info");
 
-        var parseResult = TryParseTlv(data);
+        (IEnumerable<TlvObject> elements, string error) parseResult = TryParseTlv(data);
         if (parseResult.elements == null || !parseResult.elements.Any())
         {
             if (!string.IsNullOrEmpty(parseResult.error))
@@ -100,10 +100,10 @@ public static class TlvTableBuilder
             yield break;
         }
 
-        var elementIndex = 0;
-        foreach (var element in parseResult.elements)
+        int elementIndex = 0;
+        foreach (TlvObject element in parseResult.elements)
         {
-            foreach (var row in BuildTlvElementRows(element, elementIndex++, 0, showBytes, recursive))
+            foreach (TlvRow row in BuildTlvElementRows(element, elementIndex++, 0, showBytes, recursive))
             {
                 yield return row;
             }
@@ -120,15 +120,15 @@ public static class TlvTableBuilder
         bool showBytes,
         bool recursive)
     {
-        var tagInfo = GetTagInfo(element);
-        var lengthInfo = GetLengthInfo(element);
-        var content = GetTlvContent(element);
-        var asciiContent = GetAsciiContent(element);
+        string tagInfo = GetTagInfo(element);
+        string lengthInfo = GetLengthInfo(element);
+        Maybe<string> content = GetTlvContent(element);
+        Maybe<string> asciiContent = GetAsciiContent(element);
 
-        var rawBytes = Maybe<string>.None;
+        Maybe<string> rawBytes = Maybe<string>.None;
         if (showBytes)
         {
-            var fullBytes = GetFullElementBytes(element);
+            byte[] fullBytes = GetFullElementBytes(element);
             rawBytes = Maybe<string>.From($"Full TLV: {Convert.ToHexString(fullBytes)}");
         }
 
@@ -143,7 +143,7 @@ public static class TlvTableBuilder
         );
 
         // Add known tag interpretation if available
-        var interpretation = GetKnownTagInterpretation(element);
+        Maybe<string> interpretation = GetKnownTagInterpretation(element);
         if (interpretation.HasValue)
         {
             yield return new TagInterpretationRow(depth + 1, interpretation.Value);
@@ -152,14 +152,14 @@ public static class TlvTableBuilder
         // Recursive parsing if enabled and content looks like TLV
         if (recursive && element.Value.Length > 2 && IsLikelyTlv(element.Value))
         {
-            var nestedResult = TryParseTlv(element.Value);
+            (IEnumerable<TlvObject> elements, string error) nestedResult = TryParseTlv(element.Value);
             if (nestedResult.elements != null && nestedResult.elements.Any())
             {
                 yield return new NestedTlvHeaderRow(depth + 1);
-                var nestedIndex = 0;
-                foreach (var nested in nestedResult.elements)
+                int nestedIndex = 0;
+                foreach (TlvObject nested in nestedResult.elements)
                 {
-                    foreach (var row in BuildTlvElementRows(nested, nestedIndex++, depth + 2, showBytes, recursive))
+                    foreach (TlvRow row in BuildTlvElementRows(nested, nestedIndex++, depth + 2, showBytes, recursive))
                     {
                         yield return row;
                     }
@@ -173,13 +173,13 @@ public static class TlvTableBuilder
     /// </summary>
     public static string ToJson(IEnumerable<TlvRow> rows)
     {
-        var data = new List<object>();
-        
-        foreach (var row in rows)
+        List<object> data = [];
+
+        foreach (TlvRow row in rows)
         {
             object item = row switch
             {
-                TlvTableBuilder.TlvDataRow(var elementIndex, var depth, var tagInfo, var lengthInfo, var content, var asciiContent, var rawBytes) => new
+                TlvDataRow(var elementIndex, var depth, var tagInfo, var lengthInfo, var content, var asciiContent, var rawBytes) => new
                 {
                     type = "data",
                     elementIndex,
@@ -190,23 +190,23 @@ public static class TlvTableBuilder
                     asciiContent = asciiContent.GetValueOrDefault(""),
                     rawBytes = rawBytes.GetValueOrDefault("")
                 },
-                TlvTableBuilder.NestedTlvHeaderRow(var depth, var message) => new
+                NestedTlvHeaderRow(var depth, var message) => new
                 {
                     type = "nested",
                     depth,
                     message
                 },
-                TlvTableBuilder.TagInterpretationRow(var depth, var interpretation) => new
+                TagInterpretationRow(var depth, var interpretation) => new
                 {
                     type = "interpretation",
                     depth,
                     interpretation
                 },
-                TlvTableBuilder.SummaryRow(var message) => new { type = "summary", message },
-                TlvTableBuilder.InfoRow(var message, var severity) => new { type = "info", message, severity },
+                SummaryRow(var message) => new { type = "summary", message },
+                InfoRow(var message, var severity) => new { type = "info", message, severity },
                 _ => new { type = "unknown", data = row.ToString() }
             };
-            
+
             data.Add(item);
         }
 
@@ -220,7 +220,7 @@ public static class TlvTableBuilder
     {
         try
         {
-            var elements = TlvParser.ParseAll(data);
+            IReadOnlyList<TlvObject> elements = TlvParser.ParseAll(data);
             return (elements, null);
         }
         catch (Exception ex)
@@ -229,20 +229,18 @@ public static class TlvTableBuilder
         }
     }
 
-    #region Pure Helper Functions
-
     /// <summary>
     /// Gets tag information for a TLV element.
     /// </summary>
     private static string GetTagInfo(TlvObject element)
     {
-        var tagHex = element.GetTagAsHexString();
+        string tagHex = element.GetTagAsHexString();
         byte firstTagByte = element.Tag[0];
-        var tagNumberResult = element.GetTagNumber();
-        var tagName = tagNumberResult.IsSuccess ? GetKnownTagName(tagNumberResult.Value) : "UNKNOWN";
-        var tagClass = GetTagClass(firstTagByte);
-        var constructed = (firstTagByte & 0x20) != 0 ? "constructed" : "primitive";
-            
+        Result<uint, SmartCardError> tagNumberResult = element.GetTagNumber();
+        string tagName = tagNumberResult.IsSuccess ? GetKnownTagName(tagNumberResult.Value) : "UNKNOWN";
+        string tagClass = GetTagClass(firstTagByte);
+        string constructed = (firstTagByte & 0x20) != 0 ? "constructed" : "primitive";
+
         return $"Tag {tagHex} ({tagName}) - {tagClass}, {constructed}";
     }
 
@@ -255,7 +253,7 @@ public static class TlvTableBuilder
         {
             0x4F => "AID (Application Identifier)",
             0x61 => "Application Template",
-            0x62 => "FCP Template", 
+            0x62 => "FCP Template",
             0x6F => "FCI Template",
             0x73 => "Security Support Template",
             0x80 => "Response Message Template",
@@ -311,18 +309,18 @@ public static class TlvTableBuilder
             case 0:
                 return Maybe<string>.From("(empty)");
             case <= 32:
-            {
-                // Short content - show as hex
-                var hexContent = Convert.ToHexString(element.Value);
-                return Maybe<string>.From($"Content: {hexContent}");
-            }
+                {
+                    // Short content - show as hex
+                    string hexContent = Convert.ToHexString(element.Value);
+                    return Maybe<string>.From($"Content: {hexContent}");
+                }
             default:
-            {
-                // Long content - show truncated hex
-                var truncated = element.Value[..16];
-                var hexContent = Convert.ToHexString(truncated);
-                return Maybe<string>.From($"Content: {hexContent}... ({element.Value.Length} bytes total)");
-            }
+                {
+                    // Long content - show truncated hex
+                    byte[] truncated = element.Value[..16];
+                    string hexContent = Convert.ToHexString(truncated);
+                    return Maybe<string>.From($"Content: {hexContent}... ({element.Value.Length} bytes total)");
+                }
         }
     }
 
@@ -333,7 +331,7 @@ public static class TlvTableBuilder
     {
         if (element.Value.Length > 0 && element.Value.Length <= 32 && IsPrintableAscii(element.Value))
         {
-            var ascii = System.Text.Encoding.ASCII.GetString(element.Value);
+            string ascii = System.Text.Encoding.ASCII.GetString(element.Value);
             return Maybe<string>.From($"ASCII: \"{ascii}\"");
         }
         return Maybe<string>.None;
@@ -349,12 +347,12 @@ public static class TlvTableBuilder
             error => Maybe<string>.None
         );
     }
-    
+
     private static Maybe<string> InterpretByTagNumber(uint tagNumber, TlvObject element)
     {
-        var elementValue = GetTlvValueUsingReflection(element);
+        byte[] elementValue = GetTlvValueUsingReflection(element);
         if (elementValue == null) return Maybe<string>.None;
-        
+
         return tagNumber switch
         {
             0x4F when elementValue.Length >= 5 => Maybe<string>.From($"AID: {Convert.ToHexString(elementValue)}"),
@@ -363,11 +361,11 @@ public static class TlvTableBuilder
             _ => Maybe<string>.None
         };
     }
-    
+
     private static byte[] GetTlvValueUsingReflection(TlvObject element)
     {
-        var valueProperty = typeof(TlvObject).GetProperty("Value");
-        return valueProperty?.GetValue(element) as byte[] ?? Array.Empty<byte>();
+        PropertyInfo valueProperty = typeof(TlvObject).GetProperty("Value");
+        return valueProperty?.GetValue(element) as byte[] ?? [];
     }
 
     /// <summary>
@@ -378,7 +376,7 @@ public static class TlvTableBuilder
         return state switch
         {
             0x01 => "OP_READY",
-            0x03 => "INITIALIZED", 
+            0x03 => "INITIALIZED",
             0x07 => "SECURED",
             0x0F => "CARD_LOCKED",
             0x7F => "TERMINATED",
@@ -392,10 +390,10 @@ public static class TlvTableBuilder
     private static byte[] GetFullElementBytes(TlvObject element)
     {
         // Calculate total length
-        var tagLength = element.Tag.Length;
-        var valueLength = element.Value.Length;
+        int tagLength = element.Tag.Length;
+        int valueLength = element.Value.Length;
         int lengthFieldSize;
-        
+
         switch (valueLength)
         {
             case < 128:
@@ -409,14 +407,14 @@ public static class TlvTableBuilder
                 lengthFieldSize = 3;
                 break;
         }
-        
-        var result = new byte[tagLength + lengthFieldSize + valueLength];
-        
+
+        byte[] result = new byte[tagLength + lengthFieldSize + valueLength];
+
         // Copy tag
         Array.Copy(element.Tag, 0, result, 0, tagLength);
-        
+
         // Encode length
-        var offset = tagLength;
+        int offset = tagLength;
         if (valueLength < 0x80)
         {
             // Short form
@@ -430,10 +428,10 @@ public static class TlvTableBuilder
             result[offset + 1] = (byte)valueLength;
             offset += 2;
         }
-        
+
         // Copy value
         Array.Copy(element.Value, 0, result, offset, valueLength);
-            
+
         return result;
     }
 
@@ -447,7 +445,7 @@ public static class TlvTableBuilder
             return false;
         }
 
-        var parseResult = TryParseTlv(data);
+        (IEnumerable<TlvObject> elements, string error) parseResult = TryParseTlv(data);
         return parseResult.elements?.Any() == true;
     }
 
@@ -456,7 +454,7 @@ public static class TlvTableBuilder
     /// </summary>
     private static bool IsPrintableAscii(byte[] data)
     {
-        foreach (var b in data)
+        foreach (byte b in data)
         {
             if (b is < 32 or > 126)
             {
@@ -466,5 +464,4 @@ public static class TlvTableBuilder
         return true;
     }
 
-    #endregion
 }

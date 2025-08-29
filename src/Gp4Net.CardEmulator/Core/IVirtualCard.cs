@@ -1,4 +1,5 @@
 using System;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using JetBrains.Annotations;
 
@@ -25,7 +26,7 @@ public interface IVirtualCard
     /// <summary>
     /// Resets the virtual card to its initial state.
     /// </summary>
-    void Reset();
+    UnitResult<SmartCardError> Reset();
 
     /// <summary>
     /// Gets a value indicating whether the card is currently selected.
@@ -102,7 +103,7 @@ public class ApduResponse
     /// <returns>The response bytes including status word.</returns>
     public byte[] ToBytes()
     {
-        var result = new byte[Data.Length + 2];
+        byte[] result = new byte[Data.Length + 2];
         Array.Copy(Data, 0, result, 0, Data.Length);
         result[Data.Length] = (byte)(StatusWord >> 8);
         result[Data.Length + 1] = (byte)(StatusWord & 0xFF);

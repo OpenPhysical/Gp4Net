@@ -60,7 +60,7 @@ public record CardDataInfo(
     public static Result<CardDataInfo, SmartCardError> Parse(byte[] data)
     {
         // Eliminate null by requiring non-null data at system boundary
-        return data.Length == 0 
+        return data.Length == 0
             ? Result.Success<CardDataInfo, SmartCardError>(Empty)
             : ParseCardDataElements(data);
     }
@@ -73,18 +73,18 @@ public record CardDataInfo(
     {
         return Result.Try(() =>
         {
-            var tags = ParseTlvTags(data);
-            var oids = ExtractOids(data);
-            var gpVersionFromOid = ExtractGpVersionFromOids(oids);
-            var gpVersion = ExtractGpVersionFromTags(tags);
-            
+            IReadOnlyDictionary<ushort, byte[]> tags = ParseTlvTags(data);
+            IReadOnlyList<string> oids = ExtractOids(data);
+            Maybe<string> gpVersionFromOid = ExtractGpVersionFromOids(oids);
+            Maybe<Version> gpVersion = ExtractGpVersionFromTags(tags);
+
             return new CardDataInfo(
                 data,
                 tags,
                 gpVersion,
-                tags.TryGetValue(0x64, out var scpInfo) ? Maybe<byte[]>.From(scpInfo) : Maybe<byte[]>.None,
-                tags.TryGetValue(0x65, out var configDetails) ? Maybe<byte[]>.From(configDetails) : Maybe<byte[]>.None,
-                tags.TryGetValue(0x66, out var chipDetails) ? Maybe<byte[]>.From(chipDetails) : Maybe<byte[]>.None,
+                tags.TryGetValue(0x64, out byte[] scpInfo) ? Maybe<byte[]>.From(scpInfo) : Maybe<byte[]>.None,
+                tags.TryGetValue(0x65, out byte[] configDetails) ? Maybe<byte[]>.From(configDetails) : Maybe<byte[]>.None,
+                tags.TryGetValue(0x66, out byte[] chipDetails) ? Maybe<byte[]>.From(chipDetails) : Maybe<byte[]>.None,
                 oids,
                 gpVersionFromOid
             );
@@ -97,17 +97,17 @@ public record CardDataInfo(
     /// </summary>
     private static IReadOnlyDictionary<ushort, byte[]> ParseTlvTags(byte[] data)
     {
-        var tags = new Dictionary<ushort, byte[]>();
-        
-        foreach (var element in TlvParser.ParseAll(data))
+        Dictionary<ushort, byte[]> tags = new Dictionary<ushort, byte[]>();
+
+        foreach (TlvObject element in TlvParser.ParseAll(data))
         {
-            var tagNumber = element.GetTagNumber();
+            Result<uint, SmartCardError> tagNumber = element.GetTagNumber();
             if (tagNumber.IsSuccess)
             {
                 tags[(ushort)tagNumber.Value] = element.Value;
             }
         }
-        
+
         return tags;
     }
 
@@ -117,7 +117,7 @@ public record CardDataInfo(
     /// </summary>
     private static IReadOnlyList<string> ExtractOids(byte[] data)
     {
-        var oids = new List<string>();
+        List<string> oids = [];
         ExtractOidsRecursive(data, oids);
         return oids;
     }
@@ -127,9 +127,9 @@ public record CardDataInfo(
     /// </summary>
     private static void ExtractOidsRecursive(byte[] data, List<string> oids)
     {
-        foreach (var element in TlvParser.ParseAll(data))
+        foreach (TlvObject element in TlvParser.ParseAll(data))
         {
-            var tagNumber = element.GetTagNumber();
+            Result<uint, SmartCardError> tagNumber = element.GetTagNumber();
             if (tagNumber.IsSuccess && tagNumber.Value == 0x06)
             {
                 // Parse OID using BouncyCastle ASN.1 parser
@@ -141,7 +141,7 @@ public record CardDataInfo(
             else if (element.Value.Length >= 2)
             {
                 // Recursively parse nested structures
-                var nestedElements = TlvParser.ParseAll(element.Value).ToList();
+                List<TlvObject> nestedElements = TlvParser.ParseAll(element.Value).ToList();
                 if (nestedElements.Any())
                 {
                     ExtractOidsRecursive(element.Value, oids);
@@ -158,12 +158,12 @@ public record CardDataInfo(
         try
         {
             // Create DER-encoded OID from content
-            var derBytes = new byte[oidBytes.Length + 2];
+            byte[] derBytes = new byte[oidBytes.Length + 2];
             derBytes[0] = 0x06; // OID tag
             derBytes[1] = (byte)oidBytes.Length;
             Buffer.BlockCopy(oidBytes, 0, derBytes, 2, oidBytes.Length);
 
-            var asn1Object = Asn1Object.FromByteArray(derBytes);
+            Asn1Object asn1Object = Asn1Object.FromByteArray(derBytes);
             return asn1Object is DerObjectIdentifier oidObj ? Maybe<string>.From(oidObj.Id) : Maybe<string>.None;
         }
         catch
@@ -178,7 +178,7 @@ public record CardDataInfo(
     /// </summary>
     private static Maybe<string> ExtractGpVersionFromOids(IReadOnlyList<string> oids)
     {
-        var result = oids
+        string result = oids
             .Where(oid => oid.StartsWith("1.2.840.114283.2.") && oid != "1.2.840.114283.2")
             .Select(oid => oid.Split('.'))
             .Where(parts => parts.Length >= 7)
@@ -193,7 +193,7 @@ public record CardDataInfo(
     /// </summary>
     private static Maybe<Version> ExtractGpVersionFromTags(IReadOnlyDictionary<ushort, byte[]> tags)
     {
-        return tags.TryGetValue(0x73, out var gpVersionData) 
+        return tags.TryGetValue(0x73, out byte[] gpVersionData)
             ? ParseGlobalPlatformVersion(gpVersionData)
             : Maybe<Version>.None;
     }
@@ -251,8 +251,8 @@ public record CardDataInfo(
     /// </summary>
     public override string ToString()
     {
-        var parts = new List<string>
-        {
+        List<string> parts =
+        [
             $"Data = {(Data.Length > 0 ? $"System.Byte[{Data.Length}]" : "System.Byte[]")}",
             $"Tags = System.Collections.Generic.Dictionary`2[System.UInt16,System.Byte[]]",
             $"GlobalPlatformVersion = {(GlobalPlatformVersion.HasValue ? GlobalPlatformVersion.Value.ToString() : "No value")}",
@@ -260,7 +260,7 @@ public record CardDataInfo(
             $"CardConfigurationDetails = {(CardConfigurationDetails.HasValue ? "System.Byte[]" : "No value")}",
             $"CardChipDetails = {(CardChipDetails.HasValue ? "System.Byte[]" : "No value")}",
             $"Oids = System.Collections.Generic.List`1[System.String]"
-        };
+        ];
 
         if (GlobalPlatformVersionFromOid.HasValue)
         {
@@ -273,21 +273,21 @@ public record CardDataInfo(
 
         parts.Add($"HasData = {HasData}");
 
-        var result = $"CardDataInfo {{ {string.Join(", ", parts)} }}";
+        string result = $"CardDataInfo {{ {string.Join(", ", parts)} }}";
 
         // Add parsed OIDs section if we have OIDs
         if (Oids.Count > 0)
         {
             result += "\n\nParsed OIDs:\n";
-            foreach (var oid in Oids)
+            foreach (string oid in Oids)
             {
-                var description = GetOidDescription(oid);
+                string description = GetOidDescription(oid);
                 result += $"{oid}\n-> {description}\n";
-                
+
                 // Add GP version info for version OIDs
                 if (oid.StartsWith("1.2.840.114283.2.") && oid != "1.2.840.114283.2")
                 {
-                    var versionParts = oid.Split('.').Skip(4);
+                    IEnumerable<string> versionParts = oid.Split('.').Skip(4);
                     result += $"-> GP Version: {string.Join(".", versionParts)}\n";
                 }
             }
@@ -297,14 +297,14 @@ public record CardDataInfo(
         if (SecureChannelProtocolInfo.HasValue)
         {
             result += "\nSecure Channel Protocol Info:\n";
-            var scpData = SecureChannelProtocolInfo.Value;
+            byte[] scpData = SecureChannelProtocolInfo.Value;
             result += $"Raw data: {Convert.ToHexString(scpData)}\n";
-            
+
             // Parse SCP info according to GP specification
             if (scpData.Length >= 2)
             {
-                var scpId = scpData[0];
-                var implOptions = scpData[1];
+                byte scpId = scpData[0];
+                byte implOptions = scpData[1];
                 result += $"SCP ID: {scpId:X2}, Implementation Options: {implOptions:X2}\n";
             }
         }
@@ -322,17 +322,17 @@ public record CardDataInfo(
         {
             // GlobalPlatform OIDs per GP Card Specification v2.3.1 Section H.1
             "1.2.840.114283.1" => "Card Recognition Data, also identifies GlobalPlatform as the Tag Allocation Authority",
-            "1.2.840.114283.2" => "Card Management Type and Version", 
+            "1.2.840.114283.2" => "Card Management Type and Version",
             "1.2.840.114283.3" => "Card Identification Scheme - card uniquely identified by IIN and CIN",
-            
+
             // JavaCard OIDs (Oracle/Sun Microsystems enterprise OID space)
             "1.3.6.1.4.1.42.2.110.1.3" => "JavaCard Runtime Environment version 3.x",
-            
+
             // Pattern matching for versioned OIDs
             _ when oid.StartsWith("1.2.840.114283.2.") => "Card Management Type and Version",
             _ when oid.StartsWith("1.2.840.114283.4.") => "Secure Channel Protocol of Security Domain and implementation options",
             _ when oid.StartsWith("1.3.6.1.4.1.42.2.110.") => "JavaCard Runtime Environment",
-            
+
             _ => "Unknown OID"
         };
     }

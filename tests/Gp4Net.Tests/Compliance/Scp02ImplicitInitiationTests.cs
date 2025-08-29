@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
@@ -27,7 +28,7 @@ public class Scp02ImplicitInitiationTests
     /// </summary>
     [Test]
     [TestCase(ScpImplementation.Scp02I0A)]
-    [TestCase(ScpImplementation.Scp02I1A)]  
+    [TestCase(ScpImplementation.Scp02I1A)]
     [TestCase(ScpImplementation.Scp02I2A)]
     [TestCase(ScpImplementation.Scp02I3A)]
     [TestCase(ScpImplementation.Scp02I4A)]
@@ -36,30 +37,30 @@ public class Scp02ImplicitInitiationTests
     public void Scp02_Should_Calculate_ICV_From_AID_MAC_For_Implicit_Implementations(ScpImplementation implementation)
     {
         // Arrange - GP Card Spec v2.3.1 Table E-1: bit b4 (0x10) indicates MAC over AID
-        implementation.HasMacOverAid().Should().BeTrue("Test case should only include implementations with MAC over AID");
-        implementation.IsExplicitMode().Should().BeFalse("Test should only cover implicit mode implementations");
-        
-        var selectedAid = new byte[] { 0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00 }; // GP Card Manager AID
-        var cMacKey = new byte[]
-        {
+        _ = implementation.HasMacOverAid().Should().BeTrue("Test case should only include implementations with MAC over AID");
+        _ = implementation.IsExplicitMode().Should().BeFalse("Test should only cover implicit mode implementations");
+
+        byte[] selectedAid = [0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00]; // GP Card Manager AID
+        byte[] cMacKey =
+        [
             0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
             0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F
-        };
+        ];
 
         // Act - Calculate ICV per Section E.3.3
-        var icvResult = CalculateIcvFromAidMac(selectedAid, cMacKey);
+        Result<byte[], SmartCardError> icvResult = CalculateIcvFromAidMac(selectedAid, cMacKey);
 
         // Assert
-        icvResult.IsSuccess.Should().BeTrue("ICV calculation should succeed for compliant implementations");
-        
-        icvResult.Match(
+        _ = icvResult.IsSuccess.Should().BeTrue("ICV calculation should succeed for compliant implementations");
+
+        _ = icvResult.Match(
             icv =>
             {
-                icv.Length.Should().Be(8, "ICV is always 8 bytes per GP specification");
-                
+                _ = icv.Length.Should().Be(8, "ICV is always 8 bytes per GP specification");
+
                 // Verify it's not all zeros (unless AID MAC happens to result in zeros)
-                var isAllZeros = icv.All(b => b == 0);
-                isAllZeros.Should().BeFalse("ICV from AID MAC should not be all zeros for standard GP Card Manager AID");
+                bool isAllZeros = icv.All(b => b == 0);
+                _ = isAllZeros.Should().BeFalse("ICV from AID MAC should not be all zeros for standard GP Card Manager AID");
                 return Result.Success();
             },
             error =>
@@ -78,23 +79,23 @@ public class Scp02ImplicitInitiationTests
     public void Scp02_Should_Initiate_Secure_Channel_On_First_CMac_Command_For_Implicit_Mode()
     {
         // Arrange - Test implicit mode implementation
-        var implementation = ScpImplementation.Scp02I0A; // Implicit mode, MAC over AID
-        implementation.IsExplicitMode().Should().BeFalse("Test requires implicit mode implementation");
-        
-        var sessionState = CreateImplicitSessionState();
-        var commandWithCMac = CreateCommandWithCMac();
+        ScpImplementation implementation = ScpImplementation.Scp02I0A; // Implicit mode, MAC over AID
+        _ = implementation.IsExplicitMode().Should().BeFalse("Test requires implicit mode implementation");
+
+        ImplicitSessionState sessionState = CreateImplicitSessionState();
+        TestCommand commandWithCMac = CreateCommandWithCMac();
 
         // Act - Process first C-MAC command (should initiate secure channel)
-        var result = ProcessImplicitSecureChannelInitiation(sessionState, commandWithCMac, implementation);
+        Result<ImplicitSessionState, SmartCardError> result = ProcessImplicitSecureChannelInitiation(sessionState, commandWithCMac, implementation);
 
         // Assert
-        result.IsSuccess.Should().BeTrue("Implicit secure channel initiation should succeed");
-        result.Match(
+        _ = result.IsSuccess.Should().BeTrue("Implicit secure channel initiation should succeed");
+        _ = result.Match(
             updatedState =>
             {
-                updatedState.IsSecureChannelActive.Should().BeTrue(
+                _ = updatedState.IsSecureChannelActive.Should().BeTrue(
                     "GP Section E.1.2.2: Secure channel should be active after first valid C-MAC");
-                updatedState.SecurityLevel.Should().HaveFlag(SecurityLevel.CMac,
+                _ = updatedState.SecurityLevel.Should().HaveFlag(SecurityLevel.CMac,
                     "GP Section E.1.6: Implicit initiation with C-MAC sets C_MAC level");
                 return Result.Success();
             },
@@ -120,14 +121,14 @@ public class Scp02ImplicitInitiationTests
             new { HasCMac = true, ExpectedActive = true, Description = "With C-MAC, session active" }
         };
 
-        var validationResults = testCases.Select(testCase =>
+        IEnumerable<Result> validationResults = testCases.Select(testCase =>
         {
-            var sessionState = CreateImplicitSessionState();
-            var command = testCase.HasCMac ? CreateCommandWithCMac() : CreateCommandWithoutCMac();
-            
+            ImplicitSessionState sessionState = CreateImplicitSessionState();
+            TestCommand command = testCase.HasCMac ? CreateCommandWithCMac() : CreateCommandWithoutCMac();
+
             // Act
-            var result = ProcessImplicitSecureChannelInitiation(sessionState, command, ScpImplementation.Scp02I0A);
-            
+            Result<ImplicitSessionState, SmartCardError> result = ProcessImplicitSecureChannelInitiation(sessionState, command, ScpImplementation.Scp02I0A);
+
             return result.Match(
                 state => state.IsSecureChannelActive == testCase.ExpectedActive
                     ? Result.Success()
@@ -136,8 +137,8 @@ public class Scp02ImplicitInitiationTests
             );
         });
 
-        var combinedResult = Result.Combine(validationResults.ToArray());
-        combinedResult.IsSuccess.Should().BeTrue("All protocol rules should be enforced correctly");
+        Result combinedResult = Result.Combine(validationResults.ToArray());
+        _ = combinedResult.IsSuccess.Should().BeTrue("All protocol rules should be enforced correctly");
     }
 
     // Helper methods for implicit initiation testing
@@ -145,10 +146,10 @@ public class Scp02ImplicitInitiationTests
     private static Result<byte[], SmartCardError> CalculateIcvFromAidMac(byte[] aid, byte[] cMacKey)
     {
         // GP Section E.3.3: Apply reversible padding and calculate MAC
-        var paddedAid = ApplyGpPadding(aid);
-        
+        byte[] paddedAid = ApplyGpPadding(aid);
+
         // Simulate MAC calculation over padded AID with zero ICV (simplified for testing)
-        var mac = Enumerable.Range(0, 8)
+        byte[] mac = Enumerable.Range(0, 8)
                            .Select(i => (byte)(paddedAid[i % paddedAid.Length] ^ cMacKey[i]))
                            .ToArray();
 
@@ -158,22 +159,22 @@ public class Scp02ImplicitInitiationTests
     private static byte[] ApplyGpPadding(byte[] data)
     {
         // GP padding: append 0x80 followed by zeros to reach multiple of 8
-        var paddingNeeded = data.Length % 8 == 0 ? 0 : 8 - (data.Length % 8);
-        
+        int paddingNeeded = data.Length % 8 == 0 ? 0 : 8 - (data.Length % 8);
+
         if (paddingNeeded == 0)
         {
             return data;
         }
 
-        return data.Concat(new[] { (byte)0x80 })
+        return data.Concat([(byte)0x80])
                   .Concat(Enumerable.Repeat((byte)0x00, paddingNeeded - 1))
                   .ToArray();
     }
 
     private static ImplicitSessionState CreateImplicitSessionState()
     {
-        return new ImplicitSessionState 
-        { 
+        return new ImplicitSessionState
+        {
             IsSecureChannelActive = false,
             SecurityLevel = SecurityLevel.None
         };
@@ -181,25 +182,25 @@ public class Scp02ImplicitInitiationTests
 
     private static TestCommand CreateCommandWithCMac()
     {
-        return new TestCommand 
-        { 
+        return new TestCommand
+        {
             HasCMac = true,
-            Data = new byte[] { 0x80, 0xCA, 0x00, 0x00, 0x08, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }
+            Data = [0x80, 0xCA, 0x00, 0x00, 0x08, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]
         };
     }
 
     private static TestCommand CreateCommandWithoutCMac()
     {
-        return new TestCommand 
-        { 
+        return new TestCommand
+        {
             HasCMac = false,
-            Data = new byte[] { 0x80, 0xCA, 0x00, 0x00, 0x00 }
+            Data = [0x80, 0xCA, 0x00, 0x00, 0x00]
         };
     }
 
     private static Result<ImplicitSessionState, SmartCardError> ProcessImplicitSecureChannelInitiation(
-        ImplicitSessionState sessionState, 
-        TestCommand command, 
+        ImplicitSessionState sessionState,
+        TestCommand command,
         ScpImplementation implementation)
     {
         // Simulate GP implicit initiation logic
@@ -210,8 +211,8 @@ public class Scp02ImplicitInitiationTests
         }
 
         // First C-MAC initiates secure channel per GP Section E.1.2.2
-        var newState = sessionState with 
-        { 
+        ImplicitSessionState newState = sessionState with
+        {
             IsSecureChannelActive = true,
             SecurityLevel = SecurityLevel.CMac
         };
@@ -228,6 +229,6 @@ public class Scp02ImplicitInitiationTests
     private record TestCommand
     {
         public bool HasCMac { get; init; }
-        public byte[] Data { get; init; } = Array.Empty<byte>();
+        public byte[] Data { get; init; } = [];
     }
 }

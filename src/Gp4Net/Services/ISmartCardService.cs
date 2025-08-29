@@ -55,6 +55,44 @@ public interface ISmartCardService : IDisposable
     /// <param name="value">The context value.</param>
     /// <returns>A Result containing a new service instance with the updated context, or an error if the context is invalid.</returns>
     Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value);
+
+    /// <summary>
+    /// Checks if the service is connected to a smart card.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>True if connected, false otherwise.</returns>
+    Task<Result<bool, SmartCardError>> IsConnectedAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the Answer To Reset (ATR) from the connected card.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The ATR bytes if available.</returns>
+    Task<Result<byte[], SmartCardError>> GetAtrAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the list of available card readers.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of reader names.</returns>
+    Task<Result<string[], SmartCardError>> GetReadersAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Checks if a secure channel is currently established.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>True if secure channel is established, false otherwise.</returns>
+    Task<Result<bool, SmartCardError>> IsSecureChannelEstablishedAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends a raw APDU command to the card.
+    /// </summary>
+    /// <param name="command">The APDU command bytes.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The response from the card.</returns>
+    Task<Result<CommandResponse, SmartCardError>> SendCommandAsync(
+        byte[] command,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

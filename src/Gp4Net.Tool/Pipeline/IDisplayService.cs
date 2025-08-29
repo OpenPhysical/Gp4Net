@@ -1,4 +1,5 @@
 using System;
+using Gp4Net.Domain;
 
 namespace Gp4Net.Tool.Pipeline;
 
@@ -40,7 +41,7 @@ public interface IDisplayService
     /// <summary>
     /// Displays card information.
     /// </summary>
-    void CardInfo(byte[] atr);
+    void CardInfo(Atr atr);
 
     /// <summary>
     /// Displays raw markup text.

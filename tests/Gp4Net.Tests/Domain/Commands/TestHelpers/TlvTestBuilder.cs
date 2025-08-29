@@ -8,7 +8,7 @@ namespace Gp4Net.Tests.Domain.Commands.TestHelpers;
 /// </summary>
 internal class TlvTestBuilder
 {
-    private readonly List<byte> _data = new();
+    private readonly List<byte> _data = [];
 
     public void Add(int tag, byte[] value)
     {
@@ -19,9 +19,9 @@ internal class TlvTestBuilder
 
     public void Add(int tag, Action<TlvTestBuilder> constructedContent)
     {
-        var subBuilder = new TlvTestBuilder();
+        TlvTestBuilder subBuilder = new TlvTestBuilder();
         constructedContent(subBuilder);
-        var value = subBuilder.Build();
+        byte[] value = subBuilder.Build();
         Add(tag, value);
     }
 

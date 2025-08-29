@@ -67,8 +67,8 @@ public class BeginRMacSessionCommand
     /// <returns>The APDU command bytes.</returns>
     public byte[] ToApdu()
     {
-        var dataLength = (Data?.Length ?? 0) + (Mac?.Length ?? 0);
-        var apdu = new byte[5 + dataLength];
+        int dataLength = (Data?.Length ?? 0) + (Mac?.Length ?? 0);
+        byte[] apdu = new byte[5 + dataLength];
 
         apdu[0] = Cla;
         apdu[1] = Ins;
@@ -76,7 +76,7 @@ public class BeginRMacSessionCommand
         apdu[3] = 0x01; // P2
         apdu[4] = (byte)dataLength; // Lc
 
-        var offset = 5;
+        int offset = 5;
 
         // Copy data if present
         if (Data.Length > 0)
@@ -109,7 +109,7 @@ public class BeginRMacSessionCommand
         byte[] mac = null)
     {
         // Validate security level
-        if (!System.Enum.IsDefined(typeof(SecurityLevel), securityLevel))
+        if (!Enum.IsDefined(typeof(SecurityLevel), securityLevel))
         {
             return Result.Failure<BeginRMacSessionCommand, SmartCardError>(
                 SmartCardError.InvalidArgument($"Invalid security level: {securityLevel}")
@@ -133,7 +133,7 @@ public class BeginRMacSessionCommand
         }
 
         // Convert security level to P1 parameter
-        var p1 = (byte)securityLevel;
+        byte p1 = (byte)securityLevel;
 
         return Result.Success<BeginRMacSessionCommand, SmartCardError>(
             new BeginRMacSessionCommand(cla, p1, data, mac)
@@ -201,8 +201,8 @@ public class EndRMacSessionCommand
     /// <returns>The APDU command bytes.</returns>
     public byte[] ToApdu()
     {
-        var dataLength = Mac?.Length ?? 0;
-        var apdu = new byte[5 + dataLength];
+        int dataLength = Mac?.Length ?? 0;
+        byte[] apdu = new byte[5 + dataLength];
 
         apdu[0] = Cla;
         apdu[1] = Ins;
@@ -232,7 +232,7 @@ public class EndRMacSessionCommand
         byte[] mac = null)
     {
         // Validate security level
-        if (!System.Enum.IsDefined(typeof(SecurityLevel), securityLevel))
+        if (!Enum.IsDefined(typeof(SecurityLevel), securityLevel))
         {
             return Result.Failure<EndRMacSessionCommand, SmartCardError>(
                 SmartCardError.InvalidArgument($"Invalid security level: {securityLevel}")

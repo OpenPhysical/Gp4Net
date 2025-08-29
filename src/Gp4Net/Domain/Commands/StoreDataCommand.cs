@@ -218,7 +218,7 @@ public class StoreDataCommand : IApduCommand
     public static Result<StoreDataCommand, SmartCardError> CreateDefaultKeyVersionCommand(byte keyVersion)
     {
         // Simple TLV format: 7F0D + length + key version
-        var data = new byte[] { 0x7F, 0x0D, 0x01, keyVersion };
+        byte[] data = [0x7F, 0x0D, 0x01, keyVersion];
 
         return new StoreDataCommand(DataStructureFormat.Dgi, BlockFormat.FirstOrOnly, data);
     }
@@ -238,7 +238,7 @@ public class StoreDataCommand : IApduCommand
     /// <returns>The APDU command bytes.</returns>
     public byte[] ToApdu()
     {
-        var apdu = new List<byte> { Cla, Ins, P1, P2 };
+        List<byte> apdu = [Cla, Ins, P1, P2];
 
         if (StoreData.Length > 0)
         {

@@ -12,6 +12,7 @@
     <PackageReference Include="CSharpFunctionalExtensions" Version="3.6.0" />
     <PackageReference Include="JetBrains.Annotations" Version="2024.3.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="PeterO.Cbor" Version="4.5.3" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Gp4Net/Gp4Net.csproj" />

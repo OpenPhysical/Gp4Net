@@ -1,4 +1,6 @@
 using System;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
@@ -34,11 +36,11 @@ public class AppletDeletionTraceTests
     public void GpProTrace_InitializeUpdate_ParsedCorrectly()
     {
         // Arrange & Act
-        var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
-        
+        Result<InitializeUpdateResponse, SmartCardError> responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
+
         // Assert that parsing succeeded
         Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
-        var response = responseResult.Value;
+        InitializeUpdateResponse? response = responseResult.Value;
 
         Assert.Multiple(() =>
         {
@@ -57,19 +59,19 @@ public class AppletDeletionTraceTests
     public void GpProTrace_SessionKeyDerivation_MatchesExpectedValues()
     {
         // Arrange
-        var keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1);
-        var cardChallenge = Convert.FromHexString("81E02F9C4061653A");
-            
+        Scp03KeySet keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1);
+        byte[] cardChallenge = Convert.FromHexString("81E02F9C4061653A");
+
         // Expected values from GP Pro trace line 25
-        var expectedEncKey = Convert.FromHexString("8528317332886BF53390C8F141A0D793");
-        var expectedMacKey = Convert.FromHexString("10110A26F982BE99829C3816EF1EB4A5");
-        var expectedRMacKey = Convert.FromHexString("718D60A711A1F0778A7A1AEEAB96B19C");
+        byte[] expectedEncKey = Convert.FromHexString("8528317332886BF53390C8F141A0D793");
+        byte[] expectedMacKey = Convert.FromHexString("10110A26F982BE99829C3816EF1EB4A5");
+        byte[] expectedRMacKey = Convert.FromHexString("718D60A711A1F0778A7A1AEEAB96B19C");
 
         // Act
-        var sessionKeys = Gp4Net.Cryptography.KeyDerivation.DeriveScp03SessionKeys(
-            keySet, 
-            _hostChallenge, 
-            cardChallenge, 
+        Result<SessionKeys, SmartCardError> sessionKeys = KeyDerivation.DeriveScp03SessionKeys(
+            keySet,
+            _hostChallenge,
+            cardChallenge,
             128
         );
 
@@ -93,71 +95,71 @@ public class AppletDeletionTraceTests
     public void GpProTrace_HostCryptogram_MatchesExpectedValue()
     {
         // Arrange
-        var keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1);
-        var protocol = new Scp03Protocol(keySet, _keyDerivationService, 0x70);
-        var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        Scp03KeySet keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1);
+        Scp03Protocol protocol = new Scp03Protocol(keySet, _keyDerivationService, 0x70);
+        Result<InitializeUpdateResponse, SmartCardError> responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
         Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
-        var response = responseResult.Value;
-        var cardChallenge = Convert.FromHexString("81E02F9C4061653A");
-            
+        InitializeUpdateResponse? response = responseResult.Value;
+        byte[] cardChallenge = Convert.FromHexString("81E02F9C4061653A");
+
         // Derive session keys
-        var sessionKeys = Gp4Net.Cryptography.KeyDerivation.DeriveScp03SessionKeys(
-            keySet, 
-            _hostChallenge, 
-            cardChallenge, 
+        Result<SessionKeys, SmartCardError> sessionKeys = KeyDerivation.DeriveScp03SessionKeys(
+            keySet,
+            _hostChallenge,
+            cardChallenge,
             128
         );
 
         // Expected from GP Pro trace line 27
-        var expectedHostCryptogram = Convert.FromHexString("A1883C4B93BE2B01");
+        byte[] expectedHostCryptogram = Convert.FromHexString("A1883C4B93BE2B01");
 
         // Act
         var actualHostCryptogram = protocol.CalculateHostCryptogram(
-            response, 
-            _hostChallenge, 
+            response,
+            _hostChallenge,
             sessionKeys.Value
         );
 
         // Assert
         Console.WriteLine($"Expected: {Convert.ToHexString(expectedHostCryptogram)}");
         Console.WriteLine($"Actual:   {Convert.ToHexString(actualHostCryptogram)}");
-        Assert.That( actualHostCryptogram, Is.EqualTo(expectedHostCryptogram));
+        Assert.That(actualHostCryptogram, Is.EqualTo(expectedHostCryptogram));
     }
 
     [Test]
     public void GpProTrace_ExternalAuthenticateCommand_MatchesExpectedApdu()
     {
         // Arrange
-        var keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1);
-        
+        Scp03KeySet keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1);
+
         // Setup mock to return expected session keys
-        var cardChallenge = Convert.FromHexString("81E02F9C4061653A");
-        var sessionKeys = Gp4Net.Cryptography.KeyDerivation.DeriveScp03SessionKeys(
-            keySet, 
-            _hostChallenge, 
-            cardChallenge, 
+        byte[] cardChallenge = Convert.FromHexString("81E02F9C4061653A");
+        Result<SessionKeys, SmartCardError> sessionKeys = KeyDerivation.DeriveScp03SessionKeys(
+            keySet,
+            _hostChallenge,
+            cardChallenge,
             128
         );
 
         // Use real key derivation service for functional testing
-            
-        var protocol = new Scp03Protocol(keySet, _keyDerivationService, 0x70);
-        var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
+
+        Scp03Protocol protocol = new Scp03Protocol(keySet, _keyDerivationService, 0x70);
+        Result<InitializeUpdateResponse, SmartCardError> responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
         Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
-        var response = responseResult.Value;
-        var context = protocol.ProcessInitializeUpdateResponse(response, _hostChallenge);
+        InitializeUpdateResponse? response = responseResult.Value;
+        Result<SecureChannelContext, SmartCardError> context = protocol.ProcessInitializeUpdateResponse(response, _hostChallenge);
 
         // Expected from GP Pro trace line 28: 84820100 10 A1883C4B93BE2B01FFC7CC05DCC39D2E
-        var expectedHostCryptogram = Convert.FromHexString("A1883C4B93BE2B01");
-        var expectedMac = Convert.FromHexString("FFC7CC05DCC39D2E");
+        byte[] expectedHostCryptogram = Convert.FromHexString("A1883C4B93BE2B01");
+        byte[] expectedMac = Convert.FromHexString("FFC7CC05DCC39D2E");
 
         // Act
-        var extAuthCommandResult = protocol.CreateExternalAuthenticateCommand(context.Value, SecurityLevel.CMac);
+        Result<ExternalAuthenticateCommand, SmartCardError> extAuthCommandResult = protocol.CreateExternalAuthenticateCommand(context.Value, SecurityLevel.CMac);
 
         // Assert
         Assert.That(extAuthCommandResult.IsSuccess, Is.True);
-        var extAuthCommand = extAuthCommandResult.Value;
-            
+        ExternalAuthenticateCommand? extAuthCommand = extAuthCommandResult.Value;
+
         Console.WriteLine($"Expected Host Cryptogram: {Convert.ToHexString(expectedHostCryptogram)}");
         Console.WriteLine($"Actual Host Cryptogram:   {Convert.ToHexString(extAuthCommand.HostCryptogram)}");
         Console.WriteLine($"Expected MAC: {Convert.ToHexString(expectedMac)}");
@@ -174,16 +176,16 @@ public class AppletDeletionTraceTests
     public void DeleteCommand_Analysis_ShowsDifferentApduStructure()
     {
         // From our tool's debug output: 80E40000134F09A000000308000010000007B1419E555DE028
-        var ourDeleteCommand = Convert.FromHexString("80E40000134F09A000000308000010000007B1419E555DE028");
-            
+        byte[] ourDeleteCommand = Convert.FromHexString("80E40000134F09A000000308000010000007B1419E555DE028");
+
         // From GP Pro trace line 39: 84E40080134F09A000000308000010007547C55C046E221C  
-        var gpProDeleteCommand = Convert.FromHexString("84E40080134F09A000000308000010007547C55C046E221C");
+        byte[] gpProDeleteCommand = Convert.FromHexString("84E40080134F09A000000308000010007547C55C046E221C");
 
         Console.WriteLine("=== DELETE Command Analysis ===");
         Console.WriteLine($"Our tool:  {Convert.ToHexString(ourDeleteCommand)}");
         Console.WriteLine($"GP Pro:    {Convert.ToHexString(gpProDeleteCommand)}");
         Console.WriteLine("");
-            
+
         // Parse APDU structure
         Console.WriteLine("Our tool structure:");
         Console.WriteLine($"  CLA: 0x{ourDeleteCommand[0]:X2} (our: secure messaging)");
@@ -191,7 +193,7 @@ public class AppletDeletionTraceTests
         Console.WriteLine($"  P1:  0x{ourDeleteCommand[2]:X2} (our: delete mode)");
         Console.WriteLine($"  P2:  0x{ourDeleteCommand[3]:X2}");
         Console.WriteLine($"  Lc:  0x{ourDeleteCommand[4]:X2} ({ourDeleteCommand[4]} bytes)");
-            
+
         Console.WriteLine("");
         Console.WriteLine("GP Pro structure:");
         Console.WriteLine($"  CLA: 0x{gpProDeleteCommand[0]:X2} (GP Pro: secure messaging)");
@@ -222,13 +224,13 @@ public class AppletDeletionTraceTests
         // According to GlobalPlatform specification:
         // P2 = 0x00: Delete by AID only  
         // P2 = 0x80: Delete with related objects
-            
+
         // GP Pro uses P2=0x80 when deleting, which is more comprehensive
-            
+
         // This test documents the expected behavior
         const byte expectedP2ForDeleteWithRelated = 0x80;
         const byte expectedP2ForDeleteOnly = 0x00;
-            
+
         Console.WriteLine($"Expected P2 for delete with related: 0x{expectedP2ForDeleteWithRelated:X2}");
         Console.WriteLine($"Expected P2 for delete only: 0x{expectedP2ForDeleteOnly:X2}");
         Assert.Multiple(() =>
@@ -244,16 +246,16 @@ public class AppletDeletionTraceTests
     public void DeleteCommand_WithDeleteRelated_GeneratesCorrectApdu()
     {
         // Arrange
-        var testAid = Convert.FromHexString("A000000308000010");
-        var deleteCommandResult = Gp4Net.Domain.Commands.DeleteCommand.CreateForApplication(
-            testAid, 
+        byte[] testAid = Convert.FromHexString("A000000308000010");
+        Result<DeleteCommand, SmartCardError> deleteCommandResult = DeleteCommand.CreateForApplication(
+            testAid,
             deleteRelated: true  // This should set P2=0x80
         );
         Assert.That(deleteCommandResult.IsSuccess, Is.True);
-        var deleteCommand = deleteCommandResult.Value;
+        DeleteCommand? deleteCommand = deleteCommandResult.Value;
 
         // Act
-        var apdu = deleteCommand.ToApdu();
+        byte[]? apdu = deleteCommand.ToApdu();
 
         // Assert
         Console.WriteLine($"Generated APDU: {Convert.ToHexString(apdu)}");

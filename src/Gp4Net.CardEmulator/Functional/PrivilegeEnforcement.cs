@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -34,7 +33,7 @@ public static class PrivilegeEnforcement
     /// </summary>
     private static Result<CommandPrivilegeRequirements, SmartCardError> GetRequiredPrivileges(CommandInfo command)
     {
-        var requirements = command.ClassInstruction switch
+        CommandPrivilegeRequirements requirements = command.ClassInstruction switch
         {
             // Card Manager commands require Card Manager privileges
             0x80E6 => CommandPrivilegeRequirements.Create(
@@ -166,7 +165,7 @@ public static class PrivilegeEnforcement
     /// </summary>
     private static Result<SecurityLevel, SmartCardError> GetRequiredSecurityLevel(CommandInfo command)
     {
-        var required = command.ClassInstruction switch
+        SecurityLevel required = command.ClassInstruction switch
         {
             // Administrative commands require C-MAC
             0x80E6 or 0x80E4 or 0x80E8 or 0x80D8 or 0x80F0 => SecurityLevel.CMac,
@@ -193,7 +192,7 @@ public static class PrivilegeEnforcement
             return Result.Success<bool, SmartCardError>(true);
         }
 
-        var currentLevel = (SecurityLevel)state.SecurityLevel;
+        SecurityLevel currentLevel = (SecurityLevel)state.SecurityLevel;
         if (currentLevel >= required)
         {
             return Result.Success<bool, SmartCardError>(true);
@@ -272,7 +271,7 @@ public record CommandInfo(
                 SmartCardError.WrongLength());
         }
 
-        var classInstruction = (ushort)((apdu[0] << 8) | apdu[1]);
+        ushort classInstruction = (ushort)((apdu[0] << 8) | apdu[1]);
         return Result.Success<CommandInfo, SmartCardError>(
             new CommandInfo(classInstruction, apdu[2], apdu[3], apdu.Length - 4));
     }

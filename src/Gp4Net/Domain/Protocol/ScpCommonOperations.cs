@@ -1,6 +1,7 @@
 using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain.Security;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Protocol;
@@ -27,11 +28,11 @@ public static class ScpCommonOperations
     {
         try
         {
-            var hasData = data is { Length: > 0 };
-            var hasLe = le.HasValue;
-            
+            bool hasData = data is { Length: > 0 };
+            bool hasLe = le.HasValue;
+
             // Calculate total length
-            var length = 4; // CLA INS P1 P2
+            int length = 4; // CLA INS P1 P2
             if (hasData)
             {
                 length += 1 + data!.Length; // Lc + data
@@ -40,26 +41,26 @@ public static class ScpCommonOperations
             {
                 length += 1; // Le
             }
-            
-            var apdu = new byte[length];
+
+            byte[] apdu = new byte[length];
             apdu[0] = cla;
             apdu[1] = ins;
             apdu[2] = p1;
             apdu[3] = p2;
-            
-            var offset = 4;
+
+            int offset = 4;
             if (hasData)
             {
                 apdu[offset++] = (byte)data!.Length; // Lc
                 Array.Copy(data, 0, apdu, offset, data.Length);
                 offset += data.Length;
             }
-            
+
             if (hasLe)
             {
                 apdu[offset] = le!.Value;
             }
-            
+
             return Result.Success<byte[], SmartCardError>(apdu);
         }
         catch (Exception ex)
@@ -67,7 +68,7 @@ public static class ScpCommonOperations
             return SmartCardError.UnexpectedError($"Failed to build APDU: {ex.Message}");
         }
     }
-    
+
     /// <summary>
     /// Extracts the data section from a command APDU.
     /// </summary>
@@ -85,7 +86,7 @@ public static class ScpCommonOperations
             return Result.Success<byte[], SmartCardError>([]);
         }
 
-        var lc = command[4];
+        byte lc = command[4];
         if (lc == 0)
         {
             return Result.Success<byte[], SmartCardError>([]);
@@ -96,11 +97,11 @@ public static class ScpCommonOperations
             return SmartCardError.InvalidData($"Command too short for declared data length {lc}");
         }
 
-        var data = new byte[lc];
+        byte[] data = new byte[lc];
         Array.Copy(command, 5, data, 0, lc);
         return Result.Success<byte[], SmartCardError>(data);
     }
-    
+
     /// <summary>
     /// Extracts the status word from a response.
     /// </summary>
@@ -118,10 +119,10 @@ public static class ScpCommonOperations
             return SmartCardError.InvalidData("Response must contain at least status word");
         }
 
-        var sw = (ushort)((response[response.Length - 2] << 8) | response[response.Length - 1]);
+        ushort sw = (ushort)((response[response.Length - 2] << 8) | response[response.Length - 1]);
         return Result.Success<ushort, SmartCardError>(sw);
     }
-    
+
     /// <summary>
     /// Builds MAC input by concatenating chaining value and data.
     /// </summary>
@@ -130,12 +131,12 @@ public static class ScpCommonOperations
     /// <returns>The concatenated MAC input.</returns>
     public static byte[] BuildMacInput(byte[] chainingValue, byte[] data)
     {
-        var macInput = new byte[chainingValue.Length + data.Length];
+        byte[] macInput = new byte[chainingValue.Length + data.Length];
         Array.Copy(chainingValue, 0, macInput, 0, chainingValue.Length);
         Array.Copy(data, 0, macInput, chainingValue.Length, data.Length);
         return macInput;
     }
-    
+
     /// <summary>
     /// Inserts MAC into a command APDU.
     /// </summary>
@@ -163,31 +164,31 @@ public static class ScpCommonOperations
         try
         {
             // Check if command has data
-            var hasData = command.Length > 5 && command[4] > 0;
-            var hasLe = hasData ? command.Length > 5 + command[4] : command.Length > 4;
-            
+            bool hasData = command.Length > 5 && command[4] > 0;
+            bool hasLe = hasData ? command.Length > 5 + command[4] : command.Length > 4;
+
             // Create new command with MAC
-            var newLength = command.Length + macSize;
-            var newCommand = new byte[newLength];
-            
+            int newLength = command.Length + macSize;
+            byte[] newCommand = new byte[newLength];
+
             if (hasData)
             {
                 // Copy CLA INS P1 P2
                 Array.Copy(command, 0, newCommand, 0, 4);
-                
+
                 // Update CLA to include secure messaging bit
                 newCommand[0] = SetSecureMessagingBit(command[0]);
-                
+
                 // Update Lc to include MAC
-                var originalLc = command[4];
+                byte originalLc = command[4];
                 newCommand[4] = (byte)(originalLc + macSize);
-                
+
                 // Copy original data
                 Array.Copy(command, 5, newCommand, 5, originalLc);
-                
+
                 // Append MAC
                 Array.Copy(mac, 0, newCommand, 5 + originalLc, macSize);
-                
+
                 // Copy Le if present
                 if (hasLe)
                 {
@@ -201,13 +202,13 @@ public static class ScpCommonOperations
                 newCommand[0] = SetSecureMessagingBit(command[0]);
                 newCommand[4] = (byte)macSize; // Lc = MAC size
                 Array.Copy(mac, 0, newCommand, 5, macSize);
-                
+
                 if (hasLe)
                 {
                     newCommand[newCommand.Length - 1] = command[command.Length - 1];
                 }
             }
-            
+
             return Result.Success<byte[], SmartCardError>(newCommand);
         }
         catch (Exception ex)
@@ -215,7 +216,7 @@ public static class ScpCommonOperations
             return SmartCardError.UnexpectedError($"Failed to insert MAC: {ex.Message}");
         }
     }
-    
+
     /// <summary>
     /// Extracts MAC from a response before the status word.
     /// </summary>
@@ -237,18 +238,18 @@ public static class ScpCommonOperations
 
         try
         {
-            var macOffset = response.Length - 2 - macSize;
-            var mac = new byte[macSize];
+            int macOffset = response.Length - 2 - macSize;
+            byte[] mac = new byte[macSize];
             Array.Copy(response, macOffset, mac, 0, macSize);
-            
+
             // Build response without MAC
-            var responseWithoutMac = new byte[response.Length - macSize];
+            byte[] responseWithoutMac = new byte[response.Length - macSize];
             if (macOffset > 0)
             {
                 Array.Copy(response, 0, responseWithoutMac, 0, macOffset); // Data before MAC
             }
             Array.Copy(response, response.Length - 2, responseWithoutMac, responseWithoutMac.Length - 2, 2); // Status word
-            
+
             return Result.Success<(byte[], byte[]), SmartCardError>((mac, responseWithoutMac));
         }
         catch (Exception ex)
@@ -256,7 +257,7 @@ public static class ScpCommonOperations
             return SmartCardError.UnexpectedError($"Failed to extract MAC: {ex.Message}");
         }
     }
-    
+
     /// <summary>
     /// Determines if response security should be applied based on status word.
     /// Per GlobalPlatform specification, only success and warning status words get R-MAC/R-ENC.
@@ -268,11 +269,11 @@ public static class ScpCommonOperations
         // Apply response security for:
         // - Success (0x9000)
         // - Warnings (0x62xx, 0x63xx)
-        return statusWord == 0x9000 || 
-               (statusWord & 0xFF00) == 0x6200 || 
+        return statusWord == 0x9000 ||
+               (statusWord & 0xFF00) == 0x6200 ||
                (statusWord & 0xFF00) == 0x6300;
     }
-    
+
     /// <summary>
     /// Checks if a response contains data (more than just status word).
     /// </summary>
@@ -282,7 +283,7 @@ public static class ScpCommonOperations
     {
         return response is { Length: > 2 };
     }
-    
+
     /// <summary>
     /// Sets the secure messaging bit in the CLA byte.
     /// </summary>
@@ -292,7 +293,7 @@ public static class ScpCommonOperations
     {
         return (byte)(cla | 0x04);
     }
-    
+
     /// <summary>
     /// Applies ISO 7816-4 padding to data.
     /// Appends 0x80 followed by zero bytes to reach the target block size.
@@ -304,7 +305,7 @@ public static class ScpCommonOperations
     {
         return CryptographicOperations.ApplyIso7816Padding(data, blockSize);
     }
-    
+
     /// <summary>
     /// Removes ISO 7816-4 padding from data.
     /// </summary>
@@ -314,7 +315,7 @@ public static class ScpCommonOperations
     {
         return CryptographicOperations.RemoveIso7816Padding(paddedData);
     }
-    
+
     /// <summary>
     /// Validates a host challenge.
     /// </summary>
@@ -334,7 +335,7 @@ public static class ScpCommonOperations
 
         return Result.Success();
     }
-    
+
     /// <summary>
     /// Validates a card challenge.
     /// </summary>
@@ -355,7 +356,7 @@ public static class ScpCommonOperations
 
         return Result.Success();
     }
-    
+
     /// <summary>
     /// Validates a sequence counter.
     /// </summary>

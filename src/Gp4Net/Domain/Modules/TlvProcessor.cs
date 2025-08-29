@@ -26,7 +26,7 @@ public static class TlvProcessor
                 ImmutableList<TlvObject>.Empty);
         }
 
-        return Result.Try(() => TlvParser.ParseAll(data).ToImmutableList(), ex => 
+        return Result.Try(() => TlvParser.ParseAll(data).ToImmutableList(), ex =>
             SmartCardError.InvalidResponse($"Failed to parse TLV data: {ex.Message}"));
     }
 
@@ -39,9 +39,9 @@ public static class TlvProcessor
     public static Maybe<byte[]> FindElementValue(ImmutableList<TlvObject> elements, int tag)
     {
         return elements
-            .Where(e => 
+            .Where(e =>
             {
-                var tagNumber = e.GetTagNumber();
+                Result<uint, SmartCardError> tagNumber = e.GetTagNumber();
                 return tagNumber.IsSuccess && tagNumber.Value == tag;
             })
             .Select(e => e.Value)
@@ -75,7 +75,7 @@ public static class TlvProcessor
     public static byte[] ConstructTlv(ushort tag, byte[] value)
     {
         byte[] tagBytes = [(byte)(tag >> 8), (byte)(tag & 0xFF)];
-        
+
         if (value == null || value.Length == 0)
         {
             return CombineArrays(tagBytes, [0]);
@@ -118,7 +118,7 @@ public static class TlvProcessor
     public static Result<FciTemplate, SmartCardError> ParseFciTemplate(byte[] fciData)
     {
         Result<ImmutableList<TlvObject>, SmartCardError> parseResult = ParseTlvData(fciData);
-        
+
         if (parseResult.IsFailure)
         {
             return Result.Failure<FciTemplate, SmartCardError>(parseResult.Error);
@@ -127,9 +127,9 @@ public static class TlvProcessor
         ImmutableList<TlvObject> elements = parseResult.Value;
 
         // Look for FCI template tag (0x6F)
-        TlvObject fciElement = elements.FirstOrDefault(e => 
+        TlvObject fciElement = elements.FirstOrDefault(e =>
         {
-            var tagNumber = e.GetTagNumber();
+            Result<uint, SmartCardError> tagNumber = e.GetTagNumber();
             return tagNumber.IsSuccess && tagNumber.Value == 0x6F;
         });
         if (fciElement == null)
@@ -139,9 +139,9 @@ public static class TlvProcessor
         }
 
         // Parse the FCI template contents
-        Result<ImmutableList<TlvObject>, SmartCardError> fciContentsResult = 
+        Result<ImmutableList<TlvObject>, SmartCardError> fciContentsResult =
             ParseTlvData(fciElement.Value);
-        
+
         if (fciContentsResult.IsFailure)
         {
             return Result.Failure<FciTemplate, SmartCardError>(fciContentsResult.Error);
@@ -180,7 +180,7 @@ public static class TlvProcessor
     public static Result<KeyComponents, SmartCardError> ParseKeyInformation(byte[] keyData)
     {
         Result<ImmutableList<TlvObject>, SmartCardError> parseResult = ParseTlvData(keyData);
-        
+
         if (parseResult.IsFailure)
         {
             return Result.Failure<KeyComponents, SmartCardError>(parseResult.Error);

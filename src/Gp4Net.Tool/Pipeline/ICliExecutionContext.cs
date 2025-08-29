@@ -1,7 +1,9 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
-using Gp4Net.Tool.Services;
+using Gp4Net.Core;
+using Gp4Net.Services;
 
 namespace Gp4Net.Tool.Pipeline;
 
@@ -17,30 +19,31 @@ public interface ICliExecutionContext
     IDisplayService Display { get; }
 
     /// <summary>
-    /// Gets the card service for smart card operations.
+    /// Gets the smart card service for functional card operations.
     /// </summary>
-    ICardService CardService { get; }
+    ISmartCardService CardService { get; }
 
     /// <summary>
     /// Gets the GlobalPlatform service for GP operations.
     /// Creates the service on demand with proper pipeline context.
     /// </summary>
-    Gp4Net.Services.IGlobalPlatformService GetGlobalPlatformService();
+    IGlobalPlatformService GetGlobalPlatformService();
 
     /// <summary>
-    /// Gets the keyset resolver for key management.
+    /// Gets a pure function for establishing secure channels from user requests.
+    /// Eliminates imperative keyset resolution patterns in commands.
     /// </summary>
-    IKeysetResolver KeysetResolver { get; }
+    Func<SecureChannelRequest, CancellationToken, Task<Result<SecureChannelExecutionContext, SmartCardError>>> EstablishSecureChannelAsync { get; }
 
     /// <summary>
     /// Ensures a card connection is established with the specified reader.
     /// </summary>
-    Task<ICliExecutionContext> RequireCardConnection(Maybe<string> readerName = default);
+    Task<Result<ICliExecutionContext, SmartCardError>> RequireCardConnection(Maybe<string> readerName = default);
 
     /// <summary>
     /// Ensures a secure channel is established with the specified security level.
     /// </summary>
-    Task<ICliExecutionContext> RequireSecureChannel(byte securityLevel = 1, Maybe<string> keyset = default);
+    Task<Result<ICliExecutionContext, SmartCardError>> RequireSecureChannel(byte securityLevel = 1, Maybe<string> keyset = default);
 
     /// <summary>
     /// Executes the command logic with the current context.

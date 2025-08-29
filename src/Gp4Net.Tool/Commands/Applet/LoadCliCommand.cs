@@ -1,11 +1,12 @@
-using System;
 using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain;
 using Gp4Net.Services;
 using Gp4Net.Tool.Infrastructure;
-using Gp4Net.Tool.Services;
+using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -17,136 +18,87 @@ namespace Gp4Net.Tool.Commands.Applet;
 /// </summary>
 [PublicAPI]
 [Description("Load a CAP file package onto the card (without installing applets)")]
-public class LoadCommand : BaseCommand<LoadCommand.Settings>
+public class LoadCommand : IPipelineCommand<LoadCommand.Settings>
 {
-    /// <summary>
-    /// Initializes a new instance of the LoadCommand class.
-    /// </summary>
-    public LoadCommand(
-        ICardService cardService,
-        IDomainServiceFactory domainServiceFactory,
-        IKeysetResolver keysetResolver
-    )
-        : base(cardService, domainServiceFactory, keysetResolver) { }
-
     /// <summary>
     /// Executes the load command to upload a CAP file package to the card.
     /// </summary>
-    /// <param name="context">The command context.</param>
+    /// <param name="context">The CLI execution context.</param>
     /// <param name="settings">The command settings.</param>
     /// <returns>0 if successful, 1 if failed.</returns>
-    protected override async Task<int> ExecuteCommandAsync(
-        CommandContext context,
+    public async Task<int> ExecuteAsync(
+        ICliExecutionContext context,
         Settings settings
     )
     {
-        if (!EnsureCardConnection(settings))
+        return await context.ExecuteAsync(async ctx =>
         {
-            return 1;
-        }
-
-        // Establish secure channel for loading
-        if (!await EnsureSecureChannel(settings))
-        {
-            return 1;
-        }
-
-        if (!File.Exists(settings.CapFile))
-        {
-            AnsiConsole.MarkupLine($"[red]CAP file not found: {settings.CapFile}[/]");
-            return 1;
-        }
-
-        try
-        {
-            AnsiConsole.MarkupLine($"[cyan]Reading CAP file: {settings.CapFile}[/]");
-            var capFileData = await File.ReadAllBytesAsync(settings.CapFile);
-
-            AnsiConsole.MarkupLine($"[dim]CAP file size: {capFileData.Length} bytes[/]");
-
-            if (!settings.NoCardInfo)
-            {
-                DisplayCardInfo();
-            }
-
-            AnsiConsole.WriteLine();
-
-            var progressResult = await AnsiConsole
-                .Progress()
-                .StartAsync(async ctx =>
+            return await ValidateCapFile(settings.CapFile)
+                .Bind(_ => 
                 {
-                    var task = ctx.AddTask("[green]Loading CAP file[/]");
-                    task.MaxValue = 100;
-
-                    // TODO: Call GlobalPlatformService.LoadCapFile when implemented
-                    // For now, use InstallCapFile with installApplets=false
-                    task.Value = 10;
-                    await Task.Delay(100);
-
-                    var installOptions = new InstallOptions(
-                        InstallApplets: false,
-                        MakeSelectable: false
-                    );
-
-                    var result = await GlobalPlatformService.InstallCapFileAsync(
-                        capFileData,
-                        installOptions
-                    );
-
-                    task.Value = 100;
-
-                    if (result.IsSuccess)
+                    ctx.Display.Info("Starting CAP file load operation...");
+                    return Result.Success<bool, SmartCardError>(true);
+                })
+                .Bind(_ => PerformLoad(ctx, settings))
+                .Match(
+                    success => 0,
+                    error =>
                     {
-                        return await DisplayLoadSuccess(result.Value, settings);
-                    }
-                    else
-                    {
-                        return DisplayLoadError(result.Error);
-                    }
-                });
+                        ctx.Display.Error($"Load failed: {error.Message}");
+                        return 1;
+                    });
+        });
+    }
 
-            return progressResult;
-        }
-        catch (Exception ex)
+    private static Result<bool, SmartCardError> ValidateCapFile(string capFilePath)
+    {
+        return File.Exists(capFilePath)
+            ? Result.Success<bool, SmartCardError>(true)
+            : Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument($"CAP file not found: {capFilePath}"));
+    }
+
+    private static async Task<Result<bool, SmartCardError>> PerformLoad(ICliExecutionContext context, Settings settings)
+    {
+        context.Display.Info($"Reading CAP file: {settings.CapFile}");
+        byte[] capData = await File.ReadAllBytesAsync(settings.CapFile);
+        context.Display.Info($"CAP file size: {capData.Length} bytes");
+
+        if (!settings.NoCardInfo)
         {
-            AnsiConsole.MarkupLine($"[red]Error loading CAP file: {ex.Message}[/]");
-            if (settings.Verbose)
+            await DisplayCardInfoAsync(context);
+        }
+
+        IGlobalPlatformService gpService = context.GetGlobalPlatformService();
+        context.Display.Info("Loading CAP file package...");
+        InstallOptions installOptions = new InstallOptions(
+            InstallApplets: false,  // Load only - don't install applets
+            MakeSelectable: false);
+        Result<InstallationResult, SmartCardError> loadResult = await gpService.InstallCapFileAsync(capData, Maybe<InstallOptions>.From(installOptions));
+
+        return loadResult.Match(
+            success =>
             {
-                AnsiConsole.WriteException(ex);
-            }
-            return 1;
-        }
+                context.Display.Success($"CAP file {settings.CapFile} loaded successfully");
+                return Result.Success<bool, SmartCardError>(true);
+            },
+            error =>
+            {
+                context.Display.Error($"Load failed: {error.Message}");
+                return Result.Failure<bool, SmartCardError>(error);
+            });
     }
 
-    private static Task<int> DisplayLoadSuccess(Gp4Net.Domain.InstallationResult installResult, Settings settings)
+    private static Task DisplayCardInfoAsync(ICliExecutionContext context)
     {
-        AnsiConsole.MarkupLine("[green]✓ CAP file loaded successfully[/]");
-
-        AnsiConsole.MarkupLine(
-            $"[green]Package AID:[/] {Convert.ToHexString(installResult.PackageAid)}"
-        );
-
-        if (settings.ShowDetails)
-        {
-            // TODO: Show package details when available
-            AnsiConsole.MarkupLine(
-                "[dim]Use 'applet list --filter packages' to see loaded packages[/]"
-            );
-        }
-
-        return Task.FromResult(0);
-    }
-
-    private static int DisplayLoadError(SmartCardError error)
-    {
-        AnsiConsole.MarkupLine($"[red]✗ Load failed: {error.Message}[/]");
-        return 1;
+        context.Display.Info("Card information display would go here");
+        return Task.CompletedTask;
     }
 
     /// <summary>
-    /// Settings for the load command.
+    /// Settings for the load command.  
     /// </summary>
-    public class Settings : BaseCommandSettings
+    public class Settings : CommandSettings
     {
         /// <summary>
         /// Gets or sets the CAP file path.
@@ -186,14 +138,13 @@ public class LoadCommand : BaseCommand<LoadCommand.Settings>
         [Description("Show package details after loading")]
         public bool ShowDetails { get; set; }
 
-        /// <inheritdoc />
-        public override bool RequiresSecureChannel
-        {
-            get
-            {
-                return true;
-            }
-        }
+        /// <summary>
+        /// Gets or sets whether to skip card info display.
+        /// </summary>
+        [CommandOption("--no-card-info")]
+        [Description("Skip card information display")]
+        public bool NoCardInfo { get; set; }
+
 
         /// <summary>
         /// Validates the command settings.

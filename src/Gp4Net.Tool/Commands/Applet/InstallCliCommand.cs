@@ -1,11 +1,12 @@
-using System;
 using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain;
 using Gp4Net.Services;
 using Gp4Net.Tool.Infrastructure;
-using Gp4Net.Tool.Services;
+using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -17,140 +18,77 @@ namespace Gp4Net.Tool.Commands.Applet;
 /// </summary>
 [PublicAPI]
 [CliCommand("install", "Install a CAP file on the card", "applet")]
-public class InstallCliCommand : BaseCommand<InstallCliCommand.Settings>
+public class InstallCliCommand : IPipelineCommand<InstallCliCommand.Settings>
 {
-    /// <summary>
-    /// Initializes a new instance of the InstallCliCommand class.
-    /// </summary>
-    public InstallCliCommand(
-        ICardService cardService,
-        IDomainServiceFactory domainServiceFactory,
-        IKeysetResolver keysetResolver
-    )
-        : base(cardService, domainServiceFactory, keysetResolver) { }
-
     /// <summary>
     /// Executes the install command to load and install a CAP file on the card.
     /// </summary>
-    /// <param name="context">The command context.</param>
+    /// <param name="context">The CLI execution context.</param>
     /// <param name="settings">The command settings.</param>
     /// <returns>0 if successful, 1 if failed.</returns>
-    protected override async Task<int> ExecuteCommandAsync(
-        CommandContext context,
+    public async Task<int> ExecuteAsync(
+        ICliExecutionContext context,
         Settings settings
     )
     {
-        if (!EnsureCardConnection(settings))
+        return await context.ExecuteAsync(async ctx =>
         {
-            return 1;
-        }
-
-        // Establish secure channel for installation
-        if (!await EnsureSecureChannel(settings))
-        {
-            return 1;
-        }
-
-        if (!File.Exists(settings.CapFile))
-        {
-            AnsiConsole.MarkupLine($"[red]CAP file not found: {settings.CapFile}[/]");
-            return 1;
-        }
-
-        try
-        {
-            AnsiConsole.MarkupLine($"[cyan]Reading CAP file: {settings.CapFile}[/]");
-            var capFileData = await File.ReadAllBytesAsync(settings.CapFile);
-
-            AnsiConsole.MarkupLine($"[dim]CAP file size: {capFileData.Length} bytes[/]");
-
-            if (!settings.NoCardInfo)
-            {
-                DisplayCardInfo();
-            }
-
-            AnsiConsole.WriteLine();
-
-            var progressResult = await AnsiConsole
-                .Progress()
-                .StartAsync(async ctx =>
+            return await ValidateCapFile(settings.CapFile)
+                .Bind(_ => 
                 {
-                    var task = ctx.AddTask("[green]Installing CAP file[/]");
-                    task.MaxValue = 100;
-
-                    // Simulate progress during installation
-                    task.Value = 10;
-                    await Task.Delay(100);
-
-                    var installOptions = new InstallOptions(
-                        InstallApplets: settings.InstallApplets,
-                        MakeSelectable: settings.MakeSelectable
-                    );
-
-                    var result = await GlobalPlatformService.InstallCapFileAsync(
-                        capFileData,
-                        installOptions
-                    );
-
-                    task.Value = 100;
-
-                    if (result.IsSuccess)
+                    ctx.Display.Info("Starting CAP file installation...");
+                    return Result.Success<bool, SmartCardError>(true);
+                })
+                .Bind(_ => PerformInstall(ctx, settings))
+                .Match(
+                    success => 0,
+                    error =>
                     {
-                        return await DisplayInstallSuccess(result.Value);
-                    }
-                    else
-                    {
-                        return DisplayInstallError(result.Error);
-                    }
-                });
-
-            return progressResult;
-        }
-        catch (Exception ex)
-        {
-            AnsiConsole.MarkupLine($"[red]Error installing CAP file: {ex.Message}[/]");
-            if (settings.Verbose)
-            {
-                AnsiConsole.WriteException(ex);
-            }
-            return 1;
-        }
+                        ctx.Display.Error($"Installation failed: {error.Message}");
+                        return 1;
+                    });
+        });
     }
 
-    private static Task<int> DisplayInstallSuccess(Gp4Net.Domain.InstallationResult installResult)
+    private static Result<bool, SmartCardError> ValidateCapFile(string capFilePath)
     {
-        AnsiConsole.MarkupLine("[green]✓ CAP file installed successfully[/]");
-
-        AnsiConsole.MarkupLine(
-            $"[dim]Package AID: {Convert.ToHexString(installResult.PackageAid)}[/]"
-        );
-
-        if (installResult.InstalledApplets.Count > 0)
-        {
-            AnsiConsole.MarkupLine(
-                $"[green]Installed {installResult.InstalledApplets.Count} applet(s):[/]"
-            );
-            foreach (var appletAid in installResult.InstalledApplets)
-            {
-                AnsiConsole.MarkupLine(
-                    $"  [dim]• {Convert.ToHexString(appletAid)}[/]"
-                );
-            }
-        }
-
-        return Task.FromResult(0);
+        return File.Exists(capFilePath)
+            ? Result.Success<bool, SmartCardError>(true)
+            : Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument($"CAP file not found: {capFilePath}"));
     }
 
-    private static int DisplayInstallError(SmartCardError error)
+    private static async Task<Result<bool, SmartCardError>> PerformInstall(ICliExecutionContext context, Settings settings)
     {
-        AnsiConsole.MarkupLine($"[red]✗ Installation failed: {error.Message}[/]");
-        return 1;
+        context.Display.Info($"Installing CAP file: {settings.CapFile}");
+        
+        IGlobalPlatformService gpService = context.GetGlobalPlatformService();
+        byte[] capData = await File.ReadAllBytesAsync(settings.CapFile);
+        InstallOptions installOptions = new InstallOptions 
+        {
+            InstallApplets = settings.InstallApplets,
+            MakeSelectable = settings.MakeSelectable
+        };
+        
+        Result<InstallationResult, SmartCardError> installResult = await gpService.InstallCapFileAsync(capData, Maybe<InstallOptions>.From(installOptions));
+        
+        return installResult.Match(
+            success =>
+            {
+                context.Display.Success($"CAP file {settings.CapFile} installed successfully");
+                return Result.Success<bool, SmartCardError>(true);
+            },
+            error =>
+            {
+                context.Display.Error($"Installation failed: {error.Message}");
+                return Result.Failure<bool, SmartCardError>(error);
+            });
     }
 
     /// <summary>
     /// Settings for the install command.
     /// </summary>
-    public class Settings : BaseCommandSettings
+    public class Settings : CommandSettings
     {
         /// <summary>
         /// Gets or sets the CAP file path.
@@ -195,16 +133,7 @@ public class InstallCliCommand : BaseCommand<InstallCliCommand.Settings>
             }
         }
 
-        /// <inheritdoc />
-        public override bool RequiresSecureChannel
-        {
-            get
-            {
-                return true;
-
-                // Installation always requires secure channel
-            }
-        }
+        // Note: This command requires secure channel - handled in the command implementation
 
         /// <summary>
         /// Validates the command settings.

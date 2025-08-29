@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
@@ -67,7 +66,7 @@ public static class VirtualCardTestBuilder
     public static VirtualCard WithFailingCrypto(this CardConfiguration config)
     {
         // Use insufficient entropy (4 bytes) - most crypto operations need 8+ bytes
-        var insufficientEntropy = new byte[] { 0x01, 0x02, 0x03, 0x04 };
+        byte[] insufficientEntropy = [0x01, 0x02, 0x03, 0x04];
         
         return PreloadedRngService.Create(insufficientEntropy)
             .Map(rng => new VirtualCard(config, new CryptographicService(rng)))
@@ -126,7 +125,7 @@ public static class VirtualCardTestBuilder
     /// <summary>
     /// Creates a card with specific SCP configuration.
     /// </summary>
-    public static VirtualCard WithScp(this CardConfiguration config, byte version, Gp4Net.Domain.Protocol.ScpImplementation implementation) =>
+    public static VirtualCard WithScp(this CardConfiguration config, byte version, Domain.Protocol.ScpImplementation implementation) =>
         new(config.WithScpDefaults(version, implementation), new CryptographicService());
 
     /// <summary>
@@ -155,10 +154,10 @@ public static class VirtualCardTestBuilder
     /// </summary>
     public static VirtualCard Scp02Card()
     {
-        var config = CardConfiguration.Generic() with
+        CardConfiguration config = CardConfiguration.Generic() with
         {
             DefaultScpVersion = 0x02,
-            DefaultScpImplementation = Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15
+            DefaultScpImplementation = Domain.Protocol.ScpImplementation.Scp02I15
         };
         return new VirtualCard(config, new CryptographicService());
     }
@@ -168,10 +167,10 @@ public static class VirtualCardTestBuilder
     /// </summary>
     public static VirtualCard ForSecureChannelTesting(byte scpVersion = 0x02)
     {
-        var config = scpVersion switch
+        CardConfiguration? config = scpVersion switch
         {
-            0x02 => CardConfiguration.P71().WithScpDefaults(0x02, Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15),
-            0x03 => CardConfiguration.P71().WithScpDefaults(0x03, Gp4Net.Domain.Protocol.ScpImplementation.Scp03I70),
+            0x02 => CardConfiguration.P71().WithScpDefaults(0x02, Domain.Protocol.ScpImplementation.Scp02I15),
+            0x03 => CardConfiguration.P71().WithScpDefaults(0x03, Domain.Protocol.ScpImplementation.Scp03I70),
             _ => Result.Success<CardConfiguration, SmartCardError>(CardConfiguration.P71()) // Use functional approach instead of throw
                 .Map(c => c) // Keep consistency with functional programming
                 .GetValueOrDefault(CardConfiguration.P71())
@@ -193,7 +192,7 @@ public static class VirtualCardTestBuilder
     {
         // Use minimal entropy (1 byte) - INITIALIZE UPDATE needs 6 bytes for SCP02 card challenge
         // This will cause GenerateChallenge(6) to fail with insufficient entropy error
-        var minimalEntropy = new byte[] { 0x01 };
+        byte[] minimalEntropy = [0x01];
         
         return PreloadedRngService.Create(minimalEntropy)
             .Match(
@@ -231,7 +230,7 @@ public static class VirtualCardTestBuilder
 
 /// <summary>
 /// Fluent builder for creating virtual cards with complex configurations.
-/// Uses functional programming principles with Maybe<T> for optional values.
+/// Uses functional programming principles with Maybe&lt;T&gt; for optional values.
 /// </summary>
 [PublicAPI]
 public class VirtualCardBuilder
@@ -285,14 +284,14 @@ public class VirtualCardBuilder
     /// <param name="scpVersion">The SCP version.</param>
     /// <param name="implementation">The SCP implementation.</param>
     /// <returns>A new builder instance with SCP configuration.</returns>
-    public VirtualCardBuilder WithScp(byte scpVersion, Gp4Net.Domain.Protocol.ScpImplementation implementation)
+    public VirtualCardBuilder WithScp(byte scpVersion, Domain.Protocol.ScpImplementation implementation)
     {
-        var currentConfig = _configuration.Match(
+        CardConfiguration? currentConfig = _configuration.Match(
             config => config,
             () => CardConfiguration.P71()
         );
         
-        var updatedConfig = currentConfig.WithScpDefaults(scpVersion, implementation);
+        CardConfiguration updatedConfig = currentConfig.WithScpDefaults(scpVersion, implementation);
         return new VirtualCardBuilder(Maybe<CardConfiguration>.From(updatedConfig), _cryptographicService);
     }
     
@@ -303,7 +302,7 @@ public class VirtualCardBuilder
     /// <returns>A new builder instance with the entropy-based crypto service.</returns>
     public VirtualCardBuilder WithCryptographicService(byte[] entropy)
     {
-        var cryptoService = PreloadedRngService.Create(entropy)
+        CryptographicService? cryptoService = PreloadedRngService.Create(entropy)
             .Map(rng => new CryptographicService(rng))
             .GetValueOrDefault(new CryptographicService());
             
@@ -316,12 +315,12 @@ public class VirtualCardBuilder
     /// <returns>A configured virtual card instance.</returns>
     public VirtualCard Build()
     {
-        var config = _configuration.Match(
+        CardConfiguration? config = _configuration.Match(
             configuration => configuration,
             () => CardConfiguration.P71()
         );
         
-        var crypto = _cryptographicService.Match(
+        CryptographicService? crypto = _cryptographicService.Match(
             service => service,
             () => new CryptographicService()
         );

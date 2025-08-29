@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Immutable;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
@@ -26,7 +27,7 @@ public class Scp03SecurityProcessorTests
             new byte[16], // S-RMAC
             new byte[16]  // S-DEK
         );
-        _macChainingValue = [..new byte[16]]; // SCP03 MAC chaining value
+        _macChainingValue = [.. new byte[16]]; // SCP03 MAC chaining value
     }
 
     [TearDown]
@@ -39,8 +40,8 @@ public class Scp03SecurityProcessorTests
     public void ApplyCommandSecurity_WithCMac_ReturnsSecuredCommand()
     {
         // Create a GET DATA command (no data)
-        var command = GetDataCommand.Create(0x9F7F).Value;
-        
+        GetDataCommand? command = GetDataCommand.Create(0x9F7F).Value;
+
         var result = Scp03SecurityProcessor.ApplyCommandSecurity(
             command,
             SecurityLevel.CMac,
@@ -66,8 +67,8 @@ public class Scp03SecurityProcessorTests
     [Test]
     public void ApplyCommandSecurity_WithCMacAndCEncryption_ReturnsEncryptedAndMacedCommand()
     {
-        var command = GetDataCommand.Create(0x9F7F).Value;
-        
+        GetDataCommand? command = GetDataCommand.Create(0x9F7F).Value;
+
         var result = Scp03SecurityProcessor.ApplyCommandSecurity(
             command,
             SecurityLevel.CMac | SecurityLevel.CDecryption,
@@ -91,8 +92,8 @@ public class Scp03SecurityProcessorTests
     public void ApplyResponseSecurity_WithRMac_VerifiesResponseMac()
     {
         // Create a mock response with status 9000
-        var response = new byte[] { 0x90, 0x00 };
-        
+        byte[] response = [0x90, 0x00];
+
         var result = Scp03SecurityProcessor.ApplyResponseSecurity(
             response,
             SecurityLevel.RMac,
@@ -114,26 +115,26 @@ public class Scp03SecurityProcessorTests
     public void ProcessInitializeUpdate_WithValidResponse_CreatesSecureChannelContext()
     {
         // Create a test INITIALIZE UPDATE response
-        var response = CreateTestInitializeUpdateResponse();
-        var hostChallenge = new byte[8] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
-        var keySet = new Scp03KeySet(
+        InitializeUpdateResponse response = CreateTestInitializeUpdateResponse();
+        byte[] hostChallenge = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+        Scp03KeySet keySet = new Scp03KeySet(
             new byte[16], // ENC key
             new byte[16], // MAC key  
             new byte[16]  // DEK key
         );
-        
+
         var result = Scp03SecurityProcessor.ProcessInitializeUpdate(
-            response, 
-            hostChallenge, 
+            response,
+            hostChallenge,
             keySet,
             0x60 // Use i=60 for SCP03 (though unused)
         );
-        
+
         // This test would pass once the full implementation is complete
         // For now, we expect it to return a proper result structure
         if (result.IsSuccess)
         {
-            _ = result.Value.ProtocolVersion.Should().Be(0x03);
+            _ = result.Value.ScpVersion.Should().Be(0x03);
         }
         // If it fails, that's expected until full implementation
     }
@@ -143,8 +144,8 @@ public class Scp03SecurityProcessorTests
     [Test]
     public void ApplyCommandSecurity_EmptyMacChaining_ReturnsFailure()
     {
-        var command = GetDataCommand.Create(0x9F7F).Value;
-        
+        GetDataCommand? command = GetDataCommand.Create(0x9F7F).Value;
+
         var result = Scp03SecurityProcessor.ApplyCommandSecurity(
             command,
             SecurityLevel.CMac,
@@ -161,38 +162,38 @@ public class Scp03SecurityProcessorTests
     private InitializeUpdateResponse CreateTestInitializeUpdateResponse()
     {
         // Create a minimal SCP03 response with proper structure
-        var responseData = new byte[32];
-        var offset = 0;
-        
+        byte[] responseData = new byte[32];
+        int offset = 0;
+
         // Key diversification data (10 bytes)
         Array.Fill(responseData, (byte)0x00, offset, 10);
         offset += 10;
-        
+
         // Key version (1 byte)
         responseData[offset++] = 0x01;
-        
+
         // SCP ID (1 byte) - SCP03
         responseData[offset++] = 0x03;
-        
+
         // Implementation parameter (1 byte)
         responseData[offset++] = 0x70;
-        
+
         // Card challenge (8 bytes for SCP03)
         for (int i = 0; i < 8; i++)
         {
             responseData[offset++] = (byte)(0x11 + i);
         }
-        
+
         // Card cryptogram (8 bytes)
         Array.Fill(responseData, (byte)0xBB, offset, 8);
         offset += 8;
-        
+
         // Sequence counter (3 bytes for SCP03)
         responseData[offset++] = 0x00;
         responseData[offset++] = 0x01;
         responseData[offset++] = 0x23;
-        
-        var parseResult = InitializeUpdateResponse.Parse(responseData);
+
+        Result<InitializeUpdateResponse, SmartCardError> parseResult = InitializeUpdateResponse.Parse(responseData);
         if (!parseResult.IsSuccess)
             throw new InvalidOperationException($"Failed to create test INITIALIZE UPDATE response: {parseResult.Error}");
         return parseResult.Value;

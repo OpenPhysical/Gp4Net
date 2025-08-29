@@ -1,10 +1,7 @@
 using System;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -18,23 +15,15 @@ namespace Gp4Net.Domain.Security;
 public sealed class CryptogramService
 {
     private readonly ILogger<CryptogramService> _logger;
-    private readonly MacService _macService;
-
     /// <summary>
     /// Initializes the cryptogram service with required dependencies.
     /// </summary>
     /// <param name="logger">Logger instance.</param>
-    /// <param name="macService">MAC service for cryptogram calculations.</param>
-    public CryptogramService(
-        Maybe<ILogger<CryptogramService>> logger = default, 
-        Maybe<MacService> macService = default)
+    public CryptogramService(Maybe<ILogger<CryptogramService>> logger = default)
     {
         _logger = logger.Match(
             Some: log => log,
             None: () => NullLogger<CryptogramService>.Instance);
-        _macService = macService.Match(
-            Some: service => service,
-            None: () => new MacService(NullLogger<MacService>.Instance));
     }
 
     /// <summary>
@@ -47,21 +36,18 @@ public sealed class CryptogramService
     public Result<byte[], SmartCardError> CalculateCardCryptogram(Scp02CryptogramParameters parameters)
     {
         _logger.LogDebug("Calculating SCP02 card cryptogram");
-        
+
         // Build cryptogram data: Host Challenge (8) || Sequence Counter (2) || Card Challenge (6) || Padding
-        var cryptogramData = new byte[24];
+        byte[] cryptogramData = new byte[24];
         Array.Copy(parameters.HostChallenge, 0, cryptogramData, 0, 8);
         Array.Copy(parameters.SequenceCounter, 0, cryptogramData, 8, 2);
         Array.Copy(parameters.CardChallenge, 0, cryptogramData, 10, 6);
         cryptogramData[16] = 0x80; // ISO 7816-4 padding
 
         // Use Full 3DES MAC (ISO 9797-1 Algorithm 1) with S-ENC key
-        return _macService.CalculateMac(
-            parameters.Keys.SEnc, 
-            cryptogramData, 
-            ScpVersion.Scp02, 
-            MacUsage.Cryptogram, 
-            macLength: 8);
+        return MacCalculations.CalculateScp02Cryptogram(
+            parameters.Keys.SEnc,
+            cryptogramData);
     }
 
     /// <summary>
@@ -73,14 +59,14 @@ public sealed class CryptogramService
     public Result<byte[], SmartCardError> CalculateCardCryptogram(Scp03CryptogramParameters parameters)
     {
         _logger.LogDebug("Calculating SCP03 card cryptogram");
-        
-        var context = new byte[16];
+
+        byte[] context = new byte[16];
         Array.Copy(parameters.HostChallenge, 0, context, 0, 8);
         Array.Copy(parameters.CardChallenge, 0, context, 8, 8);
-        
+
         return CalculateScp03DataDerivation(
-            parameters.Keys.SMac, 
-            context, 
+            parameters.Keys.SMac,
+            context,
             Gp4Net.Constants.DerivationConstants.CardCryptogram,
             outputLengthBits: 64);
     }
@@ -95,19 +81,16 @@ public sealed class CryptogramService
     public Result<byte[], SmartCardError> CalculateHostCryptogram(Scp02CryptogramParameters parameters)
     {
         _logger.LogDebug("Calculating SCP02 host cryptogram");
-        
-        var cryptogramData = new byte[24];
+
+        byte[] cryptogramData = new byte[24];
         Array.Copy(parameters.SequenceCounter, 0, cryptogramData, 0, 2);
         Array.Copy(parameters.CardChallenge, 0, cryptogramData, 2, 6);
         Array.Copy(parameters.HostChallenge, 0, cryptogramData, 8, 8);
         cryptogramData[16] = 0x80; // ISO 7816-4 padding
 
-        return _macService.CalculateMac(
-            parameters.Keys.SEnc, 
-            cryptogramData, 
-            ScpVersion.Scp02, 
-            MacUsage.Cryptogram, 
-            macLength: 8);
+        return MacCalculations.CalculateScp02Cryptogram(
+            parameters.Keys.SEnc,
+            cryptogramData);
     }
 
     /// <summary>
@@ -119,14 +102,14 @@ public sealed class CryptogramService
     public Result<byte[], SmartCardError> CalculateHostCryptogram(Scp03CryptogramParameters parameters)
     {
         _logger.LogDebug("Calculating SCP03 host cryptogram");
-        
-        var context = new byte[16];
+
+        byte[] context = new byte[16];
         Array.Copy(parameters.HostChallenge, 0, context, 0, 8);
         Array.Copy(parameters.CardChallenge, 0, context, 8, 8);
-        
+
         return CalculateScp03DataDerivation(
-            parameters.Keys.SMac, 
-            context, 
+            parameters.Keys.SMac,
+            context,
             Gp4Net.Constants.DerivationConstants.HostCryptogram,
             outputLengthBits: 64);
     }
@@ -150,14 +133,14 @@ public sealed class CryptogramService
             //   - L = 2-byte length in bits (big-endian)
             //   - i = 1-byte counter (0x01 for first block)
             //   - context = input data (challenges, etc.)
-            
-            var label = Gp4Net.Constants.DerivationConstants.Scp03Label; // 11 zero bytes
-            var derivationByte = new byte[] { derivationConstant }; // 1 byte
-            var separator = new byte[] { 0x00 }; // 1 byte
-            var lengthBytes = new byte[] { (byte)(outputLengthBits >> 8), (byte)outputLengthBits }; // 2 bytes big-endian
-            var counter = new byte[] { 0x01 }; // 1 byte counter
-            
-            var fixedInput = label
+
+            byte[] label = Gp4Net.Constants.DerivationConstants.Scp03Label; // 11 zero bytes
+            byte[] derivationByte = [derivationConstant]; // 1 byte
+            byte[] separator = [0x00]; // 1 byte
+            byte[] lengthBytes = [(byte)(outputLengthBits >> 8), (byte)outputLengthBits]; // 2 bytes big-endian
+            byte[] counter = [0x01]; // 1 byte counter
+
+            byte[] fixedInput = label
                 .Concat(derivationByte)
                 .Concat(separator)
                 .Concat(lengthBytes)
@@ -165,7 +148,8 @@ public sealed class CryptogramService
                 .Concat(context)
                 .ToArray();
 
-            return _macService.CalculateAesCmac(key, fixedInput, macLength: outputLengthBits / 8);
+            return MacCalculations.CalculateScp03FullMac(key, fixedInput)
+                .Map(fullMac => fullMac.Take(outputLengthBits / 8).ToArray());
         }, ex => SmartCardError.CryptographicError($"SCP03 data derivation failed: {ex.Message}"))
         .Bind(result => result);
     }

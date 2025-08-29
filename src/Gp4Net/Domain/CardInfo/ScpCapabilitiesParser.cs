@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Core.Tlv;
 using Gp4Net.Domain.Protocol;
 
@@ -18,10 +20,10 @@ public static class ScpCapabilitiesParser
     /// <returns>Comma-separated list of supported SCP protocols.</returns>
     public static string Parse(byte[] data)
     {
-        var info = ParseDetailed(data);
+        ScpInformation info = ParseDetailed(data);
         return info.ToFormattedString(multiLine: false);
     }
-    
+
     /// <summary>
     /// Parses SCP capabilities and returns detailed information.
     /// </summary>
@@ -34,7 +36,7 @@ public static class ScpCapabilitiesParser
             return new ScpInformation(new List<ScpProtocolInfo>());
         }
 
-        var protocols = new Dictionary<byte, List<ScpImplementation>>();
+        Dictionary<byte, List<ScpImplementation>> protocols = new Dictionary<byte, List<ScpImplementation>>();
 
         try
         {
@@ -48,11 +50,11 @@ public static class ScpCapabilitiesParser
         }
 
         // Convert to structured information
-        var protocolList = protocols
+        List<ScpProtocolInfo> protocolList = protocols
             .Select(kvp => new ScpProtocolInfo(kvp.Key, kvp.Value.Distinct().ToList()))
             .OrderBy(p => p.Version)
             .ToList();
-            
+
         return new ScpInformation(protocolList);
     }
 
@@ -61,11 +63,11 @@ public static class ScpCapabilitiesParser
     /// </summary>
     private static void ParseElements(IEnumerable<TlvObject> elements, Dictionary<byte, List<ScpImplementation>> protocols)
     {
-        foreach (var element in elements)
+        foreach (TlvObject element in elements)
         {
-            var tagNumber = element.GetTagNumber();
+            Result<uint, SmartCardError> tagNumber = element.GetTagNumber();
             if (tagNumber.IsFailure) continue;
-            
+
             switch (tagNumber.Value)
             {
                 case 0xA0: // Constructed tag containing SCP information
@@ -75,7 +77,7 @@ public static class ScpCapabilitiesParser
                         try
                         {
                             // Parse inner TLV structure
-                            var innerElements = TlvParser.ParseAll(element.Value);
+                            IReadOnlyList<TlvObject> innerElements = TlvParser.ParseAll(element.Value);
                             ParseA0Contents(innerElements, protocols);
                         }
                         catch
@@ -96,52 +98,52 @@ public static class ScpCapabilitiesParser
                 case 0x87: // Outside A0 context - privileges
                     // These tags outside A0 are privilege/capability indicators, not SCP
                     break;
-                    
+
                 default:
                     break;
             }
         }
     }
-    
+
     /// <summary>
     /// Parses A0 tag contents to extract SCP information per GP Card Spec Table H-5.
     /// </summary>
     private static void ParseA0Contents(IEnumerable<TlvObject> elements, Dictionary<byte, List<ScpImplementation>> protocols)
     {
         byte? currentScpType = null;
-        
-        foreach (var element in elements)
+
+        foreach (TlvObject element in elements)
         {
-            var tagNumber = element.GetTagNumber();
+            Result<uint, SmartCardError> tagNumber = element.GetTagNumber();
             if (tagNumber.IsFailure) continue;
-            
+
             switch (tagNumber.Value)
             {
                 case 0x80: // SCP type ('02', '03', '10', '11', '80', '81')
                     if (element.Value != null && element.Value.Length > 0)
                     {
-                        var scpVersion = element.Value[0];
+                        byte scpVersion = element.Value[0];
                         // Valid SCP versions per GP specification
                         if (scpVersion is 0x02 or 0x03 or 0x10 or 0x11 or 0x80 or 0x81)
                         {
                             currentScpType = scpVersion;
                             if (!protocols.ContainsKey(scpVersion))
                             {
-                                protocols[scpVersion] = new List<ScpImplementation>();
+                                protocols[scpVersion] = [];
                             }
                         }
                     }
                     break;
-                    
+
                 case 0x81: // List of supported options for that protocol
                     if (element.Value != null && element.Value.Length > 0 && currentScpType.HasValue)
                     {
-                        foreach (var optionByte in element.Value)
+                        foreach (byte optionByte in element.Value)
                         {
                             // Each byte is an implementation option
                             if (Enum.IsDefined(typeof(ScpImplementation), optionByte))
                             {
-                                var impl = (ScpImplementation)optionByte;
+                                ScpImplementation impl = (ScpImplementation)optionByte;
                                 if (currentScpType.Value == 0x02 && impl.IsScp02())
                                 {
                                     protocols[currentScpType.Value].Add(impl);
@@ -159,7 +161,7 @@ public static class ScpCapabilitiesParser
                         }
                     }
                     break;
-                    
+
                 case 0x82: // Supported keys for SCP03
                 case 0x83: // Supported TLS cipher suites for SCP81
                 case 0x84: // Maximum length of Pre Shared Key

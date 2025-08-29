@@ -1,0 +1,220 @@
+{
+  "protocol": "SCP02",
+  "source": "scripts/SCP02_minimal.py",
+  "description": "SCP02 test vectors per GlobalPlatform Card Specification E.4.2.1",
+  "generated_at": "2025-08-04T02:11:49.864289",
+  "key_derivation": {
+    "algorithm": "3DES-CBC",
+    "iv": "0000000000000000",
+    "constants": {
+      "s_mac": "0101",
+      "r_mac": "0102",
+      "s_enc": "0182",
+      "s_dek": "0181"
+    }
+  },
+  "cryptogram": {
+    "algorithm": "Full 3DES MAC",
+    "description": "24-byte input with ISO 7816-4 padding"
+  },
+  "vectors": [
+    {
+      "name": "SCP02 i=15 Derived MAC with GP Test Keys",
+      "description": "Implementation i=15 derives MAC keys per GP Card Spec Section E.4.1 and live card trace data",
+      "implementation_option": "0x15",
+      "static_keys": {
+        "enc": "404142434445464748494A4B4C4D4E4F",
+        "mac": "404142434445464748494A4B4C4D4E4F",
+        "dek": "404142434445464748494A4B4C4D4E4F"
+      },
+      "challenges": {
+        "host": "1122334455667788",
+        "card": "AABBCCDDEE11",
+        "sequence_counter": "0001"
+      },
+      "expected_session_keys": {
+        "s_enc": "25C9794A1205FF244F5FA0378D2F8D59",
+        "s_mac": "9BED98891580C3B245FE9EC58BFA8D2A",
+        "s_dek": "0E51FDF196141F227A57BD154012FD39"
+      },
+      "cryptogram_data": {
+        "card": "11223344556677880001AABBCCDDEE118000000000000000",
+        "host": "0001AABBCCDDEE1111223344556677888000000000000000"
+      },
+      "expected_cryptograms": {
+        "card": "9FB4A9227081E1D0",
+        "host": "774051B32E61E046"
+      }
+    },
+    {
+      "name": "SCP02 i=04 Dynamic MAC",
+      "description": "Implementation i=04 means derived MAC keys",
+      "implementation_option": "0x04",
+      "static_keys": {
+        "enc": "0123456789ABCDEF1234567890ABCDEF",
+        "mac": "FEDCBA9876543210ABCDEF0987654321",
+        "dek": "1122334455667788AABBCCDDEEFF1122"
+      },
+      "challenges": {
+        "host": "FEDCBA9876543210",
+        "card": "123456789ABC",
+        "sequence_counter": "00A5"
+      },
+      "expected_session_keys": {
+        "s_enc": "B1B1E3A7B4FBD9F6BDA5FDDB703C5D47",
+        "s_mac": "82D6C3CC4FE50FC6C4DF470744514496",
+        "s_dek": "CAF3D972A7E964D2BCBF868561574637"
+      },
+      "cryptogram_data": {
+        "card": "FEDCBA987654321000A5123456789ABC8000000000000000",
+        "host": "00A5123456789ABCFEDCBA98765432108000000000000000"
+      },
+      "expected_cryptograms": {
+        "card": "1D172744A5C66F2C",
+        "host": "D6715F0A0D67E3B4"
+      }
+    },
+    {
+      "name": "SCP02 Edge Case - Minimum Sequence Counter",
+      "description": "Tests boundary conditions with sequence counter 0000, i=15 derives MAC keys per GP Card Spec Section E.4.1",
+      "implementation_option": "0x15",
+      "static_keys": {
+        "enc": "AAAAAAAAAAAAAAAA0000000000000000",
+        "mac": "BBBBBBBBBBBBBBBB1111111111111111",
+        "dek": "CCCCCCCCCCCCCCCC2222222222222222"
+      },
+      "challenges": {
+        "host": "0000000000000001",
+        "card": "000000000001",
+        "sequence_counter": "0000"
+      },
+      "expected_session_keys": {
+        "s_enc": "A3BBB3F1E6C82F990D4EED66CC3665F9",
+        "s_mac": "B701CD103F177D2071BA7801D765FDA4",
+        "s_dek": "95ECBB4B79D514145507BBF5A6913362"
+      },
+      "cryptogram_data": {
+        "card": "000000000000000100000000000000018000000000000000",
+        "host": "000000000000000100000000000000018000000000000000"
+      },
+      "expected_cryptograms": {
+        "card": "F5A4C3D6C41349F3",
+        "host": "F5A4C3D6C41349F3"
+      }
+    },
+    {
+      "name": "SCP02 i=1A Implicit Initiation Single Base Key",
+      "description": "Tests implicit mode with MAC over AID for ICV using single base key",
+      "implementation_option": "0x1A",
+      "static_keys": {
+        "enc": "505152535455565758595A5B5C5D5E5F",
+        "mac": "505152535455565758595A5B5C5D5E5F",
+        "dek": "505152535455565758595A5B5C5D5E5F"
+      },
+      "challenges": {
+        "host": "A1B2C3D4E5F67890",
+        "card": "0F1E2D3C4B5A",
+        "sequence_counter": "0100"
+      },
+      "expected_session_keys": {
+        "s_enc": "85CE3D2D316CCF8A4213145E14F8F310",
+        "s_mac": "C3D06FDE295D39AFD27A800691E6DC8A",
+        "s_dek": "64E27A347D70C1C296C5282625B345F8"
+      },
+      "cryptogram_data": {
+        "card": "A1B2C3D4E5F6789001000F1E2D3C4B5A8000000000000000",
+        "host": "01000F1E2D3C4B5AA1B2C3D4E5F678908000000000000000"
+      },
+      "expected_cryptograms": {
+        "card": "A7FBBB432545701A",
+        "host": "9F4AF1C75E77CD9B"
+      }
+    },
+    {
+      "name": "SCP02 i=55 Pseudo-Random Challenge",
+      "description": "Tests pseudo-random card challenge generation method",
+      "implementation_option": "0x55",
+      "static_keys": {
+        "enc": "6162636465666768696A6B6C6D6E6F70",
+        "mac": "7172737475767778797A7B7C7D7E7F80",
+        "dek": "8182838485868788898A8B8C8D8E8F90"
+      },
+      "challenges": {
+        "host": "123456789ABCDEF0",
+        "card": "FEDCBA987654",
+        "sequence_counter": "00FF"
+      },
+      "expected_session_keys": {
+        "s_enc": "6BF0C7AE1CD147174D580E3CCDBA850D",
+        "s_mac": "F8B54878E5A4DAA2002D623103AA7FFC",
+        "s_dek": "EFEE4B8A05E74DC61DC58DABC5471B87"
+      },
+      "cryptogram_data": {
+        "card": "123456789ABCDEF000FFFEDCBA9876548000000000000000",
+        "host": "00FFFEDCBA987654123456789ABCDEF08000000000000000"
+      },
+      "expected_cryptograms": {
+        "card": "977E81C826A09585",
+        "host": "D4BBCDEED4D0B69B"
+      }
+    },
+    {
+      "name": "SCP02 i=05 ICV Encryption",
+      "description": "Tests ICV encryption for next MAC calculation",
+      "implementation_option": "0x05",
+      "static_keys": {
+        "enc": "9192939495969798999A9B9C9D9E9FA0",
+        "mac": "A1A2A3A4A5A6A7A8A9AAABACADAEAFB0",
+        "dek": "B1B2B3B4B5B6B7B8B9BABBBCBDBEBFC0"
+      },
+      "challenges": {
+        "host": "0011223344556677",
+        "card": "8899AABBCCDD",
+        "sequence_counter": "0042"
+      },
+      "expected_session_keys": {
+        "s_enc": "232D8F41780F8308909EF6BD8EF11AE5",
+        "s_mac": "8520B9AF247712F7E72BC07D8D920EB3",
+        "s_dek": "E1195FB30C63DA76888705309FB50264"
+      },
+      "cryptogram_data": {
+        "card": "001122334455667700428899AABBCCDD8000000000000000",
+        "host": "00428899AABBCCDD00112233445566778000000000000000"
+      },
+      "expected_cryptograms": {
+        "card": "CFCCEA8906886C9E",
+        "host": "66A34C3EB2876450"
+      }
+    }
+  ],
+  "cmac_vectors": [
+    {
+      "name": "Basic APDU Command",
+      "description": "INITIALIZE UPDATE command with 8-byte host challenge",
+      "mac_key": "404142434445464748494A4B4C4D4E4F",
+      "command_data": "8050000008112233445566778800",
+      "expected_cmac": "2FFDC434433797EE"
+    },
+    {
+      "name": "EXTERNAL AUTHENTICATE",
+      "description": "EXTERNAL AUTHENTICATE with host cryptogram and MAC",
+      "mac_key": "404142434445464748494A4B4C4D4E4F",
+      "command_data": "8482010010FEDCBA9876543210ABCDEF0123456789",
+      "expected_cmac": "1D4DD5F8133EDC45"
+    },
+    {
+      "name": "Short Command",
+      "description": "GET DATA command (short APDU)",
+      "mac_key": "0123456789ABCDEF1234567890ABCDEF",
+      "command_data": "80CA9F7F00",
+      "expected_cmac": "C74F5EA869D9C1EC"
+    },
+    {
+      "name": "Empty Data Field",
+      "description": "Command with empty data field",
+      "mac_key": "FEDCBA9876543210ABCDEF0987654321",
+      "command_data": "8000000000",
+      "expected_cmac": "D4F599FB27096A22"
+    }
+  ]
+}

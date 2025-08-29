@@ -1,12 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.OpenPhysical;
+using Gp4Net.Pipeline;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console;
@@ -26,19 +30,33 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
     /// </summary>
     public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
     {
-        var ctx = await context.WithVerbose(settings.Verbose).RequireCardConnection(settings);
-
-        ctx = await ctx.RequireSecureChannel(settings);
-
-        return PutDataObjects(ctx, settings);
+        Result<ICliExecutionContext, SmartCardError> connectionResult = await context.WithVerbose(settings.Verbose).RequireCardConnection(settings.GetReaderName());
+        
+        return await connectionResult.Match(
+            async connectedCtx =>
+            {
+                Result<ICliExecutionContext, SmartCardError> secureChannelResult = await connectedCtx.RequireSecureChannel(1, settings.GetKeyset());
+                return await secureChannelResult.Match(
+                    async secureCtx => await PutDataObjects(secureCtx, settings),
+                    async secureChannelError =>
+                    {
+                        AnsiConsole.MarkupLine($"[red]Secure channel error: {secureChannelError.Message}[/]");
+                        return await Task.FromResult(1);
+                    });
+            },
+            async connectionError =>
+            {
+                AnsiConsole.MarkupLine($"[red]Connection error: {connectionError.Message}[/]");
+                return await Task.FromResult(1);
+            });
     }
 
-    private static int PutDataObjects(ICliExecutionContext context, Settings settings)
+    private static async Task<int> PutDataObjects(ICliExecutionContext context, Settings settings)
     {
         try
         {
             // Parse data to write
-            var dataToWrite = new Dictionary<string, string>();
+            Dictionary<string, string> dataToWrite = new Dictionary<string, string>();
 
             // Handle different input methods
             if (!string.IsNullOrEmpty(settings.ConfigFile))
@@ -107,7 +125,7 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
             }
 
             // Write data to card
-            return WriteDataToCard(dataToWrite, context, settings);
+            return await WriteDataToCard(dataToWrite, context, settings);
         }
         catch (Exception ex)
         {
@@ -143,12 +161,12 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
             // Try to parse as JSON
             try
             {
-                var jsonData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(
+                Dictionary<string, JsonElement> jsonData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(
                     content
                 );
                 if (jsonData != null)
                 {
-                    foreach (var kvp in jsonData)
+                    foreach (KeyValuePair<string, JsonElement> kvp in jsonData)
                     {
                         dataToWrite[kvp.Key.ToLowerInvariant()] = kvp.Value.ToString();
                     }
@@ -158,16 +176,16 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
             catch
             {
                 // Not JSON, try key=value format
-                var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-                foreach (var line in lines)
+                string[] lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                foreach (string line in lines)
                 {
-                    var trimmed = line.Trim();
+                    string trimmed = line.Trim();
                     if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("#"))
                     {
                         continue;
                     }
 
-                    var parts = trimmed.Split('=', 2);
+                    string[] parts = trimmed.Split('=', 2);
                     if (parts.Length == 2)
                     {
                         dataToWrite[parts[0].Trim().ToLowerInvariant()] = parts[1].Trim();
@@ -193,17 +211,17 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
     {
         context.Display.Info("Interactive data entry mode. Press Enter to skip a field.");
 
-        var prompts = new[]
-        {
+        (string, string)[] prompts =
+        [
             ("IIN", "Issuer Identification Number (4 digits)"),
             ("CIN", "Card Image Number (digits only)"),
             ("Manager URL", "Security Domain Manager URL"),
             ("OPID", "OpenPhysical ID (format: IIII-... where I=digits)")
-        };
+        ];
 
-        foreach (var (key, description) in prompts)
+        foreach ((string key, string description) in prompts)
         {
-            var value = AnsiConsole.Ask<string>(
+            string value = AnsiConsole.Ask<string>(
                 $"[yellow]{description}[/] ({key}):",
                 string.Empty
             );
@@ -222,17 +240,17 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         ICliExecutionContext context
     )
     {
-        foreach (var pair in keyValuePairs)
+        foreach (string pair in keyValuePairs)
         {
-            var parts = pair.Split('=', 2);
+            string[] parts = pair.Split('=', 2);
             if (parts.Length != 2)
             {
                 context.Display.Error($"Invalid key=value format: {pair}");
                 return false;
             }
 
-            var key = parts[0].Trim().ToLowerInvariant();
-            var value = parts[1].Trim();
+            string key = parts[0].Trim().ToLowerInvariant();
+            string value = parts[1].Trim();
 
             if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(value))
             {
@@ -251,8 +269,8 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         ICliExecutionContext context
     )
     {
-        var hasOpid = dataToWrite.ContainsKey("opid");
-        var hasIndividualFields =
+        bool hasOpid = dataToWrite.ContainsKey("opid");
+        bool hasIndividualFields =
             dataToWrite.ContainsKey("iin")
             || dataToWrite.ContainsKey("cin")
             || dataToWrite.ContainsKey("manager-url");
@@ -274,11 +292,11 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         ICliExecutionContext context
     )
     {
-        var opidString = dataToWrite["opid"];
+        string opidString = dataToWrite["opid"];
 
-        if (!OpenPhysicalId.TryParse(opidString, out var opid) || opid == null)
+        if (!OpenPhysicalId.TryParse(opidString, out OpenPhysicalId opid) || opid == null)
         {
-            var validation = OpidValidator.ValidateOpid(opidString);
+            OpidValidationResult validation = OpidValidator.ValidateOpid(opidString);
             context.Display.Error($"Invalid OPID: {validation.ErrorMessage}");
             return false;
         }
@@ -302,14 +320,14 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         ICliExecutionContext context
     )
     {
-        var table = new Table()
+        Table table = new Table()
             .AddColumn("Data Object")
             .AddColumn("Value")
             .AddColumn("Encoding");
 
-        foreach (var kvp in dataToWrite)
+        foreach (KeyValuePair<string, string> kvp in dataToWrite)
         {
-            var encoding = kvp.Key switch
+            string encoding = kvp.Key switch
             {
                 "iin" or "cin" => "ASCII",
                 "manager-url" => "UTF-8",
@@ -323,59 +341,75 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         AnsiConsole.Write(new Panel(table).Header("[bold]Data to be written[/]"));
     }
 
-    private static int WriteDataToCard(
+    private static async Task<int> WriteDataToCard(
         Dictionary<string, string> dataToWrite,
         ICliExecutionContext context,
         Settings settings
     )
     {
-        var errors = 0;
-        var written = 0;
+        ImmutableDictionary<string, string> dataItems = dataToWrite.ToImmutableDictionary();
+        
+        return await WriteDataObjectsSequentially(dataItems, context, settings, 0, ImmutableArray<(string key, Result<bool, SmartCardError> result)>.Empty);
+    }
 
-        foreach (var kvp in dataToWrite)
+    private static async Task<int> WriteDataObjectsSequentially(
+        IReadOnlyDictionary<string, string> dataToWrite,
+        ICliExecutionContext context,
+        Settings settings,
+        int currentIndex,
+        ImmutableArray<(string key, Result<bool, SmartCardError> result)> processedResults
+    )
+    {
+        KeyValuePair<string, string>[] dataItems = dataToWrite.ToArray();
+        
+        if (currentIndex >= dataItems.Length)
         {
-            try
+            return ProcessWriteResults(processedResults, context);
+        }
+
+        (string key, string value) = dataItems[currentIndex];
+        Result<bool, SmartCardError> writeResult = await WriteDataObject(key, value, context);
+        
+        DisplayWriteResult(key, writeResult, context);
+        
+        ImmutableArray<(string key, Result<bool, SmartCardError> result)> updatedResults = processedResults.Add((key, writeResult));
+        
+        if (writeResult.IsFailure && !settings.ContinueOnError)
+        {
+            context.Display.Error("Stopping due to error (use --continue-on-error to continue)");
+            return ProcessWriteResults(updatedResults, context);
+        }
+        
+        return await WriteDataObjectsSequentially(dataToWrite, context, settings, currentIndex + 1, updatedResults);
+    }
+
+    private static void DisplayWriteResult(string key, Result<bool, SmartCardError> result, ICliExecutionContext context)
+    {
+        _ = result.Match(
+            success =>
             {
-                var success = WriteDataObject(kvp.Key, kvp.Value, context);
                 if (success)
                 {
-                    written++;
-                    context.Display.Success(
-                        $"✓ {kvp.Key.ToUpperInvariant()} written successfully"
-                    );
+                    context.Display.Success($"✓ {key.ToUpperInvariant()} written successfully");
                 }
                 else
                 {
-                    errors++;
-                    context.Display.Error($"✗ Failed to write {kvp.Key.ToUpperInvariant()}");
-
-                    if (!settings.ContinueOnError)
-                    {
-                        context.Display.Error(
-                            "Stopping due to error (use --continue-on-error to continue)"
-                        );
-                        break;
-                    }
+                    context.Display.Error($"✗ Failed to write {key.ToUpperInvariant()}");
                 }
-            }
-            catch (Exception ex)
+                return true;
+            },
+            error =>
             {
-                errors++;
-                context.Display.Error(
-                    $"✗ Error writing {kvp.Key.ToUpperInvariant()}: {ex.Message}"
-                );
+                context.Display.Error($"✗ Error writing {key.ToUpperInvariant()}: {error.Message}");
+                return false;
+            });
+    }
 
-                if (!settings.ContinueOnError)
-                {
-                    context.Display.Error(
-                        "Stopping due to error (use --continue-on-error to continue)"
-                    );
-                    break;
-                }
-            }
-        }
+    private static int ProcessWriteResults(ImmutableArray<(string key, Result<bool, SmartCardError> result)> results, ICliExecutionContext context)
+    {
+        int written = results.Count(r => r.result.Match(success => success, _ => false));
+        int errors = results.Count(r => r.result.IsFailure || r.result.Match(success => !success, _ => true));
 
-        // Summary
         if (written > 0 || errors > 0)
         {
             AnsiConsole.WriteLine();
@@ -385,55 +419,87 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         return errors > 0 ? 1 : 0;
     }
 
-    private static bool WriteDataObject(string key, string value, ICliExecutionContext context)
+    private static async Task<Result<bool, SmartCardError>> WriteDataObject(string key, string value, ICliExecutionContext context)
     {
-        try
+        return await ParseDataObjectAsync(key, value)
+            .Bind(async tagData => await CreateAndSendCommand(tagData, context));
+    }
+
+    private static Task<Result<(ushort tag, byte[] data), SmartCardError>> ParseDataObjectAsync(string key, string value)
+    {
+        Result<(ushort tag, byte[] data), SmartCardError> result = key switch
         {
-            var (tag, data) = key switch
+            "iin" => Result.Success<(ushort tag, byte[] data), SmartCardError>((
+                GetDataCommand.DataObjects.IssuerIdentificationNumber,
+                System.Text.Encoding.ASCII.GetBytes(value)
+            )),
+            "cin" => Result.Success<(ushort tag, byte[] data), SmartCardError>((
+                GetDataCommand.DataObjects.CardImageNumber,
+                System.Text.Encoding.ASCII.GetBytes(value)
+            )),
+            "manager-url" => Result.Success<(ushort tag, byte[] data), SmartCardError>((
+                GetDataCommand.DataObjects.SecurityDomainManagerUrl,
+                System.Text.Encoding.UTF8.GetBytes(value)
+            )),
+            _ when key.StartsWith("0x") => Result.Try(() => ParseRawDataObject(key, value), 
+                ex => SmartCardError.InvalidData($"Invalid raw data object format: {ex.Message}")),
+            _ => Result.Failure<(ushort tag, byte[] data), SmartCardError>(
+                SmartCardError.InvalidData($"Unknown data object: {key}"))
+        };
+        
+        return Task.FromResult(result);
+    }
+
+    private static async Task<Result<bool, SmartCardError>> CreateAndSendCommand((ushort tag, byte[] data) tagData, ICliExecutionContext context)
+    {
+        (ushort tag, byte[] data) = tagData;
+        byte[] tlvData = CreateTlvData(tag, data);
+
+        Result<StoreDataCommand, SmartCardError> storeResult = StoreDataCommand.CreateWithFormat(
+            StoreDataCommand.DataStructureFormat.BerTlv,
+            StoreDataCommand.BlockFormat.FirstOrOnly,
+            tlvData
+        );
+
+        return await storeResult.Match(
+            async storeCommand =>
             {
-                "iin"
-                    => (
-                        Domain.Commands.GetDataCommand.DataObjects.IssuerIdentificationNumber,
-                        System.Text.Encoding.ASCII.GetBytes(value)
-                    ),
-                "cin"
-                    => (
-                        Domain.Commands.GetDataCommand.DataObjects.CardImageNumber,
-                        System.Text.Encoding.ASCII.GetBytes(value)
-                    ),
-                "manager-url"
-                    => (
-                        Domain.Commands.GetDataCommand.DataObjects.SecurityDomainManagerUrl,
-                        System.Text.Encoding.UTF8.GetBytes(value)
-                    ),
-                _ when key.StartsWith("0x") => ParseRawDataObject(key, value),
-                _ => throw new ArgumentException($"Unknown data object: {key}")
-            };
+                // Construct APDU byte array from command properties
+                return await ConstructApduBytes(storeCommand)
+                    .Bind(async apduBytes =>
+                    {
+                        Result<CommandResponse, SmartCardError> responseResult = await context.CardService.SendCommandAsync(apduBytes);
+                        return responseResult.Match(
+                            response => Result.Success<bool, SmartCardError>(response.StatusWord == 0x9000),
+                            error => Result.Failure<bool, SmartCardError>(error));
+                    });
+            },
+            error => Task.FromResult(Result.Failure<bool, SmartCardError>(error)));
+    }
 
-            // Create BER-TLV formatted data
-            var tlvData = CreateTlvData(tag, data);
-
-            // Create STORE DATA command
-            var storeResult = StoreDataCommand.CreateWithFormat(
-                StoreDataCommand.DataStructureFormat.BerTlv,
-                StoreDataCommand.BlockFormat.FirstOrOnly,
-                tlvData
-            );
-            if (storeResult.IsFailure)
-            {
-                throw new InvalidOperationException($"Failed to create STORE DATA command: {storeResult.Error.Message}");
-            }
-            var storeCommand = storeResult.Value;
-
-            // Send command
-            var response = context.CardService.SendCommand(storeCommand);
-            return response.IsSuccessful;
-        }
-        catch (Exception ex)
+    /// <summary>
+    /// Constructs an APDU byte array from the command properties following ISO 7816-4 format.
+    /// Format: CLA INS P1 P2 [Lc] [Data] where Lc is the data length.
+    /// </summary>
+    private static Result<byte[], SmartCardError> ConstructApduBytes(StoreDataCommand command)
+    {
+        byte[] commandData = command.Data;
+        byte[] header = [StoreDataCommand.Cla, StoreDataCommand.Ins, command.P1, command.P2];
+        
+        return commandData.Length switch
         {
-            context.Display.Error($"Error creating command for {key}: {ex.Message}");
-            return false;
-        }
+            0 => Result.Success<byte[], SmartCardError>(header), // Case 1: No data
+            <= 255 => Result.Success<byte[], SmartCardError>(header
+                .Concat([(byte)commandData.Length])
+                .Concat(commandData)
+                .ToArray()), // Case 3 short: CLA INS P1 P2 Lc Data
+            _ when command.IsExtendedLength => Result.Success<byte[], SmartCardError>(header
+                .Concat(new byte[] { 0x00, (byte)(commandData.Length >> 8), (byte)(commandData.Length & 0xFF) })
+                .Concat(commandData)
+                .ToArray()), // Case 3 extended: CLA INS P1 P2 00 LcH LcL Data
+            _ => Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidArgument($"Data length {commandData.Length} exceeds short format limit but extended length not enabled"))
+        };
     }
 
     private static (ushort tag, byte[] data) ParseRawDataObject(string key, string value)
@@ -445,7 +511,7 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
                     key.AsSpan(2),
                     System.Globalization.NumberStyles.HexNumber,
                     null,
-                    out var tag
+                    out ushort tag
                 ))
             {
                 throw new ArgumentException($"Invalid hex tag format: {key}");
@@ -467,8 +533,8 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         else
         {
             // Try parsing as tag:data or tag=data format
-            var fullString = $"{key}:{value}";
-            var result = DataObjectParser.ParseRawDataObject(fullString);
+            string fullString = $"{key}:{value}";
+            Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(fullString);
             if (result.IsSuccess)
             {
                 return result.Value;
@@ -488,7 +554,7 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
 
     private static byte[] CreateTlvData(ushort tag, byte[] data)
     {
-        var result = new List<byte>();
+        List<byte> result = [];
 
         // Add tag
         if (tag > 0xFF)
@@ -577,11 +643,11 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         /// <returns>Success if valid, or an error message if validation fails.</returns>
         public override ValidationResult Validate()
         {
-            var hasKeyValuePairs = KeyValuePairs is { Length: > 0 };
-            var hasFile = !string.IsNullOrEmpty(ConfigFile);
-            var hasInteractive = Interactive;
+            bool hasKeyValuePairs = KeyValuePairs is { Length: > 0 };
+            bool hasFile = !string.IsNullOrEmpty(ConfigFile);
+            bool hasInteractive = Interactive;
 
-            var inputMethods = new[] { hasKeyValuePairs, hasFile, hasInteractive }.Count(x =>
+            int inputMethods = new[] { hasKeyValuePairs, hasFile, hasInteractive }.Count(x =>
                 x
             );
             switch (inputMethods)

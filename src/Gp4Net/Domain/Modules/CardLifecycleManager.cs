@@ -31,25 +31,25 @@ public static class CardLifecycleManager
     {
         // Map lifecycle state to P1 parameter per GP specification
         Result<byte, SmartCardError> p1Result = MapLifecycleStateToP1(targetState);
-        
+
         if (p1Result.IsFailure)
         {
             return Result.Failure<bool, SmartCardError>(p1Result.Error);
         }
 
         // Create SET STATUS command
-        Result<SetStatusCommand, SmartCardError> cmdResult = 
+        Result<SetStatusCommand, SmartCardError> cmdResult =
             CommandFactory.CreateSetStatusCommand(aid, p1Result.Value);
-        
+
         if (cmdResult.IsFailure)
         {
             return Result.Failure<bool, SmartCardError>(cmdResult.Error);
         }
 
         // Execute the command
-        Result<CommandResponse, SmartCardError> response = 
+        Result<CommandResponse, SmartCardError> response =
             await executeCommand(cmdResult.Value, cancellationToken);
-        
+
         if (response.IsFailure)
         {
             return Result.Failure<bool, SmartCardError>(response.Error);
@@ -76,18 +76,18 @@ public static class CardLifecycleManager
         CancellationToken cancellationToken = default)
     {
         // Create DELETE command
-        Result<DeleteCommand, SmartCardError> cmdResult = 
+        Result<DeleteCommand, SmartCardError> cmdResult =
             CommandFactory.CreateDeleteCommand(aid, deleteRelated);
-        
+
         if (cmdResult.IsFailure)
         {
             return Result.Failure<bool, SmartCardError>(cmdResult.Error);
         }
 
         // Execute the command
-        Result<CommandResponse, SmartCardError> response = 
+        Result<CommandResponse, SmartCardError> response =
             await executeCommand(cmdResult.Value, cancellationToken);
-        
+
         return response.IsSuccess
             ? ResponseParser.ParseDeleteResponse(response.Value)
             : Result.Failure<bool, SmartCardError>(response.Error);
@@ -153,18 +153,18 @@ public static class CardLifecycleManager
         }
 
         // Create SET STATUS command for the card (no AID means card-level operation)
-        Result<SetStatusCommand, SmartCardError> cmdResult = 
+        Result<SetStatusCommand, SmartCardError> cmdResult =
             CommandFactory.CreateSetStatusCommand([], p1);
-        
+
         if (cmdResult.IsFailure)
         {
             return Result.Failure<bool, SmartCardError>(cmdResult.Error);
         }
 
         // Execute the command
-        Result<CommandResponse, SmartCardError> response = 
+        Result<CommandResponse, SmartCardError> response =
             await executeCommand(cmdResult.Value, cancellationToken);
-        
+
         if (response.IsFailure)
         {
             return Result.Failure<bool, SmartCardError>(response.Error);
@@ -213,23 +213,23 @@ public static class CardLifecycleManager
         CancellationToken cancellationToken = default)
     {
         // Create INSTALL command for installation
-        Result<InstallCommand.InstallForInstallCommand, SmartCardError> cmdResult = 
+        Result<InstallCommand.InstallForInstallCommand, SmartCardError> cmdResult =
             InstallCommand.InstallForInstallCommand.Create(
                 packageAid,
                 moduleAid,       // moduleAid  
                 applicationAid,  // applicationAid
                 [privileges],  // privileges as array
                 installParameters ?? []);
-        
+
         if (cmdResult.IsFailure)
         {
             return Result.Failure<bool, SmartCardError>(cmdResult.Error);
         }
 
         // Execute the command
-        Result<CommandResponse, SmartCardError> response = 
+        Result<CommandResponse, SmartCardError> response =
             await executeCommand(cmdResult.Value, cancellationToken);
-        
+
         if (response.IsFailure)
         {
             return Result.Failure<bool, SmartCardError>(response.Error);
@@ -255,22 +255,22 @@ public static class CardLifecycleManager
     {
         // Create INSTALL command for make selectable
         // For make selectable only, we use CreateAndMakeSelectable with same AID
-        Result<InstallCommand.InstallForInstallCommand, SmartCardError> cmdResult = 
+        Result<InstallCommand.InstallForInstallCommand, SmartCardError> cmdResult =
             InstallCommand.InstallForInstallCommand.CreateAndMakeSelectable(
                 applicationAid,  // packageAid
                 applicationAid,  // moduleAid (same as package for make selectable)
                 applicationAid,  // applicationAid
                 [0x00]); // privileges (default)
-        
+
         if (cmdResult.IsFailure)
         {
             return Result.Failure<bool, SmartCardError>(cmdResult.Error);
         }
 
         // Execute the command
-        Result<CommandResponse, SmartCardError> response = 
+        Result<CommandResponse, SmartCardError> response =
             await executeCommand(cmdResult.Value, cancellationToken);
-        
+
         if (response.IsFailure)
         {
             return Result.Failure<bool, SmartCardError>(response.Error);

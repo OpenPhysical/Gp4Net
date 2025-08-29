@@ -7,7 +7,7 @@ using System;
 using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
+using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
 using Gp4Net.Domain.Security;
@@ -30,7 +30,7 @@ public class ScpProtocolTests
     public void Scp02_KeyDerivation_WithJsonTestVector_ProducesExpectedSessionKeys(Scp02TestVector vector)
     {
         // Arrange
-        var keySet = Scp02KeySet.Create(
+        Result<Scp02KeySet, SmartCardError> keySet = Scp02KeySet.Create(
             vector.StaticEncKey,
             vector.StaticMacKey,
             vector.StaticDekKey,
@@ -38,7 +38,7 @@ public class ScpProtocolTests
         );
         _ = keySet.IsSuccess.Should().BeTrue($"Failed to create key set: {vector.Name}");
 
-        var implementationOption = Convert.ToByte(vector.ImplementationOption, 16);
+        byte implementationOption = Convert.ToByte(vector.ImplementationOption, 16);
 
         // Act
         var result = Scp02ProtocolImpl.DeriveSessionKeys(
@@ -51,7 +51,7 @@ public class ScpProtocolTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue($"Key derivation failed for {vector.Name}: {(result.IsFailure ? result.Error.Message : "N/A")}");
-        
+
         var sessionKeys = result.Value;
         _ = sessionKeys.SEnc.Should().BeEquivalentTo(vector.ExpectedSEncKey, $"S-ENC mismatch for {vector.Name}");
         _ = sessionKeys.SMac.Should().BeEquivalentTo(vector.ExpectedSMacKey, $"S-MAC mismatch for {vector.Name}");
@@ -63,7 +63,7 @@ public class ScpProtocolTests
     public void Scp03_KeyDerivation_WithJsonTestVector_ProducesExpectedSessionKeys(Scp03TestVector vector)
     {
         // Arrange
-        var keySet = new Scp03KeySet(
+        Scp03KeySet keySet = new Scp03KeySet(
             vector.StaticEncKey,
             vector.StaticMacKey,
             vector.StaticDekKey,
@@ -81,7 +81,7 @@ public class ScpProtocolTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue($"Key derivation failed for {vector.Name}: {(result.IsFailure ? result.Error.Message : "N/A")}");
-        
+
         var sessionKeys = result.Value;
         _ = sessionKeys.SEnc.Should().BeEquivalentTo(vector.ExpectedSEncKey, $"S-ENC mismatch for {vector.Name}");
         _ = sessionKeys.SMac.Should().BeEquivalentTo(vector.ExpectedSMacKey, $"S-MAC mismatch for {vector.Name}");
@@ -94,11 +94,11 @@ public class ScpProtocolTests
     public void Scp02_CryptogramCalculation_WithJsonTestVector_ProducesExpectedCryptograms(Scp02TestVector vector)
     {
         // Arrange
-        var sessionEncKey = vector.ExpectedSEncKey;
+        byte[] sessionEncKey = vector.ExpectedSEncKey;
 
         // Act - Calculate card cryptogram
         var cardCryptogramResult = Scp02ProtocolImpl.CalculateCryptogramMac(sessionEncKey, vector.CardCryptogramData);
-        
+
         // Act - Calculate host cryptogram  
         var hostCryptogramResult = Scp02ProtocolImpl.CalculateCryptogramMac(sessionEncKey, vector.HostCryptogramData);
 
@@ -115,24 +115,24 @@ public class ScpProtocolTests
     public void Scp03_CryptogramCalculation_WithJsonTestVector_ProducesExpectedCryptograms(Scp03TestVector vector)
     {
         // Arrange
-        var sessionMacKey = vector.ExpectedSMacKey;
-        var context = vector.HostChallenge.Concat(vector.CardChallenge).ToArray();
-        
+        byte[] sessionMacKey = vector.ExpectedSMacKey;
+        byte[] context = vector.HostChallenge.Concat(vector.CardChallenge).ToArray();
+
         // For SCP03, cryptograms are calculated using KDF on the session MAC key
         // Card cryptogram: KDF(S-MAC, derivation constant 0x00, context, 64 bits)
         // Host cryptogram: KDF(S-MAC, derivation constant 0x01, context, 64 bits)
-        var cryptogramService = new Gp4Net.Domain.Security.CryptogramService();
+        CryptogramService cryptogramService = new CryptogramService();
 
         // Act - Create type-safe SCP03 parameters and calculate cryptograms
-        var keySet = new Scp03KeySet(sessionMacKey, sessionMacKey, sessionMacKey) { SMac = sessionMacKey };
-        
-        var cardCryptogramResult = CryptogramParameters.ForScp03(
+        Scp03KeySet keySet = new Scp03KeySet(sessionMacKey, sessionMacKey, sessionMacKey) { SMac = sessionMacKey };
+
+        Result<byte[], SmartCardError> cardCryptogramResult = CryptogramParameters.ForScp03(
                 vector.HostChallenge,
                 vector.CardChallenge,
                 keySet)
             .Bind(parameters => cryptogramService.CalculateCardCryptogram(parameters));
-        
-        var hostCryptogramResult = CryptogramParameters.ForScp03(
+
+        Result<byte[], SmartCardError> hostCryptogramResult = CryptogramParameters.ForScp03(
                 vector.HostChallenge,
                 vector.CardChallenge,
                 keySet)
@@ -182,12 +182,12 @@ public class ScpProtocolTests
     public void Scp02_KeySetCreation_WithValidKeys_Succeeds()
     {
         // Arrange
-        var encKey = new byte[16];
-        var macKey = new byte[16];
-        var dekKey = new byte[16];
-        
+        byte[] encKey = new byte[16];
+        byte[] macKey = new byte[16];
+        byte[] dekKey = new byte[16];
+
         // Act
-        var result = Scp02KeySet.Create(encKey, macKey, dekKey, 0x01);
+        Result<Scp02KeySet, SmartCardError> result = Scp02KeySet.Create(encKey, macKey, dekKey, 0x01);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue("Valid keys should create successful key set");
@@ -197,12 +197,12 @@ public class ScpProtocolTests
     public void Scp03_KeySetCreation_WithValidKeys_Succeeds()
     {
         // Arrange
-        var encKey = new byte[16];
-        var macKey = new byte[16];
-        var dekKey = new byte[16];
-        
+        byte[] encKey = new byte[16];
+        byte[] macKey = new byte[16];
+        byte[] dekKey = new byte[16];
+
         // Act
-        var keySet = new Scp03KeySet(encKey, macKey, dekKey, 0x01);
+        Scp03KeySet keySet = new Scp03KeySet(encKey, macKey, dekKey, 0x01);
 
         // Assert
         _ = keySet.Should().NotBeNull("Valid keys should create successful key set");

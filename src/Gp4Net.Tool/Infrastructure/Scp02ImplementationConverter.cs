@@ -73,29 +73,29 @@ public class Scp02ImplementationConverter : TypeConverter
     {
         if (value is string str)
         {
-            var normalizedStr = str.Trim().ToUpperInvariant();
-            
+            string normalizedStr = str.Trim().ToUpperInvariant();
+
             // Try direct lookup in dictionary
-            if (_validValues.TryGetValue(normalizedStr, out var implementation))
+            if (_validValues.TryGetValue(normalizedStr, out ScpImplementation implementation))
                 return implementation;
-                
+
             // Try parsing as hex number (with or without 0x prefix)
-            var hexStr = normalizedStr.StartsWith("0X") ? normalizedStr[2..] : normalizedStr;
-            if (byte.TryParse(hexStr, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var byteValue))
+            string hexStr = normalizedStr.StartsWith("0X") ? normalizedStr[2..] : normalizedStr;
+            if (byte.TryParse(hexStr, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out byte byteValue))
             {
                 if (Enum.IsDefined(typeof(ScpImplementation), byteValue))
                     return (ScpImplementation)byteValue;
             }
-            
+
             // Generate helpful error message
-            var commonOptions = "15|CLR, 35|MAC, 55|ENC, 75|RENC, 1A|IMPLICIT";
+            string commonOptions = "15|CLR, 35|MAC, 55|ENC, 75|RENC, 1A|IMPLICIT";
             throw new NotSupportedException(
                 $"SCP implementation '{value}' not supported. " +
                 $"Common options: {commonOptions}. " +
                 $"All valid SCP02 'i' parameter values (04-7A) are supported. " +
                 $"Use hex format (15) or specific aliases (CLR).");
         }
-        
+
         return base.ConvertFrom(context, culture, value);
     }
 
@@ -123,10 +123,10 @@ public class Scp02ImplementationConverter : TypeConverter
         if (destinationType == typeof(string) && value is ScpImplementation impl)
         {
             // Return alias if available, otherwise hex format
-            var alias = impl.GetAlias();
+            string alias = impl.GetAlias();
             return alias.Length == 2 ? alias : $"{alias} ({((byte)impl):X2})";
         }
-        
+
         return base.ConvertTo(context, culture, value, destinationType);
     }
 

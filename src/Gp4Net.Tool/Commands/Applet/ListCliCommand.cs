@@ -1,14 +1,11 @@
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Domain.Keys;
 using Gp4Net.Services;
-using Gp4Net.Tool.Commands;
 using Gp4Net.Tool.Infrastructure;
-using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -17,99 +14,121 @@ using StatusSubset = Gp4Net.Domain.Commands.GetStatusCommand.StatusSubset;
 namespace Gp4Net.Tool.Commands.Applet;
 
 /// <summary>
-/// Command to list applications on the card.
+/// Command to list applications on the card using library services.
+/// Tool handles display, library provides data.
 /// </summary>
 [PublicAPI]
 [CliCommand("list", "List applications on the card", "applet")]
 [Description("List applications on the card")]
-public class ListCliCommand : BaseCommand<ListCliCommand.Settings>
+public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
 {
-    /// <summary>
-    /// Initializes a new instance of the ListCliCommand class.
-    /// </summary>
-    public ListCliCommand(
-        ICardService cardService,
-        IDomainServiceFactory domainServiceFactory,
-        IKeysetResolver keysetResolver
-    )
-        : base(cardService, domainServiceFactory, keysetResolver) { }
+    private readonly IGlobalPlatformService _globalPlatformService;
 
     /// <summary>
-    /// Executes the list command to enumerate applications on the card.
+    /// Initializes a new instance of the ListCliCommand class with direct service injection.
+    /// </summary>
+    public ListCliCommand(IGlobalPlatformService globalPlatformService)
+    {
+        _globalPlatformService = globalPlatformService;
+    }
+
+    /// <summary>
+    /// Executes the list command using library services for data and tool for display.
     /// </summary>
     /// <param name="context">The command context.</param>
     /// <param name="settings">The command settings.</param>
     /// <returns>0 if successful, 1 if failed.</returns>
-    protected override async Task<int> ExecuteCommandAsync(CommandContext context, Settings settings)
+    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
     {
-        if (!EnsureCardConnection(settings))
-        {
-            return 1;
-        }
+        AnsiConsole.MarkupLine("[yellow]Listing applications on card...[/]");
 
-        if (!settings.NoCardInfo)
-        {
-            DisplayCardInfo();
-        }
-
-        // Use functional card content retriever for complete listing
-        var contentRetriever = DomainServiceFactory.CreateCardContentRetriever(CardService);
-        
-        // Determine key set to use (default to GP test keys)
-        var keySet = ResolveKeySetForRetrieval(settings);
-        
-        AnsiConsole.MarkupLine("[yellow]Retrieving complete card content...[/]");
-        var contentResult = await contentRetriever.RetrieveCardContentAsync(keySet);
-
-        if (contentResult.IsSuccess)
-        {
-            return await ProcessCardContent(contentResult.Value, settings);
-        }
-        else
-        {
-            return HandleError(contentResult.Error, settings);
-        }
+        // Use injected service directly - no factory needed
+        return await ExecuteWithService(_globalPlatformService, settings, context.CancellationToken);
     }
 
     /// <summary>
-    /// Resolves the key set to use for card content retrieval.
+    /// Executes with the service using proper library/tool separation.
     /// </summary>
-    private IKeySet ResolveKeySetForRetrieval(Settings settings)
+    private async Task<int> ExecuteWithService(
+        IGlobalPlatformService service, 
+        Settings settings, 
+        CancellationToken cancellationToken)
     {
-        // If specific keys are provided, use them
-        if (settings.KeyEnc != null || settings.KeyMac != null || settings.KeyDek != null)
-        {
-            return KeysetResolver.ResolveKeyset(
-                settings.Keyset,
-                settings.KeysetParams,
-                settings.KeyEnc,
-                settings.KeyMac,
-                settings.KeyDek,
-                settings.KeyVersion,
-                null);
-        }
-
-        // Use GP test keys by default
-        return null; // CardContentRetriever will default to GP test keys
+        // List command focuses only on applications - no card info display
+        // Select ISD, establish secure channel, get applications
+        return await service.SelectIsdAsync(cancellationToken)
+            .Bind(async _ => await EstablishSecureChannelFromSettings(service, settings, cancellationToken))
+            .Bind(async _ => await service.GetStatusAsync(StatusSubset.Applications, cancellationToken))
+            .Match(
+                applications => 
+                {
+                    ProcessApplications(applications, settings);
+                    return 0;
+                },
+                error => HandleError(error, "Operation failed", settings));
     }
 
     /// <summary>
-    /// Processes the complete card content for display.
+    /// Establishes secure channel from settings with functional patterns.
     /// </summary>
-    private Task<int> ProcessCardContent(CardContent cardContent, Settings settings)
+    private async Task<Result<SecureChannelState, SmartCardError>> EstablishSecureChannelFromSettings(
+        IGlobalPlatformService service, Settings settings, CancellationToken cancellationToken)
     {
-        // Convert CardContent to legacy ApplicationInfo list for compatibility
-        var allApplications = cardContent.AllApplications;
-        
-        // Add ISD to the list if present
-        var applicationsWithIsd = cardContent.IssuerSecurityDomain.HasValue
-            ? allApplications.Add(cardContent.IssuerSecurityDomain.Value)
-            : allApplications;
-
-        return ProcessApplications(applicationsWithIsd, settings);
+        // Use pattern matching to check if all keys are provided
+        return (settings.KeyEnc.HasValue && settings.KeyMac.HasValue && settings.KeyDek.HasValue) switch
+        {
+            true => 
+                // All keys provided - extract them using pattern matching
+                await settings.KeyEnc.Match(
+                    async encKey => await settings.KeyMac.Match(
+                        async macKey => await settings.KeyDek.Match(
+                            async dekKey => await service.EstablishSecureChannelAsync(
+                                encKey, macKey, dekKey,
+                                settings.KeyVersion.Match(v => v, () => (byte)0x01),
+                                cancellationToken: cancellationToken),
+                            async () => Result.Failure<SecureChannelState, SmartCardError>(
+                                SmartCardError.InvalidData("DEK key is required when using explicit keys"))),
+                        async () => Result.Failure<SecureChannelState, SmartCardError>(
+                            SmartCardError.InvalidData("MAC key is required when using explicit keys"))),
+                    async () => Result.Failure<SecureChannelState, SmartCardError>(
+                        SmartCardError.InvalidData("ENC key is required when using explicit keys"))),
+            false => 
+                // Use keyset specification
+                await service.EstablishSecureChannelAsync(
+                    settings.Keyset.Match(k => k, () => "gp_test_keys"),
+                    keyVersion: settings.KeyVersion.Match(v => v, () => (byte)0x01),
+                    cancellationToken: cancellationToken)
+        };
     }
 
-    private Task<int> ProcessApplications(IReadOnlyList<ApplicationInfo> applications, Settings settings)
+
+    /// <summary>
+    /// Handles errors with proper tool-layer error display.
+    /// </summary>
+    private static int HandleError(SmartCardError error, string operation, Settings settings)
+    {
+        AnsiConsole.MarkupLine($"[red]{operation}: {error.Message}[/]");
+        
+        if (settings.Verbose && error.InnerException.HasValue)
+        {
+            error.InnerException.Match(
+                exception => 
+                {
+                    AnsiConsole.MarkupLine("[red]Detailed error information:[/]");
+                    AnsiConsole.WriteException(exception);
+                    return true;
+                },
+                () => false);
+        }
+        
+        return 1;
+    }
+
+
+    /// <summary>
+    /// Processes applications for display using functional composition.
+    /// </summary>
+    private void ProcessApplications(IReadOnlyList<ApplicationInfo> applications, Settings settings)
     {
         // Build semantic rows using pure functional composition
         var semanticRows = ApplicationTableBuilder.BuildApplicationRows(
@@ -123,12 +142,12 @@ public class ListCliCommand : BaseCommand<ListCliCommand.Settings>
         switch (settings.Format.ToLowerInvariant())
         {
             case "json":
-                var json = ApplicationTableBuilder.ToJson(applications);
+                string json = ApplicationTableBuilder.ToJson(applications);
                 AnsiConsole.WriteLine(json);
                 break;
 
             case "csv":
-                var csv = ApplicationTableBuilder.ToCsv(applications);
+                string csv = ApplicationTableBuilder.ToCsv(applications);
                 AnsiConsole.WriteLine(csv);
                 break;
 
@@ -138,19 +157,8 @@ public class ListCliCommand : BaseCommand<ListCliCommand.Settings>
                 ApplicationTableRenderer.RenderPostTableRows(semanticRows);
                 break;
         }
-
-        return Task.FromResult(0);
     }
 
-    private static int HandleError(SmartCardError error, Settings settings)
-    {
-        AnsiConsole.MarkupLine($"[red]Error listing applications: {error.Message}[/]");
-        if (settings.Verbose && error.InnerException.HasValue)
-        {
-            AnsiConsole.WriteException(error.InnerException.Value);
-        }
-        return 1;
-    }
 
 
     /// <summary>
@@ -206,6 +214,48 @@ public class ListCliCommand : BaseCommand<ListCliCommand.Settings>
         [Description("Use secure channel for more detailed information")]
         public bool UseSecureChannel { get; set; }
 
+        /// <summary>
+        /// Gets or sets the keyset specification.
+        /// </summary>
+        [CommandOption("--keyset")]
+        [Description("Keyset specification")]
+        public Maybe<string> Keyset { get; set; } = Maybe<string>.From("gp_test_keys");
+
+        /// <summary>
+        /// Gets or sets the encryption key.
+        /// </summary>
+        [CommandOption("--key-enc")]
+        [Description("Encryption key (hex)")]
+        public Maybe<string> KeyEnc { get; set; } = Maybe<string>.None;
+
+        /// <summary>
+        /// Gets or sets the MAC key.
+        /// </summary>
+        [CommandOption("--key-mac")]
+        [Description("MAC key (hex)")]
+        public Maybe<string> KeyMac { get; set; } = Maybe<string>.None;
+
+        /// <summary>
+        /// Gets or sets the DEK key.
+        /// </summary>
+        [CommandOption("--key-dek")]
+        [Description("DEK key (hex)")]
+        public Maybe<string> KeyDek { get; set; } = Maybe<string>.None;
+
+        /// <summary>
+        /// Gets or sets the key version.
+        /// </summary>
+        [CommandOption("--key-version")]
+        [Description("Key version")]
+        public Maybe<byte> KeyVersion { get; set; } = Maybe<byte>.From((byte)0x01);
+
+        /// <summary>
+        /// Gets or sets whether to skip card info display.
+        /// </summary>
+        [CommandOption("--no-card-info")]
+        [Description("Skip card information display")]
+        public bool NoCardInfo { get; set; }
+
         /// <inheritdoc />
         public override bool RequiresSecureChannel
         {
@@ -221,7 +271,7 @@ public class ListCliCommand : BaseCommand<ListCliCommand.Settings>
         /// <returns>Success if valid, or an error message if validation fails.</returns>
         public override ValidationResult Validate()
         {
-            var validFilters = new[] { "all", "isd", "apps", "applets", "packages", "ssd" };
+            string[] validFilters = ["all", "isd", "apps", "applets", "packages", "ssd"];
             if (!validFilters.Contains(Filter.ToLowerInvariant()))
             {
                 return ValidationResult.Error(
@@ -229,7 +279,7 @@ public class ListCliCommand : BaseCommand<ListCliCommand.Settings>
                 );
             }
 
-            var validFormats = new[] { "table", "json", "csv" };
+            string[] validFormats = ["table", "json", "csv"];
             if (!validFormats.Contains(Format.ToLowerInvariant()))
             {
                 return ValidationResult.Error(

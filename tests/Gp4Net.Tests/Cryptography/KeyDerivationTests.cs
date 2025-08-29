@@ -5,6 +5,7 @@
 
 using System;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
@@ -20,17 +21,17 @@ public class KeyDerivationTests
     public void DeriveScp03SessionKeys_ValidInput_ReturnsSessionKeys()
     {
         // Arrange
-        var keySet = new Scp03KeySet(
+        Scp03KeySet keySet = new Scp03KeySet(
             encKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
             macKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
             dekKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F")
         );
 
-        var hostChallenge = Convert.FromHexString("0102030405060708");
-        var cardChallenge = Convert.FromHexString("0807060504030201");
+        byte[] hostChallenge = Convert.FromHexString("0102030405060708");
+        byte[] cardChallenge = Convert.FromHexString("0807060504030201");
 
         // Act
-        var result = KeyDerivation.DeriveScp03SessionKeys(
+        Result<SessionKeys, SmartCardError> result = KeyDerivation.DeriveScp03SessionKeys(
             keySet,
             hostChallenge,
             cardChallenge,
@@ -39,7 +40,7 @@ public class KeyDerivationTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        var sessionKeys = result.Value;
+        SessionKeys? sessionKeys = result.Value;
 
         _ = sessionKeys.SEnc.Length.Should().Be(16);
         _ = sessionKeys.SMac.Length.Should().Be(16);
@@ -58,26 +59,26 @@ public class KeyDerivationTests
     public void DeriveScp03SessionKeys_DifferentChallenges_ProducesDifferentKeys()
     {
         // Arrange
-        var keySet = new Scp03KeySet(
+        Scp03KeySet keySet = new Scp03KeySet(
             encKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
             macKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
             dekKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F")
         );
 
-        var hostChallenge1 = Convert.FromHexString("0102030405060708");
-        var cardChallenge1 = Convert.FromHexString("0807060504030201");
+        byte[] hostChallenge1 = Convert.FromHexString("0102030405060708");
+        byte[] cardChallenge1 = Convert.FromHexString("0807060504030201");
 
-        var hostChallenge2 = Convert.FromHexString("1112131415161718");
-        var cardChallenge2 = Convert.FromHexString("1817161514131211");
+        byte[] hostChallenge2 = Convert.FromHexString("1112131415161718");
+        byte[] cardChallenge2 = Convert.FromHexString("1817161514131211");
 
         // Act
-        var result1 = KeyDerivation.DeriveScp03SessionKeys(
+        Result<SessionKeys, SmartCardError> result1 = KeyDerivation.DeriveScp03SessionKeys(
             keySet,
             hostChallenge1,
             cardChallenge1,
             128
         );
-        var result2 = KeyDerivation.DeriveScp03SessionKeys(
+        Result<SessionKeys, SmartCardError> result2 = KeyDerivation.DeriveScp03SessionKeys(
             keySet,
             hostChallenge2,
             cardChallenge2,
@@ -87,9 +88,9 @@ public class KeyDerivationTests
         // Assert
         _ = result1.IsSuccess.Should().BeTrue();
         _ = result2.IsSuccess.Should().BeTrue();
-            
-        var sessionKeys1 = result1.Value;
-        var sessionKeys2 = result2.Value;
+
+        SessionKeys? sessionKeys1 = result1.Value;
+        SessionKeys? sessionKeys2 = result2.Value;
 
         _ = sessionKeys1.SEnc.Should().NotEqual(sessionKeys2.SEnc);
         _ = sessionKeys1.SMac.Should().NotEqual(sessionKeys2.SMac);
@@ -102,17 +103,17 @@ public class KeyDerivationTests
     public void DeriveScp03SessionKeys_InvalidHostChallenge_ReturnsFailure()
     {
         // Arrange
-        var keySet = new Scp03KeySet(
+        Scp03KeySet keySet = new Scp03KeySet(
             encKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
             macKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
             dekKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F")
         );
 
-        var invalidHostChallenge = Convert.FromHexString("0102030405"); // Too short
-        var cardChallenge = Convert.FromHexString("0807060504030201");
+        byte[] invalidHostChallenge = Convert.FromHexString("0102030405"); // Too short
+        byte[] cardChallenge = Convert.FromHexString("0807060504030201");
 
         // Act
-        var result = KeyDerivation.DeriveScp03SessionKeys(
+        Result<SessionKeys, SmartCardError> result = KeyDerivation.DeriveScp03SessionKeys(
             keySet,
             invalidHostChallenge,
             cardChallenge,
@@ -122,7 +123,7 @@ public class KeyDerivationTests
         // Assert
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<InvalidLengthError>();
-        var lengthError = (InvalidLengthError)result.Error;
+        InvalidLengthError? lengthError = (InvalidLengthError)result.Error;
         _ = lengthError.Field.Should().Be("hostChallenge");
         _ = lengthError.Expected.Should().Be(8);
         _ = lengthError.Actual.Should().Be(5);

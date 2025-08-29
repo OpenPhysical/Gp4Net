@@ -24,8 +24,8 @@ public static class FunctionComposition
     {
         return async (command, environment, cancellationToken) =>
         {
-            var result = await first(command, environment, cancellationToken);
-            
+            Result<CommandResult, SmartCardError> result = await first(command, environment, cancellationToken);
+
             return await result.Bind(async cmdResult =>
             {
                 // Check if the first processor created a wrapped command
@@ -33,20 +33,20 @@ public static class FunctionComposition
                 if (cmdResult.Data.Length > 0 && cmdResult.Metadata?.SecureChannelWrapped == true)
                 {
                     // First processor wrapped the command, create WrappedApduCommand for subsequent processors
-                    var wrappedResult = WrappedApduCommand.Create(command, cmdResult.Data);
-                    
+                    Result<WrappedApduCommand, SmartCardError> wrappedResult = WrappedApduCommand.Create(command, cmdResult.Data);
+
                     if (wrappedResult.IsFailure)
                     {
                         return Result.Failure<CommandResult, SmartCardError>(wrappedResult.Error);
                     }
-                    
+
                     // Safe access after success check
                     commandForSecond = wrappedResult.Value;
                 }
-                
+
                 // Use the updated environment from the first processor
-                var secondResult = await second(commandForSecond, cmdResult.UpdatedEnvironment, cancellationToken);
-                
+                Result<CommandResult, SmartCardError> secondResult = await second(commandForSecond, cmdResult.UpdatedEnvironment, cancellationToken);
+
                 // Merge results, but prefer response data from transport processors
                 return secondResult.Map(secondCmd =>
                     secondCmd with
@@ -69,7 +69,7 @@ public static class FunctionComposition
     {
         if (processors.Length == 0)
             return Identity;
-            
+
         return processors.Aggregate((acc, next) => acc.Compose(next));
     }
 
@@ -95,20 +95,20 @@ public static class FunctionComposition
         Func<CommandResult, bool> shouldRetry = null)
     {
         shouldRetry ??= result => !result.IsSuccess && IsRetriableError(result.StatusWord);
-        
+
         return async (command, environment, cancellationToken) =>
         {
-            var retryCount = 0;
+            int retryCount = 0;
             Result<CommandResult, SmartCardError> lastResult = Result.Failure<CommandResult, SmartCardError>(
                 SmartCardError.CommunicationError("No attempts made"));
-            
+
             while (retryCount <= maxRetries)
             {
                 lastResult = await processor(command, environment, cancellationToken);
-                
+
                 if (lastResult.IsSuccess && !shouldRetry(lastResult.Value))
                     break;
-                    
+
                 if (retryCount < maxRetries)
                 {
                     retryCount++;
@@ -119,11 +119,11 @@ public static class FunctionComposition
                     break;
                 }
             }
-            
-            return lastResult.Map(result => 
-                result with 
-                { 
-                    Metadata = result.Metadata with { RetryCount = retryCount } 
+
+            return lastResult.Map(result =>
+                result with
+                {
+                    Metadata = result.Metadata with { RetryCount = retryCount }
                 });
         };
     }
@@ -137,13 +137,13 @@ public static class FunctionComposition
     {
         return async (command, environment, cancellationToken) =>
         {
-            var effectiveTimeout = timeout ?? 
-                                 environment.EffectiveOptions.Timeout ?? 
-                                 TimeSpan.FromSeconds(30);
-            
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            TimeSpan effectiveTimeout = timeout ??
+                                        environment.EffectiveOptions.Timeout ??
+                                        TimeSpan.FromSeconds(30);
+
+            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(effectiveTimeout);
-            
+
             try
             {
                 return await processor(command, environment, cts.Token);
@@ -159,7 +159,7 @@ public static class FunctionComposition
     /// <summary>
     /// The identity processor - returns the command result unchanged.
     /// </summary>
-    public static readonly CommandProcessor Identity = 
+    public static readonly CommandProcessor Identity =
         (command, environment, cancellationToken) =>
             Task.FromResult(Result.Success<CommandResult, SmartCardError>(
                 CommandResult.Success([], Constants.StatusWords.Success, environment)));
@@ -171,7 +171,7 @@ public static class FunctionComposition
     {
         if (first == null) return second;
         if (second == null) return first;
-        
+
         return new CommandMetadata(
             ExecutionTime: second.ExecutionTime ?? first.ExecutionTime,
             TransmittedBytes: second.TransmittedBytes ?? first.TransmittedBytes,

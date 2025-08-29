@@ -12,8 +12,6 @@ using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
-using Gp4Net.Domain.Security;
 using JetBrains.Annotations;
 using NUnit.Framework;
 
@@ -35,14 +33,14 @@ public class DynamicTraceTests
     {
         TestContext.Out.WriteLine($"=== VerifyTraceOperation starting: {testCase.TestName} ===");
         TestContext.Out.WriteLine($"Operation: {testCase.OperationName}, Trace: {testCase.Trace?.FilePath ?? "unknown"}");
-        
+
         // Create appropriate verifier based on operation
-        var verifier = OperationVerifierFactory.Create(testCase.OperationName, testCase.Trace);
+        IOperationVerifier verifier = OperationVerifierFactory.Create(testCase.OperationName, testCase.Trace);
         TestContext.Out.WriteLine($"Created verifier type: {verifier.GetType().Name}");
 
         // Run verification
         TestContext.Out.WriteLine("About to call verifier.Verify()");
-        var result = verifier.Verify();
+        Result<bool, string> result = verifier.Verify();
         TestContext.Out.WriteLine($"Verification result: Success={result.IsSuccess}, Error={(result.IsFailure ? result.Error : "None")}");
 
         // Assert success with detailed error message if failed
@@ -80,16 +78,16 @@ public class TraceTestDiscovery : IEnumerable
 
     public IEnumerator GetEnumerator()
     {
-        var baseDir = Path.Combine(TestContext.CurrentContext.TestDirectory, TraceDirectory);
+        string baseDir = Path.Combine(TestContext.CurrentContext.TestDirectory, TraceDirectory);
         Console.WriteLine($"[TraceTestDiscovery] Looking for traces in: {baseDir}");
         Console.WriteLine($"[TraceTestDiscovery] Directory exists: {Directory.Exists(baseDir)}");
-        
+
         // Additional diagnostics for subdirectories
         if (Directory.Exists(baseDir))
         {
-            var subdirs = Directory.GetDirectories(baseDir, "*", SearchOption.AllDirectories);
+            string[] subdirs = Directory.GetDirectories(baseDir, "*", SearchOption.AllDirectories);
             Console.WriteLine($"[TraceTestDiscovery] Found {subdirs.Length} subdirectories");
-            foreach (var subdir in subdirs.Take(5)) // Log first 5 to avoid spam
+            foreach (string subdir in subdirs.Take(5)) // Log first 5 to avoid spam
             {
                 Console.WriteLine($"[TraceTestDiscovery] Subdir: {subdir}");
             }
@@ -101,18 +99,18 @@ public class TraceTestDiscovery : IEnumerable
             yield break;
         }
 
-        var traceFiles = Directory.GetFiles(baseDir, "*.json", SearchOption.AllDirectories)
+        IOrderedEnumerable<string> traceFiles = Directory.GetFiles(baseDir, "*.json", SearchOption.AllDirectories)
             .OrderBy(f => f);
 
         Console.WriteLine($"[TraceTestDiscovery] Found {traceFiles.Count()} JSON files");
 
-        foreach (var traceFile in traceFiles)
+        foreach (string traceFile in traceFiles)
         {
             TraceData trace;
             try
             {
-                var json = File.ReadAllText(traceFile);
-                var deserializedTrace = JsonSerializer.Deserialize<TraceData>(json, new JsonSerializerOptions
+                string json = File.ReadAllText(traceFile);
+                TraceData? deserializedTrace = JsonSerializer.Deserialize<TraceData>(json, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
                     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -142,11 +140,11 @@ public class TraceTestDiscovery : IEnumerable
             }
 
             // Generate tests for each testable operation
-            var operations = AnalyzeOperations(trace);
+            IEnumerable<TestableOperation> operations = AnalyzeOperations(trace);
             Console.WriteLine($"[TraceTestDiscovery] Found {operations.Count()} operations in {Path.GetFileName(traceFile)}");
-            foreach (var operation in operations)
+            foreach (TestableOperation operation in operations)
             {
-                var testName = $"trace_test_{Path.GetFileNameWithoutExtension(traceFile)}_{operation.Name}";
+                string testName = $"trace_test_{Path.GetFileNameWithoutExtension(traceFile)}_{operation.Name}";
                 Console.WriteLine($"[TraceTestDiscovery] Yielding test: {testName}");
                 yield return new TraceTestCase(trace, operation.Name, testName);
             }
@@ -158,7 +156,7 @@ public class TraceTestDiscovery : IEnumerable
         // Use test hints if available
         if (trace.TestHints?.TestableOperations != null)
         {
-            foreach (var op in trace.TestHints.TestableOperations)
+            foreach (TestHintOperation op in trace.TestHints.TestableOperations)
             {
                 yield return new TestableOperation
                 {
@@ -172,13 +170,13 @@ public class TraceTestDiscovery : IEnumerable
         // Otherwise, analyze exchanges
         for (int i = 0; i < trace.Exchanges?.Count; i++)
         {
-            var exchange = trace.Exchanges[i];
+            TraceExchange exchange = trace.Exchanges[i];
             if (string.IsNullOrEmpty(exchange.Command) || exchange.Command.Length < 4)
             {
                 continue;
             }
 
-            var claIns = exchange.Command.Substring(0, 4).ToUpperInvariant();
+            string claIns = exchange.Command.Substring(0, 4).ToUpperInvariant();
 
             switch (claIns)
             {
@@ -260,7 +258,7 @@ public abstract class BaseOperationVerifier : IOperationVerifier
     protected int FindExchangeIndex()
     {
         // Find from test hints first
-        var hint = Trace.TestHints?.TestableOperations?.FirstOrDefault(op => op.Name == OperationName);
+        TestHintOperation? hint = Trace.TestHints?.TestableOperations?.FirstOrDefault(op => op.Name == OperationName);
         if (hint != null)
         {
             return hint.ExchangeIndex;
@@ -278,7 +276,7 @@ public abstract class BaseOperationVerifier : IOperationVerifier
         {
             throw new InvalidOperationException("Trace exchanges collection is null");
         }
-        
+
         if (ExchangeIndex < 0 || ExchangeIndex >= Trace.Exchanges.Count)
         {
             throw new InvalidOperationException($"Exchange index {ExchangeIndex} out of range");
@@ -296,8 +294,8 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
     private readonly Result<CryptographicService, SmartCardError> _cryptographicServiceResult;
     protected override string OperationName => "initialize_update";
 
-    public InitializeUpdateVerifier(TraceData trace) : base(trace) 
-    { 
+    public InitializeUpdateVerifier(TraceData trace) : base(trace)
+    {
         // Store the service creation result - no fallbacks
         _cryptographicServiceResult = TraceEntropyExtractor.CreateDeterministicCryptoServiceFromTrace(trace);
     }
@@ -317,80 +315,80 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
     public override Result<bool, string> Verify()
     {
         TestContext.Out.WriteLine($"=== InitializeUpdateVerifier starting for trace: {Trace.FilePath ?? "unknown"} ===");
-        
+
         // First check if cryptographic service creation succeeded
         if (_cryptographicServiceResult.IsFailure)
         {
             return Result.Failure<bool, string>($"Cannot verify trace: failed to create deterministic cryptographic service: {_cryptographicServiceResult.Error.Message}");
         }
-        
-        var cryptographicService = _cryptographicServiceResult.Value;
-        
-            TestContext.Out.WriteLine($"Getting exchange at index: {ExchangeIndex}");
-            var exchange = GetExchange();
-            
-            TestContext.Out.WriteLine($"Processing exchange: {exchange.Command} -> {exchange.Response}");
 
-            // Parse command and response
-            var commandBytes = Convert.FromHexString(exchange.Command);
-            var responseBytes = Convert.FromHexString(exchange.Response);
-            
-            TestContext.Out.WriteLine($"Command bytes length: {commandBytes.Length}");
-            TestContext.Out.WriteLine($"Response bytes length: {responseBytes.Length}");
+        CryptographicService? cryptographicService = _cryptographicServiceResult.Value;
 
-            // Extract host challenge from command
-            if (commandBytes.Length < 13) // CLA INS P1 P2 Lc + 8 bytes
+        TestContext.Out.WriteLine($"Getting exchange at index: {ExchangeIndex}");
+        TraceExchange exchange = GetExchange();
+
+        TestContext.Out.WriteLine($"Processing exchange: {exchange.Command} -> {exchange.Response}");
+
+        // Parse command and response
+        byte[] commandBytes = Convert.FromHexString(exchange.Command);
+        byte[] responseBytes = Convert.FromHexString(exchange.Response);
+
+        TestContext.Out.WriteLine($"Command bytes length: {commandBytes.Length}");
+        TestContext.Out.WriteLine($"Response bytes length: {responseBytes.Length}");
+
+        // Extract host challenge from command
+        if (commandBytes.Length < 13) // CLA INS P1 P2 Lc + 8 bytes
+        {
+            return Result.Failure<bool, string>("INITIALIZE UPDATE command too short");
+        }
+
+        byte[] hostChallenge = new byte[8];
+        Array.Copy(commandBytes, 5, hostChallenge, 0, 8);
+
+        // Parse response
+        Result<InitializeUpdateResponse, SmartCardError> parseResult = InitializeUpdateResponse.Parse(responseBytes);
+        if (!parseResult.IsSuccess)
+        {
+            return Result.Failure<bool, string>($"Failed to parse response: {parseResult.Error}");
+        }
+        InitializeUpdateResponse? response = parseResult.Value;
+
+        // Determine SCP version from the actual SCP ID field in the response
+        Result<ScpVersion, string> scpVersionResult = (response.ScpId & 0x03) switch
+        {
+            0x02 => Result.Success<ScpVersion, string>(ScpVersion.Scp02),
+            0x03 => Result.Success<ScpVersion, string>(ScpVersion.Scp03),
+            _ => Result.Failure<ScpVersion, string>($"Unsupported SCP version: {response.ScpId & 0x03:X2}")
+        };
+
+        if (scpVersionResult.IsFailure)
+        {
+            return Result.Failure<bool, string>(scpVersionResult.Error);
+        }
+
+        ScpVersion scpVersion = scpVersionResult.Value;
+
+        // If we have static keys, verify key derivation
+        TestContext.Out.WriteLine($"Checking for static keys - Metadata: {Trace.Metadata != null}, Hints: {Trace.Metadata?.Hints != null}, StaticKeys: {Trace.Metadata?.Hints?.StaticKeys}");
+
+        if (Trace.Metadata?.Hints?.StaticKeys != null)
+        {
+            TestContext.Out.WriteLine($"Found static keys: {Trace.Metadata.Hints.StaticKeys}");
+            byte[] staticKeyBytes = Convert.FromHexString(Trace.Metadata.Hints.StaticKeys);
+
+            switch (scpVersion)
             {
-                return Result.Failure<bool, string>("INITIALIZE UPDATE command too short");
-            }
-
-            var hostChallenge = new byte[8];
-            Array.Copy(commandBytes, 5, hostChallenge, 0, 8);
-
-            // Parse response
-            var parseResult = InitializeUpdateResponse.Parse(responseBytes);
-            if (!parseResult.IsSuccess)
-            {
-                return Result.Failure<bool, string>($"Failed to parse response: {parseResult.Error}");
-            }
-            var response = parseResult.Value;
-
-            // Determine SCP version from the actual SCP ID field in the response
-            var scpVersionResult = (response.ScpId & 0x03) switch
-            {
-                0x02 => Result.Success<ScpVersion, string>(ScpVersion.Scp02),
-                0x03 => Result.Success<ScpVersion, string>(ScpVersion.Scp03),
-                _ => Result.Failure<ScpVersion, string>($"Unsupported SCP version: {response.ScpId & 0x03:X2}")
-            };
-            
-            if (scpVersionResult.IsFailure)
-            {
-                return Result.Failure<bool, string>(scpVersionResult.Error);
-            }
-            
-            var scpVersion = scpVersionResult.Value;
-
-            // If we have static keys, verify key derivation
-            TestContext.Out.WriteLine($"Checking for static keys - Metadata: {Trace.Metadata != null}, Hints: {Trace.Metadata?.Hints != null}, StaticKeys: {Trace.Metadata?.Hints?.StaticKeys}");
-            
-            if (Trace.Metadata?.Hints?.StaticKeys != null)
-            {
-                TestContext.Out.WriteLine($"Found static keys: {Trace.Metadata.Hints.StaticKeys}");
-                var staticKeyBytes = Convert.FromHexString(Trace.Metadata.Hints.StaticKeys);
-
-                switch (scpVersion)
-                {
-                    case ScpVersion.Scp03:
+                case ScpVersion.Scp03:
                     {
-                        var keySetResult = Scp03KeySet.Create(staticKeyBytes, staticKeyBytes, staticKeyBytes, response.KeyVersion);
+                        Result<Scp03KeySet, SmartCardError> keySetResult = Scp03KeySet.Create(staticKeyBytes, staticKeyBytes, staticKeyBytes, response.KeyVersion);
                         if (keySetResult.IsFailure)
                         {
                             return Result.Failure<bool, string>($"Failed to create key set: {keySetResult.Error.Message}");
                         }
-                        var keySet = keySetResult.Value;
+                        Scp03KeySet? keySet = keySetResult.Value;
 
                         // Use unified CryptographicService for SCP03 operations
-                        var sessionKeysResult = cryptographicService.DeriveSessionKeys(
+                        Result<SessionKeys, SmartCardError> sessionKeysResult = cryptographicService.DeriveSessionKeys(
                             keySet,
                             hostChallenge,
                             response.CardChallenge,
@@ -403,7 +401,7 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
 
                         // Verify card cryptogram using unified CryptographicService
                         TestContext.Out.WriteLine($"SCP03 implementation parameter from response: 0x{response.ScpParameter:X2}");
-                        var expectedCryptogramResult = cryptographicService.CalculateCardCryptogram(
+                        Result<byte[], SmartCardError> expectedCryptogramResult = cryptographicService.CalculateCardCryptogram(
                             hostChallenge,
                             response.CardChallenge,
                             keySet,
@@ -416,7 +414,7 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
                             {
                                 TestContext.Out.WriteLine($"Calculated SCP03 Card Cryptogram: {Convert.ToHexString(expectedCryptogram)}");
                                 TestContext.Out.WriteLine($"Traced SCP03 Card Cryptogram:     {Convert.ToHexString(response.CardCryptogram)}");
-                                
+
                                 // For trace-based tests, verify that cryptogram calculation succeeds and produces valid output
                                 // We don't expect exact match since trace doesn't contain the entropy used during original capture
                                 if (expectedCryptogram.Length == 8)
@@ -433,17 +431,17 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
                             error => Result.Failure<bool, string>($"Cryptogram calculation failed: {error.Message}")
                         );
                     }
-                    case ScpVersion.Scp02:
+                case ScpVersion.Scp02:
                     {
-                        var keySetResult = Scp02KeySet.Create(staticKeyBytes, staticKeyBytes, staticKeyBytes, response.KeyVersion);
+                        Result<Scp02KeySet, SmartCardError> keySetResult = Scp02KeySet.Create(staticKeyBytes, staticKeyBytes, staticKeyBytes, response.KeyVersion);
                         if (keySetResult.IsFailure)
                         {
                             return Result.Failure<bool, string>($"Failed to create key set: {keySetResult.Error.Message}");
                         }
-                        var keySet = keySetResult.Value;
+                        Scp02KeySet? keySet = keySetResult.Value;
 
                         // Use unified CryptographicService for SCP02 operations
-                        var sessionKeysResult = cryptographicService.DeriveSessionKeys(
+                        Result<SessionKeys, SmartCardError> sessionKeysResult = cryptographicService.DeriveSessionKeys(
                             keySet,
                             hostChallenge,
                             response.CardChallenge,
@@ -455,13 +453,13 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
                         }
 
                         // Log derived session keys for debugging
-                        var sessionKeys = sessionKeysResult.Value;
+                        SessionKeys? sessionKeys = sessionKeysResult.Value;
                         TestContext.Out.WriteLine($"Derived Session Keys:");
                         TestContext.Out.WriteLine($"  S-ENC: {Convert.ToHexString(sessionKeys.SEnc)}");
                         TestContext.Out.WriteLine($"  S-MAC: {Convert.ToHexString(sessionKeys.SMac)}");
 
                         // Verify card cryptogram using unified CryptographicService
-                        var expectedCryptogramResult = cryptographicService.CalculateCardCryptogram(
+                        Result<byte[], SmartCardError> expectedCryptogramResult = cryptographicService.CalculateCardCryptogram(
                             hostChallenge,
                             response.CardChallenge,
                             keySet,
@@ -474,7 +472,7 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
                             {
                                 TestContext.Out.WriteLine($"Calculated SCP02 Card Cryptogram: {Convert.ToHexString(expectedCryptogram)}");
                                 TestContext.Out.WriteLine($"Traced SCP02 Card Cryptogram:     {Convert.ToHexString(response.CardCryptogram)}");
-                                
+
                                 // For trace-based tests, verify that cryptogram calculation succeeds and produces valid output
                                 // We don't expect exact match since trace doesn't contain the entropy used during original capture
                                 if (expectedCryptogram.Length == 8)
@@ -491,10 +489,10 @@ public class InitializeUpdateVerifier : BaseOperationVerifier
                             error => Result.Failure<bool, string>($"Cryptogram calculation failed: {error.Message}")
                         );
                     }
-                }
             }
+        }
 
-            return Result.Success<bool, string>(true);
+        return Result.Success<bool, string>(true);
     }
 }
 

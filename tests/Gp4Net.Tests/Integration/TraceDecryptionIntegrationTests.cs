@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
+using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Security;
@@ -33,31 +34,31 @@ public class TraceDecryptionIntegrationTests
     public void DecryptTrace_WithConfigureGpshellTrace_ShouldProcessSuccessfully()
     {
         // Trace file must be available for test to run
-        var tracePath = Path.Combine(TraceDataPath, "Complex", "configure_gpshell_log.json");
+        string tracePath = Path.Combine(TraceDataPath, "Complex", "configure_gpshell_log.json");
         _ = File.Exists(tracePath).Should().BeTrue($"Test requires trace file at: {tracePath}");
 
-        var traceData = LoadTraceFile(tracePath);
-        var exchanges = ExtractExchangesFromTrace(traceData);
-        
-        // Use test session keys (in real scenario, these would be derived from actual keys)
-        var sessionKeys = CreateTestSessionKeys();
-        var securityLevel = SecurityLevel.None; // Start with no security for plaintext commands
-        var protocolVersion = ProtocolIdentifiers.Scp03;
+        JsonDocument traceData = LoadTraceFile(tracePath);
+        Gp4Net.Domain.Security.TraceExchange[] exchanges = ExtractExchangesFromTrace(traceData);
 
-        var result = _decryptorService.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
+        // Use test session keys (in real scenario, these would be derived from actual keys)
+        SessionKeys sessionKeys = CreateTestSessionKeys();
+        SecurityLevel securityLevel = SecurityLevel.None; // Start with no security for plaintext commands
+        ScpVersion protocolVersion = ScpVersion.Scp03;
+
+        Result<DecryptedTrace, SmartCardError> result = _decryptorService.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
 
         _ = result.IsSuccess.Should().BeTrue("Trace decryption should succeed even with plaintext commands");
-        var decryptedTrace = result.Value;
+        DecryptedTrace? decryptedTrace = result.Value;
         _ = decryptedTrace.Exchanges.Should().NotBeEmpty("Trace should contain exchanges");
-        
+
         // Verify all exchanges have valid decrypted APDUs
-        foreach (var exchange in decryptedTrace.Exchanges)
+        foreach (DecryptedExchange? exchange in decryptedTrace.Exchanges)
         {
             _ = exchange.Command.Should().NotBeNull();
             _ = exchange.Response.Should().NotBeNull();
             _ = exchange.Command.OriginalBytes.Should().NotBeEmpty();
             _ = exchange.Response.OriginalBytes.Should().NotBeEmpty();
-            
+
             // Verify response descriptions include status word information
             if (exchange.Response.Direction == ApduDirection.Response)
             {
@@ -70,32 +71,33 @@ public class TraceDecryptionIntegrationTests
     public void DecryptTrace_WithMixedSecurityLevels_ShouldHandleGracefully()
     {
         // Create a mixed trace with both plaintext and secure messaging
-        var exchanges = new[]
-        {
+        Gp4Net.Domain.Security.TraceExchange[] exchanges =
+        [
+
             // Plaintext SELECT command
             new Gp4Net.Domain.Security.TraceExchange(1,
                 HexStringToBytes("00A4040008A000000151000000"),
                 HexStringToBytes("9000")),
-            
+
             // Secure messaging command (simulated)
             new Gp4Net.Domain.Security.TraceExchange(2,
                 HexStringToBytes("84500000081234567890ABCDEF"),
                 HexStringToBytes("9000")),
-                
+
             // Another plaintext command
             new Gp4Net.Domain.Security.TraceExchange(3,
                 HexStringToBytes("80CA006600"),
                 HexStringToBytes("6A88"))
-        };
+        ];
 
-        var sessionKeys = CreateTestSessionKeys();
-        var securityLevel = SecurityLevel.CMac;
-        var protocolVersion = ProtocolIdentifiers.Scp03;
+        SessionKeys sessionKeys = CreateTestSessionKeys();
+        SecurityLevel securityLevel = SecurityLevel.CMac;
+        ScpVersion protocolVersion = ScpVersion.Scp03;
 
-        var result = _decryptorService.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
+        Result<DecryptedTrace, SmartCardError> result = _decryptorService.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
 
         _ = result.IsSuccess.Should().BeTrue("Service should handle mixed security levels gracefully");
-        var decryptedTrace = result.Value;
+        DecryptedTrace? decryptedTrace = result.Value;
         _ = decryptedTrace.Exchanges.Should().HaveCount(3);
 
         // First exchange should be plaintext
@@ -110,26 +112,26 @@ public class TraceDecryptionIntegrationTests
     [Test]
     public void DecryptApdu_WithKnownStatusWords_ShouldProvideDescriptions()
     {
-        var testCases = new[]
-        {
+        (ushort StatusWord, string Description)[] testCases =
+        [
             (StatusWord: (ushort)0x9000, Description: "Success"),
             (StatusWord: (ushort)0x6982, Description: "Security Status Not Satisfied"),
             (StatusWord: (ushort)0x6A88, Description: "Referenced Data Not Found"),
             (StatusWord: (ushort)0x6985, Description: "Conditions Not Satisfied"),
             (StatusWord: (ushort)0x6F00, Description: "General Error")
-        };
+        ];
 
-        var sessionKeys = CreateTestSessionKeys();
-        var sessionState = CreateTestSessionState(sessionKeys, SecurityLevel.None, ProtocolIdentifiers.Scp03);
+        SessionKeys sessionKeys = CreateTestSessionKeys();
+        SecureChannelState sessionState = CreateTestSessionState(sessionKeys, SecurityLevel.None, ScpVersion.Scp03);
 
-        foreach (var (statusWord, expectedDescription) in testCases)
+        foreach ((ushort statusWord, string expectedDescription) in testCases)
         {
-            var responseBytes = new byte[] { (byte)(statusWord >> 8), (byte)(statusWord & 0xFF) };
-            
-            var result = _decryptorService.DecryptApdu(responseBytes, ApduDirection.Response, sessionState);
+            byte[] responseBytes = [(byte)(statusWord >> 8), (byte)(statusWord & 0xFF)];
+
+            Result<(DecryptedApdu decryptedApdu, SecureChannelState updatedState), SmartCardError> result = _decryptorService.DecryptApdu(responseBytes, ApduDirection.Response, sessionState);
 
             _ = result.IsSuccess.Should().BeTrue($"Decryption should succeed for status word 0x{statusWord:X4}");
-            var (decryptedApdu, _) = result.Value;
+            (DecryptedApdu decryptedApdu, _) = result.Value;
             _ = decryptedApdu.Description.Should().Contain(expectedDescription,
                 $"Description should include '{expectedDescription}' for status word 0x{statusWord:X4}");
         }
@@ -139,26 +141,26 @@ public class TraceDecryptionIntegrationTests
     public void DecryptTrace_WithInvalidTrace_ShouldHandleGracefully()
     {
         // Create exchanges with malformed APDUs
-        var exchanges = new[]
-        {
+        Gp4Net.Domain.Security.TraceExchange[] exchanges =
+        [
             new Gp4Net.Domain.Security.TraceExchange(1,
                 [0x00], // Too short for valid APDU
                 [0x90, 0x00]),
-            
+
             new Gp4Net.Domain.Security.TraceExchange(2,
                 [0x00, 0xA4, 0x04, 0x00, 0x08], // Missing data despite Lc=8
                 [0x6F, 0x00])
-        };
+        ];
 
-        var sessionKeys = CreateTestSessionKeys();
-        var securityLevel = SecurityLevel.None;
-        var protocolVersion = ProtocolIdentifiers.Scp03;
+        SessionKeys sessionKeys = CreateTestSessionKeys();
+        SecurityLevel securityLevel = SecurityLevel.None;
+        ScpVersion protocolVersion = ScpVersion.Scp03;
 
-        var result = _decryptorService.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
+        Result<DecryptedTrace, SmartCardError> result = _decryptorService.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
 
         // Should succeed with graceful degradation
         _ = result.IsSuccess.Should().BeTrue("Service should handle malformed APDUs gracefully");
-        var decryptedTrace = result.Value;
+        DecryptedTrace? decryptedTrace = result.Value;
         _ = decryptedTrace.Exchanges.Should().HaveCount(2, "All exchanges should be included even if some fail");
     }
 
@@ -166,26 +168,26 @@ public class TraceDecryptionIntegrationTests
     [TestCase("Complex/configure_gpshell.json")]
     public void DecryptTrace_WithRealTraceFiles_ShouldProcessWhenAvailable(string relativeTracePath)
     {
-        var tracePath = Path.Combine(TraceDataPath, relativeTracePath);
+        string tracePath = Path.Combine(TraceDataPath, relativeTracePath);
         _ = File.Exists(tracePath).Should().BeTrue($"Test requires trace file at: {tracePath}");
 
-        var traceData = LoadTraceFile(tracePath);
-        var exchanges = ExtractExchangesFromTrace(traceData);
+        JsonDocument traceData = LoadTraceFile(tracePath);
+        Gp4Net.Domain.Security.TraceExchange[] exchanges = ExtractExchangesFromTrace(traceData);
 
         _ = exchanges.Should().NotBeEmpty($"Trace file {tracePath} must contain exchanges to test");
 
-        var sessionKeys = CreateTestSessionKeys();
-        var securityLevel = SecurityLevel.None;
-        var protocolVersion = ProtocolIdentifiers.Scp03;
+        SessionKeys sessionKeys = CreateTestSessionKeys();
+        SecurityLevel securityLevel = SecurityLevel.None;
+        ScpVersion protocolVersion = ScpVersion.Scp03;
 
-        var result = _decryptorService.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
+        Result<DecryptedTrace, SmartCardError> result = _decryptorService.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
 
         _ = result.IsSuccess.Should().BeTrue($"Should successfully process trace file: {relativeTracePath}");
-        var decryptedTrace = result.Value;
+        DecryptedTrace? decryptedTrace = result.Value;
         _ = decryptedTrace.Exchanges.Should().NotBeEmpty("Trace should contain exchanges");
-        
+
         // Verify basic structure integrity
-        foreach (var exchange in decryptedTrace.Exchanges)
+        foreach (DecryptedExchange? exchange in decryptedTrace.Exchanges)
         {
             _ = exchange.Id.Should().BeGreaterThan(0, "Exchange ID should be positive");
             _ = exchange.Command.OriginalBytes.Should().NotBeEmpty("Command should have data");
@@ -195,33 +197,33 @@ public class TraceDecryptionIntegrationTests
 
     private static JsonDocument LoadTraceFile(string tracePath)
     {
-        var jsonContent = File.ReadAllText(tracePath);
+        string jsonContent = File.ReadAllText(tracePath);
         return JsonDocument.Parse(jsonContent);
     }
 
     private static Gp4Net.Domain.Security.TraceExchange[] ExtractExchangesFromTrace(JsonDocument traceData)
     {
-        if (!traceData.RootElement.TryGetProperty("exchanges", out var exchangesElement))
+        if (!traceData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement))
         {
             return [];
         }
 
-        var exchanges = new List<Gp4Net.Domain.Security.TraceExchange>();
-        var currentIndex = 1; // Default index counter for traces without explicit indices
-        
-        foreach (var exchangeElement in exchangesElement.EnumerateArray())
+        List<Gp4Net.Domain.Security.TraceExchange> exchanges = [];
+        int currentIndex = 1; // Default index counter for traces without explicit indices
+
+        foreach (JsonElement exchangeElement in exchangesElement.EnumerateArray())
         {
-            if (exchangeElement.TryGetProperty("command", out var commandProp) &&
-                exchangeElement.TryGetProperty("response", out var responseProp))
+            if (exchangeElement.TryGetProperty("command", out JsonElement commandProp) &&
+                exchangeElement.TryGetProperty("response", out JsonElement responseProp))
             {
                 // Try to get explicit index, or use auto-incrementing counter
-                var index = exchangeElement.TryGetProperty("index", out var indexProp) 
-                    ? indexProp.GetInt32() 
+                int index = exchangeElement.TryGetProperty("index", out JsonElement indexProp)
+                    ? indexProp.GetInt32()
                     : currentIndex++;
-                    
-                var commandHex = commandProp.GetString() ?? "";
-                var responseHex = responseProp.GetString() ?? "";
-                
+
+                string commandHex = commandProp.GetString() ?? "";
+                string responseHex = responseProp.GetString() ?? "";
+
                 if (!string.IsNullOrEmpty(commandHex) && !string.IsNullOrEmpty(responseHex))
                 {
                     exchanges.Add(new Gp4Net.Domain.Security.TraceExchange(
@@ -244,7 +246,7 @@ public class TraceDecryptionIntegrationTests
             hex = "0" + hex;
         }
 
-        var bytes = new byte[hex.Length / 2];
+        byte[] bytes = new byte[hex.Length / 2];
         for (int i = 0; i < bytes.Length; i++)
         {
             bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
@@ -254,9 +256,9 @@ public class TraceDecryptionIntegrationTests
 
     private static SessionKeys CreateTestSessionKeys()
     {
-        var key = new byte[16]; // AES-128 key for SCP03
+        byte[] key = new byte[16]; // AES-128 key for SCP03
         Array.Fill(key, (byte)0x01);
-        
+
         return new SessionKeys(
             sEnc: key,
             sMac: key,
@@ -266,8 +268,8 @@ public class TraceDecryptionIntegrationTests
 
     private static SecureChannelState CreateTestSessionState(SessionKeys sessionKeys, SecurityLevel securityLevel, byte protocolVersion)
     {
-        var macChaining = protocolVersion == ProtocolIdentifiers.Scp03 ? new byte[16] : new byte[8];
-        
+        byte[] macChaining = protocolVersion == ScpVersion.Scp03 ? new byte[16] : new byte[8];
+
         return SecureChannelState.Create(
             sessionKeys,
             securityLevel,

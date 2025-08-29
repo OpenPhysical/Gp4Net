@@ -35,8 +35,8 @@ public class DefaultChallengeGenerator : IChallengeGenerator
             throw new ArgumentException("Challenge length must be positive.", nameof(length));
         }
 
-        var challenge = new byte[length];
-        var rng = new SecureRandom();
+        byte[] challenge = new byte[length];
+        SecureRandom rng = new SecureRandom();
         rng.NextBytes(challenge);
 
         _logger.LogDebug(

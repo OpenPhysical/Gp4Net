@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -6,7 +5,6 @@ using Gp4Net.Core;
 using Gp4Net.Core.Tlv;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Domain.Commands;
-using Gp4Net.Transport;
 using Gp4Net.Pipeline;
 
 namespace Gp4Net.Domain.Modules;
@@ -83,7 +81,7 @@ public static class ResponseParser
 
         // Extract CPLC data from TLV structure
         byte[] cplcBytes = ExtractTlvValue(response.Data, GetDataCommand.DataObjects.CardProductionLifeCycle);
-        
+
         if (cplcBytes == null || cplcBytes.Length == 0)
         {
             return Result.Failure<CplcData, SmartCardError>(
@@ -188,11 +186,11 @@ public static class ResponseParser
     /// </summary>
     private static ImmutableList<Privilege> ParsePrivileges(byte[] privBytes)
     {
-        var b1 = privBytes.Length > 0 ? privBytes[0] : (byte)0x00;
-        var b2 = privBytes.Length > 1 ? privBytes[1] : (byte)0x00;
-        var b3 = privBytes.Length > 2 ? privBytes[2] : (byte)0x00;
+        byte b1 = privBytes.Length > 0 ? privBytes[0] : (byte)0x00;
+        byte b2 = privBytes.Length > 1 ? privBytes[1] : (byte)0x00;
+        byte b3 = privBytes.Length > 2 ? privBytes[2] : (byte)0x00;
 
-        var list = ImmutableList.CreateBuilder<Privilege>();
+        ImmutableList<Privilege>.Builder list = ImmutableList.CreateBuilder<Privilege>();
 
         if ((b1 & 0x80) != 0) list.Add(Privilege.SecurityDomain);
         if ((b1 & 0x40) != 0) list.Add(Privilege.DapVerification);
@@ -248,13 +246,13 @@ public static class ResponseParser
 
         // Try parsing with TlvParser for more complex structures
         ImmutableList<TlvObject> elements = TlvParser.ParseAll(data).ToImmutableList();
-        
+
         // For single-byte tags
         if (expectedTag <= 0xFF)
         {
-            TlvObject element = elements.FirstOrDefault(e => 
+            TlvObject element = elements.FirstOrDefault(e =>
             {
-                var tagNumber = e.GetTagNumber();
+                Result<uint, SmartCardError> tagNumber = e.GetTagNumber();
                 return tagNumber.IsSuccess && tagNumber.Value == expectedTag;
             });
             return element?.Value ?? [];

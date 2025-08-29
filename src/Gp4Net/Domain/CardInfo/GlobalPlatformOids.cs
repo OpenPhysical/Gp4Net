@@ -68,7 +68,7 @@ public static class GlobalPlatformOids
             return null;
         }
 
-        return KnownOids.TryGetValue(oid, out var description) ? description : null;
+        return KnownOids.TryGetValue(oid, out string description) ? description : null;
     }
 
     /// <summary>
@@ -95,7 +95,7 @@ public static class GlobalPlatformOids
 
         if (oid.StartsWith("1.2.840.114283.4."))
         {
-            var parts = oid.Split('.');
+            string[] parts = oid.Split('.');
             if (parts.Length >= 6)
             {
                 switch (parts[5])
@@ -127,7 +127,7 @@ public static class GlobalPlatformOids
             return oid;
         }
 
-        var description = GetDescription(oid);
+        string description = GetDescription(oid);
         return description != null ? $"{oid} ({description})" : oid;
     }
 
@@ -147,9 +147,9 @@ public static class GlobalPlatformOids
     /// <returns>A summary of the capabilities.</returns>
     public static CapabilitiesSummary AnalyzeOids(IEnumerable<string> oids)
     {
-        var summary = new CapabilitiesSummary();
+        CapabilitiesSummary summary = new CapabilitiesSummary();
 
-        foreach (var oid in oids)
+        foreach (string oid in oids)
         {
             if (string.IsNullOrEmpty(oid))
             {
@@ -157,7 +157,7 @@ public static class GlobalPlatformOids
             }
 
             // Check for SCP support
-            var scpVersion = GetScpVersion(oid);
+            string scpVersion = GetScpVersion(oid);
             if (scpVersion != null)
             {
                 _ = summary.SupportedScpVersions.Add(scpVersion);
@@ -172,7 +172,7 @@ public static class GlobalPlatformOids
             // Check for specification version
             if (oid.StartsWith("1.2.840.114283.2."))
             {
-                var description = GetDescription(oid);
+                string description = GetDescription(oid);
                 if (description != null && description.Contains("Card Specification"))
                 {
                     _ = summary.SpecificationVersions.Add(description);
@@ -216,12 +216,12 @@ public static class GlobalPlatformOids
         /// </summary>
         public override string ToString()
         {
-            var lines = new List<string>();
+            List<string> lines = [];
 
             if (SupportedScpVersions.Count > 0)
             {
                 lines.Add("Supported Secure Channel Protocols:");
-                foreach (var scp in SupportedScpVersions.OrderBy(s => s))
+                foreach (string scp in SupportedScpVersions.OrderBy(s => s))
                 {
                     lines.Add($"  - {scp}");
                 }
@@ -230,7 +230,7 @@ public static class GlobalPlatformOids
             if (SpecificationVersions.Count > 0)
             {
                 lines.Add("\nGlobalPlatform Specifications:");
-                foreach (var spec in SpecificationVersions.OrderBy(s => s))
+                foreach (string spec in SpecificationVersions.OrderBy(s => s))
                 {
                     lines.Add($"  - {spec}");
                 }
@@ -239,7 +239,7 @@ public static class GlobalPlatformOids
             if (AllOids.Count > 0)
             {
                 lines.Add("\nAll Capabilities:");
-                foreach (var kvp in AllOids.OrderBy(k => k.Key))
+                foreach (KeyValuePair<string, string> kvp in AllOids.OrderBy(k => k.Key))
                 {
                     lines.Add($"  - {kvp.Key}: {kvp.Value}");
                 }

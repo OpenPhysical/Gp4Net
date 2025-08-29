@@ -28,8 +28,8 @@ public static class TraceEntropyExtractor
         try
         {
             // Extract all challenges and responses from the trace
-            var allEntropy = trace.Exchanges
-                .Where(exchange => !string.IsNullOrEmpty(exchange.Command) && 
+            byte[] allEntropy = trace.Exchanges
+                .Where(exchange => !string.IsNullOrEmpty(exchange.Command) &&
                                   !string.IsNullOrEmpty(exchange.Response))
                 .SelectMany(exchange => new[]
                 {
@@ -94,8 +94,8 @@ public static class TraceEntropyExtractor
 
         try
         {
-            var challenges = trace.Sessions.Values
-                .Where(session => !string.IsNullOrEmpty(session.HostChallenge) && 
+            byte[][] challenges = trace.Sessions.Values
+                .Where(session => !string.IsNullOrEmpty(session.HostChallenge) &&
                                  !string.IsNullOrEmpty(session.CardChallenge))
                 .SelectMany(session => new[]
                 {
@@ -135,7 +135,7 @@ public static class TraceEntropyExtractor
 
         try
         {
-            var hostChallenges = trace.Exchanges
+            byte[][] hostChallenges = trace.Exchanges
                 .Where(exchange => IsInitializeUpdateCommand(exchange.Command))
                 .Select(exchange => ExtractHostChallengeFromInitUpdate(exchange.Command))
                 .Where(challenge => challenge.Length == 8) // GP spec: host challenge is always 8 bytes
@@ -172,8 +172,8 @@ public static class TraceEntropyExtractor
 
         try
         {
-            var cardChallenges = trace.Exchanges
-                .Where(exchange => IsInitializeUpdateCommand(exchange.Command) && 
+            byte[][] cardChallenges = trace.Exchanges
+                .Where(exchange => IsInitializeUpdateCommand(exchange.Command) &&
                                  IsSuccessfulResponse(exchange.Response))
                 .Select(exchange => ExtractCardChallengeFromInitUpdateResponse(exchange.Response))
                 .Where(challenge => challenge.Length == 8) // GP spec: card challenge is always 8 bytes
@@ -204,7 +204,7 @@ public static class TraceEntropyExtractor
     {
         return ExtractHostChallengesFromTrace(trace)
             .Bind(hostChallenges => ExtractCardChallengesFromTrace(trace)
-                .Bind(cardChallenges => 
+                .Bind(cardChallenges =>
                 {
                     return PreloadedRngService.FromTraceChallenges(hostChallenges)
                         .Bind(hostRng => PreloadedRngService.FromTraceChallenges(cardChallenges)
@@ -238,7 +238,7 @@ public static class TraceEntropyExtractor
 
         try
         {
-            var bytes = Convert.FromHexString(commandHex);
+            byte[] bytes = Convert.FromHexString(commandHex);
             return bytes.Length >= 2 && bytes[0] == 0x80 && bytes[1] == 0x50;
         }
         catch
@@ -261,9 +261,9 @@ public static class TraceEntropyExtractor
 
         try
         {
-            var bytes = Convert.FromHexString(responseHex);
-            return bytes.Length >= 2 && 
-                   bytes[bytes.Length - 2] == 0x90 && 
+            byte[] bytes = Convert.FromHexString(responseHex);
+            return bytes.Length >= 2 &&
+                   bytes[bytes.Length - 2] == 0x90 &&
                    bytes[bytes.Length - 1] == 0x00;
         }
         catch
@@ -283,23 +283,23 @@ public static class TraceEntropyExtractor
     {
         if (string.IsNullOrEmpty(commandHex))
         {
-            return Array.Empty<byte>();
+            return [];
         }
 
         try
         {
-            var bytes = Convert.FromHexString(commandHex);
-            
+            byte[] bytes = Convert.FromHexString(commandHex);
+
             // Validate INITIALIZE UPDATE structure: CLA INS P1 P2 LC [8 bytes] [Le]
             if (bytes.Length < 13 || bytes[0] != 0x80 || bytes[1] != 0x50)
             {
-                return Array.Empty<byte>();
+                return [];
             }
 
-            var lc = bytes[4];
+            byte lc = bytes[4];
             if (lc != 8 || bytes.Length < 5 + lc)
             {
-                return Array.Empty<byte>();
+                return [];
             }
 
             // Extract 8-byte host challenge from data field
@@ -307,7 +307,7 @@ public static class TraceEntropyExtractor
         }
         catch
         {
-            return Array.Empty<byte>();
+            return [];
         }
     }
 
@@ -323,25 +323,25 @@ public static class TraceEntropyExtractor
     {
         if (string.IsNullOrEmpty(responseHex))
         {
-            return Array.Empty<byte>();
+            return [];
         }
 
         try
         {
-            var bytes = Convert.FromHexString(responseHex);
-            
+            byte[] bytes = Convert.FromHexString(responseHex);
+
             // Remove status word (last 2 bytes) to get response data
             if (bytes.Length < 4) // At minimum need data + SW
             {
-                return Array.Empty<byte>();
+                return [];
             }
-            
-            var responseData = bytes.Take(bytes.Length - 2).ToArray();
-            
+
+            byte[] responseData = bytes.Take(bytes.Length - 2).ToArray();
+
             // Per GP 2.3.1: Card challenge starts at byte 12 (0-indexed) and is 8 bytes
             if (responseData.Length < 20) // Need at least 12 + 8 bytes for challenge
             {
-                return Array.Empty<byte>();
+                return [];
             }
 
             // Extract 8-byte card challenge from bytes 12-19
@@ -349,7 +349,7 @@ public static class TraceEntropyExtractor
         }
         catch
         {
-            return Array.Empty<byte>();
+            return [];
         }
     }
 
@@ -362,28 +362,28 @@ public static class TraceEntropyExtractor
     {
         if (string.IsNullOrEmpty(hexString) || hexString.Length < 4)
         {
-            return Array.Empty<byte>();
+            return [];
         }
 
         try
         {
-            var allBytes = Convert.FromHexString(hexString);
-            
+            byte[] allBytes = Convert.FromHexString(hexString);
+
             // For APDU commands, skip the header (CLA INS P1 P2) and extract data
             if (allBytes.Length > 4)
             {
                 // Skip APDU header and length bytes, extract actual data
-                var dataStart = 4;
+                int dataStart = 4;
                 if (allBytes.Length > 5)
                 {
-                    var lc = allBytes[4];
+                    byte lc = allBytes[4];
                     if (lc > 0 && allBytes.Length >= 5 + lc)
                     {
                         dataStart = 5;
                         return allBytes.Skip(dataStart).Take(lc).ToArray();
                     }
                 }
-                
+
                 // If no data field, use what we can from the command
                 return allBytes.Skip(dataStart).ToArray();
             }
@@ -392,7 +392,7 @@ public static class TraceEntropyExtractor
         }
         catch
         {
-            return Array.Empty<byte>();
+            return [];
         }
     }
 }

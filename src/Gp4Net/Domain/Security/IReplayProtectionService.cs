@@ -17,7 +17,7 @@ public interface IReplayProtectionService
     /// <param name="sequenceCounter">The sequence counter to validate (3 bytes).</param>
     /// <returns>Success if the counter is valid (not replayed), failure otherwise.</returns>
     UnitResult<SmartCardError> ValidateSequenceCounter(byte keyVersion, byte[] sequenceCounter);
-    
+
     /// <summary>
     /// Records a sequence counter as seen to prevent future replay.
     /// </summary>
@@ -25,7 +25,7 @@ public interface IReplayProtectionService
     /// <param name="sequenceCounter">The sequence counter to record (3 bytes).</param>
     /// <returns>Success if recorded, failure if already seen.</returns>
     UnitResult<SmartCardError> RecordSequenceCounter(byte keyVersion, byte[] sequenceCounter);
-    
+
     /// <summary>
     /// Clears recorded counters for a specific key version.
     /// This should be called when a keyset is replaced.

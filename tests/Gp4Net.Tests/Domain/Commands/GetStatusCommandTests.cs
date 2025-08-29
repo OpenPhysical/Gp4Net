@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using NUnit.Framework;
@@ -20,7 +22,7 @@ public class GetStatusCommandTests
     [TestCase(GetStatusCommand.StatusSubset.ExecutableLoadFilesAndModules)]
     public void Create_WithValidStatusSubset_ReturnsSuccessResult(GetStatusCommand.StatusSubset subset)
     {
-        var result = GetStatusCommand.Create(subset);
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(subset);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Subset.Should().Be(subset);
@@ -33,7 +35,7 @@ public class GetStatusCommandTests
     [TestCase(GetStatusCommand.ResponseFormat.Tlv)]
     public void Create_WithValidResponseFormat_ReturnsSuccessResult(GetStatusCommand.ResponseFormat format)
     {
-        var result = GetStatusCommand.Create(
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             format
         );
@@ -45,9 +47,9 @@ public class GetStatusCommandTests
     [Test]
     public void Create_WithValidSearchCriteria_ReturnsSuccessResult()
     {
-        var aid = Convert.FromHexString("A0000000031010");
+        byte[] aid = Convert.FromHexString("A0000000031010");
 
-        var result = GetStatusCommand.Create(
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             GetStatusCommand.ResponseFormat.None,
             aid
@@ -62,9 +64,9 @@ public class GetStatusCommandTests
     [TestCase(17)] // Too long
     public void Create_WithInvalidSearchCriteriaLength_ReturnsFailureResult(int length)
     {
-        var aid = new byte[length];
+        byte[] aid = new byte[length];
 
-        var result = GetStatusCommand.Create(
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             GetStatusCommand.ResponseFormat.None,
             aid
@@ -80,9 +82,9 @@ public class GetStatusCommandTests
     [TestCase(16)] // Maximum valid length
     public void Create_WithValidSearchCriteriaLengths_ReturnsSuccessResult(int length)
     {
-        var aid = new byte[length];
+        byte[] aid = new byte[length];
 
-        var result = GetStatusCommand.Create(
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             GetStatusCommand.ResponseFormat.None,
             aid
@@ -95,9 +97,9 @@ public class GetStatusCommandTests
     [Test]
     public void Create_WithInvalidStatusSubset_ReturnsFailureResult()
     {
-        var invalidSubset = (GetStatusCommand.StatusSubset)0xFF;
+        GetStatusCommand.StatusSubset invalidSubset = (GetStatusCommand.StatusSubset)0xFF;
 
-        var result = GetStatusCommand.Create(invalidSubset);
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(invalidSubset);
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Message.Should().Contain("Invalid status subset");
@@ -106,9 +108,9 @@ public class GetStatusCommandTests
     [Test]
     public void Create_WithInvalidResponseFormat_ReturnsFailureResult()
     {
-        var invalidFormat = (GetStatusCommand.ResponseFormat)0xFF;
+        GetStatusCommand.ResponseFormat invalidFormat = (GetStatusCommand.ResponseFormat)0xFF;
 
-        var result = GetStatusCommand.Create(
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             invalidFormat
         );
@@ -120,13 +122,13 @@ public class GetStatusCommandTests
     [Test]
     public void SearchCriteria_IsImmutable()
     {
-        var originalAid = Convert.FromHexString("A0000000031010");
-        var result = GetStatusCommand.Create(
+        byte[] originalAid = Convert.FromHexString("A0000000031010");
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             GetStatusCommand.ResponseFormat.None,
             originalAid
         );
-        var command = result.Value;
+        GetStatusCommand? command = result.Value;
 
         originalAid[0] = 0xFF;
 
@@ -136,13 +138,13 @@ public class GetStatusCommandTests
     [Test]
     public void ToApdu_WithoutSearchCriteria_ReturnsCase2Apdu()
     {
-        var result = GetStatusCommand.Create(
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             GetStatusCommand.ResponseFormat.None
         );
-        var command = result.Value;
+        GetStatusCommand? command = result.Value;
 
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         _ = apdu.Length.Should().Be(5); // CLA INS P1 P2 Le
         _ = apdu[0].Should().Be(0x80); // CLA
@@ -155,15 +157,15 @@ public class GetStatusCommandTests
     [Test]
     public void ToApdu_WithSearchCriteria_ReturnsCase4Apdu()
     {
-        var aid = Convert.FromHexString("A0000000031010");
-        var result = GetStatusCommand.Create(
+        byte[] aid = Convert.FromHexString("A0000000031010");
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             GetStatusCommand.ResponseFormat.None,
             aid
         );
-        var command = result.Value;
+        GetStatusCommand? command = result.Value;
 
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         _ = apdu.Length.Should().Be(5 + aid.Length + 1); // CLA INS P1 P2 Lc Data Le
         _ = apdu[0].Should().Be(0x80); // CLA
@@ -182,10 +184,10 @@ public class GetStatusCommandTests
     [TestCase(GetStatusCommand.StatusSubset.ExecutableLoadFilesAndModules, 0x10)]
     public void ToApdu_WithDifferentSubsets_SetsP1Correctly(GetStatusCommand.StatusSubset subset, byte expectedP1)
     {
-        var result = GetStatusCommand.Create(subset);
-        var command = result.Value;
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(subset);
+        GetStatusCommand? command = result.Value;
 
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         _ = apdu[2].Should().Be(expectedP1);
     }
@@ -195,13 +197,13 @@ public class GetStatusCommandTests
     [TestCase(GetStatusCommand.ResponseFormat.Tlv, 0x02)]
     public void ToApdu_WithDifferentFormats_SetsP2Correctly(GetStatusCommand.ResponseFormat format, byte expectedP2)
     {
-        var result = GetStatusCommand.Create(
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             format
         );
-        var command = result.Value;
+        GetStatusCommand? command = result.Value;
 
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         _ = apdu[3].Should().Be(expectedP2);
     }
@@ -209,11 +211,11 @@ public class GetStatusCommandTests
     [Test]
     public void ToApdu_AlwaysReturnsNewArray()
     {
-        var result = GetStatusCommand.Create(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
-        var command = result.Value;
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
+        GetStatusCommand? command = result.Value;
 
-        var apdu1 = command.ToApdu();
-        var apdu2 = command.ToApdu();
+        byte[]? apdu1 = command.ToApdu();
+        byte[]? apdu2 = command.ToApdu();
 
         _ = apdu1.Should().NotBeSameAs(apdu2);
         _ = apdu2.Should().BeEquivalentTo(apdu1);
@@ -222,12 +224,12 @@ public class GetStatusCommandTests
     [Test]
     public void IApduCommand_Properties_ReturnCorrectValues()
     {
-        var result = GetStatusCommand.Create(
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             GetStatusCommand.ResponseFormat.Tlv
         );
-        var command = result.Value;
-        var iApduCommand = (IApduCommand)command;
+        GetStatusCommand? command = result.Value;
+        IApduCommand? iApduCommand = (IApduCommand)command;
 
         _ = iApduCommand.Cla.Should().Be(0x80);
         _ = iApduCommand.Ins.Should().Be(0xF2);
@@ -241,13 +243,13 @@ public class GetStatusCommandTests
     [Test]
     public void IApduCommand_WithSearchCriteria_ReturnsCorrectData()
     {
-        var aid = Convert.FromHexString("A0000000031010");
-        var result = GetStatusCommand.Create(
+        byte[] aid = Convert.FromHexString("A0000000031010");
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             GetStatusCommand.ResponseFormat.None,
             aid
         );
-        var command = result.Value;
+        GetStatusCommand? command = result.Value;
 
         _ = command.Data.Should().BeEquivalentTo(aid);
     }
@@ -256,21 +258,25 @@ public class GetStatusCommandTests
     public void GetStatusResponse_Parse_WithValidSingleEntry_ReturnsSuccess()
     {
         // TLV: E3 (template) containing 4F (AID), 9F70 (state), C5 (privileges 3 bytes)
-        var aid = Convert.FromHexString("A0000000031010");
-        var tlv = new List<byte>();
-        var inner = new List<byte>();
-        inner.Add(0x4F); inner.Add((byte)aid.Length); inner.AddRange(aid);
+        byte[] aid = Convert.FromHexString("A0000000031010");
+        List<byte> tlv = [];
+        List<byte> inner =
+        [
+            0x4F,
+            (byte)aid.Length
+        ];
+        inner.AddRange(aid);
         inner.Add(0x9F); inner.Add(0x70); inner.Add(0x01); inner.Add(0x07);
         inner.Add(0xC5); inner.Add(0x03); inner.AddRange([0x80, 0x00, 0x00]);
         tlv.Add(0xE3); tlv.Add((byte)inner.Count); tlv.AddRange(inner);
-        var response = tlv.ToArray();
+        byte[] response = tlv.ToArray();
 
-        var result = GetStatusResponse.Parse(response);
+        Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(response);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Applications.Should().HaveCount(1);
 
-        var app = result.Value.Applications[0];
+        ApplicationStatusEntry? app = result.Value.Applications[0];
         _ = app.Aid.Should().BeEquivalentTo(Convert.FromHexString("A0000000031010"));
         _ = app.State.Should().Be(ApplicationStatusEntry.LifecycleState.Selectable);
         _ = app.Privileges.Should().BeEquivalentTo(new byte[] { 0x80, 0x00, 0x00 });
@@ -279,22 +285,22 @@ public class GetStatusCommandTests
     [Test]
     public void GetStatusResponse_Parse_WithMultipleEntries_ReturnsSuccess()
     {
-        var aid1 = Convert.FromHexString("A0000000031010");
-        var aid2 = Convert.FromHexString("A000000003101001");
-        var e3_1 = BuildAppEntry(aid1, 0x07, [0x80, 0x00, 0x00]);
-        var e3_2 = BuildAppEntry(aid2, 0x0F, [0xC0, 0x40, 0x00]);
-        var response = e3_1.Concat(e3_2).ToArray();
+        byte[] aid1 = Convert.FromHexString("A0000000031010");
+        byte[] aid2 = Convert.FromHexString("A000000003101001");
+        byte[] e3_1 = BuildAppEntry(aid1, 0x07, [0x80, 0x00, 0x00]);
+        byte[] e3_2 = BuildAppEntry(aid2, 0x0F, [0xC0, 0x40, 0x00]);
+        byte[] response = e3_1.Concat(e3_2).ToArray();
 
-        var result = GetStatusResponse.Parse(response);
+        Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(response);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Applications.Should().HaveCount(2);
 
-        var app1 = result.Value.Applications[0];
+        ApplicationStatusEntry? app1 = result.Value.Applications[0];
         _ = app1.Aid.Should().BeEquivalentTo(Convert.FromHexString("A0000000031010"));
         _ = app1.State.Should().Be(ApplicationStatusEntry.LifecycleState.Selectable);
 
-        var app2 = result.Value.Applications[1];
+        ApplicationStatusEntry? app2 = result.Value.Applications[1];
         _ = app2.Aid.Should().BeEquivalentTo(Convert.FromHexString("A000000003101001"));
         _ = app2.State.Should().Be(ApplicationStatusEntry.LifecycleState.Personalized);
         _ = app2.Privileges.Should().BeEquivalentTo(new byte[] { 0xC0, 0x40, 0x00 });
@@ -310,9 +316,9 @@ public class GetStatusCommandTests
         byte stateValue,
         ApplicationStatusEntry.LifecycleState expectedState)
     {
-        var aid = Convert.FromHexString("A0000000031010");
-        var e3 = BuildAppEntry(aid, stateValue, [0x00, 0x00, 0x00]);
-        var result = GetStatusResponse.Parse(e3);
+        byte[] aid = Convert.FromHexString("A0000000031010");
+        byte[] e3 = BuildAppEntry(aid, stateValue, [0x00, 0x00, 0x00]);
+        Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(e3);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Applications[0].State.Should().Be(expectedState);
@@ -321,10 +327,10 @@ public class GetStatusCommandTests
     [Test]
     public void GetStatusResponse_Parse_WithInvalidLifecycleState_ReturnsFailure()
     {
-        var aid = Convert.FromHexString("A0000000031010");
-        var e3 = BuildAppEntry(aid, 0xFF, [0x80, 0x00, 0x00]);
+        byte[] aid = Convert.FromHexString("A0000000031010");
+        byte[] e3 = BuildAppEntry(aid, 0xFF, [0x80, 0x00, 0x00]);
 
-        var result = GetStatusResponse.Parse(e3);
+        Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(e3);
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Message.Should().Contain("Invalid lifecycle state: 0xFF");
@@ -333,9 +339,9 @@ public class GetStatusCommandTests
     [Test]
     public void GetStatusResponse_Parse_WithEmptyResponse_ReturnsEmptyList()
     {
-        var response = new byte[0];
+        byte[] response = [];
 
-        var result = GetStatusResponse.Parse(response);
+        Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(response);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Applications.Should().HaveCount(0);
@@ -344,7 +350,7 @@ public class GetStatusCommandTests
     [Test]
     public void GetStatusResponse_Parse_WithNullResponse_ReturnsFailure()
     {
-        var result = GetStatusResponse.Parse(null);
+        Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(null);
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Message.Should().Contain("Response data cannot be null");
@@ -353,13 +359,13 @@ public class GetStatusCommandTests
     [Test]
     public void GetStatusResponse_Parse_WithTruncatedData_StopsGracefully()
     {
-        var response = Convert.FromHexString(
+        byte[] response = Convert.FromHexString(
             "07" +               // AID length
             "A0000000031010" +   // AID
             "07"                 // Lifecycle state - missing privileges
         );
 
-        var result = GetStatusResponse.Parse(response);
+        Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(response);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Applications.Should().HaveCount(0);
@@ -368,9 +374,9 @@ public class GetStatusCommandTests
     [Test]
     public void GetStatusResponse_Parse_WithZeroLengthAid_StopsGracefully()
     {
-        var response = new byte[] { 0x00 }; // Zero AID length
+        byte[] response = [0x00]; // Zero AID length
 
-        var result = GetStatusResponse.Parse(response);
+        Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(response);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Applications.Should().HaveCount(0);
@@ -380,15 +386,23 @@ public class GetStatusCommandTests
     public void GetStatusResponse_Parse_WithNoPrivileges_ParsesCorrectly()
     {
         // Omit C5 to represent no privileges per spec allowance
-        var aid = Convert.FromHexString("A0000000031010");
-        var inner = new List<byte>();
-        inner.Add(0x4F); inner.Add((byte)aid.Length); inner.AddRange(aid);
+        byte[] aid = Convert.FromHexString("A0000000031010");
+        List<byte> inner =
+        [
+            0x4F,
+            (byte)aid.Length
+        ];
+        inner.AddRange(aid);
         inner.Add(0x9F); inner.Add(0x70); inner.Add(0x01); inner.Add(0x07);
-        var tlv = new List<byte>();
-        tlv.Add(0xE3); tlv.Add((byte)inner.Count); tlv.AddRange(inner);
-        var response = tlv.ToArray();
+        List<byte> tlv =
+        [
+            0xE3,
+            (byte)inner.Count
+        ];
+        tlv.AddRange(inner);
+        byte[] response = tlv.ToArray();
 
-        var result = GetStatusResponse.Parse(response);
+        Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(response);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Applications.Should().HaveCount(1);
@@ -397,25 +411,33 @@ public class GetStatusCommandTests
 
     private static byte[] BuildAppEntry(byte[] aid, byte lifecycleState, byte[] privileges3)
     {
-        var inner = new List<byte>();
-        inner.Add(0x4F); inner.Add((byte)aid.Length); inner.AddRange(aid);
+        List<byte> inner =
+        [
+            0x4F,
+            (byte)aid.Length
+        ];
+        inner.AddRange(aid);
         inner.Add(0x9F); inner.Add(0x70); inner.Add(0x01); inner.Add(lifecycleState);
         if (privileges3 != null)
         {
             inner.Add(0xC5); inner.Add(0x03); inner.AddRange(privileges3);
         }
-        var e3 = new List<byte>();
-        e3.Add(0xE3); e3.Add((byte)inner.Count); e3.AddRange(inner);
+        List<byte> e3 =
+        [
+            0xE3,
+            (byte)inner.Count
+        ];
+        e3.AddRange(inner);
         return e3.ToArray();
     }
 
     [Test]
     public void ApplicationStatusEntry_Constructor_CreatesImmutableCopies()
     {
-        var originalAid = Convert.FromHexString("A0000000031010");
-        var originalPrivileges = new byte[] { 0x80, 0x40 };
+        byte[] originalAid = Convert.FromHexString("A0000000031010");
+        byte[] originalPrivileges = [0x80, 0x40];
 
-        var entry = new ApplicationStatusEntry(
+        ApplicationStatusEntry entry = new ApplicationStatusEntry(
             originalAid,
             ApplicationStatusEntry.LifecycleState.Selectable,
             originalPrivileges
@@ -431,10 +453,10 @@ public class GetStatusCommandTests
     [Test]
     public void ToString_ReturnsDescriptiveString()
     {
-        var result = GetStatusCommand.Create(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
-        var command = result.Value;
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
+        GetStatusCommand? command = result.Value;
 
-        var str = command.ToString();
+        string? str = command.ToString();
 
         _ = str.Should().Be("GET STATUS");
     }
@@ -449,16 +471,16 @@ public class GetStatusCommandTests
     [Test]
     public void GetStatusResponse_Applications_ReturnsReadOnlyList()
     {
-        var apps = new List<ApplicationStatusEntry>
-        {
+        List<ApplicationStatusEntry> apps =
+        [
             new ApplicationStatusEntry(
                 Convert.FromHexString("A0000000031010"),
                 ApplicationStatusEntry.LifecycleState.Selectable,
                 [0x80]
             )
-        };
+        ];
 
-        var response = new GetStatusResponse(apps);
+        GetStatusResponse response = new GetStatusResponse(apps);
 
         _ = response.Applications.Should().NotBeSameAs(apps);
         _ = response.Applications.Should().HaveCount(1);

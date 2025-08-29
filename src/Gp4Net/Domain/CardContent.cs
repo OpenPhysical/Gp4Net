@@ -17,7 +17,7 @@ public record CardContent(
     /// <summary>
     /// Gets all applications and security domains combined.
     /// </summary>
-    public ImmutableList<ApplicationInfo> AllApplications => 
+    public ImmutableList<ApplicationInfo> AllApplications =>
         Applications.AddRange(SecurityDomains);
 
     /// <summary>
@@ -27,26 +27,26 @@ public record CardContent(
     {
         get
         {
-            var entities = ImmutableList.CreateBuilder<CardEntity>();
+            ImmutableList<CardEntity>.Builder entities = ImmutableList.CreateBuilder<CardEntity>();
 
             // Add ISD first
-            IssuerSecurityDomain.Execute(isd => 
+            IssuerSecurityDomain.Execute(isd =>
                 entities.Add(new CardEntity.IssuerSecurityDomainEntity(isd)));
 
             // Add security domains
-            foreach (var ssd in SecurityDomains)
+            foreach (ApplicationInfo ssd in SecurityDomains)
             {
                 entities.Add(new CardEntity.SecurityDomainEntity(ssd));
             }
 
             // Add applications
-            foreach (var app in Applications)
+            foreach (ApplicationInfo app in Applications)
             {
                 entities.Add(new CardEntity.ApplicationEntity(app));
             }
 
             // Add load files
-            foreach (var loadFile in ExecutableLoadFiles)
+            foreach (ExecutableLoadFile loadFile in ExecutableLoadFiles)
             {
                 entities.Add(new CardEntity.LoadFileEntity(loadFile));
             }
@@ -118,7 +118,7 @@ public record CardContentSummary(
     /// <summary>
     /// Gets the total number of entities on the card.
     /// </summary>
-    public int TotalEntityCount => 
+    public int TotalEntityCount =>
         (HasIsd ? 1 : 0) + SecurityDomainCount + ApplicationCount + LoadFileCount;
 }
 

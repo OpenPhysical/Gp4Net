@@ -1,12 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Transport;
 using Gp4Net.CardEmulator.Services;
-using Gp4Net.Tool.Services;
-using Gp4Net.Services;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 
@@ -23,7 +20,7 @@ public class T0ApduTransportTests
     public T0ApduTransportTests()
     {
         _logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<T0ApduTransport>.Instance;
-        var virtualCardService = new VirtualCardService();
+        VirtualCardService virtualCardService = new VirtualCardService();
         virtualCardService.SetupComprehensiveTestEnvironment();
         // Connect to the first virtual reader
         var readers = virtualCardService.GetReaders();
@@ -57,10 +54,10 @@ public class T0ApduTransportTests
     public async Task TransmitAsync_WithGetResponseChaining_Works()
     {
         // Arrange
-        var command = new TestCommand(); // Uses default GP ISD AID
+        TestCommand command = new TestCommand(); // Uses default GP ISD AID
 
         // Act
-        var response = await _transport.TransmitAsync(command, _channel);
+        ApduResponse? response = await _transport.TransmitAsync(command, _channel);
 
         // Assert - Virtual card should handle GET RESPONSE chaining automatically
         Assert.That(response, Is.Not.Null);
@@ -71,10 +68,10 @@ public class T0ApduTransportTests
     public async Task TransmitAsync_WithWrongLengthLe_RetriesWithCorrectLength()
     {
         // Arrange
-        var command = new TestCommand { ExpectedResponseLength = Maybe<int>.From(256) };
+        TestCommand command = new TestCommand { ExpectedResponseLength = Maybe<int>.From(256) };
 
         // Act
-        var response = await _transport.TransmitAsync(command, _channel);
+        ApduResponse? response = await _transport.TransmitAsync(command, _channel);
 
         // Assert - Virtual card should handle wrong length retries automatically
         Assert.That(response, Is.Not.Null);
@@ -85,10 +82,10 @@ public class T0ApduTransportTests
     public async Task TransmitAsync_WithNoLe_DoesNotAddLeByte()
     {
         // Arrange
-        var command = new TestCommand { ExpectedResponseLength = Maybe<int>.None };
+        TestCommand command = new TestCommand { ExpectedResponseLength = Maybe<int>.None };
 
         // Act
-        var response = await _transport.TransmitAsync(command, _channel);
+        ApduResponse? response = await _transport.TransmitAsync(command, _channel);
 
         // Assert - Virtual card should handle commands without LE properly
         Assert.That(response, Is.Not.Null);
@@ -144,28 +141,28 @@ public class T0ApduTransportTests
 internal class TestCardChannel : ICardChannel
 {
     private readonly VirtualCardService _virtualCardService;
-    
+
     public TestCardChannel(VirtualCardService virtualCardService)
     {
         _virtualCardService = virtualCardService;
     }
-    
+
     public TransportProtocol Protocol => TransportProtocol.T0;
     public bool IsOpen => true;
-    
+
     public async Task<byte[]> TransmitAsync(byte[] command, CancellationToken cancellationToken = default)
     {
         await Task.CompletedTask; // Satisfy async requirement
-        
+
         // Use virtual card service API directly
-        var response = _virtualCardService.SendCommand(command);
-        
+        VirtualCommandResponse response = _virtualCardService.SendCommand(command);
+
         // Combine response data and status word into full response
-        var fullResponse = new byte[response.Data.Length + 2];
+        byte[] fullResponse = new byte[response.Data.Length + 2];
         Array.Copy(response.Data, fullResponse, response.Data.Length);
         fullResponse[^2] = (byte)(response.StatusWord >> 8);
         fullResponse[^1] = (byte)(response.StatusWord & 0xFF);
-        
+
         return fullResponse;
     }
 }

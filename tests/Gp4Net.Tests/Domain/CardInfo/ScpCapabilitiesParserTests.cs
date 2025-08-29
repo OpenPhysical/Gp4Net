@@ -12,10 +12,10 @@ public class ScpCapabilitiesParserTests
     {
         // Arrange - A0 tag containing SCP02 info per GP Card Spec Table H-6
         // A0 06 80 01 02 81 01 15 - A0 with SCP type 02 and implementation option 15
-        var data = Convert.FromHexString("A006800102810115");
+        byte[] data = Convert.FromHexString("A006800102810115");
 
         // Act
-        var result = ScpCapabilitiesParser.Parse(data);
+        string? result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
         _ = result.Should().BeEquivalentTo("SCP02 (i=15)");
@@ -26,10 +26,10 @@ public class ScpCapabilitiesParserTests
     {
         // Arrange - A0 tag containing SCP03 info per GP Card Spec Table H-6
         // A0 06 80 01 03 81 01 70 - A0 with SCP type 03 and implementation option 70
-        var data = Convert.FromHexString("A006800103810170");
+        byte[] data = Convert.FromHexString("A006800103810170");
 
         // Act
-        var result = ScpCapabilitiesParser.Parse(data);
+        string? result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
         _ = result.Should().BeEquivalentTo("SCP03 (i=70)");
@@ -41,10 +41,10 @@ public class ScpCapabilitiesParserTests
         // Arrange - Multiple A0 tags with different SCPs per GP Card Spec Table H-5
         // First A0: SCP02 with options 15 and 55
         // Second A0: SCP03 with option 70
-        var data = Convert.FromHexString("A00780010281021555A006800103810170");
+        byte[] data = Convert.FromHexString("A00780010281021555A006800103810170");
 
         // Act
-        var result = ScpCapabilitiesParser.Parse(data);
+        string? result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
         _ = result.Should().BeEquivalentTo("SCP02 (i=15 i=55) SCP03 (i=70)");
@@ -54,10 +54,10 @@ public class ScpCapabilitiesParserTests
     public void Parse_WithTopLevelPrivilegeData_DoesNotIdentifyAsProtocol()
     {
         // Arrange - Tag 82 at top level is privileges, not SCP per GP Card Spec Table H-5
-        var data = Convert.FromHexString("82020203");
+        byte[] data = Convert.FromHexString("82020203");
 
         // Act
-        var result = ScpCapabilitiesParser.Parse(data);
+        string? result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
         // Should not identify as SCP since 82 at top level is for privileges
@@ -68,10 +68,10 @@ public class ScpCapabilitiesParserTests
     public void Parse_WithTopLevelAlgorithmData_DoesNotIdentifyAsProtocol()
     {
         // Arrange - Tag 83 at top level is LFDBH algorithms, not SCP per GP Card Spec Table H-5
-        var data = Convert.FromHexString("830103");
+        byte[] data = Convert.FromHexString("830103");
 
         // Act
-        var result = ScpCapabilitiesParser.Parse(data);
+        string? result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
         // Should not identify as SCP since 83 at top level is for LFDBH algorithms
@@ -83,10 +83,10 @@ public class ScpCapabilitiesParserTests
     {
         // Arrange - A0 tag containing SCP10 info per GP Card Spec Table H-6
         // A0 06 80 01 10 81 01 10 - A0 with SCP type 10 and implementation option 10
-        var data = Convert.FromHexString("A006800110810110");
+        byte[] data = Convert.FromHexString("A006800110810110");
 
         // Act
-        var result = ScpCapabilitiesParser.Parse(data);
+        string? result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
         _ = result.Should().BeEquivalentTo("SCP10 (i=10)");
@@ -97,10 +97,10 @@ public class ScpCapabilitiesParserTests
     {
         // Arrange - Mix of A0 tags (SCP) and other tags (privileges) per GP Card Spec
         // A0 with SCP02, followed by tag 82 (privileges)
-        var data = Convert.FromHexString("A006800102810115820103");
+        byte[] data = Convert.FromHexString("A006800102810115820103");
 
         // Act
-        var result = ScpCapabilitiesParser.Parse(data);
+        string? result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
         // Should only parse SCP from A0 tag, ignore tag 82
@@ -114,10 +114,10 @@ public class ScpCapabilitiesParserTests
         // First A0: SCP03 with option 70
         // Second A0: SCP02 with options 15 and 55
         // Third A0: SCP03 with option 10 (different option, same protocol)
-        var data = Convert.FromHexString("A006800103810170A00780010281021555A006800103810110");
+        byte[] data = Convert.FromHexString("A006800103810170A00780010281021555A006800103810110");
 
         // Act
-        var result = ScpCapabilitiesParser.Parse(data);
+        string? result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
         // Should merge SCP03 options and sort by protocol version
@@ -128,10 +128,10 @@ public class ScpCapabilitiesParserTests
     public void Parse_WithEmptyData_ReturnsEmptyString()
     {
         // Arrange
-        var data = Array.Empty<byte>();
+        byte[] data = [];
 
         // Act
-        var result = ScpCapabilitiesParser.Parse(data);
+        string? result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
         _ = result.Should().BeEquivalentTo(string.Empty);
@@ -141,7 +141,7 @@ public class ScpCapabilitiesParserTests
     public void Parse_WithNullData_ReturnsEmptyString()
     {
         // Act
-        var result = ScpCapabilitiesParser.Parse(null);
+        string? result = ScpCapabilitiesParser.Parse(null);
 
         // Assert
         _ = result.Should().BeEquivalentTo(string.Empty);
@@ -151,10 +151,10 @@ public class ScpCapabilitiesParserTests
     public void Parse_WithMalformedTlv_ReturnsEmptyString()
     {
         // Arrange - Tag with length exceeding data
-        var data = Convert.FromHexString("81FF01");
+        byte[] data = Convert.FromHexString("81FF01");
 
         // Act
-        var result = ScpCapabilitiesParser.Parse(data);
+        string? result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
         _ = result.Should().BeEquivalentTo(string.Empty);
@@ -167,10 +167,10 @@ public class ScpCapabilitiesParserTests
         // First A0: Unknown SCP FF
         // Second A0: Valid SCP02
         // Third A0: Valid SCP03
-        var data = Convert.FromHexString("A0068001FF8101FFA006800102810115A006800103810170");
+        byte[] data = Convert.FromHexString("A0068001FF8101FFA006800102810115A006800103810170");
 
         // Act
-        var result = ScpCapabilitiesParser.Parse(data);
+        string? result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
         // Should ignore unknown SCP FF, only parse valid ones
@@ -189,10 +189,10 @@ public class ScpCapabilitiesParserTests
         //   - 80 01 02 (SCP type = SCP02)
         //   - 81 04 15355575 (implementation options: 0x15, 0x35, 0x55, 0x75)
         // - Other tags for privileges and capabilities
-        var data = Convert.FromHexString("A0098001028104153555758103E5BEC082031E030083010284010285017B86010C87017B");
+        byte[] data = Convert.FromHexString("A0098001028104153555758103E5BEC082031E030083010284010285017B86010C87017B");
 
         // Act
-        var result = ScpCapabilitiesParser.Parse(data);
+        string? result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
         // Should identify SCP02 with all four implementation options
@@ -205,10 +205,10 @@ public class ScpCapabilitiesParserTests
     {
         // Arrange - A0 tag with SCP02 and implementation options
         // 0x15, 0x35, 0x55, 0x75 are implementation option bytes, not SCP versions
-        var data = Convert.FromHexString("A009800102810415355575");
+        byte[] data = Convert.FromHexString("A009800102810415355575");
 
         // Act
-        var result = ScpCapabilitiesParser.Parse(data);
+        string? result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
         // Should parse as SCP02 with implementation options, not as separate SCPs
@@ -227,10 +227,10 @@ public class ScpCapabilitiesParserTests
         // Per GP Card Spec, each A0 tag contains one SCP:
         // First A0: SCP02 with no options
         // Second A0: SCP03 with no options  
-        var data = Convert.FromHexString("A003800102A003800103");
+        byte[] data = Convert.FromHexString("A003800102A003800103");
 
         // Act
-        var result = ScpCapabilitiesParser.Parse(data);
+        string? result = ScpCapabilitiesParser.Parse(data);
 
         // Assert
         _ = result.Should().BeEquivalentTo("SCP02 SCP03");

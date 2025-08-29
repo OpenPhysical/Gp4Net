@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
@@ -19,7 +20,7 @@ public class GetDataCommandTests
     public void Create_WithKnownDataObject_CreatesCommand(ushort dataObject)
     {
         // Act
-        var result = GetDataCommand.Create(dataObject);
+        Result<GetDataCommand, SmartCardError> result = GetDataCommand.Create(dataObject);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -30,13 +31,13 @@ public class GetDataCommandTests
     public void GetApdu_ReturnsCorrectStructure()
     {
         // Arrange
-        var dataObject = GetDataCommand.DataObjects.CardData;
-        var commandResult = GetDataCommand.Create(dataObject);
+        ushort dataObject = GetDataCommand.DataObjects.CardData;
+        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(dataObject);
         _ = commandResult.IsSuccess.Should().BeTrue();
-        var command = commandResult.Value;
+        GetDataCommand? command = commandResult.Value;
 
         // Act
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         _ = apdu[0].Should().Be(0x80); // CLA - GlobalPlatform
@@ -57,12 +58,12 @@ public class GetDataCommandTests
     public void GetApdu_SplitsTagCorrectly(ushort tag, byte expectedP1, byte expectedP2)
     {
         // Arrange
-        var commandResult = GetDataCommand.Create(tag);
+        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(tag);
         _ = commandResult.IsSuccess.Should().BeTrue();
-        var command = commandResult.Value;
+        GetDataCommand? command = commandResult.Value;
 
         // Act
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
         _ = apdu[2].Should().Be(expectedP1); // P1
@@ -73,13 +74,13 @@ public class GetDataCommandTests
     public void GetApdu_AlwaysReturnsNewArray()
     {
         // Arrange
-        var commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardData);
+        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardData);
         _ = commandResult.IsSuccess.Should().BeTrue();
-        var command = commandResult.Value;
+        GetDataCommand? command = commandResult.Value;
 
         // Act
-        var apdu1 = command.ToApdu();
-        var apdu2 = command.ToApdu();
+        byte[]? apdu1 = command.ToApdu();
+        byte[]? apdu2 = command.ToApdu();
 
         // Assert
         _ = apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
@@ -90,12 +91,12 @@ public class GetDataCommandTests
     public void ToString_ReturnsDescriptiveString()
     {
         // Arrange
-        var commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardData);
+        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardData);
         _ = commandResult.IsSuccess.Should().BeTrue();
-        var command = commandResult.Value;
+        GetDataCommand? command = commandResult.Value;
 
         // Act
-        var result = command.ToString();
+        string? result = command.ToString();
 
         // Assert
         _ = result.Should().BeEquivalentTo("GET DATA");
@@ -128,10 +129,10 @@ public class GetDataCommandTests
         // Lc: Not present (no command data)
         // Le: 0x00 (receive all available bytes)
 
-        var commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardData);
+        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardData);
         _ = commandResult.IsSuccess.Should().BeTrue();
-        var command = commandResult.Value;
-        var apdu = ApduBuilder.BuildApdu(command);
+        GetDataCommand? command = commandResult.Value;
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         _ = apdu.Length.Should().Be(5); // 5 header bytes only
         _ = apdu[0].Should().Be(0x80); // CLA
@@ -147,9 +148,9 @@ public class GetDataCommandTests
     public void GetDataCommand_ForCommonObjects_HasDescriptiveNames(ushort dataObject, string expectedDescription)
     {
         // This test documents common data objects and their purposes
-        var commandResult = GetDataCommand.Create(dataObject);
+        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(dataObject);
         _ = commandResult.IsSuccess.Should().BeTrue();
-        var command = commandResult.Value;
+        GetDataCommand? command = commandResult.Value;
 
         // The command should be able to handle these common objects
         _ = command.Should().NotBeNull();
@@ -165,10 +166,10 @@ public class GetDataCommandTests
         // for certain data objects or when used outside secure channel.
         // Our implementation uses 0x80 (GlobalPlatform class) consistently.
 
-        var commandResult = GetDataCommand.Create(0x9F7F); // CPLC
+        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(0x9F7F); // CPLC
         _ = commandResult.IsSuccess.Should().BeTrue();
-        var command = commandResult.Value;
-        var apdu = ApduBuilder.BuildApdu(command);
+        GetDataCommand? command = commandResult.Value;
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         // We use GP class
         _ = apdu[0].Should().Be(0x80);
@@ -181,7 +182,7 @@ public class GetDataCommandTests
         byte[] identifier = [0x00, 0x9F, 0x70];
 
         // Act
-        var result = GetDataCommand.CreateFor3ByteIdentifier(identifier);
+        Result<GetDataCommand, SmartCardError> result = GetDataCommand.CreateFor3ByteIdentifier(identifier);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -192,7 +193,7 @@ public class GetDataCommandTests
     public void CreateFor3ByteIdentifier_WithNullIdentifier_ReturnsError()
     {
         // Act
-        var result = GetDataCommand.CreateFor3ByteIdentifier(null);
+        Result<GetDataCommand, SmartCardError> result = GetDataCommand.CreateFor3ByteIdentifier(null);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -208,7 +209,7 @@ public class GetDataCommandTests
     public void CreateFor3ByteIdentifier_WithInvalidLength_ReturnsError(byte[] identifier)
     {
         // Act
-        var result = GetDataCommand.CreateFor3ByteIdentifier(identifier);
+        Result<GetDataCommand, SmartCardError> result = GetDataCommand.CreateFor3ByteIdentifier(identifier);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -224,7 +225,7 @@ public class GetDataCommandTests
         byte[] responseData = [0x01, 0x02, 0x03, 0x04];
 
         // Act
-        var result = GetDataResponse.Parse(tag, responseData);
+        Result<GetDataResponse, SmartCardError> result = GetDataResponse.Parse(tag, responseData);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -236,7 +237,7 @@ public class GetDataCommandTests
     public void Parse_WithNullResponse_ReturnsError()
     {
         // Act
-        var result = GetDataResponse.Parse(0x0066, null);
+        Result<GetDataResponse, SmartCardError> result = GetDataResponse.Parse(0x0066, null);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();

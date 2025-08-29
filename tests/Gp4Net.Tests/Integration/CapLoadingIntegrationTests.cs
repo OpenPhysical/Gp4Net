@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
-using AwesomeAssertions;
 using Gp4Net.Domain;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Domain.Commands;
@@ -12,7 +10,6 @@ using Gp4Net.Domain.Security;
 using Gp4Net.Core;
 using Gp4Net.Tests.TestHelpers;
 using Gp4Net.Transport;
-using Gp4Net.Domain.Protocol;
 using CSharpFunctionalExtensions;
 using NUnit.Framework;
 
@@ -45,34 +42,34 @@ public class CapLoadingIntegrationTests
         // Verify the CAP file exists and can be read
         Assert.That(File.Exists(_capFilePath), Is.True, $"CAP file not found at: {_capFilePath}");
 
-        var capFileData = File.ReadAllBytes(_capFilePath);
+        byte[] capFileData = File.ReadAllBytes(_capFilePath);
         Assert.That(capFileData.Length, Is.GreaterThan(0), "CAP file should not be empty");
 
         // Parse and check structure
-        var capFileResult = CapFileStructure.Parse(capFileData);
+        Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(capFileData);
         Assert.That(capFileResult.IsSuccess, Is.True, "Failed to parse CAP file");
-        var capFile = capFileResult.Value;
+        CapFileStructure? capFile = capFileResult.Value;
     }
 
     [Test]
     public void CapFileLoading_EndToEndWorkflow_GeneratesCorrectWrappedCommands()
     {
         // Arrange - Load the CAP file used in the real trace
-        var capFileData = File.ReadAllBytes(_capFilePath);
+        byte[] capFileData = File.ReadAllBytes(_capFilePath);
 
         // Parse CAP file structure
-        var capFileResult = CapFileStructure.Parse(capFileData);
+        Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(capFileData);
         Assert.That(capFileResult.IsSuccess, Is.True, "Failed to parse CAP file");
-        var capFile = capFileResult.Value;
+        CapFileStructure? capFile = capFileResult.Value;
 
         // Verify we have the expected package from the trace (OpenFIPS201 package)
-        var expectedPackageAid = Convert.FromHexString("A00000030800001000");
+        byte[] expectedPackageAid = Convert.FromHexString("A00000030800001000");
         Assert.That(capFile.PackageAid, Is.EqualTo(expectedPackageAid));
 
         // Act - Generate LOAD commands from CAP file
-        var result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
+        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
         Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
-        var loadCommands = result.Value;
+        IList<LoadCommand>? loadCommands = result.Value;
 
         // Assert - Verify we generated the expected number of commands
         Assert.That(
@@ -81,7 +78,7 @@ public class CapLoadingIntegrationTests
         );
 
         // Verify first command structure matches trace expectations
-        var firstCommand = loadCommands[0];
+        LoadCommand firstCommand = loadCommands[0];
         Assert.Multiple(() =>
         {
             Assert.That(firstCommand.IsFirstBlock, Is.True, "First command should be marked as first block");
@@ -89,14 +86,14 @@ public class CapLoadingIntegrationTests
         });
 
         // Verify final command structure
-        var lastCommand = loadCommands.Last();
+        LoadCommand lastCommand = loadCommands.Last();
         Assert.That(lastCommand.IsFinalBlock, Is.True, "Last command should be marked as final block");
 
         // Convert to APDUs for secure channel wrapping
-        var plainApdus = loadCommands.Select(cmd => ApduBuilder.BuildApdu(cmd)).ToList();
+        List<byte[]> plainApdus = loadCommands.Select(cmd => ApduBuilder.BuildApdu(cmd)).ToList();
 
         // Verify APDU structure matches trace format
-        var firstApdu = plainApdus[0];
+        byte[] firstApdu = plainApdus[0];
         Assert.Multiple(() =>
         {
             Assert.That(firstApdu[0], Is.EqualTo(0x80)); // CLA
@@ -113,22 +110,22 @@ public class CapLoadingIntegrationTests
         // Skip the secure channel wrapping until we can debug the key format issue
 
         // Load CAP file and generate LOAD commands
-        var capFileData = File.ReadAllBytes(_capFilePath);
-        var result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
+        byte[] capFileData = File.ReadAllBytes(_capFilePath);
+        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
         Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
-        var loadCommands = result.Value;
-        var plainApdus = loadCommands.Select(cmd => ApduBuilder.BuildApdu(cmd)).ToList();
+        IList<LoadCommand>? loadCommands = result.Value;
+        List<byte[]> plainApdus = loadCommands.Select(cmd => ApduBuilder.BuildApdu(cmd)).ToList();
 
         // Simulate what wrapped APDUs would look like (for demonstration)
-        var wrappedApdus = plainApdus
+        List<byte[]> wrappedApdus = plainApdus
             .Select(apdu =>
             {
                 // Simple simulation: change CLA to 0x84 and add 8 bytes for MAC
-                var wrapped = new byte[apdu.Length + 8];
+                byte[] wrapped = new byte[apdu.Length + 8];
                 Array.Copy(apdu, wrapped, apdu.Length);
                 wrapped[0] = 0x84; // Secure messaging CLA
                 // Add dummy MAC at the end
-                for (var i = apdu.Length; i < wrapped.Length; i++)
+                for (int i = apdu.Length; i < wrapped.Length; i++)
                 {
                     wrapped[i] = (byte)(i % 256);
                 }
@@ -138,13 +135,13 @@ public class CapLoadingIntegrationTests
 
         // Assert - Verify wrapped APDUs have correct format
         Assert.That(wrappedApdus.Count > 0, "Should have generated wrapped APDUs");
-        foreach (var wrappedApdu in wrappedApdus)
+        foreach (byte[] wrappedApdu in wrappedApdus)
         {
             // Wrapped commands should have CLA = 0x84 (secure messaging)
             Assert.That(wrappedApdu[0], Is.EqualTo(0x84));
 
             // Should be longer than original due to MAC and padding
-            var originalIndex = wrappedApdus.IndexOf(wrappedApdu);
+            int originalIndex = wrappedApdus.IndexOf(wrappedApdu);
             Assert.That(wrappedApdu.Length, Is.GreaterThan(plainApdus[originalIndex].Length));
 
             // Should end with MAC (8 bytes)
@@ -166,26 +163,26 @@ public class CapLoadingIntegrationTests
         //     "80E80000EFC48268EE010013DECAFFED0102040A0109A000000308000010000";
 
         // Act - Load CAP file and generate commands
-        var capFileData = File.ReadAllBytes(_capFilePath);
-        var capFileResult = CapFileStructure.Parse(capFileData);
+        byte[] capFileData = File.ReadAllBytes(_capFilePath);
+        Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(capFileData);
         Assert.That(capFileResult.IsSuccess, Is.True, "Failed to parse CAP file");
-        var capFile = capFileResult.Value;
+        CapFileStructure? capFile = capFileResult.Value;
 
         // Generate INSTALL [for load] command
-        var installForLoadResult = InstallCommandBuilder.CreateForLoad(
+        Result<InstallCommand.InstallForLoadCommand, SmartCardError> installForLoadResult = InstallCommandBuilder.CreateForLoad(
             packageAid: capFile.PackageAid,
             securityDomainAid: Convert.FromHexString("A000000151000000") // Card Manager AID from trace
         );
-            
+
         Assert.That(installForLoadResult.IsSuccess, Is.True, "CreateForLoad should succeed");
-        var installForLoadCmd = installForLoadResult.Value;
-        var installForLoadApdu = ApduBuilder.BuildApdu(installForLoadCmd);
+        InstallCommand.InstallForLoadCommand? installForLoadCmd = installForLoadResult.Value;
+        byte[]? installForLoadApdu = ApduBuilder.BuildApdu(installForLoadCmd);
 
         // Generate LOAD commands
-        var result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
+        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
         Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
-        var loadCommands = result.Value;
-        var firstLoadApdu = ApduBuilder.BuildApdu(loadCommands[0]);
+        IList<LoadCommand>? loadCommands = result.Value;
+        byte[]? firstLoadApdu = ApduBuilder.BuildApdu(loadCommands[0]);
 
         Assert.Multiple(() =>
         {
@@ -200,12 +197,12 @@ public class CapLoadingIntegrationTests
         });
 
         // Verify the LOAD command contains the CAP file header
-        var loadData = loadCommands[0].Data;
+        byte[]? loadData = loadCommands[0].Data;
         Assert.That(loadData, Is.Not.Null);
 
         // Should start with TLV tag C4 (load file data block) - but actual might be different
         // The important thing is that we have valid load data structure
-        var validTlvTags = new byte[] { 0xC4, 0x50, 0x80, 0x81, 0x82, 0x83 };
+        byte[] validTlvTags = [0xC4, 0x50, 0x80, 0x81, 0x82, 0x83];
         Assert.Multiple(() =>
         {
             Assert.That(
@@ -220,8 +217,8 @@ public class CapLoadingIntegrationTests
         });
 
         // Look for CAP magic "DECAFFED" across all LOAD commands
-        var allLoadData = new List<byte>();
-        foreach (var cmd in loadCommands)
+        List<byte> allLoadData = [];
+        foreach (LoadCommand cmd in loadCommands)
         {
             if (cmd.Data != null)
             {
@@ -229,8 +226,8 @@ public class CapLoadingIntegrationTests
             }
         }
 
-        var capMagicPattern = new byte[] { 0xDE, 0xCA, 0xFF, 0xED };
-        var capMagicIndex = ByteArrayHelpers.FindBytePattern([.. allLoadData], capMagicPattern);
+        byte[] capMagicPattern = [0xDE, 0xCA, 0xFF, 0xED];
+        int capMagicIndex = ByteArrayHelpers.FindBytePattern([.. allLoadData], capMagicPattern);
         Assert.That(
             capMagicIndex, Is.GreaterThanOrEqualTo(0),
             "Should contain CAP file magic number DECAFFED somewhere in the load data"
@@ -241,11 +238,11 @@ public class CapLoadingIntegrationTests
     public void FluentInterface_SecureChannelWorkflow_DemonstratesUsability()
     {
         // Arrange - Demonstrate the fluent interface for secure channel operations
-        var capFileData = File.ReadAllBytes(_capFilePath);
+        byte[] capFileData = File.ReadAllBytes(_capFilePath);
 
         // This test demonstrates how the API could/should work for developers
         // Act - Fluent workflow demonstration
-        var result = SecureChannelWorkflow
+        SecureChannelResult result = SecureChannelWorkflow
             .WithCapFile(capFileData)
             .UsingGpTestKeys() // Use proper key derivation
             .WithSecurityLevel(SecurityLevel.CDecryption)
@@ -262,9 +259,9 @@ public class CapLoadingIntegrationTests
         Assert.That(result.PlainApdus.Count, Is.EqualTo(result.LoadCommands.Count));
         Assert.That(result.WrappedApdus.Count, Is.EqualTo(result.LoadCommands.Count));
         // Verify that wrapped APDUs are actually different from plain APDUs
-        for (var i = 0; i < result.PlainApdus.Count; i++)
+        for (int i = 0; i < result.PlainApdus.Count; i++)
         {
-            Assert.That(result.WrappedApdus[i], Is.Not.EqualTo(result.PlainApdus[i]), 
+            Assert.That(result.WrappedApdus[i], Is.Not.EqualTo(result.PlainApdus[i]),
                 $"Wrapped APDU {i} should be different from plain APDU");
         }
     }
@@ -319,11 +316,11 @@ public class SecureChannelWorkflow
     public SecureChannelResult GenerateLoadCommands(int maxBlockSize = 245)
     {
         // Generate LOAD commands from CAP file
-        var result = LoadCommand.CreateFromCapFile(_capFileData, maxBlockSize);
-        
+        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(_capFileData, maxBlockSize);
+
         // Use functional approach - create result even on failure
-        var loadCommands = result.IsSuccess ? result.Value : new List<LoadCommand>();
-        var plainApdus = loadCommands.Select(cmd => ApduBuilder.BuildApdu(cmd)).ToList();
+        IList<LoadCommand>? loadCommands = result.IsSuccess ? result.Value : new List<LoadCommand>();
+        List<byte[]> plainApdus = loadCommands.Select(cmd => ApduBuilder.BuildApdu(cmd)).ToList();
 
         // Create proper session keys using existing key derivation
         SessionKeys sessionKeys;
@@ -331,30 +328,30 @@ public class SecureChannelWorkflow
         if (_useGpTestKeys)
         {
             // Use the same approach as TraceBasedSecureChannelTests for SCP02 key derivation
-            var diversifiedKeysResult = Scp02KeySet.Create(
+            Result<Scp02KeySet, SmartCardError> diversifiedKeysResult = Scp02KeySet.Create(
                 encKey: GpTestKeys.StandardTestKey,
                 macKey: GpTestKeys.StandardTestKey,
                 dekKey: GpTestKeys.StandardTestKey,
                 keyVersion: 0xFF
             );
             Assert.That(diversifiedKeysResult.IsSuccess, Is.True);
-            var diversifiedKeys = diversifiedKeysResult.Value;
+            Scp02KeySet? diversifiedKeys = diversifiedKeysResult.Value;
 
-            var hostChallenge = Convert.FromHexString("53CA65B6EC16E7B0");
-            var cardChallenge = Convert.FromHexString("0003A33DFDBFFADF");
-            var sequenceCounter = cardChallenge[..2];
+            byte[] hostChallenge = Convert.FromHexString("53CA65B6EC16E7B0");
+            byte[] cardChallenge = Convert.FromHexString("0003A33DFDBFFADF");
+            byte[] sequenceCounter = cardChallenge[..2];
 
             // Use KeyDerivationService for SCP02 session key derivation
-            var keyDerivationService = new Gp4Net.Domain.Keys.KeyDerivationService();
-            var contextResult = Gp4Net.Domain.Keys.KeyDerivationContext.CreateForScp02(
+            KeyDerivationService keyDerivationService = new KeyDerivationService();
+            Result<KeyDerivationContext, SmartCardError> contextResult = KeyDerivationContext.CreateForScp02(
                 diversifiedKeys,
                 hostChallenge,
                 cardChallenge,
                 sequenceCounter);
-            var scp02SessionKeysResult = contextResult.IsSuccess 
+            Result<SessionKeys, SmartCardError> scp02SessionKeysResult = contextResult.IsSuccess
                 ? keyDerivationService.DeriveSessionKeys(contextResult.Value)
                 : Result.Failure<SessionKeys, SmartCardError>(contextResult.Error);
-            
+
             sessionKeys = scp02SessionKeysResult.Match(
                 onSuccess: scp02SessionKeys => new SessionKeys(
                     sEnc: scp02SessionKeys.SEnc,
@@ -371,15 +368,15 @@ public class SecureChannelWorkflow
 
         // For demonstration purposes, simulate secure channel wrapping
         // In a real implementation, this would use SecureChannelSession.WrapCommand
-        var wrappedApdus = plainApdus
+        List<byte[]> wrappedApdus = plainApdus
             .Select(apdu =>
             {
                 // Simple simulation: change CLA to 0x84 and add 8 bytes for MAC
-                var wrapped = new byte[apdu.Length + 8];
+                byte[] wrapped = new byte[apdu.Length + 8];
                 Array.Copy(apdu, wrapped, apdu.Length);
                 wrapped[0] = 0x84; // Secure messaging CLA
                 // Add dummy MAC at the end
-                for (var i = apdu.Length; i < wrapped.Length; i++)
+                for (int i = apdu.Length; i < wrapped.Length; i++)
                 {
                     wrapped[i] = (byte)(i % 256);
                 }
@@ -388,12 +385,12 @@ public class SecureChannelWorkflow
             .ToList();
 
         // Create MAC chaining state for the protocol
-        var macChainingSize = _protocol == TestSecureChannelProtocol.Scp02 ? 8 : 16;
-        var macChainingValue = new byte[macChainingSize];
-        var protocolVersion = _protocol == TestSecureChannelProtocol.Scp02 ? (byte)0x02 : (byte)0x03;
-        
+        int macChainingSize = _protocol == TestSecureChannelProtocol.Scp02 ? 8 : 16;
+        byte[] macChainingValue = new byte[macChainingSize];
+        byte protocolVersion = _protocol == TestSecureChannelProtocol.Scp02 ? (byte)0x02 : (byte)0x03;
+
         // Create secure channel state
-        var sessionResult = SecureChannelState.Create(
+        Result<SecureChannelState, SmartCardError> sessionResult = SecureChannelState.Create(
             sessionKeys,
             _securityLevel,
             protocolVersion,
@@ -402,15 +399,15 @@ public class SecureChannelWorkflow
         );
 
         // Create the result, using the session if successful or a default one for test purposes
-        var session = sessionResult.IsSuccess 
-            ? sessionResult.Value 
+        SecureChannelState? session = sessionResult.IsSuccess
+            ? sessionResult.Value
             : new SecureChannelState(
                 sessionKeys,
                 _securityLevel,
                 protocolVersion,
                 MacChainingState.Create(macChainingValue, protocolVersion, 0x00).Value,
                 0,
-                [..Guid.NewGuid().ToByteArray().Take(8)]
+                [.. Guid.NewGuid().ToByteArray().Take(8)]
             );
 
         return new SecureChannelResult
@@ -467,10 +464,10 @@ public static class ByteArrayHelpers
             return -1;
         }
 
-        for (var i = 0; i <= source.Length - pattern.Length; i++)
+        for (int i = 0; i <= source.Length - pattern.Length; i++)
         {
-            var found = true;
-            for (var j = 0; j < pattern.Length; j++)
+            bool found = true;
+            for (int j = 0; j < pattern.Length; j++)
             {
                 if (source[i + j] != pattern[j])
                 {

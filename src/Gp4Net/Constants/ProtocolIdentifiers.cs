@@ -13,17 +13,6 @@ namespace Gp4Net.Constants;
 [PublicAPI]
 public static class ProtocolIdentifiers
 {
-
-    /// <summary>
-    /// SCP02 protocol identifier.
-    /// </summary>
-    public const byte Scp02 = 0x02;
-
-    /// <summary>
-    /// SCP03 protocol identifier.
-    /// </summary>
-    public const byte Scp03 = 0x03;
-
     /// <summary>
     /// Mask for extracting the base protocol identifier.
     /// </summary>

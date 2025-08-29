@@ -1,6 +1,8 @@
 using Gp4Net.Domain.CardInfo;
 using NUnit.Framework;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 
 namespace Gp4Net.Tests.Domain.CardInfo;
 
@@ -11,8 +13,8 @@ public class CardDataInfoOidTests
     public void Parse_WithOids_ExtractsCorrectly()
     {
         // Arrange - Real card data with OIDs
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0x66,
             0x4D, // Tag 66, length 77
             0x73,
@@ -92,10 +94,10 @@ public class CardDataInfoOidTests
             0x6E,
             0x01,
             0x03 // OID: 1.3.6.1.4.1.42.2.110.1.3
-        };
+        ];
 
         // Act
-        var cardData = CardDataInfo.Parse(data);
+        Result<CardDataInfo, SmartCardError> cardData = CardDataInfo.Parse(data);
 
         // Assert
         _ = cardData.IsSuccess.Should().BeTrue();
@@ -112,8 +114,8 @@ public class CardDataInfoOidTests
     public void Parse_ExtractsGlobalPlatformVersionFromOid()
     {
         // Arrange - Data with GP version OID
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0x06,
             0x09,
             0x2A,
@@ -125,10 +127,10 @@ public class CardDataInfoOidTests
             0x02,
             0x02,
             0x03 // 1.2.840.114283.2.2.3
-        };
+        ];
 
         // Act
-        var cardData = CardDataInfo.Parse(data);
+        Result<CardDataInfo, SmartCardError> cardData = CardDataInfo.Parse(data);
 
         // Assert
         _ = cardData.Value.GlobalPlatformVersionFromOid.GetValueOrDefault().Should().BeEquivalentTo("2.2.3");
@@ -138,8 +140,8 @@ public class CardDataInfoOidTests
     public void ToString_IncludesOidDescriptions()
     {
         // Arrange
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0x06,
             0x09,
             0x2A,
@@ -155,12 +157,12 @@ public class CardDataInfoOidTests
             0x02,
             0x03,
             0x70 // SCP info
-        };
+        ];
 
         // Act
-        var cardData = CardDataInfo.Parse(data);
+        Result<CardDataInfo, SmartCardError> cardData = CardDataInfo.Parse(data);
         _ = cardData.IsSuccess.Should().BeTrue();
-        var output = cardData.Value.ToString();
+        string? output = cardData.Value.ToString();
 
         // Assert
         _ = output.Should().Contain("Parsed OIDs:");
@@ -174,16 +176,16 @@ public class CardDataInfoOidTests
     public void Parse_HandlesDataWithoutOids()
     {
         // Arrange - Data without OIDs
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0x73,
             0x02,
             0x02,
             0x03 // Just GP version bytes - tag 73, length 2, value 02 03
-        };
+        ];
 
         // Act
-        var cardData = CardDataInfo.Parse(data);
+        Result<CardDataInfo, SmartCardError> cardData = CardDataInfo.Parse(data);
 
         // Assert
         _ = cardData.Value.Oids.Should().BeEmpty();
@@ -196,8 +198,8 @@ public class CardDataInfoOidTests
     public void Parse_PreservesExistingTagParsing()
     {
         // Arrange
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0x73,
             0x03,
             0x02,
@@ -217,10 +219,10 @@ public class CardDataInfoOidTests
             0x02,
             0xFF,
             0xEE // Chip details
-        };
+        ];
 
         // Act
-        var cardData = CardDataInfo.Parse(data);
+        Result<CardDataInfo, SmartCardError> cardData = CardDataInfo.Parse(data);
 
         // Assert
         _ = cardData.Value.Tags.Should().HaveCount(4);
@@ -234,8 +236,8 @@ public class CardDataInfoOidTests
     public void Parse_WithMixedOidsAndTags_ParsesBoth()
     {
         // Arrange - Mix of OIDs and regular tags
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0x73,
             0x03,
             0x02,
@@ -255,10 +257,10 @@ public class CardDataInfoOidTests
             0x64,
             0x01,
             0x03 // SCP tag
-        };
+        ];
 
         // Act
-        var cardData = CardDataInfo.Parse(data);
+        Result<CardDataInfo, SmartCardError> cardData = CardDataInfo.Parse(data);
 
         // Assert
         _ = cardData.Value.Tags.Should().HaveCount(3); // Tags 73, 06, and 64
@@ -272,8 +274,8 @@ public class CardDataInfoOidTests
     public void Parse_NonGlobalPlatformOid_ParsedButNoVersionExtracted()
     {
         // Arrange - NIST OID
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0x06,
             0x0A,
             0x2B,
@@ -286,10 +288,10 @@ public class CardDataInfoOidTests
             0x6E,
             0x01,
             0x03
-        };
+        ];
 
         // Act
-        var cardData = CardDataInfo.Parse(data);
+        Result<CardDataInfo, SmartCardError> cardData = CardDataInfo.Parse(data);
 
         // Assert
         _ = cardData.Value.Oids.Should().HaveCount(1);

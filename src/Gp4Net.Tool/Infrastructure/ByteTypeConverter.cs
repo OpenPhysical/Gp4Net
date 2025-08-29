@@ -89,7 +89,7 @@ public class ByteTypeConverter : TypeConverter
         }
 
         // Parse as decimal
-        if (byte.TryParse(value, out var result))
+        if (byte.TryParse(value, out byte result))
         {
             return result;
         }
@@ -101,7 +101,7 @@ public class ByteTypeConverter : TypeConverter
 
     private static bool IsHexString(string value)
     {
-        foreach (var c in value)
+        foreach (char c in value)
         {
             if (!Uri.IsHexDigit(c))
             {

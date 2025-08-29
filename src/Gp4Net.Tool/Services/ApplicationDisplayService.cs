@@ -131,7 +131,7 @@ public class ApplicationDisplayService
     /// <returns>The display string.</returns>
     public static string GetPrivilegesDisplaySimple(ImmutableList<Privilege> privileges)
     {
-        return privileges.Count > 0 
+        return privileges.Count > 0
             ? string.Join(", ", privileges.Select(p => p.ToString()))
             : "None";
     }
@@ -143,7 +143,7 @@ public class ApplicationDisplayService
     /// <returns>A configured table.</returns>
     public static Table CreateApplicationTable(bool extended = false)
     {
-        var table = new Table();
+        Table table = new Table();
 
         // Basic columns
         _ = table.AddColumn("Type");
@@ -169,13 +169,13 @@ public class ApplicationDisplayService
     /// <param name="extended">Whether to include extended columns.</param>
     public static void AddApplicationRow(Table table, ApplicationInfo app, bool extended = false)
     {
-        var row = new List<string>
-        {
+        List<string> row =
+        [
             GetTypeDisplay(app.Type),
             $"[cyan]{Convert.ToHexString(app.Aid)}[/]",
             GetStateDisplay(app.LifecycleState),
             GetPrivilegesDisplay(app.Privileges)
-        };
+        ];
 
         if (extended)
         {
@@ -197,9 +197,9 @@ public class ApplicationDisplayService
     /// <param name="extended">Whether to show extended information.</param>
     public static void DisplayApplicationTable(IReadOnlyList<ApplicationInfo> applications, bool extended = false)
     {
-        var table = CreateApplicationTable(extended);
+        Table table = CreateApplicationTable(extended);
 
-        foreach (var app in applications)
+        foreach (ApplicationInfo app in applications)
         {
             AddApplicationRow(table, app, extended);
         }
@@ -213,7 +213,7 @@ public class ApplicationDisplayService
     /// <param name="applications">The applications to display.</param>
     public static void DisplayApplicationsJson(IReadOnlyList<ApplicationInfo> applications)
     {
-        var json = JsonSerializer.Serialize(
+        string json = JsonSerializer.Serialize(
             applications.Select(a => new
             {
                 type = a.Type.ToString(),
@@ -239,7 +239,7 @@ public class ApplicationDisplayService
     {
         Console.WriteLine("Type,AID,State,Privileges,Version,AssociatedSD");
 
-        foreach (var app in applications)
+        foreach (ApplicationInfo app in applications)
         {
             Console.WriteLine(
                 $"{app.Type},"
@@ -258,15 +258,15 @@ public class ApplicationDisplayService
     /// <param name="applications">The applications to display.</param>
     public static void DisplayDetailedInformation(IReadOnlyList<ApplicationInfo> applications)
     {
-        var groups = applications.GroupBy(a => a.Type);
+        IEnumerable<IGrouping<ApplicationType, ApplicationInfo>> groups = applications.GroupBy(a => a.Type);
 
-        foreach (var group in groups)
+        foreach (IGrouping<ApplicationType, ApplicationInfo> group in groups)
         {
             AnsiConsole.MarkupLine($"[bold]{group.Key}s:[/]");
 
-            foreach (var app in group)
+            foreach (ApplicationInfo app in group)
             {
-                var panel = new Panel(
+                Panel panel = new Panel(
                     $"[dim]AID:[/] {Convert.ToHexString(app.Aid)}\n"
                     + $"[dim]State:[/] {app.LifecycleState}\n"
                     + $"[dim]Privileges:[/] {GetPrivilegesDisplaySimple(app.Privileges)}"

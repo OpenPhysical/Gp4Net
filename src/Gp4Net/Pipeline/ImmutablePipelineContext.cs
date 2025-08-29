@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -31,7 +32,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     /// <inheritdoc/>
     public Maybe<T> Get<T>(string key)
     {
-        if (_values.TryGetValue(key, out var value) && value is T typedValue)
+        if (_values.TryGetValue(key, out object value) && value is T typedValue)
         {
             return Maybe<T>.From(typedValue);
         }
@@ -57,7 +58,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     {
         get
         {
-            return [.._values.Keys];
+            return [.. _values.Keys];
         }
     }
 
@@ -69,12 +70,12 @@ public sealed class ImmutablePipelineContext : IPipelineContext
             return this;
         }
 
-        var builder = _values.ToBuilder();
-        foreach (var kvp in values)
+        ImmutableDictionary<string, object>.Builder builder = _values.ToBuilder();
+        foreach (KeyValuePair<string, object> kvp in values)
         {
             builder[kvp.Key] = kvp.Value;
         }
-            
+
         return new ImmutablePipelineContext(builder.ToImmutable());
     }
 
@@ -113,7 +114,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
 
     public override string ToString()
     {
-        var items = _values.Select(kvp => $"{kvp.Key}: {kvp.Value?.GetType().Name ?? "null"}");
+        IEnumerable<string> items = _values.Select(kvp => $"{kvp.Key}: {kvp.Value?.GetType().Name ?? "null"}");
         return $"PipelineContext[{string.Join(", ", items)}]";
     }
 
@@ -182,10 +183,10 @@ public static class PipelineContextExtensions
     /// </summary>
     public static IPipelineContext Merge(this IPipelineContext context, IPipelineContext other)
     {
-        var result = context;
-        foreach (var key in other.Keys)
+        IPipelineContext result = context;
+        foreach (string key in other.Keys)
         {
-            context.Get<object>(key).Execute(value => 
+            context.Get<object>(key).Execute(value =>
             {
                 result = result.With(key, value);
             });

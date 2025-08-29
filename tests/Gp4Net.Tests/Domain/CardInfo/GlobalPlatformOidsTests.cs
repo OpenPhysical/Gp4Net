@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Gp4Net.Domain.CardInfo;
 using NUnit.Framework;
 using AwesomeAssertions;
@@ -84,7 +85,7 @@ public class GlobalPlatformOidsTests
     public void GetAllKnownOids_ShouldReturnNonEmptyDictionary()
     {
         // Act
-        var knownOids = GlobalPlatformOids.GetAllKnownOids();
+        IReadOnlyDictionary<string, string>? knownOids = GlobalPlatformOids.GetAllKnownOids();
 
         // Assert
         _ = knownOids.Should().NotBeEmpty();
@@ -96,18 +97,18 @@ public class GlobalPlatformOidsTests
     public void AnalyzeOids_ShouldCorrectlySummarizeCapabilities()
     {
         // Arrange
-        var oids = new[]
-        {
+        string[] oids =
+        [
             "1.2.840.114283.1",
             "1.2.840.114283.2.2.3",
             "1.2.840.114283.4.2",
             "1.2.840.114283.4.3",
             "1.2.840.114283.4.3.112",
             "1.3.6.1.4.1.42.2.110.1.3"
-        };
+        ];
 
         // Act
-        var summary = GlobalPlatformOids.AnalyzeOids(oids);
+        GlobalPlatformOids.CapabilitiesSummary? summary = GlobalPlatformOids.AnalyzeOids(oids);
 
         // Assert
         _ = summary.SupportedScpVersions.Should().Contain("SCP02");
@@ -122,7 +123,7 @@ public class GlobalPlatformOidsTests
     public void AnalyzeOids_ShouldHandleEmptyList()
     {
         // Act
-        var summary = GlobalPlatformOids.AnalyzeOids(new string[0]);
+        GlobalPlatformOids.CapabilitiesSummary? summary = GlobalPlatformOids.AnalyzeOids(new string[0]);
 
         // Assert
         _ = summary.SupportedScpVersions.Should().BeEmpty();
@@ -135,16 +136,16 @@ public class GlobalPlatformOidsTests
     public void CapabilitiesSummary_ToString_ShouldFormatCorrectly()
     {
         // Arrange
-        var oids = new[]
-        {
+        string[] oids =
+        [
             "1.2.840.114283.4.2",
             "1.2.840.114283.4.3.112",
             "1.2.840.114283.2.2.3"
-        };
-        var summary = GlobalPlatformOids.AnalyzeOids(oids);
+        ];
+        GlobalPlatformOids.CapabilitiesSummary? summary = GlobalPlatformOids.AnalyzeOids(oids);
 
         // Act
-        var result = summary.ToString();
+        string? result = summary.ToString();
 
         // Assert
         _ = result.Should().Contain("Supported Secure Channel Protocols:");

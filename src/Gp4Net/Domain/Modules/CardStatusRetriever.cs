@@ -1,11 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Domain;
+using Gp4Net.Core.Tlv;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using Gp4Net.Pipeline;
@@ -29,20 +30,20 @@ public static class CardStatusRetriever
         CancellationToken cancellationToken = default)
     {
         // Retrieve ISD and applications
-        Task<Result<ImmutableList<ApplicationInfo>, SmartCardError>> isdTask = 
+        Task<Result<ImmutableList<ApplicationInfo>, SmartCardError>> isdTask =
             GetIssuerSecurityDomainAsync(executeCommand, cancellationToken);
-        Task<Result<ImmutableList<ApplicationInfo>, SmartCardError>> appsTask = 
+        Task<Result<ImmutableList<ApplicationInfo>, SmartCardError>> appsTask =
             GetApplicationsAndSecurityDomainsAsync(executeCommand, cancellationToken);
-        
+
         // Retrieve load files
-        Task<Result<ImmutableList<ExecutableLoadFile>, SmartCardError>> loadFilesTask = 
+        Task<Result<ImmutableList<ExecutableLoadFile>, SmartCardError>> loadFilesTask =
             GetExecutableLoadFilesAsync(executeCommand, cancellationToken);
-        Task<Result<ImmutableList<ExecutableLoadFile>, SmartCardError>> loadFilesWithModulesTask = 
+        Task<Result<ImmutableList<ExecutableLoadFile>, SmartCardError>> loadFilesWithModulesTask =
             GetExecutableLoadFilesWithModulesAsync(executeCommand, cancellationToken);
 
         // Wait for all tasks
         await Task.WhenAll(isdTask, appsTask, loadFilesTask, loadFilesWithModulesTask);
-        
+
         // Check for failures
         if (isdTask.Result.IsFailure)
             return Result.Failure<CardContent, SmartCardError>(isdTask.Result.Error);
@@ -71,15 +72,15 @@ public static class CardStatusRetriever
         Result<GetStatusCommand, SmartCardError> cmdResult = CommandFactory.CreateGetStatusCommand(
             GetStatusCommand.StatusSubset.IssuerSecurityDomain,
             [0x4F, 0x00]); // Tag 4F, length 0
-        
+
         if (cmdResult.IsFailure)
         {
             return Result.Failure<ImmutableList<ApplicationInfo>, SmartCardError>(cmdResult.Error);
         }
 
-        Result<CommandResponse, SmartCardError> response = 
+        Result<CommandResponse, SmartCardError> response =
             await executeCommand(cmdResult.Value, cancellationToken);
-        
+
         return response.IsSuccess
             ? ResponseParser.ParseGetStatusResponse(response.Value)
             : Result.Failure<ImmutableList<ApplicationInfo>, SmartCardError>(response.Error);
@@ -95,15 +96,15 @@ public static class CardStatusRetriever
         Result<GetStatusCommand, SmartCardError> cmdResult = CommandFactory.CreateGetStatusCommand(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             [0x4F, 0x00]); // Tag 4F, length 0
-        
+
         if (cmdResult.IsFailure)
         {
             return Result.Failure<ImmutableList<ApplicationInfo>, SmartCardError>(cmdResult.Error);
         }
 
-        Result<CommandResponse, SmartCardError> response = 
+        Result<CommandResponse, SmartCardError> response =
             await executeCommand(cmdResult.Value, cancellationToken);
-        
+
         return response.IsSuccess
             ? ResponseParser.ParseGetStatusResponse(response.Value)
             : Result.Failure<ImmutableList<ApplicationInfo>, SmartCardError>(response.Error);
@@ -119,15 +120,15 @@ public static class CardStatusRetriever
         Result<GetStatusCommand, SmartCardError> cmdResult = CommandFactory.CreateGetStatusCommand(
             GetStatusCommand.StatusSubset.ExecutableLoadFiles,
             [0x4F, 0x00]); // Tag 4F, length 0
-        
+
         if (cmdResult.IsFailure)
         {
             return Result.Failure<ImmutableList<ExecutableLoadFile>, SmartCardError>(cmdResult.Error);
         }
 
-        Result<CommandResponse, SmartCardError> response = 
+        Result<CommandResponse, SmartCardError> response =
             await executeCommand(cmdResult.Value, cancellationToken);
-        
+
         return response.IsSuccess
             ? ParseLoadFileResponse(response.Value)
             : Result.Failure<ImmutableList<ExecutableLoadFile>, SmartCardError>(response.Error);
@@ -143,15 +144,15 @@ public static class CardStatusRetriever
         Result<GetStatusCommand, SmartCardError> cmdResult = CommandFactory.CreateGetStatusCommand(
             GetStatusCommand.StatusSubset.ExecutableLoadFilesAndModules,
             [0x4F, 0x00]); // Tag 4F, length 0
-        
+
         if (cmdResult.IsFailure)
         {
             return Result.Failure<ImmutableList<ExecutableLoadFile>, SmartCardError>(cmdResult.Error);
         }
 
-        Result<CommandResponse, SmartCardError> response = 
+        Result<CommandResponse, SmartCardError> response =
             await executeCommand(cmdResult.Value, cancellationToken);
-        
+
         return response.IsSuccess
             ? ParseLoadFileResponse(response.Value)
             : Result.Failure<ImmutableList<ExecutableLoadFile>, SmartCardError>(response.Error);
@@ -165,17 +166,17 @@ public static class CardStatusRetriever
         Func<IApduCommand, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
         CancellationToken cancellationToken = default)
     {
-        Result<GetStatusCommand, SmartCardError> cmdResult = 
+        Result<GetStatusCommand, SmartCardError> cmdResult =
             CommandFactory.CreateGetStatusCommand(subset);
-        
+
         if (cmdResult.IsFailure)
         {
             return Result.Failure<ImmutableList<ApplicationInfo>, SmartCardError>(cmdResult.Error);
         }
 
-        Result<CommandResponse, SmartCardError> response = 
+        Result<CommandResponse, SmartCardError> response =
             await executeCommand(cmdResult.Value, cancellationToken);
-        
+
         return response.IsSuccess
             ? ResponseParser.ParseGetStatusResponse(response.Value)
             : Result.Failure<ImmutableList<ApplicationInfo>, SmartCardError>(response.Error);
@@ -229,32 +230,32 @@ public static class CardStatusRetriever
                 SmartCardError.InvalidResponse($"GET STATUS failed with SW: {response.StatusWord:X4}"));
         }
 
-        var data = response.Data ?? [];
+        byte[] data = response.Data ?? [];
 
         // Parse TLV entries per GP Table 11-37; cards return multiple E3 entries (per-entry templates)
-        var tlvs = Gp4Net.Core.Tlv.TlvParser.ParseAll(data).ToImmutableList();
+        ImmutableList<TlvObject> tlvs = Core.Tlv.TlvParser.ParseAll(data).ToImmutableList();
 
         // Per GP Table 11-37, all load file responses MUST use E3 containers. All traced cards comply.
-        var entryTlvs = tlvs.Where(t => 
+        ImmutableList<TlvObject> entryTlvs = tlvs.Where(t =>
         {
-            var tagNumber = t.GetTagNumber();
+            Result<uint, SmartCardError> tagNumber = t.GetTagNumber();
             return tagNumber.IsSuccess && tagNumber.Value == 0xE3;
         }).ToImmutableList();
 
-        var builder = ImmutableList.CreateBuilder<ExecutableLoadFile>();
+        ImmutableList<ExecutableLoadFile>.Builder builder = ImmutableList.CreateBuilder<ExecutableLoadFile>();
 
-        foreach (var entry in entryTlvs)
+        foreach (TlvObject entry in entryTlvs)
         {
             // For E3 templates, parse children; otherwise, treat the TLV itself as a container
-            var tagNumber = entry.GetTagNumber();
-            var children = tagNumber.IsSuccess && tagNumber.Value == 0xE3
+            Result<uint, SmartCardError> tagNumber = entry.GetTagNumber();
+            ImmutableList<TlvObject> children = tagNumber.IsSuccess && tagNumber.Value == 0xE3
                 ? entry.ParseNestedTlv().ToImmutableList()
                 : new[] { entry }.ToImmutableList();
 
             // Aid (4F)
-            var aidTlv = children.FirstOrDefault(c => 
+            TlvObject aidTlv = children.FirstOrDefault(c =>
             {
-                var tagNumber = c.GetTagNumber();
+                Result<uint, SmartCardError> tagNumber = c.GetTagNumber();
                 return tagNumber.IsSuccess && tagNumber.Value == 0x4F;
             });
             if (aidTlv == null || aidTlv.Value == null || aidTlv.Value.Length == 0)
@@ -262,49 +263,49 @@ public static class CardStatusRetriever
                 // Skip malformed entry without AID
                 continue;
             }
-            var aid = aidTlv.Value;
+            byte[] aid = aidTlv.Value;
 
             // Lifecycle (prefer 9F70, else Unknown)
-            var lifeTlv = children.FirstOrDefault(c => 
+            TlvObject lifeTlv = children.FirstOrDefault(c =>
             {
-                var tagNumber = c.GetTagNumber();
+                Result<uint, SmartCardError> tagNumber = c.GetTagNumber();
                 return tagNumber.IsSuccess && tagNumber.Value == 0x9F70;
             });
-            var lifecycle = lifeTlv != null && lifeTlv.Value != null && lifeTlv.Value.Length > 0
+            LifecycleState lifecycle = lifeTlv != null && lifeTlv.Value != null && lifeTlv.Value.Length > 0
                 ? MapLifecycle(lifeTlv.Value[0])
                 : LifecycleState.Unknown;
 
             // Modules (84 can appear multiple times)
-            var moduleTlvs = children.Where(c => 
+            IEnumerable<TlvObject> moduleTlvs = children.Where(c =>
             {
-                var tagNumber = c.GetTagNumber();
+                Result<uint, SmartCardError> tagNumber = c.GetTagNumber();
                 return tagNumber.IsSuccess && tagNumber.Value == 0x84 && c.Value != null && c.Value.Length > 0;
             });
-            var modules = moduleTlvs
+            ImmutableList<ExecutableModule> modules = moduleTlvs
                 .Select(m => new ExecutableModule(m.Value))
                 .ToImmutableList();
 
             // Associated Security Domain AID (observed tag CC in traces)
-            var sdTlv = children.FirstOrDefault(c => 
+            TlvObject sdTlv = children.FirstOrDefault(c =>
             {
-                var tagNumber = c.GetTagNumber();
+                Result<uint, SmartCardError> tagNumber = c.GetTagNumber();
                 return tagNumber.IsSuccess && tagNumber.Value == 0xCC;
             });
-            var sdAidMaybe = sdTlv != null && sdTlv.Value != null && sdTlv.Value.Length >= 5 && sdTlv.Value.Length <= 16
+            Maybe<byte[]> sdAidMaybe = sdTlv != null && sdTlv.Value != null && sdTlv.Value.Length >= 5 && sdTlv.Value.Length <= 16
                 ? Maybe<byte[]>.From(sdTlv.Value)
                 : Maybe<byte[]>.None;
 
             // Version (observed tag CE 02 [major][minor])
-            var verTlv = children.FirstOrDefault(c => 
+            TlvObject verTlv = children.FirstOrDefault(c =>
             {
-                var tagNumber = c.GetTagNumber();
+                Result<uint, SmartCardError> tagNumber = c.GetTagNumber();
                 return tagNumber.IsSuccess && tagNumber.Value == 0xCE;
             });
-            var versionMaybe = Maybe<string>.None;
+            Maybe<string> versionMaybe = Maybe<string>.None;
             if (verTlv != null && verTlv.Value != null && verTlv.Value.Length >= 2)
             {
-                var major = verTlv.Value[0];
-                var minor = verTlv.Value[1];
+                byte major = verTlv.Value[0];
+                byte minor = verTlv.Value[1];
                 versionMaybe = Maybe<string>.From($"{major}.{minor}");
             }
 

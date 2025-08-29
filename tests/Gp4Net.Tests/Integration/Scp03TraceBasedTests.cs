@@ -1,19 +1,18 @@
 using System;
-using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
+using Gp4Net.Services;
 using Gp4Net.Transport;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using Gp4Net.Cryptography;
 using Gp4Net.CardEmulator.Services;
-using Gp4Net.Tool.Services;
-using Gp4Net.Services;
+using Gp4Net.Core;
 using Gp4Net.Tests.TestHelpers;
 
 namespace Gp4Net.Tests.Integration;
@@ -26,42 +25,53 @@ namespace Gp4Net.Tests.Integration;
 [Category("Integration")]
 public class Scp03TraceBasedTests
 {
-    private IKeyDerivationService _keyDerivationService = null!;
-    private VirtualCardService _virtualCardService = null!;
-    private Gp4Net.Tool.Services.ICardService _cardService = null!;
+    private IKeyDerivationService _keyDerivationService;
+    private VirtualCardService _virtualCardService;
+    private ISmartCardService _smartCardService;
 
     [SetUp]
     public void SetUp()
     {
-        _keyDerivationService = new Gp4Net.Domain.Keys.KeyDerivationService();
+        _keyDerivationService = new KeyDerivationService();
         _virtualCardService = new VirtualCardService();
         _virtualCardService.SetupComprehensiveTestEnvironment();
-        _cardService = new TestCardService(_virtualCardService);
+        _smartCardService = new TestCardService(_virtualCardService);
     }
 
     [TearDown]
     public void TearDown()
     {
-        _cardService?.Dispose();
-        _virtualCardService?.Dispose();
+        _smartCardService.Dispose();
+        _virtualCardService.Dispose();
     }
 
     // GP Test Keys from trace: "404142434445464748494A4B4C4D4E4F"
-    private readonly byte[] _testKey = Convert.FromHexString("404142434445464748494A4B4C4D4E4F");
-        
+    private readonly Scp03KeySet _testKeySet = GpTestKeys.CreateScp03TestKeySet(keyVersion: 0x01);
+
     // From GP Pro trace line 84: Host challenge: FE0530CF61BAA9F3
     private readonly byte[] _hostChallenge = Convert.FromHexString("FE0530CF61BAA9F3");
-        
+
     // From GP Pro trace line 85: Card response to INITIALIZE UPDATE
-    private readonly byte[] _initUpdateResponse = Convert.FromHexString(
-        "0370000000000000000001037083FA042C5C10F778148C0CAF84B0E110000002"
-    );
-        
+    private readonly ApduResponse _initUpdateResponse = CreateInitUpdateResponse();
+
     // Expected session keys from GP Pro trace line 92
     private readonly byte[] _expectedEncKey = Convert.FromHexString("7392646744DF8721131C4A995A845BAE");
     private readonly byte[] _expectedMacKey = Convert.FromHexString("CD9F750E543E0CF862B0EA73E3812113");
+
+    private static ApduResponse CreateInitUpdateResponse()
+    {
+        const string responseHex = "0370000000000000000001037083FA042C5C10F778148C0CAF84B0E110000002";
+        byte[] responseBytes = Convert.FromHexString(responseHex);
+
+        // APDU response format: [data][SW1][SW2]
+        // The response includes data and 9000 status word (successful)
+        byte[] dataBytes = responseBytes[..^2]; // All but last 2 bytes
+        var statusWord = (StatusWord)((responseBytes[^2] << 8) | responseBytes[^1]); // Last 2 bytes
+
+        return new ApduResponse(dataBytes, statusWord);
+    }
     private readonly byte[] _expectedRMacKey = Convert.FromHexString("D1B695D89DE01992B6CB238BDFB006D9");
-        
+
     // From GP Pro trace line 95: Expected EXTERNAL AUTHENTICATE command
     private readonly byte[] _expectedExtAuthCommand = Convert.FromHexString("84820100107B54E3B21E27DA5FFCA958062C7CA0C5");
 
@@ -69,28 +79,28 @@ public class Scp03TraceBasedTests
     public void Scp03Protocol_WithRealTraceData_ProducesCorrectSessionKeys()
     {
         // Arrange
-        var keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1); // Key version 1 from trace
-        
+        Scp03KeySet keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1); // Key version 1 from trace
+
         // Use the real key derivation to match GP Pro trace
-        var cardChallenge = Convert.FromHexString("83FA042C5C10F778"); // From response
-        var sessionKeysResult = Gp4Net.Cryptography.KeyDerivation.DeriveScp03SessionKeys(
-            keySet, 
-            _hostChallenge, 
-            cardChallenge, 
+        byte[] cardChallenge = Convert.FromHexString("83FA042C5C10F778"); // From response
+        Result<SessionKeys, SmartCardError> sessionKeysResult = KeyDerivation.DeriveScp03SessionKeys(
+            keySet,
+            _hostChallenge,
+            cardChallenge,
             128
         );
-        
+
         Assert.That(sessionKeysResult.IsSuccess, Is.True, "Session key derivation should succeed");
-        var sessionKeys = sessionKeysResult.Value;
+        SessionKeys? sessionKeys = sessionKeysResult.Value;
 
         // Use the real key derivation service for functional testing
-        var protocol = new Scp03Protocol(keySet, _keyDerivationService, 0x70); // i=70 from trace
+        Scp03Protocol protocol = new Scp03Protocol(keySet, _keyDerivationService, 0x70); // i=70 from trace
 
         // Act - Parse the real INITIALIZE UPDATE response
-        var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        Result<InitializeUpdateResponse, SmartCardError> responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
         Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
-        var response = responseResult.Value;
-        var context = protocol.ProcessInitializeUpdateResponse(response, _hostChallenge);
+        InitializeUpdateResponse? response = responseResult.Value;
+        Result<SecureChannelContext, SmartCardError> context = protocol.ProcessInitializeUpdateResponse(response, _hostChallenge);
 
         Assert.Multiple(() =>
         {
@@ -106,37 +116,37 @@ public class Scp03TraceBasedTests
     public void Scp03Protocol_WithRealTraceData_CreatesCorrectExternalAuthCommand()
     {
         // Arrange
-        var keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1);
-        
+        Scp03KeySet keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1);
+
         // Use the real key derivation to match GP Pro trace
-        var cardChallenge = Convert.FromHexString("83FA042C5C10F778"); // From response
-        var sessionKeysResult = Gp4Net.Cryptography.KeyDerivation.DeriveScp03SessionKeys(
-            keySet, 
-            _hostChallenge, 
-            cardChallenge, 
+        byte[] cardChallenge = Convert.FromHexString("83FA042C5C10F778"); // From response
+        Result<SessionKeys, SmartCardError> sessionKeysResult = KeyDerivation.DeriveScp03SessionKeys(
+            keySet,
+            _hostChallenge,
+            cardChallenge,
             128
         );
-        
+
         Assert.That(sessionKeysResult.IsSuccess, Is.True, "Session key derivation should succeed");
-        var sessionKeys = sessionKeysResult.Value;
+        SessionKeys? sessionKeys = sessionKeysResult.Value;
 
         // Use the real key derivation service for functional testing
-        var protocol = new Scp03Protocol(keySet, _keyDerivationService, 0x70);
-            
-        var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        Scp03Protocol protocol = new Scp03Protocol(keySet, _keyDerivationService, 0x70);
+
+        Result<InitializeUpdateResponse, SmartCardError> responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
         Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
-        var response = responseResult.Value;
-        var context = protocol.ProcessInitializeUpdateResponse(response, _hostChallenge);
+        InitializeUpdateResponse? response = responseResult.Value;
+        Result<SecureChannelContext, SmartCardError> context = protocol.ProcessInitializeUpdateResponse(response, _hostChallenge);
 
         // Act - Create EXTERNAL AUTHENTICATE command
-        var extAuthCommandResult = protocol.CreateExternalAuthenticateCommand(context.Value, SecurityLevel.CMac);
+        Result<ExternalAuthenticateCommand, SmartCardError> extAuthCommandResult = protocol.CreateExternalAuthenticateCommand(context.Value, SecurityLevel.CMac);
 
         // Assert - Verify the command matches GP Pro trace exactly
         Assert.That(extAuthCommandResult.IsSuccess, Is.True);
-        var extAuthCommand = extAuthCommandResult.Value;
-            
-        var expectedHostCryptogram = Convert.FromHexString("7B54E3B21E27DA5F");
-        var expectedMac = Convert.FromHexString("FCA958062C7CA0C5");
+        ExternalAuthenticateCommand? extAuthCommand = extAuthCommandResult.Value;
+
+        byte[] expectedHostCryptogram = Convert.FromHexString("7B54E3B21E27DA5F");
+        byte[] expectedMac = Convert.FromHexString("FCA958062C7CA0C5");
         Assert.Multiple(() =>
         {
             Assert.That(extAuthCommand.HostCryptogram, Is.EqualTo(expectedHostCryptogram));
@@ -148,28 +158,28 @@ public class Scp03TraceBasedTests
     public async Task SecureChannelManager_WithRealTrace_EstablishesChannelSuccessfully()
     {
         // Arrange
-        var keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1);
-            
+        Scp03KeySet keySet = new Scp03KeySet(_testKey, _testKey, _testKey, 1);
+
         // Use virtual card for functional testing
         var channel = new CardServiceChannelAdapter(_cardService);
-        var transport = new T0ApduTransport(Microsoft.Extensions.Logging.Abstractions.NullLogger<T0ApduTransport>.Instance);
-            
+        T0ApduTransport transport = new T0ApduTransport(Microsoft.Extensions.Logging.Abstractions.NullLogger<T0ApduTransport>.Instance);
+
         // Use deterministic challenge generator for trace matching
-        var challengeGenerator = new DeterministicChallengeGenerator(_hostChallenge);
+        DeterministicChallengeGenerator challengeGenerator = new DeterministicChallengeGenerator(_hostChallenge);
 
         // Setup minimal service provider for SecureChannelProtocolFactory
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddSingleton<IKeyDerivationService, KeyDerivationService>();
-        var serviceProvider = services.BuildServiceProvider();
-            
+        ServiceCollection services = new ServiceCollection();
+        _ = services.AddLogging();
+        _ = services.AddSingleton<IKeyDerivationService, KeyDerivationService>();
+        ServiceProvider serviceProvider = services.BuildServiceProvider();
+
         var factoryLogger = Microsoft.Extensions.Logging.Abstractions.NullLogger<SecureChannelProtocolFactory>.Instance;
         var protocolFactory = new SecureChannelProtocolFactory(serviceProvider, factoryLogger);
-            
+
         var managerLogger = Microsoft.Extensions.Logging.Abstractions.NullLogger<SecureChannelManager>.Instance;
         var manager = new SecureChannelManager(
-            protocolFactory, 
-            challengeGenerator, 
+            protocolFactory,
+            challengeGenerator,
             managerLogger);
 
         // Act
@@ -185,7 +195,7 @@ public class Scp03TraceBasedTests
             // Assert
             Assert.That(session.IsSuccess, Is.True);
             Assert.That(session.Value.SecurityLevel, Is.EqualTo(SecurityLevel.CMac));
-            Assert.That(session.Value.ProtocolVersion, Is.EqualTo(ProtocolIdentifiers.Scp03));
+            Assert.That(session.Value.ProtocolVersion, Is.EqualTo(ScpVersion.Scp03));
         });
 
         // Verify session establishment succeeded with virtual card
@@ -196,9 +206,9 @@ public class Scp03TraceBasedTests
     public void InitializeUpdateResponse_ParseRealTrace_ExtractsCorrectData()
     {
         // Act
-        var responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
+        Result<InitializeUpdateResponse, SmartCardError> responseResult = InitializeUpdateResponse.Parse(_initUpdateResponse);
         Assert.That(responseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
-        var response = responseResult.Value;
+        InitializeUpdateResponse? response = responseResult.Value;
 
         Assert.Multiple(() =>
         {
@@ -217,17 +227,17 @@ public class Scp03TraceBasedTests
     public void Scp03KeyDerivation_WithRealKDD_MatchesGpProKeys()
     {
         // Arrange - Use the exact KDD from trace
-        var kdd = Convert.FromHexString("03700000000000000000");
+        byte[] kdd = Convert.FromHexString("03700000000000000000");
         var baseKey = _testKey;
-            
+
         // This test verifies our key derivation algorithm matches GP Pro
         // From trace line 91: "Diversified card keys: ENC=404142... MAC=404142... DEK=404142..."
         // The keys are the same as base keys because KDD starts with 03 70 00...
-            
+
         // For SCP03 with this specific KDD, the diversified keys should equal base keys
         // This is a characteristic of cards with zero diversification data
-            
-        var keySet = new Scp03KeySet(baseKey, baseKey, baseKey, 1);
+
+        Scp03KeySet keySet = new Scp03KeySet(baseKey, baseKey, baseKey, 1);
         Assert.Multiple(() =>
         {
 

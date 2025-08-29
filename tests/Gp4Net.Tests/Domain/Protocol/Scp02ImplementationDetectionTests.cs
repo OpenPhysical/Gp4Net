@@ -25,7 +25,7 @@ public class Scp02ImplementationDetectionTests
     [SetUp]
     public void SetUp()
     {
-        var keyDerivationService = new KeyDerivationService(NullLogger<KeyDerivationService>.Instance);
+        KeyDerivationService keyDerivationService = new KeyDerivationService(NullLogger<KeyDerivationService>.Instance);
         _keySet = Scp02KeySet.Create(
             new byte[16], // ENC key
             new byte[16], // MAC key 
@@ -44,17 +44,17 @@ public class Scp02ImplementationDetectionTests
     [TestCase(0x55, ScpImplementation.Scp02I55, "i=55 should be detected correctly")]
     [TestCase(0x75, ScpImplementation.Scp02I75, "i=75 should be detected correctly")]
     public void GetScp02Implementation_WithValidImplementation_ShouldReturnCorrectEnum(
-        byte implementationParameter, 
-        ScpImplementation expectedImplementation, 
+        byte implementationParameter,
+        ScpImplementation expectedImplementation,
         string description)
     {
         // Act
-        var result = Scp02Protocol.GetScp02Implementation(implementationParameter);
+        Result<ScpImplementation, SmartCardError> result = Scp02Protocol.GetScp02Implementation(implementationParameter);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue($"{description} - should succeed");
         _ = result.Value.Should().Be(expectedImplementation, description);
-        
+
         TestContext.Out.WriteLine($"✓ {description}");
         TestContext.Out.WriteLine($"Implementation parameter 0x{implementationParameter:X2} correctly detected as {expectedImplementation}");
     }
@@ -67,11 +67,11 @@ public class Scp02ImplementationDetectionTests
     [TestCase(0x50, "i=50 is not a valid SCP02 implementation")]
     [TestCase(0xFF, "i=FF is not a valid SCP02 implementation")]
     public void GetScp02Implementation_WithInvalidImplementation_ShouldFailHard(
-        byte invalidImplementationParameter, 
+        byte invalidImplementationParameter,
         string description)
     {
         // Act & Assert
-        var result = Scp02Protocol.GetScp02Implementation(invalidImplementationParameter);
+        Result<ScpImplementation, SmartCardError> result = Scp02Protocol.GetScp02Implementation(invalidImplementationParameter);
 
         _ = result.IsFailure.Should().BeTrue($"{description} - should fail with error");
         _ = result.Error.Should().BeOfType<UnsupportedImplementationError>();
@@ -79,7 +79,7 @@ public class Scp02ImplementationDetectionTests
             $"{description} - should fail with specific implementation error");
         _ = result.Error.Message.Should().Contain("00, 02, 04, 05, 15, 35, 55, 75",
             $"{description} - should provide guidance on valid implementations");
-        
+
         TestContext.Out.WriteLine($"✓ {description}");
         TestContext.Out.WriteLine($"Invalid implementation parameter 0x{invalidImplementationParameter:X2} correctly rejected with error: {result.Error.Message}");
     }
@@ -89,23 +89,23 @@ public class Scp02ImplementationDetectionTests
     {
         // Arrange - Real INITIALIZE UPDATE response from GP Pro CLR trace
         // From scp02_CLR.log line 24: 0000234555808320483901020011C284EC19415D17F4198ADCD5102D
-        var realClrResponse = Convert.FromHexString("0000234555808320483901020011C284EC19415D17F4198ADCD5102D");
-        var hostChallenge = Convert.FromHexString("719426F20E234840");
-        
-        var parseResult = InitializeUpdateResponse.Parse(realClrResponse);
+        byte[] realClrResponse = Convert.FromHexString("0000234555808320483901020011C284EC19415D17F4198ADCD5102D");
+        byte[] hostChallenge = Convert.FromHexString("719426F20E234840");
+
+        Result<InitializeUpdateResponse, SmartCardError> parseResult = InitializeUpdateResponse.Parse(realClrResponse);
         _ = parseResult.IsSuccess.Should().BeTrue("Real GP Pro response should parse successfully");
-        
+
         // The ScpParameter should be at byte 11 (0x02 in this case)
         TestContext.Out.WriteLine($"Parsed ScpParameter: 0x{parseResult.Value.ScpParameter:X2}");
-        
+
         // Act
-        var result = _protocol.ProcessInitializeUpdateResponse(parseResult.Value, hostChallenge);
+        Result<SecureChannelContext, SmartCardError> result = _protocol.ProcessInitializeUpdateResponse(parseResult.Value, hostChallenge);
 
         // Assert - Should not fail due to unknown implementation (will fail on cryptogram, but that's expected)
         _ = result.IsFailure.Should().BeTrue("Expected failure due to cryptogram mismatch with zero keys");
         _ = result.Error.Message.Should().NotContain("Unknown SCP02 implementation parameter",
             "Real GP Pro response should have recognizable implementation parameter");
-        
+
         TestContext.Out.WriteLine($"✓ Real GP Pro CLR trace correctly parsed implementation parameter");
     }
 
@@ -114,23 +114,23 @@ public class Scp02ImplementationDetectionTests
     {
         // Arrange - Real INITIALIZE UPDATE response from GP Pro MAC trace  
         // From scp02_MAC.log line 24: 00002345558083204839010200123E6DB216F8D58177E15BAA128DF9
-        var realMacResponse = Convert.FromHexString("00002345558083204839010200123E6DB216F8D58177E15BAA128DF9");
-        var hostChallenge = Convert.FromHexString("BD76C16D1D2E2D76");
-        
-        var parseResult = InitializeUpdateResponse.Parse(realMacResponse);
+        byte[] realMacResponse = Convert.FromHexString("00002345558083204839010200123E6DB216F8D58177E15BAA128DF9");
+        byte[] hostChallenge = Convert.FromHexString("BD76C16D1D2E2D76");
+
+        Result<InitializeUpdateResponse, SmartCardError> parseResult = InitializeUpdateResponse.Parse(realMacResponse);
         _ = parseResult.IsSuccess.Should().BeTrue("Real GP Pro response should parse successfully");
-        
+
         // The ScpParameter should be at byte 11 (0x02 in this case)
         TestContext.Out.WriteLine($"Parsed ScpParameter: 0x{parseResult.Value.ScpParameter:X2}");
-        
+
         // Act
-        var result = _protocol.ProcessInitializeUpdateResponse(parseResult.Value, hostChallenge);
+        Result<SecureChannelContext, SmartCardError> result = _protocol.ProcessInitializeUpdateResponse(parseResult.Value, hostChallenge);
 
         // Assert - Should not fail due to unknown implementation
         _ = result.IsFailure.Should().BeTrue("Expected failure due to cryptogram mismatch with zero keys");
         _ = result.Error.Message.Should().NotContain("Unknown SCP02 implementation parameter",
             "Real GP Pro response should have recognizable implementation parameter");
-        
+
         TestContext.Out.WriteLine($"✓ Real GP Pro MAC trace correctly parsed implementation parameter");
     }
 
@@ -139,27 +139,27 @@ public class Scp02ImplementationDetectionTests
     /// </summary>
     private static byte[] CreateScp02Response(byte implementationParameter)
     {
-        var response = new byte[28];
-        
+        byte[] response = new byte[28];
+
         // Key Diversification Data (10 bytes) - can be zeros for test
         Array.Clear(response, 0, 10);
-        
+
         // Key Version (1 byte)
         response[10] = 0x01;
-        
+
         // SCP ID + Implementation Parameter (1 byte) = 0x02 (SCP02) + implementation
         response[11] = implementationParameter;
-        
+
         // Sequence Counter (2 bytes)
         response[12] = 0x00;
         response[13] = 0x01;
-        
+
         // Card Challenge (6 bytes)
         Array.Copy(new byte[] { 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6 }, 0, response, 14, 6);
-        
+
         // Card Cryptogram (8 bytes) - will be wrong, causing cryptogram validation to fail
         Array.Copy(new byte[] { 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8 }, 0, response, 20, 8);
-        
+
         return response;
     }
 }

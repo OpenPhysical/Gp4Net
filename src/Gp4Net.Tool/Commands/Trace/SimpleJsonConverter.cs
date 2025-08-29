@@ -28,10 +28,10 @@ public class SimpleJsonConverter
 
     public async Task<string> ConvertToSimpleJson(string inputFile, bool includeDescriptions = true)
     {
-        var exchanges = await ParseGpProTrace(inputFile);
-        var operations = DetectOperations(exchanges);
-            
-        var traceData = new SimpleTraceData
+        List<(string Command, string Response, int ResponseTime)> exchanges = await ParseGpProTrace(inputFile);
+        Dictionary<string, OperationRange> operations = DetectOperations(exchanges);
+
+        SimpleTraceData traceData = new SimpleTraceData
         {
             Operations = operations,
             Exchanges = exchanges.Select((ex, idx) => new SimpleExchange
@@ -46,7 +46,7 @@ public class SimpleJsonConverter
         // Extract card info from exchanges
         ExtractCardInfo(traceData, exchanges);
 
-        var options = new JsonSerializerOptions
+        JsonSerializerOptions options = new JsonSerializerOptions
         {
             WriteIndented = true,
             DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
@@ -57,29 +57,29 @@ public class SimpleJsonConverter
 
     private static async Task<List<(string Command, string Response, int ResponseTime)>> ParseGpProTrace(string filename)
     {
-        var exchanges = new List<(string Command, string Response, int ResponseTime)>();
-        var commandPattern = new Regex(@"^A>> T=\d+ \([\d+]+\) ([0-9A-F\s]+)$");
-        var responsePattern = new Regex(@"^A<< \([\d+]+\) \((\d+)ms\) ([0-9A-F\s]+)$");
+        List<(string Command, string Response, int ResponseTime)> exchanges = [];
+        Regex commandPattern = new Regex(@"^A>> T=\d+ \([\d+]+\) ([0-9A-F\s]+)$");
+        Regex responsePattern = new Regex(@"^A<< \([\d+]+\) \((\d+)ms\) ([0-9A-F\s]+)$");
 
         string currentCommand = null;
-        var lines = await File.ReadAllLinesAsync(filename);
-            
-        foreach (var line in lines)
+        string[] lines = await File.ReadAllLinesAsync(filename);
+
+        foreach (string line in lines)
         {
-            var trimmed = line.Trim();
-                
-            var cmdMatch = commandPattern.Match(trimmed);
+            string trimmed = line.Trim();
+
+            Match cmdMatch = commandPattern.Match(trimmed);
             if (cmdMatch.Success)
             {
                 currentCommand = cmdMatch.Groups[1].Value.Replace(" ", "").ToUpper();
                 continue;
             }
 
-            var respMatch = responsePattern.Match(trimmed);
+            Match respMatch = responsePattern.Match(trimmed);
             if (respMatch.Success && currentCommand != null)
             {
-                var responseTime = int.Parse(respMatch.Groups[1].Value);
-                var response = respMatch.Groups[2].Value.Replace(" ", "").ToUpper();
+                int responseTime = int.Parse(respMatch.Groups[1].Value);
+                string response = respMatch.Groups[2].Value.Replace(" ", "").ToUpper();
                 exchanges.Add((currentCommand, response, responseTime));
                 currentCommand = null;
             }
@@ -90,14 +90,14 @@ public class SimpleJsonConverter
 
     private Dictionary<string, OperationRange> DetectOperations(List<(string Command, string Response, int ResponseTime)> exchanges)
     {
-        var operations = new Dictionary<string, OperationRange>();
-        var currentOp = "";
-        var opStart = 0;
+        Dictionary<string, OperationRange> operations = new Dictionary<string, OperationRange>();
+        string currentOp = "";
+        int opStart = 0;
 
-        for (var i = 0; i < exchanges.Count; i++)
+        for (int i = 0; i < exchanges.Count; i++)
         {
-            var desc = GetDescription(exchanges[i].Command);
-            var newOp = DetectOperationType(desc);
+            string desc = GetDescription(exchanges[i].Command);
+            string newOp = DetectOperationType(desc);
 
             if (newOp != currentOp)
             {
@@ -155,13 +155,13 @@ public class SimpleJsonConverter
             return "";
         }
 
-        var prefix = command.Substring(0, 4);
-        if (CommandNames.TryGetValue(prefix, out var name))
+        string prefix = command.Substring(0, 4);
+        if (CommandNames.TryGetValue(prefix, out string name))
         {
             // Special case for GET DATA
             if (prefix == "80CA" && command.Length >= 8)
             {
-                var tag = command.Substring(4, 4);
+                string tag = command.Substring(4, 4);
                 return tag switch
                 {
                     "9F7F" => "GET CPLC",
@@ -178,14 +178,14 @@ public class SimpleJsonConverter
 
     private static void ExtractCardInfo(SimpleTraceData data, List<(string Command, string Response, int ResponseTime)> exchanges)
     {
-        foreach (var ex in exchanges)
+        foreach ((string Command, string Response, int ResponseTime) ex in exchanges)
         {
             // Extract ISD AID from SELECT response
             if (ex.Command.StartsWith("00A4") && ex.Response.Contains("A000000151"))
             {
                 data.Metadata.IsdAid = "A000000151000000";
             }
-                
+
             // Extract card type from CPLC
             if (ex.Command.StartsWith("80CA9F7F") && ex.Response.StartsWith("9F7F"))
             {

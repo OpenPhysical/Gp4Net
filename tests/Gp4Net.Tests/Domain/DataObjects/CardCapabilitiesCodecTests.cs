@@ -6,6 +6,7 @@
 using System;
 using System.Linq;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.DataObjects;
 using NUnit.Framework;
@@ -64,7 +65,7 @@ public class CardCapabilitiesCodecTests
     [Test]
     public void Encode_Scp02OnlyCapabilities_ProducesExpectedFormat()
     {
-        var capabilities = new CardCapabilities
+        CardCapabilities capabilities = new CardCapabilities
         {
             CardRecognitionData = Convert.FromHexString("42"),
             CardManagementTypeAndVersion = [0x02, 0x00],
@@ -96,11 +97,11 @@ public class CardCapabilitiesCodecTests
             }
         };
 
-        var encodedResult = CardCapabilitiesCodec.Encode(capabilities);
+        Result<byte[], SmartCardError> encodedResult = CardCapabilitiesCodec.Encode(capabilities);
 
         // Assert encoding succeeded
         _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode CardCapabilities");
-        var encoded = encodedResult.Value;
+        byte[]? encoded = encodedResult.Value;
 
         _ = encoded.Should().NotBeEmpty();
         _ = encoded[0].Should().Be(0x66, "first byte should be tag 0x66");
@@ -110,7 +111,7 @@ public class CardCapabilitiesCodecTests
     [Test]
     public void Encode_DualProtocolCapabilities_ProducesExpectedFormat()
     {
-        var capabilities = new CardCapabilities
+        CardCapabilities capabilities = new CardCapabilities
         {
             CardRecognitionData = Convert.FromHexString("42"),
             CardManagementTypeAndVersion = [0x02, 0x00],
@@ -144,11 +145,11 @@ public class CardCapabilitiesCodecTests
             }
         };
 
-        var encodedResult = CardCapabilitiesCodec.Encode(capabilities);
+        Result<byte[], SmartCardError> encodedResult = CardCapabilitiesCodec.Encode(capabilities);
 
         // Assert encoding succeeded
         _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode CardCapabilities");
-        var encoded = encodedResult.Value;
+        byte[]? encoded = encodedResult.Value;
 
         _ = encoded.Should().NotBeEmpty();
         _ = encoded[0].Should().Be(0x66);
@@ -162,8 +163,8 @@ public class CardCapabilitiesCodecTests
     public void Decode_ValidScp02Capabilities_ReturnsCorrectStructure()
     {
         // Simple SCP02 capabilities for testing
-        var testData = new byte[]
-        {
+        byte[] testData =
+        [
             0x66, 0x14, // Tag and length
             0x06, 0x01, 0x42, // Card recognition OID
             0x60, 0x02, 0x02, 0x00, // Card management v2.0
@@ -171,19 +172,19 @@ public class CardCapabilitiesCodecTests
             0x64, 0x01, 0x02, // SCP02
             0x65, 0x01, 0x15, // i=15
             0x66, 0x02, 0x80, 0x10 // DES, 16 bytes
-        };
+        ];
 
-        var result = CardCapabilitiesCodec.Decode(testData);
+        Result<CardCapabilities, SmartCardError> result = CardCapabilitiesCodec.Decode(testData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var capabilities = result.Value;
+        CardCapabilities? capabilities = result.Value;
 
         _ = capabilities.CardRecognitionData.Should().BeEquivalentTo(new byte[] { 0x42 });
         _ = capabilities.CardManagementTypeAndVersion.Should().BeEquivalentTo(new byte[] { 0x02, 0x00 });
         _ = capabilities.CardIdentificationScheme.Should().Be(0x00);
         _ = capabilities.SecureChannelProtocols.Should().HaveCount(1);
 
-        var scp = capabilities.SecureChannelProtocols[0];
+        SecureChannelProtocol? scp = capabilities.SecureChannelProtocols[0];
         _ = scp.Protocol.Should().Be(0x02);
         _ = scp.Implementations.Should().HaveCount(1);
         _ = scp.Implementations[0].Implementation.Should().Be(0x15);
@@ -193,9 +194,9 @@ public class CardCapabilitiesCodecTests
     [Test]
     public void Decode_InvalidData_ReturnsError()
     {
-        var invalidData = new byte[] { 0x65, 0x02, 0x00, 0x00 }; // Wrong tag
+        byte[] invalidData = [0x65, 0x02, 0x00, 0x00]; // Wrong tag
 
-        var result = CardCapabilitiesCodec.Decode(invalidData);
+        Result<CardCapabilities, SmartCardError> result = CardCapabilitiesCodec.Decode(invalidData);
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
@@ -206,7 +207,7 @@ public class CardCapabilitiesCodecTests
     [Test]
     public void RoundTrip_PreservesData()
     {
-        var original = new CardCapabilities
+        CardCapabilities original = new CardCapabilities
         {
             CardRecognitionData = Convert.FromHexString("A000000151"),
             CardManagementTypeAndVersion = [0x02, 0x01],
@@ -245,13 +246,13 @@ public class CardCapabilitiesCodecTests
             }
         };
 
-        var encodedResult = CardCapabilitiesCodec.Encode(original);
+        Result<byte[], SmartCardError> encodedResult = CardCapabilitiesCodec.Encode(original);
         _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode CardCapabilities");
-        var encoded = encodedResult.Value;
-        var decoded = CardCapabilitiesCodec.Decode(encoded);
+        byte[]? encoded = encodedResult.Value;
+        Result<CardCapabilities, SmartCardError> decoded = CardCapabilitiesCodec.Decode(encoded);
 
         _ = decoded.IsSuccess.Should().BeTrue();
-        var result = decoded.Value;
+        CardCapabilities? result = decoded.Value;
 
         _ = result.CardRecognitionData.Should().BeEquivalentTo(original.CardRecognitionData);
         _ = result.CardManagementTypeAndVersion.Should().BeEquivalentTo(original.CardManagementTypeAndVersion);
@@ -259,13 +260,13 @@ public class CardCapabilitiesCodecTests
         _ = result.SecureChannelProtocols.Count.Should().Be(original.SecureChannelProtocols.Count);
 
         // Verify SCP02
-        var scp02 = result.SecureChannelProtocols.First(s => s.Protocol == 0x02);
+        SecureChannelProtocol? scp02 = result.SecureChannelProtocols.First(s => s.Protocol == 0x02);
         _ = scp02.Implementations.Should().HaveCount(2);
         _ = scp02.Implementations.Should().Contain(i => i.Implementation == 0x15);
         _ = scp02.Implementations.Should().Contain(i => i.Implementation == 0x55);
 
         // Verify SCP03
-        var scp03 = result.SecureChannelProtocols.First(s => s.Protocol == 0x03);
+        SecureChannelProtocol? scp03 = result.SecureChannelProtocols.First(s => s.Protocol == 0x03);
         _ = scp03.Implementations.Should().HaveCount(1);
         _ = scp03.Implementations[0].Implementation.Should().Be(0x70);
         _ = scp03.Implementations[0].KeyTypes.Should().BeEquivalentTo(new byte[] { 0x80, 0x20 });
@@ -274,13 +275,13 @@ public class CardCapabilitiesCodecTests
     [Test]
     public void Encode_EmptyCapabilities_ProducesMinimalFormat()
     {
-        var capabilities = new CardCapabilities();
+        CardCapabilities capabilities = new CardCapabilities();
 
-        var encodedResult = CardCapabilitiesCodec.Encode(capabilities);
+        Result<byte[], SmartCardError> encodedResult = CardCapabilitiesCodec.Encode(capabilities);
 
         // Assert encoding succeeded
         _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode CardCapabilities");
-        var encoded = encodedResult.Value;
+        byte[]? encoded = encodedResult.Value;
 
         _ = encoded.Should().NotBeEmpty();
         _ = encoded[0].Should().Be(0x66);
@@ -290,16 +291,16 @@ public class CardCapabilitiesCodecTests
     [Test]
     public void Decode_EmptyCapabilities_ReturnsEmptyStructure()
     {
-        var minimalData = new byte[]
-        {
+        byte[] minimalData =
+        [
             0x66, 0x03, // Tag with minimal length
             0x63, 0x01, 0x00 // Just card identification scheme
-        };
+        ];
 
-        var result = CardCapabilitiesCodec.Decode(minimalData);
+        Result<CardCapabilities, SmartCardError> result = CardCapabilitiesCodec.Decode(minimalData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var capabilities = result.Value;
+        CardCapabilities? capabilities = result.Value;
         _ = capabilities.SecureChannelProtocols.Should().BeEmpty();
         _ = capabilities.CardRecognitionData.Should().BeNull();
         _ = capabilities.CardIdentificationScheme.Should().Be(0x00);
@@ -308,17 +309,17 @@ public class CardCapabilitiesCodecTests
     [Test]
     public void Encode_WithoutCardManagementVersion_HandlesGracefully()
     {
-        var capabilities = new CardCapabilities
+        CardCapabilities capabilities = new CardCapabilities
         {
             CardRecognitionData = Convert.FromHexString("42"),
             CardIdentificationScheme = 0x00
         };
 
-        var encodedResult = CardCapabilitiesCodec.Encode(capabilities);
+        Result<byte[], SmartCardError> encodedResult = CardCapabilitiesCodec.Encode(capabilities);
 
         // Assert encoding succeeded
         _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode CardCapabilities");
-        var encoded = encodedResult.Value;
+        byte[]? encoded = encodedResult.Value;
 
         _ = encoded.Should().NotBeEmpty();
         _ = encoded[0].Should().Be(0x66);
@@ -329,8 +330,8 @@ public class CardCapabilitiesCodecTests
     [Test]
     public void Decode_WithMultipleImplementationsPerProtocol_ParsesCorrectly()
     {
-        var testData = new byte[]
-        {
+        byte[] testData =
+        [
             0x66, 0x17, // Tag and length (23 bytes)
             0x63, 0x01, 0x00, // Card identification scheme
             0x64, 0x01, 0x02, // SCP02
@@ -339,15 +340,15 @@ public class CardCapabilitiesCodecTests
             0x65, 0x01, 0x04, // i=04
             0x66, 0x02, 0x80, 0x10, // DES, 16 bytes
             0x65, 0x01, 0x1A // i=1A
-        };
+        ];
 
-        var result = CardCapabilitiesCodec.Decode(testData);
+        Result<CardCapabilities, SmartCardError> result = CardCapabilitiesCodec.Decode(testData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        var capabilities = result.Value;
+        CardCapabilities? capabilities = result.Value;
 
         _ = capabilities.SecureChannelProtocols.Should().HaveCount(1);
-        var scp = capabilities.SecureChannelProtocols[0];
+        SecureChannelProtocol? scp = capabilities.SecureChannelProtocols[0];
         _ = scp.Protocol.Should().Be(0x02);
         _ = scp.Implementations.Should().HaveCount(3);
         _ = scp.Implementations.Should().Contain(i => i.Implementation == 0x15);

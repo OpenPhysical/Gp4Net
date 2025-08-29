@@ -40,7 +40,7 @@ public static class OpidValidator
         }
 
         // Remove dashes and check minimum length
-        var digitsOnly = opid.Replace("-", "");
+        string digitsOnly = opid.Replace("-", "");
         if (digitsOnly.Length < 5)
         {
             return OpidValidationResult.Failure(
@@ -49,14 +49,14 @@ public static class OpidValidator
         }
 
         // Validate format indicator
-        if (!int.TryParse(digitsOnly.Substring(4, 1), out var formatIndicator))
+        if (!int.TryParse(digitsOnly.Substring(4, 1), out int formatIndicator))
         {
             return OpidValidationResult.Failure(
                 "Format indicator (5th digit) must be a valid digit"
             );
         }
 
-        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out var format))
+        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out OpidFormat format))
         {
             return OpidValidationResult.Failure(
                 $"Format indicator '{formatIndicator}' is not supported. Valid formats are 2-9"
@@ -64,7 +64,7 @@ public static class OpidValidator
         }
 
         // Check total digit count
-        var expectedCount = format.GetExpectedDigitCount();
+        int expectedCount = format.GetExpectedDigitCount();
         if (digitsOnly.Length != expectedCount)
         {
             return OpidValidationResult.Failure(
@@ -134,7 +134,7 @@ public static class OpidValidator
         }
 
         // Try to reconstruct and validate the full OPID
-        var fullDigits = iin + cin;
+        string fullDigits = iin + cin;
         if (fullDigits.Length < 5)
         {
             return OpidValidationResult.Failure(
@@ -142,19 +142,19 @@ public static class OpidValidator
             );
         }
 
-        if (!int.TryParse(fullDigits.Substring(4, 1), out var formatIndicator))
+        if (!int.TryParse(fullDigits.Substring(4, 1), out int formatIndicator))
         {
             return OpidValidationResult.Failure("Format indicator (5th digit) is not valid");
         }
 
-        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out var format))
+        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out OpidFormat format))
         {
             return OpidValidationResult.Failure(
                 $"Format indicator '{formatIndicator}' is not supported"
             );
         }
 
-        var expectedLength = format.GetExpectedDigitCount();
+        int expectedLength = format.GetExpectedDigitCount();
         if (fullDigits.Length != expectedLength)
         {
             return OpidValidationResult.Failure(
@@ -171,9 +171,9 @@ public static class OpidValidator
     /// <returns>A dictionary of format information.</returns>
     public static Dictionary<OpidFormat, string> GetSupportedFormats()
     {
-        var formats = new Dictionary<OpidFormat, string>();
+        Dictionary<OpidFormat, string> formats = new Dictionary<OpidFormat, string>();
 
-        foreach (var format in Enum.GetValues<OpidFormat>())
+        foreach (OpidFormat format in Enum.GetValues<OpidFormat>())
         {
             formats[format] =
                 $"{format.GetDescription()} ({format.GetExpectedDigitCount()} digits)";

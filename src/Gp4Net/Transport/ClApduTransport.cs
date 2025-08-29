@@ -86,7 +86,7 @@ public class ClApduTransport : IApduTransport
         );
 
         // Delegate to T=1 implementation with contactless wrapper
-        var contactlessCommand = new ContactlessCommandWrapper(command);
+        ContactlessCommandWrapper contactlessCommand = new ContactlessCommandWrapper(command);
         return await _t1Transport
             .TransmitAsync(contactlessCommand, channel, cancellationToken)
             .ConfigureAwait(false);

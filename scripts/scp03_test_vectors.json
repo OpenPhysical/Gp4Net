@@ -1,0 +1,129 @@
+{
+  "protocol": "SCP03",
+  "source": "scripts/SCP03_minimal.py",
+  "description": "SCP03 test vectors per GlobalPlatform SCP03 v1.1.1 and NIST SP800-108",
+  "generated_at": "2025-08-04T08:19:59.763984",
+  "key_derivation": {
+    "algorithm": "AES-CMAC KDF",
+    "standard": "NIST SP 800-108",
+    "constants": {
+      "s_enc": "0x04",
+      "s_mac": "0x06",
+      "s_rmac": "0x07",
+      "card_cryptogram": "0x00",
+      "host_cryptogram": "0x01"
+    }
+  },
+  "vectors": [
+    {
+      "name": "Sequential Pattern Keys",
+      "description": "SCP03 with sequential pattern keys for testing per NIST SP800-108",
+      "static_keys": {
+        "enc": "000102030405060708090A0B0C0D0E0F",
+        "mac": "101112131415161718191A1B1C1D1E1F",
+        "dek": "202122232425262728292A2B2C2D2E2F"
+      },
+      "challenges": {
+        "host": "0001020304050607",
+        "card": "08090A0B0C0D0E0F"
+      },
+      "expected_session_keys": {
+        "s_enc": "3619112820D79FF81146E6862151F521",
+        "s_mac": "E2B6C0D5DC55B27602375D7A983A2B3C",
+        "s_rmac": "35210536E8D79B6574FC6F8B6049630D"
+      },
+      "expected_cryptograms": {
+        "card": "6E3E560916763FAA",
+        "host": "C44D56DED351F5A4"
+      }
+    },
+    {
+      "name": "All-Zeros Baseline",
+      "description": "SCP03 baseline test with all-zero keys and challenges",
+      "static_keys": {
+        "enc": "00000000000000000000000000000000",
+        "mac": "00000000000000000000000000000000",
+        "dek": "00000000000000000000000000000000"
+      },
+      "challenges": {
+        "host": "0000000000000000",
+        "card": "0000000000000000"
+      },
+      "expected_session_keys": {
+        "s_enc": "D119A7CCA75F050B4F306C8E1E5CC554",
+        "s_mac": "78C41DD9D3CCFA9814C3B128FB0BB166",
+        "s_rmac": "B7698E3A4E8C6AE05E8D8C9A533CA83E"
+      },
+      "expected_cryptograms": {
+        "card": "D2119C5615BCA32C",
+        "host": "A6C824ACA566F3FD"
+      }
+    },
+    {
+      "name": "All 0xFF Keys and Challenges",
+      "description": "SCP03 test with all 0xFF pattern for boundary testing",
+      "static_keys": {
+        "enc": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        "mac": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        "dek": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+      },
+      "challenges": {
+        "host": "FFFFFFFFFFFFFFFF",
+        "card": "FFFFFFFFFFFFFFFF"
+      },
+      "expected_session_keys": {
+        "s_enc": "33DE3D6267494625C13A8E2B382372C5",
+        "s_mac": "D14E9907C8EA69F19EEE0BB1D678BE52",
+        "s_rmac": "F4F51A2E049B61F3C24AC5733BAC07E9"
+      },
+      "expected_cryptograms": {
+        "card": "93A22E96300255BC",
+        "host": "18117A53AF7F8382"
+      }
+    },
+    {
+      "name": "Mixed Patterns",
+      "description": "SCP03 test with mixed hex patterns",
+      "static_keys": {
+        "enc": "A0A1A2A3A4A5A6A7A8A9AAABACADAEAF",
+        "mac": "B0B1B2B3B4B5B6B7B8B9BABBBCBDBEBF",
+        "dek": "C0C1C2C3C4C5C6C7C8C9CACBCCCDCECF"
+      },
+      "challenges": {
+        "host": "0123456789ABCDEF",
+        "card": "FEDCBA9876543210"
+      },
+      "expected_session_keys": {
+        "s_enc": "4FE5C3B41D1241A27F1B41F16EC8962B",
+        "s_mac": "CA632CE8EB08EFC57B8606A06559A9C6",
+        "s_rmac": "48D57C3EC8EFCBB6631EC72330FB6428"
+      },
+      "expected_cryptograms": {
+        "card": "1EF309E33483B925",
+        "host": "0385E37C1B125747"
+      }
+    },
+    {
+      "name": "Alternating 0xAA/0x55",
+      "description": "SCP03 test with alternating bit patterns",
+      "static_keys": {
+        "enc": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "mac": "55555555555555555555555555555555",
+        "dek": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      "challenges": {
+        "host": "5555555555555555",
+        "card": "AAAAAAAAAAAAAAAA"
+      },
+      "expected_session_keys": {
+        "s_enc": "F1919F3ACF4A5E0CCD5BA7BE22FFFF41",
+        "s_mac": "E47B29F6A71006EBAE6F2908CBD6F6C3",
+        "s_rmac": "F28B86FCC30CE9030ECC9771AA050242"
+      },
+      "expected_cryptograms": {
+        "card": "B53C0785454B72FF",
+        "host": "627BADF61D353860"
+      }
+    }
+  ]
+}

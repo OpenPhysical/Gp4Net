@@ -86,7 +86,7 @@ public static class P71CommandProcessors
 
     private static ApduResponse CreateP71IdentifyResponse(CardConfiguration config)
     {
-        var data = new List<byte>();
+        List<byte> data = [];
 
         // DF28 tag + length (based on FIPS 140-2 spec)
         data.AddRange([0xDF, 0x28, 0x2A]);
@@ -117,7 +117,7 @@ public static class P71CommandProcessors
         if (command[0] != 0x80 || command[1] != 0xCA)
             return Result.Failure<ushort, SmartCardError>(SmartCardError.InstructionNotSupported());
 
-        var tag = (ushort)((command[2] << 8) | command[3]);
+        ushort tag = (ushort)((command[2] << 8) | command[3]);
         return Result.Success<ushort, SmartCardError>(tag);
     }
 
@@ -138,7 +138,7 @@ public static class P71CommandProcessors
         CardConfiguration config)
     {
         // Try to get from configuration first
-        if (config.DefaultDataObjects.TryGetValue(tag, out var data))
+        if (config.DefaultDataObjects.TryGetValue(tag, out byte[]? data))
             return Result.Success<byte[], SmartCardError>(data);
 
         // Handle P71-specific dynamic data objects
@@ -160,7 +160,7 @@ public static class P71CommandProcessors
     private static ApduResponse CreateP71CplcResponse(CardConfiguration config)
     {
         // P71 CPLC data from public traces
-        var cplcData = Convert.FromHexString(
+        byte[] cplcData = Convert.FromHexString(
             "4790D3214700000000002345558919204839000000000000000018649535383931390000000000000000");
             
         return new ApduResponse(cplcData, StatusWords.Success);
@@ -169,7 +169,7 @@ public static class P71CommandProcessors
     private static Result<byte[], SmartCardError> CreateP71CplcData()
     {
         // Enhanced P71 CPLC with proper structure
-        var cplcData = new List<byte>();
+        List<byte> cplcData = [];
             
         // IC Fabricator: 4790 (NXP)
         cplcData.AddRange([0x47, 0x90]);
@@ -214,7 +214,7 @@ public static class P71CommandProcessors
     private static Result<byte[], SmartCardError> CreateP71Capabilities()
     {
         // P71 capabilities from trace data
-        var capabilities = Convert.FromHexString(
+        byte[] capabilities = Convert.FromHexString(
             "6728A00D800103810500102060708201078103E5BEC082031E030083010284010285017B86010C87017B");
         return Result.Success<byte[], SmartCardError>(capabilities);
     }
@@ -222,7 +222,7 @@ public static class P71CommandProcessors
     private static Result<byte[], SmartCardError> CreateP71CardData()
     {
         // P71 card data from trace data showing GP and JavaCard support
-        var cardData = Convert.FromHexString(
+        byte[] cardData = Convert.FromHexString(
             "664D734B06072A864886FC6B01600B06092A864886FC6B020203630906072A864886FC6B03640B06092A864886FC6B040370650D060B2A864886FC6B0507020000660C060A2B060104012A026E0103");
         return Result.Success<byte[], SmartCardError>(cardData);
     }

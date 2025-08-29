@@ -20,38 +20,38 @@ public static class SecurityDomainDataParser
             return string.Empty;
         }
 
-        var result = new List<string>();
+        List<string> result = [];
 
         // Parse A5 tag (proprietary data)
         if (data.Length >= 2 && data[0] == 0xA5)
         {
-            var offset = 2; // Skip A5 and length
+            int offset = 2; // Skip A5 and length
 
             while (offset < data.Length)
             {
                 if (data[offset] == 0x9F && offset + 1 < data.Length)
                 {
-                    var tag = (data[offset] << 8) | data[offset + 1];
+                    int tag = (data[offset] << 8) | data[offset + 1];
                     if (offset + 2 < data.Length)
                     {
-                        var length = data[offset + 2];
+                        byte length = data[offset + 2];
                         if (offset + 3 + length <= data.Length)
                         {
-                            var value = data[(offset + 3)..(offset + 3 + length)];
+                            byte[] value = data[(offset + 3)..(offset + 3 + length)];
 
                             switch (tag)
                             {
                                 case 0x9F65: // Maximum APDU size
                                     if (length >= 2)
                                     {
-                                        var maxApdu = (value[0] << 8) | value[1];
+                                        int maxApdu = (value[0] << 8) | value[1];
                                         result.Add($"Max APDU: {maxApdu} bytes");
                                     }
                                     break;
                                 case 0x9F6E: // Application production lifecycle data
                                     if (length >= 1)
                                     {
-                                        var lifecycle = ParseLifecycleState(value[0]);
+                                        string lifecycle = ParseLifecycleState(value[0]);
                                         result.Add($"Lifecycle: {lifecycle}");
                                     }
                                     break;

@@ -16,11 +16,11 @@ public static class ApduCommandExtensions
     /// <returns>The APDU as a byte array.</returns>
     public static byte[] ToApdu(this IApduCommand command)
     {
-        var apdu = new List<byte> { command.Cla, command.Ins, command.P1, command.P2 };
+        List<byte> apdu = [command.Cla, command.Ins, command.P1, command.P2];
 
-        var data = command.Data;
-        var hasData = data is { Length: > 0 };
-        var expectsResponse = command.ExpectedResponseLength.HasValue;
+        byte[] data = command.Data;
+        bool hasData = data is { Length: > 0 };
+        bool expectsResponse = command.ExpectedResponseLength.HasValue;
 
         if (command.IsExtendedLength)
         {
@@ -40,7 +40,7 @@ public static class ApduCommandExtensions
                     apdu.Add(0x00); // Extended length indicator
                 }
 
-                var le = command.ExpectedResponseLength!.Value;
+                int le = command.ExpectedResponseLength!.Value;
                 if (le == 0)
                 {
                     // Maximum length
@@ -65,7 +65,7 @@ public static class ApduCommandExtensions
 
             if (expectsResponse)
             {
-                var le = command.ExpectedResponseLength!.Value;
+                int le = command.ExpectedResponseLength!.Value;
                 if (le == 0)
                 {
                     // Maximum length (256 bytes)
@@ -80,4 +80,12 @@ public static class ApduCommandExtensions
 
         return apdu.ToArray();
     }
+
+    /// <summary>
+    /// Converts an APDU command to a byte array (alias for ToApdu).
+    /// </summary>
+    /// <param name="command">The command to convert.</param>
+    /// <returns>The APDU as a byte array.</returns>
+    public static byte[] ToByteArray(this IApduCommand command)
+        => command.ToApdu();
 }

@@ -1,5 +1,7 @@
 using System;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using NUnit.Framework;
@@ -15,9 +17,9 @@ public class InitializeUpdateCommandTests
     {
         byte keyVersion = 0x01;
         byte keyId = 0x00;
-        var hostChallenge = Convert.FromHexString("0102030405060708");
+        byte[] hostChallenge = Convert.FromHexString("0102030405060708");
 
-        var result = InitializeUpdateCommand.Create(keyVersion, keyId, hostChallenge);
+        Result<InitializeUpdateCommand, SmartCardError> result = InitializeUpdateCommand.Create(keyVersion, keyId, hostChallenge);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.KeyVersion.Should().Be(keyVersion);
@@ -32,9 +34,9 @@ public class InitializeUpdateCommandTests
     [TestCase(16)]
     public void Create_WithInvalidHostChallengeLength_ReturnsFailureResult(int length)
     {
-        var hostChallenge = new byte[length];
+        byte[] hostChallenge = new byte[length];
 
-        var result = InitializeUpdateCommand.Create(0x01, 0x00, hostChallenge);
+        Result<InitializeUpdateCommand, SmartCardError> result = InitializeUpdateCommand.Create(0x01, 0x00, hostChallenge);
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Message.Should().Contain("Host challenge must be 8 bytes");
@@ -44,13 +46,13 @@ public class InitializeUpdateCommandTests
     [Test]
     public void GetApdu_ReturnsCorrectApduStructure()
     {
-        var keyVersion = (byte)0x01;
-        var keyId = (byte)0x00;
-        var hostChallenge = Convert.FromHexString("0102030405060708");
-        var result = InitializeUpdateCommand.Create(keyVersion, keyId, hostChallenge);
-        var command = result.Value;
+        byte keyVersion = (byte)0x01;
+        byte keyId = (byte)0x00;
+        byte[] hostChallenge = Convert.FromHexString("0102030405060708");
+        Result<InitializeUpdateCommand, SmartCardError> result = InitializeUpdateCommand.Create(keyVersion, keyId, hostChallenge);
+        InitializeUpdateCommand? command = result.Value;
 
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         _ = apdu[0].Should().Be(0x80); // CLA - GlobalPlatform
         _ = apdu[1].Should().Be(0x50); // INS - INITIALIZE UPDATE
@@ -64,14 +66,14 @@ public class InitializeUpdateCommandTests
     [Test]
     public void GetApdu_WithDifferentKeyVersions_SetsP1Correctly()
     {
-        var testCases = new byte[] { 0x00, 0x01, 0x7F, 0xFF };
-        var hostChallenge = Convert.FromHexString("0102030405060708");
+        byte[] testCases = [0x00, 0x01, 0x7F, 0xFF];
+        byte[] hostChallenge = Convert.FromHexString("0102030405060708");
 
-        foreach (var keyVersion in testCases)
+        foreach (byte keyVersion in testCases)
         {
-            var result = InitializeUpdateCommand.Create(keyVersion, 0x00, hostChallenge);
-            var command = result.Value;
-            var apdu = ApduBuilder.BuildApdu(command);
+            Result<InitializeUpdateCommand, SmartCardError> result = InitializeUpdateCommand.Create(keyVersion, 0x00, hostChallenge);
+            InitializeUpdateCommand? command = result.Value;
+            byte[]? apdu = ApduBuilder.BuildApdu(command);
 
             _ = apdu[2].Should().Be(keyVersion); // P1
         }
@@ -80,14 +82,14 @@ public class InitializeUpdateCommandTests
     [Test]
     public void GetApdu_WithDifferentKeyIds_SetsP2Correctly()
     {
-        var testCases = new byte[] { 0x00, 0x01, 0x02, 0xFF };
-        var hostChallenge = Convert.FromHexString("0102030405060708");
+        byte[] testCases = [0x00, 0x01, 0x02, 0xFF];
+        byte[] hostChallenge = Convert.FromHexString("0102030405060708");
 
-        foreach (var keyId in testCases)
+        foreach (byte keyId in testCases)
         {
-            var result = InitializeUpdateCommand.Create(0x01, keyId, hostChallenge);
-            var command = result.Value;
-            var apdu = ApduBuilder.BuildApdu(command);
+            Result<InitializeUpdateCommand, SmartCardError> result = InitializeUpdateCommand.Create(0x01, keyId, hostChallenge);
+            InitializeUpdateCommand? command = result.Value;
+            byte[]? apdu = ApduBuilder.BuildApdu(command);
 
             _ = apdu[3].Should().Be(keyId); // P2
         }
@@ -97,11 +99,11 @@ public class InitializeUpdateCommandTests
     public void GetApdu_ForScp03_UsesKeyId00()
     {
         // According to SCP03 spec, key identifier must be 0x00
-        var hostChallenge = Convert.FromHexString("0102030405060708");
-        var result = InitializeUpdateCommand.Create(0x01, 0x00, hostChallenge);
-        var command = result.Value;
+        byte[] hostChallenge = Convert.FromHexString("0102030405060708");
+        Result<InitializeUpdateCommand, SmartCardError> result = InitializeUpdateCommand.Create(0x01, 0x00, hostChallenge);
+        InitializeUpdateCommand? command = result.Value;
 
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         _ = apdu[3].Should().Be(0x00); // P2 must be 0x00 for SCP03
     }
@@ -109,11 +111,11 @@ public class InitializeUpdateCommandTests
     [Test]
     public void GetApdu_AlwaysReturnsNewArray()
     {
-        var result = InitializeUpdateCommand.Create(0x01, 0x00, new byte[8]);
-        var command = result.Value;
+        Result<InitializeUpdateCommand, SmartCardError> result = InitializeUpdateCommand.Create(0x01, 0x00, new byte[8]);
+        InitializeUpdateCommand? command = result.Value;
 
-        var apdu1 = ApduBuilder.BuildApdu(command);
-        var apdu2 = ApduBuilder.BuildApdu(command);
+        byte[]? apdu1 = ApduBuilder.BuildApdu(command);
+        byte[]? apdu2 = ApduBuilder.BuildApdu(command);
 
         _ = apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
         _ = apdu2.Should().BeEquivalentTo(apdu1); // But with same content
@@ -122,11 +124,11 @@ public class InitializeUpdateCommandTests
     [Test]
     public void ToString_ReturnsDescriptiveString()
     {
-        var hostChallenge = Convert.FromHexString("0102030405060708");
-        var result = InitializeUpdateCommand.Create(0x01, 0x00, hostChallenge);
-        var command = result.Value;
+        byte[] hostChallenge = Convert.FromHexString("0102030405060708");
+        Result<InitializeUpdateCommand, SmartCardError> result = InitializeUpdateCommand.Create(0x01, 0x00, hostChallenge);
+        InitializeUpdateCommand? command = result.Value;
 
-        var resultString = command.ToString();
+        string? resultString = command.ToString();
 
         _ = resultString.Should().Be("INITIALIZE UPDATE");
     }
@@ -144,9 +146,9 @@ public class InitializeUpdateCommandTests
         // Data: 8-byte host challenge
         // Le: 0x1C (28 bytes expected response)
 
-        var result = InitializeUpdateCommand.Create(0x01, 0x00, new byte[8]);
-        var command = result.Value;
-        var apdu = ApduBuilder.BuildApdu(command);
+        Result<InitializeUpdateCommand, SmartCardError> result = InitializeUpdateCommand.Create(0x01, 0x00, new byte[8]);
+        InitializeUpdateCommand? command = result.Value;
+        byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         _ = apdu.Length.Should().Be(14); // 5 header + 8 data + 1 Le
         _ = apdu[0].Should().Be(0x80); // CLA
@@ -158,8 +160,8 @@ public class InitializeUpdateCommandTests
     [Test]
     public void Properties_UseConstantsCorrectly()
     {
-        var result = InitializeUpdateCommand.Create(0x01, 0x00, new byte[8]);
-        var command = result.Value;
+        Result<InitializeUpdateCommand, SmartCardError> result = InitializeUpdateCommand.Create(0x01, 0x00, new byte[8]);
+        InitializeUpdateCommand? command = result.Value;
 
         _ = command.Cla.Should().Be(InitializeUpdateCommand.ClassByte);
         _ = command.Ins.Should().Be(InitializeUpdateCommand.InstructionByte);
@@ -170,9 +172,9 @@ public class InitializeUpdateCommandTests
     [Test]
     public void HostChallenge_NeverReturnsNull()
     {
-        var originalChallenge = new byte[8];
-        var result = InitializeUpdateCommand.Create(0x01, 0x00, originalChallenge);
-        var command = result.Value;
+        byte[] originalChallenge = new byte[8];
+        Result<InitializeUpdateCommand, SmartCardError> result = InitializeUpdateCommand.Create(0x01, 0x00, originalChallenge);
+        InitializeUpdateCommand? command = result.Value;
 
         _ = command.HostChallenge.Should().NotBeNull();
         _ = command.HostChallenge.Length.Should().Be(8);
@@ -181,9 +183,9 @@ public class InitializeUpdateCommandTests
     [Test]
     public void HostChallenge_IsImmutable()
     {
-        var originalChallenge = Convert.FromHexString("0102030405060708");
-        var result = InitializeUpdateCommand.Create(0x01, 0x00, originalChallenge);
-        var command = result.Value;
+        byte[] originalChallenge = Convert.FromHexString("0102030405060708");
+        Result<InitializeUpdateCommand, SmartCardError> result = InitializeUpdateCommand.Create(0x01, 0x00, originalChallenge);
+        InitializeUpdateCommand? command = result.Value;
 
         // Modify the original array
         originalChallenge[0] = 0xFF;

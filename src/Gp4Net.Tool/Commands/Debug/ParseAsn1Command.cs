@@ -1,8 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
-using Org.BouncyCastle.Asn1;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console;
@@ -48,18 +48,18 @@ public class ParseAsn1Command : IPipelineCommand<ParseAsn1Command.Settings>
             }
 
             // Clean up hex string
-            var cleanHex = settings.HexData.Replace(" ", "").Replace("-", "").Replace(":", "");
-                
+            string cleanHex = settings.HexData.Replace(" ", "").Replace("-", "").Replace(":", "");
+
             if (cleanHex.Length % 2 != 0)
             {
                 context.Display.Error("Hex string must have even number of characters");
                 return Task.FromResult(1);
             }
 
-            var data = Convert.FromHexString(cleanHex);
+            byte[] data = Convert.FromHexString(cleanHex);
 
             // Build semantic rows using pure functional composition
-            var semanticRows = Asn1TableBuilder.BuildAsn1Rows(
+            List<Asn1TableBuilder.Asn1Row> semanticRows = Asn1TableBuilder.BuildAsn1Rows(
                 data,
                 showBytes: settings.ShowBytes,
                 showOffsets: settings.ShowOffsets
@@ -69,7 +69,7 @@ public class ParseAsn1Command : IPipelineCommand<ParseAsn1Command.Settings>
             switch (settings.Format.ToLowerInvariant())
             {
                 case "json":
-                    var json = Asn1TableBuilder.ToJson(semanticRows);
+                    string json = Asn1TableBuilder.ToJson(semanticRows);
                     AnsiConsole.WriteLine(json);
                     break;
 

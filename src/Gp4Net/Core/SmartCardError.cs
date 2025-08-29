@@ -143,6 +143,14 @@ public record SmartCardError(
     }
 
     /// <summary>
+    /// Creates an error for data integrity failures.
+    /// </summary>
+    public static SmartCardError IntegrityError(string message)
+    {
+        return Simple("INTEGRITY_ERROR", message);
+    }
+
+    /// <summary>
     /// Creates an error for file not found (6A82).
     /// </summary>
     public static SmartCardError FileNotFound()
@@ -191,12 +199,20 @@ public record SmartCardError(
     }
 
     /// <summary>
+    /// Creates an error for cancelled operations.
+    /// </summary>
+    public static SmartCardError OperationCancelled(string message)
+    {
+        return Simple("OPERATION_CANCELLED", message);
+    }
+
+    /// <summary>
     /// Adds context information to the error.
     /// </summary>
     public SmartCardError WithContext(string key, object value)
     {
-        var currentContext = Context.GetValueOrDefault(new Dictionary<string, object>());
-        var newContext = new Dictionary<string, object>(currentContext)
+        IReadOnlyDictionary<string, object> currentContext = Context.GetValueOrDefault(new Dictionary<string, object>());
+        Dictionary<string, object> newContext = new Dictionary<string, object>(currentContext)
         {
             [key] = value
         };
@@ -208,9 +224,9 @@ public record SmartCardError(
     /// </summary>
     public SmartCardError WithContext(IReadOnlyDictionary<string, object> additionalContext)
     {
-        var currentContext = Context.GetValueOrDefault(new Dictionary<string, object>());
-        var newContext = new Dictionary<string, object>(currentContext);
-        foreach (var kvp in additionalContext)
+        IReadOnlyDictionary<string, object> currentContext = Context.GetValueOrDefault(new Dictionary<string, object>());
+        Dictionary<string, object> newContext = new Dictionary<string, object>(currentContext);
+        foreach (KeyValuePair<string, object> kvp in additionalContext)
         {
             newContext[kvp.Key] = kvp.Value;
         }

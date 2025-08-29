@@ -33,8 +33,8 @@ public static class KnownOids
     /// <returns>The description if known, otherwise None.</returns>
     public static Maybe<string> GetDescription(string oid)
     {
-        return OidDescriptions.TryGetValue(oid, out var description) 
-            ? Maybe<string>.From(description) 
+        return OidDescriptions.TryGetValue(oid, out string description)
+            ? Maybe<string>.From(description)
             : Maybe<string>.None;
     }
 

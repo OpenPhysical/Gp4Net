@@ -71,7 +71,7 @@ public record CommandResponse(
     /// </summary>
     public CommandResponse WithMetadata(string key, object value)
     {
-        var newMetadata = new Dictionary<string, object>(Metadata)
+        Dictionary<string, object> newMetadata = new Dictionary<string, object>(Metadata)
         {
             [key] = value
         };

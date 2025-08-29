@@ -23,7 +23,7 @@ public sealed class SecureKeyStorage : IDisposable
     {
         get
         {
-            return this._keyData?.Length ?? 0;
+            return _keyData?.Length ?? 0;
         }
     }
 
@@ -33,8 +33,8 @@ public sealed class SecureKeyStorage : IDisposable
     /// <param name="key">The key data to store securely.</param>
     public SecureKeyStorage(byte[] key)
     {
-        this._keyData = new byte[key.Length];
-        key.CopyTo(this._keyData, 0);
+        _keyData = new byte[key.Length];
+        key.CopyTo(_keyData, 0);
     }
 
     /// <summary>
@@ -43,15 +43,15 @@ public sealed class SecureKeyStorage : IDisposable
     /// <returns>A copy of the key data.</returns>
     public byte[] GetKeyCopy()
     {
-        this.ThrowIfDisposed();
+        ThrowIfDisposed();
 
-        if (this._keyData == null)
+        if (_keyData == null)
         {
             throw new InvalidOperationException("Key data is not available.");
         }
 
-        var copy = new byte[this._keyData.Length];
-        this._keyData.CopyTo(copy, 0);
+        byte[] copy = new byte[_keyData.Length];
+        _keyData.CopyTo(copy, 0);
         return copy;
     }
 
@@ -61,14 +61,14 @@ public sealed class SecureKeyStorage : IDisposable
     /// <param name="action">The action to execute with the key data.</param>
     public void UseKey(Action<byte[]> action)
     {
-        this.ThrowIfDisposed();
+        ThrowIfDisposed();
 
-        if (this._keyData == null)
+        if (_keyData == null)
         {
             throw new InvalidOperationException("Key data is not available.");
         }
 
-        action(this._keyData);
+        action(_keyData);
     }
 
     /// <summary>
@@ -79,14 +79,14 @@ public sealed class SecureKeyStorage : IDisposable
     /// <returns>The result of the function.</returns>
     public T UseKey<T>(Func<byte[], T> func)
     {
-        this.ThrowIfDisposed();
+        ThrowIfDisposed();
 
-        if (this._keyData == null)
+        if (_keyData == null)
         {
             throw new InvalidOperationException("Key data is not available.");
         }
 
-        return func(this._keyData);
+        return func(_keyData);
     }
 
     /// <summary>
@@ -94,10 +94,10 @@ public sealed class SecureKeyStorage : IDisposable
     /// </summary>
     public void Clear()
     {
-        if (this._keyData != null)
+        if (_keyData != null)
         {
-            Arrays.Fill(this._keyData, 0);
-            this._keyData = null;
+            Arrays.Fill(_keyData, 0);
+            _keyData = null;
         }
     }
 
@@ -106,16 +106,16 @@ public sealed class SecureKeyStorage : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (!this._isDisposed)
+        if (!_isDisposed)
         {
-            this.Clear();
-            this._isDisposed = true;
+            Clear();
+            _isDisposed = true;
         }
     }
 
     private void ThrowIfDisposed()
     {
-        ObjectDisposedException.ThrowIf(this._isDisposed, nameof(SecureKeyStorage));
+        ObjectDisposedException.ThrowIf(_isDisposed, nameof(SecureKeyStorage));
     }
 }
 
@@ -139,10 +139,10 @@ public sealed class SecureSessionKeys : IDisposable
     /// <param name="dek">The data encryption key (optional).</param>
     public SecureSessionKeys(byte[] sEnc, byte[] sMac, byte[] sRMac, byte[] dek = null)
     {
-        this._sEnc = new SecureKeyStorage(sEnc);
-        this._sMac = new SecureKeyStorage(sMac);
-        this._sRMac = new SecureKeyStorage(sRMac);
-        this._dek = dek != null ? new SecureKeyStorage(dek) : null;
+        _sEnc = new SecureKeyStorage(sEnc);
+        _sMac = new SecureKeyStorage(sMac);
+        _sRMac = new SecureKeyStorage(sRMac);
+        _dek = dek != null ? new SecureKeyStorage(dek) : null;
     }
 
     /// <summary>
@@ -151,8 +151,8 @@ public sealed class SecureSessionKeys : IDisposable
     /// <param name="action">The action to execute with the key.</param>
     public void UseSEnc(Action<byte[]> action)
     {
-        this.ThrowIfDisposed();
-        this._sEnc.UseKey(action);
+        ThrowIfDisposed();
+        _sEnc.UseKey(action);
     }
 
     /// <summary>
@@ -163,8 +163,8 @@ public sealed class SecureSessionKeys : IDisposable
     /// <returns>The result of the function.</returns>
     public T UseSEnc<T>(Func<byte[], T> func)
     {
-        this.ThrowIfDisposed();
-        return this._sEnc.UseKey(func);
+        ThrowIfDisposed();
+        return _sEnc.UseKey(func);
     }
 
     /// <summary>
@@ -173,8 +173,8 @@ public sealed class SecureSessionKeys : IDisposable
     /// <param name="action">The action to execute with the key.</param>
     public void UseSMac(Action<byte[]> action)
     {
-        this.ThrowIfDisposed();
-        this._sMac.UseKey(action);
+        ThrowIfDisposed();
+        _sMac.UseKey(action);
     }
 
     /// <summary>
@@ -185,8 +185,8 @@ public sealed class SecureSessionKeys : IDisposable
     /// <returns>The result of the function.</returns>
     public T UseSMac<T>(Func<byte[], T> func)
     {
-        this.ThrowIfDisposed();
-        return this._sMac.UseKey(func);
+        ThrowIfDisposed();
+        return _sMac.UseKey(func);
     }
 
     /// <summary>
@@ -195,8 +195,8 @@ public sealed class SecureSessionKeys : IDisposable
     /// <param name="action">The action to execute with the key.</param>
     public void UseSrMac(Action<byte[]> action)
     {
-        this.ThrowIfDisposed();
-        this._sRMac.UseKey(action);
+        ThrowIfDisposed();
+        _sRMac.UseKey(action);
     }
 
     /// <summary>
@@ -207,8 +207,8 @@ public sealed class SecureSessionKeys : IDisposable
     /// <returns>The result of the function.</returns>
     public T UseSrMac<T>(Func<byte[], T> func)
     {
-        this.ThrowIfDisposed();
-        return this._sRMac.UseKey(func);
+        ThrowIfDisposed();
+        return _sRMac.UseKey(func);
     }
 
     /// <summary>
@@ -217,10 +217,10 @@ public sealed class SecureSessionKeys : IDisposable
     /// <param name="action">The action to execute with the key.</param>
     public void UseDek(Action<byte[]> action)
     {
-        this.ThrowIfDisposed();
-        if (this._dek != null)
+        ThrowIfDisposed();
+        if (_dek != null)
         {
-            this._dek.UseKey(key => action(key));
+            _dek.UseKey(key => action(key));
         }
         else
         {
@@ -234,12 +234,12 @@ public sealed class SecureSessionKeys : IDisposable
     /// <returns>A SessionKeys object with copies of the keys.</returns>
     public SessionKeys ToSessionKeys()
     {
-        this.ThrowIfDisposed();
+        ThrowIfDisposed();
         return new SessionKeys(
-            this._sEnc.GetKeyCopy(),
-            this._sMac.GetKeyCopy(),
-            this._sRMac.GetKeyCopy(),
-            this._dek?.GetKeyCopy()
+            _sEnc.GetKeyCopy(),
+            _sMac.GetKeyCopy(),
+            _sRMac.GetKeyCopy(),
+            _dek?.GetKeyCopy()
         );
     }
 
@@ -248,18 +248,18 @@ public sealed class SecureSessionKeys : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (!this._isDisposed)
+        if (!_isDisposed)
         {
-            this._sEnc?.Dispose();
-            this._sMac?.Dispose();
-            this._sRMac?.Dispose();
-            this._dek?.Dispose();
-            this._isDisposed = true;
+            _sEnc?.Dispose();
+            _sMac?.Dispose();
+            _sRMac?.Dispose();
+            _dek?.Dispose();
+            _isDisposed = true;
         }
     }
 
     private void ThrowIfDisposed()
     {
-        ObjectDisposedException.ThrowIf(this._isDisposed, nameof(SecureSessionKeys));
+        ObjectDisposedException.ThrowIf(_isDisposed, nameof(SecureSessionKeys));
     }
 }

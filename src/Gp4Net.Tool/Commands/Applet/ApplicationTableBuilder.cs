@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using CSharpFunctionalExtensions;
 using Gp4Net.Domain;
+using Gp4Net.Tool.Common;
 
 namespace Gp4Net.Tool.Commands.Applet;
 
@@ -14,12 +15,11 @@ namespace Gp4Net.Tool.Commands.Applet;
 /// </summary>
 public static class ApplicationTableBuilder
 {
-    #region Semantic Row Types
 
     /// <summary>
-    /// Base type for all application display rows, enabling type-safe UI composition.
+    /// Base type for all application display rows, inheriting from semantic row system.
     /// </summary>
-    public abstract record ApplicationRow;
+    public abstract record ApplicationRow : SemanticTableBuilder.SemanticRow;
 
     /// <summary>
     /// Row displaying application information with standard columns.
@@ -34,21 +34,19 @@ public static class ApplicationTableBuilder
     ) : ApplicationRow;
 
     /// <summary>
-    /// Header row indicating the start of a section.
+    /// Header row for application sections.
     /// </summary>
     public record SectionHeaderRow(string Title) : ApplicationRow;
 
     /// <summary>
-    /// Summary information row.
+    /// Summary information row for application listing.
     /// </summary>
     public record SummaryRow(string Message) : ApplicationRow;
 
     /// <summary>
-    /// Warning or informational message row.
+    /// Warning or informational message row for applications.
     /// </summary>
     public record InfoRow(string Message, string Severity = "info") : ApplicationRow;
-
-    #endregion
 
     /// <summary>
     /// Main entry point to build all application information rows using functional composition.
@@ -65,7 +63,7 @@ public static class ApplicationTableBuilder
         bool showSummary = false,
         string filter = null)
     {
-        var filteredApps = string.IsNullOrEmpty(filter) || filter == "all"
+        IReadOnlyList<ApplicationInfo> filteredApps = string.IsNullOrEmpty(filter) || filter == "all"
             ? applications
             : FilterApplications(applications, filter);
 
@@ -76,16 +74,16 @@ public static class ApplicationTableBuilder
         }
 
         // Group applications by type for better organization
-        var grouped = filteredApps.GroupBy(a => a.Type).OrderBy(g => GetTypePriority(g.Key));
+        IOrderedEnumerable<IGrouping<ApplicationType, ApplicationInfo>> grouped = filteredApps.GroupBy(a => a.Type).OrderBy(g => GetTypePriority(g.Key));
 
-        foreach (var group in grouped)
+        foreach (IGrouping<ApplicationType, ApplicationInfo> group in grouped)
         {
             if (grouped.Count() > 1)
             {
                 yield return new SectionHeaderRow(GetTypeDisplayName(group.Key) + "s");
             }
 
-            foreach (var app in group.OrderBy(a => Convert.ToHexString(a.Aid)))
+            foreach (ApplicationInfo app in group.OrderBy(a => Convert.ToHexString(a.Aid)))
             {
                 yield return BuildApplicationDataRow(app, showExtended);
             }
@@ -139,10 +137,7 @@ public static class ApplicationTableBuilder
     /// </summary>
     public static string ToCsv(IReadOnlyList<ApplicationInfo> applications)
     {
-        var lines = new List<string>
-        {
-            "Type,AID,State,Privileges,Version,AssociatedSD"
-        };
+        List<string> lines = ["Type,AID,State,Privileges,Version,AssociatedSD"];
 
         lines.AddRange(applications.Select(app =>
             $"{app.Type}," +
@@ -155,8 +150,6 @@ public static class ApplicationTableBuilder
 
         return string.Join(Environment.NewLine, lines);
     }
-
-    #region Pure Helper Functions
 
     /// <summary>
     /// Filters applications based on filter criteria using pure functions.
@@ -172,7 +165,7 @@ public static class ApplicationTableBuilder
             "selectable" => applications.Where(a => a.LifecycleState == LifecycleState.Selectable).ToList(),
             "locked" => applications.Where(a => a.LifecycleState == LifecycleState.Locked).ToList(),
             "installed" => applications.Where(a => a.LifecycleState == LifecycleState.Installed).ToList(),
-            _ when filter.Length >= 6 => applications.Where(a => 
+            _ when filter.Length >= 6 => applications.Where(a =>
                 Convert.ToHexString(a.Aid).Contains(filter.ToUpperInvariant(), StringComparison.OrdinalIgnoreCase)).ToList(),
             _ => applications
         };
@@ -260,5 +253,4 @@ public static class ApplicationTableBuilder
         };
     }
 
-    #endregion
 }

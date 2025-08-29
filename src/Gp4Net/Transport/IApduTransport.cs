@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -111,6 +113,7 @@ public interface IApduCommand
     /// </summary>
     bool IsExtendedLength { get; }
 }
+
 
 /// <summary>
 /// Represents an APDU response.

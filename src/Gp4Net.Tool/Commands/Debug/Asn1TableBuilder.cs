@@ -13,7 +13,6 @@ namespace Gp4Net.Tool.Commands.Debug;
 /// </summary>
 public static class Asn1TableBuilder
 {
-    #region Semantic Row Types
 
     /// <summary>
     /// Base type for all ASN.1 display rows, enabling type-safe UI composition.
@@ -67,8 +66,6 @@ public static class Asn1TableBuilder
     /// </summary>
     public record InfoRow(string Message, string Severity = "info") : Asn1Row;
 
-    #endregion
-
     /// <summary>
     /// Main entry point to build ASN.1 parsing rows using functional composition.
     /// Returns semantic row types that can be rendered by any UI framework.
@@ -91,14 +88,14 @@ public static class Asn1TableBuilder
         yield return new SummaryRow($"Parsing {data.Length} bytes of ASN.1 data:");
         yield return new InfoRow($"Raw hex: {Convert.ToHexString(data)}", "info");
 
-        var parseResult = TryParseAsn1(data);
+        (Asn1Object asn1Object, string error) parseResult = TryParseAsn1(data);
         if (parseResult.asn1Object == null)
         {
             yield return new InfoRow($"Error parsing ASN.1 data: {parseResult.error}", "error");
             yield break;
         }
 
-        foreach (var row in BuildAsn1ObjectRows(parseResult.asn1Object, 0, 0, showBytes, showOffsets))
+        foreach (Asn1Row row in BuildAsn1ObjectRows(parseResult.asn1Object, 0, 0, showBytes, showOffsets))
         {
             yield return row;
         }
@@ -114,13 +111,13 @@ public static class Asn1TableBuilder
         bool showBytes,
         bool showOffsets)
     {
-        var typeInfo = GetAsn1TypeInfo(obj);
-        var offsetStr = showOffsets ? $"@{offset:X4}" : "";
-        
-        var rawBytes = Maybe<string>.None;
+        string typeInfo = GetAsn1TypeInfo(obj);
+        string offsetStr = showOffsets ? $"@{offset:X4}" : "";
+
+        Maybe<string> rawBytes = Maybe<string>.None;
         if (showBytes && obj.GetEncoded() != null)
         {
-            var encoded = obj.GetEncoded();
+            byte[] encoded = obj.GetEncoded();
             rawBytes = Maybe<string>.From($"Bytes: {Convert.ToHexString(encoded)}");
         }
 
@@ -133,7 +130,7 @@ public static class Asn1TableBuilder
         );
 
         // Handle different ASN.1 types
-        foreach (var childRow in GetAsn1ChildRows(obj, depth, offset, showBytes, showOffsets))
+        foreach (Asn1Row childRow in GetAsn1ChildRows(obj, depth, offset, showBytes, showOffsets))
         {
             yield return childRow;
         }
@@ -153,11 +150,11 @@ public static class Asn1TableBuilder
         {
             case Asn1Sequence sequence:
                 yield return new ContainerHeaderRow(depth, "Sequence", sequence.Count);
-                var seqOffset = offset + GetHeaderLength(obj);
-                for (var i = 0; i < sequence.Count; i++)
+                int seqOffset = offset + GetHeaderLength(obj);
+                for (int i = 0; i < sequence.Count; i++)
                 {
                     yield return new ElementHeaderRow(depth + 1, i, $"Element {i}:");
-                    foreach (var row in BuildAsn1ObjectRows(sequence[i].ToAsn1Object(), depth + 2, seqOffset, showBytes, showOffsets))
+                    foreach (Asn1Row row in BuildAsn1ObjectRows(sequence[i].ToAsn1Object(), depth + 2, seqOffset, showBytes, showOffsets))
                     {
                         yield return row;
                     }
@@ -167,11 +164,11 @@ public static class Asn1TableBuilder
 
             case Asn1Set set:
                 yield return new ContainerHeaderRow(depth, "Set", set.Count);
-                var setOffset = offset + GetHeaderLength(obj);
-                for (var i = 0; i < set.Count; i++)
+                int setOffset = offset + GetHeaderLength(obj);
+                for (int i = 0; i < set.Count; i++)
                 {
                     yield return new ElementHeaderRow(depth + 1, i, $"Element {i}:");
-                    foreach (var row in BuildAsn1ObjectRows(set[i].ToAsn1Object(), depth + 2, setOffset, showBytes, showOffsets))
+                    foreach (Asn1Row row in BuildAsn1ObjectRows(set[i].ToAsn1Object(), depth + 2, setOffset, showBytes, showOffsets))
                     {
                         yield return row;
                     }
@@ -180,16 +177,16 @@ public static class Asn1TableBuilder
                 break;
 
             case DerOctetString octetString:
-                var octets = octetString.GetOctets();
-                
+                byte[] octets = octetString.GetOctets();
+
                 // Try to parse nested ASN.1 if it looks like it
                 if (octets.Length > 2 && IsLikelyAsn1(octets))
                 {
-                    var nestedResult = TryParseAsn1(octets);
+                    (Asn1Object asn1Object, string error) nestedResult = TryParseAsn1(octets);
                     if (nestedResult.asn1Object != null)
                     {
                         yield return new NestedAsn1HeaderRow(depth + 1);
-                        foreach (var row in BuildAsn1ObjectRows(nestedResult.asn1Object, depth + 2, 0, showBytes, showOffsets))
+                        foreach (Asn1Row row in BuildAsn1ObjectRows(nestedResult.asn1Object, depth + 2, 0, showBytes, showOffsets))
                         {
                             yield return row;
                         }
@@ -222,13 +219,13 @@ public static class Asn1TableBuilder
     /// </summary>
     public static string ToJson(IEnumerable<Asn1Row> rows)
     {
-        var data = new List<object>();
-        
-        foreach (var row in rows)
+        List<object> data = [];
+
+        foreach (Asn1Row row in rows)
         {
             object item = row switch
             {
-                Asn1TableBuilder.Asn1DataRow(var depth, var offset, var typeInfo, var value, var rawBytes) => new
+                Asn1DataRow(var depth, var offset, var typeInfo, var value, var rawBytes) => new
                 {
                     type = "data",
                     depth,
@@ -237,31 +234,31 @@ public static class Asn1TableBuilder
                     value = value.GetValueOrDefault(""),
                     rawBytes = rawBytes.GetValueOrDefault("")
                 },
-                Asn1TableBuilder.ContainerHeaderRow(var depth, var containerType, var elementCount) => new
+                ContainerHeaderRow(var depth, var containerType, var elementCount) => new
                 {
                     type = "container",
                     depth,
                     containerType,
                     elementCount
                 },
-                Asn1TableBuilder.ElementHeaderRow(var depth, var elementIndex, var description) => new
+                ElementHeaderRow(var depth, var elementIndex, var description) => new
                 {
                     type = "element",
                     depth,
                     elementIndex,
                     description
                 },
-                Asn1TableBuilder.NestedAsn1HeaderRow(var depth, var message) => new
+                NestedAsn1HeaderRow(var depth, var message) => new
                 {
                     type = "nested",
                     depth,
                     message
                 },
-                Asn1TableBuilder.SummaryRow(var message) => new { type = "summary", message },
-                Asn1TableBuilder.InfoRow(var message, var severity) => new { type = "info", message, severity },
+                SummaryRow(var message) => new { type = "summary", message },
+                InfoRow(var message, var severity) => new { type = "info", message, severity },
                 _ => new { type = "unknown", data = row.ToString() }
             };
-            
+
             data.Add(item);
         }
 
@@ -275,7 +272,7 @@ public static class Asn1TableBuilder
     {
         try
         {
-            var asn1Object = Asn1Object.FromByteArray(data);
+            Asn1Object asn1Object = Asn1Object.FromByteArray(data);
             return (asn1Object, null);
         }
         catch (Exception ex)
@@ -284,35 +281,33 @@ public static class Asn1TableBuilder
         }
     }
 
-    #region Pure Helper Functions
-
     /// <summary>
     /// Gets type information for an ASN.1 object.
     /// </summary>
     private static string GetAsn1TypeInfo(Asn1Object obj)
     {
-        var encoded = obj.GetEncoded();
+        byte[] encoded = obj.GetEncoded();
         if (encoded == null || encoded.Length == 0)
         {
             return "Invalid ASN.1 object";
         }
 
-        var tag = encoded[0];
-        var tagClass = (tag & 0xC0) >> 6;
-        var constructed = (tag & 0x20) != 0;
-        var tagNumber = tag & 0x1F;
+        byte tag = encoded[0];
+        int tagClass = (tag & 0xC0) >> 6;
+        bool constructed = (tag & 0x20) != 0;
+        int tagNumber = tag & 0x1F;
 
-        var classStr = tagClass switch
+        string classStr = tagClass switch
         {
             0 => "Universal",
-            1 => "Application", 
+            1 => "Application",
             2 => "Context",
             3 => "Private",
             _ => "Unknown"
         };
 
-        var typeStr = obj.GetType().Name;
-        var lengthInfo = GetLengthInfo(encoded);
+        string typeStr = obj.GetType().Name;
+        string lengthInfo = GetLengthInfo(encoded);
 
         return $"{classStr} {typeStr} (tag={tag:X2}, constructed={constructed}, length={lengthInfo})";
     }
@@ -327,21 +322,21 @@ public static class Asn1TableBuilder
             return "?";
         }
 
-        var lengthByte = encoded[1];
+        byte lengthByte = encoded[1];
         if ((lengthByte & 0x80) == 0)
         {
             return lengthByte.ToString();
         }
         else
         {
-            var lengthBytes = lengthByte & 0x7F;
+            int lengthBytes = lengthByte & 0x7F;
             if (lengthBytes == 0)
             {
                 return "indefinite";
             }
 
-            var length = 0;
-            for (var i = 0; i < lengthBytes && i + 2 < encoded.Length; i++)
+            int length = 0;
+            for (int i = 0; i < lengthBytes && i + 2 < encoded.Length; i++)
             {
                 length = (length << 8) | encoded[i + 2];
             }
@@ -354,13 +349,13 @@ public static class Asn1TableBuilder
     /// </summary>
     private static int GetHeaderLength(Asn1Object obj)
     {
-        var encoded = obj.GetEncoded();
+        byte[] encoded = obj.GetEncoded();
         if (encoded.Length < 2)
         {
             return 2;
         }
 
-        var lengthByte = encoded[1];
+        byte lengthByte = encoded[1];
         if ((lengthByte & 0x80) == 0)
         {
             return 2; // Tag + short length
@@ -381,9 +376,9 @@ public static class Asn1TableBuilder
             return false;
         }
 
-        var tag = data[0];
-        var length = data[1];
-            
+        byte tag = data[0];
+        byte length = data[1];
+
         // Check if tag looks reasonable (common ASN.1 tags)
         if ((tag & 0x1F) > 30)
         {
@@ -399,10 +394,9 @@ public static class Asn1TableBuilder
         else
         {
             // Long form
-            var lengthBytes = length & 0x7F;
+            int lengthBytes = length & 0x7F;
             return lengthBytes is > 0 and <= 4 && data.Length >= lengthBytes + 2;
         }
     }
 
-    #endregion
 }

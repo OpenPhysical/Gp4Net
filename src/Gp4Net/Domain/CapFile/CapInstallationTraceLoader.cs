@@ -5,8 +5,6 @@ using System.Linq;
 using System.Text.Json;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Domain.Commands;
-using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.CapFile;
@@ -72,7 +70,7 @@ public static class CapInstallationTraceLoader
     {
         return Result.Try(() =>
         {
-            var content = File.ReadAllText(filePath);
+            string content = File.ReadAllText(filePath);
             return string.IsNullOrWhiteSpace(content)
                 ? Result.Failure<string, SmartCardError>(SmartCardError.InvalidData("Trace file is empty"))
                 : Result.Success<string, SmartCardError>(content);
@@ -97,27 +95,27 @@ public static class CapInstallationTraceLoader
 
     private static Result<TraceMetadata, SmartCardError> ExtractMetadata(JsonElement root)
     {
-        if (!root.TryGetProperty("metadata", out var metadataElement))
+        if (!root.TryGetProperty("metadata", out JsonElement metadataElement))
         {
             return Result.Failure<TraceMetadata, SmartCardError>(
                 SmartCardError.InvalidData("Missing metadata section in trace"));
         }
 
-        if (!metadataElement.TryGetProperty("card", out var cardElement))
+        if (!metadataElement.TryGetProperty("card", out JsonElement cardElement))
         {
             return Result.Failure<TraceMetadata, SmartCardError>(
                 SmartCardError.InvalidData("Missing card metadata in trace"));
         }
 
-        var atr = cardElement.TryGetProperty("atr", out var atrElement) 
+        string atr = cardElement.TryGetProperty("atr", out JsonElement atrElement)
             ? atrElement.GetString() ?? "UNKNOWN"
             : "UNKNOWN";
 
-        var isdAid = cardElement.TryGetProperty("isd_aid", out var isdElement)
+        string isdAid = cardElement.TryGetProperty("isd_aid", out JsonElement isdElement)
             ? isdElement.GetString() ?? "A000000151000000"
             : "A000000151000000";
 
-        var cardType = cardElement.TryGetProperty("card_type", out var typeElement)
+        string cardType = cardElement.TryGetProperty("card_type", out JsonElement typeElement)
             ? typeElement.GetString() ?? "UNKNOWN"
             : "UNKNOWN";
 
@@ -127,19 +125,20 @@ public static class CapInstallationTraceLoader
 
     private static Result<ImmutableArray<TraceExchange>, SmartCardError> ExtractExchanges(JsonElement root)
     {
-        if (!root.TryGetProperty("exchanges", out var exchangesElement))
+        if (!root.TryGetProperty("exchanges", out JsonElement exchangesElement))
         {
             return Result.Failure<ImmutableArray<TraceExchange>, SmartCardError>(
                 SmartCardError.InvalidData("Missing exchanges section in trace"));
         }
 
-        var exchanges = ImmutableArray.CreateBuilder<TraceExchange>();
+        ImmutableArray<TraceExchange>.Builder exchanges = ImmutableArray.CreateBuilder<TraceExchange>();
 
         return exchangesElement.EnumerateArray()
             .Select(ParseExchange)
             .Aggregate(Result.Success<ImmutableArray<TraceExchange>.Builder, SmartCardError>(exchanges),
                 (acc, exchangeResult) => acc.Bind(builder =>
-                    exchangeResult.Map(exchange => {
+                    exchangeResult.Map(exchange =>
+                    {
                         builder.Add(exchange);
                         return builder;
                     })))
@@ -150,27 +149,27 @@ public static class CapInstallationTraceLoader
     {
         return Result.Try(() =>
         {
-            var index = exchangeElement.TryGetProperty("index", out var indexElement) 
-                ? indexElement.GetInt32() 
+            int index = exchangeElement.TryGetProperty("index", out JsonElement indexElement)
+                ? indexElement.GetInt32()
                 : 0;
 
-            var command = exchangeElement.TryGetProperty("command", out var cmdElement)
+            string command = exchangeElement.TryGetProperty("command", out JsonElement cmdElement)
                 ? cmdElement.GetString() ?? ""
                 : "";
 
-            var response = exchangeElement.TryGetProperty("response", out var respElement)
+            string response = exchangeElement.TryGetProperty("response", out JsonElement respElement)
                 ? respElement.GetString() ?? ""
                 : "";
 
-            var description = exchangeElement.TryGetProperty("description", out var descElement)
+            string description = exchangeElement.TryGetProperty("description", out JsonElement descElement)
                 ? descElement.GetString() ?? ""
                 : "";
 
-            var responseTime = exchangeElement.TryGetProperty("response_time_ms", out var timeElement)
+            int responseTime = exchangeElement.TryGetProperty("response_time_ms", out JsonElement timeElement)
                 ? timeElement.GetInt32()
                 : 0;
 
-            var secureMessaging = exchangeElement.TryGetProperty("secure_messaging", out var secureElement)
+            bool secureMessaging = exchangeElement.TryGetProperty("secure_messaging", out JsonElement secureElement)
                 ? secureElement.GetBoolean()
                 : false;
 
@@ -190,9 +189,9 @@ public static class CapInstallationTraceLoader
     {
         // Look for CAP file information in the trace responses
         // This is derived from the installation sequence analysis
-        var packageAid = "A00000030800001000"; // From trace analysis
-        var appletAid = "A000000308000010000100"; // From trace analysis
-        
+        string packageAid = "A00000030800001000"; // From trace analysis
+        string appletAid = "A000000308000010000100"; // From trace analysis
+
         return Maybe<CapMetadata>.From(new CapMetadata(
             packageAid,
             appletAid,
@@ -204,7 +203,7 @@ public static class CapInstallationTraceLoader
     private static Result<TraceExchange, SmartCardError> ExtractSelectCommand(
         ImmutableArray<TraceExchange> exchanges)
     {
-        var selectExchange = exchanges.FirstOrDefault(e => 
+        TraceExchange selectExchange = exchanges.FirstOrDefault(e =>
             e.Command.StartsWith("00A404", StringComparison.OrdinalIgnoreCase));
 
         return selectExchange != default
@@ -215,10 +214,10 @@ public static class CapInstallationTraceLoader
     private static Result<SecureChannelCommands, SmartCardError> ExtractSecureChannelCommands(
         ImmutableArray<TraceExchange> exchanges)
     {
-        var initUpdate = exchanges.FirstOrDefault(e => 
+        TraceExchange initUpdate = exchanges.FirstOrDefault(e =>
             e.Command.StartsWith("8050", StringComparison.OrdinalIgnoreCase));
 
-        var extAuth = exchanges.FirstOrDefault(e => 
+        TraceExchange extAuth = exchanges.FirstOrDefault(e =>
             e.Command.StartsWith("8482", StringComparison.OrdinalIgnoreCase));
 
         if (initUpdate == default)
@@ -234,7 +233,7 @@ public static class CapInstallationTraceLoader
     private static Result<TraceExchange, SmartCardError> ExtractInstallCommands(
         ImmutableArray<TraceExchange> exchanges)
     {
-        var installForLoad = exchanges.FirstOrDefault(e => 
+        TraceExchange installForLoad = exchanges.FirstOrDefault(e =>
             e.Command.StartsWith("84E602", StringComparison.OrdinalIgnoreCase));
 
         return installForLoad != default
@@ -245,9 +244,10 @@ public static class CapInstallationTraceLoader
     private static Result<ImmutableArray<TraceExchange>, SmartCardError> ExtractLoadCommands(
         ImmutableArray<TraceExchange> exchanges)
     {
-        var loadCommands = exchanges
-            .Where(e => e.Command.StartsWith("84E8", StringComparison.OrdinalIgnoreCase))
-            .ToImmutableArray();
+        ImmutableArray<TraceExchange> loadCommands = [
+            ..exchanges
+                .Where(e => e.Command.StartsWith("84E8", StringComparison.OrdinalIgnoreCase))
+        ];
 
         return loadCommands.Length > 0
             ? Result.Success<ImmutableArray<TraceExchange>, SmartCardError>(loadCommands)

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -14,8 +15,8 @@ public class CardCapabilitiesTests
     public void Parse_WithScpOptions_ParsesCorrectly()
     {
         // Arrange - SCP03 with i=70 and AES-128/192/256 support
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0xA0,
             0x09, // Tag A0, length 9
             0x80,
@@ -26,24 +27,24 @@ public class CardCapabilitiesTests
             0x70, // Supported options = 70
             0x82,
             0x01,
-            0x07, // Supported keys = 07 (all AES lengths)
-        };
+            0x07 // Supported keys = 07 (all AES lengths)
+        ];
 
         // Act
         Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
         _ = result.IsSuccess.Should().BeTrue();
-        CardCapabilities capabilities = result.Value;
+        CardCapabilities? capabilities = result.Value;
 
         // Assert
         _ = capabilities.Should().NotBeNull();
         _ = capabilities.ScpOptions.Should().HaveCount(1);
 
-        var scpOption = capabilities.ScpOptions.First();
+        ScpOption? scpOption = capabilities.ScpOptions.First();
         _ = scpOption.ScpId.Should().Be(0x03);
         _ = scpOption.Implementation.Should().Be(0x70);
 
         _ = capabilities.SupportedKeyLengths.ContainsKey(0x03).Should().BeTrue();
-        var keyLengths = capabilities.SupportedKeyLengths[0x03];
+        ImmutableList<int>? keyLengths = capabilities.SupportedKeyLengths[0x03];
         _ = keyLengths.Should().Contain(128);
         _ = keyLengths.Should().Contain(192);
         _ = keyLengths.Should().Contain(256);
@@ -53,19 +54,19 @@ public class CardCapabilitiesTests
     public void Parse_WithSecurityDomainPrivileges_ParsesCorrectly()
     {
         // Arrange
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0x80,
             0x03, // Tag 80, length 3
             0xC0,
             0x00,
             0x00 // SD privileges
-        };
+        ];
 
         // Act
         Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
         _ = result.IsSuccess.Should().BeTrue();
-        CardCapabilities capabilities = result.Value;
+        CardCapabilities? capabilities = result.Value;
 
         // Assert
         _ = capabilities.SdPrivileges.HasValue.Should().BeTrue();
@@ -78,19 +79,19 @@ public class CardCapabilitiesTests
     public void Parse_WithApplicationPrivileges_ParsesCorrectly()
     {
         // Arrange
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0x81,
             0x03, // Tag 81, length 3
             0x00,
             0x02,
             0x00 // App privileges with FinalApplication
-        };
+        ];
 
         // Act
         Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
         _ = result.IsSuccess.Should().BeTrue();
-        CardCapabilities capabilities = result.Value;
+        CardCapabilities? capabilities = result.Value;
 
         // Assert
         _ = capabilities.AppPrivileges.HasValue.Should().BeTrue();
@@ -102,22 +103,22 @@ public class CardCapabilitiesTests
     public void Parse_WithSupportedAlgorithms_ParsesCorrectly()
     {
         // Arrange
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0x82,
             0x02, // Tag 82, length 2
             0x03,
             0x00 // SHA-1 and SHA-256 supported
-        };
+        ];
 
         // Act
         Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
         _ = result.IsSuccess.Should().BeTrue();
-        CardCapabilities capabilities = result.Value;
+        CardCapabilities? capabilities = result.Value;
 
         // Assert
         _ = capabilities.Algorithms.HasValue.Should().BeTrue();
-        var hashAlgs = capabilities.Algorithms.Value.GetHashAlgorithms();
+        string? hashAlgs = capabilities.Algorithms.Value.GetHashAlgorithms();
         _ = hashAlgs.Should().Contain("SHA-1");
         _ = hashAlgs.Should().Contain("SHA-256");
     }
@@ -126,22 +127,22 @@ public class CardCapabilitiesTests
     public void Parse_WithCipherSuites_ParsesCorrectly()
     {
         // Arrange
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0x86,
             0x02, // Tag 86 (DAP verification), length 2
             0x01,
             0x02 // DES_MAC and AES_CMAC_128
-        };
+        ];
 
         // Act
         Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
         _ = result.IsSuccess.Should().BeTrue();
-        CardCapabilities capabilities = result.Value;
+        CardCapabilities? capabilities = result.Value;
 
         // Assert
         _ = capabilities.CipherSuites.ContainsKey(CipherUsage.DapVerification).Should().BeTrue();
-        var ciphers = capabilities.CipherSuites[CipherUsage.DapVerification];
+        ImmutableList<CipherSuite>? ciphers = capabilities.CipherSuites[CipherUsage.DapVerification];
         _ = ciphers.Should().Contain(CipherSuite.Des3Mac);
         _ = ciphers.Should().Contain(CipherSuite.AesCmac128);
     }
@@ -150,8 +151,9 @@ public class CardCapabilitiesTests
     public void Parse_ComplexCapabilities_ParsesAllSections()
     {
         // Arrange - Complex capabilities like from the trace
-        var data = new byte[]
-        {
+        byte[] data =
+        [
+
             // SCP options
             0xA0,
             0x09,
@@ -188,12 +190,12 @@ public class CardCapabilitiesTests
             0x02,
             0x03,
             0x04
-        };
+        ];
 
         // Act
         Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
         _ = result.IsSuccess.Should().BeTrue();
-        CardCapabilities capabilities = result.Value;
+        CardCapabilities? capabilities = result.Value;
 
         // Assert
         _ = capabilities.Should().NotBeNull();
@@ -204,7 +206,7 @@ public class CardCapabilitiesTests
         _ = capabilities.CipherSuites.Should().NotBeEmpty();
 
         // Verify the ToString() method produces readable output
-        var output = capabilities.ToString();
+        string? output = capabilities.ToString();
         _ = output.Should().Contain("SCP03");
         _ = output.Should().Contain("AES");
         _ = output.Should().Contain("SecurityDomain");
@@ -214,8 +216,8 @@ public class CardCapabilitiesTests
     public void ToString_FormatsOutputCorrectly()
     {
         // Arrange
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0xA0,
             0x09,
             0x80,
@@ -232,13 +234,13 @@ public class CardCapabilitiesTests
             0xC0,
             0x00,
             0x00
-        };
+        ];
 
         // Act
         Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
         _ = result.IsSuccess.Should().BeTrue();
-        CardCapabilities capabilities = result.Value;
-        var output = capabilities.ToString();
+        CardCapabilities? capabilities = result.Value;
+        string? output = capabilities.ToString();
 
         // Assert
         _ = output.Should().Contain("Card Capabilities:");

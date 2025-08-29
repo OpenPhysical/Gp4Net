@@ -166,20 +166,20 @@ public class DeleteCommand : IApduCommand
     /// </summary>
     private Result<byte[], SmartCardError> GetDeleteData()
     {
-        var data = new List<byte>();
+        List<byte> data = [];
 
         if (Target is DeleteTarget.ByAid or DeleteTarget.WithRelated)
         {
             // For AID deletion, encode as TLV: 4F <len> <AIDs concatenated>
-            var totalAidLength = Aids.Sum(aid => aid.Length);
+            int totalAidLength = Aids.Sum(aid => aid.Length);
             data.Add(0x4F); // Tag for AID
             data.Add((byte)totalAidLength);
-            foreach (var aid in Aids)
+            foreach (byte[] aid in Aids)
             {
                 data.AddRange(aid);
             }
             // If DeletionTokenKey or DeletionToken is present, emit TLV (calculated as needed)
-            var tokenToUse = DeletionToken;
+            Maybe<byte[]> tokenToUse = DeletionToken;
 
             // If no token but we have a key, compute the token
             if (!tokenToUse.HasValue && DeleteTokenKey.HasValue)
@@ -190,7 +190,7 @@ public class DeleteCommand : IApduCommand
                     return SmartCardError.InvalidArgument("Delete token calculation requires exactly one AID.");
                 }
                 // Compute token using the DeleteTokenCalculator
-                var tokenResult = Gp4Net.Cryptography.DeleteTokenCalculator.ComputeDeleteToken(
+                Result<byte[], SmartCardError> tokenResult = Cryptography.DeleteTokenCalculator.ComputeDeleteToken(
                     DeleteTokenKey.Value,
                     P1,
                     P2,
@@ -216,7 +216,7 @@ public class DeleteCommand : IApduCommand
         else
         {
             // For key deletion, as TLV: D0 (keyId) + D2 (keyVer) per entry
-            foreach (var keyRef in Aids)
+            foreach (byte[] keyRef in Aids)
             {
                 switch (keyRef.Length)
                 {
@@ -265,20 +265,19 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken = default
     )
     {
-        if (aid == null)
-        {
-            return SmartCardError.InvalidArgument("AID cannot be null.");
-        }
+        return Maybe<byte[]>.From(aid).Match(
+            Some: aidValue => aidValue.Length == 0
+                ? SmartCardError.InvalidArgument("AID cannot be empty.")
+                : CreateApplicationDeleteCommand(aidValue, deleteRelated, deletionToken),
+            None: () => SmartCardError.InvalidArgument("AID cannot be null."));
+    }
 
-        if (aid.Length == 0)
-        {
-            return SmartCardError.InvalidArgument("AID cannot be empty.");
-        }
-
-        var type = deleteRelated
+    private static Result<DeleteCommand, SmartCardError> CreateApplicationDeleteCommand(byte[] aid, bool deleteRelated, Maybe<byte[]> deletionToken)
+    {
+        DeleteType type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
             : DeleteType.DeleteObjectOnly;
-        var target = deleteRelated
+        DeleteTarget target = deleteRelated
             ? DeleteTarget.WithRelated
             : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, [aid], deletionToken);
@@ -297,20 +296,19 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken = default
     )
     {
-        if (aid == null)
-        {
-            return SmartCardError.InvalidArgument("Package AID cannot be null.");
-        }
+        return Maybe<byte[]>.From(aid).Match(
+            Some: aidValue => aidValue.Length == 0
+                ? SmartCardError.InvalidArgument("Package AID cannot be empty.")
+                : CreatePackageDeleteCommand(aidValue, deleteRelated, deletionToken),
+            None: () => SmartCardError.InvalidArgument("Package AID cannot be null."));
+    }
 
-        if (aid.Length == 0)
-        {
-            return SmartCardError.InvalidArgument("Package AID cannot be empty.");
-        }
-
-        var type = deleteRelated
+    private static Result<DeleteCommand, SmartCardError> CreatePackageDeleteCommand(byte[] aid, bool deleteRelated, Maybe<byte[]> deletionToken)
+    {
+        DeleteType type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
             : DeleteType.DeleteObjectOnly;
-        var target = deleteRelated
+        DeleteTarget target = deleteRelated
             ? DeleteTarget.WithRelated
             : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, [aid], deletionToken);
@@ -329,20 +327,19 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken = default
     )
     {
-        if (aid == null)
-        {
-            return SmartCardError.InvalidArgument("Executable load file AID cannot be null.");
-        }
+        return Maybe<byte[]>.From(aid).Match(
+            Some: aidValue => aidValue.Length == 0
+                ? SmartCardError.InvalidArgument("Executable load file AID cannot be empty.")
+                : CreateExecutableLoadFileDeleteCommand(aidValue, deleteRelated, deletionToken),
+            None: () => SmartCardError.InvalidArgument("Executable load file AID cannot be null."));
+    }
 
-        if (aid.Length == 0)
-        {
-            return SmartCardError.InvalidArgument("Executable load file AID cannot be empty.");
-        }
-
-        var type = deleteRelated
+    private static Result<DeleteCommand, SmartCardError> CreateExecutableLoadFileDeleteCommand(byte[] aid, bool deleteRelated, Maybe<byte[]> deletionToken)
+    {
+        DeleteType type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
             : DeleteType.DeleteObjectOnly;
-        var target = deleteRelated
+        DeleteTarget target = deleteRelated
             ? DeleteTarget.WithRelated
             : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, [aid], deletionToken);
@@ -361,33 +358,37 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken = default
     )
     {
-        if (aids == null)
-        {
-            return SmartCardError.InvalidArgument("AIDs list cannot be null.");
-        }
+        return Maybe<IList<byte[]>>.From(aids).Match(
+            Some: aidsList => ValidateAndCreateMultipleDeleteCommand(aidsList, deleteRelated, deletionToken),
+            None: () => SmartCardError.InvalidArgument("AIDs list cannot be null."));
+    }
 
+    private static Result<DeleteCommand, SmartCardError> ValidateAndCreateMultipleDeleteCommand(IList<byte[]> aids, bool deleteRelated, Maybe<byte[]> deletionToken)
+    {
         if (aids.Count == 0)
         {
             return SmartCardError.InvalidArgument("At least one AID must be provided.");
         }
 
-        foreach (var aid in aids)
-        {
-            if (aid == null)
-            {
-                return SmartCardError.InvalidArgument("AIDs cannot contain null values.");
-            }
+        // Validate all AIDs using functional approach - collect all validation results
+        List<Maybe<SmartCardError>> validationErrors = aids
+            .Select(aid => Maybe<byte[]>.From(aid).Match(
+                Some: aidValue => aidValue.Length == 0
+                    ? Maybe<SmartCardError>.From(SmartCardError.InvalidArgument("AIDs cannot be empty."))
+                    : Maybe<SmartCardError>.None,
+                None: () => Maybe<SmartCardError>.From(SmartCardError.InvalidArgument("AIDs cannot contain null values."))))
+            .Where(error => error.HasValue)
+            .ToList();
 
-            if (aid.Length == 0)
-            {
-                return SmartCardError.InvalidArgument("AIDs cannot be empty.");
-            }
+        if (validationErrors.Any())
+        {
+            return validationErrors.First().Value;  // Return first validation error
         }
 
-        var type = deleteRelated
+        DeleteType type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
             : DeleteType.DeleteObjectOnly;
-        var target = deleteRelated
+        DeleteTarget target = deleteRelated
             ? DeleteTarget.WithRelated
             : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, aids, deletionToken);
@@ -406,7 +407,7 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken = default
     )
     {
-        var keyReference = new byte[] { keyIdentifier, keyVersion };
+        byte[] keyReference = [keyIdentifier, keyVersion];
         return new DeleteCommand(
             DeleteType.DeleteObjectOnly,
             DeleteTarget.ByAid,
@@ -430,7 +431,7 @@ public class DeleteCommand : IApduCommand
     /// <returns>The APDU command bytes.</returns>
     public byte[] ToApdu()
     {
-        var data = new List<byte>();
+        List<byte> data = [];
 
         if (Target is DeleteTarget.ByAid or DeleteTarget.WithRelated)
         {
@@ -439,13 +440,13 @@ public class DeleteCommand : IApduCommand
             // Based on the trace: 4F09A000000308000010000
 
             // Calculate total length of all AIDs
-            var totalAidLength = Aids.Sum(aid => aid.Length);
+            int totalAidLength = Aids.Sum(aid => aid.Length);
 
             data.Add(0x4F); // AID tag
             data.Add((byte)totalAidLength);
 
             // Add all AIDs concatenated
-            foreach (var aid in Aids)
+            foreach (byte[] aid in Aids)
             {
                 data.AddRange(aid);
             }
@@ -453,7 +454,7 @@ public class DeleteCommand : IApduCommand
         else
         {
             // For key deletion, the AID contains key identifier and version
-            foreach (var keyRef in Aids)
+            foreach (byte[] keyRef in Aids)
             {
                 data.AddRange(keyRef);
             }
@@ -468,14 +469,14 @@ public class DeleteCommand : IApduCommand
         }
 
         // Build APDU
-        var apdu = new List<byte>
-        {
+        List<byte> apdu =
+        [
             Cla,
             Ins,
             (byte)Type,
             (byte)Target,
-            (byte)data.Count, // Lc
-        };
+            (byte)data.Count // Lc
+        ];
 
         apdu.AddRange(data);
 
@@ -524,7 +525,7 @@ public class DeleteResponse
         Maybe<IList<DeletionReceipt>> deletionReceipts = default
     )
     {
-        Data = data != null ? (byte[])data.Clone() : [];
+        Data = Maybe<byte[]>.From(data).Map(d => (byte[])d.Clone()).GetValueOrDefault([]);
         StatusWord = statusWord;
         IsSuccessful = statusWord == StatusWords.Success;
         DeletionReceipts = deletionReceipts
@@ -540,7 +541,7 @@ public class DeleteResponse
     /// <returns>The parsed response.</returns>
     public static DeleteResponse Parse(byte[] response, ushort statusWord)
     {
-        var deletionReceipts = new List<DeletionReceipt>();
+        List<DeletionReceipt> deletionReceipts = [];
 
         if (response is { Length: > 0 })
         {
@@ -548,12 +549,12 @@ public class DeleteResponse
             // - Length of delete confirmation (1-2 bytes): Mandatory
             // - Delete confirmation (0-n bytes): Conditional
 
-            var offset = 0;
+            int offset = 0;
 
             // Read the length of delete confirmation
             if (offset < response.Length)
             {
-                var confirmationLength = response[offset];
+                byte confirmationLength = response[offset];
                 offset++;
 
                 // Handle extended length encoding (81 80 - 81 FF)
@@ -567,23 +568,23 @@ public class DeleteResponse
                 if (confirmationLength <= 0 || offset + confirmationLength > response.Length)
                 {
                     return new DeleteResponse(
-                        response ?? [],
+                        Maybe<byte[]>.From(response).GetValueOrDefault([]),
                         statusWord,
                         deletionReceipts.Count > 0 ? Maybe<IList<DeletionReceipt>>.From(deletionReceipts) : Maybe<IList<DeletionReceipt>>.None
                     );
                 }
 
                 // Parse the deletion confirmation data
-                var confirmationEnd = offset + confirmationLength;
+                int confirmationEnd = offset + confirmationLength;
                 while (offset < confirmationEnd)
                 {
                     // Look for AID TLV (4F tag)
                     if (offset + 2 < confirmationEnd && response[offset] == 0x4F)
                     {
-                        var aidLength = response[offset + 1];
+                        byte aidLength = response[offset + 1];
                         if (offset + 2 + aidLength <= confirmationEnd)
                         {
-                            var aid = new byte[aidLength];
+                            byte[] aid = new byte[aidLength];
                             Array.Copy(response, offset + 2, aid, 0, aidLength);
                             deletionReceipts.Add(new DeletionReceipt(aid, true));
                             offset += 2 + aidLength;
@@ -603,7 +604,7 @@ public class DeleteResponse
         }
 
         return new DeleteResponse(
-            response ?? [],
+            Maybe<byte[]>.From(response).GetValueOrDefault([]),
             statusWord,
             deletionReceipts.Count > 0 ? Maybe<IList<DeletionReceipt>>.From(deletionReceipts) : Maybe<IList<DeletionReceipt>>.None
         );

@@ -1,8 +1,9 @@
 using System;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
-using Gp4Net.Tool.Commands;
+using Gp4Net.Core;
 using JetBrains.Annotations;
+using Spectre.Console.Cli;
 
 namespace Gp4Net.Tool.Pipeline;
 
@@ -36,11 +37,19 @@ public static class FunctionalCommandExtensions
         this ICliExecutionContext context,
         string readerName = null)
     {
-        if (context.CardService.IsConnected)
-        {
-            return Result.Success<ICliExecutionContext, string>(context);
-        }
+        Result<bool, SmartCardError> connectionResult = await context.CardService.IsConnectedAsync();
+        return await connectionResult.Match(
+            isConnected => isConnected 
+                ? Task.FromResult(Result.Success<ICliExecutionContext, string>(context))
+                : EstablishConnection(context, readerName),
+            error => Task.FromResult(Result.Failure<ICliExecutionContext, string>(error.Message))
+        );
+    }
 
+    private static async Task<Result<ICliExecutionContext, string>> EstablishConnection(
+        ICliExecutionContext context, 
+        string readerName)
+    {
         try
         {
             _ = await context.RequireCardConnection(readerName);
@@ -71,37 +80,6 @@ public static class FunctionalCommandExtensions
         }
     }
 
-    /// <summary>
-    /// Executes a card command with functional composition.
-    /// </summary>
-    public static async Task<int> ExecuteCardCommandFunctional(
-        this ICliExecutionContext context,
-        BaseCommandSettings settings,
-        Func<ICliExecutionContext, Task<Result<bool, string>>> commandLogic)
-    {
-        var result = await context
-            .RequireCardConnectionFunctional(settings.Reader?.Name)
-            .Bind(async ctx =>
-            {
-                _ = ctx.DisplayCardInfo(settings);
-                return settings.RequiresSecureChannel
-                    ? await ctx.RequireSecureChannelFunctional(settings.SecurityLevel, settings.Keyset)
-                    : Result.Success<ICliExecutionContext, string>(ctx);
-            })
-            .Bind(async ctx => 
-            {
-                var commandResult = await commandLogic(ctx);
-                return commandResult.Map(_ => ctx);
-            });
-
-        return result.Match(
-            onSuccess: _ => 0,
-            onFailure: error =>
-            {
-                context.Display.Error($"Command failed: {error}");
-                return 1;
-            });
-    }
 
     /// <summary>
     /// Chains functional operations on the CLI context.
@@ -110,7 +88,7 @@ public static class FunctionalCommandExtensions
         this Task<Result<ICliExecutionContext, string>> contextTask,
         Func<ICliExecutionContext, Task<Result<TResult, string>>> operation)
     {
-        var contextResult = await contextTask;
+        Result<ICliExecutionContext, string> contextResult = await contextTask;
         return await contextResult.Bind(operation);
     }
 
@@ -121,7 +99,7 @@ public static class FunctionalCommandExtensions
         this Task<Result<ICliExecutionContext, string>> contextTask,
         Func<ICliExecutionContext, Task<Result<ICliExecutionContext, string>>> operation)
     {
-        var contextResult = await contextTask;
+        Result<ICliExecutionContext, string> contextResult = await contextTask;
         return await contextResult.Bind(operation);
     }
 
@@ -132,7 +110,29 @@ public static class FunctionalCommandExtensions
         this Task<Result<ICliExecutionContext, string>> contextTask,
         Func<ICliExecutionContext, TResult> mapper)
     {
-        var contextResult = await contextTask;
+        Result<ICliExecutionContext, string> contextResult = await contextTask;
         return contextResult.Map(mapper);
+    }
+
+    /// <summary>
+    /// Executes a card command using functional patterns with connection and error handling.
+    /// </summary>
+    public static async Task<int> ExecuteCardCommandFunctional(
+        this ICliExecutionContext context,
+        CommandSettings settings,
+        Func<ICliExecutionContext, Task<Result<bool, string>>> commandLogic)
+    {
+        Result<ICliExecutionContext, string> connectionResult = await context.RequireCardConnectionFunctional();
+        Result<bool, string> commandResult = await connectionResult.Match(
+            async ctx => await commandLogic(ctx),
+            error => Task.FromResult(Result.Failure<bool, string>(error)));
+            
+        return commandResult.Match(
+                success => 0,
+                error =>
+                {
+                    context.Display.Error($"Command failed: {error}");
+                    return 1;
+                });
     }
 }

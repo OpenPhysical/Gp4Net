@@ -125,11 +125,11 @@ public class CplcData
             );
         }
 
-        var cplc = new CplcData { Data = new byte[data.Length] };
+        CplcData cplc = new CplcData { Data = new byte[data.Length] };
         Array.Copy(data, cplc.Data, data.Length);
 
         // Parse according to CPLC structure
-        var offset = 0;
+        int offset = 0;
         cplc.IcFabricator = ReadUInt16(data, ref offset);
         cplc.IcType = ReadUInt16(data, ref offset);
         cplc.OperatingSystemId = ReadUInt16(data, ref offset);
@@ -165,14 +165,14 @@ public class CplcData
 
     private static ushort ReadUInt16(byte[] data, ref int offset)
     {
-        var value = (ushort)((data[offset] << 8) | data[offset + 1]);
+        ushort value = (ushort)((data[offset] << 8) | data[offset + 1]);
         offset += 2;
         return value;
     }
 
     private static uint ReadUInt32(byte[] data, ref int offset)
     {
-        var value = (uint)(
+        uint value = (uint)(
             (data[offset] << 24)
             | (data[offset + 1] << 16)
             | (data[offset + 2] << 8)
@@ -187,7 +187,7 @@ public class CplcData
     /// </summary>
     public override string ToString()
     {
-        var sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
         _ = sb.AppendLine("CPLC Data:");
         _ = sb.AppendLine($"  IC Fabricator: {IcFabricator:X4}");
         _ = sb.AppendLine($"  IC Type: {IcType:X4}");

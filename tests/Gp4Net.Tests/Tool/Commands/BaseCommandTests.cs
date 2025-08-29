@@ -1,20 +1,14 @@
 using System;
 using System.Threading.Tasks;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Services;
 using Gp4Net.Tool.Pipeline;
 using Gp4Net.Tool.Services;
 using Gp4Net.CardEmulator.Services;
+using Gp4Net.Core;
 using NUnit.Framework;
 using Spectre.Console.Testing;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
-using Gp4Net.Domain.Protocol;
-using Gp4Net.Transport;
-using CSharpFunctionalExtensions;
-using Gp4Net.Domain;
-using Gp4Net.Tests.Tool.Commands.Card;
 using Gp4Net.Tests.TestHelpers;
 
 namespace Gp4Net.Tests.Tool.Commands;
@@ -25,14 +19,14 @@ namespace Gp4Net.Tests.Tool.Commands;
 [TestFixture]
 public class BaseCommandTests
 {
-    private IDisplayService _displayService = null!;
-    private Gp4Net.Tool.Services.ICardService _cardService = null!;
-    private IGlobalPlatformService _globalPlatformService = null!;
-    private IDomainServiceFactory _domainServiceFactory = null!;
-    private IKeysetResolver _keysetResolver = null!;
-    private CliContext _cliContext = null!;
-    private TestConsole _console = null!;
-    private VirtualCardService _virtualCardService = null!;
+    private IDisplayService _displayService;
+    private ISmartCardService _smartCardService;
+    private IGlobalPlatformService _globalPlatformService;
+    private Maybe<IDomainServiceFactory> _domainServiceFactory;
+    private IKeysetResolver _keysetResolver;
+    private CliContext _cliContext;
+    private TestConsole _console;
+    private VirtualCardService _virtualCardService;
 
     [SetUp]
     public void Setup()
@@ -40,28 +34,33 @@ public class BaseCommandTests
         _displayService = new DisplayService(false);
         _virtualCardService = new VirtualCardService();
         _virtualCardService.SetupComprehensiveTestEnvironment();
-        _cardService = new TestCardService(_virtualCardService);
-        _keysetResolver = new FunctionalKeysetResolverAdapter();
-        // Skip complex domain service factory setup for base command tests
-        _domainServiceFactory = null;
-        _globalPlatformService = null;
+        _smartCardService = new TestCardService(_virtualCardService);
+        _keysetResolver = new KeysetResolver();
+        // Skip complex domain service factory setup for base command tests - use empty implementation
+        _domainServiceFactory = Maybe<IDomainServiceFactory>.None;
+        _globalPlatformService = new EmptyGlobalPlatformService();
         _console = new TestConsole();
 
         _cliContext = new CliContext(
             _displayService,
-            _cardService,
-            _domainServiceFactory,
+            _smartCardService,
+            _domainServiceFactory.GetValueOrDefault(CreateEmptyDomainServiceFactory()),
             _keysetResolver,
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CliContext>.Instance
         );
     }
 
+    private static IDomainServiceFactory CreateEmptyDomainServiceFactory()
+    {
+        return new EmptyDomainServiceFactory();
+    }
+
     [TearDown]
     public void TearDown()
     {
-        _console?.Dispose();
-        _cardService?.Dispose();
-        _virtualCardService?.Dispose();
+        _console.Dispose();
+        _smartCardService.Dispose();
+        _virtualCardService.Dispose();
     }
 
     [Test]
@@ -71,7 +70,7 @@ public class BaseCommandTests
         // Virtual card service handles connection state automatically
 
         // Act
-        var result = await _cliContext.RequireCardConnection("TestReader");
+        Result<ICliExecutionContext, SmartCardError> result = await _cliContext.RequireCardConnection("TestReader");
 
         // Assert
         _ = result.Should().BeEquivalentTo(_cliContext);
@@ -85,7 +84,7 @@ public class BaseCommandTests
         // Virtual card service handles connection automatically
 
         // Act
-        var result = await _cliContext.RequireCardConnection("TestReader");
+        Result<ICliExecutionContext, SmartCardError> result = await _cliContext.RequireCardConnection("TestReader");
 
         // Assert
         _ = result.Should().BeEquivalentTo(_cliContext);
@@ -99,7 +98,7 @@ public class BaseCommandTests
         // Virtual card service provides readers and handles connection automatically
 
         // Act
-        var result = await _cliContext.RequireCardConnection("auto");
+        Result<ICliExecutionContext, SmartCardError> result = await _cliContext.RequireCardConnection("auto");
 
         // Assert
         _ = result.Should().BeEquivalentTo(_cliContext);
@@ -112,7 +111,7 @@ public class BaseCommandTests
         // Arrange
         // Create a failing card service for this test
         var failingCardService = new FailingCardService();
-        var failingContext = new CliContext(
+        CliContext failingContext = new CliContext(
             _displayService,
             failingCardService,
             _domainServiceFactory,
@@ -131,7 +130,7 @@ public class BaseCommandTests
         // Arrange
         // Create a failing card service for this test
         var failingCardService = new FailingCardService();
-        var failingContext = new CliContext(
+        CliContext failingContext = new CliContext(
             _displayService,
             failingCardService,
             _domainServiceFactory,
@@ -151,7 +150,7 @@ public class BaseCommandTests
         // Virtual card service secure channel state handled automatically
 
         // Act
-        var result = await _cliContext.RequireSecureChannel();
+        Result<ICliExecutionContext, SmartCardError> result = await _cliContext.RequireSecureChannel();
 
         // Assert
         _ = result.Should().BeEquivalentTo(_cliContext);
@@ -165,7 +164,7 @@ public class BaseCommandTests
         // Virtual card service handles secure channel establishment automatically
 
         // Act
-        var result = await _cliContext.RequireSecureChannel(1);
+        Result<ICliExecutionContext, SmartCardError> result = await _cliContext.RequireSecureChannel(1);
 
         // Assert
         _ = result.Should().BeEquivalentTo(_cliContext);
@@ -178,7 +177,7 @@ public class BaseCommandTests
         // Arrange
         // Create a failing card service for this test
         var failingCardService = new FailingCardService();
-        var failingContext = new CliContext(
+        CliContext failingContext = new CliContext(
             _displayService,
             failingCardService,
             _domainServiceFactory,
@@ -195,10 +194,10 @@ public class BaseCommandTests
     public async Task ExecuteAsync_WithAsyncFunction_ExecutesSuccessfully()
     {
         // Arrange
-        var executed = false;
+        bool executed = false;
 
         // Act
-        var result = await _cliContext.ExecuteAsync(async ctx =>
+        int result = await _cliContext.ExecuteAsync(async ctx =>
         {
             executed = true;
             await Task.Delay(1);
@@ -214,10 +213,10 @@ public class BaseCommandTests
     public async Task ExecuteAsync_WithSyncFunction_ExecutesSuccessfully()
     {
         // Arrange
-        var executed = false;
+        bool executed = false;
 
         // Act
-        var result = await _cliContext.ExecuteAsync(ctx =>
+        int result = await _cliContext.ExecuteAsync(ctx =>
         {
             executed = true;
             return 42;
@@ -232,7 +231,7 @@ public class BaseCommandTests
     public async Task ExecuteAsync_WithException_ReturnsErrorCode()
     {
         // Act
-        var result = await _cliContext.ExecuteAsync((Func<ICliExecutionContext, int>)(ctx =>
+        int result = await _cliContext.ExecuteAsync((Func<ICliExecutionContext, int>)(ctx =>
             {
                 throw new InvalidOperationException("Test exception");
             }));

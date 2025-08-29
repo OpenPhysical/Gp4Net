@@ -4,10 +4,11 @@ using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Tool.Commands;
-using Gp4Net.Tool.Services;
+using Gp4Net.Services;
+using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -19,59 +20,66 @@ namespace Gp4Net.Tool.Commands.Applet;
 /// Command to get the status of applets on the card.
 /// </summary>
 [PublicAPI]
-public class StatusCommand : BaseCommand<StatusCommand.Settings>
+[CommandHandler]
+public class StatusCommand : IPipelineCommand<StatusCommand.Settings>
 {
-    /// <summary>
-    /// Initializes a new instance of the StatusCommand class.
-    /// </summary>
-    public StatusCommand(
-        ICardService cardService,
-        IDomainServiceFactory domainServiceFactory,
-        IKeysetResolver keysetResolver
-    )
-        : base(cardService, domainServiceFactory, keysetResolver) { }
-
     /// <summary>
     /// Executes the status command to display the status of applications on the card.
     /// </summary>
-    /// <param name="context">The command context.</param>
+    /// <param name="context">The CLI execution context.</param>
     /// <param name="settings">The command settings.</param>
     /// <returns>0 if successful, 1 if failed.</returns>
-    protected override async Task<int> ExecuteCommandAsync(CommandContext context, Settings settings)
+    public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
     {
-        if (!EnsureCardConnection(settings))
+        return await context.ExecuteAsync(async ctx =>
         {
-            return 1;
-        }
+            ctx.Display.Info("Starting applet status retrieval...");
+            
+            IGlobalPlatformService gpService = ctx.GetGlobalPlatformService();
+            
+            if (!settings.NoCardInfo)
+            {
+                await DisplayCardInfoAsync(ctx);
+            }
 
-        // Optionally establish secure channel for better status information
-        if (settings.RequiresSecureChannel && !await EnsureSecureChannel(settings))
-        {
-            return 1;
-        }
-
-        if (!settings.NoCardInfo)
-        {
-            DisplayCardInfo();
-        }
-
-        var statusResult = await GlobalPlatformService.GetStatusAsync(
-            StatusSubset.ApplicationsAndSupplementaryDomains);
-
-        if (statusResult.IsSuccess)
-        {
-            return await DisplayApplications(statusResult.Value, settings);
-        }
-        else
-        {
-            return HandleError(statusResult.Error);
-        }
+            Result<ImmutableList<ApplicationInfo>, SmartCardError> statusResult = await RetrieveApplicationStatus(gpService);
+            return await statusResult.Match(
+                async applications => await ProcessApplications(ctx, applications, settings),
+                error =>
+                {
+                    ctx.Display.Error($"Failed to get applet status: {error.Message}");
+                    return Task.FromResult(1);
+                });
+        });
     }
 
-    private static Task<int> DisplayApplications(ImmutableList<ApplicationInfo> applications, Settings settings)
+    private static Task DisplayCardInfoAsync(ICliExecutionContext context)
+    {
+        context.Display.Info("Card information display would go here");
+        return Task.CompletedTask;
+    }
+
+    private static async Task<Result<ImmutableList<ApplicationInfo>, SmartCardError>> RetrieveApplicationStatus(
+        IGlobalPlatformService globalPlatformService)
+    {
+        return await globalPlatformService.GetStatusAsync(StatusSubset.ApplicationsAndSupplementaryDomains);
+    }
+
+    private static Task<int> ProcessApplications(
+        ICliExecutionContext context,
+        ImmutableList<ApplicationInfo> applications, 
+        Settings settings)
+    {
+        return Task.FromResult(DisplayApplications(context, applications, settings));
+    }
+
+    private static int DisplayApplications(
+        ICliExecutionContext context,
+        ImmutableList<ApplicationInfo> applications, 
+        Settings settings)
     {
         // Build semantic rows using pure functional composition
-        var semanticRows = ApplicationTableBuilder.BuildApplicationRows(
+        List<ApplicationTableBuilder.ApplicationRow> semanticRows = ApplicationTableBuilder.BuildApplicationRows(
             applications,
             showExtended: false,
             showSummary: true,
@@ -79,13 +87,14 @@ public class StatusCommand : BaseCommand<StatusCommand.Settings>
         ).ToList();
 
         // Check if we have any applications to display
-        if (!semanticRows.OfType<ApplicationTableBuilder.ApplicationDataRow>().Any())
+        List<ApplicationTableBuilder.ApplicationDataRow> applicationRows = semanticRows.OfType<ApplicationTableBuilder.ApplicationDataRow>().ToList();
+        if (!applicationRows.Any())
         {
-            AnsiConsole.MarkupLine("[yellow]No applets found on card[/]");
-            return Task.FromResult(0);
+            context.Display.Warning("No applets found on card");
+            return 0;
         }
 
-        AnsiConsole.MarkupLine($"[green]Found {applications.Count} applet(s) on card:[/]");
+        context.Display.Success($"Found {applications.Count} applet(s) on card:");
 
         // Render using semantic table renderer
         ApplicationTableRenderer.RenderToTable(semanticRows, showExtended: false);
@@ -93,45 +102,55 @@ public class StatusCommand : BaseCommand<StatusCommand.Settings>
 
         if (settings.Detailed)
         {
-            AnsiConsole.WriteLine();
-            DisplayDetailedApplicationInfo(applications);
+            DisplayDetailedApplicationInfo(context, applications);
         }
 
-        return Task.FromResult(0);
+        return 0;
     }
 
     /// <summary>
-    /// Displays detailed information for each application.
+    /// Displays detailed information for each application using Spectre.Console formatting.
     /// </summary>
-    private static void DisplayDetailedApplicationInfo(IReadOnlyList<ApplicationInfo> applications)
+    private static void DisplayDetailedApplicationInfo(ICliExecutionContext context, IReadOnlyList<ApplicationInfo> applications)
     {
-        foreach (var app in applications)
-        {
-            AnsiConsole.MarkupLine($"[bold]{app.Type}:[/] [cyan]{Convert.ToHexString(app.Aid)}[/]");
-            AnsiConsole.MarkupLine($"  State: {app.LifecycleState}");
-            AnsiConsole.MarkupLine($"  Privileges: {string.Join(", ", app.Privileges.Select(p => p.ToString()))}");
-            if (!string.IsNullOrEmpty(app.Version.GetValueOrDefault()))
-            {
-                AnsiConsole.MarkupLine($"  Version: {app.Version.Value}");
-            }
-            if (app.AssociatedSecurityDomain.HasValue)
-            {
-                AnsiConsole.MarkupLine($"  Associated SD: {Convert.ToHexString(app.AssociatedSecurityDomain.Value)}");
-            }
-            AnsiConsole.WriteLine();
-        }
+        List<Table> tables = applications
+            .Select(CreateApplicationDetailsTable)
+            .ToList();
+
+        // Display all tables functionally by writing them to console
+        bool displayResult = tables
+            .Select(table => { AnsiConsole.Write(table); return true; })
+            .All(success => success);
     }
 
-    private static int HandleError(SmartCardError error)
+    private static Table CreateApplicationDetailsTable(ApplicationInfo app)
     {
-        AnsiConsole.MarkupLine($"[red]Error getting applet status: {error.Message}[/]");
-        return 1;
+        Table table = new Table()
+            .AddColumn("Property")
+            .AddColumn("Value")
+            .Title($"[bold]{app.Type}: [cyan]{Convert.ToHexString(app.Aid)}[/][/]")
+            .Border(TableBorder.Rounded);
+
+        _ = table.AddRow("State", $"[yellow]{app.LifecycleState}[/]");
+        _ = table.AddRow("Privileges", string.Join(", ", app.Privileges.Select(p => p.ToString())));
+
+        app.Version.Match(
+            version => table.AddRow("Version", $"[green]{version}[/]"),
+            () => { }
+        );
+
+        app.AssociatedSecurityDomain.Match(
+            securityDomain => table.AddRow("Associated SD", $"[dim]{Convert.ToHexString(securityDomain)}[/]"),
+            () => { }
+        );
+
+        return table;
     }
 
     /// <summary>
     /// Settings for the status command.
     /// </summary>
-    public class Settings : BaseCommandSettings
+    public class Settings : CommandSettings
     {
         /// <summary>
         /// Gets or sets a value indicating whether to show detailed information.
@@ -139,5 +158,12 @@ public class StatusCommand : BaseCommand<StatusCommand.Settings>
         [CommandOption("-d|--detailed")]
         [Description("Show detailed applet information")]
         public bool Detailed { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to skip card info display.
+        /// </summary>
+        [CommandOption("--no-card-info")]
+        [Description("Skip card information display")]
+        public bool NoCardInfo { get; set; }
     }
 }

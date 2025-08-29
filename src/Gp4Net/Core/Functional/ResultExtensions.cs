@@ -49,7 +49,7 @@ public static class ResultExtensions
         this Task<Result<T1, E>> resultTask,
         Func<T1, T2> selector)
     {
-        var result = await resultTask;
+        Result<T1, E> result = await resultTask;
         return result.Map(selector);
     }
 
@@ -60,8 +60,8 @@ public static class ResultExtensions
         this Task<Result<T1, E>> resultTask,
         Func<T1, Task<Result<T2, E>>> bind)
     {
-        var result = await resultTask;
-        return result.IsSuccess 
+        Result<T1, E> result = await resultTask;
+        return result.IsSuccess
             ? await bind(result.Value)
             : Result.Failure<T2, E>(result.Error);
     }
@@ -74,12 +74,12 @@ public static class ResultExtensions
         Func<T1, Task<Result<T2, E>>> bind,
         Func<T1, T2, T3> project)
     {
-        var result = await resultTask;
+        Result<T1, E> result = await resultTask;
         if (result.IsFailure)
             return Result.Failure<T3, E>(result.Error);
 
-        var t1 = result.Value;
-        var result2 = await bind(t1);
+        T1 t1 = result.Value;
+        Result<T2, E> result2 = await bind(t1);
         return result2.Map(t2 => project(t1, t2));
     }
 
@@ -91,13 +91,13 @@ public static class ResultExtensions
         Func<Task<T>> operation,
         Func<Exception, E> onError)
     {
-        try 
-        { 
-            var value = await operation();
+        try
+        {
+            T value = await operation();
             return Result.Success<T, E>(value);
         }
-        catch (Exception ex) 
-        { 
+        catch (Exception ex)
+        {
             return Result.Failure<T, E>(onError(ex));
         }
     }
@@ -109,13 +109,13 @@ public static class ResultExtensions
         Func<T> operation,
         Func<Exception, E> onError)
     {
-        try 
-        { 
-            var value = operation();
+        try
+        {
+            T value = operation();
             return Result.Success<T, E>(value);
         }
-        catch (Exception ex) 
-        { 
+        catch (Exception ex)
+        {
             return Result.Failure<T, E>(onError(ex));
         }
     }
@@ -167,4 +167,87 @@ public static class ResultExtensions
             ? Maybe<T>.From(result.Value)
             : Maybe<T>.None;
     }
+
+    /// <summary>
+    /// Converts Result&lt;T, E&gt; to UnitResult&lt;E&gt;, discarding success value.
+    /// </summary>
+    public static UnitResult<E> ToUnitResult<T, E>(this Result<T, E> result)
+    {
+        return result.IsSuccess
+            ? UnitResult.Success<E>()
+            : UnitResult.Failure<E>(result.Error);
+    }
+
+    /// <summary>
+    /// Identity function for UnitResult - returns the same UnitResult.
+    /// Useful for pipeline consistency when ToUnitResult is called on already converted results.
+    /// </summary>
+    public static UnitResult<E> ToUnitResult<E>(this UnitResult<E> unitResult)
+    {
+        return unitResult;
+    }
+
+    /// <summary>
+    /// Converts UnitResult&lt;E&gt; to Result&lt;bool, E&gt; for contexts requiring Result with value.
+    /// Success becomes Result.Success(true), failure preserves error.
+    /// </summary>
+    public static Result<bool, E> ToResult<E>(this UnitResult<E> unitResult)
+    {
+        return unitResult.IsSuccess
+            ? Result.Success<bool, E>(true)
+            : Result.Failure<bool, E>(unitResult.Error);
+    }
+
+    /// <summary>
+    /// Enables binding operations on UnitResult.
+    /// </summary>
+    public static UnitResult<E> Bind<E>(
+        this UnitResult<E> unitResult,
+        Func<UnitResult<E>> bind)
+    {
+        return unitResult.IsSuccess
+            ? bind()
+            : unitResult;
+    }
+
+    /// <summary>
+    /// Enables binding operations on UnitResult with ignored parameter (for pipeline compatibility with lambdas).
+    /// Commonly used with patterns like .Bind(_ => SomeValidation()).
+    /// </summary>
+    public static UnitResult<E> Bind<E>(
+        this UnitResult<E> unitResult,
+        Func<object, UnitResult<E>> bind)
+    {
+        return unitResult.IsSuccess
+            ? bind(new object())
+            : unitResult;
+    }
+
+
+
+    /// <summary>
+    /// Enables async binding operations on UnitResult.
+    /// </summary>
+    public static async Task<UnitResult<E>> Bind<E>(
+        this UnitResult<E> unitResult,
+        Func<Task<UnitResult<E>>> bind)
+    {
+        return unitResult.IsSuccess
+            ? await bind()
+            : unitResult;
+    }
+
+    /// <summary>
+    /// Enables async binding operations on UnitResult with parameter.
+    /// </summary>
+    public static async Task<UnitResult<E>> Bind<T, E>(
+        this Task<Result<T, E>> resultTask,
+        Func<T, Task<UnitResult<E>>> bind)
+    {
+        Result<T, E> result = await resultTask;
+        return result.IsSuccess
+            ? await bind(result.Value)
+            : UnitResult.Failure<E>(result.Error);
+    }
+
 }

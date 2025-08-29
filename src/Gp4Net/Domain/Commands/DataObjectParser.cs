@@ -24,15 +24,15 @@ public static class DataObjectParser
         }
 
         // Support both ':' and '=' as separators, 2-4 character tags, and allow any data
-        var match = Regex.Match(dataObject, @"^([0-9A-Fa-f]{2,4})[:=](.*)$");
+        Match match = Regex.Match(dataObject, @"^([0-9A-Fa-f]{2,4})[:=](.*)$");
         if (!match.Success)
         {
             return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
                 SmartCardError.InvalidArgument("Invalid data object format"));
         }
 
-        var tagHex = match.Groups[1].Value;
-        var dataHex = match.Groups[2].Value;
+        string tagHex = match.Groups[1].Value;
+        string dataHex = match.Groups[2].Value;
 
         // Validate hex characters in data if not empty
         if (!string.IsNullOrEmpty(dataHex))
@@ -42,7 +42,7 @@ public static class DataObjectParser
                 return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
                     SmartCardError.InvalidArgument("Data must contain only hex characters"));
             }
-                
+
             // Ensure even number of hex characters for data
             if (dataHex.Length % 2 != 0)
             {
@@ -51,10 +51,10 @@ public static class DataObjectParser
             }
         }
 
-        return Result.Try(() => Convert.ToUInt16(tagHex, 16), ex => 
+        return Result.Try(() => Convert.ToUInt16(tagHex, 16), ex =>
                 SmartCardError.InvalidArgument($"Invalid tag format: {ex.Message}"))
-            .Bind(parsedTag => 
-                Result.Try(() => string.IsNullOrEmpty(dataHex) ? [] : Convert.FromHexString(dataHex), ex => 
+            .Bind(parsedTag =>
+                Result.Try(() => string.IsNullOrEmpty(dataHex) ? [] : Convert.FromHexString(dataHex), ex =>
                     SmartCardError.InvalidArgument($"Invalid data format: {ex.Message}"))
                 .Map(parsedData => (parsedTag, parsedData)));
     }
@@ -74,12 +74,7 @@ public static class DataObjectParser
         }
 
         // Data should not be null (empty data is allowed for some tags)
-        if (data == null)
-        {
-            return false;
-        }
-
         // Additional validation could be added here based on specific tag requirements
-        return true;
+        return Maybe<byte[]>.From(data).HasValue;
     }
 }

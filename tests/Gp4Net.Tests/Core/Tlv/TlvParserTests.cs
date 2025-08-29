@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -17,10 +18,10 @@ public class TlvParserTests
     public void ParseSingle_WithSimpleTlv_ParsesCorrectly()
     {
         // Arrange - Simple TLV: Tag=0x80, Length=2, Value=0x0102
-        var data = new byte[] { 0x80, 0x02, 0x01, 0x02 };
+        byte[] data = [0x80, 0x02, 0x01, 0x02];
 
         // Act
-        var tlv = TlvParser.ParseSingle(data);
+        Maybe<TlvObject> tlv = TlvParser.ParseSingle(data);
 
         // Assert
         _ = tlv.HasValue.Should().BeTrue();
@@ -33,10 +34,10 @@ public class TlvParserTests
     public void ParseSingle_WithMultiByteTag_ParsesCorrectly()
     {
         // Arrange - Multi-byte tag: 0x9F70
-        var data = new byte[] { 0x9F, 0x70, 0x03, 0x01, 0x02, 0x03 };
+        byte[] data = [0x9F, 0x70, 0x03, 0x01, 0x02, 0x03];
 
         // Act
-        var tlv = TlvParser.ParseSingle(data);
+        Maybe<TlvObject> tlv = TlvParser.ParseSingle(data);
 
         // Assert
         _ = tlv.HasValue.Should().BeTrue();
@@ -49,18 +50,18 @@ public class TlvParserTests
     public void ParseSingle_WithLongFormLength_ParsesCorrectly()
     {
         // Arrange - Long form length: 0x81 0x80 (128 bytes)
-        var data = new byte[131]; // Tag(1) + Length(2) + Value(128)
+        byte[] data = new byte[131]; // Tag(1) + Length(2) + Value(128)
         data[0] = 0x80; // Tag
         data[1] = 0x81; // Long form, 1 byte follows
         data[2] = 0x80; // Length = 128
         // Fill value with test pattern
-        for (var i = 0; i < 128; i++)
+        for (int i = 0; i < 128; i++)
         {
             data[3 + i] = (byte)(i & 0xFF);
         }
 
         // Act
-        var tlv = TlvParser.ParseSingle(data);
+        Maybe<TlvObject> tlv = TlvParser.ParseSingle(data);
 
         // Assert
         _ = tlv.HasValue.Should().BeTrue();
@@ -68,7 +69,7 @@ public class TlvParserTests
         _ = tlv.Value.Length.Should().Be(128);
         _ = tlv.Value.Length.Should().Be(128);
         // Verify actual pattern in value matches expected sequence
-        for (var i = 0; i < 128; i++)
+        for (int i = 0; i < 128; i++)
         {
             _ = tlv.Value.Value[i].Should().Be((byte)(i & 0xFF));
         }
@@ -78,10 +79,10 @@ public class TlvParserTests
     public void ParseSingle_WithEmptyValue_ParsesCorrectly()
     {
         // Arrange - TLV with zero-length value
-        var data = new byte[] { 0x80, 0x00 };
+        byte[] data = [0x80, 0x00];
 
         // Act
-        var tlv = TlvParser.ParseSingle(data);
+        Maybe<TlvObject> tlv = TlvParser.ParseSingle(data);
 
         // Assert
         _ = tlv.HasValue.Should().BeTrue();
@@ -94,10 +95,10 @@ public class TlvParserTests
     public void ParseSingle_WithInvalidData_ReturnsNull()
     {
         // Arrange - Incomplete TLV (missing value bytes)
-        var data = new byte[] { 0x80, 0x05, 0x01, 0x02 }; // Says 5 bytes but only has 2
+        byte[] data = [0x80, 0x05, 0x01, 0x02]; // Says 5 bytes but only has 2
 
         // Act
-        var tlv = TlvParser.ParseSingle(data);
+        Maybe<TlvObject> tlv = TlvParser.ParseSingle(data);
 
         // Assert
         _ = tlv.HasValue.Should().BeFalse();
@@ -107,8 +108,8 @@ public class TlvParserTests
     public void ParseAll_WithMultipleTlvObjects_ParsesAll()
     {
         // Arrange - Multiple TLV objects
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0x80,
             0x02,
             0x01,
@@ -120,11 +121,11 @@ public class TlvParserTests
             0x03,
             0x04,
             0x05,
-            0x06, // Third TLV
-        };
+            0x06 // Third TLV
+        ];
 
         // Act
-        var tlvList = TlvParser.ParseAll(data);
+        IReadOnlyList<TlvObject>? tlvList = TlvParser.ParseAll(data);
 
         // Assert
         _ = tlvList.Should().NotBeNull();
@@ -138,20 +139,20 @@ public class TlvParserTests
     public void ParseAll_WithNestedTlv_ParsesTopLevel()
     {
         // Arrange - Nested TLV structure
-        var nestedData = new byte[] { 0x81, 0x01, 0xFF };
-        var data = new byte[]
-        {
+        byte[] nestedData = [0x81, 0x01, 0xFF];
+        byte[] data =
+        [
             0x80,
             0x05, // Container tag
             0x81,
             0x01,
             0xFF, // Nested TLV
             0x82,
-            0x00, // Empty nested TLV
-        };
+            0x00 // Empty nested TLV
+        ];
 
         // Act
-        var tlvList = TlvParser.ParseAll(data);
+        IReadOnlyList<TlvObject>? tlvList = TlvParser.ParseAll(data);
 
         // Assert
         _ = tlvList.Should().NotBeNull();
@@ -160,7 +161,7 @@ public class TlvParserTests
         _ = tlvList[0].Length.Should().Be(5);
 
         // Parse nested content
-        var nested = tlvList[0].ParseNestedTlv();
+        IReadOnlyList<TlvObject>? nested = tlvList[0].ParseNestedTlv();
         _ = nested.Should().HaveCount(2);
     }
 
@@ -168,8 +169,8 @@ public class TlvParserTests
     public void FindByTag_WithSingleByteTag_FindsCorrectObject()
     {
         // Arrange
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0x80,
             0x02,
             0x01,
@@ -181,11 +182,11 @@ public class TlvParserTests
             0x03,
             0x04,
             0x05,
-            0x06,
-        };
+            0x06
+        ];
 
         // Act
-        var found = TlvParser.FindByTag(data, 0x81);
+        Maybe<TlvObject> found = TlvParser.FindByTag(data, 0x81);
 
         // Assert
         _ = found.HasValue.Should().BeTrue();
@@ -197,8 +198,8 @@ public class TlvParserTests
     public void FindByTag_WithTwoByteTag_FindsCorrectObject()
     {
         // Arrange
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0x80,
             0x02,
             0x01,
@@ -211,11 +212,11 @@ public class TlvParserTests
             0x03,
             0x04,
             0x05,
-            0x06,
-        };
+            0x06
+        ];
 
         // Act
-        var found = TlvParser.FindByTag(data, (ushort)0x9F70);
+        Maybe<TlvObject> found = TlvParser.FindByTag(data, (ushort)0x9F70);
 
         // Assert
         _ = found.HasValue.Should().BeTrue();
@@ -227,10 +228,10 @@ public class TlvParserTests
     public void TlvObject_GetValueAsNumber_ConvertsCorrectly()
     {
         // Arrange
-        var tlv = new TlvObject([0x80], [0x01, 0x23, 0x45]);
+        TlvObject tlv = new TlvObject([0x80], [0x01, 0x23, 0x45]);
 
         // Act
-        var number = tlv.GetValueAsNumber();
+        Maybe<uint> number = tlv.GetValueAsNumber();
 
         // Assert
         _ = number.HasValue.Should().BeTrue();
@@ -241,10 +242,10 @@ public class TlvParserTests
     public void TlvObject_GetValueAsHexString_FormatsCorrectly()
     {
         // Arrange
-        var tlv = new TlvObject([0x80], [0x01, 0x23, 0x45, 0x67]);
+        TlvObject tlv = new TlvObject([0x80], [0x01, 0x23, 0x45, 0x67]);
 
         // Act
-        var hexString = tlv.GetValueAsHexString();
+        string? hexString = tlv.GetValueAsHexString();
 
         // Assert
         _ = hexString.Should().Be("01234567");
@@ -280,19 +281,19 @@ public class TlvParserTests
     public void ParseSingle_WithOffset_ParsesFromCorrectPosition()
     {
         // Arrange
-        var data = new byte[]
-        {
+        byte[] data =
+        [
             0xFF,
             0xFF,
             0xFF, // Junk data
             0x80,
             0x02,
             0x01,
-            0x02, // Actual TLV
-        };
+            0x02 // Actual TLV
+        ];
 
         // Act
-        var tlv = TlvParser.ParseSingle(data, 3, out var consumed);
+        Maybe<TlvObject> tlv = TlvParser.ParseSingle(data, 3, out int consumed);
 
         // Assert
         _ = tlv.HasValue.Should().BeTrue();
@@ -309,7 +310,7 @@ public class TlvParserTests
     public void ParseSingle_WithInvalidFormats_ReturnsNull(byte[] data)
     {
         // Act
-        var tlv = TlvParser.ParseSingle(data);
+        Maybe<TlvObject> tlv = TlvParser.ParseSingle(data);
 
         // Assert
         _ = tlv.HasValue.Should().BeFalse();

@@ -18,21 +18,21 @@ public static class CommandRegistrationExtensions
     /// </summary>
     public static void RegisterCliCommands(this IConfigurator config, IServiceCollection services)
     {
-        var assembly = Assembly.GetExecutingAssembly();
-        var commandTypes = assembly.GetTypes()
+        Assembly assembly = Assembly.GetExecutingAssembly();
+        List<Type> commandTypes = assembly.GetTypes()
             .Where(t => t.IsClass && !t.IsAbstract)
             .Where(t => t.GetCustomAttributes<CliCommandAttribute>().Any())
             .ToList();
 
         // Group commands by branch
-        var branches = new Dictionary<string, List<(Type Type, CliCommandAttribute Attr)>>();
-        var rootCommands = new List<(Type Type, CliCommandAttribute Attr)>();
+        Dictionary<string, List<(Type Type, CliCommandAttribute Attr)>> branches = new Dictionary<string, List<(Type Type, CliCommandAttribute Attr)>>();
+        List<(Type Type, CliCommandAttribute Attr)> rootCommands = [];
 
-        foreach (var commandType in commandTypes)
+        foreach (Type commandType in commandTypes)
         {
-            var attrs = commandType.GetCustomAttributes<CliCommandAttribute>().ToList();
-                
-            foreach (var attr in attrs)
+            List<CliCommandAttribute> attrs = commandType.GetCustomAttributes<CliCommandAttribute>().ToList();
+
+            foreach (CliCommandAttribute attr in attrs)
             {
                 if (string.IsNullOrEmpty(attr.Branch))
                 {
@@ -50,20 +50,20 @@ public static class CommandRegistrationExtensions
         }
 
         // Register root commands
-        foreach (var (type, attr) in rootCommands)
+        foreach ((Type type, CliCommandAttribute attr) in rootCommands)
         {
             RegisterCommand(config, services, type, attr);
         }
 
         // Register branches with their commands
-        foreach (var (branchName, commands) in branches)
+        foreach ((string branchName, List<(Type Type, CliCommandAttribute Attr)> commands) in branches)
         {
             _ = config.AddBranch(branchName, branch =>
             {
                 // Set branch description based on name
                 branch.SetDescription(GetBranchDescription(branchName));
 
-                foreach (var (type, attr) in commands)
+                foreach ((Type type, CliCommandAttribute attr) in commands)
                 {
                     RegisterCommand(branch, services, type, attr);
                 }
@@ -74,15 +74,15 @@ public static class CommandRegistrationExtensions
     private static void RegisterCommand(object config, IServiceCollection services, Type commandType, CliCommandAttribute attr)
     {
         // Check if the command implements IPipelineCommand<TSettings>
-        var pipelineInterface = commandType.GetInterfaces()
-            .FirstOrDefault(i => i.IsGenericType && 
+        Type pipelineInterface = commandType.GetInterfaces()
+            .FirstOrDefault(i => i.IsGenericType &&
                                  i.GetGenericTypeDefinition() == typeof(IPipelineCommand<>));
 
         Type registrationType;
         if (pipelineInterface != null)
         {
             // This is a pipeline command, wrap it with PipelineCommand<TSettings>
-            var settingsType = pipelineInterface.GetGenericArguments()[0];
+            Type settingsType = pipelineInterface.GetGenericArguments()[0];
             registrationType = typeof(PipelineCommand<>).MakeGenericType(settingsType);
 
             // Register the original command implementation for DI
@@ -95,19 +95,19 @@ public static class CommandRegistrationExtensions
         }
 
         // Get the generic AddCommand method
-        var addCommandMethod = config.GetType()
+        MethodInfo addCommandMethod = config.GetType()
             .GetMethods()
-            .FirstOrDefault(m => m.Name == "AddCommand" && 
-                                 m.IsGenericMethodDefinition && 
+            .FirstOrDefault(m => m.Name == "AddCommand" &&
+                                 m.IsGenericMethodDefinition &&
                                  m.GetParameters().Length == 1);
 
         if (addCommandMethod != null)
         {
-            var genericMethod = addCommandMethod.MakeGenericMethod(registrationType);
-            var commandConfig = genericMethod.Invoke(config, [attr.Name]);
-                
+            MethodInfo genericMethod = addCommandMethod.MakeGenericMethod(registrationType);
+            object commandConfig = genericMethod.Invoke(config, [attr.Name]);
+
             // Set description
-            var withDescriptionMethod = commandConfig?.GetType().GetMethod("WithDescription");
+            MethodInfo withDescriptionMethod = commandConfig?.GetType().GetMethod("WithDescription");
             _ = (withDescriptionMethod?.Invoke(commandConfig, [attr.Description]));
         }
     }

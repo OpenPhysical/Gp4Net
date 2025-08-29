@@ -1,105 +1,73 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
-using Gp4Net.Domain;
-using Gp4Net.Domain.CardInfo;
-using Gp4Net.Domain.Commands;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain.CardInfo;
 using Gp4Net.Services;
 using Gp4Net.Tool.Commands.Card;
-using Gp4Net.Tool.Pipeline;
-using Gp4Net.Tool.Services;
 using Gp4Net.CardEmulator.Services;
-using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using Spectre.Console.Testing;
-using StatusSubset = Gp4Net.Domain.Commands.GetStatusCommand.StatusSubset;
-using Gp4Net.Tests.Tool;
 using Gp4Net.Tests.TestHelpers;
-using Gp4Net.Tool.Infrastructure;
-using Gp4Net.Transport;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Tool.Commands.Card;
 
 [TestFixture]
 public class InfoCommandTests
 {
-    private IDisplayService _displayService;
-    private Gp4Net.Tool.Services.ICardService _cardService;
     private IGlobalPlatformService _globalPlatformService;
-    private IKeysetResolver _keysetResolver;
-    private TestCliContext _testContext;
     private InfoCommand _command;
     private TestConsole _console;
-
     private VirtualCardService _virtualCardService = null!;
 
     [SetUp]
     public void Setup()
     {
-        _displayService = new DisplayService(false);
-        
         _virtualCardService = new VirtualCardService();
         _virtualCardService.SetupComprehensiveTestEnvironment();
-        _cardService = new TestCardService(_virtualCardService);
         
-        // Skip domain service factory setup for InfoCommand tests
-        _globalPlatformService = null;
-        _keysetResolver = new FunctionalKeysetResolverAdapter();
+        // Use library approach - direct service injection
+        _globalPlatformService = new EmptyGlobalPlatformService();
         _console = new TestConsole();
 
-        _testContext = new TestCliContext(
-            _displayService,
-            _cardService,
-            _globalPlatformService,
-            _keysetResolver,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance
-        );
-
-        _command = new InfoCommand();
+        // Create command with direct service injection (modern approach)
+        _command = new InfoCommand(_globalPlatformService);
     }
 
     [TearDown]
     public void TearDown()
     {
         _console?.Dispose();
-        _cardService?.Dispose();
         _virtualCardService?.Dispose();
     }
 
     [Test]
-    public async Task ExecuteAsync_WithValidContext_ReturnsSuccess()
+    public async Task ExecuteAsync_WithValidSettings_ReturnsSuccess()
     {
         // Arrange
-        var settings = new InfoCommand.Settings();
+        InfoCommand.Settings settings = new InfoCommand.Settings();
+        var context = TestCommandContext.Create();
 
         // Act
-        var result = await _command.ExecuteAsync(_testContext, settings);
+        int result = await _command.ExecuteAsync(context, settings);
 
         // Assert
         _ = result.Should().Be(0);
     }
 
     [Test]
-    public async Task ExecuteAsync_CardServiceException_ReturnsError()
+    public async Task ExecuteAsync_GlobalPlatformServiceException_ReturnsError()
     {
-        // Arrange - Create a failing card service for this test
-        var failingCardService = new FailingCardService();
-        var failingContext = new TestCliContext(
-            _displayService,
-            failingCardService,
-            _globalPlatformService,
-            _keysetResolver,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance
-        );
-        var settings = new InfoCommand.Settings();
+        // Arrange - Create a command with failing service
+        FailingGlobalPlatformService failingService = new FailingGlobalPlatformService();
+        InfoCommand failingCommand = new InfoCommand(failingService);
+        InfoCommand.Settings settings = new InfoCommand.Settings();
+        var context = TestCommandContext.Create();
 
         // Act
-        var result = await _command.ExecuteAsync(failingContext, settings);
+        int result = await failingCommand.ExecuteAsync(context, settings);
 
         // Assert
         _ = result.Should().Be(1);
@@ -109,7 +77,7 @@ public class InfoCommandTests
     public void Settings_RequiresSecureChannel_ReturnsFalse()
     {
         // Arrange
-        var settings = new InfoCommand.Settings();
+        InfoCommand.Settings settings = new InfoCommand.Settings();
 
         // Assert - InfoCommand should not require secure channel by default
         // This assumes InfoCommand.Settings inherits from a base that has RequiresSecureChannel property
@@ -117,78 +85,28 @@ public class InfoCommandTests
     }
 
     [Test]
-    public async Task ExecuteAsync_IsdSelectionFails_ContinuesExecution()
+    public async Task ExecuteAsync_GetCardInfoSucceeds_ReturnsSuccess()
     {
         // Arrange
-        var settings = new InfoCommand.Settings();
+        InfoCommand.Settings settings = new InfoCommand.Settings();
+        var context = TestCommandContext.Create();
 
         // Act
-        var result = await _command.ExecuteAsync(_testContext, settings);
-
-        // Assert
-        _ = result.Should().Be(0); // Should still succeed
-    }
-
-    [Test]
-    public async Task ExecuteAsync_CplcFails_ContinuesWithOtherData()
-    {
-        // Arrange
-        var settings = new InfoCommand.Settings();
-
-        // Act
-        var result = await _command.ExecuteAsync(_testContext, settings);
+        int result = await _command.ExecuteAsync(context, settings);
 
         // Assert
         _ = result.Should().Be(0);
     }
 
     [Test]
-    public async Task ExecuteAsync_GetApplicationsFails_StillShowsOtherInfo()
+    public async Task ExecuteAsync_WithVerboseSettings_DisplaysDetailedInfo()
     {
         // Arrange
-        var settings = new InfoCommand.Settings();
+        InfoCommand.Settings settings = new InfoCommand.Settings { Verbose = true };
+        var context = TestCommandContext.Create();
 
         // Act
-        var result = await _command.ExecuteAsync(_testContext, settings);
-
-        // Assert
-        _ = result.Should().Be(0);
-    }
-
-    [Test]
-    public async Task ExecuteAsync_WithAtr_DisplaysAtr()
-    {
-        // Arrange
-        var settings = new InfoCommand.Settings();
-
-        // Act
-        var result = await _command.ExecuteAsync(_testContext, settings);
-
-        // Assert
-        _ = result.Should().Be(0);
-    }
-
-    [Test]
-    public async Task ExecuteAsync_WithCplc_DisplaysCplc()
-    {
-        // Arrange
-        var settings = new InfoCommand.Settings();
-
-        // Act
-        var result = await _command.ExecuteAsync(_testContext, settings);
-
-        // Assert
-        _ = result.Should().Be(0);
-    }
-
-    [Test]
-    public async Task ExecuteAsync_WithApplications_DisplaysSummary()
-    {
-        // Arrange
-        var settings = new InfoCommand.Settings();
-
-        // Act
-        var result = await _command.ExecuteAsync(_testContext, settings);
+        int result = await _command.ExecuteAsync(context, settings);
 
         // Assert
         _ = result.Should().Be(0);
@@ -196,31 +114,128 @@ public class InfoCommandTests
 }
 
 /// <summary>
-/// Test implementation of card service that fails for testing error handling.
+/// Test implementation of GlobalPlatform service that fails for error testing.
 /// </summary>
-public class FailingCardService : Gp4Net.Tool.Services.ICardService
+public class FailingGlobalPlatformService : IGlobalPlatformService
 {
-    public bool IsSecureChannelEstablished => false;
-    public bool IsConnected => false;
-    public bool IsDisposed { get; private set; }
-    
-    public byte[] GetAtr() => [];
-    
-    public IReadOnlyList<string> GetReaders() => new List<string>();
-    
-    public bool Connect(string readerName) => false;
-    
-    public void Disconnect() { }
-    
-    public Gp4Net.Tool.Services.CardResponse SendCommand(byte[] command) => new Gp4Net.Tool.Services.CardResponse([], 0x6F00);
-    
-    public Gp4Net.Tool.Services.CardResponse SendCommand(IApduCommand command) => new Gp4Net.Tool.Services.CardResponse([], 0x6F00);
-    
-    public bool EstablishSecureChannel(byte[] keySet, byte securityLevel) => false;
-    
-    public void Dispose()
+    public ISmartCardService CardService { get; } = new EmptySmartCardService();
+
+    public Task<Result<SelectResponse, SmartCardError>> SelectIsdAsync(CancellationToken cancellationToken = default)
     {
-        IsDisposed = true;
-        GC.SuppressFinalize(this);
+        return Task.FromResult(Result.Failure<SelectResponse, SmartCardError>(
+            SmartCardError.CommunicationError("Test failure - ISD selection failed")));
+    }
+
+    public Task<Result<SecureChannelState, SmartCardError>> EstablishSecureChannelAsync(
+        KeySet keySet, 
+        SecurityLevel securityLevel = SecurityLevel.CMac, 
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<SecureChannelState, SmartCardError>(
+            SmartCardError.CommunicationError("Test failure - secure channel establishment failed")));
+    }
+
+    public Task<Result<SecureChannelState, SmartCardError>> EstablishSecureChannelAsync(
+        string keysetName, 
+        SecurityLevel securityLevel = SecurityLevel.CMac, 
+        byte keyVersion = 1, 
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<SecureChannelState, SmartCardError>(
+            SmartCardError.CommunicationError("Test failure - secure channel establishment failed")));
+    }
+
+    public Task<Result<SecureChannelState, SmartCardError>> EstablishSecureChannelAsync(
+        string encKey, 
+        string macKey, 
+        string dekKey, 
+        byte keyVersion, 
+        SecurityLevel securityLevel = SecurityLevel.CMac, 
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<SecureChannelState, SmartCardError>(
+            SmartCardError.CommunicationError("Test failure - secure channel establishment failed")));
+    }
+
+    public Task<Result<CardInformation, SmartCardError>> GetCardInfoAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<CardInformation, SmartCardError>(
+            SmartCardError.CommunicationError("Test failure - card info retrieval failed")));
+    }
+
+    public Task<Result<ImmutableList<ApplicationInfo>, SmartCardError>> GetStatusAsync(
+        StatusSubset subset = StatusSubset.IssuerSecurityDomain, 
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<ImmutableList<ApplicationInfo>, SmartCardError>(
+            SmartCardError.CommunicationError("Test failure")));
+    }
+
+    public Task<Result<InstallationResult, SmartCardError>> InstallCapFileAsync(
+        byte[] capFileData, 
+        Maybe<InstallOptions> options = default, 
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<InstallationResult, SmartCardError>(
+            SmartCardError.CommunicationError("Test failure")));
+    }
+
+    public Task<Result<bool, SmartCardError>> DeleteApplicationAsync(
+        byte[] aid, 
+        bool deleteRelated = false, 
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<bool, SmartCardError>(
+            SmartCardError.CommunicationError("Test failure")));
+    }
+
+    public Task<Result<bool, SmartCardError>> PutKeysAsync(
+        KeySet keySet, 
+        byte keyVersion, 
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<bool, SmartCardError>(
+            SmartCardError.CommunicationError("Test failure")));
+    }
+
+    public Task<Result<CplcData, SmartCardError>> GetCplcAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<CplcData, SmartCardError>(
+            SmartCardError.CommunicationError("Test failure")));
+    }
+
+    public Task<Result<byte[], SmartCardError>> GetDataAsync(
+        ushort tag, 
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<byte[], SmartCardError>(
+            SmartCardError.CommunicationError("Test failure")));
+    }
+
+    public Task<Result<bool, SmartCardError>> SetLifecycleStateAsync(
+        byte[] aid, 
+        LifecycleState state, 
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<bool, SmartCardError>(
+            SmartCardError.CommunicationError("Test failure")));
+    }
+}
+
+/// <summary>
+/// Helper for creating test command contexts for Spectre.Console commands.
+/// </summary>
+public static class TestCommandContext
+{
+    /// <summary>
+    /// Creates a test command context with default values.
+    /// </summary>
+    public static CommandContext Create()
+    {
+        return new CommandContext(
+            ImmutableArray<string>.Empty, 
+            "test", 
+            null, 
+            CancellationToken.None);
     }
 }

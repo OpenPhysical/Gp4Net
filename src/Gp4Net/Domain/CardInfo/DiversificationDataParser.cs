@@ -49,16 +49,16 @@ public static class DiversificationDataParser
         try
         {
             // Use TlvParser to find CF tag (diversification data)
-            var cfElementMaybe = TlvParser.FindByTag(data, 0xCF);
-                
+            Maybe<TlvObject> cfElementMaybe = TlvParser.FindByTag(data, 0xCF);
+
             // No CF tag found - treat as no data available
             if (!cfElementMaybe.HasValue)
             {
                 return "[red]None[/]";
             }
-            
-            var cfElement = cfElementMaybe.Value;
-                
+
+            TlvObject cfElement = cfElementMaybe.Value;
+
             // CF tag found but content too short for SCP data (needs 10 bytes for 5 pairs)
             if (cfElement.Value.Length < 10)
             {
@@ -67,14 +67,14 @@ public static class DiversificationDataParser
 
             // Parse 5 pairs of bytes (SCP version + i= parameter) from the CF content using functional approach
             var scpPairs = Enumerable.Range(0, 5)
-                .Select(pairIndex => new 
-                { 
-                    ScpVersion = cfElement.Value[pairIndex * 2], 
-                    IParameter = cfElement.Value[pairIndex * 2 + 1] 
+                .Select(pairIndex => new
+                {
+                    ScpVersion = cfElement.Value[pairIndex * 2],
+                    IParameter = cfElement.Value[pairIndex * 2 + 1]
                 })
                 .Where(pair => !(pair.ScpVersion == 0x00 && pair.IParameter == 0x00)) // Skip empty slots
                 .ToList();
-                
+
             // Check for invalid SCP versions - fail if any found
             foreach (var pair in scpPairs)
             {
@@ -84,8 +84,8 @@ public static class DiversificationDataParser
                     return "[red]None[/]";
                 }
             }
-            
-            var scpSupport = scpPairs
+
+            List<string> scpSupport = scpPairs
                 .Select(pair => $"SCP{pair.ScpVersion:X2} (i={pair.IParameter:X2})")
                 .ToList();
 

@@ -1,4 +1,3 @@
-using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
@@ -23,11 +22,11 @@ public static class VirtualCardTraceReplayHelper
     /// <param name="config">Optional card configuration (defaults to Generic).</param>
     /// <returns>A virtual card that will reproduce the exact trace behavior.</returns>
     public static Result<VirtualCard, SmartCardError> ForTraceReplay(
-        TraceData trace, 
+        TraceData trace,
         Maybe<CardConfiguration> config)
     {
-        var cardConfig = config.GetValueOrDefault(CardConfiguration.Generic());
-        
+        CardConfiguration cardConfig = config.GetValueOrDefault(CardConfiguration.Generic());
+
         return TraceEntropyExtractor.ExtractCardChallengesFromTrace(trace)
             .Bind(cardChallenges => PreloadedRngService.FromTraceChallenges(cardChallenges)
                 .Map(cardRng => new VirtualCard(cardConfig, new CryptographicService(cardRng))));
@@ -42,17 +41,17 @@ public static class VirtualCardTraceReplayHelper
     /// <param name="config">Optional card configuration (defaults to Generic).</param>
     /// <returns>Tuple of (virtualCard, testCryptoService) with separate entropy sources.</returns>
     public static Result<(VirtualCard card, CryptographicService testService), SmartCardError> ForTraceReplayWithSeparateEntropy(
-        TraceData trace, 
+        TraceData trace,
         Maybe<CardConfiguration> config)
     {
-        var cardConfig = config.GetValueOrDefault(CardConfiguration.Generic());
-        
+        CardConfiguration cardConfig = config.GetValueOrDefault(CardConfiguration.Generic());
+
         return TraceEntropyExtractor.CreateSeparatedRngServicesFromTrace(trace)
             .Map(services =>
             {
-                var (hostRng, cardRng) = services;
-                var virtualCard = new VirtualCard(cardConfig, new CryptographicService(cardRng));
-                var testService = new CryptographicService(hostRng);
+                (PreloadedRngService hostRng, PreloadedRngService cardRng) = services;
+                VirtualCard virtualCard = new VirtualCard(cardConfig, new CryptographicService(cardRng));
+                CryptographicService testService = new CryptographicService(hostRng);
                 return (virtualCard, (CryptographicService)testService);
             });
     }

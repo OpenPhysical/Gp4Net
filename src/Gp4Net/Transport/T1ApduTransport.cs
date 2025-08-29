@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
@@ -78,12 +77,12 @@ public class T1ApduTransport : IApduTransport
         }
 
         // Build APDU according to T=1 rules
-        var apdu = ApduBuilder.BuildApdu(command);
+        byte[] apdu = ApduBuilder.BuildApdu(command);
 
         _logger.LogDebug("T=1 Transmit: {Apdu}", BitConverter.ToString(apdu));
 
         // T=1 handles chaining at the protocol level
-        var response = await channel
+        byte[] response = await channel
             .TransmitAsync(apdu, cancellationToken)
             .ConfigureAwait(false);
 
@@ -104,11 +103,11 @@ public class T1ApduTransport : IApduTransport
             throw new InvalidOperationException("Response too short");
         }
 
-        var sw1 = response[response.Length - 2];
-        var sw2 = response[response.Length - 1];
-        var statusWord = (ushort)((sw1 << 8) | sw2);
+        byte sw1 = response[response.Length - 2];
+        byte sw2 = response[response.Length - 1];
+        ushort statusWord = (ushort)((sw1 << 8) | sw2);
 
-        var data = new byte[response.Length - 2];
+        byte[] data = new byte[response.Length - 2];
         if (data.Length > 0)
         {
             Array.Copy(response, 0, data, 0, data.Length);

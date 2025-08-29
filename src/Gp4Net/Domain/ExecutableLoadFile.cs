@@ -43,7 +43,7 @@ public record ExecutableLoadFile(
     /// <summary>
     /// Gets the associated security domain AID as hex string if available.
     /// </summary>
-    public string AssociatedSecurityDomainAidHex => 
+    public string AssociatedSecurityDomainAidHex =>
         AssociatedSecurityDomainAid.Map(Convert.ToHexString).GetValueOrDefault("None");
 }
 

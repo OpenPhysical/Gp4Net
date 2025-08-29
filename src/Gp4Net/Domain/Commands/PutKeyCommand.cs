@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -137,8 +136,8 @@ public class PutKeyCommand : IApduCommand
     {
         get
         {
-            var data = new List<byte>();
-            foreach (var block in KeyDataBlocks)
+            List<byte> data = [];
+            foreach (KeyDataBlock block in KeyDataBlocks)
             {
                 data.AddRange(block.ToBytes());
             }
@@ -206,12 +205,12 @@ public class PutKeyCommand : IApduCommand
         }
 
         // Determine usage qualifier based on number of keys
-        var usageQualifier = keyDataBlocks.Count == 1 ? 
-            KeyUsageQualifier.SingleKey : 
+        KeyUsageQualifier usageQualifier = keyDataBlocks.Count == 1 ?
+            KeyUsageQualifier.SingleKey :
             KeyUsageQualifier.MultipleKeys;
 
         // For now, we always use plain text (no key encryption)
-        var kekIdentifier = KeyEncryptionKeyIdentifier.None;
+        KeyEncryptionKeyIdentifier kekIdentifier = KeyEncryptionKeyIdentifier.None;
 
         return new PutKeyCommand(usageQualifier, kekIdentifier, keyDataBlocks);
     }
@@ -232,23 +231,23 @@ public class PutKeyCommand : IApduCommand
     public byte[] ToApdu()
     {
         // Calculate total data length
-        var dataLength = 0;
-        foreach (var block in KeyDataBlocks)
+        int dataLength = 0;
+        foreach (KeyDataBlock block in KeyDataBlocks)
         {
             dataLength += block.ToBytes().Length;
         }
 
-        var apdu = new List<byte>
-        {
+        List<byte> apdu =
+        [
             Cla,
             Ins,
             (byte)UsageQualifier,
             (byte)KekIdentifier,
-            (byte)dataLength,
-        };
+            (byte)dataLength
+        ];
 
         // Add key data blocks
-        foreach (var block in KeyDataBlocks)
+        foreach (KeyDataBlock block in KeyDataBlocks)
         {
             apdu.AddRange(block.ToBytes());
         }
@@ -362,7 +361,7 @@ public class KeyDataBlock
     /// <returns>The byte representation.</returns>
     public byte[] ToBytes()
     {
-        var result = new List<byte> { (byte)Type, Length };
+        List<byte> result = [(byte)Type, Length];
 
         result.AddRange(Value);
 
@@ -576,12 +575,12 @@ public class PutKeyResponse
             return SmartCardError.InvalidResponse($"Invalid response length {response.Length}, expected multiple of 3 bytes for key check values.");
         }
 
-        var keyCheckValues = new List<byte[]>();
+        List<byte[]> keyCheckValues = [];
 
         // Each key check value is 3 bytes
-        for (var i = 0; i + 2 < response.Length; i += 3)
+        for (int i = 0; i + 2 < response.Length; i += 3)
         {
-            var kcv = response.Skip(i).Take(3).ToArray();
+            byte[] kcv = response.Skip(i).Take(3).ToArray();
             keyCheckValues.Add(kcv);
         }
 

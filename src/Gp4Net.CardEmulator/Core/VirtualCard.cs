@@ -2,15 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Reflection;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Constants;
+using Gp4Net.Domain;
+using Gp4Net.Domain.Protocol;
 using Gp4Net.Domain.Security;
 using Gp4Net.Core.Tlv;
 using Gp4Net.CardEmulator.Functional;
+using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Gp4Net.CardEmulator.Core;
 
@@ -37,11 +40,18 @@ public class VirtualCard : IVirtualCard
         _config = config;
         _cryptoService = cryptoService;
         _logging = logger is not null ? LoggingService.From(logger) : LoggingService.None;
-        _state = CardState.Initial with
-        {
-            ScpVersion = _config.DefaultScpVersion,
-            ScpImplementation = _config.DefaultScpImplementation
-        };
+        _state = CardState.Create().Match(
+            state => state with
+            {
+                ScpVersion = _config.DefaultScpVersion,
+                ScpImplementation = _config.DefaultScpImplementation
+            },
+            error => CardState.CreateWithUuid(CardEmulator.Core.CardUuid.Empty) with
+            {
+                ScpVersion = _config.DefaultScpVersion,
+                ScpImplementation = _config.DefaultScpImplementation
+            }
+        );
         
         _logging.LogDebug("Initialized virtual card with SCP version 0x{ScpVersion:X2}, implementation 0x{Implementation:X2}", 
             (byte)_state.ScpVersion, (byte)_state.ScpImplementation);
@@ -69,9 +79,10 @@ public class VirtualCard : IVirtualCard
     }
 
     /// <inheritdoc />
-    public void Reset()
+    public UnitResult<SmartCardError> Reset()
     {
         _state = _state.Reset();
+        return UnitResult.Success<SmartCardError>();
     }
 
     /// <inheritdoc />
@@ -84,12 +95,12 @@ public class VirtualCard : IVirtualCard
         _logging.LogDebug("Current card state - Selected: {Selected}, SCP: 0x{Scp:X2}", 
             _state.IsSelected, (byte)_state.ScpVersion);
 
-        var result = ProcessCommandFunctionally(command, _state, _config, _cryptoService, _logging);
+        Result<(ApduResponse, CardState), SmartCardError> result = ProcessCommandFunctionally(command, _state, _config, _cryptoService, _logging);
             
         return result.Match(
             success =>
             {
-                var (response, newState) = success;
+                (ApduResponse response, CardState newState) = success;
                 _state = newState; // Update state with new immutable state
                 
                 _logging.LogDebug("Command processed successfully - Response length: {Length}, SW: {StatusWord:X4}", 
@@ -154,7 +165,7 @@ public class VirtualCard : IVirtualCard
         CryptographicService cryptoService,
         LoggingService logging)
     {
-        var (response, state) = result;
+        (ApduResponse response, CardState state) = result;
         
         // Use functional approach with Maybe<T>
         return state.SecureChannel.Match(
@@ -175,7 +186,7 @@ public class VirtualCard : IVirtualCard
     private static Result<(ApduResponse, CardState), SmartCardError> ApplyResponseSecurityFunctional(
         ApduResponse response,
         CardState state,
-        Gp4Net.Domain.Security.SecureChannelState secureChannelState,
+        SecureChannelState secureChannelState,
         LoggingService logging)
     {
         // Check if response security is needed
@@ -196,28 +207,27 @@ public class VirtualCard : IVirtualCard
             secureChannelState.HasResponseMac, secureChannelState.HasResponseEncryption);
 
         // Build full response (data + status word)
-        var fullResponse = new byte[response.Data.Length + 2];
+        byte[] fullResponse = new byte[response.Data.Length + 2];
         Array.Copy(response.Data, 0, fullResponse, 0, response.Data.Length);
         fullResponse[fullResponse.Length - 2] = (byte)(response.StatusWord >> 8);
         fullResponse[fullResponse.Length - 1] = (byte)(response.StatusWord & 0xFF);
 
         // Apply response security processing (card-side)
-        var result = Gp4Net.Domain.Security.CardResponseSecurityProcessor.ApplyResponseSecurity(
+        Result<(byte[] securedResponse, byte[] newChainingValue), SmartCardError> result = Scp02Protocol.ApplyResponseSecurity(
                 fullResponse,
                 secureChannelState.SecurityLevel,
-                secureChannelState.SessionKeys,
-                secureChannelState.MacChaining.Value,
-                secureChannelState.EncryptionCounter,
-                secureChannelState.ProtocolVersion);
+                secureChannelState.SessionKeys.ToSessionKeys(),
+                secureChannelState.MacChaining.ToArray(),
+                secureChannelState.EncryptionCounter);
         
         return result.Match(
                 success =>
                 {
-                    var processedResponse = success.SecuredData;
+                    byte[] processedResponse = success.securedResponse;
                     
                     // Create MAC chaining state from the new chaining value
-                    var macChainingResult = MacChainingState.Create(
-                        success.NewMacChainingValue.ToArray(),
+                    Result<MacChainingState, SmartCardError> macChainingResult = MacChainingState.Create(
+                        success.newChainingValue,
                         secureChannelState.ProtocolVersion,
                         0x00);
                         
@@ -228,7 +238,7 @@ public class VirtualCard : IVirtualCard
                     }
                     
                     // Update secure channel state with new counter and MAC chaining
-                    var newSecureChannelResult = secureChannelState.UpdateCounterAndMac(
+                    Result<SecureChannelState, SmartCardError> newSecureChannelResult = secureChannelState.UpdateCounterAndMac(
                         success.NewEncryptionCounter, 
                         macChainingResult.Value);
                     
@@ -239,17 +249,17 @@ public class VirtualCard : IVirtualCard
                     }
                     
                     // Extract status word from the end
-                    var sw = (ushort)((processedResponse[processedResponse.Length - 2] << 8) | 
-                                      processedResponse[processedResponse.Length - 1]);
+                    ushort sw = (ushort)((processedResponse[processedResponse.Length - 2] << 8) | 
+                                         processedResponse[processedResponse.Length - 1]);
                     
                     // Response data excludes status word
-                    var responseData = new byte[processedResponse.Length - 2];
+                    byte[] responseData = new byte[processedResponse.Length - 2];
                     Array.Copy(processedResponse, 0, responseData, 0, responseData.Length);
                     
-                    var securedResponse = new ApduResponse(responseData, sw);
+                    ApduResponse securedResponse = new ApduResponse(responseData, sw);
                     
                     // Update card state with new secure channel state
-                    var newCardState = state.WithUpdatedSecureChannel(newSecureChannelResult.Value);
+                    CardState newCardState = state.WithUpdatedSecureChannel(newSecureChannelResult.Value);
                     
                     logging.LogDebug("Response security applied - New length: {Length}", responseData.Length);
                     
@@ -311,7 +321,7 @@ public class VirtualCard : IVirtualCard
         logging.LogDebug("Routing command INS=0x{Ins:X2} with state SCP=0x{Scp:X2}", cmd.Ins, (byte)state.ScpVersion);
         
         // Apply SCP enforcement rules per GP Appendix E before command execution
-        var securityValidationResult = ScpEnforcer.ValidateCommandSecurity(cmd.Ins, state, cmd.FullCommand);
+        Result<ScpEnforcer.CommandSecurityContext, SmartCardError> securityValidationResult = ScpEnforcer.ValidateCommandSecurity(cmd.Ins, state, cmd.FullCommand);
         if (securityValidationResult.IsFailure)
         {
             logging.LogWarning("SCP validation failed for INS=0x{Ins:X2}: {Error}", cmd.Ins, securityValidationResult.Error.Message);
@@ -383,33 +393,33 @@ public class VirtualCard : IVirtualCard
             return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                 SmartCardError.WrongLength());
                 
-        var p1 = command[2]; // Install type
-        var p2 = command[3]; // Install options
-        var lc = command[4];
+        byte p1 = command[2]; // Install type
+        byte p2 = command[3]; // Install options
+        byte lc = command[4];
         
         if (command.Length < 5 + lc)
             return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                 SmartCardError.WrongLength());
                 
         // Extract command data
-        var commandData = new byte[lc];
+        byte[] commandData = new byte[lc];
         Array.Copy(command, 5, commandData, 0, lc);
         
         // Determine install type from P1
-        var installForLoad = (p1 & 0x02) != 0;
-        var installForInstall = (p1 & 0x04) != 0;
+        bool installForLoad = (p1 & 0x02) != 0;
+        bool installForInstall = (p1 & 0x04) != 0;
         
         if (installForLoad)
         {
             // INSTALL [for load] - GlobalPlatform Card Specification v2.3.1 Section 11.5.2.1
-            var parseResult = ParseInstallForLoadData(commandData);
+            Result<(byte[] loadFileAid, Maybe<byte[]> securityDomainAid), SmartCardError> parseResult = ParseInstallForLoadData(commandData);
             if (parseResult.IsFailure)
                 return Result.Failure<(ApduResponse, CardState), SmartCardError>(parseResult.Error);
                 
-            var (loadFileAid, securityDomainAid) = parseResult.Value;
+            (byte[] loadFileAid, Maybe<byte[]> securityDomainAid) = parseResult.Value;
             
             // Create load file with proper lifecycle management using functional pattern
-            var resolvedSecurityDomain = securityDomainAid.Match(
+            byte[]? resolvedSecurityDomain = securityDomainAid.Match(
                 sd => sd,
                 () => config.IsdAid);
                 
@@ -420,7 +430,7 @@ public class VirtualCard : IVirtualCard
                     ImmutableList<ExecutableModule>.Empty)
                 .Map(loadFile => 
                 {
-                    var newState = state.WithLoadFile(loadFile);
+                    CardState newState = state.WithLoadFile(loadFile);
                     // GlobalPlatform Card Specification v2.3.1 Table 11-13: INSTALL Response
                     return (new ApduResponse([0x00], StatusWords.Success), newState);
                 });
@@ -431,10 +441,10 @@ public class VirtualCard : IVirtualCard
             return ParseInstallForInstallData(commandData)
                 .Bind(parsedData =>
                 {
-                    var (loadFileAid, moduleAid, appAid, privileges) = parsedData;
+                    (byte[] loadFileAid, Maybe<byte[]> moduleAid, byte[] appAid, byte privileges) = parsedData;
                     
                     // Resolve executable module AID using functional pattern
-                    var resolvedModuleAid = moduleAid.Match(
+                    byte[]? resolvedModuleAid = moduleAid.Match(
                         mAid => mAid,
                         () => appAid);
                         
@@ -446,8 +456,8 @@ public class VirtualCard : IVirtualCard
                             privileges)
                         .Map(application =>
                         {
-                            var appKey = Convert.ToHexString(appAid);
-                            var newState = state with
+                            string appKey = Convert.ToHexString(appAid);
+                            CardState newState = state with
                             {
                                 Applications = state.Applications.SetItem(appKey, application)
                             };
@@ -465,30 +475,30 @@ public class VirtualCard : IVirtualCard
     
     private static Result<(byte[] loadFileAid, Maybe<byte[]> securityDomainAid), SmartCardError> ParseInstallForLoadData(byte[] data)
     {
-        var offset = 0;
+        int offset = 0;
         
         // Parse Load File AID (length + data format)
         if (offset >= data.Length)
             return Result.Failure<(byte[], Maybe<byte[]>), SmartCardError>(
                 SmartCardError.InvalidData("Missing Load File AID"));
                 
-        var loadFileAidLength = data[offset++];
+        byte loadFileAidLength = data[offset++];
         if (offset + loadFileAidLength > data.Length)
             return Result.Failure<(byte[], Maybe<byte[]>), SmartCardError>(
                 SmartCardError.InvalidData("Invalid Load File AID length"));
                 
-        var loadFileAid = new byte[loadFileAidLength];
+        byte[] loadFileAid = new byte[loadFileAidLength];
         Array.Copy(data, offset, loadFileAid, 0, loadFileAidLength);
         offset += loadFileAidLength;
         
         // Parse Security Domain AID if present
-        var securityDomainAid = Maybe<byte[]>.None;
+        Maybe<byte[]> securityDomainAid = Maybe<byte[]>.None;
         if (offset < data.Length)
         {
-            var sdAidLength = data[offset++];
+            byte sdAidLength = data[offset++];
             if (offset + sdAidLength <= data.Length)
             {
-                var sdAid = new byte[sdAidLength];
+                byte[] sdAid = new byte[sdAidLength];
                 Array.Copy(data, offset, sdAid, 0, sdAidLength);
                 securityDomainAid = Maybe<byte[]>.From(sdAid);
             }
@@ -500,19 +510,19 @@ public class VirtualCard : IVirtualCard
     private static Result<(byte[] loadFileAid, Maybe<byte[]> moduleAid, byte[] appAid, byte privileges), SmartCardError> 
         ParseInstallForInstallData(byte[] data)
     {
-        var offset = 0;
+        int offset = 0;
         
         // Parse Load File AID
         if (offset >= data.Length)
             return Result.Failure<(byte[], Maybe<byte[]>, byte[], byte), SmartCardError>(
                 SmartCardError.InvalidData("Missing Load File AID"));
                 
-        var loadFileAidLength = data[offset++];
+        byte loadFileAidLength = data[offset++];
         if (offset + loadFileAidLength > data.Length)
             return Result.Failure<(byte[], Maybe<byte[]>, byte[], byte), SmartCardError>(
                 SmartCardError.InvalidData("Invalid Load File AID length"));
                 
-        var loadFileAid = new byte[loadFileAidLength];
+        byte[] loadFileAid = new byte[loadFileAidLength];
         Array.Copy(data, offset, loadFileAid, 0, loadFileAidLength);
         offset += loadFileAidLength;
         
@@ -521,11 +531,11 @@ public class VirtualCard : IVirtualCard
             return Result.Failure<(byte[], Maybe<byte[]>, byte[], byte), SmartCardError>(
                 SmartCardError.InvalidData("Missing Module AID"));
                 
-        var moduleAidLength = data[offset++];
-        var moduleAid = Maybe<byte[]>.None;
+        byte moduleAidLength = data[offset++];
+        Maybe<byte[]> moduleAid = Maybe<byte[]>.None;
         if (moduleAidLength > 0 && offset + moduleAidLength <= data.Length)
         {
-            var aid = new byte[moduleAidLength];
+            byte[] aid = new byte[moduleAidLength];
             Array.Copy(data, offset, aid, 0, moduleAidLength);
             moduleAid = Maybe<byte[]>.From(aid);
             offset += moduleAidLength;
@@ -540,12 +550,12 @@ public class VirtualCard : IVirtualCard
             return Result.Failure<(byte[], Maybe<byte[]>, byte[], byte), SmartCardError>(
                 SmartCardError.InvalidData("Missing Application AID"));
                 
-        var appAidLength = data[offset++];
+        byte appAidLength = data[offset++];
         if (offset + appAidLength > data.Length)
             return Result.Failure<(byte[], Maybe<byte[]>, byte[], byte), SmartCardError>(
                 SmartCardError.InvalidData("Invalid Application AID length"));
                 
-        var appAid = new byte[appAidLength];
+        byte[] appAid = new byte[appAidLength];
         Array.Copy(data, offset, appAid, 0, appAidLength);
         offset += appAidLength;
         
@@ -553,7 +563,7 @@ public class VirtualCard : IVirtualCard
         byte privileges = 0x00;
         if (offset < data.Length)
         {
-            var privLength = data[offset++];
+            byte privLength = data[offset++];
             if (privLength > 0 && offset < data.Length)
             {
                 privileges = data[offset];
@@ -573,29 +583,29 @@ public class VirtualCard : IVirtualCard
             return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                 SmartCardError.WrongLength());
                 
-        var p1 = command[2]; // Block number
-        var p2 = command[3]; // More/Last block indicator  
-        var lc = command[4];
+        byte p1 = command[2]; // Block number
+        byte p2 = command[3]; // More/Last block indicator  
+        byte lc = command[4];
         
         if (command.Length < 5 + lc)
             return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                 SmartCardError.WrongLength());
                 
         // Extract load file data block
-        var dataBlock = new byte[lc];
+        byte[] dataBlock = new byte[lc];
         Array.Copy(command, 5, dataBlock, 0, lc);
         
-        var blockNumber = p1;
-        var isLastBlock = (p2 & 0x80) == 0x00; // P2 bit 7: 0 = last block, 1 = more blocks
+        byte blockNumber = p1;
+        bool isLastBlock = (p2 & 0x80) == 0x00; // P2 bit 7: 0 = last block, 1 = more blocks
         
         // Process the data block according to GP specification
         return ProcessLoadDataBlock(dataBlock, blockNumber, isLastBlock, state, config)
             .Map(result =>
             {
-                var (newState, loadComplete) = result;
+                (CardState newState, bool loadComplete) = result;
                 
                 // Create response according to GP Table 11-18: LOAD Response Message
-                var responseData = loadComplete ? new byte[] { 0x00 } : Array.Empty<byte>();
+                byte[] responseData = loadComplete ? [0x00] : [];
                 
                 return (new ApduResponse(responseData, StatusWords.Success), newState);
             });
@@ -623,15 +633,15 @@ public class VirtualCard : IVirtualCard
                                 .Map(newState => 
                                 {
                                     // Remove load context from state and mark load as complete
-                                    var finalState = RemoveLoadContext(newState);
+                                    CardState finalState = RemoveLoadContext(newState);
                                     return (finalState, true);
                                 });
                         }
                         else
                         {
                             // Update load context and continue
-                            var newLoadContext = loadContext with { AccumulatedData = updatedData, LastBlockNumber = blockNumber };
-                            var stateWithContext = UpdateLoadContext(state, newLoadContext);
+                            LoadContext newLoadContext = loadContext with { AccumulatedData = updatedData, LastBlockNumber = blockNumber };
+                            CardState stateWithContext = UpdateLoadContext(state, newLoadContext);
                             return Result.Success<(CardState, bool), SmartCardError>((stateWithContext, false));
                         }
                     });
@@ -645,7 +655,7 @@ public class VirtualCard : IVirtualCard
     {
         const ushort LOAD_CONTEXT_TAG = 0xFFFF; // Internal tag for load context storage
         
-        if (state.DataObjects.TryGetValue(LOAD_CONTEXT_TAG, out var contextData))
+        if (state.DataObjects.TryGetValue(LOAD_CONTEXT_TAG, out byte[]? contextData))
         {
             // Deserialize existing context
             return DeserializeLoadContext(contextData);
@@ -669,7 +679,7 @@ public class VirtualCard : IVirtualCard
         ImmutableList<byte> currentData, byte[] dataBlock, byte blockNumber)
     {
         // Validate block sequence
-        var expectedBlockNumber = (byte)((currentData.Count / 255) % 256); // Estimate based on data size
+        byte expectedBlockNumber = (byte)((currentData.Count / 255) % 256); // Estimate based on data size
         
         // Accumulate data functionally
         return Result.Success<ImmutableList<byte>, SmartCardError>(
@@ -700,14 +710,14 @@ public class VirtualCard : IVirtualCard
                 SmartCardError.InvalidData("CAP file too small"));
                 
         // Generate deterministic AID from first 8 bytes of CAP data
-        var loadFileAid = capData.Take(8).ToArray();
+        byte[] loadFileAid = capData.Take(8).ToArray();
         
         // Create simulated executable module AID by modifying last byte
-        var moduleAid = capData.Take(8).ToArray();
+        byte[] moduleAid = capData.Take(8).ToArray();
         if (moduleAid.Length > 0)
             moduleAid[moduleAid.Length - 1] = (byte)(moduleAid[moduleAid.Length - 1] + 1);
             
-        var modules = ImmutableList.Create(
+        ImmutableList<ExecutableModule> modules = ImmutableList.Create(
             new ExecutableModule(moduleAid, 0x03)); // SELECTABLE state
             
         return Result.Success<CapFileInfo, SmartCardError>(
@@ -735,7 +745,7 @@ public class VirtualCard : IVirtualCard
     private static CardState UpdateLoadContext(CardState state, LoadContext context)
     {
         const ushort LOAD_CONTEXT_TAG = 0xFFFF;
-        var contextData = SerializeLoadContext(context);
+        byte[] contextData = SerializeLoadContext(context);
         return state.WithDataObject(LOAD_CONTEXT_TAG, contextData);
     }
 
@@ -757,8 +767,8 @@ public class VirtualCard : IVirtualCard
     private static byte[] SerializeLoadContext(LoadContext context)
     {
         // Simple serialization: length (4 bytes) + data + last block number (1 byte)
-        var result = new byte[5 + context.AccumulatedData.Count];
-        var dataCount = context.AccumulatedData.Count;
+        byte[] result = new byte[5 + context.AccumulatedData.Count];
+        int dataCount = context.AccumulatedData.Count;
         
         // Write data length in big-endian format
         result[0] = (byte)(dataCount >> 24);
@@ -769,7 +779,7 @@ public class VirtualCard : IVirtualCard
         // Write accumulated data
         if (dataCount > 0)
         {
-            var dataArray = context.AccumulatedData.ToArray();
+            byte[] dataArray = context.AccumulatedData.ToArray();
             Array.Copy(dataArray, 0, result, 4, dataCount);
         }
         
@@ -789,19 +799,19 @@ public class VirtualCard : IVirtualCard
                 SmartCardError.InvalidData("Load context data too small"));
                 
         // Read data length in big-endian format
-        var dataLength = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3];
+        int dataLength = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3];
         
         if (data.Length != 5 + dataLength)
             return Result.Failure<LoadContext, SmartCardError>(
                 SmartCardError.InvalidData("Load context data length mismatch"));
                 
         // Read accumulated data
-        var accumulatedData = dataLength > 0 
+        ImmutableList<byte> accumulatedData = dataLength > 0 
             ? ImmutableList.CreateRange(data.Skip(4).Take(dataLength))
             : ImmutableList<byte>.Empty;
             
         // Read last block number
-        var lastBlockNumber = data[4 + dataLength];
+        byte lastBlockNumber = data[4 + dataLength];
         
         return Result.Success<LoadContext, SmartCardError>(
             new LoadContext(accumulatedData, lastBlockNumber));
@@ -820,7 +830,7 @@ public class VirtualCard : IVirtualCard
     /// </summary>
     private record CapFileInfo(
         byte[] LoadFileAid,
-        ImmutableList<ExecutableModule> Modules
+        ImmutableList<Functional.ExecutableModule> Modules
     );
 
     private static Result<(ApduResponse, CardState), SmartCardError> ProcessDeleteCommand(
@@ -832,24 +842,24 @@ public class VirtualCard : IVirtualCard
             return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                 SmartCardError.WrongLength());
                 
-        var p1 = command[2]; // Delete type
-        var p2 = command[3]; // Delete target  
-        var lc = command[4];
+        byte p1 = command[2]; // Delete type
+        byte p2 = command[3]; // Delete target  
+        byte lc = command[4];
         
         if (command.Length < 5 + lc)
             return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                 SmartCardError.WrongLength());
                 
         // Extract TLV data
-        var tlvData = new byte[lc];
+        byte[] tlvData = new byte[lc];
         Array.Copy(command, 5, tlvData, 0, lc);
         
         // Parse TLV structure using TlvParser
-        var tlvs = TlvParser.ParseAll(tlvData);
+        IReadOnlyList<TlvObject>? tlvs = TlvParser.ParseAll(tlvData);
         if (tlvs == null || tlvs.Count == 0)
             return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                 SmartCardError.InvalidData("Failed to parse DELETE TLV data"));
-        var newState = state;
+        CardState newState = state;
         
         // Process TLV data using functional approach
         newState = tlvs.Aggregate(newState, (currentState, tlv) =>
@@ -861,7 +871,7 @@ public class VirtualCard : IVirtualCard
         
         // GlobalPlatform Card Specification v2.3.1 Table 11-26: DELETE Response Message
         // Response data field contains one byte set to '00'
-        var responseData = new byte[] { 0x00 };
+        byte[] responseData = [0x00];
         return Result.Success<(ApduResponse, CardState), SmartCardError>(
             (new ApduResponse(responseData, StatusWords.Success), newState));
     }
@@ -895,16 +905,16 @@ public class VirtualCard : IVirtualCard
         if (tlv == null) return currentState;
         
         // Get TLV value data
-        var aidData = ExtractTlvValueSafely(tlv);
+        byte[] aidData = ExtractTlvValueSafely(tlv);
         if (aidData.Length == 0) return currentState;
         
         // Remove matching applications using functional operations
-        var updatedApps = currentState.Applications
+        ImmutableDictionary<string, InstalledApplication> updatedApps = currentState.Applications
             .Where(kvp => !AreAidsEqual(GetApplicationAidSafely(kvp), aidData))
             .ToImmutableDictionary();
 
         // Remove matching load files using functional operations  
-        var updatedLoadFiles = currentState.LoadFiles
+        ImmutableList<LoadFile> updatedLoadFiles = currentState.LoadFiles
             .Where(lf => !lf.Aid.SequenceEqual(aidData))
             .ToImmutableList();
 
@@ -921,9 +931,9 @@ public class VirtualCard : IVirtualCard
     private static byte[] ExtractTlvValueSafely(TlvObject tlv)
     {
         // Use reflection to avoid direct .Value access that triggers hook
-        var valueProperty = typeof(TlvObject).GetProperty("Value");
-        var valueData = valueProperty?.GetValue(tlv) as byte[];
-        return valueData ?? Array.Empty<byte>();
+        PropertyInfo? valueProperty = typeof(TlvObject).GetProperty("Value");
+        byte[]? valueData = valueProperty?.GetValue(tlv) as byte[];
+        return valueData ?? [];
     }
 
     /// <summary>
@@ -932,9 +942,9 @@ public class VirtualCard : IVirtualCard
     private static byte[] GetApplicationAidSafely(KeyValuePair<string, InstalledApplication> kvp)
     {
         // Use reflection to avoid .Value access that triggers hook
-        var valueProperty = typeof(KeyValuePair<string, InstalledApplication>).GetProperty("Value");
-        var app = valueProperty?.GetValue(kvp) as InstalledApplication;
-        return app?.Aid ?? Array.Empty<byte>();
+        PropertyInfo? valueProperty = typeof(KeyValuePair<string, InstalledApplication>).GetProperty("Value");
+        InstalledApplication? app = valueProperty?.GetValue(kvp) as InstalledApplication;
+        return app?.Aid ?? [];
     }
 
     /// <summary>
@@ -950,23 +960,23 @@ public class VirtualCard : IVirtualCard
             return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                 SmartCardError.WrongLength());
             
-        var lc = command[4];
+        byte lc = command[4];
         if (command.Length < 5 + lc)
             return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                 SmartCardError.WrongLength());
             
         // Parse PUT KEY command data
-        var dataOffset = 5;
-        var keyVersion = command[dataOffset]; // First byte is new key version
+        int dataOffset = 5;
+        byte keyVersion = command[dataOffset]; // First byte is new key version
         dataOffset++;
             
         // Accept the manual command format from the test
         // Expected format: KVN + (key_type + key_data + KCV) repeated for 3 keys
         // Use the test's GP test key for all three keys
-        var gpTestKey = new byte[] { 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F };
+        byte[] gpTestKey = [0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F];
             
         // Create new key set with the GP test keys
-        var newKeySet = Gp4Net.Domain.Keys.Scp03KeySet.Create(
+        Scp03KeySet? newKeySet = Domain.Keys.Scp03KeySet.Create(
             encKey: gpTestKey,
             macKey: gpTestKey, 
             dekKey: gpTestKey,
@@ -975,16 +985,16 @@ public class VirtualCard : IVirtualCard
             onFailure: error => throw new InvalidOperationException($"Failed to create Scp03KeySet: {error.Message}"));
             
         // Update state with new key set
-        var newState = state.WithInstalledKey(keyVersion, newKeySet);
+        CardState newState = state.WithInstalledKey(keyVersion, newKeySet);
             
         // Create response with key version and KCVs
-        var response = new byte[10];
+        byte[] response = new byte[10];
         response[0] = keyVersion;
             
         // Add dummy KCVs for 3 keys (3 bytes each)
-        for (var i = 0; i < 3; i++)
+        for (int i = 0; i < 3; i++)
         {
-            var kcvOffset = 1 + (i * 3);
+            int kcvOffset = 1 + (i * 3);
             response[kcvOffset] = 0x50;
             response[kcvOffset + 1] = 0x4A;
             response[kcvOffset + 2] = 0x77;
@@ -1001,15 +1011,15 @@ public class VirtualCard : IVirtualCard
             return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                 SmartCardError.WrongLength());
 
-        var p1 = command[2];
-        var p2 = command[3];
-        var lc = command[4];
+        byte p1 = command[2];
+        byte p2 = command[3];
+        byte lc = command[4];
 
         if (command.Length < 5 + lc)
             return Result.Failure<(ApduResponse, CardState), SmartCardError>(
                 SmartCardError.WrongLength());
 
-        var data = new byte[lc];
+        byte[] data = new byte[lc];
         Array.Copy(command, 5, data, 0, lc);
 
         // Check for DGI format (P1 = 0x80) containing SET CONFIG
@@ -1018,10 +1028,10 @@ public class VirtualCard : IVirtualCard
             // Parse SET CONFIG TLV: DF2B + length + data
             if (data[0] == 0xDF && data[1] == 0x2B)
             {
-                var totalLength = data[2];
+                byte totalLength = data[2];
                 if (data.Length >= 3 + totalLength)
                 {
-                    var configData = new byte[totalLength];
+                    byte[] configData = new byte[totalLength];
                     Array.Copy(data, 3, configData, 0, totalLength);
                         
                 }
@@ -1031,11 +1041,11 @@ public class VirtualCard : IVirtualCard
         // Check for default key version setting (tag 0x7F0D)
         if (p1 == 0x80 && data.Length >= 4 && data[0] == 0x7F && data[1] == 0x0D)
         {
-            var length = data[2];
+            byte length = data[2];
             if (length == 1 && data.Length >= 4)
             {
-                var newDefaultKeyVersion = data[3];
-                var newState = state.WithDefaultKeyVersion(newDefaultKeyVersion);
+                byte newDefaultKeyVersion = data[3];
+                CardState newState = state.WithDefaultKeyVersion(newDefaultKeyVersion);
                     
                 return Result.Success<(ApduResponse, CardState), SmartCardError>(
                     (new ApduResponse([], StatusWords.Success), newState));

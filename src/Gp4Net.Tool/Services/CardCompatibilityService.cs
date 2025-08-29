@@ -106,30 +106,30 @@ public class CardCompatibilityService : ICardCompatibilityService
         try
         {
             // Detect card type
-            var cardTypeResult = await DetectCardTypeAsync(channel, transport, cancellationToken);
+            Result<CardTypeInfo, SmartCardError> cardTypeResult = await DetectCardTypeAsync(channel, transport, cancellationToken);
             if (cardTypeResult.IsFailure)
             {
                 return Result.Failure<CardCompatibilityResult, SmartCardError>(cardTypeResult.Error);
             }
 
-            var cardType = cardTypeResult.Value;
+            CardTypeInfo cardType = cardTypeResult.Value;
 
             // Check environment validation
-            var envResult = await _environmentValidation.ValidateEnvironmentAsync(
+            Result<EnvironmentValidationResult, SmartCardError> envResult = await _environmentValidation.ValidateEnvironmentAsync(
                 keySet, channel, transport, cancellationToken);
-                
+
             if (envResult.IsFailure)
             {
                 return Result.Failure<CardCompatibilityResult, SmartCardError>(envResult.Error);
             }
 
-            var envValidation = envResult.Value;
+            EnvironmentValidationResult envValidation = envResult.Value;
 
             // Analyze compatibility based on operation type and card characteristics
-            var (isCompatible, isSafe, message, warnings, recommendations) = 
+            (bool isCompatible, bool isSafe, string message, string[] warnings, string[] recommendations) =
                 AnalyzeCompatibility(operation, keySet, cardType, envValidation);
 
-            var result = new CardCompatibilityResult(
+            CardCompatibilityResult result = new CardCompatibilityResult(
                 isCompatible, isSafe, cardType, message, warnings, recommendations);
 
             _logger.LogInformation(
@@ -159,17 +159,17 @@ public class CardCompatibilityService : ICardCompatibilityService
         try
         {
             // First, try to identify by ATR if available
-            var atrHash = GetChannelIdentifier(channel);
-            if (KnownCardTypes.TryGetValue(atrHash, out var knownType))
+            string atrHash = GetChannelIdentifier(channel);
+            if (KnownCardTypes.TryGetValue(atrHash, out CardTypeInfo knownType))
             {
                 return Result.Success<CardTypeInfo, SmartCardError>(knownType);
             }
 
             // Try to get CPLC data for manufacturer identification
-            var cplcResult = await GetCplcDataAsync(channel, transport, cancellationToken);
+            Result<byte[], SmartCardError> cplcResult = await GetCplcDataAsync(channel, transport, cancellationToken);
             if (cplcResult.IsSuccess)
             {
-                var cardType = AnalyzeCplcForCardType(cplcResult.Value);
+                CardTypeInfo cardType = AnalyzeCplcForCardType(cplcResult.Value);
                 if (cardType != null)
                 {
                     return Result.Success<CardTypeInfo, SmartCardError>(cardType);
@@ -177,7 +177,7 @@ public class CardCompatibilityService : ICardCompatibilityService
             }
 
             // Fallback to generic unknown card
-            var genericCard = new CardTypeInfo(
+            CardTypeInfo genericCard = new CardTypeInfo(
                 "Unknown",
                 "Unknown",
                 null,
@@ -208,21 +208,21 @@ public class CardCompatibilityService : ICardCompatibilityService
         {
             // Try to get card status or security status
             // This is card-specific and may not be available on all cards
-            var commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.ConfirmationCounter);
+            Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.ConfirmationCounter);
             if (commandResult.IsFailure)
             {
                 return Result.Failure<int?, SmartCardError>(commandResult.Error);
             }
-                
-            var response = await transport.TransmitAsync(commandResult.Value, channel, cancellationToken);
+
+            ApduResponse response = await transport.TransmitAsync(commandResult.Value, channel, cancellationToken);
 
             if (response.IsSuccess && response.Data.Length > 0)
             {
                 // Parse counter if available (implementation depends on card type)
-                var parseResult = GetDataResponse.Parse(GetDataCommand.DataObjects.ConfirmationCounter, response.Data);
+                Result<GetDataResponse, SmartCardError> parseResult = GetDataResponse.Parse(GetDataCommand.DataObjects.ConfirmationCounter, response.Data);
                 return parseResult.Map(parsedResponse =>
                 {
-                    var counter = parsedResponse.GetValueAsNumber();
+                    Maybe<uint> counter = parsedResponse.GetValueAsNumber();
                     return counter.HasValue ? (int?)counter.Value : null;
                 });
             }
@@ -245,13 +245,13 @@ public class CardCompatibilityService : ICardCompatibilityService
     {
         try
         {
-            var commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardProductionLifeCycle);
+            Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardProductionLifeCycle);
             if (commandResult.IsFailure)
             {
                 return Result.Failure<byte[], SmartCardError>(commandResult.Error);
             }
-            var getDataCmd = commandResult.Value;
-            var response = await transport.TransmitAsync(getDataCmd, channel, cancellationToken);
+            GetDataCommand getDataCmd = commandResult.Value;
+            ApduResponse response = await transport.TransmitAsync(getDataCmd, channel, cancellationToken);
 
             if (response.IsSuccess && response.Data.Length > 0)
             {
@@ -278,9 +278,9 @@ public class CardCompatibilityService : ICardCompatibilityService
             }
 
             // Extract manufacturer code from CPLC (typically at offset 8-9)
-            var manufacturerCode = (ushort)((cplcData[8] << 8) | cplcData[9]);
-                
-            if (CplcManufacturers.TryGetValue(manufacturerCode, out var manufacturer))
+            ushort manufacturerCode = (ushort)((cplcData[8] << 8) | cplcData[9]);
+
+            if (CplcManufacturers.TryGetValue(manufacturerCode, out string manufacturer))
             {
                 return new CardTypeInfo(
                     manufacturer,
@@ -308,7 +308,7 @@ public class CardCompatibilityService : ICardCompatibilityService
         return channel.GetHashCode().ToString("X8");
     }
 
-    private static (bool IsCompatible, bool IsSafe, string Message, string[] Warnings, string[] Recommendations) 
+    private static (bool IsCompatible, bool IsSafe, string Message, string[] Warnings, string[] Recommendations)
         AnalyzeCompatibility(
             CardOperation operation,
             IKeySet keySet,
@@ -316,8 +316,8 @@ public class CardCompatibilityService : ICardCompatibilityService
             EnvironmentValidationResult envValidation
         )
     {
-        var warnings = new List<string>();
-        var recommendations = new List<string>();
+        List<string> warnings = [];
+        List<string> recommendations = [];
 
         // If environment validation failed, operation is not safe
         if (!envValidation.IsSafe)
@@ -325,13 +325,13 @@ public class CardCompatibilityService : ICardCompatibilityService
             warnings.Add(envValidation.Message);
             warnings.AddRange(envValidation.Warnings);
             recommendations.Add("Use appropriate keyset for card environment");
-                
-            return (false, false, "Environment validation failed", 
+
+            return (false, false, "Environment validation failed",
                 warnings.ToArray(), recommendations.ToArray());
         }
 
         // Check operation-specific compatibility
-        var (opCompatible, opSafe, opMessage) = operation switch
+        (bool opCompatible, bool opSafe, string opMessage) = operation switch
         {
             CardOperation.Authentication => CheckAuthenticationCompatibility(keySet, cardType, envValidation),
             CardOperation.KeyInstallation => CheckKeyInstallationCompatibility(cardType),

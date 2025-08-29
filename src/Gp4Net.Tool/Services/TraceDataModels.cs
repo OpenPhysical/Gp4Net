@@ -13,12 +13,12 @@ public class TraceMetadata
     /// Card type identifier.
     /// </summary>
     public string CardType { get; set; } = "NXP_P71";
-    
+
     /// <summary>
     /// Answer to Reset (ATR) value.
     /// </summary>
     public string Atr { get; set; } = "3BD518FF8191FE1FC38073C821100A";
-    
+
     /// <summary>
     /// Issuer Security Domain AID.
     /// </summary>
@@ -35,7 +35,7 @@ public class OperationRange
     /// Starting exchange index.
     /// </summary>
     public int StartIndex { get; set; }
-    
+
     /// <summary>
     /// Ending exchange index.
     /// </summary>
@@ -52,17 +52,17 @@ public class SimpleExchange
     /// Command APDU (hex string).
     /// </summary>
     public string Command { get; set; } = "";
-    
+
     /// <summary>
     /// Response APDU (hex string).
     /// </summary>
     public string Response { get; set; } = "";
-    
+
     /// <summary>
     /// Optional description of the command.
     /// </summary>
     public string Description { get; set; }
-    
+
     /// <summary>
     /// Optional response time in milliseconds.
     /// </summary>
@@ -79,12 +79,12 @@ public class SimpleTraceData
     /// Trace metadata.
     /// </summary>
     public TraceMetadata Metadata { get; set; } = new();
-    
+
     /// <summary>
     /// Operations mapped to exchange ranges.
     /// </summary>
     public Dictionary<string, OperationRange> Operations { get; set; } = new();
-    
+
     /// <summary>
     /// List of APDU exchanges.
     /// </summary>

@@ -1,14 +1,12 @@
 using System;
 using System.Collections.Immutable;
 using System.Linq;
-using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Generators;
 using Org.BouncyCastle.Crypto.Modes;
 using Org.BouncyCastle.Crypto.Paddings;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Security;
-using Org.BouncyCastle.Utilities;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 
@@ -46,10 +44,10 @@ public sealed class SecureKeyStore
         return Result.Try(() =>
         {
             // Generate cryptographically secure master key and salt
-            var masterKey = new byte[32]; // 256-bit key
-            var salt = new byte[16];      // 128-bit salt
-                
-            var random = new SecureRandom();
+            byte[] masterKey = new byte[32]; // 256-bit key
+            byte[] salt = new byte[16];      // 128-bit salt
+
+            SecureRandom random = new SecureRandom();
             random.NextBytes(masterKey);
             random.NextBytes(salt);
 
@@ -86,8 +84,8 @@ public sealed class SecureKeyStore
         return Result.Try(() =>
         {
             // Encrypt the key before storing
-            var encryptedKey = EncryptKey(keyId, keyData);
-            var newKeys = _keys.Add(keyId, encryptedKey);
+            EncryptedKey encryptedKey = EncryptKey(keyId, keyData);
+            ImmutableDictionary<string, EncryptedKey> newKeys = _keys.Add(keyId, encryptedKey);
 
             // Clear the original key data
             Array.Clear(keyData, 0, keyData.Length);
@@ -108,7 +106,7 @@ public sealed class SecureKeyStore
                 SmartCardError.InvalidArgument("Key ID cannot be null or empty"));
         }
 
-        if (!_keys.TryGetValue(keyId, out var encryptedKey))
+        if (!_keys.TryGetValue(keyId, out EncryptedKey encryptedKey))
         {
             return Result.Failure<SecureKey, SmartCardError>(
                 SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found"));
@@ -116,7 +114,7 @@ public sealed class SecureKeyStore
 
         return Result.Try(() =>
         {
-            var decryptedKey = DecryptKey(keyId, encryptedKey);
+            byte[] decryptedKey = DecryptKey(keyId, encryptedKey);
             return new SecureKey(keyId, decryptedKey);
         }, ex => SmartCardError.SecurityError($"Failed to retrieve key: {ex.Message}"));
     }
@@ -138,7 +136,7 @@ public sealed class SecureKeyStore
                 SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found"));
         }
 
-        var newKeys = _keys.Remove(keyId);
+        ImmutableDictionary<string, EncryptedKey> newKeys = _keys.Remove(keyId);
         return Result.Success<SecureKeyStore, SmartCardError>(
             new SecureKeyStore(newKeys, _masterKey, _salt));
     }
@@ -148,7 +146,7 @@ public sealed class SecureKeyStore
     /// </summary>
     public ImmutableArray<string> ListKeyIds()
     {
-        return [.._keys.Keys];
+        return [.. _keys.Keys];
     }
 
     /// <summary>
@@ -170,9 +168,9 @@ public sealed class SecureKeyStore
         byte keyVersion,
         bool isScp03 = false)
     {
-        var encKeyResult = GetKey(encKeyId);
-        var macKeyResult = GetKey(macKeyId);
-        var dekKeyResult = GetKey(dekKeyId);
+        Result<SecureKey, SmartCardError> encKeyResult = GetKey(encKeyId);
+        Result<SecureKey, SmartCardError> macKeyResult = GetKey(macKeyId);
+        Result<SecureKey, SmartCardError> dekKeyResult = GetKey(dekKeyId);
 
         if (encKeyResult.IsFailure)
         {
@@ -189,9 +187,9 @@ public sealed class SecureKeyStore
             return Result.Failure<IKeySet, SmartCardError>(dekKeyResult.Error);
         }
 
-        using (var encKey = encKeyResult.Value)
-        using (var macKey = macKeyResult.Value)
-        using (var dekKey = dekKeyResult.Value)
+        using (SecureKey encKey = encKeyResult.Value)
+        using (SecureKey macKey = macKeyResult.Value)
+        using (SecureKey dekKey = dekKeyResult.Value)
         {
             return encKey.Use(encData =>
                 macKey.Use(macData =>
@@ -199,7 +197,7 @@ public sealed class SecureKeyStore
                     {
                         if (isScp03)
                         {
-                            var keySetResult = Scp03KeySet.Create(encData, macData, dekData, keyVersion);
+                            Result<Scp03KeySet, SmartCardError> keySetResult = Scp03KeySet.Create(encData, macData, dekData, keyVersion);
                             if (keySetResult.IsFailure)
                             {
                                 return Result.Failure<IKeySet, SmartCardError>(
@@ -209,7 +207,7 @@ public sealed class SecureKeyStore
                         }
                         else
                         {
-                            var keySetResult = Scp02KeySet.Create(encData, macData, dekData, keyVersion);
+                            Result<Scp02KeySet, SmartCardError> keySetResult = Scp02KeySet.Create(encData, macData, dekData, keyVersion);
                             if (keySetResult.IsFailure)
                             {
                                 return Result.Failure<IKeySet, SmartCardError>(
@@ -224,71 +222,71 @@ public sealed class SecureKeyStore
     private EncryptedKey EncryptKey(string keyId, byte[] keyData)
     {
         // Derive a key-specific encryption key from master key
-        var keySpecificKey = DeriveKeySpecificKey(keyId);
-        
+        byte[] keySpecificKey = DeriveKeySpecificKey(keyId);
+
         // Generate IV
-        var iv = new byte[16];
-        var random = new SecureRandom();
+        byte[] iv = new byte[16];
+        SecureRandom random = new SecureRandom();
         random.NextBytes(iv);
-        
+
         // Setup AES-CBC cipher
-        var cipher = new PaddedBufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
-        var keyParam = new KeyParameter(keySpecificKey);
-        var keyParamWithIv = new ParametersWithIV(keyParam, iv);
-        
+        PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
+        KeyParameter keyParam = new KeyParameter(keySpecificKey);
+        ParametersWithIV keyParamWithIv = new ParametersWithIV(keyParam, iv);
+
         cipher.Init(true, keyParamWithIv);
-        
+
         // Encrypt
-        var outputSize = cipher.GetOutputSize(keyData.Length);
-        var encrypted = new byte[outputSize];
-        var processedBytes = cipher.ProcessBytes(keyData, 0, keyData.Length, encrypted, 0);
-        var finalBytes = cipher.DoFinal(encrypted, processedBytes);
-        
+        int outputSize = cipher.GetOutputSize(keyData.Length);
+        byte[] encrypted = new byte[outputSize];
+        int processedBytes = cipher.ProcessBytes(keyData, 0, keyData.Length, encrypted, 0);
+        int finalBytes = cipher.DoFinal(encrypted, processedBytes);
+
         // Resize array if needed
         if (processedBytes + finalBytes < encrypted.Length)
         {
             encrypted = encrypted.Take(processedBytes + finalBytes).ToArray();
         }
-        
+
         return new EncryptedKey(encrypted, iv);
     }
 
     private byte[] DecryptKey(string keyId, EncryptedKey encryptedKey)
     {
-        var keySpecificKey = DeriveKeySpecificKey(keyId);
-        
+        byte[] keySpecificKey = DeriveKeySpecificKey(keyId);
+
         // Setup AES-CBC cipher for decryption
-        var cipher = new PaddedBufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
-        var keyParam = new KeyParameter(keySpecificKey);
-        var keyParamWithIv = new ParametersWithIV(keyParam, encryptedKey.Iv);
-        
+        PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
+        KeyParameter keyParam = new KeyParameter(keySpecificKey);
+        ParametersWithIV keyParamWithIv = new ParametersWithIV(keyParam, encryptedKey.Iv);
+
         cipher.Init(false, keyParamWithIv); // false for decryption
-        
+
         // Decrypt
-        var outputSize = cipher.GetOutputSize(encryptedKey.Data.Length);
-        var decrypted = new byte[outputSize];
-        var processedBytes = cipher.ProcessBytes(encryptedKey.Data, 0, encryptedKey.Data.Length, decrypted, 0);
-        var finalBytes = cipher.DoFinal(decrypted, processedBytes);
-        
+        int outputSize = cipher.GetOutputSize(encryptedKey.Data.Length);
+        byte[] decrypted = new byte[outputSize];
+        int processedBytes = cipher.ProcessBytes(encryptedKey.Data, 0, encryptedKey.Data.Length, decrypted, 0);
+        int finalBytes = cipher.DoFinal(decrypted, processedBytes);
+
         // Resize array if needed
         if (processedBytes + finalBytes < decrypted.Length)
         {
             decrypted = decrypted.Take(processedBytes + finalBytes).ToArray();
         }
-        
+
         return decrypted;
     }
 
     private byte[] DeriveKeySpecificKey(string keyId)
     {
         // Use PBKDF2 to derive a key-specific encryption key
-        var keyIdBytes = System.Text.Encoding.UTF8.GetBytes(keyId);
-        var combinedSalt = _salt.Concat(keyIdBytes).ToArray();
-        
-        var generator = new Pkcs5S2ParametersGenerator(new Org.BouncyCastle.Crypto.Digests.Sha256Digest());
+        byte[] keyIdBytes = System.Text.Encoding.UTF8.GetBytes(keyId);
+        byte[] combinedSalt = _salt.Concat(keyIdBytes).ToArray();
+
+        Pkcs5S2ParametersGenerator generator = new Pkcs5S2ParametersGenerator(new Org.BouncyCastle.Crypto.Digests.Sha256Digest());
         generator.Init(_masterKey, combinedSalt, 10000);
-        
-        var keyParam = (KeyParameter)generator.GenerateDerivedParameters("AES", 256); // 256 bits
+
+        KeyParameter keyParam = (KeyParameter)generator.GenerateDerivedParameters("AES", 256); // 256 bits
         return keyParam.GetKey();
     }
 

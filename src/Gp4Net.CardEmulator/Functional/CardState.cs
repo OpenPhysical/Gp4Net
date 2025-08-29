@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
-using System.Linq;
 using CSharpFunctionalExtensions;
+using Gp4Net.Core;
+using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Security;
 using Gp4Net.CardEmulator.Core;
@@ -15,13 +16,14 @@ namespace Gp4Net.CardEmulator.Functional;
 /// </summary>
 [PublicAPI]
 public record CardState(
+    CardUuid Uuid,
     bool IsSelected,
     byte ScpVersion,
-    Gp4Net.Domain.Protocol.ScpImplementation ScpImplementation,
+    Domain.Protocol.ScpImplementation ScpImplementation,
     Maybe<SecureChannelState> SecureChannel,
-    IKeySet? CurrentKeys,
-    byte[]? HostChallenge,
-    byte[]? CardChallenge,
+    Maybe<IKeySet> CurrentKeys,
+    Maybe<byte[]> HostChallenge,
+    Maybe<byte[]> CardChallenge,
     ImmutableDictionary<ushort, byte[]> DataObjects,
     ImmutableDictionary<string, InstalledApplication> Applications,
     ImmutableList<LoadFile> LoadFiles,
@@ -38,18 +40,18 @@ public record CardState(
     /// Per GP Card Spec v2.3.1 Section 6.4.2.1.1: "Once the card session has been established... the Application defined 
     /// as implicitly selectable on the Basic Logical Channel... shall become the selected Application on the Basic Logical Channel"
     /// </summary>
-    public static CardState Initial
+    public static Result<CardState, SmartCardError> Create()
     {
-        get
-        {
-            return new CardState(
+        return CardUuid.Generate()
+            .Map(uuid => new CardState(
+                Uuid: uuid,
                 IsSelected: true, // ISD is implicitly selected by default per GP Card Spec v2.3.1
                 ScpVersion: 0x02,
-                ScpImplementation: Gp4Net.Domain.Protocol.ScpImplementation.Scp02I15,
+                ScpImplementation: Domain.Protocol.ScpImplementation.Scp02I15,
                 SecureChannel: Maybe<SecureChannelState>.None,
-                CurrentKeys: null,
-                HostChallenge: null,
-                CardChallenge: null,
+                CurrentKeys: Maybe<IKeySet>.None,
+                HostChallenge: Maybe<byte[]>.None,
+                CardChallenge: Maybe<byte[]>.None,
                 DataObjects: ImmutableDictionary<ushort, byte[]>.Empty,
                 Applications: ImmutableDictionary<string, InstalledApplication>.Empty,
                 LoadFiles: ImmutableList<LoadFile>.Empty,
@@ -57,8 +59,33 @@ public record CardState(
                 DefaultKeyVersion: 0xFF,
                 SequenceCounters: ImmutableDictionary<byte, byte[]>.Empty,
                 ApplicationContext: ApplicationSelectionContext.WithIsd()
-            );
-        }
+            ));
+    }
+
+    /// <summary>
+    /// Creates initial state with a specific UUID. Used for testing and deserialization.
+    /// </summary>
+    /// <param name="uuid">The UUID to use for the card.</param>
+    /// <returns>Initial card state with the specified UUID.</returns>
+    public static CardState CreateWithUuid(CardUuid uuid)
+    {
+        return new CardState(
+            Uuid: uuid,
+            IsSelected: true,
+            ScpVersion: 0x02,
+            ScpImplementation: Domain.Protocol.ScpImplementation.Scp02I15,
+            SecureChannel: Maybe<SecureChannelState>.None,
+            CurrentKeys: Maybe<IKeySet>.None,
+            HostChallenge: Maybe<byte[]>.None,
+            CardChallenge: Maybe<byte[]>.None,
+            DataObjects: ImmutableDictionary<ushort, byte[]>.Empty,
+            Applications: ImmutableDictionary<string, InstalledApplication>.Empty,
+            LoadFiles: ImmutableList<LoadFile>.Empty,
+            InstalledKeys: ImmutableDictionary<byte, IKeySet>.Empty,
+            DefaultKeyVersion: 0xFF,
+            SequenceCounters: ImmutableDictionary<byte, byte[]>.Empty,
+            ApplicationContext: ApplicationSelectionContext.WithIsd()
+        );
     }
 
     /// <summary>
@@ -86,7 +113,7 @@ public record CardState(
     /// <summary>
     /// Gets the session keys if a secure channel is established.
     /// </summary>
-    public Maybe<Gp4Net.Domain.Keys.SessionKeys> SessionKeys
+    public Maybe<SessionKeys> SessionKeys
     {
         get
         {
@@ -143,17 +170,27 @@ public record CardState(
     /// <summary>
     /// Creates a new state with updated challenges.
     /// </summary>
-    public CardState WithChallenges(byte[]? hostChallenge, byte[]? cardChallenge) => this with
+    public CardState WithChallenges(Maybe<byte[]> hostChallenge, Maybe<byte[]> cardChallenge) => this with
     {
         HostChallenge = hostChallenge,
         CardChallenge = cardChallenge
     };
 
+    /// <summary>
+    /// Creates a new state with a different UUID. Used for card reset operations.
+    /// </summary>
+    public CardState WithUuid(CardUuid newUuid) => this with { Uuid = newUuid };
+
 
     /// <summary>
     /// Creates a new state with updated current keys.
     /// </summary>
-    public CardState WithKeys(IKeySet keys) => this with { CurrentKeys = keys };
+    public CardState WithKeys(IKeySet keys) => this with { CurrentKeys = Maybe<IKeySet>.From(keys) };
+
+    /// <summary>
+    /// Creates a new state with current keys cleared.
+    /// </summary>
+    public CardState WithoutKeys() => this with { CurrentKeys = Maybe<IKeySet>.None };
 
 
     /// <summary>
@@ -202,7 +239,7 @@ public record CardState(
     /// </summary>
     public byte[] GetSequenceCounter(byte keyVersion)
     {
-        if (SequenceCounters.TryGetValue(keyVersion, out var counter))
+        if (SequenceCounters.TryGetValue(keyVersion, out byte[] counter))
             return counter;
         
         // Return appropriate default counter based on SCP version
@@ -216,8 +253,8 @@ public record CardState(
     /// </summary>
     public CardState WithIncrementedSequenceCounter(byte keyVersion)
     {
-        var currentCounter = GetSequenceCounter(keyVersion);
-        var newCounter = IncrementCounter(currentCounter);
+        byte[] currentCounter = GetSequenceCounter(keyVersion);
+        byte[] newCounter = IncrementCounter(currentCounter);
         return this with { SequenceCounters = SequenceCounters.SetItem(keyVersion, newCounter) };
     }
 
@@ -228,9 +265,9 @@ public record CardState(
     public CardState WithResetSequenceCounter(byte keyVersion)
     {
         // Return appropriate reset counter based on SCP version
-        var resetCounter = ScpVersion == 0x02 
-            ? new byte[] { 0x00, 0x01 } // 2-byte counter for SCP02
-            : new byte[] { 0x00, 0x00, 0x01 }; // 3-byte counter for SCP03
+        byte[] resetCounter = ScpVersion == 0x02 
+            ? [0x00, 0x01] // 2-byte counter for SCP02
+            : [0x00, 0x00, 0x01]; // 3-byte counter for SCP03
         return this with { SequenceCounters = SequenceCounters.SetItem(keyVersion, resetCounter) };
     }
 
@@ -240,7 +277,7 @@ public record CardState(
     /// </summary>
     private static byte[] IncrementCounter(byte[] counter)
     {
-        var newCounter = new byte[counter.Length];
+        byte[] newCounter = new byte[counter.Length];
         System.Array.Copy(counter, newCounter, counter.Length);
 
         switch (counter.Length)
@@ -249,7 +286,7 @@ public record CardState(
             case 2:
             {
                 // 2-byte counter for SCP02
-                var value = (newCounter[0] << 8) | newCounter[1];
+                int value = (newCounter[0] << 8) | newCounter[1];
                 value++;
                 newCounter[0] = (byte)(value >> 8);
                 newCounter[1] = (byte)value;
@@ -258,7 +295,7 @@ public record CardState(
             case 3:
             {
                 // 3-byte counter for SCP03
-                var value = (newCounter[0] << 16) | (newCounter[1] << 8) | newCounter[2];
+                int value = (newCounter[0] << 16) | (newCounter[1] << 8) | newCounter[2];
                 value++;
                 newCounter[0] = (byte)(value >> 16);
                 newCounter[1] = (byte)(value >> 8);
@@ -318,14 +355,14 @@ public record CardState(
     /// Per GP Card Spec v2.3.1 Section 6.4.2.1.1: After card reset, ISD becomes implicitly selected.
     /// Preserves installed applications, keys, and sequence counters but clears secure channel state.
     /// </summary>
-    public CardState Reset() => Initial with
+    public CardState Reset() => CreateWithUuid(Uuid) with
     {
-        ScpVersion = this.ScpVersion,
-        ScpImplementation = this.ScpImplementation,
-        DataObjects = this.DataObjects,
-        InstalledKeys = this.InstalledKeys,
-        DefaultKeyVersion = this.DefaultKeyVersion,
-        SequenceCounters = this.SequenceCounters, // Preserve sequence counters across resets
+        ScpVersion = ScpVersion,
+        ScpImplementation = ScpImplementation,
+        DataObjects = DataObjects,
+        InstalledKeys = InstalledKeys,
+        DefaultKeyVersion = DefaultKeyVersion,
+        SequenceCounters = SequenceCounters, // Preserve sequence counters across resets
         ApplicationContext = ApplicationSelectionContext.WithIsd(), // Reset to ISD as implicitly selected
         IsSelected = true // ISD is implicitly selected after reset per GP Card Spec v2.3.1
     };

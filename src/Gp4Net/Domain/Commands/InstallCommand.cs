@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
@@ -122,7 +121,7 @@ public abstract record InstallCommand : IApduCommand
                 SmartCardError.InvalidArgument("Package AID cannot be empty."));
         }
 
-        return Result.Success<ImmutableArray<byte>, SmartCardError>([..packageAid]);
+        return Result.Success<ImmutableArray<byte>, SmartCardError>([.. packageAid]);
     }
 
     /// <summary>
@@ -192,18 +191,18 @@ public abstract record InstallCommand : IApduCommand
             byte[] hash = null,
             byte[] installToken = null)
         {
-            var packageAidResult = ValidatePackageAid(packageAid);
+            Result<ImmutableArray<byte>, SmartCardError> packageAidResult = ValidatePackageAid(packageAid);
             if (packageAidResult.IsFailure)
             {
                 return Result.Failure<InstallForLoadCommand, SmartCardError>(packageAidResult.Error);
             }
 
             // Convert maxDataBlockSize to load parameters if provided
-            var loadParameters = maxDataBlockSize.HasValue 
-                ? new byte[] { 0xC9, 0x02, (byte)(maxDataBlockSize.Value >> 8), (byte)(maxDataBlockSize.Value & 0xFF) }
+            byte[] loadParameters = maxDataBlockSize.HasValue
+                ? [0xC9, 0x02, (byte)(maxDataBlockSize.Value >> 8), (byte)(maxDataBlockSize.Value & 0xFF)]
                 : null;
 
-            var command = new InstallForLoadCommand(
+            InstallForLoadCommand command = new InstallForLoadCommand(
                 packageAidResult.Value,
                 securityDomainAid?.ToImmutableArray() ?? default,
                 hash?.ToImmutableArray() ?? default,
@@ -224,10 +223,12 @@ public abstract record InstallCommand : IApduCommand
 
         private byte[] BuildData()
         {
-            var builder = new List<byte>();
+            List<byte> builder =
+            [
+                (byte)PackageAid.Length
+            ];
 
             // Package AID
-            builder.Add((byte)PackageAid.Length);
             builder.AddRange(PackageAid);
 
             // Security Domain AID
@@ -359,7 +360,7 @@ public abstract record InstallCommand : IApduCommand
             byte[] installParameters = null,
             byte[] installToken = null)
         {
-            var packageAidResult = ValidatePackageAid(packageAid);
+            Result<ImmutableArray<byte>, SmartCardError> packageAidResult = ValidatePackageAid(packageAid);
             if (packageAidResult.IsFailure)
             {
                 return Result.Failure<InstallForInstallCommand, SmartCardError>(packageAidResult.Error);
@@ -383,12 +384,12 @@ public abstract record InstallCommand : IApduCommand
                     SmartCardError.InvalidArgument("Privileges cannot be null."));
             }
 
-            var command = new InstallForInstallCommand(
+            InstallForInstallCommand command = new InstallForInstallCommand(
                 InstallType.ForInstall,
                 packageAidResult.Value,
-                [..applicationAid],
-                [..moduleAid],
-                [..privileges],
+                [.. applicationAid],
+                [.. moduleAid],
+                [.. privileges],
                 installParameters?.ToImmutableArray() ?? default,
                 installToken?.ToImmutableArray() ?? default);
 
@@ -413,7 +414,7 @@ public abstract record InstallCommand : IApduCommand
             byte[] installParameters = null,
             byte[] installToken = null)
         {
-            var packageAidResult = ValidatePackageAid(packageAid);
+            Result<ImmutableArray<byte>, SmartCardError> packageAidResult = ValidatePackageAid(packageAid);
             if (packageAidResult.IsFailure)
             {
                 return Result.Failure<InstallForInstallCommand, SmartCardError>(packageAidResult.Error);
@@ -437,12 +438,12 @@ public abstract record InstallCommand : IApduCommand
                     SmartCardError.InvalidArgument("Privileges cannot be null."));
             }
 
-            var command = new InstallForInstallCommand(
+            InstallForInstallCommand command = new InstallForInstallCommand(
                 InstallType.ForInstallAndMakeSelectable,
                 packageAidResult.Value,
-                [..applicationAid],
-                [..moduleAid],
-                [..privileges],
+                [.. applicationAid],
+                [.. moduleAid],
+                [.. privileges],
                 installParameters?.ToImmutableArray() ?? default,
                 installToken?.ToImmutableArray() ?? default);
 
@@ -460,10 +461,12 @@ public abstract record InstallCommand : IApduCommand
 
         private byte[] BuildData()
         {
-            var builder = new List<byte>();
+            List<byte> builder =
+            [
+                (byte)PackageAid.Length
+            ];
 
             // Package AID
-            builder.Add((byte)PackageAid.Length);
             builder.AddRange(PackageAid);
 
             // Module AID

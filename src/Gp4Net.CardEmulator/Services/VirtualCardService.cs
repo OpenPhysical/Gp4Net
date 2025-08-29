@@ -1,538 +1,237 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
-using Gp4Net.CardEmulator.Functional;
-using Gp4Net.Domain.Keys;
-using Gp4Net.Pipeline;
-using Gp4Net.Transport;
+using Gp4Net.Core;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Services;
 
 /// <summary>
-/// Virtual implementation of a card service for testing with emulated cards.
-/// This service can be used as a drop-in replacement for WSCT-based services.
-/// Implements ICardService for integration with GlobalPlatformService and provides
-/// additional methods for test environment setup and CLI integration.
+/// Service for managing virtual card operations in test environments.
+/// Provides a unified interface for card reader management and communication.
 /// </summary>
 [PublicAPI]
-public class VirtualCardService : ICardService
+public class VirtualCardService : IDisposable
 {
-    protected internal readonly VirtualReaderManager ReaderManager;
-    private Maybe<VirtualCardReader> _connectedReader = Maybe<VirtualCardReader>.None;
-    private Maybe<VirtualCard> _currentCard = Maybe<VirtualCard>.None;
-    private bool _disposed;
+    private readonly VirtualReaderManager _readerManager;
+    private readonly Maybe<VirtualCardReader> _connectedReader;
+    private readonly bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the VirtualCardService class.
     /// </summary>
-    /// <param name="readerManager">The virtual reader manager.</param>
-    public VirtualCardService(VirtualReaderManager readerManager)
+    public VirtualCardService()
     {
-        ReaderManager = readerManager;
-    }
-    
-    /// <summary>
-    /// Initializes a new instance with a default reader manager.
-    /// </summary>
-    public VirtualCardService() : this(CreateDefaultReaderManager())
-    {
-    }
-
-    /// <inheritdoc />
-    public IReadOnlyList<string> GetReaders()
-    {
-        return ReaderManager.GetReaderNames();
-    }
-
-    /// <inheritdoc />
-    public bool Connect(string readerName)
-    {
-        if (string.IsNullOrEmpty(readerName))
-            throw new ArgumentException("Reader name cannot be null or empty", nameof(readerName));
-
-        Disconnect(); // Ensure clean state
-
-        var reader = ReaderManager.GetReader(readerName);
-        if (reader == null)
-            return false;
-
-        if (!reader.Connect())
-            return false;
-
-        _connectedReader = Maybe<VirtualCardReader>.From(reader);
-        _currentCard = reader.InsertedCard is VirtualCard card 
-            ? Maybe<VirtualCard>.From(card) 
-            : Maybe<VirtualCard>.None;
-        return true;
-    }
-
-    /// <inheritdoc />
-    public void Disconnect()
-    {
-        _connectedReader.Execute(reader => reader.Disconnect());
+        _readerManager = new VirtualReaderManager();
         _connectedReader = Maybe<VirtualCardReader>.None;
-        _currentCard = Maybe<VirtualCard>.None;
-    }
-
-    /// <inheritdoc />
-    public bool IsConnected
-    {
-        get
-        {
-            return _connectedReader.Match(
-                Some: reader => reader.IsConnected,
-                None: () => false
-            );
-        }
-    }
-
-    /// <inheritdoc />
-    public byte[]? GetAtr()
-    {
-        return _connectedReader.Match(
-            Some: reader => reader.GetAtr(),
-            None: () => null
-        );
-    }
-
-    /// <inheritdoc />
-    public CardResponse SendCommand(byte[] command)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        if (!IsConnected)
-            throw new InvalidOperationException("Card is not connected");
-
-        var response = _connectedReader.Match(
-            Some: reader => reader.TransmitCommand(command),
-            None: () => throw new InvalidOperationException("Card is not connected")
-        );
-        return new CardResponse(response.Data, response.StatusWord);
-    }
-
-    /// <inheritdoc />
-    public CardResponse SendCommand(IApduCommand command)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        // Convert IApduCommand to byte array
-        var apduBytes = new List<byte> { command.Cla, command.Ins, command.P1, command.P2 };
-
-        if (command.Data is { Length: > 0 })
-        {
-            if (command.IsExtendedLength && command.Data.Length > 255)
-            {
-                apduBytes.Add(0x00);
-                apduBytes.Add((byte)(command.Data.Length >> 8));
-                apduBytes.Add((byte)(command.Data.Length & 0xFF));
-            }
-            else
-            {
-                apduBytes.Add((byte)command.Data.Length);
-            }
-            apduBytes.AddRange(command.Data);
-        }
-
-        if (command.ExpectedResponseLength.HasValue)
-        {
-            var expectedLength = command.ExpectedResponseLength.Value;
-            if (command.IsExtendedLength && expectedLength > 255)
-            {
-                if (command.Data == null || command.Data.Length == 0)
-                {
-                    apduBytes.Add(0x00); // Extended length prefix if no data
-                }
-                apduBytes.Add((byte)(expectedLength >> 8));
-                apduBytes.Add((byte)(expectedLength & 0xFF));
-            }
-            else
-            {
-                apduBytes.Add(expectedLength is 0 or 256
-                    ? (byte)0x00
-                    : (byte)expectedLength);
-            }
-        }
-
-        return SendCommand(apduBytes.ToArray());
-    }
-
-    /// <inheritdoc />
-    public bool EstablishSecureChannel(byte[] keySet, byte securityLevel)
-    {
-        ArgumentNullException.ThrowIfNull(keySet);
-
-        if (!IsConnected)
-            throw new InvalidOperationException("Card is not connected");
-
-        try
-        {
-            // Create appropriate key set based on current card protocol
-            IKeySet keys;
-            var hasScp03 = _currentCard.Match(
-                Some: card => HasScp03Capability(card),
-                None: () => false
-            );
-            if (hasScp03)
-            {
-                keys = Scp03KeySet.Create(keySet, keySet, keySet, 0xFF).Match(
-                    onSuccess: static k => k,
-                    onFailure: static error => throw new InvalidOperationException($"Failed to create Scp03KeySet: {error.Message}"));
-            }
-            else
-            {
-                keys = Scp02KeySet.Create(keySet, keySet, keySet, 0xFF).Match(
-                    onSuccess: static k => k,
-                    onFailure: error => throw new InvalidOperationException($"Failed to create Scp02KeySet: {error.Message}"));
-            }
-
-            // Note: Functional cards use immutable configuration,
-            // so key override would require creating a new card instance
-            // For now, we rely on the test cryptographic service
-
-            // Send INITIALIZE UPDATE command
-            var hostChallenge = new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
-            var initUpdateCmd = new byte[] { 0x80, 0x50, 0x00, 0x00, 0x08 }
-                .Concat(hostChallenge).ToArray();
-
-            var initResponse = SendCommand(initUpdateCmd);
-            if (!initResponse.IsSuccessful)
-                return false;
-
-            // Send EXTERNAL AUTHENTICATE command
-            var extAuthCmd = new byte[] { 0x84, 0x82, securityLevel, 0x00, 0x10 }
-                .Concat(new byte[16]).ToArray(); // Simplified authentication data
-
-            var authResponse = SendCommand(extAuthCmd);
-            return authResponse.IsSuccessful;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-    }
-
-    /// <inheritdoc />
-    public bool IsSecureChannelEstablished
-    {
-        get
-        {
-            return _currentCard.Match(
-                Some: card => card.IsSecureChannelEstablished,
-                None: () => false
-            );
-        }
+        _disposed = false;
     }
 
     /// <summary>
-    /// Processes an APDU command and returns a pipeline-compatible response.
-    /// This method is used by the VirtualCardServiceAdapter for CLI integration.
+    /// Private constructor for creating new instances with state.
     /// </summary>
-    /// <param name="command">The APDU command to process.</param>
-    /// <returns>The command response with context.</returns>
-    public CommandResponse ProcessCommand(IApduCommand command)
+    private VirtualCardService(VirtualReaderManager readerManager, Maybe<VirtualCardReader> connectedReader, bool disposed)
     {
-        ArgumentNullException.ThrowIfNull(command);
-
-        if (!IsConnected)
-        {
-            return CommandResponse.Failure(0x6F00); // Internal error - not connected
-        }
-
-        try
-        {
-            // Convert IApduCommand to byte array
-            byte[] commandBytes;
-            switch (command)
-            {
-                case ICompleteApduCommand completeCommand:
-                    commandBytes = completeCommand.GetCompleteApdu();
-                    break;
-                case BaseApduCommand baseCommand:
-                    commandBytes = baseCommand.ToApdu();
-                    break;
-                default:
-                {
-                    // Manual construction for basic IApduCommand
-                    var apdu = new List<byte> { command.Cla, command.Ins, command.P1, command.P2 };
-                    
-                    if (command.Data is { Length: > 0 })
-                    {
-                        apdu.Add((byte)command.Data.Length);
-                        apdu.AddRange(command.Data);
-                    }
-                    
-                    if (command.ExpectedResponseLength.HasValue)
-                    {
-                        var le = command.ExpectedResponseLength.Value;
-                        apdu.Add(le == 256 ? (byte)0 : (byte)le);
-                    }
-                    
-                    commandBytes = apdu.ToArray();
-                    break;
-                }
-            }
-                
-            // Send to virtual card
-            var response = _connectedReader.Match(
-                Some: reader => reader.TransmitCommand(commandBytes),
-                None: () => throw new InvalidOperationException("Card is not connected")
-            );
-                
-            // Create CommandResponse with empty context (virtual cards don't need context)
-            return new CommandResponse(
-                response.Data,
-                response.StatusWord,
-                ImmutablePipelineContext.Empty,
-                new Dictionary<string, object>
-                {
-                    [ResponseMetadata.TransmittedBytes] = commandBytes,
-                    [ResponseMetadata.ReceivedBytes] = response.Data.Concat([
-                        (byte)(response.StatusWord >> 8), 
-                        (byte)(response.StatusWord & 0xFF)
-                    ]).ToArray()
-                });
-        }
-        catch (Exception ex)
-        {
-            return CommandResponse.Failure(0x6F00) // Internal error
-                .WithMetadata("Error", ex.Message);
-        }
+        _readerManager = readerManager;
+        _connectedReader = connectedReader;
+        _disposed = disposed;
     }
 
     /// <summary>
-    /// Adds a virtual reader with a P71 card for testing.
+    /// Gets the virtual reader manager for managing card readers.
     /// </summary>
-    /// <param name="readerName">The name for the virtual reader.</param>
-    /// <returns>The virtual reader.</returns>
-    public VirtualCardReader AddVirtualP71Reader(string readerName = "Virtual P71 Reader 00 00")
-    {
-        var reader = new VirtualCardReader(readerName);
-        var p71Card = VirtualCardTestBuilder.P71Card();
-
-        reader.InsertCard(p71Card);
-        ReaderManager.AddReader(reader);
-
-        return reader;
-    }
-
-    /// <summary>
-    /// Adds a virtual reader with a dual-protocol card for testing.
-    /// </summary>
-    /// <param name="readerName">The name for the virtual reader.</param>
-    /// <returns>The virtual reader.</returns>
-    public VirtualCardReader AddVirtualDualProtocolReader(string readerName = "Virtual Dual Protocol Reader 00 00")
-    {
-        var reader = new VirtualCardReader(readerName);
-        var dualProtocolCard = VirtualCardTestBuilder.DualProtocolCard();
-
-        reader.InsertCard(dualProtocolCard);
-        ReaderManager.AddReader(reader);
-
-        return reader;
-    }
-
-    /// <summary>
-    /// Adds a virtual reader with an SCP03-first card for testing.
-    /// </summary>
-    /// <param name="readerName">The name for the virtual reader.</param>
-    /// <returns>The virtual reader.</returns>
-    public VirtualCardReader AddVirtualScp03Reader(string readerName = "Virtual SCP03 Reader 00 00")
-    {
-        var reader = new VirtualCardReader(readerName);
-        var scp03Card = VirtualCardTestBuilder.Scp03FirstCard();
-
-        reader.InsertCard(scp03Card);
-        ReaderManager.AddReader(reader);
-
-        return reader;
-    }
-
-    /// <summary>
-    /// Sets up a standard test environment with virtual readers and cards.
-    /// </summary>
-    public void SetupTestEnvironment()
-    {
-        // Clear existing readers
-        ReaderManager.Clear();
-
-        // Add P71 card reader (SCP02 only)
-        AddVirtualP71Reader("Virtual P71 Reader 00 00");
-
-        // Add dual-protocol card reader (SCP02 + SCP03)
-        AddVirtualDualProtocolReader("Virtual Dual Protocol Reader 01 00");
-
-        // Add SCP03-first card reader
-        AddVirtualScp03Reader("Virtual SCP03 Reader 02 00");
-    }
-
-    /// <summary>
-    /// Sets up a comprehensive test environment with multiple card types.
-    /// </summary>
-    public void SetupComprehensiveTestEnvironment()
-    {
-        // Clear existing readers
-        ReaderManager.Clear();
-
-        // Add various card types for comprehensive testing
-        AddVirtualP71Reader("Virtual P71 Reader 00 00");
-        AddVirtualDualProtocolReader("Virtual Dual Protocol Reader 01 00");
-        AddVirtualScp03Reader("Virtual SCP03 Reader 02 00");
-
-        // Add additional readers for stress testing
-        var reader4 = new VirtualCardReader("Virtual Generic Reader 03 00");
-        var genericCard = VirtualCardTestBuilder.GenericCard();
-        reader4.InsertCard(genericCard);
-        ReaderManager.AddReader(reader4);
-
-        var reader5 = new VirtualCardReader("Virtual SCP02 Reader 04 00");
-        var scp02Card = VirtualCardTestBuilder.Scp02Card();
-        reader5.InsertCard(scp02Card);
-        ReaderManager.AddReader(reader5);
-    }
-
-    /// <summary>
-    /// Sets up a trace replay environment with deterministic virtual cards.
-    /// Uses deterministic entropy to ensure reproducible cryptographic operations.
-    /// </summary>
-    public VirtualCardReader SetupTraceReplayEnvironment(string readerName = "Trace Replay Virtual Reader")
-    {
-        // Clear existing readers
-        ReaderManager.Clear();
-
-        // Create deterministic entropy using functional approach
-        var deterministicEntropy = Enumerable.Range(0, 32)
-            .Select(i => (byte)(i * 7 % 256))
-            .ToArray();
-
-        return SetupDeterministicTestEnvironment(deterministicEntropy, readerName);
-    }
-
-    /// <summary>
-    /// Sets up deterministic test environment with preloaded entropy for reproducible testing.
-    /// </summary>
-    public VirtualCardReader SetupDeterministicTestEnvironment(
-        byte[] deterministicEntropy,
-        string readerName = "Deterministic Virtual Reader")
-    {
-        // Clear existing readers
-        ReaderManager.Clear();
-
-        var cardResult = VirtualCardTestBuilder.P71CardWithEntropy(deterministicEntropy);
-        var card = cardResult.Match(
-            onSuccess: c => c,
-            onFailure: _ => VirtualCardTestBuilder.P71Card() // Fallback to standard card
-        );
-
-        var reader = new VirtualCardReader(readerName);
-        reader.InsertCard(card);
-        ReaderManager.AddReader(reader);
-
-        return reader;
-    }
-
-    /// <summary>
-    /// Creates a virtual card service configured for trace-based testing with comprehensive coverage tracking.
-    /// </summary>
-    public static VirtualCardService CreateForTraceBasedTesting()
-    {
-        var service = new VirtualCardService();
-        service.SetupComprehensiveTestEnvironment();
-        return service;
-    }
-
-    /// <summary>
-    /// Creates a virtual card service with a card configured for specific entropy testing.
-    /// Enables deterministic crypto operations for trace replay scenarios.
-    /// </summary>
-    /// <param name="entropy">The entropy bytes to use for deterministic operations.</param>
-    /// <param name="readerName">Optional name for the virtual reader.</param>
-    /// <returns>A VirtualCardService with deterministic crypto behavior.</returns>
-    public static VirtualCardService CreateWithDeterministicEntropy(
-        byte[] entropy, 
-        string readerName = "Deterministic Entropy Reader")
-    {
-        var service = new VirtualCardService();
-        service.SetupDeterministicTestEnvironment(entropy, readerName);
-        return service;
-    }
-
-    /// <summary>
-    /// Creates a virtual card service optimized for high-coverage testing.
-    /// Includes multiple card types and configurations for comprehensive test scenarios.
-    /// </summary>
-    public static VirtualCardService CreateForHighCoverageTesting()
-    {
-        var service = new VirtualCardService();
-        
-        // Clear any existing readers first
-        service.ReaderManager.Clear();
-        
-        // Add cards with different protocol configurations for maximum coverage
-        service.AddVirtualP71Reader("Coverage-P71-SCP02");
-        service.AddVirtualScp03Reader("Coverage-SCP03-Primary");
-        service.AddVirtualDualProtocolReader("Coverage-Dual-Protocol");
-        
-        // Add cards with different entropy configurations
-        var deterministicEntropy1 = Enumerable.Range(0, 32).Select(i => (byte)(i * 3)).ToArray();
-        var deterministicEntropy2 = Enumerable.Range(0, 32).Select(i => (byte)(i * 5)).ToArray();
-        
-        service.SetupDeterministicTestEnvironment(deterministicEntropy1, "Coverage-Deterministic-1");
-        service.SetupDeterministicTestEnvironment(deterministicEntropy2, "Coverage-Deterministic-2");
-        
-        return service;
-    }
-
-    /// <summary>
-    /// Gets the virtual reader manager for advanced operations.
-    /// </summary>
-    /// <returns>The virtual reader manager.</returns>
+    /// <returns>The virtual reader manager instance.</returns>
     public VirtualReaderManager GetReaderManager()
     {
-        return ReaderManager;
+        return _disposed 
+            ? new VirtualReaderManager() // Return empty manager if disposed
+            : _readerManager;
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Connects to a virtual card reader by name.
+    /// </summary>
+    /// <param name="readerName">The name of the reader to connect to.</param>
+    /// <returns>A result indicating whether the connection was successful.</returns>
+    public Result<bool, SmartCardError> Connect(string readerName)
+    {
+        if (_disposed)
+        {
+            return Result.Failure<bool, SmartCardError>(
+                SmartCardError.CommunicationError("Service has been disposed"));
+        }
+
+        return Maybe<string>.From(readerName)
+            .Where(name => !string.IsNullOrEmpty(name))
+            .ToResult(SmartCardError.InvalidArgument("Reader name cannot be null or empty"))
+            .Bind(name => FindAndConnectToReader(name));
+    }
+
+    /// <summary>
+    /// Finds and connects to the specified reader.
+    /// </summary>
+    private Result<bool, SmartCardError> FindAndConnectToReader(string readerName)
+    {
+        Maybe<VirtualCardReader> reader = Maybe<VirtualCardReader>.From(_readerManager.GetReader(readerName));
+        
+        return reader.ToResult(SmartCardError.CommunicationError($"Reader '{readerName}' not found"))
+            .Map(r => r.Connect());
+    }
+
+    /// <summary>
+    /// Creates a new service instance with a connected reader.
+    /// </summary>
+    /// <param name="reader">The reader to connect to.</param>
+    /// <returns>A new service instance with the reader connected.</returns>
+    public VirtualCardService WithConnectedReader(VirtualCardReader reader)
+    {
+        return new VirtualCardService(_readerManager, Maybe<VirtualCardReader>.From(reader), _disposed);
+    }
+
+    /// <summary>
+    /// Sends an APDU command to the connected card.
+    /// </summary>
+    /// <param name="command">The APDU command bytes to send.</param>
+    /// <returns>A virtual command response compatible with test expectations.</returns>
+    public VirtualCommandResponse SendCommand(byte[] command)
+    {
+        if (_disposed)
+        {
+            return VirtualCommandResponse.Failed(SmartCardError.CommunicationError("Service has been disposed"));
+        }
+
+        return Maybe<byte[]>.From(command)
+            .Where(cmd => cmd.Length > 0)
+            .ToResult(SmartCardError.InvalidArgument("Command cannot be null or empty"))
+            .Bind(cmd => _connectedReader
+                .ToResult(SmartCardError.CommunicationError("No reader is connected"))
+                .Map(reader => reader.TransmitCommand(cmd))
+                .Map(VirtualCommandResponse.FromApduResponse))
+            .Match(
+                success => success,
+                error => VirtualCommandResponse.Failed(error));
+    }
+
+    /// <summary>
+    /// Disconnects from the current reader and returns a disposed service.
+    /// </summary>
+    public VirtualCardService Disconnect()
+    {
+        _connectedReader.Match(
+            reader => { reader.Disconnect(); return true; },
+            () => true);
+
+        return new VirtualCardService(_readerManager, Maybe<VirtualCardReader>.None, false);
+    }
+
+    /// <summary>
+    /// Creates a disposed version of this service.
+    /// </summary>
+    public VirtualCardService MarkDisposed()
+    {
+        VirtualCardService disconnectedService = Disconnect();
+        disconnectedService._readerManager.Clear();
+        return new VirtualCardService(_readerManager, Maybe<VirtualCardReader>.None, true);
+    }
+
+    /// <summary>
+    /// Disposes the service resources.
+    /// </summary>
     public void Dispose()
     {
-        if (!_disposed)
-        {
-            Disconnect();
-            ReaderManager.Clear();
-            _disposed = true;
-        }
+        // Functional approach - create disposed instance
+        VirtualCardService disposedService = MarkDisposed();
+        // Note: In pure functional approach, we'd return the disposed service
+        // but IDisposable interface requires void return
+    }
+}
+
+/// <summary>
+/// Represents a virtual command response that matches test expectations.
+/// Adapts between different response formats for compatibility.
+/// </summary>
+[PublicAPI]
+public class VirtualCommandResponse
+{
+    /// <summary>
+    /// Gets a value indicating whether the command was successful.
+    /// </summary>
+    public bool IsSuccessful { get; }
+
+    /// <summary>
+    /// Gets the response data bytes (excluding status word).
+    /// </summary>
+    public byte[] Data { get; }
+
+    /// <summary>
+    /// Gets the status word from the response.
+    /// </summary>
+    public StatusWord StatusWord { get; }
+
+    /// <summary>
+    /// Gets any error information if the command failed.
+    /// </summary>
+    public Maybe<SmartCardError> Error { get; }
+
+    /// <summary>
+    /// Initializes a new instance of the VirtualCommandResponse class.
+    /// </summary>
+    /// <param name="isSuccessful">Whether the command was successful.</param>
+    /// <param name="data">The response data.</param>
+    /// <param name="statusWord">The status word.</param>
+    /// <param name="error">Any error information.</param>
+    private VirtualCommandResponse(bool isSuccessful, byte[] data, StatusWord statusWord, Maybe<SmartCardError> error)
+    {
+        IsSuccessful = isSuccessful;
+        Data = data ?? [];
+        StatusWord = statusWord;
+        Error = error;
     }
 
     /// <summary>
-    /// Creates a default reader manager with standard test cards.
+    /// Creates a successful response from an APDU response.
     /// </summary>
-    private static VirtualReaderManager CreateDefaultReaderManager()
+    /// <param name="apduResponse">The APDU response to convert.</param>
+    /// <returns>A virtual command response.</returns>
+    public static VirtualCommandResponse FromApduResponse(ApduResponse apduResponse)
     {
-        var manager = new VirtualReaderManager();
+        bool isSuccessful = apduResponse.IsSuccessful;
+        Maybe<SmartCardError> error = isSuccessful 
+            ? Maybe<SmartCardError>.None 
+            : Maybe<SmartCardError>.From(SmartCardError.FromStatusWord(apduResponse.StatusWord));
 
-        // Add standard test cards using functional architecture
-        var p71Reader = new VirtualCardReader("Enhanced P71 SCP02 Card");
-        var p71Card = VirtualCardTestBuilder.ForSecureChannelTesting(0x02);
-        p71Reader.InsertCard(p71Card);
-        manager.AddReader(p71Reader);
-
-        // Create P71 card configured for SCP03
-        var p71Scp03Reader = new VirtualCardReader("Enhanced P71 SCP03 Card");
-        var p71Scp03Card = VirtualCardTestBuilder.ForSecureChannelTesting(0x03);
-        p71Scp03Reader.InsertCard(p71Scp03Card);
-        manager.AddReader(p71Scp03Reader);
-
-        return manager;
+        return new VirtualCommandResponse(
+            isSuccessful, 
+            apduResponse.Data, 
+            apduResponse.StatusWord, 
+            error);
     }
 
     /// <summary>
-    /// Checks if the card has SCP03 capability.
+    /// Creates a failed response with error information.
     /// </summary>
-    private static bool HasScp03Capability(VirtualCard card)
+    /// <param name="error">The error that caused the failure.</param>
+    /// <returns>A virtual command response indicating failure.</returns>
+    public static VirtualCommandResponse Failed(SmartCardError error)
     {
-        // Check the card configuration for SCP03 support
-        return card.Configuration.DefaultScpVersion == 0x03;
+        return new VirtualCommandResponse(
+            false, 
+            [], 
+            0x6F00, // Generic error status word
+            Maybe<SmartCardError>.From(error));
+    }
+
+    /// <summary>
+    /// Creates a successful response with data.
+    /// </summary>
+    /// <param name="data">The response data.</param>
+    /// <returns>A virtual command response indicating success.</returns>
+    public static VirtualCommandResponse Success(byte[]? data = null)
+    {
+        return new VirtualCommandResponse(
+            true, 
+            data ?? [], 
+            0x9000, // Success status word
+            Maybe<SmartCardError>.None);
     }
 }

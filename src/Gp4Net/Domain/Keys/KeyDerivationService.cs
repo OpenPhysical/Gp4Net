@@ -4,15 +4,12 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
+using Gp4Net.Domain.Security;
 using Gp4Net.Domain.Protocol;
 using Kdf108.Domain.Kdf;
 using Kdf108.Domain.Kdf.Modes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Org.BouncyCastle.Crypto;
-using Org.BouncyCastle.Crypto.Engines;
-using Org.BouncyCastle.Crypto.Modes;
-using Org.BouncyCastle.Crypto.Parameters;
 
 namespace Gp4Net.Domain.Keys;
 
@@ -83,7 +80,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
         return DeriveScp03Key(scp03KeySet.EncKey, DerivationConstants.SEnc, derivationContext, keyLength)
             .Bind(sEnc => DeriveScp03Key(scp03KeySet.MacKey, DerivationConstants.SMac, derivationContext, keyLength)
                 .Bind(sMac => DeriveScp03Key(scp03KeySet.MacKey, DerivationConstants.SrMac, derivationContext, keyLength)
-                    .Map(sRMac => 
+                    .Map(sRMac =>
                     {
                         _logger.LogInformation("Successfully derived SCP03 session keys");
                         return new SessionKeys(sEnc, sMac, sRMac, scp03KeySet.DekKey);
@@ -109,8 +106,8 @@ public sealed class KeyDerivationService : IKeyDerivationService
         // The spec says counter comes after L field, so we need to split the fixed input data
 
         // Build fixed input data before counter
-        var dataBeforeCounter = new byte[15]; // Label + Separator + L
-        var offset = 0;
+        byte[] dataBeforeCounter = new byte[15]; // Label + Separator + L
+        int offset = 0;
 
         // Label (11 bytes of 0x00)
         DerivationConstants.Scp03Label.CopyTo(dataBeforeCounter, offset);
@@ -127,11 +124,11 @@ public sealed class KeyDerivationService : IKeyDerivationService
         dataBeforeCounter[offset++] = (byte)keyLengthBits;
 
         // Build fixed input data after counter
-        var dataAfterCounter = new byte[16]; // Context
+        byte[] dataAfterCounter = new byte[16]; // Context
         context.CopyTo(dataAfterCounter, 0);
 
         // Determine PRF type based on key length - fail secure on unknown lengths
-        var prfTypeResult = kdk.Length switch
+        Result<PrfType, SmartCardError> prfTypeResult = kdk.Length switch
         {
             16 => Result.Success<PrfType, SmartCardError>(PrfType.CmacAes128),
             24 => Result.Success<PrfType, SmartCardError>(PrfType.CmacAes192),
@@ -139,11 +136,11 @@ public sealed class KeyDerivationService : IKeyDerivationService
             _ => Result.Failure<PrfType, SmartCardError>(
                 SmartCardError.InvalidArgument($"Unsupported KDK length: {kdk.Length} bytes. Expected 16, 24, or 32 bytes."))
         };
-        
+
         return prfTypeResult.Bind(prfType =>
         {
             // Configure KDF options for SCP03 - counter in the middle
-            var options = new KdfOptions(
+            KdfOptions options = new KdfOptions(
                 prfType: prfType,
                 counterLengthBits: 8, // SCP03 uses 8-bit counter
                 useCounter: true,
@@ -151,7 +148,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
             );
 
             // Use DeriveWithSplitFixedInput to place counter in the middle
-            var derivedKey = _kdf.DeriveWithSplitFixedInput(
+            byte[] derivedKey = _kdf.DeriveWithSplitFixedInput(
                 kdk,
                 dataBeforeCounter,
                 dataAfterCounter,
@@ -218,18 +215,18 @@ public sealed class KeyDerivationService : IKeyDerivationService
     private Result<SessionKeys, SmartCardError> DeriveScp02SessionKeys(IKeyDerivationContext context)
     {
         // Build derivation parameters
-        var buildParams = context.KeySet.AsScp02KeySet()
+        Result<Scp02KeyDerivationParams, SmartCardError> buildParams = context.KeySet.AsScp02KeySet()
             .Bind(keySet => context.SequenceCounter.ToResult("SCP02 requires sequence counter")
                 .Map(seqCounter => new Scp02KeyDerivationParams(
-                    keySet, 
-                    seqCounter, 
+                    keySet,
+                    seqCounter,
                     context.Implementation.GetValueOrDefault(ScpImplementation.Scp02I15))));
 
         // Compose key derivations functionally
         return buildParams.Bind(derivationParams =>
         {
             _logger.LogDebug("SCP02 key derivation with implementation i={Implementation:X2}", (byte)derivationParams.Implementation);
-            
+
             return DeriveAllScp02Keys(derivationParams);
         });
     }
@@ -245,19 +242,19 @@ public sealed class KeyDerivationService : IKeyDerivationService
         _logger.LogTrace("DEK key: {DekKey}", Convert.ToHexString(parameters.KeySet.DekKey));
         _logger.LogTrace("Sequence counter: {SequenceCounter}", Convert.ToHexString(parameters.SequenceCounter));
         _logger.LogDebug("Uses derived MAC keys: {UsesDerivedMacKeys}", UsesDerivedMacKeys(parameters.Implementation));
-        
-        var deriveMacKey = UsesDerivedMacKeys(parameters.Implementation)
+
+        Result<byte[], SmartCardError> deriveMacKey = UsesDerivedMacKeys(parameters.Implementation)
             ? DeriveScp02Key(parameters.KeySet.MacKey, DerivationConstants.Scp02.CMac, parameters.SequenceCounter)
             : Result.Success<byte[], SmartCardError>(parameters.KeySet.MacKey);
 
         return DeriveScp02Key(parameters.KeySet.EncKey, DerivationConstants.Scp02.SecureChannelEncryption, parameters.SequenceCounter)
             .Bind(sEnc => deriveMacKey
-                .Bind(sMac => 
+                .Bind(sMac =>
                 {
                     // Always derive R-MAC session key, regardless of implementation support
                     // GP Pro behavior shows distinct R-MAC keys are derived even for i=00
-                    var deriveRMac = DeriveScp02Key(parameters.KeySet.MacKey, DerivationConstants.Scp02.RMac, parameters.SequenceCounter);
-                    
+                    Result<byte[], SmartCardError> deriveRMac = DeriveScp02Key(parameters.KeySet.MacKey, DerivationConstants.Scp02.RMac, parameters.SequenceCounter);
+
                     return deriveRMac.Bind(sRMac =>
                         DeriveScp02Key(parameters.KeySet.DekKey, DerivationConstants.Scp02.DataEncryptionKey, parameters.SequenceCounter)
                             .Map(sDek => new SessionKeys(sEnc, sMac, sRMac, sDek)));
@@ -276,7 +273,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
         byte[] sequenceCounter)
     {
         // Delegate to pure functional implementation
-        return Scp02Cryptography.DeriveScp02SessionKey(baseKey, derivationConstant, sequenceCounter);
+        return Scp02Protocol.DeriveScp02SessionKey(baseKey, derivationConstant, sequenceCounter);
     }
 
     /// <summary>
@@ -320,29 +317,29 @@ public sealed class KeyDerivationService : IKeyDerivationService
             // For SCP03 authentication cryptograms, use the data derivation scheme
             case 0x03 when
                 context.Type is CryptogramType.CardCryptogram or CryptogramType.HostCryptogram:
-            {
-                // Validate context data length
-                if (context.Data.Length != 16)
                 {
-                    return Result.Failure<byte[], SmartCardError>(
-                        new InvalidLengthError("cryptogramContext", 16, context.Data.Length));
+                    // Validate context data length
+                    if (context.Data.Length != 16)
+                    {
+                        return Result.Failure<byte[], SmartCardError>(
+                            new InvalidLengthError("cryptogramContext", 16, context.Data.Length));
+                    }
+
+                    // Determine derivation constant based on cryptogram type
+                    byte derivationConstant = context.Type switch
+                    {
+                        CryptogramType.CardCryptogram => DerivationConstants.CardCryptogram, // 0x00
+                        CryptogramType.HostCryptogram => DerivationConstants.HostCryptogram, // 0x01
+                        _ => throw new InvalidOperationException($"Unexpected cryptogram type: {context.Type}")
+                    };
+
+                    // Use SCP03 data derivation scheme
+                    return DeriveScp03Data(
+                        context.Key,
+                        derivationConstant,
+                        context.Data,
+                        64); // 64 bits = 8 bytes output
                 }
-
-                // Determine derivation constant based on cryptogram type
-                var derivationConstant = context.Type switch
-                {
-                    CryptogramType.CardCryptogram => DerivationConstants.CardCryptogram, // 0x00
-                    CryptogramType.HostCryptogram => DerivationConstants.HostCryptogram, // 0x01
-                    _ => throw new InvalidOperationException($"Unexpected cryptogram type: {context.Type}")
-                };
-
-                // Use SCP03 data derivation scheme
-                return DeriveScp03Data(
-                    context.Key,
-                    derivationConstant,
-                    context.Data,
-                    64); // 64 bits = 8 bytes output
-            }
 
             // For SCP02, the data is already properly formatted by CryptogramBuilder
             // It includes the sequence counter and proper padding, so we should not decompose it
@@ -350,14 +347,14 @@ public sealed class KeyDerivationService : IKeyDerivationService
                 // For SCP02, use the appropriate MAC algorithm based on cryptogram type
                 return context.Type switch
                 {
-                    CryptogramType.CardCryptogram or CryptogramType.HostCryptogram => 
+                    CryptogramType.CardCryptogram or CryptogramType.HostCryptogram =>
                         // SCP02 uses Full 3DES MAC for cryptograms
-                        CryptographicOperations.CalculateFull3DesMac(context.Key, context.Data),
-                    
-                    CryptogramType.CommandMac or CryptogramType.ResponseMac => 
+                        MacCalculations.CalculateScp02Cryptogram(context.Key, context.Data),
+
+                    CryptogramType.CommandMac or CryptogramType.ResponseMac =>
                         // SCP02 uses Retail MAC for C-MAC and R-MAC
-                        CryptographicOperations.CalculateRetailMac(context.Key, context.Data),
-                    
+                        MacCalculations.CalculateScp02CommandMac(context.Key, context.Data),
+
                     _ => Result.Failure<byte[], SmartCardError>(
                         new UnsupportedImplementationError($"SCP02 cryptogram type: {context.Type}"))
                 };
@@ -388,7 +385,7 @@ public sealed class KeyDerivationService : IKeyDerivationService
     private static bool UsesDerivedMacKeys(ScpImplementation implementation)
     {
         // Per GP Card Specification v2.3.1 Section E.4.1:
-        // "Generating the Secure Channel C-MAC session keys using the Secure Channel base key or MAC key (S-MAC) 
+        // "Generating the Secure Channel C-MAC session keys using the Secure Channel base key or MAC key (S-MAC)
         // and the session keys derivation data with a constant of '0101'"
         // All SCP02 implementations derive MAC keys from static keys using constant 0x0101
         // This is confirmed by live card trace data from real hardware implementations
@@ -397,9 +394,9 @@ public sealed class KeyDerivationService : IKeyDerivationService
             // All SCP02 implementations derive MAC keys per GP specification Section E.4.1
             // Live card traces confirm this behavior for all tested implementations
             ScpImplementation.Scp02I15 => true,   // CLR mode: derives MAC keys (confirmed by live trace data)
-            ScpImplementation.Scp02I35 => true,   // MAC mode: derives MAC keys (confirmed by live trace data)  
+            ScpImplementation.Scp02I35 => true,   // MAC mode: derives MAC keys (confirmed by live trace data)
             ScpImplementation.Scp02I55 => true,   // ENC mode: derives MAC keys (confirmed by live trace data)
-            
+
             // Default: derive MAC keys per GP Card Specification v2.3.1 Section E.4.1
             _ => true  // All implementations derive MAC keys per specification and live card behavior
         };
