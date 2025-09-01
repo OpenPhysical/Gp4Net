@@ -4,6 +4,4 @@ namespace Gp4Net.Core.ServiceLifetime;
 /// Marker interface for services that should be registered as singletons.
 /// Used with Scrutor for automatic service registration.
 /// </summary>
-public interface ISingletonService
-{
-}
+public interface ISingletonService { }

@@ -1,7 +1,8 @@
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
+using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
 using Org.BouncyCastle.Security;
@@ -35,41 +36,72 @@ public record SecureChannelState(
     /// Creates a new secure channel state with an updated MAC chaining state.
     /// Used after MAC calculations to maintain proper chaining for subsequent operations.
     /// </summary>
-    public Result<SecureChannelState, SmartCardError> UpdateMacChaining(MacChainingState newMacChaining)
+    public Result<SecureChannelState, SmartCardError> UpdateMacChaining(
+        MacChainingState newMacChaining
+    )
     {
-        return Maybe<MacChainingState>.From(newMacChaining).Match(
-            Some: macChaining => Result.Success<SecureChannelState, SmartCardError>(
-                this with { MacChaining = macChaining }),
-            None: () => SmartCardError.InvalidArgument("MAC chaining state cannot be null"));
+        return Maybe<MacChainingState>
+            .From(newMacChaining)
+            .Match(
+                Some: macChaining =>
+                    Result.Success<SecureChannelState, SmartCardError>(
+                        this with
+                        {
+                            MacChaining = macChaining,
+                        }
+                    ),
+                None: () => SmartCardError.InvalidArgument("MAC chaining state cannot be null")
+            );
     }
 
     /// <summary>
     /// Creates a new secure channel state with an updated MAC chaining value.
     /// Used after MAC calculations to maintain proper chaining for subsequent operations.
     /// </summary>
-    public Result<SecureChannelState, SmartCardError> UpdateMacChainingValue(byte[] newMacChainingValue)
+    public Result<SecureChannelState, SmartCardError> UpdateMacChainingValue(
+        byte[] newMacChainingValue
+    )
     {
-        return Maybe<byte[]>.From(newMacChainingValue).Match(
-            Some: macValue => MacChainingState.Create(macValue, ProtocolVersion, 0x00)
-                .Bind(newMacChaining => Result.Success<SecureChannelState, SmartCardError>(
-                    this with { MacChaining = newMacChaining })),
-            None: () => SmartCardError.InvalidArgument("MAC chaining value cannot be null"));
+        return Maybe<byte[]>
+            .From(newMacChainingValue)
+            .Match(
+                Some: macValue =>
+                    MacChainingState
+                        .Create(macValue, ProtocolVersion, 0x00)
+                        .Bind(newMacChaining =>
+                            Result.Success<SecureChannelState, SmartCardError>(
+                                this with
+                                {
+                                    MacChaining = newMacChaining,
+                                }
+                            )
+                        ),
+                None: () => SmartCardError.InvalidArgument("MAC chaining value cannot be null")
+            );
     }
 
     /// <summary>
     /// Creates a new secure channel state with both updated MAC chaining state and incremented counter.
     /// Convenience method for operations that affect both values.
     /// </summary>
-    public Result<SecureChannelState, SmartCardError> UpdateCounterAndMac(uint newCounter, MacChainingState newMacChaining)
+    public Result<SecureChannelState, SmartCardError> UpdateCounterAndMac(
+        uint newCounter,
+        MacChainingState newMacChaining
+    )
     {
-        return Maybe<MacChainingState>.From(newMacChaining).Match(
-            Some: macChaining => Result.Success<SecureChannelState, SmartCardError>(
-                this with
-                {
-                    EncryptionCounter = newCounter,
-                    MacChaining = macChaining
-                }),
-            None: () => SmartCardError.InvalidArgument("MAC chaining state cannot be null"));
+        return Maybe<MacChainingState>
+            .From(newMacChaining)
+            .Match(
+                Some: macChaining =>
+                    Result.Success<SecureChannelState, SmartCardError>(
+                        this with
+                        {
+                            EncryptionCounter = newCounter,
+                            MacChaining = macChaining,
+                        }
+                    ),
+                None: () => SmartCardError.InvalidArgument("MAC chaining state cannot be null")
+            );
     }
 
     /// <summary>
@@ -77,10 +109,7 @@ public record SecureChannelState(
     /// </summary>
     public bool HasCommandMac
     {
-        get
-        {
-            return SecurityLevel.HasCMac();
-        }
+        get { return SecurityLevel.HasCMac(); }
     }
 
     /// <summary>
@@ -88,10 +117,7 @@ public record SecureChannelState(
     /// </summary>
     public bool HasCommandEncryption
     {
-        get
-        {
-            return SecurityLevel.HasCEncryption();
-        }
+        get { return SecurityLevel.HasCEncryption(); }
     }
 
     /// <summary>
@@ -99,10 +125,7 @@ public record SecureChannelState(
     /// </summary>
     public bool HasResponseMac
     {
-        get
-        {
-            return SecurityLevel.HasRMac();
-        }
+        get { return SecurityLevel.HasRMac(); }
     }
 
     /// <summary>
@@ -110,10 +133,7 @@ public record SecureChannelState(
     /// </summary>
     public bool HasResponseEncryption
     {
-        get
-        {
-            return SecurityLevel.HasREncryption();
-        }
+        get { return SecurityLevel.HasREncryption(); }
     }
 
     /// <summary>
@@ -121,10 +141,7 @@ public record SecureChannelState(
     /// </summary>
     public bool IsScp03
     {
-        get
-        {
-            return ProtocolVersion == ScpVersion.Scp03;
-        }
+        get { return ProtocolVersion == ScpVersion.Scp03; }
     }
 
     /// <summary>
@@ -132,10 +149,7 @@ public record SecureChannelState(
     /// </summary>
     public bool IsScp02
     {
-        get
-        {
-            return ProtocolVersion == ScpVersion.Scp02;
-        }
+        get { return ProtocolVersion == ScpVersion.Scp02; }
     }
 
     /// <summary>
@@ -143,10 +157,7 @@ public record SecureChannelState(
     /// </summary>
     public byte[] MacChainingValue
     {
-        get
-        {
-            return MacChaining.ToArray();
-        }
+        get { return MacChaining.ToArray(); }
     }
 
     /// <summary>
@@ -163,13 +174,31 @@ public record SecureChannelState(
         SecurityLevel securityLevel,
         ScpVersion protocolVersion,
         byte[] initialMacChainingValue,
-        byte implementationParameter)
+        byte implementationParameter
+    )
     {
-        return Maybe<SessionKeys>.From(sessionKeys).Match(
-            Some: keys => Maybe<byte[]>.From(initialMacChainingValue).Match(
-                Some: macValue => CreateInternal(keys, securityLevel, protocolVersion, macValue, implementationParameter),
-                None: () => SmartCardError.InvalidArgument("Initial MAC chaining value cannot be null")),
-            None: () => SmartCardError.InvalidArgument("Session keys cannot be null"));
+        return Maybe<SessionKeys>
+            .From(sessionKeys)
+            .Match(
+                Some: keys =>
+                    Maybe<byte[]>
+                        .From(initialMacChainingValue)
+                        .Match(
+                            Some: macValue =>
+                                CreateInternal(
+                                    keys,
+                                    securityLevel,
+                                    protocolVersion,
+                                    macValue,
+                                    implementationParameter
+                                ),
+                            None: () =>
+                                SmartCardError.InvalidArgument(
+                                    "Initial MAC chaining value cannot be null"
+                                )
+                        ),
+                None: () => SmartCardError.InvalidArgument("Session keys cannot be null")
+            );
     }
 
     private static Result<SecureChannelState, SmartCardError> CreateInternal(
@@ -177,18 +206,22 @@ public record SecureChannelState(
         SecurityLevel securityLevel,
         ScpVersion protocolVersion,
         byte[] initialMacChainingValue,
-        byte implementationParameter)
+        byte implementationParameter
+    )
     {
         if (protocolVersion != ScpVersion.Scp02 && protocolVersion != ScpVersion.Scp03)
         {
-            return SmartCardError.InvalidArgument($"Unsupported protocol version: 0x{protocolVersion:X2}");
+            return SmartCardError.InvalidArgument(
+                $"Unsupported protocol version: 0x{protocolVersion:X2}"
+            );
         }
 
         // Create the MAC chaining state
         Result<MacChainingState, SmartCardError> macChainingResult = MacChainingState.Create(
             initialMacChainingValue,
             protocolVersion,
-            implementationParameter);
+            implementationParameter
+        );
 
         if (macChainingResult.IsFailure)
         {
@@ -208,7 +241,8 @@ public record SecureChannelState(
                 macChainingResult.Value,
                 0, // Start with counter = 0 per GP specification
                 [.. sessionId]
-            ));
+            )
+        );
     }
 
     /// <summary>
@@ -217,11 +251,19 @@ public record SecureChannelState(
     /// <returns>A result indicating success or describing validation errors.</returns>
     public Result<SecureChannelState, SmartCardError> Validate()
     {
-        return Maybe<SessionKeys>.From(SessionKeys).Match(
-            Some: keys => Maybe<MacChainingState>.From(MacChaining).Match(
-                Some: macChaining => ValidateInternal(),
-                None: () => SmartCardError.InvalidData("MAC chaining state cannot be null")),
-            None: () => SmartCardError.InvalidData("Session keys are null"));
+        return Maybe<SessionKeys>
+            .From(SessionKeys)
+            .Match(
+                Some: keys =>
+                    Maybe<MacChainingState>
+                        .From(MacChaining)
+                        .Match(
+                            Some: macChaining => ValidateInternal(),
+                            None: () =>
+                                SmartCardError.InvalidData("MAC chaining state cannot be null")
+                        ),
+                None: () => SmartCardError.InvalidData("Session keys are null")
+            );
     }
 
     private Result<SecureChannelState, SmartCardError> ValidateInternal()

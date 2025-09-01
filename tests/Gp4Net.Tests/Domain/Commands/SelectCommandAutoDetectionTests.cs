@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -16,7 +18,8 @@ public class SelectCommandAutoDetectionTests
     public void CreateForIssuerSecurityDomain_CreatesSelectWithEmptyAid()
     {
         // Act
-        Result<SelectCommand, SmartCardError> result = SelectCommand.CreateForIssuerSecurityDomain();
+        Result<SelectCommand, SmartCardError> result =
+            SelectCommand.CreateForIssuerSecurityDomain();
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -31,7 +34,8 @@ public class SelectCommandAutoDetectionTests
     public void EmptySelectCommand_GeneratesCorrectApdu()
     {
         // Arrange
-        Result<SelectCommand, SmartCardError> result = SelectCommand.CreateForIssuerSecurityDomain();
+        Result<SelectCommand, SmartCardError> result =
+            SelectCommand.CreateForIssuerSecurityDomain();
         _ = result.IsSuccess.Should().BeTrue();
         SelectCommand? command = result.Value;
 
@@ -74,11 +78,25 @@ public class SelectCommandAutoDetectionTests
                 string aidHex = Convert.ToHexString(fci.ApplicationAid);
                 _ = aidHex.Should().BeEquivalentTo("A000000151000000");
                 _ = fci.MaxCommandDataLength.Match(
-                    value => { _ = value.Should().Be(255); return true; },
-                    () => { _ = false.Should().BeTrue("MaxCommandDataLength should have a value"); return false; });
+                    value =>
+                    {
+                        _ = value.Should().Be(255);
+                        return true;
+                    },
+                    () =>
+                    {
+                        _ = false.Should().BeTrue("MaxCommandDataLength should have a value");
+                        return false;
+                    }
+                );
                 return true;
             },
-            () => { _ = false.Should().BeTrue("FCI should have a value"); return false; });
+            () =>
+            {
+                _ = false.Should().BeTrue("FCI should have a value");
+                return false;
+            }
+        );
     }
 
     [Test]
@@ -91,7 +109,7 @@ public class SelectCommandAutoDetectionTests
             builder =>
             {
                 builder.Add(0x84, Convert.FromHexString("A0000000030000")); // AID
-                builder.Add(0x50, System.Text.Encoding.UTF8.GetBytes("ISD")); // Label
+                builder.Add(0x50, Encoding.UTF8.GetBytes("ISD")); // Label
                 builder.Add(
                     0xA5,
                     subBuilder =>
@@ -119,17 +137,49 @@ public class SelectCommandAutoDetectionTests
                 string aidHex = Convert.ToHexString(fci.ApplicationAid);
                 _ = aidHex.Should().BeEquivalentTo("A0000000030000");
                 _ = fci.ApplicationLabel.Match(
-                    label => { _ = label.Should().BeEquivalentTo("ISD"); return true; },
-                    () => { _ = false.Should().BeTrue("ApplicationLabel should have a value"); return false; });
+                    label =>
+                    {
+                        _ = label.Should().BeEquivalentTo("ISD");
+                        return true;
+                    },
+                    () =>
+                    {
+                        _ = false.Should().BeTrue("ApplicationLabel should have a value");
+                        return false;
+                    }
+                );
                 _ = fci.MaxCommandDataLength.Match(
-                    value => { _ = value.Should().Be(255); return true; },
-                    () => { _ = false.Should().BeTrue("MaxCommandDataLength should have a value"); return false; });
+                    value =>
+                    {
+                        _ = value.Should().Be(255);
+                        return true;
+                    },
+                    () =>
+                    {
+                        _ = false.Should().BeTrue("MaxCommandDataLength should have a value");
+                        return false;
+                    }
+                );
                 _ = fci.MaxResponseDataLength.Match(
-                    value => { _ = value.Should().Be(255); return true; },
-                    () => { _ = false.Should().BeTrue("MaxResponseDataLength should have a value"); return false; });
+                    value =>
+                    {
+                        _ = value.Should().Be(255);
+                        return true;
+                    },
+                    () =>
+                    {
+                        _ = false.Should().BeTrue("MaxResponseDataLength should have a value");
+                        return false;
+                    }
+                );
                 return true;
             },
-            () => { _ = false.Should().BeTrue("FCI should have a value"); return false; });
+            () =>
+            {
+                _ = false.Should().BeTrue("FCI should have a value");
+                return false;
+            }
+        );
     }
 
     [Test]
@@ -223,7 +273,10 @@ public class SelectCommandAutoDetectionTests
         byte[] aid = Convert.FromHexString("A000000151000000");
 
         // Act
-        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
+        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(
+            aid,
+            SelectCommand.SelectMode.Next
+        );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -251,7 +304,9 @@ public class SelectCommandAutoDetectionTests
     public void SelectCommand_ToString_ReturnsSelect()
     {
         // Arrange
-        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(Convert.FromHexString("A000000151000000"));
+        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(
+            Convert.FromHexString("A000000151000000")
+        );
         _ = result.IsSuccess.Should().BeTrue();
         SelectCommand? command = result.Value;
 
@@ -268,7 +323,7 @@ public class SelectCommandAutoDetectionTests
 /// </summary>
 internal class TlvBuilder
 {
-    private readonly System.Collections.Generic.List<byte> _data = [];
+    private readonly List<byte> _data = [];
 
     public void Add(int tag, byte[] value)
     {

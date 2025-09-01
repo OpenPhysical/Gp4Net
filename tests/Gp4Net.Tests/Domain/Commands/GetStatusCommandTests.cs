@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -14,13 +13,14 @@ namespace Gp4Net.Tests.Domain.Commands;
 [Category("Unit")]
 public class GetStatusCommandTests
 {
-
     [Test]
     [TestCase(GetStatusCommand.StatusSubset.IssuerSecurityDomain)]
     [TestCase(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains)]
     [TestCase(GetStatusCommand.StatusSubset.ExecutableLoadFiles)]
     [TestCase(GetStatusCommand.StatusSubset.ExecutableLoadFilesAndModules)]
-    public void Create_WithValidStatusSubset_ReturnsSuccessResult(GetStatusCommand.StatusSubset subset)
+    public void Create_WithValidStatusSubset_ReturnsSuccessResult(
+        GetStatusCommand.StatusSubset subset
+    )
     {
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(subset);
 
@@ -33,7 +33,9 @@ public class GetStatusCommandTests
     [Test]
     [TestCase(GetStatusCommand.ResponseFormat.None)]
     [TestCase(GetStatusCommand.ResponseFormat.Tlv)]
-    public void Create_WithValidResponseFormat_ReturnsSuccessResult(GetStatusCommand.ResponseFormat format)
+    public void Create_WithValidResponseFormat_ReturnsSuccessResult(
+        GetStatusCommand.ResponseFormat format
+    )
     {
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
@@ -60,7 +62,7 @@ public class GetStatusCommandTests
     }
 
     [Test]
-    [TestCase(4)]  // Too short
+    [TestCase(4)] // Too short
     [TestCase(17)] // Too long
     public void Create_WithInvalidSearchCriteriaLength_ReturnsFailureResult(int length)
     {
@@ -73,11 +75,13 @@ public class GetStatusCommandTests
         );
 
         _ = result.IsFailure.Should().BeTrue();
-        _ = result.Error.Message.Should().Contain("Search criteria AID must be between 5 and 16 bytes");
+        _ = result
+            .Error.Message.Should()
+            .Contain("Search criteria AID must be between 5 and 16 bytes");
     }
 
     [Test]
-    [TestCase(5)]  // Minimum valid length
+    [TestCase(5)] // Minimum valid length
     [TestCase(10)] // Mid-range
     [TestCase(16)] // Maximum valid length
     public void Create_WithValidSearchCriteriaLengths_ReturnsSuccessResult(int length)
@@ -139,8 +143,7 @@ public class GetStatusCommandTests
     public void ToApdu_WithoutSearchCriteria_ReturnsCase2Apdu()
     {
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
-            GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
-            GetStatusCommand.ResponseFormat.None
+            GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains
         );
         GetStatusCommand? command = result.Value;
 
@@ -182,7 +185,10 @@ public class GetStatusCommandTests
     [TestCase(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains, 0x40)]
     [TestCase(GetStatusCommand.StatusSubset.ExecutableLoadFiles, 0x20)]
     [TestCase(GetStatusCommand.StatusSubset.ExecutableLoadFilesAndModules, 0x10)]
-    public void ToApdu_WithDifferentSubsets_SetsP1Correctly(GetStatusCommand.StatusSubset subset, byte expectedP1)
+    public void ToApdu_WithDifferentSubsets_SetsP1Correctly(
+        GetStatusCommand.StatusSubset subset,
+        byte expectedP1
+    )
     {
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(subset);
         GetStatusCommand? command = result.Value;
@@ -195,7 +201,10 @@ public class GetStatusCommandTests
     [Test]
     [TestCase(GetStatusCommand.ResponseFormat.None, 0x00)]
     [TestCase(GetStatusCommand.ResponseFormat.Tlv, 0x02)]
-    public void ToApdu_WithDifferentFormats_SetsP2Correctly(GetStatusCommand.ResponseFormat format, byte expectedP2)
+    public void ToApdu_WithDifferentFormats_SetsP2Correctly(
+        GetStatusCommand.ResponseFormat format,
+        byte expectedP2
+    )
     {
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
@@ -211,7 +220,9 @@ public class GetStatusCommandTests
     [Test]
     public void ToApdu_AlwaysReturnsNewArray()
     {
-        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
+            GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains
+        );
         GetStatusCommand? command = result.Value;
 
         byte[]? apdu1 = command.ToApdu();
@@ -229,7 +240,7 @@ public class GetStatusCommandTests
             GetStatusCommand.ResponseFormat.Tlv
         );
         GetStatusCommand? command = result.Value;
-        IApduCommand? iApduCommand = (IApduCommand)command;
+        IApduCommand? iApduCommand = command;
 
         _ = iApduCommand.Cla.Should().Be(0x80);
         _ = iApduCommand.Ins.Should().Be(0xF2);
@@ -260,16 +271,19 @@ public class GetStatusCommandTests
         // TLV: E3 (template) containing 4F (AID), 9F70 (state), C5 (privileges 3 bytes)
         byte[] aid = Convert.FromHexString("A0000000031010");
         List<byte> tlv = [];
-        List<byte> inner =
-        [
-            0x4F,
-            (byte)aid.Length
-        ];
+        List<byte> inner = [0x4F, (byte)aid.Length];
         inner.AddRange(aid);
-        inner.Add(0x9F); inner.Add(0x70); inner.Add(0x01); inner.Add(0x07);
-        inner.Add(0xC5); inner.Add(0x03); inner.AddRange([0x80, 0x00, 0x00]);
-        tlv.Add(0xE3); tlv.Add((byte)inner.Count); tlv.AddRange(inner);
-        byte[] response = tlv.ToArray();
+        inner.Add(0x9F);
+        inner.Add(0x70);
+        inner.Add(0x01);
+        inner.Add(0x07);
+        inner.Add(0xC5);
+        inner.Add(0x03);
+        inner.AddRange([0x80, 0x00, 0x00]);
+        tlv.Add(0xE3);
+        tlv.Add((byte)inner.Count);
+        tlv.AddRange(inner);
+        byte[] response = [.. tlv];
 
         Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(response);
 
@@ -289,7 +303,7 @@ public class GetStatusCommandTests
         byte[] aid2 = Convert.FromHexString("A000000003101001");
         byte[] e3_1 = BuildAppEntry(aid1, 0x07, [0x80, 0x00, 0x00]);
         byte[] e3_2 = BuildAppEntry(aid2, 0x0F, [0xC0, 0x40, 0x00]);
-        byte[] response = e3_1.Concat(e3_2).ToArray();
+        byte[] response = [.. e3_1, .. e3_2];
 
         Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(response);
 
@@ -314,7 +328,8 @@ public class GetStatusCommandTests
     [TestCase(0x87, ApplicationStatusEntry.LifecycleState.Locked)]
     public void GetStatusResponse_Parse_WithDifferentLifecycleStates_ParsesCorrectly(
         byte stateValue,
-        ApplicationStatusEntry.LifecycleState expectedState)
+        ApplicationStatusEntry.LifecycleState expectedState
+    )
     {
         byte[] aid = Convert.FromHexString("A0000000031010");
         byte[] e3 = BuildAppEntry(aid, stateValue, [0x00, 0x00, 0x00]);
@@ -360,9 +375,11 @@ public class GetStatusCommandTests
     public void GetStatusResponse_Parse_WithTruncatedData_StopsGracefully()
     {
         byte[] response = Convert.FromHexString(
-            "07" +               // AID length
-            "A0000000031010" +   // AID
-            "07"                 // Lifecycle state - missing privileges
+            "07"
+                + // AID length
+                "A0000000031010"
+                + // AID
+                "07" // Lifecycle state - missing privileges
         );
 
         Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(response);
@@ -387,20 +404,15 @@ public class GetStatusCommandTests
     {
         // Omit C5 to represent no privileges per spec allowance
         byte[] aid = Convert.FromHexString("A0000000031010");
-        List<byte> inner =
-        [
-            0x4F,
-            (byte)aid.Length
-        ];
+        List<byte> inner = [0x4F, (byte)aid.Length];
         inner.AddRange(aid);
-        inner.Add(0x9F); inner.Add(0x70); inner.Add(0x01); inner.Add(0x07);
-        List<byte> tlv =
-        [
-            0xE3,
-            (byte)inner.Count
-        ];
+        inner.Add(0x9F);
+        inner.Add(0x70);
+        inner.Add(0x01);
+        inner.Add(0x07);
+        List<byte> tlv = [0xE3, (byte)inner.Count];
         tlv.AddRange(inner);
-        byte[] response = tlv.ToArray();
+        byte[] response = [.. tlv];
 
         Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(response);
 
@@ -411,24 +423,21 @@ public class GetStatusCommandTests
 
     private static byte[] BuildAppEntry(byte[] aid, byte lifecycleState, byte[] privileges3)
     {
-        List<byte> inner =
-        [
-            0x4F,
-            (byte)aid.Length
-        ];
+        List<byte> inner = [0x4F, (byte)aid.Length];
         inner.AddRange(aid);
-        inner.Add(0x9F); inner.Add(0x70); inner.Add(0x01); inner.Add(lifecycleState);
+        inner.Add(0x9F);
+        inner.Add(0x70);
+        inner.Add(0x01);
+        inner.Add(lifecycleState);
         if (privileges3 != null)
         {
-            inner.Add(0xC5); inner.Add(0x03); inner.AddRange(privileges3);
+            inner.Add(0xC5);
+            inner.Add(0x03);
+            inner.AddRange(privileges3);
         }
-        List<byte> e3 =
-        [
-            0xE3,
-            (byte)inner.Count
-        ];
+        List<byte> e3 = [0xE3, (byte)inner.Count];
         e3.AddRange(inner);
-        return e3.ToArray();
+        return [.. e3];
     }
 
     [Test]
@@ -453,7 +462,9 @@ public class GetStatusCommandTests
     [Test]
     public void ToString_ReturnsDescriptiveString()
     {
-        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains);
+        Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
+            GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains
+        );
         GetStatusCommand? command = result.Value;
 
         string? str = command.ToString();
@@ -477,7 +488,7 @@ public class GetStatusCommandTests
                 Convert.FromHexString("A0000000031010"),
                 ApplicationStatusEntry.LifecycleState.Selectable,
                 [0x80]
-            )
+            ),
         ];
 
         GetStatusResponse response = new GetStatusResponse(apps);
@@ -485,5 +496,4 @@ public class GetStatusCommandTests
         _ = response.Applications.Should().NotBeSameAs(apps);
         _ = response.Applications.Should().HaveCount(1);
     }
-
 }

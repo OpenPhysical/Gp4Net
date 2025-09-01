@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Core.Tlv;
+using Gp4Net.Services;
+using static Gp4Net.Services.TlvService;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 
@@ -121,12 +124,18 @@ public class SelectCommand : BaseApduCommand
         SelectMode mode = SelectMode.First
     )
     {
-        return Maybe<byte[]>.From(aid).Match(
-            Some: aidValue => ValidateAndCreateSelect(aidValue, mode),
-            None: () => new InvalidDataError("AID", "cannot be null"));
+        return Maybe<byte[]>
+            .From(aid)
+            .Match(
+                Some: aidValue => ValidateAndCreateSelect(aidValue, mode),
+                None: () => new InvalidDataError("AID", "cannot be null")
+            );
     }
 
-    private static Result<SelectCommand, SmartCardError> ValidateAndCreateSelect(byte[] aid, SelectMode mode)
+    private static Result<SelectCommand, SmartCardError> ValidateAndCreateSelect(
+        byte[] aid,
+        SelectMode mode
+    )
     {
         if (aid.Length > 16)
         {
@@ -139,9 +148,10 @@ public class SelectCommand : BaseApduCommand
         // GP Card Specification v2.3.1 Table 11-81: P2 parameter for SELECT command
         // 0x00 = First or only occurrence
         // 0x02 = Next occurrence
-        FileControlInfo controlInfo = mode == SelectMode.First
-            ? FileControlInfo.ReturnFci      // 0x00 = First occurrence
-            : (FileControlInfo)SelectMode.Next;  // 0x02 = Next occurrence
+        FileControlInfo controlInfo =
+            mode == SelectMode.First
+                ? FileControlInfo.ReturnFci // 0x00 = First occurrence
+                : (FileControlInfo)SelectMode.Next; // 0x02 = Next occurrence
 
         return Result.Success<SelectCommand, SmartCardError>(
             new SelectCommand(aid, control, controlInfo)
@@ -154,7 +164,7 @@ public class SelectCommand : BaseApduCommand
     /// <returns>A Result containing the SelectCommand or an error.</returns>
     public static Result<SelectCommand, SmartCardError> CreateForIssuerSecurityDomain()
     {
-        return Create([], SelectMode.First);
+        return Create([]);
     }
 
     /// <summary>
@@ -163,14 +173,22 @@ public class SelectCommand : BaseApduCommand
     internal static Result<SelectCommand, SmartCardError> CreateWith(
         byte[] aid,
         SelectMode mode,
-        FileControlInfo controlInfo)
+        FileControlInfo controlInfo
+    )
     {
-        return Maybe<byte[]>.From(aid).Match(
-            Some: aidValue => ValidateAndCreateSelectWith(aidValue, mode, controlInfo),
-            None: () => new InvalidDataError("AID", "cannot be null"));
+        return Maybe<byte[]>
+            .From(aid)
+            .Match(
+                Some: aidValue => ValidateAndCreateSelectWith(aidValue, mode, controlInfo),
+                None: () => new InvalidDataError("AID", "cannot be null")
+            );
     }
 
-    private static Result<SelectCommand, SmartCardError> ValidateAndCreateSelectWith(byte[] aid, SelectMode mode, FileControlInfo controlInfo)
+    private static Result<SelectCommand, SmartCardError> ValidateAndCreateSelectWith(
+        byte[] aid,
+        SelectMode mode,
+        FileControlInfo controlInfo
+    )
     {
         if (aid.Length > 16)
         {
@@ -184,50 +202,34 @@ public class SelectCommand : BaseApduCommand
         );
     }
 
-
     /// <inheritdoc />
     public override byte Cla
     {
-        get
-        {
-            return ClassByte;
-        }
+        get { return ClassByte; }
     }
 
     /// <inheritdoc />
     public override byte Ins
     {
-        get
-        {
-            return InstructionByte;
-        }
+        get { return InstructionByte; }
     }
 
     /// <inheritdoc />
     public override byte P1
     {
-        get
-        {
-            return (byte)Control;
-        }
+        get { return (byte)Control; }
     }
 
     /// <inheritdoc />
     public override byte P2
     {
-        get
-        {
-            return (byte)ControlInfo;
-        }
+        get { return (byte)ControlInfo; }
     }
 
     /// <inheritdoc />
     public override byte[] Data
     {
-        get
-        {
-            return Aid;
-        }
+        get { return Aid; }
     }
 
     /// <inheritdoc />
@@ -235,10 +237,11 @@ public class SelectCommand : BaseApduCommand
     {
         get
         {
-            return ControlInfo == FileControlInfo.NoResponseData ? Maybe<int>.None : Maybe<int>.From(256);
+            return ControlInfo == FileControlInfo.NoResponseData
+                ? Maybe<int>.None
+                : Maybe<int>.From(256);
         }
     }
-
 
     /// <summary>
     /// Returns a string representation of this command.
@@ -374,13 +377,16 @@ public class SelectResponse
         if (response is null)
         {
             return Result.Failure<SelectResponse, SmartCardError>(
-                new InvalidDataError("Response", "cannot be null"));
+                new InvalidDataError("Response", "cannot be null")
+            );
         }
 
         // Try to parse FCI data
         Result<Maybe<FileControlInformation>, SmartCardError> fciResult = ParseFciData(response);
         return fciResult.IsSuccess
-            ? Result.Success<SelectResponse, SmartCardError>(new SelectResponse(response, fciResult.Value))
+            ? Result.Success<SelectResponse, SmartCardError>(
+                new SelectResponse(response, fciResult.Value)
+            )
             : Result.Failure<SelectResponse, SmartCardError>(fciResult.Error);
     }
 
@@ -404,23 +410,31 @@ public class SelectResponse
         if (data.Length == 0)
         {
             return Result.Success<Maybe<FileControlInformation>, SmartCardError>(
-                Maybe<FileControlInformation>.None);
+                Maybe<FileControlInformation>.None
+            );
         }
 
-        IReadOnlyList<TlvObject> tlvObjects = TlvParser.ParseAll(data);
+        var parseResult = TlvService.TlvParser.ParseMultiple(data.ToImmutableArray());
+        if (parseResult.IsFailure)
+        {
+            return Result.Success<Maybe<FileControlInformation>, SmartCardError>(
+                Maybe<FileControlInformation>.None
+            );
+        }
+        var tlvObjects = parseResult.Value.Objects;
 
         // Find FCI template (0x6F) using functional composition
-        TlvObject[] fciTemplate = tlvObjects
-            .Select(tlv => tlv.GetTagNumber()
-                .Match(
-                    tag => tag == 0x6F ? Maybe<TlvObject>.From(tlv) : Maybe<TlvObject>.None,
-                    error => Maybe<TlvObject>.None))
+        TlvObject[] fciTemplate = [.. tlvObjects
+            .Select(tlv =>
+                tlv.Tag.ToNumber()
+                    .Match(
+                        tag => tag == 0x6F ? Maybe<TlvObject>.From(tlv) : Maybe<TlvObject>.None,
+                        error => Maybe<TlvObject>.None
+                    )
+            )
             .Where(maybeTlv => maybeTlv.HasValue)
-            .SelectMany(maybeTlv => maybeTlv.Match(
-                tlv => [tlv],
-                () => Array.Empty<TlvObject>()))
-            .Take(1)
-            .ToArray();
+            .SelectMany(maybeTlv => maybeTlv.Match(tlv => [tlv], () => Array.Empty<TlvObject>()))
+            .Take(1)];
 
         if (fciTemplate.Length > 0)
         {
@@ -429,10 +443,13 @@ public class SelectResponse
         }
 
         return Result.Success<Maybe<FileControlInformation>, SmartCardError>(
-            Maybe<FileControlInformation>.None);
+            Maybe<FileControlInformation>.None
+        );
     }
 
-    private static Result<FileControlInformation, SmartCardError> ParseFciTemplate(TlvObject fciTemplate)
+    private static Result<FileControlInformation, SmartCardError> ParseFciTemplate(
+        TlvObject fciTemplate
+    )
     {
         byte[] applicationAid = [];
         Maybe<string> applicationLabel = Maybe<string>.None;
@@ -445,43 +462,60 @@ public class SelectResponse
         byte[] discretionaryData = [];
 
         // Parse direct children of FCI template
-        IReadOnlyList<TlvObject> children = fciTemplate.ParseNestedTlv();
+        var childrenResult = TlvService.TlvParser.ParseMultiple(fciTemplate.TlvData.Bytes);
+        if (childrenResult.IsFailure)
+        {
+            return Result.Failure<FileControlInformation, SmartCardError>(
+                SmartCardError.InvalidData("Failed to parse FCI template children")
+            );
+        }
+        var children = childrenResult.Value.Objects;
         foreach (TlvObject tlv in children)
         {
-            Result<uint, SmartCardError> tagResult = tlv.GetTagNumber();
+            var tagResult = tlv.Tag.ToNumber();
             if (tagResult.IsFailure)
                 return Result.Failure<FileControlInformation, SmartCardError>(
-                    SmartCardError.InvalidData("Failed to parse nested TLV tag"));
+                    SmartCardError.InvalidData("Failed to parse nested TLV tag")
+                );
 
             switch (tagResult.Value)
             {
                 case 0x84: // DF Name (AID)
-                    applicationAid = tlv.Value;
+                    applicationAid = tlv.TlvData.Bytes.ToArray();
                     break;
                 case 0x50: // Application Label
-                           // Per ISO 7816-4 and GP specifications, application labels must be ASCII
-                    Result<string, SmartCardError> labelResult = EncodingUtils.SafeAsciiDecode(tlv.Value);
-                    if (labelResult.IsFailure)
+                    // Per ISO 7816-4 and GP specifications, application labels must be ASCII
+                    try
+                    {
+                        string labelText = Encoding.ASCII.GetString(tlv.TlvData.Bytes.ToArray());
+                        applicationLabel = Maybe<string>.From(labelText);
+                    }
+                    catch
                     {
                         return Result.Failure<FileControlInformation, SmartCardError>(
-                            SmartCardError.InvalidData("Invalid ASCII encoding in application label"));
+                            SmartCardError.InvalidData(
+                                "Invalid ASCII encoding in application label"
+                            )
+                        );
                     }
-                    applicationLabel = labelResult.IsSuccess ? Maybe<string>.From(labelResult.Value) : Maybe<string>.None;
                     break;
                 case 0x87: // Application Priority Indicator
-                    if (tlv.Value.Length > 0)
+                    if (tlv.TlvData.Bytes.Length > 0)
                     {
-                        applicationPriorityIndicator = Maybe<byte>.From(tlv.Value[0]);
+                        applicationPriorityIndicator = Maybe<byte>.From(tlv.TlvData.Bytes[0]);
                     }
 
                     break;
                 case 0x9F38: // PDOL (Processing Options Data Object List)
-                             // Not currently used but could be parsed
+                    // Not currently used but could be parsed
                     break;
                 case 0xA5: // FCI Proprietary Template
-                    Result<ProprietaryTemplateData, SmartCardError> proprietaryResult = ParseProprietaryTemplate(tlv);
+                    Result<ProprietaryTemplateData, SmartCardError> proprietaryResult =
+                        ParseProprietaryTemplate(tlv);
                     if (proprietaryResult.IsFailure)
-                        return Result.Failure<FileControlInformation, SmartCardError>(proprietaryResult.Error);
+                        return Result.Failure<FileControlInformation, SmartCardError>(
+                            proprietaryResult.Error
+                        );
 
                     maxCommandDataLength = proprietaryResult.Value.MaxCommandDataLength;
                     maxResponseDataLength = proprietaryResult.Value.MaxResponseDataLength;
@@ -490,7 +524,7 @@ public class SelectResponse
                     cardData = proprietaryResult.Value.CardData;
                     break;
                 case 0xBF0C: // FCI Issuer Discretionary Data
-                    discretionaryData = tlv.Value;
+                    discretionaryData = tlv.TlvData.Bytes.ToArray();
                     break;
             }
         }
@@ -506,7 +540,8 @@ public class SelectResponse
                 cardImageNumber: cardImageNumber,
                 cardData: cardData,
                 discretionaryData: discretionaryData
-            ));
+            )
+        );
     }
 
     /// <summary>
@@ -517,13 +552,15 @@ public class SelectResponse
         Maybe<ushort> MaxResponseDataLength,
         byte[] IssuerIdentificationNumber,
         byte[] CardImageNumber,
-        byte[] CardData);
+        byte[] CardData
+    );
 
     /// <summary>
     /// Parses the proprietary template within FCI.
     /// </summary>
     private static Result<ProprietaryTemplateData, SmartCardError> ParseProprietaryTemplate(
-        TlvObject proprietaryTemplate)
+        TlvObject proprietaryTemplate
+    )
     {
         Maybe<ushort> maxCommandDataLength = Maybe<ushort>.None;
         Maybe<ushort> maxResponseDataLength = Maybe<ushort>.None;
@@ -531,46 +568,58 @@ public class SelectResponse
         byte[] cardImageNumber = [];
         byte[] cardData = [];
 
-        IReadOnlyList<TlvObject> children = proprietaryTemplate.ParseNestedTlv();
+        var childrenResult = TlvService.TlvParser.ParseMultiple(proprietaryTemplate.TlvData.Bytes);
+        if (childrenResult.IsFailure)
+        {
+            return Result.Failure<ProprietaryTemplateData, SmartCardError>(
+                SmartCardError.InvalidData("Failed to parse proprietary template children")
+            );
+        }
+        var children = childrenResult.Value.Objects;
         foreach (TlvObject tlv in children)
         {
-            Result<uint, SmartCardError> tagNumber = tlv.GetTagNumber();
+            var tagNumber = tlv.Tag.ToNumber();
             if (tagNumber.IsFailure)
                 return Result.Failure<ProprietaryTemplateData, SmartCardError>(
-                    SmartCardError.InvalidData("Failed to parse proprietary template tag"));
+                    SmartCardError.InvalidData("Failed to parse proprietary template tag")
+                );
 
             switch (tagNumber.Value)
             {
                 case 0x9F65: // Maximum length of data field in command message
-                    switch (tlv.Value.Length)
+                    switch (tlv.TlvData.Bytes.Length)
                     {
                         case 1:
-                            maxCommandDataLength = Maybe<ushort>.From(tlv.Value[0]);
+                            maxCommandDataLength = Maybe<ushort>.From(tlv.TlvData.Bytes[0]);
                             break;
                         case 2:
-                            maxCommandDataLength = Maybe<ushort>.From((ushort)((tlv.Value[0] << 8) | tlv.Value[1]));
+                            maxCommandDataLength = Maybe<ushort>.From(
+                                (ushort)(tlv.TlvData.Bytes[0] << 8 | tlv.TlvData.Bytes[1])
+                            );
                             break;
                     }
                     break;
                 case 0x9F66: // Maximum length of data field in response message
-                    switch (tlv.Value.Length)
+                    switch (tlv.TlvData.Bytes.Length)
                     {
                         case 1:
-                            maxResponseDataLength = Maybe<ushort>.From(tlv.Value[0]);
+                            maxResponseDataLength = Maybe<ushort>.From(tlv.TlvData.Bytes[0]);
                             break;
                         case 2:
-                            maxResponseDataLength = Maybe<ushort>.From((ushort)((tlv.Value[0] << 8) | tlv.Value[1]));
+                            maxResponseDataLength = Maybe<ushort>.From(
+                                (ushort)(tlv.TlvData.Bytes[0] << 8 | tlv.TlvData.Bytes[1])
+                            );
                             break;
                     }
                     break;
                 case 0x42: // Issuer Identification Number
-                    issuerIdentificationNumber = tlv.Value;
+                    issuerIdentificationNumber = tlv.TlvData.Bytes.ToArray();
                     break;
                 case 0x45: // Card Image Number
-                    cardImageNumber = tlv.Value;
+                    cardImageNumber = tlv.TlvData.Bytes.ToArray();
                     break;
                 case 0x66: // Card Data
-                    cardData = tlv.Value;
+                    cardData = tlv.TlvData.Bytes.ToArray();
                     break;
             }
         }
@@ -581,6 +630,8 @@ public class SelectResponse
                 maxResponseDataLength,
                 issuerIdentificationNumber,
                 cardImageNumber,
-                cardData));
+                cardData
+            )
+        );
     }
 }

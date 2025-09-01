@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Microsoft.Extensions.DependencyInjection;
 using Gp4Net.Tool.Pipeline;
+using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console.Cli;
 
 namespace Gp4Net.Tool.Infrastructure;
@@ -19,18 +19,19 @@ public static class CommandRegistrationExtensions
     public static void RegisterCliCommands(this IConfigurator config, IServiceCollection services)
     {
         Assembly assembly = Assembly.GetExecutingAssembly();
-        List<Type> commandTypes = assembly.GetTypes()
+        List<Type> commandTypes = [.. assembly
+            .GetTypes()
             .Where(t => t.IsClass && !t.IsAbstract)
-            .Where(t => t.GetCustomAttributes<CliCommandAttribute>().Any())
-            .ToList();
+            .Where(t => t.GetCustomAttributes<CliCommandAttribute>().Any())];
 
         // Group commands by branch
-        Dictionary<string, List<(Type Type, CliCommandAttribute Attr)>> branches = new Dictionary<string, List<(Type Type, CliCommandAttribute Attr)>>();
+        Dictionary<string, List<(Type Type, CliCommandAttribute Attr)>> branches =
+            new Dictionary<string, List<(Type Type, CliCommandAttribute Attr)>>();
         List<(Type Type, CliCommandAttribute Attr)> rootCommands = [];
 
         foreach (Type commandType in commandTypes)
         {
-            List<CliCommandAttribute> attrs = commandType.GetCustomAttributes<CliCommandAttribute>().ToList();
+            List<CliCommandAttribute> attrs = [.. commandType.GetCustomAttributes<CliCommandAttribute>()];
 
             foreach (CliCommandAttribute attr in attrs)
             {
@@ -56,27 +57,39 @@ public static class CommandRegistrationExtensions
         }
 
         // Register branches with their commands
-        foreach ((string branchName, List<(Type Type, CliCommandAttribute Attr)> commands) in branches)
+        foreach (
+            (string branchName, List<(Type Type, CliCommandAttribute Attr)> commands) in branches
+        )
         {
-            _ = config.AddBranch(branchName, branch =>
-            {
-                // Set branch description based on name
-                branch.SetDescription(GetBranchDescription(branchName));
-
-                foreach ((Type type, CliCommandAttribute attr) in commands)
+            _ = config.AddBranch(
+                branchName,
+                branch =>
                 {
-                    RegisterCommand(branch, services, type, attr);
+                    // Set branch description based on name
+                    branch.SetDescription(GetBranchDescription(branchName));
+
+                    foreach ((Type type, CliCommandAttribute attr) in commands)
+                    {
+                        RegisterCommand(branch, services, type, attr);
+                    }
                 }
-            });
+            );
         }
     }
 
-    private static void RegisterCommand(object config, IServiceCollection services, Type commandType, CliCommandAttribute attr)
+    private static void RegisterCommand(
+        object config,
+        IServiceCollection services,
+        Type commandType,
+        CliCommandAttribute attr
+    )
     {
         // Check if the command implements IPipelineCommand<TSettings>
-        Type pipelineInterface = commandType.GetInterfaces()
-            .FirstOrDefault(i => i.IsGenericType &&
-                                 i.GetGenericTypeDefinition() == typeof(IPipelineCommand<>));
+        Type pipelineInterface = commandType
+            .GetInterfaces()
+            .FirstOrDefault(i =>
+                i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IPipelineCommand<>)
+            );
 
         Type registrationType;
         if (pipelineInterface != null)
@@ -95,11 +108,14 @@ public static class CommandRegistrationExtensions
         }
 
         // Get the generic AddCommand method
-        MethodInfo addCommandMethod = config.GetType()
+        MethodInfo addCommandMethod = config
+            .GetType()
             .GetMethods()
-            .FirstOrDefault(m => m.Name == "AddCommand" &&
-                                 m.IsGenericMethodDefinition &&
-                                 m.GetParameters().Length == 1);
+            .FirstOrDefault(m =>
+                m.Name == "AddCommand"
+                && m.IsGenericMethodDefinition
+                && m.GetParameters().Length == 1
+            );
 
         if (addCommandMethod != null)
         {
@@ -107,18 +123,21 @@ public static class CommandRegistrationExtensions
             object commandConfig = genericMethod.Invoke(config, [attr.Name]);
 
             // Set description
-            MethodInfo withDescriptionMethod = commandConfig?.GetType().GetMethod("WithDescription");
-            _ = (withDescriptionMethod?.Invoke(commandConfig, [attr.Description]));
+            MethodInfo withDescriptionMethod = commandConfig
+                ?.GetType()
+                .GetMethod("WithDescription");
+            _ = withDescriptionMethod?.Invoke(commandConfig, [attr.Description]);
         }
     }
 
-    private static string GetBranchDescription(string branchName) => branchName.ToLowerInvariant() switch
-    {
-        "card" => "Smart card operations (connect, info, etc.)",
-        "applet" => "Applet management operations",
-        "script" => "Lua scripting operations",
-        "package" => "Package and CAP file operations",
-        "trace" => "Trace file operations",
-        _ => $"{branchName} operations"
-    };
+    private static string GetBranchDescription(string branchName) =>
+        branchName.ToLowerInvariant() switch
+        {
+            "card" => "Smart card operations (connect, info, etc.)",
+            "applet" => "Applet management operations",
+            "script" => "Lua scripting operations",
+            "package" => "Package and CAP file operations",
+            "trace" => "Trace file operations",
+            _ => $"{branchName} operations",
+        };
 }

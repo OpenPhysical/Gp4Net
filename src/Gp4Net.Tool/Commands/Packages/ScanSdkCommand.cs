@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
@@ -34,7 +35,9 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
                 $"[cyan]Scanning Oracle Java Card SDKs at: {Markup.Escape(settings.SdkPath)}[/]"
             );
 
-            Dictionary<string, PackageInfo> mappings = await ScanForPackageMappingsAsync(settings.SdkPath);
+            Dictionary<string, PackageInfo> mappings = await ScanForPackageMappingsAsync(
+                settings.SdkPath
+            );
 
             AnsiConsole.MarkupLine($"[green]Found {mappings.Count} package mappings[/]");
 
@@ -63,9 +66,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         }
     }
 
-    private static Task<Dictionary<string, PackageInfo>> ScanForPackageMappingsAsync(
-        string sdkPath
-    )
+    private static Task<Dictionary<string, PackageInfo>> ScanForPackageMappingsAsync(string sdkPath)
     {
         Dictionary<string, PackageInfo> mappings = new Dictionary<string, PackageInfo>();
 
@@ -130,9 +131,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         }
 
         // Find the last occurrence of the package name in the file
-        byte[] packageNameBytes = System.Text.Encoding.UTF8.GetBytes(
-            packageName.Replace('.', '/')
-        );
+        byte[] packageNameBytes = Encoding.UTF8.GetBytes(packageName.Replace('.', '/'));
         int lastIndex = FindLastOccurrence(fileBytes, packageNameBytes);
 
         if (lastIndex == -1)
@@ -403,7 +402,9 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
             .AddColumn("Source File");
 
         foreach (
-            KeyValuePair<string, PackageInfo> mapping in mappings.OrderBy(m => m.Value.SdkVersion).ThenBy(m => m.Value.Name)
+            KeyValuePair<string, PackageInfo> mapping in mappings
+                .OrderBy(m => m.Value.SdkVersion)
+                .ThenBy(m => m.Value.Name)
         )
         {
             _ = table.AddRow(
@@ -416,9 +417,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         }
 
         AnsiConsole.Write(
-            new Panel(table)
-                .Header("[bold]Discovered Package Mappings[/]")
-                .BorderColor(Color.Green)
+            new Panel(table).Header("[bold]Discovered Package Mappings[/]").BorderColor(Color.Green)
         );
     }
 

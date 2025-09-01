@@ -98,10 +98,7 @@ public record Scp02TestVector : IScpTestVector
     public required string Source { get; init; }
     public string Protocol
     {
-        get
-        {
-            return "SCP02";
-        }
+        get { return "SCP02"; }
     }
 
     /// <summary>
@@ -155,10 +152,7 @@ public record Scp03TestVector : IScpTestVector
     public required string Source { get; init; }
     public string Protocol
     {
-        get
-        {
-            return "SCP03";
-        }
+        get { return "SCP03"; }
     }
 
     public required byte[] StaticEncKey { get; init; }
@@ -202,14 +196,17 @@ public record Scp02CMacTestVector
 [PublicAPI]
 public static class ScpTestVectors
 {
-    private static readonly Lazy<IReadOnlyList<Scp02TestVector>> _scp02Vectors =
-        new(() => LoadScp02Vectors().AsReadOnly());
+    private static readonly Lazy<IReadOnlyList<Scp02TestVector>> _scp02Vectors = new(() =>
+        LoadScp02Vectors().AsReadOnly()
+    );
 
-    private static readonly Lazy<IReadOnlyList<Scp03TestVector>> _scp03Vectors =
-        new(() => LoadScp03Vectors().AsReadOnly());
+    private static readonly Lazy<IReadOnlyList<Scp03TestVector>> _scp03Vectors = new(() =>
+        LoadScp03Vectors().AsReadOnly()
+    );
 
-    private static readonly Lazy<IReadOnlyList<Scp02CMacTestVector>> _scp02CMacVectors =
-        new(() => LoadScp02CMacVectors().AsReadOnly());
+    private static readonly Lazy<IReadOnlyList<Scp02CMacTestVector>> _scp02CMacVectors = new(() =>
+        LoadScp02CMacVectors().AsReadOnly()
+    );
 
     /// <summary>
     /// All SCP02 test vectors from scripts/scp02_test_vectors.json.
@@ -217,10 +214,7 @@ public static class ScpTestVectors
     /// </summary>
     public static IReadOnlyList<Scp02TestVector> Scp02Vectors
     {
-        get
-        {
-            return _scp02Vectors.Value;
-        }
+        get { return _scp02Vectors.Value; }
     }
 
     /// <summary>
@@ -229,10 +223,7 @@ public static class ScpTestVectors
     /// </summary>
     public static IReadOnlyList<Scp03TestVector> Scp03Vectors
     {
-        get
-        {
-            return _scp03Vectors.Value;
-        }
+        get { return _scp03Vectors.Value; }
     }
 
     /// <summary>
@@ -240,10 +231,7 @@ public static class ScpTestVectors
     /// </summary>
     public static IReadOnlyList<Scp02CMacTestVector> Scp02CMacVectors
     {
-        get
-        {
-            return _scp02CMacVectors.Value;
-        }
+        get { return _scp02CMacVectors.Value; }
     }
 
     /// <summary>
@@ -253,10 +241,7 @@ public static class ScpTestVectors
     {
         get
         {
-            return Scp02Vectors.Cast<IScpTestVector>()
-                .Concat(Scp03Vectors.Cast<IScpTestVector>())
-                .ToList()
-                .AsReadOnly();
+            return Scp02Vectors.Concat(Scp03Vectors.Cast<IScpTestVector>()).ToList().AsReadOnly();
         }
     }
 
@@ -286,31 +271,85 @@ public static class ScpTestVectors
 
         foreach (JsonElement vectorElement in root.GetProperty("vectors").EnumerateArray())
         {
-            vectors.Add(new Scp02TestVector
-            {
-                Name = vectorElement.GetProperty("name").GetString()!,
-                Description = vectorElement.GetProperty("description").GetString()!,
-                Source = source,
-                ImplementationOption = vectorElement.GetProperty("implementation_option").GetString()!,
+            vectors.Add(
+                new Scp02TestVector
+                {
+                    Name = vectorElement.GetProperty("name").GetString()!,
+                    Description = vectorElement.GetProperty("description").GetString()!,
+                    Source = source,
+                    ImplementationOption = vectorElement
+                        .GetProperty("implementation_option")
+                        .GetString()!,
 
-                StaticEncKey = Convert.FromHexString(vectorElement.GetProperty("static_keys").GetProperty("enc").GetString()!),
-                StaticMacKey = Convert.FromHexString(vectorElement.GetProperty("static_keys").GetProperty("mac").GetString()!),
-                StaticDekKey = Convert.FromHexString(vectorElement.GetProperty("static_keys").GetProperty("dek").GetString()!),
+                    StaticEncKey = Convert.FromHexString(
+                        vectorElement.GetProperty("static_keys").GetProperty("enc").GetString()!
+                    ),
+                    StaticMacKey = Convert.FromHexString(
+                        vectorElement.GetProperty("static_keys").GetProperty("mac").GetString()!
+                    ),
+                    StaticDekKey = Convert.FromHexString(
+                        vectorElement.GetProperty("static_keys").GetProperty("dek").GetString()!
+                    ),
 
-                HostChallenge = Convert.FromHexString(vectorElement.GetProperty("challenges").GetProperty("host").GetString()!),
-                CardChallenge = Convert.FromHexString(vectorElement.GetProperty("challenges").GetProperty("card").GetString()!),
-                SequenceCounter = Convert.FromHexString(vectorElement.GetProperty("challenges").GetProperty("sequence_counter").GetString()!),
+                    HostChallenge = Convert.FromHexString(
+                        vectorElement.GetProperty("challenges").GetProperty("host").GetString()!
+                    ),
+                    CardChallenge = Convert.FromHexString(
+                        vectorElement.GetProperty("challenges").GetProperty("card").GetString()!
+                    ),
+                    SequenceCounter = Convert.FromHexString(
+                        vectorElement
+                            .GetProperty("challenges")
+                            .GetProperty("sequence_counter")
+                            .GetString()!
+                    ),
 
-                ExpectedSEncKey = Convert.FromHexString(vectorElement.GetProperty("expected_session_keys").GetProperty("s_enc").GetString()!),
-                ExpectedSMacKey = Convert.FromHexString(vectorElement.GetProperty("expected_session_keys").GetProperty("s_mac").GetString()!),
-                ExpectedSDekKey = Convert.FromHexString(vectorElement.GetProperty("expected_session_keys").GetProperty("s_dek").GetString()!),
+                    ExpectedSEncKey = Convert.FromHexString(
+                        vectorElement
+                            .GetProperty("expected_session_keys")
+                            .GetProperty("s_enc")
+                            .GetString()!
+                    ),
+                    ExpectedSMacKey = Convert.FromHexString(
+                        vectorElement
+                            .GetProperty("expected_session_keys")
+                            .GetProperty("s_mac")
+                            .GetString()!
+                    ),
+                    ExpectedSDekKey = Convert.FromHexString(
+                        vectorElement
+                            .GetProperty("expected_session_keys")
+                            .GetProperty("s_dek")
+                            .GetString()!
+                    ),
 
-                CardCryptogramData = Convert.FromHexString(vectorElement.GetProperty("cryptogram_data").GetProperty("card").GetString()!),
-                HostCryptogramData = Convert.FromHexString(vectorElement.GetProperty("cryptogram_data").GetProperty("host").GetString()!),
+                    CardCryptogramData = Convert.FromHexString(
+                        vectorElement
+                            .GetProperty("cryptogram_data")
+                            .GetProperty("card")
+                            .GetString()!
+                    ),
+                    HostCryptogramData = Convert.FromHexString(
+                        vectorElement
+                            .GetProperty("cryptogram_data")
+                            .GetProperty("host")
+                            .GetString()!
+                    ),
 
-                ExpectedCardCryptogram = Convert.FromHexString(vectorElement.GetProperty("expected_cryptograms").GetProperty("card").GetString()!),
-                ExpectedHostCryptogram = Convert.FromHexString(vectorElement.GetProperty("expected_cryptograms").GetProperty("host").GetString()!)
-            });
+                    ExpectedCardCryptogram = Convert.FromHexString(
+                        vectorElement
+                            .GetProperty("expected_cryptograms")
+                            .GetProperty("card")
+                            .GetString()!
+                    ),
+                    ExpectedHostCryptogram = Convert.FromHexString(
+                        vectorElement
+                            .GetProperty("expected_cryptograms")
+                            .GetProperty("host")
+                            .GetString()!
+                    ),
+                }
+            );
         }
 
         return vectors;
@@ -328,26 +367,63 @@ public static class ScpTestVectors
 
         foreach (JsonElement vectorElement in root.GetProperty("vectors").EnumerateArray())
         {
-            vectors.Add(new Scp03TestVector
-            {
-                Name = vectorElement.GetProperty("name").GetString()!,
-                Description = vectorElement.GetProperty("description").GetString()!,
-                Source = source,
+            vectors.Add(
+                new Scp03TestVector
+                {
+                    Name = vectorElement.GetProperty("name").GetString()!,
+                    Description = vectorElement.GetProperty("description").GetString()!,
+                    Source = source,
 
-                StaticEncKey = Convert.FromHexString(vectorElement.GetProperty("static_keys").GetProperty("enc").GetString()!),
-                StaticMacKey = Convert.FromHexString(vectorElement.GetProperty("static_keys").GetProperty("mac").GetString()!),
-                StaticDekKey = Convert.FromHexString(vectorElement.GetProperty("static_keys").GetProperty("dek").GetString()!),
+                    StaticEncKey = Convert.FromHexString(
+                        vectorElement.GetProperty("static_keys").GetProperty("enc").GetString()!
+                    ),
+                    StaticMacKey = Convert.FromHexString(
+                        vectorElement.GetProperty("static_keys").GetProperty("mac").GetString()!
+                    ),
+                    StaticDekKey = Convert.FromHexString(
+                        vectorElement.GetProperty("static_keys").GetProperty("dek").GetString()!
+                    ),
 
-                HostChallenge = Convert.FromHexString(vectorElement.GetProperty("challenges").GetProperty("host").GetString()!),
-                CardChallenge = Convert.FromHexString(vectorElement.GetProperty("challenges").GetProperty("card").GetString()!),
+                    HostChallenge = Convert.FromHexString(
+                        vectorElement.GetProperty("challenges").GetProperty("host").GetString()!
+                    ),
+                    CardChallenge = Convert.FromHexString(
+                        vectorElement.GetProperty("challenges").GetProperty("card").GetString()!
+                    ),
 
-                ExpectedSEncKey = Convert.FromHexString(vectorElement.GetProperty("expected_session_keys").GetProperty("s_enc").GetString()!),
-                ExpectedSMacKey = Convert.FromHexString(vectorElement.GetProperty("expected_session_keys").GetProperty("s_mac").GetString()!),
-                ExpectedSRMacKey = Convert.FromHexString(vectorElement.GetProperty("expected_session_keys").GetProperty("s_rmac").GetString()!),
+                    ExpectedSEncKey = Convert.FromHexString(
+                        vectorElement
+                            .GetProperty("expected_session_keys")
+                            .GetProperty("s_enc")
+                            .GetString()!
+                    ),
+                    ExpectedSMacKey = Convert.FromHexString(
+                        vectorElement
+                            .GetProperty("expected_session_keys")
+                            .GetProperty("s_mac")
+                            .GetString()!
+                    ),
+                    ExpectedSRMacKey = Convert.FromHexString(
+                        vectorElement
+                            .GetProperty("expected_session_keys")
+                            .GetProperty("s_rmac")
+                            .GetString()!
+                    ),
 
-                ExpectedCardCryptogram = Convert.FromHexString(vectorElement.GetProperty("expected_cryptograms").GetProperty("card").GetString()!),
-                ExpectedHostCryptogram = Convert.FromHexString(vectorElement.GetProperty("expected_cryptograms").GetProperty("host").GetString()!)
-            });
+                    ExpectedCardCryptogram = Convert.FromHexString(
+                        vectorElement
+                            .GetProperty("expected_cryptograms")
+                            .GetProperty("card")
+                            .GetString()!
+                    ),
+                    ExpectedHostCryptogram = Convert.FromHexString(
+                        vectorElement
+                            .GetProperty("expected_cryptograms")
+                            .GetProperty("host")
+                            .GetString()!
+                    ),
+                }
+            );
         }
 
         return vectors;
@@ -365,16 +441,24 @@ public static class ScpTestVectors
 
         foreach (JsonElement vectorElement in root.GetProperty("cmac_vectors").EnumerateArray())
         {
-            vectors.Add(new Scp02CMacTestVector
-            {
-                Name = vectorElement.GetProperty("name").GetString()!,
-                Description = vectorElement.GetProperty("description").GetString()!,
-                Source = source,
+            vectors.Add(
+                new Scp02CMacTestVector
+                {
+                    Name = vectorElement.GetProperty("name").GetString()!,
+                    Description = vectorElement.GetProperty("description").GetString()!,
+                    Source = source,
 
-                MacKey = Convert.FromHexString(vectorElement.GetProperty("mac_key").GetString()!),
-                CommandData = Convert.FromHexString(vectorElement.GetProperty("command_data").GetString()!),
-                ExpectedCMac = Convert.FromHexString(vectorElement.GetProperty("expected_cmac").GetString()!)
-            });
+                    MacKey = Convert.FromHexString(
+                        vectorElement.GetProperty("mac_key").GetString()!
+                    ),
+                    CommandData = Convert.FromHexString(
+                        vectorElement.GetProperty("command_data").GetString()!
+                    ),
+                    ExpectedCMac = Convert.FromHexString(
+                        vectorElement.GetProperty("expected_cmac").GetString()!
+                    ),
+                }
+            );
         }
 
         return vectors;
@@ -388,14 +472,18 @@ public static class ScpTestVectors
 
         // Navigate up to find the project root (look for scripts directory)
         DirectoryInfo? currentDir = new DirectoryInfo(assemblyDir);
-        while (currentDir != null && !Directory.Exists(Path.Combine(currentDir.FullName, "scripts")))
+        while (
+            currentDir != null && !Directory.Exists(Path.Combine(currentDir.FullName, "scripts"))
+        )
         {
             currentDir = currentDir.Parent;
         }
 
         if (currentDir == null)
         {
-            throw new FileNotFoundException($"Could not locate project root with scripts directory from {assemblyDir}");
+            throw new FileNotFoundException(
+                $"Could not locate project root with scripts directory from {assemblyDir}"
+            );
         }
 
         string jsonPath = Path.Combine(currentDir.FullName, "scripts", fileName);

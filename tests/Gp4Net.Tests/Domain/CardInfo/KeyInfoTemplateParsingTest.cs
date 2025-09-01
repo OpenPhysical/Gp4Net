@@ -20,15 +20,19 @@ public class KeyInfoTemplateParsingTest
         // From gp_pro_card_info_complete.json - actual GET DATA response without status
         // E012 = tag E0, length 12 (18 bytes)
         // C00401018810 = key 1: C0 tag, 04 length, 01 keyId, 01 version, 88 type, 10 length
-        // C00402018810 = key 2: C0 tag, 04 length, 02 keyId, 01 version, 88 type, 10 length  
+        // C00402018810 = key 2: C0 tag, 04 length, 02 keyId, 01 version, 88 type, 10 length
         // C004030188   = key 3: C0 tag, 04 length, 03 keyId, 01 version, 88 type
         byte[] keyInfoBytes = Convert.FromHexString("E012C00401018810C00402018810C00403018810");
 
         // Parse
-        Result<KeyInformationTemplate, SmartCardError> result = KeyInformationTemplate.Parse(keyInfoBytes);
+        Result<KeyInformationTemplate, SmartCardError> result = KeyInformationTemplate.Parse(
+            keyInfoBytes
+        );
 
         // Verify parse succeeded
-        _ = result.IsSuccess.Should().BeTrue($"Parse failed: {(result.IsFailure ? result.Error.ToString() : "Unknown")}");
+        _ = result
+            .IsSuccess.Should()
+            .BeTrue($"Parse failed: {(result.IsFailure ? result.Error.ToString() : "Unknown")}");
 
         // Verify 3 keys
         KeyInformationTemplate? keyInfo = result.Value;

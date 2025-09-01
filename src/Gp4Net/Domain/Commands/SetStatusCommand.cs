@@ -46,14 +46,19 @@ public sealed class SetStatusCommand : BaseApduCommand
     /// <returns>The command or an error.</returns>
     public static Result<SetStatusCommand, SmartCardError> Create(byte[] aid, byte p1)
     {
-        return Maybe<byte[]>.From(aid).Match(
-            Some: aidValue => CreateSetStatusCommand(aidValue, p1),
-            None: () => SmartCardError.InvalidArgument("AID cannot be null"));
+        return Maybe<byte[]>
+            .From(aid)
+            .Match(
+                Some: aidValue => CreateSetStatusCommand(aidValue, p1),
+                None: () => SmartCardError.InvalidArgument("AID cannot be null")
+            );
     }
 
-    private static Result<SetStatusCommand, SmartCardError> CreateSetStatusCommand(byte[] aid, byte p1)
+    private static Result<SetStatusCommand, SmartCardError> CreateSetStatusCommand(
+        byte[] aid,
+        byte p1
+    )
     {
-
         // P2 is always 0x00 for SET STATUS
         byte p2 = 0x00;
 
@@ -70,11 +75,15 @@ public sealed class SetStatusCommand : BaseApduCommand
     /// <returns>The command or an error.</returns>
     public static Result<SetStatusCommand, SmartCardError> CreateForMakeSelectable(byte[] aid)
     {
-        return Maybe<byte[]>.From(aid).Match(
-            Some: aidValue => aidValue.Length == 0
-                ? SmartCardError.InvalidArgument("AID is required for make selectable")
-                : Create(aidValue, 0x07),
-            None: () => SmartCardError.InvalidArgument("AID is required for make selectable"));
+        return Maybe<byte[]>
+            .From(aid)
+            .Match(
+                Some: aidValue =>
+                    aidValue.Length == 0
+                        ? SmartCardError.InvalidArgument("AID is required for make selectable")
+                        : Create(aidValue, 0x07),
+                None: () => SmartCardError.InvalidArgument("AID is required for make selectable")
+            );
     }
 
     /// <summary>
@@ -84,11 +93,15 @@ public sealed class SetStatusCommand : BaseApduCommand
     /// <returns>The command or an error.</returns>
     public static Result<SetStatusCommand, SmartCardError> CreateForLock(byte[] aid)
     {
-        return Maybe<byte[]>.From(aid).Match(
-            Some: aidValue => aidValue.Length == 0
-                ? SmartCardError.InvalidArgument("AID is required for lock")
-                : Create(aidValue, 0x83),
-            None: () => SmartCardError.InvalidArgument("AID is required for lock"));
+        return Maybe<byte[]>
+            .From(aid)
+            .Match(
+                Some: aidValue =>
+                    aidValue.Length == 0
+                        ? SmartCardError.InvalidArgument("AID is required for lock")
+                        : Create(aidValue, 0x83),
+                None: () => SmartCardError.InvalidArgument("AID is required for lock")
+            );
     }
 
     /// <summary>

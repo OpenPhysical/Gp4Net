@@ -24,14 +24,16 @@ public class ConnectCommand : IPipelineCommand<ConnectCommand.Settings>
     {
         return await context.ExecuteCardCommandFunctional(
             settings,
-            async ctx => await ConnectAndGetCardInfoAsync(ctx));
+            async ctx => await ConnectAndGetCardInfoAsync(ctx)
+        );
     }
 
     /// <summary>
-    /// Connects to card and retrieves basic information using functional patterns.
+    /// Connects to card and retrieves basic information.
     /// </summary>
     private static async Task<Result<bool, string>> ConnectAndGetCardInfoAsync(
-        ICliExecutionContext context)
+        ICliExecutionContext context
+    )
     {
         context.Display.Success("Successfully connected to card");
 
@@ -59,7 +61,8 @@ public class ConnectCommand : IPipelineCommand<ConnectCommand.Settings>
                     }
                     return true;
                 },
-                () => false);
+                () => false
+            );
 
             // Display raw response data in verbose mode
             if (response.RawData.Length > 0)

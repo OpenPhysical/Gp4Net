@@ -5,10 +5,13 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
+using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Core.Tlv;
+using Gp4Net.Services;
+using static Gp4Net.Services.TlvService;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.DataObjects;
@@ -29,7 +32,8 @@ public static class SecurityDomainInfoCodec
     {
         if (sdInfo is null)
             return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidArgument("Security domain info cannot be null"));
+                SmartCardError.InvalidArgument("Security domain info cannot be null")
+            );
 
         using MemoryStream stream = new MemoryStream();
 
@@ -40,28 +44,28 @@ public static class SecurityDomainInfoCodec
         MemoryStream contentStream = new MemoryStream();
 
         // OID (9F70) - two-byte tag
-        if (sdInfo.Oid != null)
-        {
-            WriteTlvWithTag(contentStream, [0x9F, 0x70], sdInfo.Oid);
-        }
+        sdInfo.Oid.Match(
+            oid => { WriteTlvWithTag(contentStream, [0x9F, 0x70], oid); },
+            () => { /* No OID to write */ }
+        );
 
         // Security Domain AID (if present)
-        if (sdInfo.SecurityDomainAid != null)
-        {
-            contentStream.Write(sdInfo.SecurityDomainAid, 0, sdInfo.SecurityDomainAid.Length);
-        }
+        sdInfo.SecurityDomainAid.Match(
+            aid => { contentStream.Write(aid, 0, aid.Length); },
+            () => { /* No AID to write */ }
+        );
 
         // Image data (C5)
-        if (sdInfo.ImageData != null)
-        {
-            WriteTlv(contentStream, 0xC5, sdInfo.ImageData);
-        }
+        sdInfo.ImageData.Match(
+            imageData => { WriteTlv(contentStream, 0xC5, imageData); },
+            () => { /* No image data to write */ }
+        );
 
         // Application production life cycle data (C4)
-        if (sdInfo.LifeCycleData != null)
-        {
-            WriteTlv(contentStream, 0xC4, sdInfo.LifeCycleData);
-        }
+        sdInfo.LifeCycleData.Match(
+            lifeCycleData => { WriteTlv(contentStream, 0xC4, lifeCycleData); },
+            () => { /* No life cycle data to write */ }
+        );
 
         byte[] content = contentStream.ToArray();
 
@@ -77,7 +81,8 @@ public static class SecurityDomainInfoCodec
                 break;
             default:
                 return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidData("Security domain information too large for encoding"));
+                    SmartCardError.InvalidData("Security domain information too large for encoding")
+                );
         }
 
         // Write content
@@ -95,79 +100,79 @@ public static class SecurityDomainInfoCodec
     {
         if (data is null)
             return Result.Failure<SecurityDomainInfo, SmartCardError>(
-                SmartCardError.InvalidArgument("Data cannot be null"));
+                SmartCardError.InvalidArgument("Data cannot be null")
+            );
 
-        // Parse the outer TLV structure
-        Maybe<TlvObject> outerTlvMaybe = TlvParser.ParseSingle(data);
-        if (!outerTlvMaybe.HasValue)
-        {
-            return SmartCardError.InvalidData("No TLV data found");
-        }
+        // Parse the outer TLV structure using functional composition
+        return TlvParser.Parse(data.ToImmutableArray())
+            .Bind(outerTlv => outerTlv.Tag.ToNumber()
+                .Bind(tagNumber => tagNumber != 0xC1
+                    ? Result.Failure<SecurityDomainInfo, SmartCardError>(
+                        SmartCardError.InvalidData("Invalid security domain information format - expected tag 0xC1"))
+                    : ParseSecurityDomainContent(outerTlv)));
+    }
 
-        Result<uint, SmartCardError> tagResult = outerTlvMaybe.Value.GetTagNumber();
-        if (tagResult.IsFailure || tagResult.Value != 0xC1)
-        {
-            return SmartCardError.InvalidData("Invalid security domain information format - expected tag 0xC1");
-        }
-
-        TlvObject outerTlv = outerTlvMaybe.Value;
-
-        try
-        {
-            SecurityDomainInfo sdInfo = new SecurityDomainInfo();
+    private static Result<SecurityDomainInfo, SmartCardError> ParseSecurityDomainContent(TlvObject outerTlv)
+    {
+        var sdInfo = new SecurityDomainInfo();
 
             // Parse all TLV elements within the security domain data
-            IReadOnlyList<TlvObject> elements = TlvParser.ParseAll(outerTlv.Value);
+            var elementsResult = TlvService.TlvParser.ParseMultiple(outerTlv.TlvData.Bytes);
+            if (elementsResult.IsFailure) 
+                return Result.Failure<SecurityDomainInfo, SmartCardError>(elementsResult.Error);
+            var elements = elementsResult.Value.Objects;
 
             foreach (TlvObject element in elements)
             {
-                switch (element.Tag.Length)
+                switch (element.Tag.Bytes.Length)
                 {
                     // Handle two-byte tags for OID (9F70)
-                    case 2 when element.Tag[0] == 0x9F && element.Tag[1] == 0x70:
+                    case 2 when element.Tag.Bytes[0] == 0x9F && element.Tag.Bytes[1] == 0x70:
+                    {
+                        // Only set OID if it has actual content
+                        if (element.TlvData.Bytes.Length > 0)
                         {
-                            // Only set OID if it has actual content
-                            if (element.Value.Length > 0)
-                            {
-                                sdInfo.Oid = element.Value;
-                            }
-                            break;
+                            sdInfo = sdInfo with { Oid = Maybe<byte[]>.From(element.TlvData.Bytes.ToArray()) };
                         }
+                        break;
+                    }
                     case 1:
-                        Result<uint, SmartCardError> elementTagNumber = element.GetTagNumber();
-                        if (elementTagNumber.IsFailure) continue;
-
-                        switch (elementTagNumber.Value)
-                        {
-                            case 0xC5: // Image data
-                                sdInfo.ImageData = element.Value;
-                                break;
-
-                            case 0xC4: // Life cycle data
-                                sdInfo.LifeCycleData = element.Value;
-                                break;
-
-                            default:
-                                // Could be AID data - store as SecurityDomainAid if not yet set
-                                if (sdInfo.SecurityDomainAid == null && element.Length > 0)
+                        var elementTagNumber = element.Tag.ToNumber();
+                        elementTagNumber.Match(
+                            tagNumber => {
+                                switch (tagNumber)
                                 {
-                                    // Reconstruct TLV format for AID
-                                    using MemoryStream aidStream = new MemoryStream();
-                                    WriteTlv(aidStream, (byte)elementTagNumber.Value, element.Value);
-                                    sdInfo.SecurityDomainAid = aidStream.ToArray();
+                                    case 0xC5: // Image data
+                                        sdInfo = sdInfo with { ImageData = Maybe<byte[]>.From(element.TlvData.Bytes.ToArray()) };
+                                        break;
+
+                                    case 0xC4: // Life cycle data
+                                        sdInfo = sdInfo with { LifeCycleData = Maybe<byte[]>.From(element.TlvData.Bytes.ToArray()) };
+                                        break;
+
+                                    default:
+                                        // Could be AID data - store as SecurityDomainAid if not yet set
+                                        if (!sdInfo.SecurityDomainAid.HasValue && element.TlvData.Bytes.Length > 0)
+                                        {
+                                            // Reconstruct TLV format for AID
+                                            using var aidStream = new MemoryStream();
+                                            WriteTlv(
+                                                aidStream,
+                                                (byte)tagNumber,
+                                                element.TlvData.Bytes.ToArray()
+                                            );
+                                            sdInfo = sdInfo with { SecurityDomainAid = Maybe<byte[]>.From(aidStream.ToArray()) };
+                                        }
+                                        break;
                                 }
-                                break;
-                        }
+                            },
+                            error => { /* Ignore invalid tag numbers */ }
+                        );
                         break;
                 }
             }
 
-            return sdInfo;
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.InvalidData($"Failed to parse security domain information: {ex.Message}");
-        }
+        return sdInfo;
     }
 
     private static void WriteTlv(Stream stream, byte tag, byte[] value)
@@ -185,7 +190,9 @@ public static class SecurityDomainInfoCodec
                 stream.WriteByte((byte)value.Length);
                 break;
             default:
-                throw new ArgumentException($"Value too long for simple TLV encoding: {value.Length} bytes");
+                throw new ArgumentException(
+                    $"Value too long for simple TLV encoding: {value.Length} bytes"
+                );
         }
 
         stream.Write(value, 0, value.Length);
@@ -206,7 +213,9 @@ public static class SecurityDomainInfoCodec
                 stream.WriteByte((byte)value.Length);
                 break;
             default:
-                throw new ArgumentException($"Value too long for simple TLV encoding: {value.Length} bytes");
+                throw new ArgumentException(
+                    $"Value too long for simple TLV encoding: {value.Length} bytes"
+                );
         }
 
         stream.Write(value, 0, value.Length);
@@ -217,25 +226,25 @@ public static class SecurityDomainInfoCodec
 /// Represents GlobalPlatform security domain information.
 /// </summary>
 [PublicAPI]
-public class SecurityDomainInfo
+public record SecurityDomainInfo
 {
     /// <summary>
     /// Object identifier (OID) for the security domain.
     /// </summary>
-    public byte[] Oid { get; set; }
+    public Maybe<byte[]> Oid { get; init; } = Maybe<byte[]>.None;
 
     /// <summary>
     /// Security Domain AID with length encoding.
     /// </summary>
-    public byte[] SecurityDomainAid { get; set; }
+    public Maybe<byte[]> SecurityDomainAid { get; init; } = Maybe<byte[]>.None;
 
     /// <summary>
     /// Image data for security domain.
     /// </summary>
-    public byte[] ImageData { get; set; }
+    public Maybe<byte[]> ImageData { get; init; } = Maybe<byte[]>.None;
 
     /// <summary>
     /// Application production life cycle data.
     /// </summary>
-    public byte[] LifeCycleData { get; set; }
+    public Maybe<byte[]> LifeCycleData { get; init; } = Maybe<byte[]>.None;
 }

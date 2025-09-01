@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
-namespace Gp4Net.Domain.Keys;
-
 using System;
 using Org.BouncyCastle.Utilities;
+
+namespace Gp4Net.Domain.Keys;
 
 /// <summary>
 /// Provides secure storage for cryptographic keys with automatic memory cleanup.
@@ -21,10 +21,7 @@ public sealed class SecureKeyStorage : IDisposable
     /// </summary>
     public int Length
     {
-        get
-        {
-            return _keyData?.Length ?? 0;
-        }
+        get { return _keyData?.Length ?? 0; }
     }
 
     /// <summary>

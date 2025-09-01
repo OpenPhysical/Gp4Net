@@ -40,28 +40,33 @@ public sealed record WrappedApduCommand : ICompleteApduCommand
     /// <returns>A result containing the wrapped command or an error.</returns>
     public static Result<WrappedApduCommand, SmartCardError> Create(
         IApduCommand originalCommand,
-        byte[] wrappedBytes)
+        byte[] wrappedBytes
+    )
     {
         if (originalCommand == null)
         {
             return Result.Failure<WrappedApduCommand, SmartCardError>(
-                SmartCardError.InvalidArgument("Original command cannot be null"));
+                SmartCardError.InvalidArgument("Original command cannot be null")
+            );
         }
 
         if (wrappedBytes == null)
         {
             return Result.Failure<WrappedApduCommand, SmartCardError>(
-                SmartCardError.InvalidArgument("Wrapped bytes cannot be null"));
+                SmartCardError.InvalidArgument("Wrapped bytes cannot be null")
+            );
         }
 
         if (wrappedBytes.Length < 4)
         {
             return Result.Failure<WrappedApduCommand, SmartCardError>(
-                SmartCardError.InvalidArgument("Wrapped bytes must contain at least header"));
+                SmartCardError.InvalidArgument("Wrapped bytes must contain at least header")
+            );
         }
 
         return Result.Success<WrappedApduCommand, SmartCardError>(
-            new WrappedApduCommand(originalCommand, wrappedBytes));
+            new WrappedApduCommand(originalCommand, wrappedBytes)
+        );
     }
 
     /// <inheritdoc />
@@ -95,24 +100,24 @@ public sealed record WrappedApduCommand : ICompleteApduCommand
             switch (lc)
             {
                 case 0 when WrappedBytes.Length > 6:
+                {
+                    // Extended length
+                    int extendedLc = WrappedBytes[5] << 8 | WrappedBytes[6];
+                    if (WrappedBytes.Length >= 7 + extendedLc)
                     {
-                        // Extended length
-                        int extendedLc = (WrappedBytes[5] << 8) | WrappedBytes[6];
-                        if (WrappedBytes.Length >= 7 + extendedLc)
-                        {
-                            byte[] data = new byte[extendedLc];
-                            Array.Copy(WrappedBytes, 7, data, 0, extendedLc);
-                            return data;
-                        }
-                        break;
-                    }
-                case > 0 when WrappedBytes.Length >= 5 + lc:
-                    {
-                        // Standard length
-                        byte[] data = new byte[lc];
-                        Array.Copy(WrappedBytes, 5, data, 0, lc);
+                        byte[] data = new byte[extendedLc];
+                        Array.Copy(WrappedBytes, 7, data, 0, extendedLc);
                         return data;
                     }
+                    break;
+                }
+                case > 0 when WrappedBytes.Length >= 5 + lc:
+                {
+                    // Standard length
+                    byte[] data = new byte[lc];
+                    Array.Copy(WrappedBytes, 5, data, 0, lc);
+                    return data;
+                }
             }
 
             return [];
@@ -124,17 +129,20 @@ public sealed record WrappedApduCommand : ICompleteApduCommand
     {
         get
         {
-            if (WrappedBytes.Length <= 4) return Maybe<int>.None;
+            if (WrappedBytes.Length <= 4)
+                return Maybe<int>.None;
 
             bool hasData = Data.Length > 0;
 
             if (hasData)
             {
                 byte lc = WrappedBytes[4];
-                int dataEndIndex = lc == 0 ? 7 + ((WrappedBytes[5] << 8) | WrappedBytes[6]) : 5 + lc;
+                int dataEndIndex = lc == 0 ? 7 + (WrappedBytes[5] << 8 | WrappedBytes[6]) : 5 + lc;
                 if (WrappedBytes.Length > dataEndIndex)
                 {
-                    return Maybe<int>.From(WrappedBytes[dataEndIndex] == 0 ? 256 : WrappedBytes[dataEndIndex]);
+                    return Maybe<int>.From(
+                        WrappedBytes[dataEndIndex] == 0 ? 256 : WrappedBytes[dataEndIndex]
+                    );
                 }
             }
             else if (WrappedBytes.Length == 5)

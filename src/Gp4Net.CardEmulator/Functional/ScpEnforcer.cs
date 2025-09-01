@@ -11,7 +11,7 @@ namespace Gp4Net.CardEmulator.Functional;
 /// Implements command-level security requirements and access control rules.
 /// </summary>
 [PublicAPI]
-public static class ScpEnforcer
+public static partial class ScpEnforcer
 {
     /// <summary>
     /// GlobalPlatform Card Specification v2.3.1 Appendix E - Security Level Requirements.
@@ -20,48 +20,54 @@ public static class ScpEnforcer
     public static class SecurityRequirements
     {
         /// <summary>Commands that can be executed without secure channel establishment.</summary>
-        public static readonly ImmutableHashSet<byte> OpenAccessCommands = ImmutableHashSet.Create<byte>(
-            0xA4, // SELECT
-            0x50, // INITIALIZE UPDATE
-            0x82, // EXTERNAL AUTHENTICATE (completes secure channel establishment)
-            0xCA  // GET DATA (some data objects)
-        );
+        public static readonly ImmutableHashSet<byte> OpenAccessCommands =
+            ImmutableHashSet.Create<byte>(
+                0xA4, // SELECT
+                0x50, // INITIALIZE UPDATE
+                0x82, // EXTERNAL AUTHENTICATE (completes secure channel establishment)
+                0xCA // GET DATA (some data objects)
+            );
 
         /// <summary>Commands that require secure channel establishment but no additional security.</summary>
-        public static readonly ImmutableHashSet<byte> AuthenticatedCommands = ImmutableHashSet.Create<byte>(
-            0xCA  // GET DATA (protected data objects)
-        );
+        public static readonly ImmutableHashSet<byte> AuthenticatedCommands =
+            ImmutableHashSet.Create<byte>(
+                0xCA // GET DATA (protected data objects)
+            );
 
         /// <summary>Commands that require C-MAC security level (command authentication).</summary>
-        public static readonly ImmutableHashSet<byte> CommandMacRequiredCommands = ImmutableHashSet.Create<byte>(
-            0xE6, // INSTALL
-            0xE8, // LOAD
-            0xE4, // DELETE
-            0xD8, // PUT KEY
-            0xE2, // STORE DATA
-            0xF2  // GET STATUS (some variants)
-        );
+        public static readonly ImmutableHashSet<byte> CommandMacRequiredCommands =
+            ImmutableHashSet.Create<byte>(
+                0xE6, // INSTALL
+                0xE8, // LOAD
+                0xE4, // DELETE
+                0xD8, // PUT KEY
+                0xE2, // STORE DATA
+                0xF2 // GET STATUS (some variants)
+            );
 
         /// <summary>Commands that require C-ENC security level (command encryption).</summary>
-        public static readonly ImmutableHashSet<byte> CommandEncryptionRequiredCommands = ImmutableHashSet.Create<byte>(
-            0xD8, // PUT KEY (key data must be encrypted)
-            0xE2  // STORE DATA (sensitive data)
-        );
+        public static readonly ImmutableHashSet<byte> CommandEncryptionRequiredCommands =
+            ImmutableHashSet.Create<byte>(
+                0xD8, // PUT KEY (key data must be encrypted)
+                0xE2 // STORE DATA (sensitive data)
+            );
 
         /// <summary>Commands that require R-MAC security level (response authentication).</summary>
-        public static readonly ImmutableHashSet<byte> ResponseMacRequiredCommands = ImmutableHashSet.Create<byte>(
-            0xE6, // INSTALL
-            0xE8, // LOAD
-            0xE4, // DELETE
-            0xD8, // PUT KEY
-            0xF2  // GET STATUS
-        );
+        public static readonly ImmutableHashSet<byte> ResponseMacRequiredCommands =
+            ImmutableHashSet.Create<byte>(
+                0xE6, // INSTALL
+                0xE8, // LOAD
+                0xE4, // DELETE
+                0xD8, // PUT KEY
+                0xF2 // GET STATUS
+            );
 
         /// <summary>Commands that require R-ENC security level (response encryption).</summary>
-        public static readonly ImmutableHashSet<byte> ResponseEncryptionRequiredCommands = ImmutableHashSet.Create<byte>(
-            0xCA, // GET DATA (sensitive data)
-            0xF2  // GET STATUS (sensitive status)
-        );
+        public static readonly ImmutableHashSet<byte> ResponseEncryptionRequiredCommands =
+            ImmutableHashSet.Create<byte>(
+                0xCA, // GET DATA (sensitive data)
+                0xF2 // GET STATUS (sensitive status)
+            );
     }
 
     /// <summary>
@@ -69,32 +75,49 @@ public static class ScpEnforcer
     /// Returns Result with command validation or security error per GP Appendix E.1.1.
     /// </summary>
     public static Result<CommandSecurityContext, SmartCardError> ValidateCommandSecurity(
-        byte instruction, CardState state, byte[] fullCommand)
+        byte instruction,
+        CardState state,
+        byte[] fullCommand
+    )
     {
         return CreateCommandSecurityContext(instruction, state, fullCommand)
-            .Bind(context => ValidateCardSelectionRequirements(context))
-            .Bind(context => ValidateSecureChannelRequirements(context))
-            .Bind(context => ValidateSecurityLevelRequirements(context))
-            .Bind(context => ValidateCommandAuthentication(context));
+            .Bind(ValidateCardSelectionRequirements)
+            .Bind(ValidateSecureChannelRequirements)
+            .Bind(ValidateSecurityLevelRequirements)
+            .Bind(ValidateCommandAuthentication);
     }
 
     /// <summary>
     /// Determines the required security levels for command execution per GP Table E-1.
     /// </summary>
     public static Result<SecurityLevelRequirements, SmartCardError> GetRequiredSecurityLevels(
-        byte instruction, byte[] commandData)
+        byte instruction,
+        byte[] commandData
+    )
     {
         // GP Appendix E.1.2 - Command-specific security requirements
         SecurityLevelRequirements requirements = new SecurityLevelRequirements(
             RequiresSecureChannel: !SecurityRequirements.OpenAccessCommands.Contains(instruction),
-            RequiresCommandMac: SecurityRequirements.CommandMacRequiredCommands.Contains(instruction),
-            RequiresCommandEncryption: SecurityRequirements.CommandEncryptionRequiredCommands.Contains(instruction),
-            RequiresResponseMac: SecurityRequirements.ResponseMacRequiredCommands.Contains(instruction),
-            RequiresResponseEncryption: SecurityRequirements.ResponseEncryptionRequiredCommands.Contains(instruction)
+            RequiresCommandMac: SecurityRequirements.CommandMacRequiredCommands.Contains(
+                instruction
+            ),
+            RequiresCommandEncryption: SecurityRequirements.CommandEncryptionRequiredCommands.Contains(
+                instruction
+            ),
+            RequiresResponseMac: SecurityRequirements.ResponseMacRequiredCommands.Contains(
+                instruction
+            ),
+            RequiresResponseEncryption: SecurityRequirements.ResponseEncryptionRequiredCommands.Contains(
+                instruction
+            )
         );
 
         // Special cases based on command parameters per GP Appendix E.1.3
-        SecurityLevelRequirements enhancedRequirements = ApplyCommandSpecificRules(instruction, commandData, requirements);
+        SecurityLevelRequirements enhancedRequirements = ApplyCommandSpecificRules(
+            instruction,
+            commandData,
+            requirements
+        );
 
         return Result.Success<SecurityLevelRequirements, SmartCardError>(enhancedRequirements);
     }
@@ -103,19 +126,25 @@ public static class ScpEnforcer
     /// Validates that the established secure channel meets command requirements.
     /// </summary>
     public static Result<CommandSecurityContext, SmartCardError> ValidateSecureChannelCompliance(
-        CommandSecurityContext context)
+        CommandSecurityContext context
+    )
     {
         return context.SecurityRequirements.RequiresSecureChannel switch
         {
-            true when !context.CardState.IsSecureChannelEstablished => 
-                Result.Failure<CommandSecurityContext, SmartCardError>(
-                    SmartCardError.SecurityStatusNotSatisfied()),
-            
-            true when !IsSecurityLevelSufficient(context.CardState.SecurityLevel, context.SecurityRequirements) =>
-                Result.Failure<CommandSecurityContext, SmartCardError>(
-                    SmartCardError.SecurityStatusNotSatisfied()),
-                    
-            _ => Result.Success<CommandSecurityContext, SmartCardError>(context)
+            true when !context.CardState.IsSecureChannelEstablished => Result.Failure<
+                CommandSecurityContext,
+                SmartCardError
+            >(SmartCardError.SecurityStatusNotSatisfied()),
+
+            true
+                when !IsSecurityLevelSufficient(
+                    context.CardState.SecurityLevel,
+                    context.SecurityRequirements
+                ) => Result.Failure<CommandSecurityContext, SmartCardError>(
+                SmartCardError.SecurityStatusNotSatisfied()
+            ),
+
+            _ => Result.Success<CommandSecurityContext, SmartCardError>(context),
         };
     }
 
@@ -123,30 +152,32 @@ public static class ScpEnforcer
     /// Applies command-specific security enhancement rules per GP Appendix E.1.3.
     /// </summary>
     private static SecurityLevelRequirements ApplyCommandSpecificRules(
-        byte instruction, byte[] commandData, SecurityLevelRequirements baseRequirements)
+        byte instruction,
+        byte[] commandData,
+        SecurityLevelRequirements baseRequirements
+    )
     {
         return instruction switch
         {
             // GET DATA - Security depends on requested data object
-            0xCA when commandData.Length >= 4 => ApplyGetDataSecurityRules(commandData, baseRequirements),
-            
+            0xCA when commandData.Length >= 4 => ApplyGetDataSecurityRules(
+                commandData,
+                baseRequirements
+            ),
+
             // INSTALL - All variants require C-MAC and R-MAC
-            0xE6 => baseRequirements with 
-            { 
-                RequiresCommandMac = true, 
-                RequiresResponseMac = true 
-            },
-            
+            0xE6 => baseRequirements with { RequiresCommandMac = true, RequiresResponseMac = true },
+
             // PUT KEY - Always requires encryption for key data
-            0xD8 => baseRequirements with 
-            { 
+            0xD8 => baseRequirements with
+            {
                 RequiresCommandEncryption = true,
                 RequiresCommandMac = true,
-                RequiresResponseMac = true 
+                RequiresResponseMac = true,
             },
-            
+
             // Default: return base requirements
-            _ => baseRequirements
+            _ => baseRequirements,
         };
     }
 
@@ -154,29 +185,45 @@ public static class ScpEnforcer
     /// Applies GET DATA specific security rules based on requested data object per GP Table E-2.
     /// </summary>
     private static SecurityLevelRequirements ApplyGetDataSecurityRules(
-        byte[] commandData, SecurityLevelRequirements baseRequirements)
+        byte[] commandData,
+        SecurityLevelRequirements baseRequirements
+    )
     {
-        if (commandData.Length < 4) return baseRequirements;
+        // Per ISO 7816-4: APDU format is CLA INS P1 P2 [Lc] [Data] [Le]
+        // GET DATA command requires P1P2 parameters to identify the requested data object
+        // Minimum 4 bytes needed: CLA (0) + INS (1) + P1 (2) + P2 (3)
+        if (commandData.Length < 4)
+            return baseRequirements;
 
         // Extract P1P2 (data object identifier)
-        ushort dataObjectId = (ushort)((commandData[2] << 8) | commandData[3]);
+        ushort dataObjectId = (ushort)(commandData[2] << 8 | commandData[3]);
 
         return dataObjectId switch
         {
             // Sensitive data objects require encryption
-            0x00C1 or // Security Domain Info
-            0x00CF or // Key Diversification Data  
+            0x00C1
+            or // Security Domain Info
+            0x00CF
+            or // Key Diversification Data
             0x00E0 => // Key Information Template
-                baseRequirements with { RequiresResponseEncryption = true },
-                
+            baseRequirements with
+            {
+                RequiresResponseEncryption = true,
+            },
+
             // Protected data objects require authentication only
-            0x0066 or // Card Capabilities
-            0x0067 or // Card Management Type and Version
-            0x9F7F => // Card Production Life Cycle  
-                baseRequirements with { RequiresSecureChannel = true },
-                
+            0x0066
+            or // Card Capabilities
+            0x0067
+            or // Card Management Type and Version
+            0x9F7F => // Card Production Life Cycle
+            baseRequirements with
+            {
+                RequiresSecureChannel = true,
+            },
+
             // Public data objects - no additional requirements
-            _ => baseRequirements
+            _ => baseRequirements,
         };
     }
 
@@ -184,7 +231,10 @@ public static class ScpEnforcer
     /// Creates command security context for validation processing.
     /// </summary>
     private static Result<CommandSecurityContext, SmartCardError> CreateCommandSecurityContext(
-        byte instruction, CardState state, byte[] fullCommand)
+        byte instruction,
+        CardState state,
+        byte[] fullCommand
+    )
     {
         return GetRequiredSecurityLevels(instruction, fullCommand)
             .Map(requirements => new CommandSecurityContext(
@@ -202,7 +252,8 @@ public static class ScpEnforcer
     /// When a supplemental Security Domain is selected, it must have SecurityDomain privileges to handle INITIALIZE UPDATE.
     /// </summary>
     private static Result<CommandSecurityContext, SmartCardError> ValidateCardSelectionRequirements(
-        CommandSecurityContext context)
+        CommandSecurityContext context
+    )
     {
         // For INITIALIZE UPDATE, verify that the currently selected entity can handle secure channel operations
         if (context.Instruction == 0x50)
@@ -214,43 +265,56 @@ public static class ScpEnforcer
         return context.CardState.IsSelected
             ? Result.Success<CommandSecurityContext, SmartCardError>(context)
             : Result.Failure<CommandSecurityContext, SmartCardError>(
-                SmartCardError.ConditionsNotSatisfied()
-                    .WithContext("Requirement", "Application must be selected"));
+                SmartCardError
+                    .ConditionsNotSatisfied()
+                    .WithContext("Requirement", "Application must be selected")
+            );
     }
 
     /// <summary>
     /// Validates that the currently selected application can handle Security Domain operations.
     /// Per GP Card Spec v2.3.1: Only Security Domains can process INITIALIZE UPDATE commands.
     /// </summary>
-    private static Result<CommandSecurityContext, SmartCardError> ValidateSecurityDomainCapabilities(
-        CommandSecurityContext context)
+    private static Result<
+        CommandSecurityContext,
+        SmartCardError
+    > ValidateSecurityDomainCapabilities(CommandSecurityContext context)
     {
         // ISD is always implicitly selected and can always handle INITIALIZE UPDATE
         Maybe<VirtualApplication> selectedApp = context.CardState.CurrentlySelectedApplication;
-        
+
         // Use functional pattern matching approach
         return selectedApp.Match(
-            Some: app => app.Privileges.HasFlag(ApplicationPrivileges.SecurityDomain)
-                ? Result.Success<CommandSecurityContext, SmartCardError>(context)
-                : Result.Failure<CommandSecurityContext, SmartCardError>(
-                    SmartCardError.ConditionsNotSatisfied()
-                        .WithContext("Instruction", "INITIALIZE UPDATE")
-                        .WithContext("Requirement", "Selected application must have SecurityDomain privileges per GP Card Spec v2.3.1")),
-            None: () => Result.Success<CommandSecurityContext, SmartCardError>(context)); // No app selected = ISD implicitly selected
+            Some: app =>
+                app.Privileges.HasFlag(ApplicationPrivileges.SecurityDomain)
+                    ? Result.Success<CommandSecurityContext, SmartCardError>(context)
+                    : Result.Failure<CommandSecurityContext, SmartCardError>(
+                        SmartCardError
+                            .ConditionsNotSatisfied()
+                            .WithContext("Instruction", "INITIALIZE UPDATE")
+                            .WithContext(
+                                "Requirement",
+                                "Selected application must have SecurityDomain privileges per GP Card Spec v2.3.1"
+                            )
+                    ),
+            None: () => Result.Success<CommandSecurityContext, SmartCardError>(context)
+        ); // No app selected = ISD implicitly selected
     }
 
     /// <summary>
     /// Validates secure channel establishment requirements.
     /// </summary>
     private static Result<CommandSecurityContext, SmartCardError> ValidateSecureChannelRequirements(
-        CommandSecurityContext context)
+        CommandSecurityContext context
+    )
     {
         if (!context.SecurityRequirements.RequiresSecureChannel)
             return Result.Success<CommandSecurityContext, SmartCardError>(context);
 
         if (!context.CardState.IsSecureChannelEstablished)
             return Result.Failure<CommandSecurityContext, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied());
+                SmartCardError.SecurityStatusNotSatisfied()
+            );
 
         return Result.Success<CommandSecurityContext, SmartCardError>(context);
     }
@@ -259,22 +323,28 @@ public static class ScpEnforcer
     /// Validates security level requirements against established secure channel.
     /// </summary>
     private static Result<CommandSecurityContext, SmartCardError> ValidateSecurityLevelRequirements(
-        CommandSecurityContext context)
+        CommandSecurityContext context
+    )
     {
         if (!context.SecurityRequirements.RequiresSecureChannel)
             return Result.Success<CommandSecurityContext, SmartCardError>(context);
 
         byte currentLevel = context.CardState.SecurityLevel;
-        
+
         // Check C-MAC requirement
         if (context.SecurityRequirements.RequiresCommandMac && !HasCommandMac(currentLevel))
             return Result.Failure<CommandSecurityContext, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied());
+                SmartCardError.SecurityStatusNotSatisfied()
+            );
 
         // Check C-ENC requirement
-        if (context.SecurityRequirements.RequiresCommandEncryption && !HasCommandEncryption(currentLevel))
+        if (
+            context.SecurityRequirements.RequiresCommandEncryption
+            && !HasCommandEncryption(currentLevel)
+        )
             return Result.Failure<CommandSecurityContext, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied());
+                SmartCardError.SecurityStatusNotSatisfied()
+            );
 
         return Result.Success<CommandSecurityContext, SmartCardError>(context);
     }
@@ -282,11 +352,12 @@ public static class ScpEnforcer
     /// <summary>
     /// Validates command authentication (MAC verification) if required.
     /// Implements proper MAC validation per GP Card Specification v2.3.1 and SCP03 v1.1.1 Section 6.2.4.
-    /// Performs structural validation and secure channel verification. Full cryptographic MAC 
+    /// Performs structural validation and secure channel verification. Full cryptographic MAC
     /// verification is handled by the secure channel pipeline.
     /// </summary>
     private static Result<CommandSecurityContext, SmartCardError> ValidateCommandAuthentication(
-        CommandSecurityContext context)
+        CommandSecurityContext context
+    )
     {
         return context.SecurityRequirements.RequiresCommandMac
             ? ValidateSecureChannelForMac(context.CardState)
@@ -299,40 +370,49 @@ public static class ScpEnforcer
     /// Validates MAC structure and length per GP specification.
     /// Ensures command has proper MAC length for the SCP version.
     /// </summary>
-    private static Result<bool, SmartCardError> ValidateMacStructure(byte[] command, byte scpVersion)
+    private static Result<bool, SmartCardError> ValidateMacStructure(
+        byte[] command,
+        byte scpVersion
+    )
     {
         int expectedMacLength = scpVersion switch
         {
-            0x02 => 8,  // SCP02 uses 8-byte MAC per GP Card Spec v2.3.1 Section E.4  
+            0x02 => 8, // SCP02 uses 8-byte MAC per GP Card Spec v2.3.1 Section E.4
             0x03 => 16, // SCP03 uses 16-byte AES-CMAC per GP SCP03 v1.1.1 Section 6.2.4
-            _ => 8      // Default to SCP02 MAC length
+            _ => 8, // Default to SCP02 MAC length
         };
 
         return command.Length >= 5 + expectedMacLength
             ? Result.Success<bool, SmartCardError>(true)
             : Result.Failure<bool, SmartCardError>(
-                SmartCardError.InvalidData($"Command MAC length invalid for SCP{scpVersion:X2}"));
+                SmartCardError.InvalidData($"Command MAC length invalid for SCP{scpVersion:X2}")
+            );
     }
 
     /// <summary>
     /// Validates that secure channel is established for MAC operations.
     /// </summary>
-    private static Result<CardState, SmartCardError> ValidateSecureChannelForMac(CardState cardState)
+    private static Result<CardState, SmartCardError> ValidateSecureChannelForMac(
+        CardState cardState
+    )
     {
         return cardState.IsSecureChannelEstablished
             ? Result.Success<CardState, SmartCardError>(cardState)
             : Result.Failure<CardState, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied());
+                SmartCardError.SecurityStatusNotSatisfied()
+            );
     }
-
 
     /// <summary>
     /// Checks if the current security level meets the minimum requirements.
     /// </summary>
-    private static bool IsSecurityLevelSufficient(byte currentLevel, SecurityLevelRequirements requirements)
+    private static bool IsSecurityLevelSufficient(
+        byte currentLevel,
+        SecurityLevelRequirements requirements
+    )
     {
-        return (!requirements.RequiresCommandMac || HasCommandMac(currentLevel)) &&
-               (!requirements.RequiresCommandEncryption || HasCommandEncryption(currentLevel));
+        return (!requirements.RequiresCommandMac || HasCommandMac(currentLevel))
+            && (!requirements.RequiresCommandEncryption || HasCommandEncryption(currentLevel));
     }
 
     /// <summary>
@@ -354,25 +434,4 @@ public static class ScpEnforcer
     /// Checks if security level includes R-ENC (Response Encryption).
     /// </summary>
     private static bool HasResponseEncryption(byte securityLevel) => (securityLevel & 0x20) != 0;
-
-    /// <summary>
-    /// Represents command security validation context.
-    /// </summary>
-    public record CommandSecurityContext(
-        byte Instruction,
-        byte[] FullCommand,
-        CardState CardState,
-        SecurityLevelRequirements SecurityRequirements
-    );
-
-    /// <summary>
-    /// Represents security level requirements for a command per GP Appendix E.
-    /// </summary>
-    public record SecurityLevelRequirements(
-        bool RequiresSecureChannel,
-        bool RequiresCommandMac,
-        bool RequiresCommandEncryption,
-        bool RequiresResponseMac,
-        bool RequiresResponseEncryption
-    );
 }

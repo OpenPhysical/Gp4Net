@@ -1,6 +1,6 @@
-using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.CardEmulator.Functional;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Core;
@@ -26,7 +26,8 @@ public interface IVirtualCard
     /// <summary>
     /// Resets the virtual card to its initial state.
     /// </summary>
-    UnitResult<SmartCardError> Reset();
+    /// <returns>A new card instance in reset state, or an error.</returns>
+    Result<IVirtualCard, SmartCardError> Reset();
 
     /// <summary>
     /// Gets a value indicating whether the card is currently selected.
@@ -37,76 +38,48 @@ public interface IVirtualCard
     /// Gets a value indicating whether a secure channel is established.
     /// </summary>
     bool IsSecureChannelEstablished { get; }
+
+    /// <summary>
+    /// Gets the card configuration (for testing purposes).
+    /// </summary>
+    CardConfiguration Configuration { get; }
 }
 
 /// <summary>
-/// Represents an APDU response with data and status word.
+/// Functional interface for a virtual smart card that can process APDU commands.
+/// All operations are functional and return new instances with updated state.
 /// </summary>
 [PublicAPI]
-public class ApduResponse
+public interface IFunctionalVirtualCard
 {
     /// <summary>
-    /// Gets the response data.
+    /// Gets the Answer to Reset (ATR) of the virtual card.
     /// </summary>
-    public byte[] Data { get; }
+    byte[] GetAtr();
 
     /// <summary>
-    /// Gets the status word.
+    /// Processes an APDU command and returns the response with updated card state.
     /// </summary>
-    public StatusWord StatusWord { get; }
+    /// <param name="command">The APDU command bytes.</param>
+    /// <returns>The APDU response and updated card instance, or an error.</returns>
+    Result<
+        (ApduResponse Response, IFunctionalVirtualCard UpdatedCard),
+        SmartCardError
+    > ProcessCommand(byte[] command);
 
     /// <summary>
-    /// Gets a value indicating whether the command was successful.
+    /// Resets the virtual card to its initial state.
     /// </summary>
-    public bool IsSuccessful
-    {
-        get
-        {
-            return StatusWord == 0x9000;
-        }
-    }
+    /// <returns>A new card instance in reset state, or an error.</returns>
+    Result<IFunctionalVirtualCard, SmartCardError> Reset();
 
     /// <summary>
-    /// Initializes a new instance of the ApduResponse class.
+    /// Gets a value indicating whether the card is currently selected.
     /// </summary>
-    /// <param name="data">The response data.</param>
-    /// <param name="statusWord">The status word.</param>
-    public ApduResponse(byte[] data, StatusWord statusWord)
-    {
-        Data = data ?? throw new ArgumentNullException(nameof(data));
-        StatusWord = statusWord;
-    }
+    bool IsSelected { get; }
 
     /// <summary>
-    /// Creates a successful response with data.
+    /// Gets a value indicating whether a secure channel is established.
     /// </summary>
-    /// <param name="data">The response data.</param>
-    /// <returns>A successful APDU response.</returns>
-    public static ApduResponse Success(byte[]? data = null)
-    {
-        return new ApduResponse(data ?? [], new StatusWord(0x9000));
-    }
-
-    /// <summary>
-    /// Creates an error response with the specified status word.
-    /// </summary>
-    /// <param name="statusWord">The error status word.</param>
-    /// <returns>An error APDU response.</returns>
-    public static ApduResponse Error(ushort statusWord)
-    {
-        return new ApduResponse([], statusWord);
-    }
-
-    /// <summary>
-    /// Converts the response to a byte array suitable for transmission.
-    /// </summary>
-    /// <returns>The response bytes including status word.</returns>
-    public byte[] ToBytes()
-    {
-        byte[] result = new byte[Data.Length + 2];
-        Array.Copy(Data, 0, result, 0, Data.Length);
-        result[Data.Length] = (byte)(StatusWord >> 8);
-        result[Data.Length + 1] = (byte)(StatusWord & 0xFF);
-        return result;
-    }
+    bool IsSecureChannelEstablished { get; }
 }

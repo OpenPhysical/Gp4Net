@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -114,7 +112,6 @@ public interface IApduCommand
     bool IsExtendedLength { get; }
 }
 
-
 /// <summary>
 /// Represents an APDU response.
 /// </summary>
@@ -136,10 +133,7 @@ public class ApduResponse
     /// </summary>
     public byte Sw1
     {
-        get
-        {
-            return (byte)(StatusWord >> 8);
-        }
+        get { return (byte)(StatusWord >> 8); }
     }
 
     /// <summary>
@@ -147,10 +141,7 @@ public class ApduResponse
     /// </summary>
     public byte Sw2
     {
-        get
-        {
-            return (byte)(StatusWord & 0xFF);
-        }
+        get { return (byte)(StatusWord & 0xFF); }
     }
 
     /// <summary>
@@ -158,10 +149,7 @@ public class ApduResponse
     /// </summary>
     public bool IsSuccess
     {
-        get
-        {
-            return StatusWord == 0x9000;
-        }
+        get { return StatusWord == 0x9000; }
     }
 
     /// <summary>

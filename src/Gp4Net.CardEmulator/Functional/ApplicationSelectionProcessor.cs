@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using Gp4Net.CardEmulator.Core;
+using Gp4Net.Core;
 
 namespace Gp4Net.CardEmulator.Functional;
 
@@ -46,7 +47,7 @@ public static class ApplicationSelectionProcessor
         byte lc = command[4];
 
         // Validate CLA and INS
-        if (ins != 0xA4)
+        if (ins != Gp4Net.Constants.Constants.GlobalPlatform.Ins.Select)
         {
             return Result.Failure<SelectCommandData, SmartCardError>(
                 SmartCardError.InstructionNotSupported());
@@ -67,14 +68,14 @@ public static class ApplicationSelectionProcessor
                 SmartCardError.WrongLength());
         }
 
-        ImmutableArray<byte> aid = lc == 0 
-            ? ImmutableArray<byte>.Empty 
+        ImmutableArray<byte> aid = lc == 0
+            ? ImmutableArray<byte>.Empty
             : [..command.Skip(5).Take(lc)];
 
         return Result.Success<SelectCommandData, SmartCardError>(new SelectCommandData(
             aid,
             selectionControl,
-            (FileControlInformation)(p2 & 0x0F),
+            (FileControlInformation)(p2 & Gp4Net.Constants.Constants.GlobalPlatform.CommonBytes.LowerNibbleMask),
             (p1 & 0x04) != 0 // File occurrence bit
         ));
     }
@@ -104,12 +105,12 @@ public static class ApplicationSelectionProcessor
         {
             // Empty AID selects ISD
             return state.ApplicationContext.SelectIsd()
-                .Map(newContext => state.WithApplicationContext(newContext).WithSelected(true));
+                .Map(newContext => state.WithApplicationContext(newContext).WithSelected());
         }
 
         // Select specific application by AID
         return state.ApplicationContext.SelectApplication(aid)
-            .Map(newContext => state.WithApplicationContext(newContext).WithSelected(true));
+            .Map(newContext => state.WithApplicationContext(newContext).WithSelected());
     }
 
     /// <summary>
@@ -136,7 +137,7 @@ public static class ApplicationSelectionProcessor
 
         VirtualApplication matchingApp = candidates.First();
         return state.ApplicationContext.SelectApplication(matchingApp.Aid)
-            .Map(newContext => state.WithApplicationContext(newContext).WithSelected(true));
+            .Map(newContext => state.WithApplicationContext(newContext).WithSelected());
     }
 
     /// <summary>
@@ -170,14 +171,16 @@ public static class ApplicationSelectionProcessor
             {
                 byte[] nextAid = Convert.FromHexString(candidateAids[currentIndex + 1]);
                 return state.ApplicationContext.SelectApplication([..nextAid])
-                    .Map(newContext => state.WithApplicationContext(newContext).WithSelected(true));
+                    .Map(newContext => state.WithApplicationContext(newContext).WithSelected());
             }
         }
 
         // If no history or at end, select first
+        // GlobalPlatform Card Specification v2.3.1 Section 11.1.1.1 - SELECT command processing
+        // When multiple applications match AID, select first registered application
         VirtualApplication firstApp = candidates.First();
         return state.ApplicationContext.SelectApplication(firstApp.Aid)
-            .Map(newContext => state.WithApplicationContext(newContext).WithSelected(true));
+            .Map(newContext => state.WithApplicationContext(newContext).WithSelected());
     }
 
     /// <summary>
@@ -198,12 +201,12 @@ public static class ApplicationSelectionProcessor
     {
         // Simple FCI (File Control Information) template
         ImmutableArray<byte>.Builder fciBuilder = ImmutableArray.CreateBuilder<byte>();
-        
+
         // FCI Template tag (6F)
         fciBuilder.Add(0x6F);
-        
+
         ImmutableArray<byte>.Builder contentBuilder = ImmutableArray.CreateBuilder<byte>();
-        
+
         // Application AID (84)
         if (!app.Aid.IsEmpty)
         {
@@ -211,11 +214,11 @@ public static class ApplicationSelectionProcessor
             contentBuilder.Add((byte)app.Aid.Length);
             contentBuilder.AddRange(app.Aid);
         }
-        
+
         // Application name (50) - optional
         if (!string.IsNullOrEmpty(app.Name))
         {
-            byte[] nameBytes = System.Text.Encoding.UTF8.GetBytes(app.Name);
+            byte[] nameBytes = Encoding.UTF8.GetBytes(app.Name);
             if (nameBytes.Length <= 16) // Reasonable limit
             {
                 contentBuilder.Add(0x50);
@@ -223,21 +226,63 @@ public static class ApplicationSelectionProcessor
                 contentBuilder.AddRange(nameBytes);
             }
         }
-        
+
         ImmutableArray<byte> content = contentBuilder.ToImmutable();
         fciBuilder.Add((byte)content.Length);
         fciBuilder.AddRange(content);
-        
+
         return fciBuilder.ToImmutable().ToArray();
     }
 
     /// <summary>
-    /// Generates SELECT response for ISD selection.
+    /// Generates proper FCI response for ISD selection according to GP specification.
+    /// Per GP 2.3.1 Table 11-82: FCI contains mandatory '6F' template with '84' (AID) and 'A5' (proprietary data).
     /// </summary>
     private static byte[] GenerateIsdSelectResponse()
     {
-        // Simple FCI for ISD - includes ISD-specific data
-        return [0x6F, 0x00]; // Empty FCI template
+        // Standard GP ISD AID
+        byte[] isdAid = Gp4Net.Constants.Constants.GlobalPlatform.Aids.IsdDefault;
+        
+        // Build FCI according to GP spec:
+        // 6F (FCI Template)
+        //   84 (DF Name/AID) - 8 bytes
+        //   A5 (Proprietary data) - contains ISD-specific info
+        //     9F70 (Life Cycle State) - 1 byte: 0x07 (INITIALIZED)
+        
+        byte[] proprietaryData = BuildProprietaryData();
+        byte[] aidTlv = BuildTlv(0x84, isdAid);
+        byte[] proprietaryTlv = BuildTlv(0xA5, proprietaryData);
+        
+        byte[] fciContent = [..aidTlv, ..proprietaryTlv];
+        return BuildTlv(0x6F, fciContent);
+    }
+
+    /// <summary>
+    /// Builds proprietary data section for ISD FCI.
+    /// </summary>
+    private static byte[] BuildProprietaryData()
+    {
+        // Life cycle state: SELECTABLE (INITIALIZED)
+        byte[] lifecycleState = [Gp4Net.Constants.Constants.GlobalPlatform.LifecycleStates.Selectable];
+        byte[] lifecycleTlv = BuildTlv(0x9F, 0x70, lifecycleState);
+        
+        return lifecycleTlv;
+    }
+
+    /// <summary>
+    /// Builds a TLV structure with single-byte tag.
+    /// </summary>
+    private static byte[] BuildTlv(byte tag, byte[] value)
+    {
+        return [tag, (byte)value.Length, ..value];
+    }
+
+    /// <summary>
+    /// Builds a TLV structure with two-byte tag.
+    /// </summary>
+    private static byte[] BuildTlv(byte tag1, byte tag2, byte[] value)
+    {
+        return [tag1, tag2, (byte)value.Length, ..value];
     }
 
     /// <summary>
@@ -247,35 +292,4 @@ public static class ApplicationSelectionProcessor
     {
         return state with { IsSelected = isSelected };
     }
-}
-
-/// <summary>
-/// Data extracted from a SELECT command.
-/// </summary>
-internal record SelectCommandData(
-    ImmutableArray<byte> Aid,
-    SelectionControl SelectionControl,
-    FileControlInformation Fci,
-    bool FileOccurrence
-);
-
-/// <summary>
-/// SELECT command P1 parameter values.
-/// </summary>
-internal enum SelectionControl : byte
-{
-    SelectByName = 0x04,
-    SelectFirstOccurrence = 0x00,
-    SelectNextOccurrence = 0x02
-}
-
-/// <summary>
-/// SELECT command P2 parameter values for FCI.
-/// </summary>
-internal enum FileControlInformation : byte
-{
-    ReturnFci = 0x00,
-    ReturnFcp = 0x04,
-    ReturnFmd = 0x08,
-    NoResponse = 0x0C
 }

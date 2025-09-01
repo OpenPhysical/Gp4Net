@@ -1,9 +1,11 @@
 using System;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
+using Gp4Net.Cryptography;
+using static Gp4Net.Cryptography.CryptoService;
 
 namespace Gp4Net.Core.Functional;
+
 public static class EnumParsingExtensions
 {
     /// <summary>
@@ -51,20 +53,18 @@ public static class EnumParsingExtensions
     /// <summary>
     /// Converts a byte to ScpVersion with functional error handling.
     /// </summary>
-    public static Result<ScpVersion> ToScpVersion(this byte value)
-        => value.ToEnum<ScpVersion>();
+    public static Result<ScpVersion> ToScpVersion(this byte value) => value.ToEnum<ScpVersion>();
 
     /// <summary>
     /// Converts an int to ScpVersion with functional error handling.
     /// </summary>
-    public static Result<ScpVersion> ToScpVersion(this int value)
-        => value >= 0 && value <= 255
+    public static Result<ScpVersion> ToScpVersion(this int value) =>
+        value is >= 0 and <= 255
             ? ((byte)value).ToEnum<ScpVersion>()
             : Result.Failure<ScpVersion>($"Value {value} is outside byte range for ScpVersion");
 
     /// <summary>
     /// Converts ScpVersion to byte.
     /// </summary>
-    public static byte ToByte(this ScpVersion version)
-        => (byte)version;
+    public static byte ToByte(this ScpVersion version) => (byte)version;
 }

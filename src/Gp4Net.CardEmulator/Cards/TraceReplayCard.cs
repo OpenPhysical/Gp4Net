@@ -1,337 +1,314 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Trace;
 using Gp4Net.Core;
-using ApduResponse = Gp4Net.CardEmulator.Core.ApduResponse;
 
 namespace Gp4Net.CardEmulator.Cards;
 
 /// <summary>
-/// Virtual card that replays responses from an APDU trace.
+/// Functional virtual card that replays APDU responses from a trace.
+/// Simple, clean implementation focusing on core functionality.
 /// </summary>
-public class TraceReplayCard : IVirtualCard
+// @TODO THERE NEEDS TO BE A WAY TO USE THIS
+public sealed record TraceReplayCard : IFunctionalVirtualCard
 {
     private readonly ApduTrace _trace;
-    private readonly Dictionary<string, ApduResponse> _exactMatches;
-    private readonly Dictionary<string, List<ApduResponse>> _patternMatches;
-    private readonly List<ApduExchange> _executedExchanges;
-    private readonly bool _strictMode;
-    private int _exchangeIndex;
+    private readonly ImmutableList<ApduExchange> _executedExchanges;
+    private readonly int _nextExchangeIndex;
 
     /// <summary>
     /// Gets whether the card is selected.
     /// </summary>
-    public bool IsSelected { get; private set; }
+    public bool IsSelected { get; }
 
     /// <summary>
     /// Gets whether a secure channel is established.
     /// </summary>
-    public bool IsSecureChannelEstablished { get; private set; }
+    public bool IsSecureChannelEstablished { get; }
+
 
     /// <summary>
-    /// Gets the executed exchanges for verification.
+    /// Initializes a new TraceReplayCard with trace and state.
     /// </summary>
-    public IReadOnlyList<ApduExchange> ExecutedExchanges
+    private TraceReplayCard(
+        ApduTrace trace,
+        bool isSelected,
+        bool isSecureChannelEstablished,
+        ImmutableList<ApduExchange> executedExchanges,
+        int nextExchangeIndex
+    )
     {
-        get
-        {
-            return _executedExchanges.AsReadOnly();
-        }
+        _trace = trace;
+        IsSelected = isSelected;
+        IsSecureChannelEstablished = isSecureChannelEstablished;
+        _executedExchanges = executedExchanges;
+        _nextExchangeIndex = nextExchangeIndex;
     }
 
     /// <summary>
-    /// Initializes a new instance of the TraceReplayCard class.
+    /// Creates a new TraceReplayCard from an APDU trace.
     /// </summary>
     /// <param name="trace">The APDU trace to replay.</param>
-    /// <param name="strictMode">If true, requires exact command matches. If false, allows pattern matching.</param>
-    public TraceReplayCard(ApduTrace trace, bool strictMode = false)
+    /// <returns>A new TraceReplayCard instance or an error.</returns>
+    public static Result<TraceReplayCard, SmartCardError> Create(ApduTrace trace)
     {
-        _trace = trace ?? throw new ArgumentNullException(nameof(trace));
-        _exactMatches = new Dictionary<string, ApduResponse>(StringComparer.OrdinalIgnoreCase);
-        _patternMatches = new Dictionary<string, List<ApduResponse>>(
-            StringComparer.OrdinalIgnoreCase
-        );
-        _executedExchanges = [];
-        _strictMode = strictMode;
-        _exchangeIndex = 0;
-
-        BuildResponseMappings();
+        return Maybe
+            .From(trace)
+            .ToResult(SmartCardError.InvalidArgument("Trace cannot be null"))
+            .Map(t => new TraceReplayCard(
+                t,
+                isSelected: false,
+                isSecureChannelEstablished: false,
+                executedExchanges: ImmutableList<ApduExchange>.Empty,
+                nextExchangeIndex: 0
+            ));
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Gets the Answer to Reset (ATR) of the virtual card.
+    /// </summary>
+    /// <returns>ATR bytes from trace or default JavaCard ATR.</returns>
     public byte[] GetAtr()
     {
-        // Return ATR from trace if available, otherwise default JavaCard ATR
-        return _trace.Atr ?? Convert.FromHexString("3B7D94000080318065B08311AC83009000");
+        return _trace.Atr
+            .GetValueOrDefault(Convert.FromHexString("3B7D94000080318065B08311AC83009000"));
     }
-
-    /// <inheritdoc />
-    public ApduResponse ProcessCommand(byte[] command)
-    {
-        if (command == null || command.Length < 4)
-        {
-            var errorResponse = ApduResponse.Error(0x6700); // Wrong length
-            RecordExchange(command ?? [], errorResponse);
-            return errorResponse;
-        }
-
-        ApduResponse? response = null;
-
-        // Try sequential replay first (if enabled)
-        if (!_strictMode && _exchangeIndex < _trace.Exchanges.Count)
-        {
-            var expectedExchange = _trace.Exchanges[_exchangeIndex];
-            if (CommandsMatch(command, expectedExchange.Command, allowDynamicData: true))
-            {
-                response = expectedExchange.Response;
-                _exchangeIndex++;
-            }
-        }
-
-        // Try exact match
-        if (response == null)
-        {
-            var exactKey = GetExactKey(command);
-            if (_exactMatches.TryGetValue(exactKey, out var exactResponse))
-            {
-                response = exactResponse;
-            }
-        }
-
-        // Try pattern match if not in strict mode
-        if (response == null && !_strictMode)
-        {
-            response = FindPatternMatch(command);
-        }
-
-        // Return error if no match found
-        if (response == null)
-        {
-            response = ApduResponse.Error(0x6D00); // INS not supported
-        }
-
-        // Update card state
-        UpdateCardState(command, response);
-
-        // Record the exchange
-        RecordExchange(command, response);
-
-        return response;
-    }
-
-    /// <inheritdoc />
-    public void Reset()
-    {
-        IsSelected = false;
-        IsSecureChannelEstablished = false;
-        _executedExchanges.Clear();
-        _exchangeIndex = 0;
-    }
-
-    private void BuildResponseMappings()
-    {
-        foreach (var exchange in _trace.Exchanges)
-        {
-            if (exchange.Response == null || exchange.Command.Length < 4)
-                continue;
-
-            // Store exact match
-            var exactKey = GetExactKey(exchange.Command);
-            _exactMatches[exactKey] = exchange.Response;
-
-            // Store pattern match (CLA+INS+P1+P2)
-            var patternKey = GetPatternKey(exchange.Command);
-            if (!_patternMatches.ContainsKey(patternKey))
-            {
-                _patternMatches[patternKey] = [];
-            }
-            _patternMatches[patternKey].Add(exchange.Response);
-        }
-    }
-
-    private static string GetExactKey(byte[] command)
-    {
-        return BitConverter.ToString(command);
-    }
-
-    private static string GetPatternKey(byte[] command)
-    {
-        if (command.Length < 4)
-            return string.Empty;
-
-        return $"{command[0]:X2}-{command[1]:X2}-{command[2]:X2}-{command[3]:X2}";
-    }
-
-    private ApduResponse? FindPatternMatch(byte[] command)
-    {
-        if (command.Length < 4)
-            return null;
-
-        var ins = command[1];
-
-        // Special handling for commands with dynamic data
-        switch (ins)
-        {
-            case 0x50: // INITIALIZE UPDATE - has random host challenge
-                return FindInitializeUpdateResponse(command);
-
-            case 0x82: // EXTERNAL AUTHENTICATE - has cryptogram
-                return FindExternalAuthResponse(command);
-
-            case 0xE6: // INSTALL - may have variable data
-                return FindInstallResponse(command);
-
-            default:
-                // Try pattern key match
-                var patternKey = GetPatternKey(command);
-                if (
-                    _patternMatches.TryGetValue(patternKey, out var responses)
-                    && responses.Count > 0
-                )
-                {
-                    // Return first matching response
-                    // Could be enhanced to cycle through responses for repeated commands
-                    return responses[0];
-                }
-                break;
-        }
-
-        return null;
-    }
-
-    private ApduResponse? FindInitializeUpdateResponse(byte[] command)
-    {
-        // INITIALIZE UPDATE: CLA=80/84 INS=50 P1=key_version P2=key_id Lc=08 Data=host_challenge Le=00
-        var exchanges = _trace.FindExchanges(ins: 0x50).ToList();
-
-        if (exchanges.Count > 0 && exchanges[0].Response != null)
-        {
-            return exchanges[0].Response;
-        }
-
-        return null;
-    }
-
-    private ApduResponse? FindExternalAuthResponse(byte[] command)
-    {
-        // EXTERNAL AUTHENTICATE: CLA=84 INS=82 P1=security_level P2=00 Lc=10 Data=cryptogram Le=00
-        var exchanges = _trace.FindExchanges(ins: 0x82).ToList();
-
-        if (exchanges.Count > 0 && exchanges[0].Response != null)
-        {
-            // Check if we can match the security level
-            var p1 = command[2];
-            var matchingExchange = exchanges.FirstOrDefault(ex => ex.Command[2] == p1);
-            if (matchingExchange?.Response != null)
-            {
-                return matchingExchange.Response;
-            }
-
-            // Otherwise return first response
-            return exchanges[0].Response;
-        }
-
-        return null;
-    }
-
-    private ApduResponse? FindInstallResponse(byte[] command)
-    {
-        // INSTALL commands have variable data but same P1 indicates same operation type
-        var p1 = command[2];
-        var exchanges = _trace.FindExchanges(ins: 0xE6, p1: p1).ToList();
-
-        if (exchanges.Count > 0 && exchanges[0].Response != null)
-        {
-            return exchanges[0].Response;
-        }
-
-        return null;
-    }
-
-    private static bool CommandsMatch(byte[] actual, byte[] expected, bool allowDynamicData)
-    {
-        if (actual.Length != expected.Length)
-            return false;
-
-        // Always check header
-        if (actual.Length < 4)
-            return false;
-
-        // CLA might differ by secure messaging bit
-        var claMask = allowDynamicData ? 0xFC : 0xFF; // Ignore SM bits if dynamic
-        if ((actual[0] & claMask) != (expected[0] & claMask))
-            return false;
-
-        // INS, P1, P2 must match
-        if (actual[1] != expected[1] || actual[2] != expected[2] || actual[3] != expected[3])
-            return false;
-
-        if (!allowDynamicData)
-        {
-            // Exact match required
-            for (var i = 4; i < actual.Length; i++)
-            {
-                if (actual[i] != expected[i])
-                    return false;
-            }
-        }
-
-        return true;
-    }
-
-    private void UpdateCardState(byte[] command, ApduResponse response)
-    {
-        if (command.Length < 4 || !response.IsSuccessful)
-            return;
-
-        var ins = command[1];
-
-        switch (ins)
-        {
-            case 0xA4: // SELECT
-                IsSelected = true;
-                break;
-
-            case 0x50: // INITIALIZE UPDATE
-                // Don't set secure channel until EXTERNAL AUTHENTICATE succeeds
-                break;
-
-            case 0x82: // EXTERNAL AUTHENTICATE
-                if (response.IsSuccessful)
-                {
-                    IsSecureChannelEstablished = true;
-                }
-                break;
-        }
-    }
-
-    private void RecordExchange(byte[] command, ApduResponse response)
-    {
-        var exchange = new ApduExchange(command, response);
-        _executedExchanges.Add(exchange);
-    }
-}
-
-/// <summary>
-/// Options for trace replay behavior.
-/// </summary>
-public class TraceReplayOptions
-{
-    /// <summary>
-    /// Gets or sets whether to require exact command matches.
-    /// </summary>
-    public bool StrictMode { get; set; }
 
     /// <summary>
-    /// Gets or sets whether to follow trace order sequentially.
+    /// Processes an APDU command functionally, returning response and updated card state.
     /// </summary>
-    public bool SequentialMode { get; set; } = true;
+    /// <param name="command">The APDU command bytes.</param>
+    /// <returns>The APDU response and updated card instance, or an error.</returns>
+    public Result<
+        (ApduResponse Response, IFunctionalVirtualCard UpdatedCard),
+        SmartCardError
+    > ProcessCommand(byte[] command)
+    {
+        return ValidateCommand(command)
+            .Bind(cmd =>
+                FindResponseForCommand(cmd)
+                    .Map(response =>
+                        CreateUpdatedCard(cmd, response)
+                            .Map(updatedCard => (response, (IFunctionalVirtualCard)updatedCard))
+                    )
+            )
+            .Bind(result => result);
+    }
 
     /// <summary>
-    /// Gets or sets whether to update card state based on commands.
+    /// Resets the virtual card to its initial state.
     /// </summary>
-    public bool TrackState { get; set; } = true;
+    /// <returns>A new card instance in reset state.</returns>
+    public Result<IFunctionalVirtualCard, SmartCardError> Reset()
+    {
+        TraceReplayCard resetCard = new(
+            _trace,
+            isSelected: false,
+            isSecureChannelEstablished: false,
+            executedExchanges: ImmutableList<ApduExchange>.Empty,
+            nextExchangeIndex: 0
+        );
+
+        return Result.Success<IFunctionalVirtualCard, SmartCardError>(resetCard);
+    }
+
+    /// <summary>
+    /// Validates the incoming APDU command.
+    /// </summary>
+    /// <param name="command">The command to validate.</param>
+    /// <returns>The validated command or an error.</returns>
+    private static Result<byte[], SmartCardError> ValidateCommand(byte[] command)
+    {
+        return Maybe
+            .From(command)
+            .ToResult(SmartCardError.InvalidArgument("Command cannot be null"))
+            .Ensure(
+                cmd => cmd.Length >= 4,
+                SmartCardError.WrongLength("Command must be at least 4 bytes")
+            );
+    }
+
+    /// <summary>
+    /// Finds the appropriate response for a command using simple sequential replay.
+    /// </summary>
+    /// <param name="command">The command to find a response for.</param>
+    /// <returns>The matching response or default error response.</returns>
+    private Result<ApduResponse, SmartCardError> FindResponseForCommand(byte[] command)
+    {
+        // Try sequential replay first - most common case
+        ApduResponse sequentialResponse = TrySequentialReplay(command);
+        if (sequentialResponse.IsSuccessful)
+            return Result.Success<ApduResponse, SmartCardError>(sequentialResponse);
+
+        // Try exact command match
+        ApduResponse exactMatchResponse = TryExactMatch(command);
+        if (exactMatchResponse.IsSuccessful)
+            return Result.Success<ApduResponse, SmartCardError>(exactMatchResponse);
+
+        // @TODO FAIL HARD.  If we can't replay, DON'T!
+
+        // Try pattern match by instruction
+        ApduResponse patternResponse = TryPatternMatch(command);
+        return Result.Success<ApduResponse, SmartCardError>(patternResponse);
+    }
+
+    /// <summary>
+    /// Attempts sequential replay if the next expected command matches.
+    /// </summary>
+    /// <param name="command">The command to match.</param>
+    /// <returns>The response if sequential match found, otherwise error response.</returns>
+    private ApduResponse TrySequentialReplay(byte[] command)
+    {
+        if (_nextExchangeIndex >= _trace.Exchanges.Count)
+            return ApduResponse.Error(0x6D00);
+
+        ApduExchange nextExchange = _trace.Exchanges[_nextExchangeIndex];
+
+        return CommandHeaderMatches(command, nextExchange.Command)
+            ? nextExchange.Response.Match(
+                response => response,
+                () => ApduResponse.Error(0x6D00)
+            )
+            : ApduResponse.Error(0x6D00);
+    }
+
+    /// <summary>
+    /// Attempts to find exact command match in trace.
+    /// </summary>
+    /// <param name="command">The command to match.</param>
+    /// <returns>The response if exact match found, otherwise error response.</returns>
+    private ApduResponse TryExactMatch(byte[] command)
+    {
+        string commandKey = BitConverter.ToString(command);
+
+        ApduExchange[] matchingExchanges = _trace
+            .Exchanges.Where(ex => BitConverter.ToString(ex.Command) == commandKey)
+            .ToArray();
+
+        if (matchingExchanges.Length == 0)
+            return ApduResponse.Error(0x6D00);
+
+        return matchingExchanges[0].Response.Match(
+            response => response,
+            () => ApduResponse.Error(0x6D00)
+        );
+    }
+
+    /// <summary>
+    /// Attempts to find response by instruction pattern matching.
+    /// </summary>
+    /// <param name="command">The command to match.</param>
+    /// <returns>The response if pattern match found, otherwise error response.</returns>
+    private ApduResponse TryPatternMatch(byte[] command)
+    {
+        byte ins = command[1];
+
+        ApduExchange[] matchingExchanges = _trace
+            .Exchanges.Where(ex => ex.Command.Length >= 2 && ex.Command[1] == ins)
+            .ToArray();
+
+        if (matchingExchanges.Length == 0)
+            return ApduResponse.Error(0x6D00);
+
+        return matchingExchanges[0].Response.Match(
+            response => response,
+            () => ApduResponse.Error(0x6D00)
+        );
+    }
+
+    /// <summary>
+    /// Checks if command headers match (CLA, INS, P1, P2).
+    /// </summary>
+    /// <param name="actual">The actual command.</param>
+    /// <param name="expected">The expected command.</param>
+    /// <returns>True if headers match, allowing for secure messaging bits in CLA.</returns>
+    private static bool CommandHeaderMatches(byte[] actual, byte[] expected)
+    {
+        if (actual.Length < 4 || expected.Length < 4)
+            return false;
+
+        // Allow CLA secure messaging bits to differ (mask with 0xFC)
+        bool claMatches = (actual[0] & 0xFC) == (expected[0] & 0xFC);
+        bool insMatches = actual[1] == expected[1];
+        bool p1Matches = actual[2] == expected[2];
+        bool p2Matches = actual[3] == expected[3];
+
+        return claMatches && insMatches && p1Matches && p2Matches;
+    }
+
+    /// <summary>
+    /// Creates an updated card instance with new state based on the processed command.
+    /// </summary>
+    /// <param name="command">The processed command.</param>
+    /// <param name="response">The response that was returned.</param>
+    /// <returns>A new card instance with updated state.</returns>
+    private Result<TraceReplayCard, SmartCardError> CreateUpdatedCard(
+        byte[] command,
+        ApduResponse response
+    )
+    {
+        return ApduExchange
+            .Create(command, Maybe.From(response))
+            .Map(exchange =>
+            {
+                ImmutableList<ApduExchange>.Builder exchangeBuilder =
+                    _executedExchanges.ToBuilder();
+                exchangeBuilder.Add(exchange);
+                ImmutableList<ApduExchange> newExecutedExchanges = exchangeBuilder.ToImmutable();
+
+                (bool newSelected, bool newSecureChannel, int newIndex) = CalculateNewState(
+                    command,
+                    response
+                );
+
+                return new TraceReplayCard(
+                    _trace,
+                    newSelected,
+                    newSecureChannel,
+                    newExecutedExchanges,
+                    newIndex
+                );
+            });
+    }
+
+    /// <summary>
+    /// Calculates the new card state based on the command and response.
+    /// </summary>
+    /// <param name="command">The processed command.</param>
+    /// <param name="response">The response returned.</param>
+    /// <returns>New state values for selected status, secure channel, and exchange index.</returns>
+    private (bool IsSelected, bool IsSecureChannelEstablished, int ExchangeIndex) CalculateNewState(
+        byte[] command,
+        ApduResponse response
+    )
+    {
+        if (!response.IsSuccessful)
+            return (IsSelected, IsSecureChannelEstablished, _nextExchangeIndex);
+
+        byte ins = command[1];
+        int newIndex = ShouldAdvanceSequentialIndex(command)
+            ? _nextExchangeIndex + 1
+            : _nextExchangeIndex;
+
+        return ins switch
+        {
+            0xA4 => (true, IsSecureChannelEstablished, newIndex), // SELECT
+            0x82 => (IsSelected, true, newIndex), // EXTERNAL AUTHENTICATE
+            _ => (IsSelected, IsSecureChannelEstablished, newIndex),
+        };
+    }
+
+    /// <summary>
+    /// Determines if the sequential exchange index should advance based on command match.
+    /// </summary>
+    /// <param name="command">The processed command.</param>
+    /// <returns>True if the index should advance.</returns>
+    private bool ShouldAdvanceSequentialIndex(byte[] command)
+    {
+        return _nextExchangeIndex < _trace.Exchanges.Count
+            && CommandHeaderMatches(command, _trace.Exchanges[_nextExchangeIndex].Command);
+    }
 }

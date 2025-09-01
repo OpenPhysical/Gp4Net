@@ -2,12 +2,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Gp4Net.Tool.Services;
 
 namespace Gp4Net.Tool.Commands.Trace;
-
 
 /// <summary>
 /// Simplified trace converter that produces minimal JSON.
@@ -23,24 +23,30 @@ public class SimpleJsonConverter
         { "8482", "EXTERNAL AUTHENTICATE" },
         { "84E6", "INSTALL" },
         { "84E8", "LOAD" },
-        { "84E4", "DELETE" }
+        { "84E4", "DELETE" },
     };
 
     public async Task<string> ConvertToSimpleJson(string inputFile, bool includeDescriptions = true)
     {
-        List<(string Command, string Response, int ResponseTime)> exchanges = await ParseGpProTrace(inputFile);
+        List<(string Command, string Response, int ResponseTime)> exchanges = await ParseGpProTrace(
+            inputFile
+        );
         Dictionary<string, OperationRange> operations = DetectOperations(exchanges);
 
         SimpleTraceData traceData = new SimpleTraceData
         {
             Operations = operations,
-            Exchanges = exchanges.Select((ex, idx) => new SimpleExchange
-            {
-                Command = ex.Command,
-                Response = ex.Response,
-                Description = includeDescriptions ? GetDescription(ex.Command) : null,
-                ResponseTimeMs = ex.ResponseTime > 20 ? ex.ResponseTime : null // Only include if > 20ms
-            }).ToList()
+            Exchanges = [.. exchanges
+                .Select(
+                    (ex, idx) =>
+                        new SimpleExchange
+                        {
+                            Command = ex.Command,
+                            Response = ex.Response,
+                            Description = includeDescriptions ? GetDescription(ex.Command) : null,
+                            ResponseTimeMs = ex.ResponseTime > 20 ? ex.ResponseTime : null, // Only include if > 20ms
+                        }
+                )],
         };
 
         // Extract card info from exchanges
@@ -49,13 +55,15 @@ public class SimpleJsonConverter
         JsonSerializerOptions options = new JsonSerializerOptions
         {
             WriteIndented = true,
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         };
 
         return JsonSerializer.Serialize(traceData, options);
     }
 
-    private static async Task<List<(string Command, string Response, int ResponseTime)>> ParseGpProTrace(string filename)
+    private static async Task<
+        List<(string Command, string Response, int ResponseTime)>
+    > ParseGpProTrace(string filename)
     {
         List<(string Command, string Response, int ResponseTime)> exchanges = [];
         Regex commandPattern = new Regex(@"^A>> T=\d+ \([\d+]+\) ([0-9A-F\s]+)$");
@@ -88,7 +96,9 @@ public class SimpleJsonConverter
         return exchanges;
     }
 
-    private Dictionary<string, OperationRange> DetectOperations(List<(string Command, string Response, int ResponseTime)> exchanges)
+    private Dictionary<string, OperationRange> DetectOperations(
+        List<(string Command, string Response, int ResponseTime)> exchanges
+    )
     {
         Dictionary<string, OperationRange> operations = new Dictionary<string, OperationRange>();
         string currentOp = "";
@@ -103,7 +113,11 @@ public class SimpleJsonConverter
             {
                 if (!string.IsNullOrEmpty(currentOp))
                 {
-                    operations[currentOp] = new OperationRange { StartIndex = opStart + 1, EndIndex = i };
+                    operations[currentOp] = new OperationRange
+                    {
+                        StartIndex = opStart + 1,
+                        EndIndex = i,
+                    };
                 }
                 currentOp = newOp;
                 opStart = i;
@@ -112,7 +126,11 @@ public class SimpleJsonConverter
 
         if (!string.IsNullOrEmpty(currentOp))
         {
-            operations[currentOp] = new OperationRange { StartIndex = opStart + 1, EndIndex = exchanges.Count };
+            operations[currentOp] = new OperationRange
+            {
+                StartIndex = opStart + 1,
+                EndIndex = exchanges.Count,
+            };
         }
 
         return operations;
@@ -120,7 +138,10 @@ public class SimpleJsonConverter
 
     private static string DetectOperationType(string description)
     {
-        if (description.Contains("SELECT") || description.Contains("GET") && !description.Contains("STATUS"))
+        if (
+            description.Contains("SELECT")
+            || description.Contains("GET") && !description.Contains("STATUS")
+        )
         {
             return "info";
         }
@@ -168,7 +189,7 @@ public class SimpleJsonConverter
                     "0066" => "GET CARD DATA",
                     "0067" => "GET CARD CAPS",
                     "00E0" => "GET KEY INFO",
-                    _ => $"GET DATA {tag}"
+                    _ => $"GET DATA {tag}",
                 };
             }
             return name;
@@ -176,7 +197,10 @@ public class SimpleJsonConverter
         return "";
     }
 
-    private static void ExtractCardInfo(SimpleTraceData data, List<(string Command, string Response, int ResponseTime)> exchanges)
+    private static void ExtractCardInfo(
+        SimpleTraceData data,
+        List<(string Command, string Response, int ResponseTime)> exchanges
+    )
     {
         foreach ((string Command, string Response, int ResponseTime) ex in exchanges)
         {

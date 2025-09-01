@@ -1,8 +1,8 @@
 using System.Collections.Immutable;
-using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
+using static Gp4Net.Cryptography.CryptoService;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain;
@@ -28,7 +28,8 @@ public record MacChainingState(
     public static Result<MacChainingState, SmartCardError> Create(
         byte[] initialValue,
         ScpVersion protocolVersion,
-        byte implementationParameter)
+        byte implementationParameter
+    )
     {
         if (initialValue == null)
         {
@@ -36,8 +37,7 @@ public record MacChainingState(
         }
 
         // Validate protocol version
-        if (protocolVersion != ScpVersion.Scp02 &&
-            protocolVersion != ScpVersion.Scp03)
+        if (protocolVersion != ScpVersion.Scp02 && protocolVersion != ScpVersion.Scp03)
         {
             return new InvalidFormatError("ProtocolVersion", "SCP02 (0x02) or SCP03 (0x03)");
         }
@@ -46,15 +46,15 @@ public record MacChainingState(
         int expectedSize = protocolVersion == ScpVersion.Scp03 ? 16 : 8;
         if (initialValue.Length != expectedSize)
         {
-            return new InvalidLengthError($"SCP{protocolVersion:X2} chaining value", expectedSize, initialValue.Length);
+            return new InvalidLengthError(
+                $"SCP{protocolVersion:X2} chaining value",
+                expectedSize,
+                initialValue.Length
+            );
         }
 
         return Result.Success<MacChainingState, SmartCardError>(
-            new MacChainingState(
-                [.. initialValue],
-                protocolVersion,
-                implementationParameter
-            )
+            new MacChainingState([.. initialValue], protocolVersion, implementationParameter)
         );
     }
 
@@ -66,7 +66,8 @@ public record MacChainingState(
     /// <returns>A Result containing the created state or an error.</returns>
     public static Result<MacChainingState, SmartCardError> CreateZeroInitialized(
         ScpVersion protocolVersion,
-        byte implementationParameter)
+        byte implementationParameter
+    )
     {
         int size = protocolVersion == ScpVersion.Scp03 ? 16 : 8;
         return Create(new byte[size], protocolVersion, implementationParameter);
@@ -77,10 +78,7 @@ public record MacChainingState(
     /// </summary>
     public int Size
     {
-        get
-        {
-            return Value.Length;
-        }
+        get { return Value.Length; }
     }
 
     /// <summary>
@@ -88,10 +86,7 @@ public record MacChainingState(
     /// </summary>
     public bool IsScp03
     {
-        get
-        {
-            return ProtocolVersion == ScpVersion.Scp03;
-        }
+        get { return ProtocolVersion == ScpVersion.Scp03; }
     }
 
     /// <summary>
@@ -99,10 +94,7 @@ public record MacChainingState(
     /// </summary>
     public bool IsScp02
     {
-        get
-        {
-            return ProtocolVersion == ScpVersion.Scp02;
-        }
+        get { return ProtocolVersion == ScpVersion.Scp02; }
     }
 
     /// <summary>
@@ -110,7 +102,7 @@ public record MacChainingState(
     /// </summary>
     public byte[] ToArray()
     {
-        return Value.ToArray();
+        return [.. Value];
     }
 
     /// <summary>
@@ -133,12 +125,12 @@ public record MacChainingState(
             ScpVersion.Scp03 => false, // SCP03 never updates on R-MAC
             ScpVersion.Scp02 => ImplementationParameter switch
             {
-                0x05 => true,  // i=05: R-MAC updates chaining value
+                0x05 => true, // i=05: R-MAC updates chaining value
                 0x15 => false, // i=15: R-MAC does not update chaining value
                 0x55 => false, // i=55: R-MAC does not update chaining value
-                _ => false     // Default: no update
+                _ => false, // Default: no update
             },
-            _ => false
+            _ => false,
         };
     }
 }

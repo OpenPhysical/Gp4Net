@@ -5,11 +5,13 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Core.Tlv;
+using Gp4Net.Services;
+using static Gp4Net.Services.TlvService;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.DataObjects;
@@ -17,7 +19,9 @@ namespace Gp4Net.Domain.DataObjects;
 /// <summary>
 /// Encodes and decodes GlobalPlatform card capabilities according to GP Card Specification.
 /// Card capabilities are returned in response to GET DATA for tag 0x0066.
+/// This codec delegates to UnifiedTlvParser for TLV operations.
 /// </summary>
+[Obsolete("Use UnifiedTlvParser with domain-specific capabilities parsing logic for new code. This codec will be removed in a future version.")]
 [PublicAPI]
 public static class CardCapabilitiesCodec
 {
@@ -30,7 +34,8 @@ public static class CardCapabilitiesCodec
     {
         if (capabilities is null)
             return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidArgument("Capabilities cannot be null"));
+                SmartCardError.InvalidArgument("Capabilities cannot be null")
+            );
 
         using MemoryStream stream = new MemoryStream();
 
@@ -67,7 +72,7 @@ public static class CardCapabilitiesCodec
 
                 if (impl.KeyTypes.Any())
                 {
-                    WriteTlv(stream, 0x66, impl.KeyTypes.ToArray());
+                    WriteTlv(stream, 0x66, [.. impl.KeyTypes]);
                 }
             }
         }
@@ -96,7 +101,8 @@ public static class CardCapabilitiesCodec
         {
             // Extended length encoding would be needed for larger capabilities
             return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidData("Card capabilities too large for simple length encoding"));
+                SmartCardError.InvalidData("Card capabilities too large for simple length encoding")
+            );
         }
 
         return Result.Success<byte[], SmartCardError>(data);
@@ -111,95 +117,135 @@ public static class CardCapabilitiesCodec
     {
         if (data is null)
             return Result.Failure<CardCapabilities, SmartCardError>(
-                SmartCardError.InvalidArgument("Data cannot be null"));
+                SmartCardError.InvalidArgument("Data cannot be null")
+            );
 
         // Parse the outer TLV structure
-        Maybe<TlvObject> outerTlvMaybe = TlvParser.ParseSingle(data);
-        if (!outerTlvMaybe.HasValue)
+        var parseResult = TlvParser.Parse(data.ToImmutableArray());
+        if (parseResult.IsFailure)
         {
-            return SmartCardError.InvalidData("Invalid card capabilities data format - no outer TLV found");
+            return Result.Failure<CardCapabilities, SmartCardError>(parseResult.Error);
         }
 
-        Result<uint, SmartCardError> tagResult = outerTlvMaybe.Value.GetTagNumber();
-        if (tagResult.IsFailure || tagResult.Value != 0x66)
+        if (!parseResult.IsSuccess)
         {
-            return SmartCardError.InvalidData("Invalid card capabilities data format - expected tag 0x66");
+            return Result.Failure<CardCapabilities, SmartCardError>(
+                SmartCardError.InvalidData("Parse result was not successful"));
         }
 
-        TlvObject outerTlv = outerTlvMaybe.Value;
+        var outerTlv = parseResult.Value;
+        var tagResult = outerTlv.Tag.ToNumber();
+        if (tagResult.IsFailure)
+        {
+            return Result.Failure<CardCapabilities, SmartCardError>(tagResult.Error);
+        }
+
+        if (tagResult.IsSuccess && tagResult.Value != 0x66)
+        {
+            return Result.Failure<CardCapabilities, SmartCardError>(
+                SmartCardError.InvalidData("Invalid card capabilities data format - expected tag 0x66"));
+        }
 
         try
         {
             CardCapabilities capabilities = new CardCapabilities();
 
             // Parse all TLV elements within the capabilities data
-            IReadOnlyList<TlvObject> elements = TlvParser.ParseAll(outerTlv.Value);
+            var elementsResult = TlvParser.ParseMultiple(outerTlv.TlvData.Bytes);
+            if (elementsResult.IsFailure)
+            {
+                return Result.Failure<CardCapabilities, SmartCardError>(elementsResult.Error);
+            }
+            var elements = elementsResult.Value.Objects;
 
             // Track the current protocol and implementation context
-            SecureChannelProtocol currentProtocol = null;
-            ScpImplementationSpecifier currentImplementation = null;
+            Maybe<SecureChannelProtocol> currentProtocol = Maybe<SecureChannelProtocol>.None;
+            Maybe<ScpImplementationSpecifier> currentImplementation = Maybe<ScpImplementationSpecifier>.None;
 
             foreach (TlvObject element in elements)
             {
-                Result<uint, SmartCardError> tagNumberResult = element.GetTagNumber();
-                if (tagNumberResult.IsFailure) continue;
+                var tagNumberResult = element.Tag.ToNumber();
+                if (tagNumberResult.IsFailure)
+                    continue;
 
-                switch (tagNumberResult.Value)
+                if (tagNumberResult.IsSuccess)
+                {
+                    switch (tagNumberResult.Value)
                 {
                     case 0x06: // Card recognition data OID
-                        capabilities.CardRecognitionData = element.Value;
+                        capabilities.CardRecognitionData = element.TlvData.Bytes.ToArray();
                         break;
 
                     case 0x60: // Card management type and version
-                        if (element.Length == 2)
+                        if (element.Length.LengthValue == 2)
                         {
-                            capabilities.CardManagementTypeAndVersion = element.Value;
+                            capabilities.CardManagementTypeAndVersion = element.TlvData.Bytes.ToArray();
                         }
                         break;
 
                     case 0x63: // Card identification scheme
-                        if (element.Length == 1)
+                        if (element.Length.LengthValue == 1)
                         {
-                            capabilities.CardIdentificationScheme = element.Value[0];
+                            capabilities.CardIdentificationScheme = element.TlvData.Bytes[0];
                         }
                         break;
 
                     case 0x64: // Secure channel protocol
-                        if (element.Length == 1)
+                        if (element.Length.LengthValue == 1)
                         {
-                            currentProtocol = new SecureChannelProtocol { Protocol = element.Value[0] };
-                            capabilities.SecureChannelProtocols.Add(currentProtocol);
-                            currentImplementation = null; // Reset implementation context
+                            var protocol = new SecureChannelProtocol
+                            {
+                                Protocol = element.TlvData.Bytes[0],
+                            };
+                            currentProtocol = Maybe<SecureChannelProtocol>.From(protocol);
+                            var protocolList = capabilities.SecureChannelProtocols.ToList();
+                            protocolList.Add(protocol);
+                            capabilities.SecureChannelProtocols = protocolList;
+                            currentImplementation = Maybe<ScpImplementationSpecifier>.None; // Reset implementation context
                         }
                         break;
 
                     case 0x65: // Secure channel implementation
-                        if (element.Length == 1 && currentProtocol != null)
+                        if (element.Length.LengthValue == 1 && currentProtocol.HasValue)
                         {
                             // If we already have a currentImplementation, it means we're seeing a new one
-                            currentImplementation = new ScpImplementationSpecifier { Implementation = element.Value[0] };
-                            currentProtocol.Implementations.Add(currentImplementation);
+                            var implementation = new ScpImplementationSpecifier
+                            {
+                                Implementation = element.TlvData.Bytes[0],
+                            };
+                            currentImplementation = Maybe<ScpImplementationSpecifier>.From(implementation);
+                            currentProtocol.Match(
+                                scp =>
+                                {
+                                    var implList = scp.Implementations.ToList();
+                                    implList.Add(implementation);
+                                    scp.Implementations = implList;
+                                },
+                                () => { /* No current protocol to add implementation to */ }
+                            );
                         }
                         break;
 
                     case 0x66: // Key types for implementation
-                        if (currentImplementation != null)
-                        {
-                            currentImplementation.KeyTypes.AddRange(element.Value);
-                        }
+                        currentImplementation.Match(
+                            impl =>
+                            {
+                                var keyTypesList = impl.KeyTypes.ToList();
+                                keyTypesList.AddRange(element.TlvData.Bytes.ToArray());
+                                impl.KeyTypes = keyTypesList;
+                            },
+                            () => { /* No current implementation to add key types to */ }
+                        );
                         break;
 
                     case 0x73: // Card configuration details
-                        capabilities.CardConfigurationDetails = element.Value;
+                        capabilities.CardConfigurationDetails = element.TlvData.Bytes.ToArray();
                         break;
 
                     case 0x74: // Card/chip details
-                        capabilities.CardChipDetails = element.Value;
+                        capabilities.CardChipDetails = element.TlvData.Bytes.ToArray();
                         break;
-
-                    default:
-                        // Unknown tags are ignored for forward compatibility
-                        break;
+                }
                 }
             }
 
@@ -226,7 +272,9 @@ public static class CardCapabilitiesCodec
                 stream.WriteByte((byte)value.Length);
                 break;
             default:
-                throw new ArgumentException($"Value too long for simple TLV encoding: {value.Length} bytes");
+                throw new ArgumentException(
+                    $"Value too long for simple TLV encoding: {value.Length} bytes"
+                );
         }
 
         stream.Write(value, 0, value.Length);

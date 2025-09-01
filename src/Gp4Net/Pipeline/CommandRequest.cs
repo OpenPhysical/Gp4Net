@@ -9,7 +9,8 @@ namespace Gp4Net.Pipeline;
 public record CommandRequest(
     IApduCommand Command,
     IPipelineContext Context,
-    CommandOptions Options = null)
+    CommandOptions Options = null
+)
 {
     /// <summary>
     /// Creates a simple request with just a command.
@@ -46,7 +47,8 @@ public record CommandRequest(
     /// <summary>
     /// Creates a new request with a context value added.
     /// </summary>
-    public CommandRequest WithContextValue<T>(string key, T value) where T : class
+    public CommandRequest WithContextValue<T>(string key, T value)
+        where T : class
     {
         return this with { Context = Context.With(key, value) };
     }
@@ -60,7 +62,8 @@ public record CommandOptions(
     int MaxRetries = 0,
     bool RequiresSecureChannel = true,
     bool CaptureMetrics = true,
-    bool EnableLogging = true)
+    bool EnableLogging = true
+)
 {
     /// <summary>
     /// Default options for most commands.

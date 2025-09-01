@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Core.Tlv;
+using Gp4Net.Services;
+using static Gp4Net.Services.TlvService;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.CardInfo;
@@ -24,12 +26,13 @@ public class KeyInformationTemplate
     /// <summary>
     /// Gets the list of key entries.
     /// </summary>
-    public List<KeyEntry> Keys { get; } = [];
+    public IReadOnlyList<KeyEntry> Keys { get; init; } = [];
 
-    private KeyInformationTemplate(byte[] rawData)
+    private KeyInformationTemplate(byte[] rawData, IReadOnlyList<KeyEntry> keys = null)
     {
         // rawData is guaranteed to be non-null by static factory methods
         Data = rawData;
+        Keys = keys ?? [];
     }
 
     /// <summary>
@@ -39,12 +42,10 @@ public class KeyInformationTemplate
     {
         if (data == null || data.Length == 0)
         {
-            return SmartCardError.InvalidArgument(
-                "Key information data cannot be null or empty"
-            );
+            return SmartCardError.InvalidArgument("Key information data cannot be null or empty");
         }
 
-        KeyInformationTemplate template = new KeyInformationTemplate(data);
+        KeyInformationTemplate template = new KeyInformationTemplate(data, []);
 
         // Check if data starts with E0 tag and extract the content
         byte[] contentToParse = data;
@@ -69,7 +70,7 @@ public class KeyInformationTemplate
                     offset = 2;
                     for (int i = 0; i < lenLength; i++)
                     {
-                        length = (length << 8) | data[offset++];
+                        length = length << 8 | data[offset++];
                     }
                 }
             }
@@ -82,41 +83,40 @@ public class KeyInformationTemplate
         }
 
         // Parse the content for C0 tags
-        List<TlvObject> elements = TlvParser.ParseAll(contentToParse).ToList();
-
-        foreach (TlvObject element in elements)
-        {
-            Result<uint, SmartCardError> tagNumber = element.GetTagNumber();
-            if (tagNumber.IsSuccess && tagNumber.Value == 0xC0) // Key Information Data
+        return TlvParser.ParseMultiple(contentToParse.ToImmutableArray())
+            .Map(parseResult => 
             {
-                template.ParseKeyInformationData(element.Value);
-            }
-        }
-
-        return Result.Success<KeyInformationTemplate, SmartCardError>(template);
+                IReadOnlyList<KeyEntry> keys = parseResult.Objects
+                    .Where(element => element.Tag.ToNumber()
+                        .Match(
+                            onSuccess: tagNumber => tagNumber == 0xC0,
+                            onFailure: _ => false))
+                    .Select(element => ParseKeyInformationData(element.TlvData.Bytes.ToArray()))
+                    .ToImmutableList();
+                
+                return new KeyInformationTemplate(data, keys);
+            });
     }
 
-    private void ParseKeyInformationData(byte[] data)
+    private static KeyEntry ParseKeyInformationData(byte[] data)
     {
-        if (data == null || data.Length < 3)
+        if (data.Length < 3)
         {
-            return;
+            return new KeyEntry { KeyId = 0, KeyVersion = 0, KeyTypes = [] };
         }
 
-        KeyEntry keyEntry = new KeyEntry { KeyId = data[0], KeyVersion = data[1] };
+        IReadOnlyList<KeyType> keyTypes = data
+            .Skip(2)
+            .Select(ParseKeyType)
+            .Where(keyType => keyType != KeyType.Unknown)
+            .ToImmutableList();
 
-        // Parse key types starting from byte 2
-        // The format is: ID, Version, KeyType1, KeyType2, KeyType3, ...
-        for (int i = 2; i < data.Length; i++)
-        {
-            KeyType keyType = ParseKeyType(data[i]);
-            if (keyType != KeyType.Unknown)
-            {
-                keyEntry.KeyTypes.Add(keyType);
-            }
-        }
-
-        Keys.Add(keyEntry);
+        return new KeyEntry 
+        { 
+            KeyId = data[0], 
+            KeyVersion = data[1],
+            KeyTypes = keyTypes
+        };
     }
 
     private static KeyType ParseKeyType(byte value)
@@ -138,7 +138,7 @@ public class KeyInformationTemplate
             0xA7 => KeyType.RsaChineseRemainderDpi,
             0xA8 => KeyType.RsaChineseRemainderDqi,
             0xFF => KeyType.NotAvailable,
-            _ => KeyType.Unknown
+            _ => KeyType.Unknown,
         };
     }
 
@@ -162,44 +162,36 @@ public class KeyInformationTemplate
 /// <summary>
 /// Represents a single key entry in the Key Information Template.
 /// </summary>
-public class KeyEntry
+public record KeyEntry
 {
     /// <summary>
-    /// Gets or sets the key identifier.
+    /// Gets the key identifier.
     /// </summary>
-    public byte KeyId { get; set; }
+    public required byte KeyId { get; init; }
 
     /// <summary>
-    /// Gets or sets the key version number.
+    /// Gets the key version number.
     /// </summary>
-    public byte KeyVersion { get; set; }
+    public required byte KeyVersion { get; init; }
 
     /// <summary>
     /// Gets the list of key types supported for this key.
     /// </summary>
-    public List<KeyType> KeyTypes { get; } = [];
+    public required IReadOnlyList<KeyType> KeyTypes { get; init; } = [];
 
     /// <summary>
     /// Gets the primary key type (first in the list).
     /// </summary>
-    public KeyType PrimaryKeyType
-    {
-        get
-        {
-            return KeyTypes.FirstOrDefault();
-        }
-    }
+    public Maybe<KeyType> PrimaryKeyType => KeyTypes.Any() 
+        ? Maybe<KeyType>.From(KeyTypes.First())
+        : Maybe<KeyType>.None;
 
     /// <summary>
-    /// Gets the key length in bits based on the key type.
+    /// Gets the key length in bits based on the primary key type.
     /// </summary>
-    public int KeyLength
-    {
-        get
-        {
-            return DetermineKeyLength(PrimaryKeyType);
-        }
-    }
+    public int KeyLength => PrimaryKeyType
+        .Map(DetermineKeyLength)
+        .GetValueOrDefault(0);
 
     private static int DetermineKeyLength(KeyType keyType)
     {
@@ -210,7 +202,7 @@ public class KeyEntry
             KeyType.TripleDes3Key => 192,
             KeyType.Des3 => 192,
             KeyType.Aes => 128, // Default AES, actual length may vary
-            _ => 0
+            _ => 0,
         };
     }
 
@@ -219,10 +211,12 @@ public class KeyEntry
     /// </summary>
     public override string ToString()
     {
-        string keyTypeStr = PrimaryKeyType.ToFriendlyString();
+        string keyTypeStr = PrimaryKeyType
+            .Map(keyType => keyType.ToFriendlyString())
+            .GetValueOrDefault("Unknown");
         string lengthStr = KeyLength > 0 ? $"length: {KeyLength / 8} ({keyTypeStr})" : keyTypeStr;
 
-        return $"Version: {KeyVersion} (0x{KeyVersion:X2}) ID: {KeyId} (0x{KeyId:X2}) type: {keyTypeStr,-12} {lengthStr}";
+        return $"Version: {KeyVersion} (0x{KeyVersion:X2}) ID: {KeyId} (0x{KeyId:X2}) type: {keyTypeStr, -12} {lengthStr}";
     }
 }
 
@@ -246,7 +240,7 @@ public enum KeyType
     RsaChineseRemainderPq = 0xA6,
     RsaChineseRemainderDpi = 0xA7,
     RsaChineseRemainderDqi = 0xA8,
-    NotAvailable = 0xFF
+    NotAvailable = 0xFF,
 }
 
 /// <summary>
@@ -273,7 +267,7 @@ public static class KeyTypeExtensions
             KeyType.RsaChineseRemainderDpi => "RSA-CRT-DPI",
             KeyType.RsaChineseRemainderDqi => "RSA-CRT-DQI",
             KeyType.NotAvailable => "N/A",
-            _ => $"Unknown(0x{(byte)keyType:X2})"
+            _ => $"Unknown(0x{(byte)keyType:X2})",
         };
     }
 }

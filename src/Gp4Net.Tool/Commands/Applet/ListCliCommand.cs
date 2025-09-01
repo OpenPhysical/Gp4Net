@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -43,87 +45,125 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
         AnsiConsole.MarkupLine("[yellow]Listing applications on card...[/]");
 
         // Use injected service directly - no factory needed
-        return await ExecuteWithService(_globalPlatformService, settings, context.CancellationToken);
+        return await ExecuteWithService(_globalPlatformService, settings, CancellationToken.None);
     }
 
     /// <summary>
     /// Executes with the service using proper library/tool separation.
     /// </summary>
     private async Task<int> ExecuteWithService(
-        IGlobalPlatformService service, 
-        Settings settings, 
-        CancellationToken cancellationToken)
+        IGlobalPlatformService service,
+        Settings settings,
+        CancellationToken cancellationToken
+    )
     {
         // List command focuses only on applications - no card info display
         // Select ISD, establish secure channel, get applications
-        return await service.SelectIsdAsync(cancellationToken)
-            .Bind(async _ => await EstablishSecureChannelFromSettings(service, settings, cancellationToken))
-            .Bind(async _ => await service.GetStatusAsync(StatusSubset.Applications, cancellationToken))
+        return await service
+            .SelectIsdAsync(cancellationToken)
+            .Bind(async _ =>
+                await EstablishSecureChannelFromSettings(service, settings, cancellationToken)
+            )
+            .Bind(async _ =>
+                await service.GetStatusAsync(
+                    StatusSubset.ApplicationsAndSupplementaryDomains,
+                    cancellationToken
+                )
+            )
             .Match(
-                applications => 
+                applications =>
                 {
                     ProcessApplications(applications, settings);
                     return 0;
                 },
-                error => HandleError(error, "Operation failed", settings));
+                error =>
+                {
+                    HandleError(error, "Operation failed", settings);
+                    return 1;
+                }
+            );
     }
 
     /// <summary>
     /// Establishes secure channel from settings with functional patterns.
     /// </summary>
-    private async Task<Result<SecureChannelState, SmartCardError>> EstablishSecureChannelFromSettings(
-        IGlobalPlatformService service, Settings settings, CancellationToken cancellationToken)
+    private async Task<
+        Result<SecureChannelState, SmartCardError>
+    > EstablishSecureChannelFromSettings(
+        IGlobalPlatformService service,
+        Settings settings,
+        CancellationToken cancellationToken
+    )
     {
         // Use pattern matching to check if all keys are provided
-        return (settings.KeyEnc.HasValue && settings.KeyMac.HasValue && settings.KeyDek.HasValue) switch
+        return (
+            settings.KeyEnc.HasValue && settings.KeyMac.HasValue && settings.KeyDek.HasValue
+        ) switch
         {
-            true => 
-                // All keys provided - extract them using pattern matching
-                await settings.KeyEnc.Match(
-                    async encKey => await settings.KeyMac.Match(
-                        async macKey => await settings.KeyDek.Match(
-                            async dekKey => await service.EstablishSecureChannelAsync(
-                                encKey, macKey, dekKey,
-                                settings.KeyVersion.Match(v => v, () => (byte)0x01),
-                                cancellationToken: cancellationToken),
-                            async () => Result.Failure<SecureChannelState, SmartCardError>(
-                                SmartCardError.InvalidData("DEK key is required when using explicit keys"))),
-                        async () => Result.Failure<SecureChannelState, SmartCardError>(
-                            SmartCardError.InvalidData("MAC key is required when using explicit keys"))),
-                    async () => Result.Failure<SecureChannelState, SmartCardError>(
-                        SmartCardError.InvalidData("ENC key is required when using explicit keys"))),
-            false => 
-                // Use keyset specification
-                await service.EstablishSecureChannelAsync(
-                    settings.Keyset.Match(k => k, () => "gp_test_keys"),
-                    keyVersion: settings.KeyVersion.Match(v => v, () => (byte)0x01),
-                    cancellationToken: cancellationToken)
+            true =>
+            // All keys provided - extract them using pattern matching
+            await settings.KeyEnc.Match(
+                async encKey =>
+                    await settings.KeyMac.Match(
+                        async macKey =>
+                            await settings.KeyDek.Match(
+                                async dekKey =>
+                                    await service.EstablishSecureChannelAsync(
+                                        encKey,
+                                        macKey,
+                                        dekKey,
+                                        settings.KeyVersion.Match(v => v, () => (byte)0x01),
+                                        cancellationToken: cancellationToken
+                                    ),
+                                async () =>
+                                    Result.Failure<SecureChannelState, SmartCardError>(
+                                        SmartCardError.InvalidData(
+                                            "DEK key is required when using explicit keys"
+                                        )
+                                    )
+                            ),
+                        async () =>
+                            Result.Failure<SecureChannelState, SmartCardError>(
+                                SmartCardError.InvalidData(
+                                    "MAC key is required when using explicit keys"
+                                )
+                            )
+                    ),
+                async () =>
+                    Result.Failure<SecureChannelState, SmartCardError>(
+                        SmartCardError.InvalidData("ENC key is required when using explicit keys")
+                    )
+            ),
+            false =>
+            // Use keyset specification
+            await service.EstablishSecureChannelAsync(
+                settings.GetKeyset().Match(k => k, () => "gp_test_keys"),
+                keyVersion: settings.KeyVersion.Match(v => v, () => (byte)0x01),
+                cancellationToken: cancellationToken
+            ),
         };
     }
-
 
     /// <summary>
     /// Handles errors with proper tool-layer error display.
     /// </summary>
-    private static int HandleError(SmartCardError error, string operation, Settings settings)
+    private static void HandleError(SmartCardError error, string operation, Settings settings)
     {
         AnsiConsole.MarkupLine($"[red]{operation}: {error.Message}[/]");
-        
+
         if (settings.Verbose && error.InnerException.HasValue)
         {
             error.InnerException.Match(
-                exception => 
+                exception =>
                 {
                     AnsiConsole.MarkupLine("[red]Detailed error information:[/]");
                     AnsiConsole.WriteException(exception);
                     return true;
                 },
-                () => false);
+                () => false
+            );
         }
-        
-        return 1;
     }
-
 
     /// <summary>
     /// Processes applications for display using functional composition.
@@ -131,12 +171,14 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
     private void ProcessApplications(IReadOnlyList<ApplicationInfo> applications, Settings settings)
     {
         // Build semantic rows using pure functional composition
-        var semanticRows = ApplicationTableBuilder.BuildApplicationRows(
-            applications,
-            showExtended: settings.ShowExtended,
-            showSummary: settings.ShowSummary,
-            filter: settings.Filter
-        ).ToList();
+        var semanticRows = ApplicationTableBuilder
+            .BuildApplicationRows(
+                applications,
+                showExtended: settings.ShowExtended,
+                showSummary: settings.ShowSummary,
+                filter: settings.Filter
+            )
+            .ToList();
 
         // Display based on format using pure functions
         switch (settings.Format.ToLowerInvariant())
@@ -158,8 +200,6 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
                 break;
         }
     }
-
-
 
     /// <summary>
     /// Settings for the list command.
@@ -201,10 +241,7 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
         /// </summary>
         public bool ShowSummary
         {
-            get
-            {
-                return !NoSummary;
-            }
+            get { return !NoSummary; }
         }
 
         /// <summary>
@@ -213,41 +250,6 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
         [CommandOption("--secure-channel")]
         [Description("Use secure channel for more detailed information")]
         public bool UseSecureChannel { get; set; }
-
-        /// <summary>
-        /// Gets or sets the keyset specification.
-        /// </summary>
-        [CommandOption("--keyset")]
-        [Description("Keyset specification")]
-        public Maybe<string> Keyset { get; set; } = Maybe<string>.From("gp_test_keys");
-
-        /// <summary>
-        /// Gets or sets the encryption key.
-        /// </summary>
-        [CommandOption("--key-enc")]
-        [Description("Encryption key (hex)")]
-        public Maybe<string> KeyEnc { get; set; } = Maybe<string>.None;
-
-        /// <summary>
-        /// Gets or sets the MAC key.
-        /// </summary>
-        [CommandOption("--key-mac")]
-        [Description("MAC key (hex)")]
-        public Maybe<string> KeyMac { get; set; } = Maybe<string>.None;
-
-        /// <summary>
-        /// Gets or sets the DEK key.
-        /// </summary>
-        [CommandOption("--key-dek")]
-        [Description("DEK key (hex)")]
-        public Maybe<string> KeyDek { get; set; } = Maybe<string>.None;
-
-        /// <summary>
-        /// Gets or sets the key version.
-        /// </summary>
-        [CommandOption("--key-version")]
-        [Description("Key version")]
-        public Maybe<byte> KeyVersion { get; set; } = Maybe<byte>.From((byte)0x01);
 
         /// <summary>
         /// Gets or sets whether to skip card info display.

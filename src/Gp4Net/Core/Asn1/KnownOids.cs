@@ -13,18 +13,17 @@ public static class KnownOids
     /// <summary>
     /// Dictionary of known OIDs and their human-readable descriptions.
     /// </summary>
-    private static readonly Dictionary<string, string> OidDescriptions =
-        new()
-        {
-            // GlobalPlatform OIDs
-            { "1.2.840.114283.1", "GlobalPlatform" },
-            { "1.2.840.114283.2.2.3", "GlobalPlatform Card Specification 2.2.3" },
-            { "1.2.840.114283.3", "GlobalPlatform Card Identification Scheme" },
-            { "1.2.840.114283.4.3.112", "SCP03 with S-ENC and S-MAC" },
-            { "1.2.840.114283.5.7.2.0.0", "GlobalPlatform Conformance Testing" },
-            // Java Card OIDs
-            { "1.3.6.1.4.1.42.2.110.1.3", "Oracle Java Card VM" }
-        };
+    private static readonly Dictionary<string, string> OidDescriptions = new()
+    {
+        // GlobalPlatform OIDs
+        { "1.2.840.114283.1", "GlobalPlatform" },
+        { "1.2.840.114283.2.2.3", "GlobalPlatform Card Specification 2.2.3" },
+        { "1.2.840.114283.3", "GlobalPlatform Card Identification Scheme" },
+        { "1.2.840.114283.4.3.112", "SCP03 with S-ENC and S-MAC" },
+        { "1.2.840.114283.5.7.2.0.0", "GlobalPlatform Conformance Testing" },
+        // Java Card OIDs
+        { "1.3.6.1.4.1.42.2.110.1.3", "Oracle Java Card VM" },
+    };
 
     /// <summary>
     /// Gets the description for a known OID.

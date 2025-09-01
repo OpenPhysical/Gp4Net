@@ -153,7 +153,7 @@ public class CplcData
     }
 
     /// <summary>
-    /// Attempts to parse CPLC data using functional error handling.
+    /// Attempts to parse CPLC data.
     /// Alias for Parse method for consistency with TryParse patterns.
     /// </summary>
     /// <param name="data">The CPLC data bytes (must be at least 42 bytes).</param>
@@ -165,7 +165,7 @@ public class CplcData
 
     private static ushort ReadUInt16(byte[] data, ref int offset)
     {
-        ushort value = (ushort)((data[offset] << 8) | data[offset + 1]);
+        ushort value = (ushort)(data[offset] << 8 | data[offset + 1]);
         offset += 2;
         return value;
     }
@@ -173,10 +173,7 @@ public class CplcData
     private static uint ReadUInt32(byte[] data, ref int offset)
     {
         uint value = (uint)(
-            (data[offset] << 24)
-            | (data[offset + 1] << 16)
-            | (data[offset + 2] << 8)
-            | data[offset + 3]
+            data[offset] << 24 | data[offset + 1] << 16 | data[offset + 2] << 8 | data[offset + 3]
         );
         offset += 4;
         return value;
@@ -193,9 +190,7 @@ public class CplcData
         _ = sb.AppendLine($"  IC Type: {IcType:X4}");
         _ = sb.AppendLine($"  Operating System ID: {OperatingSystemId:X4}");
         _ = sb.AppendLine($"  Operating System Release Date: {OperatingSystemReleaseDate:X4}");
-        _ = sb.AppendLine(
-            $"  Operating System Release Level: {OperatingSystemReleaseLevel:X4}"
-        );
+        _ = sb.AppendLine($"  Operating System Release Level: {OperatingSystemReleaseLevel:X4}");
         _ = sb.AppendLine($"  IC Fabrication Date: {IcFabricationDate:X4}");
         _ = sb.AppendLine($"  IC Serial Number: {IcSerialNumber:X8}");
         _ = sb.AppendLine($"  IC Batch Identifier: {IcBatchIdentifier:X4}");
@@ -212,9 +207,7 @@ public class CplcData
         );
         _ = sb.AppendLine($"  IC Personalizer: {IcPersonalizer:X4}");
         _ = sb.AppendLine($"  IC Personalization Date: {IcPersonalizationDate:X4}");
-        _ = sb.AppendLine(
-            $"  IC Personalization Equipment ID: {IcPersonalizationEquipmentId:X8}"
-        );
+        _ = sb.AppendLine($"  IC Personalization Equipment ID: {IcPersonalizationEquipmentId:X8}");
         return sb.ToString();
     }
 

@@ -15,12 +15,15 @@ public static class DataObjectParser
     /// </summary>
     /// <param name="dataObject">The data object string to parse.</param>
     /// <returns>A Result containing the tag and data bytes, or an error.</returns>
-    public static Result<(ushort tag, byte[] data), SmartCardError> ParseRawDataObject(string dataObject)
+    public static Result<(ushort tag, byte[] data), SmartCardError> ParseRawDataObject(
+        string dataObject
+    )
     {
         if (string.IsNullOrWhiteSpace(dataObject))
         {
             return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
-                SmartCardError.InvalidArgument("Data object cannot be null or empty"));
+                SmartCardError.InvalidArgument("Data object cannot be null or empty")
+            );
         }
 
         // Support both ':' and '=' as separators, 2-4 character tags, and allow any data
@@ -28,7 +31,8 @@ public static class DataObjectParser
         if (!match.Success)
         {
             return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
-                SmartCardError.InvalidArgument("Invalid data object format"));
+                SmartCardError.InvalidArgument("Invalid data object format")
+            );
         }
 
         string tagHex = match.Groups[1].Value;
@@ -40,23 +44,32 @@ public static class DataObjectParser
             if (!Regex.IsMatch(dataHex, @"^[0-9A-Fa-f]*$"))
             {
                 return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
-                    SmartCardError.InvalidArgument("Data must contain only hex characters"));
+                    SmartCardError.InvalidArgument("Data must contain only hex characters")
+                );
             }
 
             // Ensure even number of hex characters for data
             if (dataHex.Length % 2 != 0)
             {
                 return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
-                    SmartCardError.InvalidArgument("Data must have even number of hex characters"));
+                    SmartCardError.InvalidArgument("Data must have even number of hex characters")
+                );
             }
         }
 
-        return Result.Try(() => Convert.ToUInt16(tagHex, 16), ex =>
-                SmartCardError.InvalidArgument($"Invalid tag format: {ex.Message}"))
+        return Result
+            .Try(
+                () => Convert.ToUInt16(tagHex, 16),
+                ex => SmartCardError.InvalidArgument($"Invalid tag format: {ex.Message}")
+            )
             .Bind(parsedTag =>
-                Result.Try(() => string.IsNullOrEmpty(dataHex) ? [] : Convert.FromHexString(dataHex), ex =>
-                    SmartCardError.InvalidArgument($"Invalid data format: {ex.Message}"))
-                .Map(parsedData => (parsedTag, parsedData)));
+                Result
+                    .Try(
+                        () => string.IsNullOrEmpty(dataHex) ? [] : Convert.FromHexString(dataHex),
+                        ex => SmartCardError.InvalidArgument($"Invalid data format: {ex.Message}")
+                    )
+                    .Map(parsedData => (parsedTag, parsedData))
+            );
     }
 
     /// <summary>

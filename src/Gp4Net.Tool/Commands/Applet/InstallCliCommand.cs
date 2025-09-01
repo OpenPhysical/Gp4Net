@@ -26,15 +26,12 @@ public class InstallCliCommand : IPipelineCommand<InstallCliCommand.Settings>
     /// <param name="context">The CLI execution context.</param>
     /// <param name="settings">The command settings.</param>
     /// <returns>0 if successful, 1 if failed.</returns>
-    public async Task<int> ExecuteAsync(
-        ICliExecutionContext context,
-        Settings settings
-    )
+    public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
     {
         return await context.ExecuteAsync(async ctx =>
         {
             return await ValidateCapFile(settings.CapFile)
-                .Bind(_ => 
+                .Bind(_ =>
                 {
                     ctx.Display.Info("Starting CAP file installation...");
                     return Result.Success<bool, SmartCardError>(true);
@@ -46,7 +43,8 @@ public class InstallCliCommand : IPipelineCommand<InstallCliCommand.Settings>
                     {
                         ctx.Display.Error($"Installation failed: {error.Message}");
                         return 1;
-                    });
+                    }
+                );
         });
     }
 
@@ -55,23 +53,31 @@ public class InstallCliCommand : IPipelineCommand<InstallCliCommand.Settings>
         return File.Exists(capFilePath)
             ? Result.Success<bool, SmartCardError>(true)
             : Result.Failure<bool, SmartCardError>(
-                SmartCardError.InvalidArgument($"CAP file not found: {capFilePath}"));
+                SmartCardError.InvalidArgument($"CAP file not found: {capFilePath}")
+            );
     }
 
-    private static async Task<Result<bool, SmartCardError>> PerformInstall(ICliExecutionContext context, Settings settings)
+    private static async Task<Result<bool, SmartCardError>> PerformInstall(
+        ICliExecutionContext context,
+        Settings settings
+    )
     {
         context.Display.Info($"Installing CAP file: {settings.CapFile}");
-        
+
         IGlobalPlatformService gpService = context.GetGlobalPlatformService();
         byte[] capData = await File.ReadAllBytesAsync(settings.CapFile);
-        InstallOptions installOptions = new InstallOptions 
+        InstallOptions installOptions = new InstallOptions
         {
             InstallApplets = settings.InstallApplets,
-            MakeSelectable = settings.MakeSelectable
+            MakeSelectable = settings.MakeSelectable,
         };
-        
-        Result<InstallationResult, SmartCardError> installResult = await gpService.InstallCapFileAsync(capData, Maybe<InstallOptions>.From(installOptions));
-        
+
+        Result<Results.InstallationResult, SmartCardError> installResult =
+            await gpService.InstallCapFileAsync(
+                capData,
+                Maybe<InstallOptions>.From(installOptions)
+            );
+
         return installResult.Match(
             success =>
             {
@@ -82,7 +88,8 @@ public class InstallCliCommand : IPipelineCommand<InstallCliCommand.Settings>
             {
                 context.Display.Error($"Installation failed: {error.Message}");
                 return Result.Failure<bool, SmartCardError>(error);
-            });
+            }
+        );
     }
 
     /// <summary>
@@ -109,10 +116,7 @@ public class InstallCliCommand : IPipelineCommand<InstallCliCommand.Settings>
         /// </summary>
         public bool InstallApplets
         {
-            get
-            {
-                return !NoInstallApplets;
-            }
+            get { return !NoInstallApplets; }
         }
 
         /// <summary>
@@ -127,10 +131,7 @@ public class InstallCliCommand : IPipelineCommand<InstallCliCommand.Settings>
         /// </summary>
         public bool MakeSelectable
         {
-            get
-            {
-                return !NoMakeSelectable;
-            }
+            get { return !NoMakeSelectable; }
         }
 
         // Note: This command requires secure channel - handled in the command implementation

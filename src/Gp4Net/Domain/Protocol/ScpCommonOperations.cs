@@ -1,7 +1,7 @@
 using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Domain.Security;
+using Gp4Net.Cryptography;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Protocol;
@@ -24,7 +24,13 @@ public static class ScpCommonOperations
     /// <param name="le">Expected response length (optional).</param>
     /// <returns>The complete APDU command.</returns>
     public static Result<byte[], SmartCardError> BuildApdu(
-        byte cla, byte ins, byte p1, byte p2, byte[] data = null, byte? le = null)
+        byte cla,
+        byte ins,
+        byte p1,
+        byte p2,
+        byte[] data = null,
+        byte? le = null
+    )
     {
         try
         {
@@ -119,7 +125,7 @@ public static class ScpCommonOperations
             return SmartCardError.InvalidData("Response must contain at least status word");
         }
 
-        ushort sw = (ushort)((response[response.Length - 2] << 8) | response[response.Length - 1]);
+        ushort sw = (ushort)(response[^2] << 8 | response[^1]);
         return Result.Success<ushort, SmartCardError>(sw);
     }
 
@@ -144,7 +150,11 @@ public static class ScpCommonOperations
     /// <param name="mac">The MAC to insert.</param>
     /// <param name="macSize">The size of the MAC.</param>
     /// <returns>The command with MAC appended.</returns>
-    public static Result<byte[], SmartCardError> InsertMacInCommand(byte[] command, byte[] mac, int macSize)
+    public static Result<byte[], SmartCardError> InsertMacInCommand(
+        byte[] command,
+        byte[] mac,
+        int macSize
+    )
     {
         if (command == null)
         {
@@ -192,7 +202,7 @@ public static class ScpCommonOperations
                 // Copy Le if present
                 if (hasLe)
                 {
-                    newCommand[newCommand.Length - 1] = command[command.Length - 1];
+                    newCommand[^1] = command[^1];
                 }
             }
             else
@@ -205,7 +215,7 @@ public static class ScpCommonOperations
 
                 if (hasLe)
                 {
-                    newCommand[newCommand.Length - 1] = command[command.Length - 1];
+                    newCommand[^1] = command[^1];
                 }
             }
 
@@ -223,8 +233,10 @@ public static class ScpCommonOperations
     /// <param name="response">The response with MAC.</param>
     /// <param name="macSize">The expected MAC size.</param>
     /// <returns>The extracted MAC and response without MAC.</returns>
-    public static Result<(byte[] mac, byte[] responseWithoutMac), SmartCardError> ExtractMacFromResponse(
-        byte[] response, int macSize)
+    public static Result<
+        (byte[] mac, byte[] responseWithoutMac),
+        SmartCardError
+    > ExtractMacFromResponse(byte[] response, int macSize)
     {
         if (response == null)
         {
@@ -233,7 +245,9 @@ public static class ScpCommonOperations
 
         if (response.Length < 2 + macSize)
         {
-            return SmartCardError.InvalidData($"Response too short to contain {macSize}-byte MAC and status word");
+            return SmartCardError.InvalidData(
+                $"Response too short to contain {macSize}-byte MAC and status word"
+            );
         }
 
         try
@@ -248,7 +262,13 @@ public static class ScpCommonOperations
             {
                 Array.Copy(response, 0, responseWithoutMac, 0, macOffset); // Data before MAC
             }
-            Array.Copy(response, response.Length - 2, responseWithoutMac, responseWithoutMac.Length - 2, 2); // Status word
+            Array.Copy(
+                response,
+                response.Length - 2,
+                responseWithoutMac,
+                responseWithoutMac.Length - 2,
+                2
+            ); // Status word
 
             return Result.Success<(byte[], byte[]), SmartCardError>((mac, responseWithoutMac));
         }
@@ -269,9 +289,9 @@ public static class ScpCommonOperations
         // Apply response security for:
         // - Success (0x9000)
         // - Warnings (0x62xx, 0x63xx)
-        return statusWord == 0x9000 ||
-               (statusWord & 0xFF00) == 0x6200 ||
-               (statusWord & 0xFF00) == 0x6300;
+        return statusWord == 0x9000
+            || (statusWord & 0xFF00) == 0x6200
+            || (statusWord & 0xFF00) == 0x6300;
     }
 
     /// <summary>
@@ -303,7 +323,7 @@ public static class ScpCommonOperations
     /// <returns>The padded data.</returns>
     public static Result<byte[], SmartCardError> ApplyIso7816Padding(byte[] data, int blockSize)
     {
-        return CryptographicOperations.ApplyIso7816Padding(data, blockSize);
+        return CryptoService.Utils.ApplyIso7816Padding(data, blockSize);
     }
 
     /// <summary>
@@ -313,7 +333,7 @@ public static class ScpCommonOperations
     /// <returns>The unpadded data.</returns>
     public static Result<byte[], SmartCardError> RemoveIso7816Padding(byte[] paddedData)
     {
-        return CryptographicOperations.RemoveIso7816Padding(paddedData);
+        return CryptoService.Utils.RemoveIso7816Padding(paddedData);
     }
 
     /// <summary>
@@ -351,7 +371,9 @@ public static class ScpCommonOperations
 
         if (challenge.Length != expectedLength)
         {
-            return Result.Failure($"Card challenge must be {expectedLength} bytes, got {challenge.Length}");
+            return Result.Failure(
+                $"Card challenge must be {expectedLength} bytes, got {challenge.Length}"
+            );
         }
 
         return Result.Success();
@@ -372,7 +394,9 @@ public static class ScpCommonOperations
 
         if (counter.Length < minLength)
         {
-            return Result.Failure($"Sequence counter must be at least {minLength} bytes, got {counter.Length}");
+            return Result.Failure(
+                $"Sequence counter must be at least {minLength} bytes, got {counter.Length}"
+            );
         }
 
         return Result.Success();

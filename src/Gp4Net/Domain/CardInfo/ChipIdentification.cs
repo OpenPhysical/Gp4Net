@@ -39,7 +39,7 @@ public enum IcFabricator : ushort
     /// <summary>
     /// Unknown fabricator.
     /// </summary>
-    Unknown = 0x0000
+    Unknown = 0x0000,
 }
 
 /// <summary>
@@ -83,7 +83,7 @@ public enum IcType : ushort
     /// <summary>
     /// Unknown IC type.
     /// </summary>
-    Unknown = 0x0000
+    Unknown = 0x0000,
 }
 
 /// <summary>
@@ -130,7 +130,7 @@ public enum ChipPlatform
     /// <summary>
     /// STMicroelectronics ST33 platform.
     /// </summary>
-    ST33
+    ST33,
 }
 
 /// <summary>
@@ -158,7 +158,7 @@ public enum P71MemoryConfiguration
     /// 344KB Flash memory with 1KB RAM.
     /// Specialized configuration with minimal RAM.
     /// </summary>
-    P71D352
+    P71D352,
 }
 
 /// <summary>
@@ -206,7 +206,7 @@ public enum SecurityCertification
     /// <summary>
     /// EMVCo security certification for payment cards.
     /// </summary>
-    EMVCo
+    EMVCo,
 }
 
 /// <summary>
@@ -239,5 +239,5 @@ public enum OperatingSystemId : ushort
     /// <summary>
     /// Unknown operating system.
     /// </summary>
-    Unknown = 0x0000
+    Unknown = 0x0000,
 }

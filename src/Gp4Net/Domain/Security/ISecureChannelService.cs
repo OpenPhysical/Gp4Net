@@ -28,7 +28,8 @@ public interface ISecureChannelService
         SecurityLevel securityLevel,
         byte protocolVersion,
         byte[] initialMacChainingValue,
-        byte implementationParameter = 0x00);
+        byte implementationParameter = 0x00
+    );
 
     /// <summary>
     /// Wraps an APDU command with secure messaging (C-MAC and/or C-ENC).
@@ -39,7 +40,8 @@ public interface ISecureChannelService
     /// <returns>A result containing the wrapped command data and updated state, or an error.</returns>
     Result<(byte[] wrappedCommand, SecureChannelState newState), SmartCardError> WrapCommand(
         IApduCommand command,
-        SecureChannelState state);
+        SecureChannelState state
+    );
 
     /// <summary>
     /// Unwraps a response APDU that may contain secure messaging (R-MAC and/or R-ENC).
@@ -50,7 +52,8 @@ public interface ISecureChannelService
     /// <returns>A result containing the unwrapped response data and updated state, or an error.</returns>
     Result<(byte[] unwrappedResponse, SecureChannelState newState), SmartCardError> UnwrapResponse(
         byte[] response,
-        SecureChannelState state);
+        SecureChannelState state
+    );
 
     /// <summary>
     /// Validates that a secure channel state is compatible with the specified operation.
@@ -61,7 +64,8 @@ public interface ISecureChannelService
     /// <returns>A result indicating whether the state is valid for the operation.</returns>
     Result<SecureChannelState, SmartCardError> ValidateStateForOperation(
         SecureChannelState state,
-        SecureChannelOperation operationType);
+        SecureChannelOperation operationType
+    );
 }
 
 /// <summary>
@@ -83,5 +87,5 @@ public enum SecureChannelOperation
     /// <summary>
     /// General secure messaging operation.
     /// </summary>
-    SecureMessaging
+    SecureMessaging,
 }

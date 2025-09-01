@@ -15,9 +15,7 @@ namespace Gp4Net.Tool.Pipeline;
 public class PipelineCommand<TSettings> : AsyncCommand<TSettings>
     where TSettings : CommandSettings
 {
-    private static readonly ILog Logger = LogManager.GetLogger(
-        typeof(PipelineCommand<TSettings>)
-    );
+    private static readonly ILog Logger = LogManager.GetLogger(typeof(PipelineCommand<TSettings>));
 
     private readonly IPipelineCommand<TSettings> _command;
     private readonly ICliExecutionContext _context;
@@ -28,10 +26,7 @@ public class PipelineCommand<TSettings> : AsyncCommand<TSettings>
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public override async Task<int> ExecuteAsync(
-        CommandContext context,
-        TSettings settings
-    )
+    public override async Task<int> ExecuteAsync(CommandContext context, TSettings settings)
     {
         try
         {

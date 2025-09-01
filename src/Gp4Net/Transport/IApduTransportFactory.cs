@@ -1,3 +1,4 @@
+using System;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 
@@ -15,10 +16,7 @@ public interface IApduTransportFactory
     /// <param name="protocol">The transport protocol.</param>
     /// <param name="supportsExtendedLength">Whether extended length is supported (for T=1).</param>
     /// <returns>The transport instance.</returns>
-    IApduTransport CreateTransport(
-        TransportProtocol protocol,
-        bool supportsExtendedLength = true
-    );
+    IApduTransport CreateTransport(TransportProtocol protocol, bool supportsExtendedLength = true);
 }
 
 /// <summary>
@@ -46,22 +44,18 @@ public class ApduTransportFactory : IApduTransportFactory
     {
         return protocol switch
         {
-            TransportProtocol.T0
-                => new T0ApduTransport(_loggerFactory.CreateLogger<T0ApduTransport>()),
-            TransportProtocol.T1
-                => new T1ApduTransport(
-                    _loggerFactory.CreateLogger<T1ApduTransport>(),
-                    supportsExtendedLength
-                ),
-            TransportProtocol.Tcl
-                => new ClApduTransport(
-                    _loggerFactory.CreateLogger<ClApduTransport>(),
-                    _loggerFactory.CreateLogger<T1ApduTransport>()
-                ),
-            _
-                => throw new System.NotSupportedException(
-                    $"Transport protocol {protocol} is not supported"
-                ),
+            TransportProtocol.T0 => new T0ApduTransport(
+                _loggerFactory.CreateLogger<T0ApduTransport>()
+            ),
+            TransportProtocol.T1 => new T1ApduTransport(
+                _loggerFactory.CreateLogger<T1ApduTransport>(),
+                supportsExtendedLength
+            ),
+            TransportProtocol.Tcl => new ClApduTransport(
+                _loggerFactory.CreateLogger<ClApduTransport>(),
+                _loggerFactory.CreateLogger<T1ApduTransport>()
+            ),
+            _ => throw new NotSupportedException($"Transport protocol {protocol} is not supported"),
         };
     }
 }

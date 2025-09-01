@@ -15,24 +15,37 @@ namespace Gp4Net.Domain.Security;
 [PublicAPI]
 public class InMemoryReplayProtectionService : IReplayProtectionService
 {
-    private readonly ConcurrentDictionary<byte, ConcurrentDictionary<string, bool>> _seenCounters = new();
+    private readonly ConcurrentDictionary<byte, ConcurrentDictionary<string, bool>> _seenCounters =
+        new();
 
     /// <inheritdoc />
-    public UnitResult<SmartCardError> ValidateSequenceCounter(byte keyVersion, byte[] sequenceCounter)
+    public UnitResult<SmartCardError> ValidateSequenceCounter(
+        byte keyVersion,
+        byte[] sequenceCounter
+    )
     {
         // Security fix: Accept both 2-byte (SCP02) and 3-byte sequence counters
         // SCP02 uses 2-byte sequence counters, while other protocols may use 3-byte
-        if (sequenceCounter == null || (sequenceCounter.Length != 2 && sequenceCounter.Length != 3))
+        if (sequenceCounter == null || sequenceCounter.Length != 2 && sequenceCounter.Length != 3)
         {
-            return UnitResult.Failure(SmartCardError.InvalidArgument("Sequence counter must be 2 or 3 bytes"));
+            return UnitResult.Failure(
+                SmartCardError.InvalidArgument("Sequence counter must be 2 or 3 bytes")
+            );
         }
 
         string counterKey = Convert.ToHexString(sequenceCounter);
-        ConcurrentDictionary<string, bool> keyCounters = _seenCounters.GetOrAdd(keyVersion, _ => new ConcurrentDictionary<string, bool>());
+        ConcurrentDictionary<string, bool> keyCounters = _seenCounters.GetOrAdd(
+            keyVersion,
+            _ => new ConcurrentDictionary<string, bool>()
+        );
 
         if (keyCounters.ContainsKey(counterKey))
         {
-            return UnitResult.Failure(SmartCardError.SecurityError($"Replay attack detected: sequence counter {counterKey} has been used before"));
+            return UnitResult.Failure(
+                SmartCardError.SecurityError(
+                    $"Replay attack detected: sequence counter {counterKey} has been used before"
+                )
+            );
         }
 
         return UnitResult.Success<SmartCardError>();
@@ -43,31 +56,37 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
     {
         // Security fix: Accept both 2-byte (SCP02) and 3-byte sequence counters
         // SCP02 uses 2-byte sequence counters, while other protocols may use 3-byte
-        if (sequenceCounter == null || (sequenceCounter.Length != 2 && sequenceCounter.Length != 3))
+        if (sequenceCounter == null || sequenceCounter.Length != 2 && sequenceCounter.Length != 3)
         {
-            return UnitResult.Failure(SmartCardError.InvalidArgument("Sequence counter must be 2 or 3 bytes"));
+            return UnitResult.Failure(
+                SmartCardError.InvalidArgument("Sequence counter must be 2 or 3 bytes")
+            );
         }
 
         string counterKey = Convert.ToHexString(sequenceCounter);
-        ConcurrentDictionary<string, bool> keyCounters = _seenCounters.GetOrAdd(keyVersion, _ => new ConcurrentDictionary<string, bool>());
+        ConcurrentDictionary<string, bool> keyCounters = _seenCounters.GetOrAdd(
+            keyVersion,
+            _ => new ConcurrentDictionary<string, bool>()
+        );
 
         if (!keyCounters.TryAdd(counterKey, true))
         {
-            return UnitResult.Failure(SmartCardError.SecurityError($"Sequence counter {counterKey} already recorded"));
+            return UnitResult.Failure(
+                SmartCardError.SecurityError($"Sequence counter {counterKey} already recorded")
+            );
         }
 
         // Per GP spec: sequence counter should increment, so we can validate ordering
-        int counterValue = (sequenceCounter[0] << 16) | (sequenceCounter[1] << 8) | sequenceCounter[2];
+        int counterValue = sequenceCounter[0] << 16 | sequenceCounter[1] << 8 | sequenceCounter[2];
 
         // Optional: Remove old counters that are significantly lower than current to prevent memory growth
         // This is safe because counters must increment
         if (keyCounters.Count > 100) // Arbitrary threshold
         {
-            List<string> keysToRemove = keyCounters.Keys
-                .Select(k => (key: k, value: ParseCounterValue(k)))
+            List<string> keysToRemove = [.. keyCounters
+                .Keys.Select(k => (key: k, value: ParseCounterValue(k)))
                 .Where(kv => kv.value < counterValue - 50) // Keep last 50 counters
-                .Select(kv => kv.key)
-                .ToList();
+                .Select(kv => kv.key)];
 
             foreach (string key in keysToRemove)
             {
@@ -88,6 +107,6 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
     private static int ParseCounterValue(string hexCounter)
     {
         byte[] bytes = Convert.FromHexString(hexCounter);
-        return (bytes[0] << 16) | (bytes[1] << 8) | bytes[2];
+        return bytes[0] << 16 | bytes[1] << 8 | bytes[2];
     }
 }

@@ -1,7 +1,7 @@
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
+using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Domain.Protocol;
 using JetBrains.Annotations;
 
@@ -25,8 +25,14 @@ public sealed record KeyDerivationContext(
     byte[] HostChallenge,
     byte[] CardChallenge,
     Maybe<byte[]> SequenceCounter,
-    Maybe<ScpImplementation> Implementation) : IKeyDerivationContext
+    Maybe<ScpImplementation> Implementation
+) : IKeyDerivationContext
 {
+    /// <summary>
+    /// Gets the base keyset as object to match interface.
+    /// </summary>
+    public object BaseKeySet => KeySet;
+
     /// <summary>
     /// Creates a key derivation context for SCP02 with validation.
     /// Per GlobalPlatform Card Specification v2.3.1 Section E.4.2
@@ -42,41 +48,47 @@ public sealed record KeyDerivationContext(
         byte[] hostChallenge,
         byte[] cardChallenge,
         byte[] sequenceCounter,
-        ScpImplementation implementation = ScpImplementation.Scp02I15)
+        ScpImplementation implementation = ScpImplementation.Scp02I15
+    )
     {
         // Validate key set type
         if (keySet is not Scp02KeySet)
         {
             return Result.Failure<KeyDerivationContext, SmartCardError>(
-                SmartCardError.InvalidArgument("SCP02 requires Scp02KeySet"));
+                SmartCardError.InvalidArgument("SCP02 requires Scp02KeySet")
+            );
         }
 
         // Validate host challenge (8 bytes for all protocols)
         if (hostChallenge?.Length != 8)
         {
             return Result.Failure<KeyDerivationContext, SmartCardError>(
-                new InvalidLengthError("hostChallenge", 8, hostChallenge?.Length ?? 0));
+                new InvalidLengthError("hostChallenge", 8, hostChallenge?.Length ?? 0)
+            );
         }
 
         // Validate card challenge (6 bytes for SCP02)
         if (cardChallenge.Length != 6)
         {
             return Result.Failure<KeyDerivationContext, SmartCardError>(
-                new InvalidLengthError("cardChallenge", 6, cardChallenge.Length));
+                new InvalidLengthError("cardChallenge", 6, cardChallenge.Length)
+            );
         }
 
         // Validate sequence counter (required for SCP02, must be exactly 2 bytes)
         if (sequenceCounter.Length != 2)
         {
             return Result.Failure<KeyDerivationContext, SmartCardError>(
-                new InvalidLengthError("sequenceCounter", 2, sequenceCounter.Length));
+                new InvalidLengthError("sequenceCounter", 2, sequenceCounter.Length)
+            );
         }
 
         // Validate implementation is SCP02
         if (!IsValidScp02Implementation(implementation))
         {
             return Result.Failure<KeyDerivationContext, SmartCardError>(
-                SmartCardError.InvalidArgument($"Invalid SCP02 implementation: {implementation}"));
+                SmartCardError.InvalidArgument($"Invalid SCP02 implementation: {implementation}")
+            );
         }
 
         return Result.Success<KeyDerivationContext, SmartCardError>(
@@ -86,7 +98,9 @@ public sealed record KeyDerivationContext(
                 CloneArray(hostChallenge),
                 CloneArray(cardChallenge),
                 Maybe<byte[]>.From(CloneArray(sequenceCounter)),
-                Maybe<ScpImplementation>.From(implementation)));
+                Maybe<ScpImplementation>.From(implementation)
+            )
+        );
     }
 
     /// <summary>
@@ -102,27 +116,33 @@ public sealed record KeyDerivationContext(
         IKeySet keySet,
         byte[] hostChallenge,
         byte[] cardChallenge,
-        Maybe<ScpImplementation> implementation = default)
+        Maybe<ScpImplementation> implementation = default
+    )
     {
         // Validate key set type
         if (keySet is not Scp03KeySet)
         {
             return Result.Failure<KeyDerivationContext, SmartCardError>(
-                SmartCardError.InvalidArgument("SCP03 requires Scp03KeySet"));
+                SmartCardError.InvalidArgument("SCP03 requires Scp03KeySet")
+            );
         }
 
         // Validate host challenge (8 bytes for all protocols)
         if (hostChallenge?.Length != 8)
         {
             return Result.Failure<KeyDerivationContext, SmartCardError>(
-                new InvalidLengthError("hostChallenge", 8, hostChallenge?.Length ?? 0));
+                new InvalidLengthError("hostChallenge", 8, hostChallenge?.Length ?? 0)
+            );
         }
 
         // Validate card challenge (8 bytes for SCP03)
         if (cardChallenge.Length != 8)
         {
             return Result.Failure<KeyDerivationContext, SmartCardError>(
-                SmartCardError.InvalidData($"SCP03 card challenge must be 8 bytes, got {cardChallenge.Length}"));
+                SmartCardError.InvalidData(
+                    $"SCP03 card challenge must be 8 bytes, got {cardChallenge.Length}"
+                )
+            );
         }
 
         // Use default implementation if not provided
@@ -131,10 +151,15 @@ public sealed record KeyDerivationContext(
             : implementation;
 
         // Validate implementation is SCP03
-        if (actualImplementation.HasValue && !IsValidScp03Implementation(actualImplementation.Value))
+        if (
+            actualImplementation.HasValue && !IsValidScp03Implementation(actualImplementation.Value)
+        )
         {
             return Result.Failure<KeyDerivationContext, SmartCardError>(
-                SmartCardError.InvalidArgument($"Invalid SCP03 implementation: {actualImplementation.Value}"));
+                SmartCardError.InvalidArgument(
+                    $"Invalid SCP03 implementation: {actualImplementation.Value}"
+                )
+            );
         }
 
         return Result.Success<KeyDerivationContext, SmartCardError>(
@@ -143,8 +168,10 @@ public sealed record KeyDerivationContext(
                 keySet,
                 CloneArray(hostChallenge),
                 CloneArray(cardChallenge),
-                Maybe<byte[]>.None,  // SCP03 doesn't use sequence counter
-                actualImplementation));
+                Maybe<byte[]>.None, // SCP03 doesn't use sequence counter
+                actualImplementation
+            )
+        );
     }
 
     /// <summary>
@@ -161,7 +188,8 @@ public sealed record KeyDerivationContext(
         byte[] hostChallenge,
         byte[] cardChallenge,
         Maybe<byte[]> sequenceCounter = default,
-        Maybe<ScpImplementation> implementation = default)
+        Maybe<ScpImplementation> implementation = default
+    )
     {
         return keySet switch
         {
@@ -171,18 +199,17 @@ public sealed record KeyDerivationContext(
                     hostChallenge,
                     cardChallenge,
                     sequenceCounter.Value,
-                    implementation.GetValueOrDefault(ScpImplementation.Scp02I15))
+                    implementation.GetValueOrDefault(ScpImplementation.Scp02I15)
+                )
                 : Result.Failure<KeyDerivationContext, SmartCardError>(
-                    SmartCardError.InvalidArgument("SCP02 requires sequence counter")),
+                    SmartCardError.InvalidArgument("SCP02 requires sequence counter")
+                ),
 
-            Scp03KeySet => CreateForScp03(
-                keySet,
-                hostChallenge,
-                cardChallenge,
-                implementation),
+            Scp03KeySet => CreateForScp03(keySet, hostChallenge, cardChallenge, implementation),
 
             _ => Result.Failure<KeyDerivationContext, SmartCardError>(
-                SmartCardError.InvalidArgument($"Unsupported key set type: {keySet.GetType().Name}"))
+                SmartCardError.InvalidArgument($"Unsupported key set type: {keySet.GetType().Name}")
+            ),
         };
     }
 
@@ -193,10 +220,12 @@ public sealed record KeyDerivationContext(
     public byte GetImplementationParameter()
     {
         // For the new bitmap-based enum, the byte value IS the implementation parameter
-        return (byte)Implementation.GetValueOrDefault(
-            Protocol == ScpVersion.Scp02
-                ? ScpImplementation.Scp02I15
-                : ScpImplementation.Scp03I70);
+        return (byte)
+            Implementation.GetValueOrDefault(
+                Protocol == ScpVersion.Scp02
+                    ? ScpImplementation.Scp02I15
+                    : ScpImplementation.Scp03I70
+            );
     }
 
     /// <summary>

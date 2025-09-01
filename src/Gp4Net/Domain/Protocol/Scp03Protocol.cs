@@ -6,9 +6,9 @@
 using System;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Domain.Security;
+using Gp4Net.Cryptography;
+using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
@@ -19,7 +19,7 @@ namespace Gp4Net.Domain.Protocol;
 /// Pure functional SCP03 secure channel protocol implementation.
 /// Per GlobalPlatform Card Specification v2.3.1 Appendix E.5 "SCP03".
 /// All operations are stateless and deterministic for testing with known values.
-/// Uses existing BouncyCastle abstractions from CryptographicOperations.
+/// Uses UnifiedCryptoService for all cryptographic operations.
 /// </summary>
 [PublicAPI]
 public static class Scp03Protocol
@@ -49,21 +49,20 @@ public static class Scp03Protocol
     /// </summary>
     public static int CardChallengeLength => 8;
 
-
     /// <summary>
     /// Validates if the implementation parameter is valid for SCP03.
     /// </summary>
     public static bool IsValidImplementation(byte implementation)
     {
         return implementation == 0x00
-               || // No R-MAC, no R-ENC
-               implementation == 0x10
-               || // R-MAC
-               implementation == 0x20
-               || // R-ENC
-               implementation == 0x60
-               || // R-MAC and R-ENC with random card challenge
-               implementation == 0x70; // R-MAC and R-ENC with pseudo-random card challenge
+            || // No R-MAC, no R-ENC
+            implementation == 0x10
+            || // R-MAC
+            implementation == 0x20
+            || // R-ENC
+            implementation == 0x60
+            || // R-MAC and R-ENC with random card challenge
+            implementation == 0x70; // R-MAC and R-ENC with pseudo-random card challenge
     }
 
     /// <summary>
@@ -72,7 +71,8 @@ public static class Scp03Protocol
     /// </summary>
     public static Result<InitializeUpdateCommand, SmartCardError> CreateInitializeUpdateCommand(
         byte keyVersion,
-        byte[] hostChallenge)
+        byte[] hostChallenge
+    )
     {
         // For SCP03, key identifier must be 0x00
         return InitializeUpdateCommand.Create(keyVersion, 0x00, hostChallenge);
@@ -86,32 +86,35 @@ public static class Scp03Protocol
         IKeySet keySet,
         byte[] hostChallenge,
         byte[] cardChallenge,
-        byte implementationParameter = 0x70)
+        byte implementationParameter = 0x70
+    )
     {
         // Create key derivation context using the centralized approach
-        return KeyDerivationContext.CreateForScp03(
+        return KeyDerivationContext
+            .CreateForScp03(
                 keySet,
                 hostChallenge,
                 cardChallenge,
-                Maybe<ScpImplementation>.From(GetScpImplementation(implementationParameter)))
-            .Bind(context =>
-            {
-                // Use centralized key derivation service
-                KeyDerivationService keyDerivationService = new KeyDerivationService();
-                return keyDerivationService.DeriveSessionKeys(context);
-            });
+                Maybe<ScpImplementation>.From(GetScpImplementation(implementationParameter))
+            )
+            .Bind(CryptoService.KeyDerivation.DeriveSessionKeys);
     }
 
     /// <summary>
     /// Creates an EXTERNAL AUTHENTICATE command with MAC for SCP03.
     /// Per GP Card Spec v2.3.1 Section E.5.3.
     /// </summary>
-    public static Result<ExternalAuthenticateCommand, SmartCardError> CreateExternalAuthenticateCommand(
+    public static Result<
+        ExternalAuthenticateCommand,
+        SmartCardError
+    > CreateExternalAuthenticateCommand(
         SecurityLevel securityLevel,
         byte[] hostCryptogram,
-        byte[] macKey)
+        byte[] macKey
+    )
     {
-        return ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram)
+        return ExternalAuthenticateCommand
+            .CreateWithoutMac(securityLevel, hostCryptogram)
             .Bind(command =>
             {
                 byte[] apdu = BuildCommandApdu(command);
@@ -122,9 +125,16 @@ public static class Scp03Protocol
                 Array.Copy(zeroChaining, 0, macInput, 0, zeroChaining.Length);
                 Array.Copy(apdu, 0, macInput, zeroChaining.Length, apdu.Length);
 
-                return MacCalculations.CalculateScp03CommandMac(macKey, macInput)
+                return CryptoService.Mac
+                    .CalculateScp03CommandMac(macKey, macInput)
                     .Map(mac => mac.Take(MacSize).ToArray()) // Truncate to 8 bytes
-                    .Bind(truncatedMac => ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, truncatedMac));
+                    .Bind(truncatedMac =>
+                        ExternalAuthenticateCommand.CreateWithMac(
+                            securityLevel,
+                            hostCryptogram,
+                            truncatedMac
+                        )
+                    );
             });
 
         static byte[] BuildCommandApdu(ExternalAuthenticateCommand command)
@@ -150,7 +160,7 @@ public static class Scp03Protocol
             0x70 => ScpImplementation.Scp03I70,
             0x60 => ScpImplementation.Scp03I60,
             0x11 => ScpImplementation.Scp03I11,
-            _ => ScpImplementation.Scp03I70
+            _ => ScpImplementation.Scp03I70,
         };
     }
 
@@ -166,13 +176,15 @@ public static class Scp03Protocol
     public static Result<SecureChannelContext, SmartCardError> ProcessInitializeUpdateResponse(
         InitializeUpdateResponse response,
         byte[] hostChallenge,
-        IKeySet keySet)
+        IKeySet keySet
+    )
     {
         // Validate protocol version
         if (response.ScpId != ProtocolVersion)
         {
             return SmartCardError.InvalidResponse(
-                $"Expected SCP03 but received {response.ScpId:X2}");
+                $"Expected SCP03 but received {response.ScpId:X2}"
+            );
         }
 
         // Validate key set type
@@ -186,20 +198,31 @@ public static class Scp03Protocol
                 scp03KeySet,
                 hostChallenge,
                 response.CardChallenge,
-                response.ImplementationParameter)
+                response.ImplementationParameter
+            )
             .Bind(sessionKeys =>
             {
                 // Verify card cryptogram using SCP03-specific logic
-                Result<byte[], SmartCardError> cardCryptogramData = CryptographicOperations.BuildScp03CardCryptogramData(response, hostChallenge);
+                Result<byte[], SmartCardError> cardCryptogramData =
+                    CryptoService.Cryptogram.BuildScp03CardCryptogramData(response, hostChallenge);
                 return cardCryptogramData
-                    .Bind(cryptogramData => MacCalculations.CalculateScp03Cryptogram(sessionKeys.SEnc, cryptogramData))
+                    .Bind(cryptogramData =>
+                        CryptoService.Cryptogram.CalculateScp03Cryptogram(sessionKeys.SEnc, cryptogramData)
+                    )
                     .Bind(calculatedCryptogram =>
                     {
                         // SCP03 uses full 16-byte cryptogram comparison (first 8 bytes are used in response)
-                        byte[] expectedCryptogram = calculatedCryptogram.Take(8).ToArray();
-                        if (!CryptographicOperations.CompareBytes(expectedCryptogram, response.CardCryptogram))
+                        byte[] expectedCryptogram = [.. calculatedCryptogram.Take(8)];
+                        if (
+                            !CryptoService.Utils.CompareBytes(
+                                expectedCryptogram,
+                                response.CardCryptogram
+                            )
+                        )
                         {
-                            return SmartCardError.AuthenticationFailed("Card cryptogram verification failed");
+                            return SmartCardError.AuthenticationFailed(
+                                "Card cryptogram verification failed"
+                            );
                         }
 
                         return SecureChannelContext.Create(
@@ -207,7 +230,8 @@ public static class Scp03Protocol
                             response,
                             sessionKeys,
                             ProtocolVersion,
-                            keySet);
+                            keySet
+                        );
                     });
             });
     }
@@ -220,26 +244,39 @@ public static class Scp03Protocol
     /// <returns>The secure channel session state or error.</returns>
     public static Result<SecureChannelState, SmartCardError> CreateSecureChannelSession(
         SecureChannelContext context,
-        SecurityLevel securityLevel)
+        SecurityLevel securityLevel
+    )
     {
         // For SCP03, calculate initial MAC chaining value from EXTERNAL AUTHENTICATE command
-        return CryptographicOperations.BuildScp03HostCryptogramData(context.InitializeUpdateResponse, context.HostChallenge)
-            .Bind(hostCryptogramData => MacCalculations.CalculateScp03Cryptogram(context.SessionKeys.SEnc, hostCryptogramData))
+        return CryptoService.Cryptogram
+            .BuildScp03HostCryptogramData(context.InitializeUpdateResponse, context.HostChallenge)
+            .Bind(hostCryptogramData =>
+                CryptoService.Cryptogram.CalculateScp03Cryptogram(
+                    context.SessionKeys.SEnc,
+                    hostCryptogramData
+                )
+            )
             .Bind(hostCryptogram =>
             {
                 // Create the EXTERNAL AUTHENTICATE command to calculate initial chaining
-                byte[] truncatedCryptogram = hostCryptogram.Take(8).ToArray();
-                byte[] commandData = CryptographicOperations.ConcatenateArrays(truncatedCryptogram, [(byte)securityLevel]);
+                byte[] truncatedCryptogram = [.. hostCryptogram.Take(8)];
+                byte[] commandData = CryptoService.Utils.ConcatenateArrays(
+                    truncatedCryptogram,
+                    [(byte)securityLevel]
+                );
 
-                return ExternalAuthenticateCommand.Create(commandData)
+                return ExternalAuthenticateCommand
+                    .Create(commandData)
                     .Bind(command =>
                     {
                         // Calculate initial MAC chaining value using SCP03 logic
-                        byte[] macData = CryptographicOperations.ConcatenateArrays(
+                        byte[] macData = CryptoService.Utils.ConcatenateArrays(
                             [command.Cla, command.Ins, command.P1, command.P2, command.Lc],
-                            command.Data);
+                            command.Data
+                        );
 
-                        return MacCalculations.CalculateScp03FullMac(context.SessionKeys.SMac, macData)
+                        return CryptoService.Mac
+                            .CalculateScp03FullMac(context.SessionKeys.SMac, macData)
                             .Bind(initialChaining =>
                                 // Create the secure channel state
                                 SecureChannelState.Create(
@@ -247,7 +284,9 @@ public static class Scp03Protocol
                                     securityLevel,
                                     ProtocolVersion,
                                     initialChaining, // SCP03 uses full 16-byte MAC as chaining value
-                                    context.InitializeUpdateResponse.ImplementationParameter));
+                                    context.InitializeUpdateResponse.ImplementationParameter
+                                )
+                            );
                     });
             });
     }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using CSharpFunctionalExtensions;
 using Gp4Net.Domain;
 using Gp4Net.Tool.Commands;
+using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Tool.Extensions;
@@ -26,7 +27,8 @@ public static class CommandSettingsExtensions
             ExplicitKeys: ExtractExplicitKeys(settings),
             KeysetParameters: ExtractKeysetParameters(settings),
             SecurityLevel: SecurityLevel.CMac, // Default for GP operations
-            KeyVersion: ExtractKeyVersion(settings));
+            KeyVersion: ExtractKeyVersion(settings)
+        );
     }
 
     /// <summary>
@@ -35,7 +37,7 @@ public static class CommandSettingsExtensions
     /// </summary>
     private static Maybe<ExplicitKeys> ExtractExplicitKeys(SecureCommandSettings settings)
     {
-        // Check if any explicit keys are provided using functional patterns
+        // Check if any explicit keys are provided
         bool hasExplicitKeys = HasExplicitKeyProperties(settings);
         if (!hasExplicitKeys)
         {
@@ -49,8 +51,8 @@ public static class CommandSettingsExtensions
 
         // Validate that all keys are present if any are provided
         return encKey.Bind(enc =>
-            macKey.Bind(mac =>
-                dekKey.Map(dek => new ExplicitKeys(enc, mac, dek))));
+            macKey.Bind(mac => dekKey.Map(dek => new ExplicitKeys(enc, mac, dek)))
+        );
     }
 
     /// <summary>
@@ -61,10 +63,10 @@ public static class CommandSettingsExtensions
     {
         // Use dynamic property access with safe fallbacks
         Type settingsType = settings.GetType();
-        
-        return HasPropertyWithValue(settingsType, settings, "KeyEnc") ||
-               HasPropertyWithValue(settingsType, settings, "KeyMac") ||
-               HasPropertyWithValue(settingsType, settings, "KeyDek");
+
+        return HasPropertyWithValue(settingsType, settings, "KeyEnc")
+            || HasPropertyWithValue(settingsType, settings, "KeyMac")
+            || HasPropertyWithValue(settingsType, settings, "KeyDek");
     }
 
     /// <summary>
@@ -96,16 +98,24 @@ public static class CommandSettingsExtensions
     /// </summary>
     private static byte ExtractKeyVersion(SecureCommandSettings settings)
     {
-        Maybe<string> keyVersionProperty = GetPropertyValue(settings.GetType(), settings, "KeyVersion");
+        Maybe<string> keyVersionProperty = GetPropertyValue(
+            settings.GetType(),
+            settings,
+            "KeyVersion"
+        );
         return keyVersionProperty
-            .Bind(value => Maybe<byte>.From(byte.TryParse(value, out byte result) ? (byte?)result : null))
-            .GetValueOrDefault((byte)0x01);
+            .Bind(value =>
+                byte.TryParse(value, out byte result) ? Maybe<byte>.From(result) : Maybe<byte>.None
+            )
+            .GetValueOrDefault(0x01);
     }
 
     /// <summary>
     /// Extracts keyset parameters using safe property access.
     /// </summary>
-    private static Maybe<Dictionary<string, string>> ExtractKeysetParameters(SecureCommandSettings settings)
+    private static Maybe<Dictionary<string, string>> ExtractKeysetParameters(
+        SecureCommandSettings settings
+    )
     {
         return GetPropertyValue(settings.GetType(), settings, "KeysetParams")
             .Where(param => !string.IsNullOrEmpty(param))
@@ -119,24 +129,38 @@ public static class CommandSettingsExtensions
     {
         return hexString
             .Where(s => !string.IsNullOrEmpty(s))
-            .Bind(hex => Maybe<byte[]>.From(
-                Result.Try(() => Convert.FromHexString(hex), _ => (byte[])null).GetValueOrDefault()));
+            .Bind(hex =>
+                Maybe<byte[]>.From(
+                    Result
+                        .Try(() => Convert.FromHexString(hex), _ => (byte[])null)
+                        .GetValueOrDefault()
+                )
+            );
     }
 
     /// <summary>
     /// Safe property value extraction using reflection.
     /// Pure function with Maybe return type.
     /// </summary>
-    private static Maybe<string> GetPropertyValue(Type settingsType, object settings, string propertyName)
+    private static Maybe<string> GetPropertyValue(
+        Type settingsType,
+        object settings,
+        string propertyName
+    )
     {
         return Maybe<string>.From(
-            settingsType.GetProperty(propertyName)?.GetValue(settings) as string);
+            settingsType.GetProperty(propertyName)?.GetValue(settings) as string
+        );
     }
 
     /// <summary>
     /// Checks if a property exists and has a non-empty value.
     /// </summary>
-    private static bool HasPropertyWithValue(Type settingsType, object settings, string propertyName)
+    private static bool HasPropertyWithValue(
+        Type settingsType,
+        object settings,
+        string propertyName
+    )
     {
         return GetPropertyValue(settingsType, settings, propertyName)
             .Where(value => !string.IsNullOrEmpty(value))

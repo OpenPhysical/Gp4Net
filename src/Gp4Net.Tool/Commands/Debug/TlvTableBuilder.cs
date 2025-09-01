@@ -1,12 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Core.Tlv;
+using Gp4Net.Services;
+using static Gp4Net.Services.TlvService;
 using Gp4Net.Tool.Common;
+using Gp4Net.Constants;
 
 namespace Gp4Net.Tool.Commands.Debug;
 
@@ -17,7 +21,6 @@ namespace Gp4Net.Tool.Commands.Debug;
 /// </summary>
 public static class TlvTableBuilder
 {
-
     /// <summary>
     /// Base type for all TLV display rows, inheriting from semantic row system.
     /// </summary>
@@ -39,18 +42,12 @@ public static class TlvTableBuilder
     /// <summary>
     /// Row for nested TLV detection.
     /// </summary>
-    public record NestedTlvHeaderRow(
-        int Depth,
-        string Message = "Nested TLV detected:"
-    ) : TlvRow;
+    public record NestedTlvHeaderRow(int Depth, string Message = "Nested TLV detected:") : TlvRow;
 
     /// <summary>
     /// Row for known tag interpretations.
     /// </summary>
-    public record TagInterpretationRow(
-        int Depth,
-        string Interpretation
-    ) : TlvRow;
+    public record TagInterpretationRow(int Depth, string Interpretation) : TlvRow;
 
     /// <summary>
     /// Summary information row.
@@ -75,7 +72,8 @@ public static class TlvTableBuilder
         byte[] data,
         bool showBytes = false,
         bool showOffsets = true,
-        bool recursive = true)
+        bool recursive = true
+    )
     {
         if (data == null || data.Length == 0)
         {
@@ -84,7 +82,7 @@ public static class TlvTableBuilder
         }
 
         yield return new SummaryRow($"Parsing {data.Length} bytes of TLV data:");
-        yield return new InfoRow($"Raw hex: {Convert.ToHexString(data)}", "info");
+        yield return new InfoRow($"Raw hex: {Convert.ToHexString(data)}");
 
         (IEnumerable<TlvObject> elements, string error) parseResult = TryParseTlv(data);
         if (parseResult.elements == null || !parseResult.elements.Any())
@@ -103,7 +101,9 @@ public static class TlvTableBuilder
         int elementIndex = 0;
         foreach (TlvObject element in parseResult.elements)
         {
-            foreach (TlvRow row in BuildTlvElementRows(element, elementIndex++, 0, showBytes, recursive))
+            foreach (
+                TlvRow row in BuildTlvElementRows(element, elementIndex++, 0, showBytes, recursive)
+            )
             {
                 yield return row;
             }
@@ -118,7 +118,8 @@ public static class TlvTableBuilder
         int elementIndex,
         int depth,
         bool showBytes,
-        bool recursive)
+        bool recursive
+    )
     {
         string tagInfo = GetTagInfo(element);
         string lengthInfo = GetLengthInfo(element);
@@ -150,16 +151,26 @@ public static class TlvTableBuilder
         }
 
         // Recursive parsing if enabled and content looks like TLV
-        if (recursive && element.Value.Length > 2 && IsLikelyTlv(element.Value))
+        if (recursive && element.TlvData.Bytes.Length > 2 && IsLikelyTlv(element.TlvData.Bytes.ToArray()))
         {
-            (IEnumerable<TlvObject> elements, string error) nestedResult = TryParseTlv(element.Value);
+            (IEnumerable<TlvObject> elements, string error) nestedResult = TryParseTlv(
+                element.TlvData.Bytes.ToArray()
+            );
             if (nestedResult.elements != null && nestedResult.elements.Any())
             {
                 yield return new NestedTlvHeaderRow(depth + 1);
                 int nestedIndex = 0;
                 foreach (TlvObject nested in nestedResult.elements)
                 {
-                    foreach (TlvRow row in BuildTlvElementRows(nested, nestedIndex++, depth + 2, showBytes, recursive))
+                    foreach (
+                        TlvRow row in BuildTlvElementRows(
+                            nested,
+                            nestedIndex++,
+                            depth + 2,
+                            showBytes,
+                            recursive
+                        )
+                    )
                     {
                         yield return row;
                     }
@@ -179,7 +190,15 @@ public static class TlvTableBuilder
         {
             object item = row switch
             {
-                TlvDataRow(var elementIndex, var depth, var tagInfo, var lengthInfo, var content, var asciiContent, var rawBytes) => new
+                TlvDataRow(
+                    var elementIndex,
+                    var depth,
+                    var tagInfo,
+                    var lengthInfo,
+                    var content,
+                    var asciiContent,
+                    var rawBytes
+                ) => new
                 {
                     type = "data",
                     elementIndex,
@@ -188,23 +207,28 @@ public static class TlvTableBuilder
                     lengthInfo,
                     content = content.GetValueOrDefault(""),
                     asciiContent = asciiContent.GetValueOrDefault(""),
-                    rawBytes = rawBytes.GetValueOrDefault("")
+                    rawBytes = rawBytes.GetValueOrDefault(""),
                 },
                 NestedTlvHeaderRow(var depth, var message) => new
                 {
                     type = "nested",
                     depth,
-                    message
+                    message,
                 },
                 TagInterpretationRow(var depth, var interpretation) => new
                 {
                     type = "interpretation",
                     depth,
-                    interpretation
+                    interpretation,
                 },
                 SummaryRow(var message) => new { type = "summary", message },
-                InfoRow(var message, var severity) => new { type = "info", message, severity },
-                _ => new { type = "unknown", data = row.ToString() }
+                InfoRow(var message, var severity) => new
+                {
+                    type = "info",
+                    message,
+                    severity,
+                },
+                _ => new { type = "unknown", data = row.ToString() },
             };
 
             data.Add(item);
@@ -220,7 +244,10 @@ public static class TlvTableBuilder
     {
         try
         {
-            IReadOnlyList<TlvObject> elements = TlvParser.ParseAll(data);
+            var parseResult = TlvService.TlvParser.ParseMultiple(data.ToImmutableArray());
+            if (parseResult.IsFailure)
+                return (Enumerable.Empty<TlvObject>(), parseResult.Error.Message);
+            IReadOnlyList<TlvObject> elements = parseResult.Value.Objects;
             return (elements, null);
         }
         catch (Exception ex)
@@ -234,10 +261,12 @@ public static class TlvTableBuilder
     /// </summary>
     private static string GetTagInfo(TlvObject element)
     {
-        string tagHex = element.GetTagAsHexString();
-        byte firstTagByte = element.Tag[0];
-        Result<uint, SmartCardError> tagNumberResult = element.GetTagNumber();
-        string tagName = tagNumberResult.IsSuccess ? GetKnownTagName(tagNumberResult.Value) : "UNKNOWN";
+        string tagHex = Convert.ToHexString(element.Tag.Bytes.ToArray());
+        byte firstTagByte = element.Tag.Bytes[0];
+        Result<uint, SmartCardError> tagNumberResult = element.Tag.ToNumber();
+        string tagName = tagNumberResult.IsSuccess
+            ? GetKnownTagName(tagNumberResult.Value)
+            : "UNKNOWN";
         string tagClass = GetTagClass(firstTagByte);
         string constructed = (firstTagByte & 0x20) != 0 ? "constructed" : "primitive";
 
@@ -272,7 +301,7 @@ public static class TlvTableBuilder
             0xC5 => "Key Information Data",
             0xCF => "Diversification Data",
             0xE0 => "Key Information",
-            _ => "Unknown"
+            _ => "Unknown",
         };
     }
 
@@ -287,7 +316,7 @@ public static class TlvTableBuilder
             0x40 => "Application",
             0x80 => "Context",
             0xC0 => "Private",
-            _ => "Unknown"
+            _ => "Unknown",
         };
     }
 
@@ -296,7 +325,7 @@ public static class TlvTableBuilder
     /// </summary>
     private static string GetLengthInfo(TlvObject element)
     {
-        return $"{element.Value.Length} bytes";
+        return $"{element.TlvData.Bytes.Length} bytes";
     }
 
     /// <summary>
@@ -304,23 +333,26 @@ public static class TlvTableBuilder
     /// </summary>
     private static Maybe<string> GetTlvContent(TlvObject element)
     {
-        switch (element.Value.Length)
+        switch (element.TlvData.Bytes.Length)
         {
             case 0:
                 return Maybe<string>.From("(empty)");
             case <= 32:
-                {
-                    // Short content - show as hex
-                    string hexContent = Convert.ToHexString(element.Value);
-                    return Maybe<string>.From($"Content: {hexContent}");
-                }
+            {
+                // Short content - show as hex
+                string hexContent = Convert.ToHexString(element.TlvData.Bytes.ToArray());
+                return Maybe<string>.From($"Content: {hexContent}");
+            }
             default:
-                {
-                    // Long content - show truncated hex
-                    byte[] truncated = element.Value[..16];
-                    string hexContent = Convert.ToHexString(truncated);
-                    return Maybe<string>.From($"Content: {hexContent}... ({element.Value.Length} bytes total)");
-                }
+            {
+                // Long content - show truncated hex
+                byte[] valueBytes = element.TlvData.Bytes.ToArray();
+                byte[] truncated = valueBytes[..16];
+                string hexContent = Convert.ToHexString(truncated);
+                return Maybe<string>.From(
+                    $"Content: {hexContent}... ({valueBytes.Length} bytes total)"
+                );
+            }
         }
     }
 
@@ -329,9 +361,10 @@ public static class TlvTableBuilder
     /// </summary>
     private static Maybe<string> GetAsciiContent(TlvObject element)
     {
-        if (element.Value.Length > 0 && element.Value.Length <= 32 && IsPrintableAscii(element.Value))
+        byte[] valueBytes = element.TlvData.Bytes.ToArray();
+        if (valueBytes.Length is > 0 and <= 32 && IsPrintableAscii(valueBytes))
         {
-            string ascii = System.Text.Encoding.ASCII.GetString(element.Value);
+            string ascii = Encoding.ASCII.GetString(valueBytes);
             return Maybe<string>.From($"ASCII: \"{ascii}\"");
         }
         return Maybe<string>.None;
@@ -342,23 +375,32 @@ public static class TlvTableBuilder
     /// </summary>
     private static Maybe<string> GetKnownTagInterpretation(TlvObject element)
     {
-        return element.GetTagNumber().Match(
-            tagNumber => InterpretByTagNumber(tagNumber, element),
-            error => Maybe<string>.None
-        );
+        return element
+            .Tag.ToNumber()
+            .Match(
+                tagNumber => InterpretByTagNumber(tagNumber, element),
+                error => Maybe<string>.None
+            );
     }
 
     private static Maybe<string> InterpretByTagNumber(uint tagNumber, TlvObject element)
     {
         byte[] elementValue = GetTlvValueUsingReflection(element);
-        if (elementValue == null) return Maybe<string>.None;
+        if (elementValue == null)
+            return Maybe<string>.None;
 
         return tagNumber switch
         {
-            0x4F when elementValue.Length >= 5 => Maybe<string>.From($"AID: {Convert.ToHexString(elementValue)}"),
-            0x8A when elementValue.Length == 1 => Maybe<string>.From($"Life Cycle: {GetLifeCycleStateName(elementValue[0])}"),
-            0x81 or 0x82 or 0x83 => Maybe<string>.From("Security-related data - may indicate SCP support"),
-            _ => Maybe<string>.None
+            0x4F when elementValue.Length >= 5 => Maybe<string>.From(
+                $"AID: {Convert.ToHexString(elementValue)}"
+            ),
+            0x8A when elementValue.Length == 1 => Maybe<string>.From(
+                $"Life Cycle: {GetLifeCycleStateName(elementValue[0])}"
+            ),
+            0x81 or 0x82 or 0x83 => Maybe<string>.From(
+                "Security-related data - may indicate SCP support"
+            ),
+            _ => Maybe<string>.None,
         };
     }
 
@@ -380,7 +422,7 @@ public static class TlvTableBuilder
             0x07 => "SECURED",
             0x0F => "CARD_LOCKED",
             0x7F => "TERMINATED",
-            _ => $"Unknown (0x{state:X2})"
+            _ => $"Unknown (0x{state:X2})",
         };
     }
 
@@ -390,8 +432,8 @@ public static class TlvTableBuilder
     private static byte[] GetFullElementBytes(TlvObject element)
     {
         // Calculate total length
-        int tagLength = element.Tag.Length;
-        int valueLength = element.Value.Length;
+        int tagLength = element.Tag.Bytes.Length;
+        int valueLength = element.TlvData.Bytes.Length;
         int lengthFieldSize;
 
         switch (valueLength)
@@ -411,7 +453,7 @@ public static class TlvTableBuilder
         byte[] result = new byte[tagLength + lengthFieldSize + valueLength];
 
         // Copy tag
-        Array.Copy(element.Tag, 0, result, 0, tagLength);
+        Array.Copy(element.Tag.Bytes.ToArray(), 0, result, 0, tagLength);
 
         // Encode length
         int offset = tagLength;
@@ -430,7 +472,7 @@ public static class TlvTableBuilder
         }
 
         // Copy value
-        Array.Copy(element.Value, 0, result, offset, valueLength);
+        Array.Copy(element.TlvData.Bytes.ToArray(), 0, result, offset, valueLength);
 
         return result;
     }
@@ -463,5 +505,4 @@ public static class TlvTableBuilder
         }
         return true;
     }
-
 }

@@ -1,9 +1,8 @@
 using System;
-using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Domain.Security;
+using Gp4Net.Cryptography;
+using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
@@ -14,7 +13,7 @@ namespace Gp4Net.Domain.Protocol;
 /// Pure functional SCP02 secure channel protocol implementation.
 /// Per GlobalPlatform Card Specification v2.3.1 Appendix E.4 "SCP02".
 /// All operations are stateless and deterministic for testing with known values.
-/// Uses existing BouncyCastle abstractions from CryptographicOperations.
+/// Uses existing BouncyCastle abstractions from UnifiedCryptoService.Cipher.
 /// </summary>
 [PublicAPI]
 public static class Scp02Protocol
@@ -55,19 +54,23 @@ public static class Scp02Protocol
     public static Result<byte[], SmartCardError> DeriveScp02SessionKey(
         byte[] baseKey,
         byte[] derivationConstant,
-        byte[] sequenceCounter)
+        byte[] sequenceCounter
+    )
     {
         if (baseKey.Length != 16)
             return Result.Failure<byte[], SmartCardError>(
-                new InvalidLengthError("baseKey", 16, baseKey.Length));
+                new InvalidLengthError("baseKey", 16, baseKey.Length)
+            );
 
         if (derivationConstant.Length != 2)
             return Result.Failure<byte[], SmartCardError>(
-                new InvalidLengthError("derivationConstant", 2, derivationConstant.Length));
+                new InvalidLengthError("derivationConstant", 2, derivationConstant.Length)
+            );
 
         if (sequenceCounter.Length != 2)
             return Result.Failure<byte[], SmartCardError>(
-                new InvalidLengthError("sequenceCounter", 2, sequenceCounter.Length));
+                new InvalidLengthError("sequenceCounter", 2, sequenceCounter.Length)
+            );
 
         // Build derivation data per Figure E-2:
         // Constant (2) || Sequence Counter (2) || Padding (12 zeros)
@@ -78,9 +81,8 @@ public static class Scp02Protocol
 
         // Encrypt using 3DES-CBC with zero IV using existing abstractions
         byte[] zeroIv = new byte[8];
-        return CryptographicOperations.Encrypt3DesCbc(baseKey, zeroIv, derivationData);
+        return CryptoService.Cipher.Encrypt3DesCbc(baseKey, zeroIv, derivationData);
     }
-
 
     /// <summary>
     /// Calculates Full 3DES MAC for SCP02 cryptograms.
@@ -90,28 +92,20 @@ public static class Scp02Protocol
     /// <param name="key">The S-ENC session key (16 bytes).</param>
     /// <param name="data">The cryptogram data (24 bytes, already includes padding).</param>
     /// <returns>The cryptogram value (8 bytes).</returns>
-    public static Result<byte[], SmartCardError> CalculateScp02Cryptogram(
-        byte[] key,
-        byte[] data)
+    public static Result<byte[], SmartCardError> CalculateScp02Cryptogram(byte[] key, byte[] data)
     {
         if (key.Length != 16)
             return Result.Failure<byte[], SmartCardError>(
-                new InvalidLengthError("key", 16, key.Length));
+                new InvalidLengthError("key", 16, key.Length)
+            );
 
         if (data.Length != 24)
             return Result.Failure<byte[], SmartCardError>(
-                new InvalidLengthError("data", 24, data.Length));
+                new InvalidLengthError("data", 24, data.Length)
+            );
 
-        // Full 3DES CBC-MAC with zero IV using existing abstractions
-        byte[] zeroIv = new byte[8];
-        return CryptographicOperations.Encrypt3DesCbc(key, zeroIv, data)
-            .Map(result =>
-            {
-                // Return last 8 bytes as cryptogram
-                byte[] cryptogram = new byte[8];
-                Array.Copy(result, result.Length - 8, cryptogram, 0, 8);
-                return cryptogram;
-            });
+        // Calculate SCP02 cryptogram using UnifiedCryptoService
+        return CryptoService.Cryptogram.CalculateScp02Cryptogram(key, data);
     }
 
     /// <summary>
@@ -122,20 +116,18 @@ public static class Scp02Protocol
     /// <param name="key">The MAC key (16 bytes).</param>
     /// <param name="data">The data to MAC (will be padded internally).</param>
     /// <returns>The MAC value (8 bytes).</returns>
-    public static Result<byte[], SmartCardError> CalculateScp02Mac(
-        byte[] key,
-        byte[] data)
+    public static Result<byte[], SmartCardError> CalculateScp02Mac(byte[] key, byte[] data)
     {
         if (key.Length != 16)
             return Result.Failure<byte[], SmartCardError>(
-                new InvalidLengthError("key", 16, key.Length));
+                new InvalidLengthError("key", 16, key.Length)
+            );
 
         if (data.Length == 0)
-            return Result.Failure<byte[], SmartCardError>(
-                new EmptyDataError("data"));
+            return Result.Failure<byte[], SmartCardError>(new EmptyDataError("data"));
 
         // Use existing MAC calculation from MacCalculations
-        return MacCalculations.CalculateScp02CommandMac(key, data);
+        return CryptoService.Mac.CalculateScp02CommandMac(key, data);
     }
 
     /// <summary>
@@ -153,33 +145,40 @@ public static class Scp02Protocol
         byte[] hostChallenge,
         byte[] cardChallenge,
         byte[] sequenceCounter,
-        byte implementationParameter)
+        byte implementationParameter
+    )
     {
         if (hostChallenge.Length != 8)
             return Result.Failure<SessionKeys, SmartCardError>(
-                new InvalidLengthError("hostChallenge", 8, hostChallenge.Length));
+                new InvalidLengthError("hostChallenge", 8, hostChallenge.Length)
+            );
 
         if (cardChallenge.Length != 6)
             return Result.Failure<SessionKeys, SmartCardError>(
-                new InvalidLengthError("cardChallenge", 6, cardChallenge.Length));
+                new InvalidLengthError("cardChallenge", 6, cardChallenge.Length)
+            );
 
         if (sequenceCounter.Length != 2)
             return Result.Failure<SessionKeys, SmartCardError>(
-                new InvalidLengthError("sequenceCounter", 2, sequenceCounter.Length));
+                new InvalidLengthError("sequenceCounter", 2, sequenceCounter.Length)
+            );
 
         if (!IsValidScp02Implementation(implementationParameter))
             return Result.Failure<SessionKeys, SmartCardError>(
-                new UnsupportedImplementationError($"SCP02 i={implementationParameter:X2}"));
+                new UnsupportedImplementationError($"SCP02 i={implementationParameter:X2}")
+            );
 
         ScpImplementation implementation = (ScpImplementation)implementationParameter;
-        Result<KeyDerivationContext, SmartCardError> contextResult = KeyDerivationContext.CreateForScp02(
-            keySet, hostChallenge, cardChallenge, sequenceCounter, implementation);
+        Result<KeyDerivationContext, SmartCardError> contextResult =
+            KeyDerivationContext.CreateForScp02(
+                keySet,
+                hostChallenge,
+                cardChallenge,
+                sequenceCounter,
+                implementation
+            );
 
-        if (contextResult.IsFailure)
-            return Result.Failure<SessionKeys, SmartCardError>(contextResult.Error);
-
-        KeyDerivationService keyDerivationService = new KeyDerivationService();
-        return keyDerivationService.DeriveSessionKeys(contextResult.Value);
+        return contextResult.Bind(CryptoService.KeyDerivation.DeriveSessionKeys);
     }
 
     /// <summary>
@@ -193,11 +192,13 @@ public static class Scp02Protocol
     public static Result<byte[], SmartCardError> CalculateCommandMac(
         byte[] command,
         byte[] macKey,
-        byte[] chainingValue)
+        byte[] chainingValue
+    )
     {
         if (chainingValue.Length != ChainingValueSize)
             return Result.Failure<byte[], SmartCardError>(
-                new InvalidLengthError("chainingValue", ChainingValueSize, chainingValue.Length));
+                new InvalidLengthError("chainingValue", ChainingValueSize, chainingValue.Length)
+            );
 
         // SCP02 C-MAC: 3DES-MAC over (chaining_value || command) using ISO 9797-1 Algorithm 3
         byte[] macInput = new byte[chainingValue.Length + command.Length];
@@ -218,11 +219,13 @@ public static class Scp02Protocol
     public static Result<byte[], SmartCardError> CalculateResponseMac(
         byte[] response,
         byte[] rMacKey,
-        byte[] chainingValue)
+        byte[] chainingValue
+    )
     {
         if (chainingValue.Length != ChainingValueSize)
             return Result.Failure<byte[], SmartCardError>(
-                new InvalidLengthError("chainingValue", ChainingValueSize, chainingValue.Length));
+                new InvalidLengthError("chainingValue", ChainingValueSize, chainingValue.Length)
+            );
 
         // SCP02 R-MAC: 3DES-MAC over (chaining_value || response) using ISO 9797-1 Algorithm 3
         byte[] macInput = new byte[chainingValue.Length + response.Length];
@@ -241,7 +244,8 @@ public static class Scp02Protocol
     /// <returns>The calculated MAC which becomes the ICV for subsequent commands.</returns>
     public static Result<byte[], SmartCardError> CalculateInitialMacChainingValue(
         ExternalAuthenticateCommand command,
-        byte[] macKey)
+        byte[] macKey
+    )
     {
         // Build the EXTERNAL AUTHENTICATE APDU for MAC calculation
         byte[] apdu = new byte[5 + command.HostCryptogram.Length];
@@ -264,15 +268,20 @@ public static class Scp02Protocol
     /// <param name="sessionKeys">The session keys.</param>
     /// <param name="chainingValue">The MAC chaining value.</param>
     /// <returns>The secured command and new chaining value.</returns>
-    public static Result<(byte[] securedCommand, byte[] newChainingValue), SmartCardError> ApplyCommandSecurity(
+    public static Result<
+        (byte[] securedCommand, byte[] newChainingValue),
+        SmartCardError
+    > ApplyCommandSecurity(
         byte[] command,
         SecurityLevel securityLevel,
         SessionKeys sessionKeys,
-        byte[] chainingValue)
+        byte[] chainingValue
+    )
     {
         if (chainingValue.Length != ChainingValueSize)
             return Result.Failure<(byte[], byte[]), SmartCardError>(
-                new InvalidLengthError("chainingValue", ChainingValueSize, chainingValue.Length));
+                new InvalidLengthError("chainingValue", ChainingValueSize, chainingValue.Length)
+            );
 
         byte[] processedCommand = command;
         byte[] newChainingValue = chainingValue;
@@ -280,7 +289,10 @@ public static class Scp02Protocol
         // Apply C-ENCRYPTION if required
         if (securityLevel.HasCEncryption())
         {
-            Result<byte[], SmartCardError> encryptResult = ApplyCommandEncryption(processedCommand, sessionKeys.SEnc);
+            Result<byte[], SmartCardError> encryptResult = ApplyCommandEncryption(
+                processedCommand,
+                sessionKeys.SEnc
+            );
             if (encryptResult.IsFailure)
                 return encryptResult.Error;
 
@@ -289,9 +301,15 @@ public static class Scp02Protocol
 
         // Apply C-MAC if required
         if (!securityLevel.HasCMac())
-            return Result.Success<(byte[], byte[]), SmartCardError>((processedCommand, newChainingValue));
+            return Result.Success<(byte[], byte[]), SmartCardError>(
+                (processedCommand, newChainingValue)
+            );
 
-        Result<byte[], SmartCardError> macResult = CalculateCommandMac(processedCommand, sessionKeys.SMac, chainingValue);
+        Result<byte[], SmartCardError> macResult = CalculateCommandMac(
+            processedCommand,
+            sessionKeys.SMac,
+            chainingValue
+        );
         if (macResult.IsFailure)
             return macResult.Error;
 
@@ -307,7 +325,9 @@ public static class Scp02Protocol
         // Set secure messaging bit in CLA
         processedCommand[0] |= 0x04;
 
-        return Result.Success<(byte[], byte[]), SmartCardError>((processedCommand, newChainingValue));
+        return Result.Success<(byte[], byte[]), SmartCardError>(
+            (processedCommand, newChainingValue)
+        );
     }
 
     /// <summary>
@@ -319,33 +339,44 @@ public static class Scp02Protocol
     /// <param name="chainingValue">The MAC chaining value.</param>
     /// <param name="encryptionCounter">The encryption counter (not used in SCP02).</param>
     /// <returns>The secured response and new chaining value.</returns>
-    public static Result<(byte[] securedResponse, byte[] newChainingValue), SmartCardError> ApplyResponseSecurity(
+    public static Result<
+        (byte[] securedResponse, byte[] newChainingValue),
+        SmartCardError
+    > ApplyResponseSecurity(
         byte[] response,
         SecurityLevel securityLevel,
         SessionKeys sessionKeys,
         byte[] chainingValue,
-        uint encryptionCounter = 0)
+        uint encryptionCounter = 0
+    )
     {
         if (response.Length < 2)
             return Result.Failure<(byte[], byte[]), SmartCardError>(
-                new InvalidLengthError("response", 2, response.Length));
+                new InvalidLengthError("response", 2, response.Length)
+            );
 
         if (chainingValue.Length != ChainingValueSize)
             return Result.Failure<(byte[], byte[]), SmartCardError>(
-                new InvalidLengthError("chainingValue", ChainingValueSize, chainingValue.Length));
+                new InvalidLengthError("chainingValue", ChainingValueSize, chainingValue.Length)
+            );
 
         byte[] processedResponse = response;
         byte[] newChainingValue = chainingValue;
 
         // Check if response security should be applied based on status word
-        ushort statusWord = (ushort)((response[response.Length - 2] << 8) | response[response.Length - 1]);
+        ushort statusWord = (ushort)(response[^2] << 8 | response[^1]);
         if (!ShouldApplyResponseSecurity(statusWord))
-            return Result.Success<(byte[], byte[]), SmartCardError>((processedResponse, newChainingValue));
+            return Result.Success<(byte[], byte[]), SmartCardError>(
+                (processedResponse, newChainingValue)
+            );
 
         // Apply R-ENCRYPTION if required
         if (securityLevel.HasREncryption() && HasResponseData(response))
         {
-            Result<byte[], SmartCardError> encryptResult = ApplyResponseEncryption(processedResponse, sessionKeys.SEnc);
+            Result<byte[], SmartCardError> encryptResult = ApplyResponseEncryption(
+                processedResponse,
+                sessionKeys.SEnc
+            );
             if (encryptResult.IsFailure)
                 return encryptResult.Error;
 
@@ -355,7 +386,11 @@ public static class Scp02Protocol
         // Apply R-MAC if required
         if (securityLevel.HasRMac())
         {
-            Result<byte[], SmartCardError> macResult = CalculateResponseMac(processedResponse, sessionKeys.SrMac, chainingValue);
+            Result<byte[], SmartCardError> macResult = CalculateResponseMac(
+                processedResponse,
+                sessionKeys.SrMac,
+                chainingValue
+            );
             if (macResult.IsFailure)
                 return macResult.Error;
 
@@ -367,11 +402,19 @@ public static class Scp02Protocol
             byte[] securedResponse = new byte[processedResponse.Length + MacSize];
             Array.Copy(processedResponse, 0, securedResponse, 0, statusOffset); // Data
             Array.Copy(mac, 0, securedResponse, statusOffset, MacSize); // R-MAC
-            Array.Copy(processedResponse, statusOffset, securedResponse, securedResponse.Length - 2, 2); // Status
+            Array.Copy(
+                processedResponse,
+                statusOffset,
+                securedResponse,
+                securedResponse.Length - 2,
+                2
+            ); // Status
             processedResponse = securedResponse;
         }
 
-        return Result.Success<(byte[], byte[]), SmartCardError>((processedResponse, newChainingValue));
+        return Result.Success<(byte[], byte[]), SmartCardError>(
+            (processedResponse, newChainingValue)
+        );
     }
 
     /// <summary>
@@ -380,7 +423,9 @@ public static class Scp02Protocol
     /// </summary>
     /// <param name="implementationParameter">The i= parameter from INITIALIZE UPDATE response</param>
     /// <returns>The corresponding ScpImplementation enum value</returns>
-    public static Result<ScpImplementation, SmartCardError> GetScp02Implementation(byte implementationParameter)
+    public static Result<ScpImplementation, SmartCardError> GetScp02Implementation(
+        byte implementationParameter
+    )
     {
         if (Enum.IsDefined(typeof(ScpImplementation), implementationParameter))
         {
@@ -391,7 +436,9 @@ public static class Scp02Protocol
 
         return Result.Failure<ScpImplementation, SmartCardError>(
             new UnsupportedImplementationError(
-                $"SCP02 i={implementationParameter:X2} (valid: 00, 02, 04, 05, 15, 35, 55, 75)"));
+                $"SCP02 i={implementationParameter:X2} (valid: 00, 02, 04, 05, 15, 35, 55, 75)"
+            )
+        );
     }
 
     /// <summary>
@@ -403,14 +450,39 @@ public static class Scp02Protocol
     {
         return implementationParameter switch
         {
-            0x00 or 0x02 or 0x04 or 0x05 or 0x0A or 0x14 or 0x15 or 0x1A or
-            0x24 or 0x25 or 0x2A or 0x34 or 0x35 or 0x3A or 0x44 or 0x45 or
-            0x4A or 0x54 or 0x55 or 0x64 or 0x65 or 0x6A or 0x74 or 0x75 or 0x7A => true,
-            _ => false
+            0x00
+            or 0x02
+            or 0x04
+            or 0x05
+            or 0x0A
+            or 0x14
+            or 0x15
+            or 0x1A
+            or 0x24
+            or 0x25
+            or 0x2A
+            or 0x34
+            or 0x35
+            or 0x3A
+            or 0x44
+            or 0x45
+            or 0x4A
+            or 0x54
+            or 0x55
+            or 0x64
+            or 0x65
+            or 0x6A
+            or 0x74
+            or 0x75
+            or 0x7A => true,
+            _ => false,
         };
     }
 
-    private static Result<byte[], SmartCardError> ApplyCommandEncryption(byte[] command, byte[] sEncKey)
+    private static Result<byte[], SmartCardError> ApplyCommandEncryption(
+        byte[] command,
+        byte[] sEncKey
+    )
     {
         if (command.Length <= 5) // No data to encrypt
             return Result.Success<byte[], SmartCardError>(command);
@@ -425,11 +497,14 @@ public static class Scp02Protocol
 
         // For SCP02 C-ENC, use zero IV with automatic padding
         byte[] iv = new byte[8];
-        return CryptographicOperations.Encrypt3DesCbcWithPadding(sEncKey, iv, dataToEncrypt)
+        return CryptoService.Cipher
+            .Encrypt3DesCbcWithPadding(sEncKey, iv, dataToEncrypt)
             .Map(encryptedData =>
             {
                 // Build new command with encrypted data
-                byte[] newCommand = new byte[5 + encryptedData.Length + (command.Length > 5 + lc ? 1 : 0)];
+                byte[] newCommand = new byte[
+                    5 + encryptedData.Length + (command.Length > 5 + lc ? 1 : 0)
+                ];
                 Array.Copy(command, 0, newCommand, 0, 4); // CLA INS P1 P2
                 newCommand[0] |= 0x04; // Set secure messaging bit
                 newCommand[4] = (byte)(encryptedData.Length + MacSize); // New Lc includes MAC
@@ -437,7 +512,7 @@ public static class Scp02Protocol
 
                 // Copy Le if present
                 if (command.Length > 5 + lc)
-                    newCommand[newCommand.Length - 1] = command[command.Length - 1];
+                    newCommand[^1] = command[^1];
 
                 return newCommand;
             });
@@ -445,7 +520,8 @@ public static class Scp02Protocol
 
     private static Result<byte[], SmartCardError> ApplyResponseEncryption(
         byte[] response,
-        byte[] sEncKey)
+        byte[] sEncKey
+    )
     {
         int statusOffset = response.Length - 2;
         if (statusOffset <= 0) // No data to encrypt
@@ -457,7 +533,8 @@ public static class Scp02Protocol
         // For SCP02 R-ENC, use zero IV with automatic padding
         byte[] iv = new byte[8];
 
-        return CryptographicOperations.Encrypt3DesCbcWithPadding(sEncKey, iv, responseData)
+        return CryptoService.Cipher
+            .Encrypt3DesCbcWithPadding(sEncKey, iv, responseData)
             .Map(encryptedData =>
             {
                 // Combine encrypted data with original status word
@@ -471,9 +548,9 @@ public static class Scp02Protocol
     private static bool ShouldApplyResponseSecurity(ushort statusWord)
     {
         // Only apply response security for success and warning status words per GP spec
-        return statusWord == 0x9000 ||
-               (statusWord & 0xFF00) == 0x6200 ||
-               (statusWord & 0xFF00) == 0x6300;
+        return statusWord == 0x9000
+            || (statusWord & 0xFF00) == 0x6200
+            || (statusWord & 0xFF00) == 0x6300;
     }
 
     private static bool HasResponseData(byte[] response)
@@ -488,7 +565,9 @@ public static class Scp02Protocol
     /// </summary>
     /// <param name="hostChallenge">The host challenge (8 bytes).</param>
     /// <returns>The INITIALIZE UPDATE command or error.</returns>
-    public static Result<InitializeUpdateCommand, SmartCardError> CreateInitializeUpdateCommand(byte[] hostChallenge)
+    public static Result<InitializeUpdateCommand, SmartCardError> CreateInitializeUpdateCommand(
+        byte[] hostChallenge
+    )
     {
         return InitializeUpdateCommand.Create(0x00, 0x00, hostChallenge);
     }
@@ -503,13 +582,15 @@ public static class Scp02Protocol
     public static Result<SecureChannelContext, SmartCardError> ProcessInitializeUpdateResponse(
         InitializeUpdateResponse response,
         byte[] hostChallenge,
-        IKeySet keySet)
+        IKeySet keySet
+    )
     {
         // Validate protocol version
         if (response.ScpId != ProtocolVersion)
         {
             return SmartCardError.InvalidResponse(
-                $"Expected SCP02 but received {response.ScpId:X2}");
+                $"Expected SCP02 but received {response.ScpId:X2}"
+            );
         }
 
         // Validate key set type
@@ -524,36 +605,57 @@ public static class Scp02Protocol
                 hostChallenge,
                 response.CardChallenge,
                 response.SequenceCounter,
-                response.ImplementationParameter)
+                response.ImplementationParameter
+            )
             .Bind(sessionKeys =>
             {
                 // Verify card cryptogram
                 // Build proper key information for the response
-                byte[] keyInformation = [scp02KeySet.KeyVersion, 0x02, response.ImplementationParameter];
-                
-                // Create InitializeUpdateResponse using the Create factory method
-                Result<InitializeUpdateResponse, SmartCardError> initResponseResult = InitializeUpdateResponse.Create(
-                    [], // empty key diversification data
+                byte[] keyInformation =
+                [
                     scp02KeySet.KeyVersion,
-                    0x02, // SCP02
-                    response.SequenceCounter,
-                    response.CardChallenge,
-                    response.CardCryptogram);
-                
+                    0x02,
+                    response.ImplementationParameter,
+                ];
+
+                // Create InitializeUpdateResponse using the Create factory method
+                Result<InitializeUpdateResponse, SmartCardError> initResponseResult =
+                    InitializeUpdateResponse.Create(
+                        [], // empty key diversification data
+                        scp02KeySet.KeyVersion,
+                        0x02, // SCP02
+                        response.SequenceCounter,
+                        response.CardChallenge,
+                        response.CardCryptogram
+                    );
+
                 if (initResponseResult.IsFailure)
                 {
                     return initResponseResult.Error;
                 }
-                
+
                 InitializeUpdateResponse initResponse = initResponseResult.Value;
-                Result<byte[], SmartCardError> cardCryptogramData = CryptographicOperations.BuildScp02CardCryptogramData(initResponse, hostChallenge);
+                Result<byte[], SmartCardError> cardCryptogramData =
+                    CryptoService.Cryptogram.BuildScp02CardCryptogramData(
+                        initResponse,
+                        hostChallenge
+                    );
                 return cardCryptogramData
-                    .Bind(cryptogramData => CalculateScp02Cryptogram(sessionKeys.SEnc, cryptogramData))
+                    .Bind(cryptogramData =>
+                        CalculateScp02Cryptogram(sessionKeys.SEnc, cryptogramData)
+                    )
                     .Bind(calculatedCryptogram =>
                     {
-                        if (!CryptographicOperations.CompareBytes(calculatedCryptogram, response.CardCryptogram))
+                        if (
+                            !CryptoService.Utils.CompareBytes(
+                                calculatedCryptogram,
+                                response.CardCryptogram
+                            )
+                        )
                         {
-                            return SmartCardError.AuthenticationFailed("Card cryptogram verification failed");
+                            return SmartCardError.AuthenticationFailed(
+                                "Card cryptogram verification failed"
+                            );
                         }
 
                         return SecureChannelContext.Create(
@@ -561,7 +663,8 @@ public static class Scp02Protocol
                             response,
                             sessionKeys,
                             ProtocolVersion,
-                            keySet);
+                            keySet
+                        );
                     });
             });
     }
@@ -572,31 +675,47 @@ public static class Scp02Protocol
     /// <param name="context">The secure channel context from INITIALIZE UPDATE.</param>
     /// <param name="securityLevel">The requested security level.</param>
     /// <returns>The EXTERNAL AUTHENTICATE command with cryptogram and MAC or error.</returns>
-    public static Result<ExternalAuthenticateCommand, SmartCardError> CreateExternalAuthenticateCommand(
-        SecureChannelContext context,
-        SecurityLevel securityLevel)
+    public static Result<
+        ExternalAuthenticateCommand,
+        SmartCardError
+    > CreateExternalAuthenticateCommand(SecureChannelContext context, SecurityLevel securityLevel)
     {
-        // Build host cryptogram data
-        return CryptographicOperations.BuildScp02HostCryptogramData(context.InitializeUpdateResponse, context.HostChallenge)
-            .Bind(hostCryptogramData => CalculateScp02Cryptogram(context.SessionKeys.SEnc, hostCryptogramData))
+        // Build host cryptogram data using UnifiedCryptoService
+        return CryptoService.Cryptogram
+            .BuildScp02HostCryptogramData(context.InitializeUpdateResponse, context.HostChallenge)
+            .Bind(hostCryptogramData =>
+                CryptoService.Cryptogram.CalculateScp02Cryptogram(context.SessionKeys.SEnc, hostCryptogramData)
+            )
             .Bind(hostCryptogram =>
             {
-                byte[] commandData = CryptographicOperations.ConcatenateArrays(hostCryptogram, [(byte)securityLevel]);
-                
-                return ExternalAuthenticateCommand.Create(commandData)
+                byte[] commandData = CryptoService.Utils.ConcatenateArrays(
+                    hostCryptogram,
+                    [(byte)securityLevel]
+                );
+
+                return ExternalAuthenticateCommand
+                    .Create(commandData)
                     .Bind(command =>
                     {
                         // Calculate command MAC for EXTERNAL AUTHENTICATE
-                        byte[] macData = CryptographicOperations.ConcatenateArrays(
+                        byte[] macData = CryptoService.Utils.ConcatenateArrays(
                             [command.Cla, command.Ins, command.P1, command.P2, command.Lc],
-                            command.Data);
-                        
+                            command.Data
+                        );
+
                         // For EXTERNAL AUTHENTICATE (first secured command), use zero chaining value
                         byte[] initialChainingValue = new byte[8]; // 8 zeros
-                        return CalculateCommandMac(macData, context.SessionKeys.SMac, initialChainingValue)
+                        return CalculateCommandMac(
+                                macData,
+                                context.SessionKeys.SMac,
+                                initialChainingValue
+                            )
                             .Map(mac =>
                             {
-                                byte[] securedData = CryptographicOperations.ConcatenateArrays(commandData, mac);
+                                byte[] securedData = CryptoService.Utils.ConcatenateArrays(
+                                    commandData,
+                                    mac
+                                );
                                 return ExternalAuthenticateCommand.Create(securedData).Value;
                             });
                     });
@@ -611,17 +730,27 @@ public static class Scp02Protocol
     /// <returns>The secure channel session state or error.</returns>
     public static Result<SecureChannelState, SmartCardError> CreateSecureChannelSession(
         SecureChannelContext context,
-        SecurityLevel securityLevel)
+        SecurityLevel securityLevel
+    )
     {
         // Calculate initial MAC chaining value from EXTERNAL AUTHENTICATE command
-        return CryptographicOperations.BuildScp02HostCryptogramData(context.InitializeUpdateResponse, context.HostChallenge)
-            .Bind(hostCryptogramData => CalculateScp02Cryptogram(context.SessionKeys.SEnc, hostCryptogramData))
+        return CryptoService.Cryptogram
+            .BuildScp02HostCryptogramData(context.InitializeUpdateResponse, context.HostChallenge)
+            .Bind(hostCryptogramData =>
+                CryptoService.Cryptogram.CalculateScp02Cryptogram(context.SessionKeys.SEnc, hostCryptogramData)
+            )
             .Bind(hostCryptogram =>
             {
-                byte[] commandData = CryptographicOperations.ConcatenateArrays(hostCryptogram, [(byte)securityLevel]);
-                
-                return ExternalAuthenticateCommand.Create(commandData)
-                    .Bind(command => CalculateInitialMacChainingValue(command, context.SessionKeys.SMac))
+                byte[] commandData = CryptoService.Utils.ConcatenateArrays(
+                    hostCryptogram,
+                    [(byte)securityLevel]
+                );
+
+                return ExternalAuthenticateCommand
+                    .Create(commandData)
+                    .Bind(command =>
+                        CalculateInitialMacChainingValue(command, context.SessionKeys.SMac)
+                    )
                     .Bind(initialChaining =>
                         // Create the secure channel state
                         SecureChannelState.Create(
@@ -629,7 +758,9 @@ public static class Scp02Protocol
                             securityLevel,
                             ProtocolVersion,
                             initialChaining,
-                            context.InitializeUpdateResponse.ImplementationParameter));
+                            context.InitializeUpdateResponse.ImplementationParameter
+                        )
+                    );
             });
     }
 }

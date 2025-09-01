@@ -21,7 +21,8 @@ public interface ISmartCardService : IDisposable
     /// <returns>The result of the command execution.</returns>
     Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
         IApduCommand command,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Executes a command with additional options.
@@ -33,7 +34,8 @@ public interface ISmartCardService : IDisposable
     Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
         IApduCommand command,
         CommandOptions options,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Gets the current command context containing state information.
@@ -61,7 +63,9 @@ public interface ISmartCardService : IDisposable
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>True if connected, false otherwise.</returns>
-    Task<Result<bool, SmartCardError>> IsConnectedAsync(CancellationToken cancellationToken = default);
+    Task<Result<bool, SmartCardError>> IsConnectedAsync(
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Gets the Answer To Reset (ATR) from the connected card.
@@ -75,14 +79,18 @@ public interface ISmartCardService : IDisposable
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>List of reader names.</returns>
-    Task<Result<string[], SmartCardError>> GetReadersAsync(CancellationToken cancellationToken = default);
+    Task<Result<string[], SmartCardError>> GetReadersAsync(
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Checks if a secure channel is currently established.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>True if secure channel is established, false otherwise.</returns>
-    Task<Result<bool, SmartCardError>> IsSecureChannelEstablishedAsync(CancellationToken cancellationToken = default);
+    Task<Result<bool, SmartCardError>> IsSecureChannelEstablishedAsync(
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Sends a raw APDU command to the card.
@@ -92,7 +100,8 @@ public interface ISmartCardService : IDisposable
     /// <returns>The response from the card.</returns>
     Task<Result<CommandResponse, SmartCardError>> SendCommandAsync(
         byte[] command,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 }
 
 /// <summary>
@@ -146,5 +155,5 @@ public enum CardProtocol
     /// <summary>
     /// T=CL (contactless) protocol.
     /// </summary>
-    Tcl = 3
+    Tcl = 3,
 }

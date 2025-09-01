@@ -14,7 +14,4 @@ public interface ICliCommand
 /// <summary>
 /// Metadata for CLI commands.
 /// </summary>
-public record CliCommandMetadata(
-    string Name,
-    string Description,
-    string ParentCommand = null);
+public record CliCommandMetadata(string Name, string Description, string ParentCommand = null);

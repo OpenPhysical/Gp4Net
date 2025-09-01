@@ -6,12 +6,12 @@
 using System;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Security;
 using NUnit.Framework;
+using ScpVersion = Gp4Net.Cryptography.CryptoService.ScpVersion;
 
 namespace Gp4Net.Tests.Domain;
 
@@ -29,7 +29,7 @@ public class SecureChannelStateTests
             new byte[16], // S-ENC
             new byte[16], // S-MAC
             new byte[16], // S-RMAC
-            new byte[16]  // S-DEK
+            new byte[16] // S-DEK
         );
         _sessionKeys = testKeys;
         _macChainingValue = new byte[16]; // SCP03 MAC chaining value size
@@ -44,7 +44,11 @@ public class SecureChannelStateTests
     [Test]
     public void Create_ValidParameters_CreatesState()
     {
-        Result<MacChainingState, SmartCardError> macChainingState = MacChainingState.Create(_macChainingValue, ScpVersion.Scp03, 0x00);
+        Result<MacChainingState, SmartCardError> macChainingState = MacChainingState.Create(
+            _macChainingValue,
+            ScpVersion.Scp03,
+            0x00
+        );
         _ = macChainingState.IsSuccess.Should().BeTrue();
 
         Result<SecureChannelState, SmartCardError> result = SecureChannelState.Create(
@@ -124,10 +128,16 @@ public class SecureChannelStateTests
 
         byte[] newMacChaining = new byte[16];
         Array.Fill(newMacChaining, (byte)0xFF);
-        Result<MacChainingState, SmartCardError> newMacState = MacChainingState.Create(newMacChaining, ScpVersion.Scp03, 0x00);
+        Result<MacChainingState, SmartCardError> newMacState = MacChainingState.Create(
+            newMacChaining,
+            ScpVersion.Scp03,
+            0x00
+        );
         _ = newMacState.IsSuccess.Should().BeTrue();
 
-        Result<SecureChannelState, SmartCardError> updateResult = state.UpdateMacChaining(newMacState.Value);
+        Result<SecureChannelState, SmartCardError> updateResult = state.UpdateMacChaining(
+            newMacState.Value
+        );
 
         _ = updateResult.IsSuccess.Should().BeTrue();
         SecureChannelState? newState = updateResult.Value;
@@ -175,12 +185,19 @@ public class SecureChannelStateTests
 
         byte[] newMacChaining = new byte[16];
         Array.Fill(newMacChaining, (byte)0xAA);
-        Result<MacChainingState, SmartCardError> newMacState = MacChainingState.Create(newMacChaining, ScpVersion.Scp03, 0x00);
+        Result<MacChainingState, SmartCardError> newMacState = MacChainingState.Create(
+            newMacChaining,
+            ScpVersion.Scp03,
+            0x00
+        );
         _ = newMacState.IsSuccess.Should().BeTrue();
 
         uint newCounter = 42u;
 
-        Result<SecureChannelState, SmartCardError> updateResult = state.UpdateCounterAndMac(newCounter, newMacState.Value);
+        Result<SecureChannelState, SmartCardError> updateResult = state.UpdateCounterAndMac(
+            newCounter,
+            newMacState.Value
+        );
 
         _ = updateResult.IsSuccess.Should().BeTrue();
         SecureChannelState? newState = updateResult.Value;

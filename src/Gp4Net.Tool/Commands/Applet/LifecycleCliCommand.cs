@@ -29,7 +29,7 @@ public class LifecycleCommand : IPipelineCommand<LifecycleCommand.Settings>
         return await context.ExecuteAsync(async ctx =>
         {
             Result<bool, SmartCardError> result = await ValidateSettings(settings)
-                .Bind(_ => 
+                .Bind(_ =>
                 {
                     ctx.Display.Info($"Setting lifecycle state for: {settings.Aid}");
                     ctx.Display.Info($"New state: {settings.State}");
@@ -37,53 +37,73 @@ public class LifecycleCommand : IPipelineCommand<LifecycleCommand.Settings>
                 })
                 .Bind(_ => ConfirmOperation(ctx, settings))
                 .Bind(_ => PerformLifecycleChange(ctx, settings));
-            
+
             return result.Match(
                 success => 0,
                 error =>
                 {
                     ctx.Display.Error($"Lifecycle change failed: {error.Message}");
                     return 1;
-                });
+                }
+            );
         });
     }
 
     private static Result<bool, SmartCardError> ValidateSettings(Settings settings)
     {
-        return Result.Try(() => Convert.FromHexString(settings.Aid), 
-                ex => $"Invalid AID format: {ex.Message}")
+        return Result
+            .Try(
+                () => Convert.FromHexString(settings.Aid),
+                ex => $"Invalid AID format: {ex.Message}"
+            )
             .MapError(SmartCardError.InvalidArgument)
             .Map(_ => true);
     }
 
-    private static Result<bool, SmartCardError> ConfirmOperation(ICliExecutionContext context, Settings settings)
+    private static Result<bool, SmartCardError> ConfirmOperation(
+        ICliExecutionContext context,
+        Settings settings
+    )
     {
         if (settings.Force)
         {
             return Result.Success<bool, SmartCardError>(true);
         }
 
-        bool confirmed = AnsiConsole.Confirm($"Set lifecycle state of {settings.Aid} to {settings.State}?");
+        bool confirmed = AnsiConsole.Confirm(
+            $"Set lifecycle state of {settings.Aid} to {settings.State}?"
+        );
         return confirmed
             ? Result.Success<bool, SmartCardError>(true)
-            : Result.Failure<bool, SmartCardError>(SmartCardError.OperationCancelled("User cancelled operation"));
+            : Result.Failure<bool, SmartCardError>(
+                SmartCardError.OperationCancelled("User cancelled operation")
+            );
     }
 
-    private static async Task<Result<bool, SmartCardError>> PerformLifecycleChange(ICliExecutionContext context, Settings settings)
+    private static async Task<Result<bool, SmartCardError>> PerformLifecycleChange(
+        ICliExecutionContext context,
+        Settings settings
+    )
     {
         byte[] aid = Convert.FromHexString(settings.Aid);
         context.Display.Info("Executing lifecycle state change...");
-        
+
         IGlobalPlatformService gpService = context.GetGlobalPlatformService();
-        Result<bool, SmartCardError> result = await gpService.SetLifecycleStateAsync(aid, settings.State);
-        
+        Result<bool, SmartCardError> result = await gpService.SetLifecycleStateAsync(
+            aid,
+            settings.State
+        );
+
         return result.Match(
             success =>
             {
-                context.Display.Success($"Lifecycle state changed successfully to {settings.State}");
+                context.Display.Success(
+                    $"Lifecycle state changed successfully to {settings.State}"
+                );
                 return Result.Success<bool, SmartCardError>(true);
             },
-            error => Result.Failure<bool, SmartCardError>(error));
+            error => Result.Failure<bool, SmartCardError>(error)
+        );
     }
 
     /// <summary>

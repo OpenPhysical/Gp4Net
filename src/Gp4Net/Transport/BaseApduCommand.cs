@@ -1,5 +1,4 @@
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Transport;
@@ -35,9 +34,9 @@ public abstract class BaseApduCommand : IApduCommand
     {
         get
         {
-            int dataLength = Maybe<byte[]>.From(Data).Match(
-                Some: data => data.Length,
-                None: () => 0);
+            int dataLength = Maybe<byte[]>
+                .From(Data)
+                .Match(Some: data => data.Length, None: () => 0);
             return dataLength > 255 ? (byte)0 : (byte)dataLength;
         }
     }
@@ -47,16 +46,16 @@ public abstract class BaseApduCommand : IApduCommand
     {
         get
         {
-            int dataLength = Maybe<byte[]>.From(Data).Match(
-                Some: data => data.Length,
-                None: () => 0);
+            int dataLength = Maybe<byte[]>
+                .From(Data)
+                .Match(Some: data => data.Length, None: () => 0);
             int responseLength = ExpectedResponseLength.Match(
                 Some: length => length,
-                None: () => 0);
+                None: () => 0
+            );
 
-            return dataLength > ApduConstants.MaxShortLengthLc
-                   || responseLength > ApduConstants.MaxShortLengthLe;
+            return dataLength > Constants.Constants.Apdu.Formats.MaxShortLengthLc
+                || responseLength > Constants.Constants.Apdu.Formats.MaxShortLengthLe;
         }
     }
-
 }

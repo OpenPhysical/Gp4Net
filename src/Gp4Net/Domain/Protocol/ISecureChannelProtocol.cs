@@ -4,9 +4,9 @@
 // -----------------------------------------------------------------------------
 
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Domain;
+using Gp4Net.Cryptography;
+using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
@@ -20,7 +20,8 @@ namespace Gp4Net.Domain.Protocol;
 /// </summary>
 /// <typeparam name="TSelf">The implementing type (CRTP pattern).</typeparam>
 [PublicAPI]
-public interface ISecureChannelProtocol<TSelf> where TSelf : ISecureChannelProtocol<TSelf>
+public interface ISecureChannelProtocol<TSelf>
+    where TSelf : ISecureChannelProtocol<TSelf>
 {
     // Protocol Identity
 
@@ -36,7 +37,9 @@ public interface ISecureChannelProtocol<TSelf> where TSelf : ISecureChannelProto
     /// </summary>
     /// <param name="hostChallenge">The host challenge (8 bytes).</param>
     /// <returns>The INITIALIZE UPDATE command or error.</returns>
-    static abstract Result<InitializeUpdateCommand, SmartCardError> CreateInitializeUpdateCommand(byte[] hostChallenge);
+    static abstract Result<InitializeUpdateCommand, SmartCardError> CreateInitializeUpdateCommand(
+        byte[] hostChallenge
+    );
 
     /// <summary>
     /// Processes an INITIALIZE UPDATE response and creates a secure channel context.
@@ -49,7 +52,8 @@ public interface ISecureChannelProtocol<TSelf> where TSelf : ISecureChannelProto
     static abstract Result<SecureChannelContext, SmartCardError> ProcessInitializeUpdateResponse(
         InitializeUpdateResponse response,
         byte[] hostChallenge,
-        IKeySet keySet);
+        IKeySet keySet
+    );
 
     /// <summary>
     /// Creates an EXTERNAL AUTHENTICATE command for the specified security level.
@@ -57,9 +61,10 @@ public interface ISecureChannelProtocol<TSelf> where TSelf : ISecureChannelProto
     /// <param name="context">The secure channel context from INITIALIZE UPDATE.</param>
     /// <param name="securityLevel">The requested security level.</param>
     /// <returns>The EXTERNAL AUTHENTICATE command with cryptogram and MAC or error.</returns>
-    static abstract Result<ExternalAuthenticateCommand, SmartCardError> CreateExternalAuthenticateCommand(
-        SecureChannelContext context,
-        SecurityLevel securityLevel);
+    static abstract Result<
+        ExternalAuthenticateCommand,
+        SmartCardError
+    > CreateExternalAuthenticateCommand(SecureChannelContext context, SecurityLevel securityLevel);
 
     /// <summary>
     /// Creates a secure channel session from the established context.
@@ -69,5 +74,6 @@ public interface ISecureChannelProtocol<TSelf> where TSelf : ISecureChannelProto
     /// <returns>The secure channel session state or error.</returns>
     static abstract Result<SecureChannelState, SmartCardError> CreateSecureChannelSession(
         SecureChannelContext context,
-        SecurityLevel securityLevel);
+        SecurityLevel securityLevel
+    );
 }

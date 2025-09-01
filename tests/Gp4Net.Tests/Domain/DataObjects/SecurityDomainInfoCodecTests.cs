@@ -23,7 +23,7 @@ public class SecurityDomainInfoCodecTests
             Oid = Convert.FromHexString("A000000151000000"), // GP OID
             SecurityDomainAid = Convert.FromHexString("4F08A000000151000000"), // AID with length
             ImageData = Convert.FromHexString("0102030405"),
-            LifeCycleData = Convert.FromHexString("07")
+            LifeCycleData = Convert.FromHexString("07"),
         };
 
         Result<byte[], SmartCardError> encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
@@ -52,7 +52,7 @@ public class SecurityDomainInfoCodecTests
     {
         SecurityDomainInfo sdInfo = new SecurityDomainInfo
         {
-            Oid = Convert.FromHexString("A000000151")
+            Oid = Convert.FromHexString("A000000151"),
         };
 
         Result<byte[], SmartCardError> encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
@@ -74,13 +74,32 @@ public class SecurityDomainInfoCodecTests
     {
         byte[] testData =
         [
-            0xC1, 0x13, // Tag and length (19 bytes)
-            0x9F, 0x70, 0x08, 0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x00, // OID
-            0xC5, 0x03, 0x01, 0x02, 0x03, // Image data
-            0xC4, 0x01, 0x07 // Lifecycle data
+            0xC1,
+            0x13, // Tag and length (19 bytes)
+            0x9F,
+            0x70,
+            0x08,
+            0xA0,
+            0x00,
+            0x00,
+            0x01,
+            0x51,
+            0x00,
+            0x00,
+            0x00, // OID
+            0xC5,
+            0x03,
+            0x01,
+            0x02,
+            0x03, // Image data
+            0xC4,
+            0x01,
+            0x07, // Lifecycle data
         ];
 
-        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(testData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(
+            testData
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         SecurityDomainInfo? sdInfo = result.Value;
@@ -95,12 +114,28 @@ public class SecurityDomainInfoCodecTests
     {
         byte[] testData =
         [
-            0xC1, 0x0F, // Tag and length (15 bytes)
-            0x9F, 0x70, 0x05, 0xA0, 0x00, 0x00, 0x01, 0x51, // OID
-            0x4F, 0x05, 0xA0, 0x00, 0x00, 0x01, 0x51 // Security Domain AID
+            0xC1,
+            0x0F, // Tag and length (15 bytes)
+            0x9F,
+            0x70,
+            0x05,
+            0xA0,
+            0x00,
+            0x00,
+            0x01,
+            0x51, // OID
+            0x4F,
+            0x05,
+            0xA0,
+            0x00,
+            0x00,
+            0x01,
+            0x51, // Security Domain AID
         ];
 
-        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(testData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(
+            testData
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         SecurityDomainInfo? sdInfo = result.Value;
@@ -116,12 +151,16 @@ public class SecurityDomainInfoCodecTests
     {
         byte[] invalidData = [0xC2, 0x03, 0x01, 0x02, 0x03]; // Wrong tag
 
-        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(invalidData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(
+            invalidData
+        );
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
         _ = result.Error.Code.Should().Be("INVALID_DATA");
-        _ = result.Error.Message.Should().Contain("Invalid security domain information format - expected tag 0xC1");
+        _ = result
+            .Error.Message.Should()
+            .Contain("Invalid security domain information format - expected tag 0xC1");
     }
 
     [Test]
@@ -129,11 +168,22 @@ public class SecurityDomainInfoCodecTests
     {
         byte[] testData =
         [
-            0xC1, 0x81, 0x08, // Tag with extended length (8 bytes content)
-            0x9F, 0x70, 0x05, 0xA0, 0x00, 0x00, 0x01, 0x51 // OID only
+            0xC1,
+            0x81,
+            0x08, // Tag with extended length (8 bytes content)
+            0x9F,
+            0x70,
+            0x05,
+            0xA0,
+            0x00,
+            0x00,
+            0x01,
+            0x51, // OID only
         ];
 
-        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(testData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(
+            testData
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         SecurityDomainInfo? sdInfo = result.Value;
@@ -148,13 +198,15 @@ public class SecurityDomainInfoCodecTests
             Oid = Convert.FromHexString("A000000151000000"),
             SecurityDomainAid = Convert.FromHexString("4F08A000000151000000"),
             ImageData = Convert.FromHexString("010203040506070809"),
-            LifeCycleData = Convert.FromHexString("0F")
+            LifeCycleData = Convert.FromHexString("0F"),
         };
 
         Result<byte[], SmartCardError> encodedResult = SecurityDomainInfoCodec.Encode(original);
         _ = encodedResult.IsSuccess.Should().BeTrue("Failed to encode SecurityDomainInfo");
         byte[]? encoded = encodedResult.Value;
-        Result<SecurityDomainInfo, SmartCardError> decoded = SecurityDomainInfoCodec.Decode(encoded);
+        Result<SecurityDomainInfo, SmartCardError> decoded = SecurityDomainInfoCodec.Decode(
+            encoded
+        );
 
         _ = decoded.IsSuccess.Should().BeTrue();
         SecurityDomainInfo? result = decoded.Value;
@@ -187,7 +239,9 @@ public class SecurityDomainInfoCodecTests
     {
         byte[] emptyData = [0xC1, 0x00]; // Tag with zero length
 
-        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(emptyData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(
+            emptyData
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         SecurityDomainInfo? sdInfo = result.Value;
@@ -202,11 +256,21 @@ public class SecurityDomainInfoCodecTests
     {
         byte[] testData =
         [
-            0xC1, 0x08, // Tag and length
-            0x9F, 0x70, 0x05, 0xA0, 0x00, 0x00, 0x01, 0x51 // OID only
+            0xC1,
+            0x08, // Tag and length
+            0x9F,
+            0x70,
+            0x05,
+            0xA0,
+            0x00,
+            0x00,
+            0x01,
+            0x51, // OID only
         ];
 
-        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(testData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(
+            testData
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         SecurityDomainInfo? sdInfo = result.Value;
@@ -222,11 +286,16 @@ public class SecurityDomainInfoCodecTests
     {
         byte[] testData =
         [
-            0xC1, 0x03, // Tag and length (3 bytes)
-            0x9F, 0x70, 0x00 // OID with zero length
+            0xC1,
+            0x03, // Tag and length (3 bytes)
+            0x9F,
+            0x70,
+            0x00, // OID with zero length
         ];
 
-        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(testData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(
+            testData
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         SecurityDomainInfo? sdInfo = result.Value;
@@ -238,7 +307,7 @@ public class SecurityDomainInfoCodecTests
     {
         SecurityDomainInfo sdInfo = new SecurityDomainInfo
         {
-            ImageData = Convert.FromHexString("ABCDEF")
+            ImageData = Convert.FromHexString("ABCDEF"),
         };
 
         Result<byte[], SmartCardError> encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
@@ -259,12 +328,25 @@ public class SecurityDomainInfoCodecTests
     {
         byte[] testData =
         [
-            0xC1, 0x0C, // Tag and length (12 bytes)
-            0x9F, 0x70, 0x05, 0xA0, 0x00, 0x00, 0x01, 0x51, // OID
-            0xC6, 0x02, 0xFF, 0xFE // Unknown tag with data
+            0xC1,
+            0x0C, // Tag and length (12 bytes)
+            0x9F,
+            0x70,
+            0x05,
+            0xA0,
+            0x00,
+            0x00,
+            0x01,
+            0x51, // OID
+            0xC6,
+            0x02,
+            0xFF,
+            0xFE, // Unknown tag with data
         ];
 
-        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(testData);
+        Result<SecurityDomainInfo, SmartCardError> result = SecurityDomainInfoCodec.Decode(
+            testData
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         SecurityDomainInfo? sdInfo = result.Value;

@@ -12,7 +12,6 @@ public class WsctCardChannelWrapper : ICardChannelWrapper
     private readonly CardChannel _channel;
     private bool _disposed;
 
-
     /// <summary>
     /// Initializes a new instance of the WsctCardChannelWrapper class.
     /// </summary>

@@ -1,9 +1,11 @@
 using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Core.Tlv;
+using Gp4Net.Services;
+using static Gp4Net.Services.TlvService;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 
@@ -87,10 +89,7 @@ public class GetStatusCommand : IApduCommand
     /// </summary>
     byte IApduCommand.Cla
     {
-        get
-        {
-            return Cla;
-        }
+        get { return Cla; }
     }
 
     /// <summary>
@@ -98,10 +97,7 @@ public class GetStatusCommand : IApduCommand
     /// </summary>
     byte IApduCommand.Ins
     {
-        get
-        {
-            return Ins;
-        }
+        get { return Ins; }
     }
 
     /// <summary>
@@ -109,10 +105,7 @@ public class GetStatusCommand : IApduCommand
     /// </summary>
     public byte P1
     {
-        get
-        {
-            return (byte)Subset;
-        }
+        get { return (byte)Subset; }
     }
 
     /// <summary>
@@ -120,10 +113,7 @@ public class GetStatusCommand : IApduCommand
     /// </summary>
     public byte P2
     {
-        get
-        {
-            return (byte)Format;
-        }
+        get { return (byte)Format; }
     }
 
     /// <summary>
@@ -131,10 +121,7 @@ public class GetStatusCommand : IApduCommand
     /// </summary>
     public byte[] Data
     {
-        get
-        {
-            return SearchCriteria;
-        }
+        get { return SearchCriteria; }
     }
 
     /// <summary>
@@ -142,10 +129,7 @@ public class GetStatusCommand : IApduCommand
     /// </summary>
     public Maybe<int> ExpectedResponseLength
     {
-        get
-        {
-            return Maybe<int>.From(256);
-        }
+        get { return Maybe<int>.From(256); }
     }
 
     /// <summary>
@@ -153,10 +137,7 @@ public class GetStatusCommand : IApduCommand
     /// </summary>
     public bool IsExtendedLength
     {
-        get
-        {
-            return false;
-        }
+        get { return false; }
     }
 
     /// <summary>
@@ -204,12 +185,14 @@ public class GetStatusCommand : IApduCommand
         // Validate search criteria if provided
         // Note: Search criteria can be a TLV structure (e.g., 4F00 for empty search)
         // or an AID (5-16 bytes). We allow both.
-        if (searchCriteria != null && searchCriteria.Length > 0)
+        if (searchCriteria is { Length: > 0 })
         {
             // If it looks like a raw AID (not TLV), validate length
             if (searchCriteria[0] != 0x4F && searchCriteria.Length is < 5 or > 16)
             {
-                return SmartCardError.InvalidArgument("Search criteria AID must be between 5 and 16 bytes.");
+                return SmartCardError.InvalidArgument(
+                    "Search criteria AID must be between 5 and 16 bytes."
+                );
             }
         }
 
@@ -236,7 +219,7 @@ public class GetStatusCommand : IApduCommand
             StatusSubset.ApplicationsAndSupplementaryDomains => true,
             StatusSubset.ExecutableLoadFiles => true,
             StatusSubset.ExecutableLoadFilesAndModules => true,
-            _ => false
+            _ => false,
         };
     }
 
@@ -249,7 +232,7 @@ public class GetStatusCommand : IApduCommand
         {
             ResponseFormat.None => true,
             ResponseFormat.Tlv => true,
-            _ => false
+            _ => false,
         };
     }
 
@@ -264,7 +247,9 @@ public class GetStatusCommand : IApduCommand
         if (searchCriteria[0] != 0x4F && searchCriteria.Length is < 5 or > 16)
         {
             return Maybe<SmartCardError>.From(
-                SmartCardError.InvalidArgument("Search criteria AID must be between 5 and 16 bytes.")
+                SmartCardError.InvalidArgument(
+                    "Search criteria AID must be between 5 and 16 bytes."
+                )
             );
         }
         return Maybe<SmartCardError>.None;
@@ -291,11 +276,9 @@ public class GetStatusCommand : IApduCommand
             apdu[5 + dataLength] = 0x00; // LE byte
             return apdu;
         }
-        else
-        {
-            // Case 2: No data but expects response (CLA INS P1 P2 Le)
-            return [Cla, Ins, (byte)Subset, (byte)Format, 0x00];
-        }
+
+        // Case 2: No data but expects response (CLA INS P1 P2 Le)
+        return [Cla, Ins, (byte)Subset, (byte)Format, 0x00];
     }
 }
 
@@ -314,6 +297,7 @@ public class ApplicationStatusEntry
         /// Application is loaded (for load files and apps reporting 0x01).
         /// </summary>
         Loaded = 0x01,
+
         /// <summary>
         /// Application is installed.
         /// </summary>
@@ -367,12 +351,18 @@ public class ApplicationStatusEntry
     /// <param name="state">The lifecycle state.</param>
     /// <param name="privileges">The application privileges.</param>
     /// <param name="executableLoadFileAid">The executable load file AID (optional).</param>
-    public ApplicationStatusEntry(byte[] aid, LifecycleState state, byte[] privileges, byte[] executableLoadFileAid = null)
+    public ApplicationStatusEntry(
+        byte[] aid,
+        LifecycleState state,
+        byte[] privileges,
+        byte[] executableLoadFileAid = null
+    )
     {
         Aid = (byte[])aid.Clone();
         State = state;
         Privileges = (byte[])privileges.Clone();
-        ExecutableLoadFileAid = executableLoadFileAid != null ? (byte[])executableLoadFileAid.Clone() : [];
+        ExecutableLoadFileAid =
+            executableLoadFileAid != null ? (byte[])executableLoadFileAid.Clone() : [];
     }
 }
 
@@ -403,88 +393,112 @@ public class GetStatusResponse
     /// <returns>A Result containing either the parsed response or an error.</returns>
     public static Result<GetStatusResponse, SmartCardError> Parse(byte[] response)
     {
-        return Maybe<byte[]>.From(response).Match(
-            Some: responseValue => ParseTlv(responseValue),
-            None: () => SmartCardError.InvalidArgument("Response data cannot be null")
-        );
+        return Maybe<byte[]>
+            .From(response)
+            .Match(
+                Some: responseValue => ParseTlv(responseValue),
+                None: () => SmartCardError.InvalidArgument("Response data cannot be null")
+            );
     }
 
     private static Result<GetStatusResponse, SmartCardError> ParseTlv(byte[] response)
     {
-        try
+        return TlvParser
+            .ParseMultiple(response.ToImmutableArray())
+            .MapError(_ => SmartCardError.InvalidResponse("Failed to parse GET STATUS TLV response"))
+            .Bind(ParseApplicationEntries)
+            .Map(entries => new GetStatusResponse(entries.ToList()));
+    }
+
+    private static Result<IEnumerable<ApplicationStatusEntry>, SmartCardError> ParseApplicationEntries(
+        ParseResult parseResult)
+    {
+        var validEntries = parseResult.Objects
+            .Select(ParseSingleApplicationEntry)
+            .Where(result => result.IsSuccess)
+            .Select(result => result.Value)
+            .ToList();
+
+        return Result.Success<IEnumerable<ApplicationStatusEntry>, SmartCardError>(validEntries);
+    }
+
+    private static Result<ApplicationStatusEntry, SmartCardError> ParseSingleApplicationEntry(TlvObject container)
+    {
+        return container.Tag.ToNumber()
+            .Bind(tagNumber => tagNumber == 0xE3
+                ? TlvParser.ParseMultiple(container.TlvData.Bytes)
+                : Result.Failure<ParseResult, SmartCardError>(SmartCardError.InvalidResponse("Expected E3 container tag")))
+            .Bind(childParseResult => ExtractRequiredTlvs(childParseResult.Objects))
+            .Bind(tlvs => CreateApplicationEntry(tlvs.aid, tlvs.lifecycle, tlvs.privileges, tlvs.executableLoadFile));
+    }
+
+    private static Result<(TlvObject aid, TlvObject lifecycle, Maybe<TlvObject> privileges, Maybe<TlvObject> executableLoadFile), SmartCardError> ExtractRequiredTlvs(
+        ImmutableArray<TlvObject> children)
+    {
+        var aidTlvs = children
+            .Where(c => c.Tag.ToNumber().Match(tagNum => tagNum == 0x4F, _ => false))
+            .ToImmutableArray();
+
+        var lifecycleTlvs = children
+            .Where(c => c.Tag.ToNumber().Match(tagNum => tagNum == 0x9F70, _ => false))
+            .ToImmutableArray();
+
+        var privilegesTlvs = children
+            .Where(c => c.Tag.ToNumber().Match(tagNum => tagNum == 0xC5, _ => false))
+            .ToImmutableArray();
+
+        var executableLoadFileTlvs = children
+            .Where(c => c.Tag.ToNumber().Match(tagNum => tagNum == 0xC4, _ => false))
+            .ToImmutableArray();
+
+        if (aidTlvs.Length == 0)
         {
-            IReadOnlyList<TlvObject> tlvs = TlvParser.ParseAll(response);
-            List<ApplicationStatusEntry> entries = [];
-
-            foreach (TlvObject t in tlvs)
-            {
-                // Per GP Table 11-36, all responses MUST use E3 containers. All traced cards comply.
-                Result<uint, SmartCardError> tagResult = t.GetTagNumber();
-                if (tagResult.IsFailure || tagResult.Value != 0xE3)
-                {
-                    continue; // Skip non-E3 entries - specification violation
-                }
-
-                List<TlvObject> children = t.ParseNestedTlv().ToList();
-                // Find required TLVs using functional approach
-                Maybe<TlvObject> aidTlvMaybe = Maybe<TlvObject>.None;
-                Maybe<TlvObject> lcTlvMaybe = Maybe<TlvObject>.None;
-                Maybe<TlvObject> privTlvMaybe = Maybe<TlvObject>.None;
-                Maybe<TlvObject> elfTlvMaybe = Maybe<TlvObject>.None;
-
-                foreach (TlvObject child in children)
-                {
-                    Result<uint, SmartCardError> childTagResult = child.GetTagNumber();
-                    if (childTagResult.IsFailure) continue;
-
-                    switch (childTagResult.Value)
-                    {
-                        case 0x4F:
-                            aidTlvMaybe = Maybe<TlvObject>.From(child);
-                            break;
-                        case 0x9F70:
-                            lcTlvMaybe = Maybe<TlvObject>.From(child);
-                            break;
-                        case 0xC5:
-                            privTlvMaybe = Maybe<TlvObject>.From(child);
-                            break;
-                        case 0xC4:
-                            elfTlvMaybe = Maybe<TlvObject>.From(child);
-                            break;
-                    }
-                }
-
-                if (aidTlvMaybe.HasNoValue || lcTlvMaybe.HasNoValue)
-                {
-                    // Insufficient data for an entry; skip
-                    continue;
-                }
-
-                TlvObject aidTlv = aidTlvMaybe.Value;
-                TlvObject lcTlv = lcTlvMaybe.Value;
-
-                byte[] aid = aidTlv.Value;
-                if (lcTlv.Value.Length == 0)
-                {
-                    continue;
-                }
-                byte lc = lcTlv.Value[0];
-                if (!IsValidLifecycleState(lc))
-                {
-                    return SmartCardError.InvalidResponse($"Invalid lifecycle state: 0x{lc:X2}");
-                }
-
-                byte[] priv = privTlvMaybe.HasValue ? privTlvMaybe.Value.Value : [];
-                byte[] elf = elfTlvMaybe.HasValue ? elfTlvMaybe.Value.Value : [];
-                entries.Add(new ApplicationStatusEntry(aid, (ApplicationStatusEntry.LifecycleState)lc, priv, elf));
-            }
-
-            return new GetStatusResponse(entries);
+            return SmartCardError.InvalidResponse("Missing required AID (4F) TLV");
         }
-        catch
+
+        if (lifecycleTlvs.Length == 0)
         {
-            return SmartCardError.InvalidResponse("Failed to parse GET STATUS TLV response");
+            return SmartCardError.InvalidResponse("Missing required lifecycle state (9F70) TLV");
         }
+
+        var aidTlv = aidTlvs[0];
+        var lifecycleTlv = lifecycleTlvs[0];
+        var privilegesTlv = privilegesTlvs.Length > 0 ? Maybe<TlvObject>.From(privilegesTlvs[0]) : Maybe<TlvObject>.None;
+        var executableLoadFileTlv = executableLoadFileTlvs.Length > 0 ? Maybe<TlvObject>.From(executableLoadFileTlvs[0]) : Maybe<TlvObject>.None;
+
+        return (aidTlv, lifecycleTlv, privilegesTlv, executableLoadFileTlv);
+    }
+
+    private static Result<ApplicationStatusEntry, SmartCardError> CreateApplicationEntry(
+        TlvObject aidTlv,
+        TlvObject lifecycleTlv,
+        Maybe<TlvObject> privilegesTlv,
+        Maybe<TlvObject> executableLoadFileTlv)
+    {
+        if (lifecycleTlv.TlvData.Bytes.Length == 0)
+        {
+            return SmartCardError.InvalidResponse("Lifecycle state TLV has no data");
+        }
+
+        byte lifecycleState = lifecycleTlv.TlvData.Bytes[0];
+        if (!IsValidLifecycleState(lifecycleState))
+        {
+            return SmartCardError.InvalidResponse($"Invalid lifecycle state: 0x{lifecycleState:X2}");
+        }
+
+        byte[] aid = aidTlv.TlvData.Bytes.ToArray();
+        byte[] privileges = privilegesTlv.Match(
+            Some: tlv => tlv.TlvData.Bytes.ToArray(),
+            None: () => []);
+        byte[] executableLoadFile = executableLoadFileTlv.Match(
+            Some: tlv => tlv.TlvData.Bytes.ToArray(),
+            None: () => []);
+
+        return new ApplicationStatusEntry(
+            aid,
+            (ApplicationStatusEntry.LifecycleState)lifecycleState,
+            privileges,
+            executableLoadFile);
     }
 
     // No legacy parser: GET STATUS responses must be TLV per Table 11-36/11-37.
@@ -502,7 +516,7 @@ public class GetStatusResponse
             0x0F => true, // Personalized
             0x83 => true, // Blocked
             0x87 => true, // Locked
-            _ => false
+            _ => false,
         };
     }
 }

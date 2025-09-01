@@ -1,5 +1,5 @@
-using Gp4Net.Constants;
 using Gp4Net.Cryptography;
+using static Gp4Net.Cryptography.CryptoService;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Keys;
@@ -7,7 +7,7 @@ namespace Gp4Net.Domain.Keys;
 /// <summary>
 /// Immutable context for cryptogram calculation operations.
 /// </summary>
-/// <param name="ProtocolVersion">The protocol version byte.</param>
+/// <param name="ProtocolVersionEnum">The protocol version enumeration.</param>
 /// <param name="Key">The key to use for cryptogram calculation.</param>
 /// <param name="Data">The data to calculate cryptogram over.</param>
 /// <param name="Type">The cryptogram type.</param>
@@ -16,7 +16,8 @@ public sealed record CryptogramContext(
     ScpVersion ProtocolVersionEnum,
     byte[] Key,
     byte[] Data,
-    CryptogramType Type) : ICryptogramContext
+    CryptogramType Type
+) : ICryptogramContext
 {
     /// <summary>
     /// Gets the protocol version as byte to match interface.

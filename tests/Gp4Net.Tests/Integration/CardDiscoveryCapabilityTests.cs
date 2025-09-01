@@ -30,22 +30,38 @@ public class CardDiscoveryCapabilityTests
     public static class P71CardResponses
     {
         // GET DATA 0x0066 (Card Data) - Contains card manager and supported protocols information
-        public static readonly byte[] CardData_0x0066 = Convert.FromHexString("664D734B06072A864886FC6B01600B06092A864886FC6B020203630906072A864886FC6B03640B06092A864886FC6B040370650D060B2A864886FC6B0507020000660C060A2B060104012A026E0103");
+        public static readonly byte[] CardData_0x0066 = Convert.FromHexString(
+            "664D734B06072A864886FC6B01600B06092A864886FC6B020203630906072A864886FC6B03640B06092A864886FC6B040370650D060B2A864886FC6B0507020000660C060A2B060104012A026E0103"
+        );
 
         // GET DATA 0x0067 (Card Capabilities) - Contains card capabilities and supported algorithms
-        public static readonly byte[] CardCapabilities_0x0067 = Convert.FromHexString("6728A00D800103810500102060708201078103E5BEC082031E030083010284010285017B86010C87017B");
+        public static readonly byte[] CardCapabilities_0x0067 = Convert.FromHexString(
+            "6728A00D800103810500102060708201078103E5BEC082031E030083010284010285017B86010C87017B"
+        );
 
         // GET DATA 0x00C1 (Security Domain Info) - Contains security domain information
-        public static readonly byte[] SecurityDomainInfo_0x00C1_P71_Key01 = Convert.FromHexString("C103000001");
-        public static readonly byte[] SecurityDomainInfo_0x00C1_P71_Key19 = Convert.FromHexString("C103000019");
+        public static readonly byte[] SecurityDomainInfo_0x00C1_P71_Key01 = Convert.FromHexString(
+            "C103000001"
+        );
+        public static readonly byte[] SecurityDomainInfo_0x00C1_P71_Key19 = Convert.FromHexString(
+            "C103000019"
+        );
 
         // GET DATA 0x00E0 (Key Information Template) - Contains key information
-        public static readonly byte[] KeyInfoTemplate_0x00E0 = Convert.FromHexString("E012C00401018810C00402018810C00403018810");
+        public static readonly byte[] KeyInfoTemplate_0x00E0 = Convert.FromHexString(
+            "E012C00401018810C00402018810C00403018810"
+        );
 
         // Alternative card with different capabilities (from gp_pro_list_success.txt)
-        public static readonly byte[] CardCapabilities_Alternative = Convert.FromHexString("6724A0098001028104153555758103E5BEC082031E030083010284010285017B86010C87017B");
-        public static readonly byte[] SecurityDomainInfo_Alternative = Convert.FromHexString("C1020000");
-        public static readonly byte[] KeyInfoTemplate_Alternative = Convert.FromHexString("E012C00401018010C00402018010C00403018010");
+        public static readonly byte[] CardCapabilities_Alternative = Convert.FromHexString(
+            "6724A0098001028104153555758103E5BEC082031E030083010284010285017B86010C87017B"
+        );
+        public static readonly byte[] SecurityDomainInfo_Alternative = Convert.FromHexString(
+            "C1020000"
+        );
+        public static readonly byte[] KeyInfoTemplate_Alternative = Convert.FromHexString(
+            "E012C00401018010C00402018010C00403018010"
+        );
     }
 
     [Test]
@@ -71,10 +87,15 @@ public class CardDiscoveryCapabilityTests
         _ = cardData[configDetailsStart].Should().Be(0x06, "Should contain OID tag");
         _ = cardData[configDetailsStart + 1].Should().Be(0x07, "OID length should be 7");
 
-        byte[] gpCardManagerOid = new ArraySegment<byte>(cardData, configDetailsStart + 2, 7).ToArray();
+        byte[] gpCardManagerOid = new ArraySegment<byte>(
+            cardData,
+            configDetailsStart + 2,
+            7
+        ).ToArray();
         byte[] expectedGpOid = [0x2A, 0x86, 0x48, 0x86, 0xFC, 0x6B, 0x01];
-        _ = gpCardManagerOid.Should().BeEquivalentTo(expectedGpOid,
-            "Should contain GlobalPlatform Card Manager OID");
+        _ = gpCardManagerOid
+            .Should()
+            .BeEquivalentTo(expectedGpOid, "Should contain GlobalPlatform Card Manager OID");
     }
 
     [Test]
@@ -85,10 +106,12 @@ public class CardDiscoveryCapabilityTests
         byte[] capabilitiesData = P71CardResponses.CardCapabilities_0x0067;
 
         // Strip the tag and length bytes (0x67 0x28) to get the raw capabilities data
-        byte[] rawData = capabilitiesData.Skip(2).ToArray();
+        byte[] rawData = [.. capabilitiesData.Skip(2)];
 
         // Use CardCapabilities.Parse which expects the format with tags 0xA0, 0x81, etc.
-        Result<CardCapabilities, SmartCardError> result = Gp4Net.Domain.CardInfo.CardCapabilities.TryParse(Maybe<byte[]>.From(rawData));
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(
+            Maybe<byte[]>.From(rawData)
+        );
 
         _ = result.IsSuccess.Should().BeTrue("P71 capabilities should parse successfully");
 
@@ -111,8 +134,12 @@ public class CardDiscoveryCapabilityTests
     public void SecurityDomainInfo_P71_ParsesWithCodec()
     {
         // Test SecurityDomainInfoCodec against both P71 configurations
-        Result<SecurityDomainInfo, SmartCardError> sdInfo1 = SecurityDomainInfoCodec.Decode(P71CardResponses.SecurityDomainInfo_0x00C1_P71_Key01);
-        Result<SecurityDomainInfo, SmartCardError> sdInfo2 = SecurityDomainInfoCodec.Decode(P71CardResponses.SecurityDomainInfo_0x00C1_P71_Key19);
+        Result<SecurityDomainInfo, SmartCardError> sdInfo1 = SecurityDomainInfoCodec.Decode(
+            P71CardResponses.SecurityDomainInfo_0x00C1_P71_Key01
+        );
+        Result<SecurityDomainInfo, SmartCardError> sdInfo2 = SecurityDomainInfoCodec.Decode(
+            P71CardResponses.SecurityDomainInfo_0x00C1_P71_Key19
+        );
 
         _ = sdInfo1.IsSuccess.Should().BeTrue("P71 Security Domain Info (key 01) should decode");
         _ = sdInfo2.IsSuccess.Should().BeTrue("P71 Security Domain Info (key 19) should decode");
@@ -146,11 +173,15 @@ public class CardDiscoveryCapabilityTests
     {
         // Compare P71 capabilities with alternative card using the correct parser
         // Strip tag and length bytes before parsing
-        byte[] p71RawData = P71CardResponses.CardCapabilities_0x0067.Skip(2).ToArray();
-        byte[] altRawData = P71CardResponses.CardCapabilities_Alternative.Skip(2).ToArray();
+        byte[] p71RawData = [.. P71CardResponses.CardCapabilities_0x0067.Skip(2)];
+        byte[] altRawData = [.. P71CardResponses.CardCapabilities_Alternative.Skip(2)];
 
-        Result<CardCapabilities, SmartCardError> p71Result = Gp4Net.Domain.CardInfo.CardCapabilities.TryParse(Maybe<byte[]>.From(p71RawData));
-        Result<CardCapabilities, SmartCardError> altResult = Gp4Net.Domain.CardInfo.CardCapabilities.TryParse(Maybe<byte[]>.From(altRawData));
+        Result<CardCapabilities, SmartCardError> p71Result = CardCapabilities.TryParse(
+            Maybe<byte[]>.From(p71RawData)
+        );
+        Result<CardCapabilities, SmartCardError> altResult = CardCapabilities.TryParse(
+            Maybe<byte[]>.From(altRawData)
+        );
 
         _ = p71Result.IsSuccess.Should().BeTrue("P71 capabilities should decode");
         _ = altResult.IsSuccess.Should().BeTrue("Alternative capabilities should decode");
@@ -160,8 +191,14 @@ public class CardDiscoveryCapabilityTests
         // Alt: 6724A0098001028104153555758103E5BEC082031E030083010284010285017B86010C87017B
 
         // Length difference: 0x28 (40) vs 0x24 (36) - P71 has more capabilities
-        _ = P71CardResponses.CardCapabilities_0x0067[1].Should().Be(0x28, "P71 should have 40 bytes of capabilities");
-        _ = P71CardResponses.CardCapabilities_Alternative[1].Should().Be(0x24, "Alternative should have 36 bytes");
+        _ = P71CardResponses
+            .CardCapabilities_0x0067[1]
+            .Should()
+            .Be(0x28, "P71 should have 40 bytes of capabilities");
+        _ = P71CardResponses
+            .CardCapabilities_Alternative[1]
+            .Should()
+            .Be(0x24, "Alternative should have 36 bytes");
     }
 
     [Test]
@@ -176,13 +213,25 @@ public class CardDiscoveryCapabilityTests
         byte[] emptyData = [];
 
         // Test that parsers return appropriate failures for empty/invalid data
-        Result<CardCapabilities, SmartCardError> cardCapResult = Gp4Net.Domain.CardInfo.CardCapabilities.TryParse(Maybe<byte[]>.From(emptyData));
-        Result<SecurityDomainInfo, SmartCardError> sdInfoResult = SecurityDomainInfoCodec.Decode(emptyData);
-        Result<KeyInfoTemplate, SmartCardError> keyInfoResult = KeyInfoTemplateCodec.Decode(emptyData);
+        Result<CardCapabilities, SmartCardError> cardCapResult = CardCapabilities.TryParse(
+            Maybe<byte[]>.From(emptyData)
+        );
+        Result<SecurityDomainInfo, SmartCardError> sdInfoResult = SecurityDomainInfoCodec.Decode(
+            emptyData
+        );
+        Result<KeyInfoTemplate, SmartCardError> keyInfoResult = KeyInfoTemplateCodec.Decode(
+            emptyData
+        );
 
-        _ = cardCapResult.IsFailure.Should().BeTrue("Empty card capabilities data should fail to decode");
-        _ = sdInfoResult.IsFailure.Should().BeTrue("Empty security domain info should fail to decode");
-        _ = keyInfoResult.IsFailure.Should().BeTrue("Empty key info template should fail to decode");
+        _ = cardCapResult
+            .IsFailure.Should()
+            .BeTrue("Empty card capabilities data should fail to decode");
+        _ = sdInfoResult
+            .IsFailure.Should()
+            .BeTrue("Empty security domain info should fail to decode");
+        _ = keyInfoResult
+            .IsFailure.Should()
+            .BeTrue("Empty key info template should fail to decode");
     }
 
     [Test]
@@ -192,22 +241,27 @@ public class CardDiscoveryCapabilityTests
         // Using the data from gp_pro_card_info.txt trace
 
         // Step 1: Parse card capabilities to determine supported protocols
-        byte[] capabilitiesRawData = P71CardResponses.CardCapabilities_0x0067.Skip(2).ToArray();
-        Result<CardCapabilities, SmartCardError> capabilitiesResult = Gp4Net.Domain.CardInfo.CardCapabilities.TryParse(Maybe<byte[]>.From(capabilitiesRawData));
+        byte[] capabilitiesRawData = [.. P71CardResponses.CardCapabilities_0x0067.Skip(2)];
+        Result<CardCapabilities, SmartCardError> capabilitiesResult = CardCapabilities.TryParse(
+            Maybe<byte[]>.From(capabilitiesRawData)
+        );
         _ = capabilitiesResult.IsSuccess.Should().BeTrue("Card capabilities should be parseable");
 
         // Step 2: Parse security domain info to get key version information
-        Result<SecurityDomainInfo, SmartCardError> sdInfoResult = SecurityDomainInfoCodec.Decode(P71CardResponses.SecurityDomainInfo_0x00C1_P71_Key19);
+        Result<SecurityDomainInfo, SmartCardError> sdInfoResult = SecurityDomainInfoCodec.Decode(
+            P71CardResponses.SecurityDomainInfo_0x00C1_P71_Key19
+        );
         _ = sdInfoResult.IsSuccess.Should().BeTrue("Security domain info should be parseable");
 
         // Step 3: Parse key information to understand key structure
-        Result<KeyInfoTemplate, SmartCardError> keyInfoResult = KeyInfoTemplateCodec.Decode(P71CardResponses.KeyInfoTemplate_0x00E0);
+        Result<KeyInfoTemplate, SmartCardError> keyInfoResult = KeyInfoTemplateCodec.Decode(
+            P71CardResponses.KeyInfoTemplate_0x00E0
+        );
         _ = keyInfoResult.IsSuccess.Should().BeTrue("Key info template should be parseable");
 
         // Step 4: Validate that all parsing succeeded (real P71 card supports all these features)
-        bool allParsingSucceeded = capabilitiesResult.IsSuccess &&
-                                   sdInfoResult.IsSuccess &&
-                                   keyInfoResult.IsSuccess;
+        bool allParsingSucceeded =
+            capabilitiesResult.IsSuccess && sdInfoResult.IsSuccess && keyInfoResult.IsSuccess;
 
         _ = allParsingSucceeded.Should().BeTrue("P71 card should support full discovery workflow");
     }
@@ -234,8 +288,9 @@ public class CardDiscoveryCapabilityTests
 
         byte[] gpCardManagerOid = new ArraySegment<byte>(cardData, offset + 2, 7).ToArray();
         byte[] expectedGpOid = [0x2A, 0x86, 0x48, 0x86, 0xFC, 0x6B, 0x01];
-        _ = gpCardManagerOid.Should().BeEquivalentTo(expectedGpOid,
-            "Should contain GlobalPlatform Card Manager OID");
+        _ = gpCardManagerOid
+            .Should()
+            .BeEquivalentTo(expectedGpOid, "Should contain GlobalPlatform Card Manager OID");
 
         // Second structure at offset 13: 60 0B (context tag)
         int contextTagOffset = offset + 9; // After first OID

@@ -78,7 +78,7 @@ public static class ApduCommandExtensions
             }
         }
 
-        return apdu.ToArray();
+        return [.. apdu];
     }
 
     /// <summary>
@@ -86,6 +86,5 @@ public static class ApduCommandExtensions
     /// </summary>
     /// <param name="command">The command to convert.</param>
     /// <returns>The APDU as a byte array.</returns>
-    public static byte[] ToByteArray(this IApduCommand command)
-        => command.ToApdu();
+    public static byte[] ToByteArray(this IApduCommand command) => command.ToApdu();
 }

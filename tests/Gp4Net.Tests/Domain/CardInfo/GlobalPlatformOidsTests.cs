@@ -1,7 +1,7 @@
 using System.Collections.Generic;
+using AwesomeAssertions;
 using Gp4Net.Domain.CardInfo;
 using NUnit.Framework;
-using AwesomeAssertions;
 
 namespace Gp4Net.Tests.Domain.CardInfo;
 
@@ -13,12 +13,18 @@ public class GlobalPlatformOidsTests
     {
         // Act & Assert
         _ = GlobalPlatformOids.GetDescription("1.2.840.114283.1").Should().Be("GlobalPlatform");
-        _ = GlobalPlatformOids.GetDescription("1.2.840.114283.4.3")
-            .Should().Be("Secure Channel Protocol 03 (SCP03)");
-        _ = GlobalPlatformOids.GetDescription("1.2.840.114283.4.3.112")
-            .Should().Be("SCP03 with S-ENC and S-MAC");
-        _ = GlobalPlatformOids.GetDescription("1.3.6.1.4.1.42.2.110.1.3")
-            .Should().Be("Oracle Java Card VM");
+        _ = GlobalPlatformOids
+            .GetDescription("1.2.840.114283.4.3")
+            .Should()
+            .Be("Secure Channel Protocol 03 (SCP03)");
+        _ = GlobalPlatformOids
+            .GetDescription("1.2.840.114283.4.3.112")
+            .Should()
+            .Be("SCP03 with S-ENC and S-MAC");
+        _ = GlobalPlatformOids
+            .GetDescription("1.3.6.1.4.1.42.2.110.1.3")
+            .Should()
+            .Be("Oracle Java Card VM");
     }
 
     [Test]
@@ -66,10 +72,14 @@ public class GlobalPlatformOidsTests
     public void FormatOid_ShouldIncludeDescriptionForKnownOids()
     {
         // Act & Assert
-        _ = GlobalPlatformOids.FormatOid("1.2.840.114283.1")
-            .Should().Be("1.2.840.114283.1 (GlobalPlatform)");
-        _ = GlobalPlatformOids.FormatOid("1.2.840.114283.4.3.112")
-            .Should().Be("1.2.840.114283.4.3.112 (SCP03 with S-ENC and S-MAC)");
+        _ = GlobalPlatformOids
+            .FormatOid("1.2.840.114283.1")
+            .Should()
+            .Be("1.2.840.114283.1 (GlobalPlatform)");
+        _ = GlobalPlatformOids
+            .FormatOid("1.2.840.114283.4.3.112")
+            .Should()
+            .Be("1.2.840.114283.4.3.112 (SCP03 with S-ENC and S-MAC)");
     }
 
     [Test]
@@ -104,7 +114,7 @@ public class GlobalPlatformOidsTests
             "1.2.840.114283.4.2",
             "1.2.840.114283.4.3",
             "1.2.840.114283.4.3.112",
-            "1.3.6.1.4.1.42.2.110.1.3"
+            "1.3.6.1.4.1.42.2.110.1.3",
         ];
 
         // Act
@@ -114,8 +124,9 @@ public class GlobalPlatformOidsTests
         _ = summary.SupportedScpVersions.Should().Contain("SCP02");
         _ = summary.SupportedScpVersions.Should().Contain("SCP03");
         _ = summary.SupportsScp03WithEncryption.Should().BeTrue();
-        _ = summary.SpecificationVersions
-            .Should().Contain("GlobalPlatform Card Specification 2.2.3");
+        _ = summary
+            .SpecificationVersions.Should()
+            .Contain("GlobalPlatform Card Specification 2.2.3");
         _ = summary.AllOids.Should().HaveCount(6);
     }
 
@@ -123,7 +134,9 @@ public class GlobalPlatformOidsTests
     public void AnalyzeOids_ShouldHandleEmptyList()
     {
         // Act
-        GlobalPlatformOids.CapabilitiesSummary? summary = GlobalPlatformOids.AnalyzeOids(new string[0]);
+        GlobalPlatformOids.CapabilitiesSummary? summary = GlobalPlatformOids.AnalyzeOids(
+            new string[0]
+        );
 
         // Assert
         _ = summary.SupportedScpVersions.Should().BeEmpty();
@@ -136,12 +149,7 @@ public class GlobalPlatformOidsTests
     public void CapabilitiesSummary_ToString_ShouldFormatCorrectly()
     {
         // Arrange
-        string[] oids =
-        [
-            "1.2.840.114283.4.2",
-            "1.2.840.114283.4.3.112",
-            "1.2.840.114283.2.2.3"
-        ];
+        string[] oids = ["1.2.840.114283.4.2", "1.2.840.114283.4.3.112", "1.2.840.114283.2.2.3"];
         GlobalPlatformOids.CapabilitiesSummary? summary = GlobalPlatformOids.AnalyzeOids(oids);
 
         // Act

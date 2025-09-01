@@ -50,7 +50,7 @@ public enum ShareMode
     /// <summary>
     /// Direct access to the reader.
     /// </summary>
-    Direct
+    Direct,
 }
 
 /// <summary>
@@ -76,7 +76,7 @@ public enum Protocol
     /// <summary>
     /// Any available protocol.
     /// </summary>
-    Any = T0 | T1
+    Any = T0 | T1,
 }
 
 /// <summary>
@@ -102,5 +102,5 @@ public enum CardDisposition
     /// <summary>
     /// Eject the card.
     /// </summary>
-    EjectCard
+    EjectCard,
 }

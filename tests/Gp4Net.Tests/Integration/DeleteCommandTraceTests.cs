@@ -15,9 +15,8 @@ namespace Gp4Net.Tests.Integration;
 [Category("Integration")]
 public class DeleteCommandTraceTests : TraceBasedTestBase
 {
-    public DeleteCommandTraceTests() : base("install_uninstall.json", TraceOperations.Uninstall)
-    {
-    }
+    public DeleteCommandTraceTests()
+        : base("install_uninstall.json", TraceOperations.Uninstall) { }
 
     [Test]
     public void DeleteCommand_MatchesTraceFormat()
@@ -34,14 +33,14 @@ public class DeleteCommandTraceTests : TraceBasedTestBase
         // 20EEDD243F094FAD - 8 bytes deletion token
 
         byte[] aid = Convert.FromHexString("A0000003080000100001");
-        Result<DeleteCommand, SmartCardError> deleteCommandResult = DeleteCommand.CreateForApplication(aid, deleteRelated: true);
+        Result<DeleteCommand, SmartCardError> deleteCommandResult =
+            DeleteCommand.CreateForApplication(aid, deleteRelated: true);
         DeleteCommand? deleteCommand = deleteCommandResult.Value;
 
         // Act - Convert to APDU
         byte[]? apdu = deleteCommand.ToApdu();
         Assert.Multiple(() =>
         {
-
             // Assert - Verify structure
             Assert.That(apdu[0], Is.EqualTo(0x80)); // CLA (without secure messaging)
             Assert.That(apdu[1], Is.EqualTo(0xE4)); // INS
@@ -58,7 +57,7 @@ public class DeleteCommandTraceTests : TraceBasedTestBase
         });
 
         // Verify the AID
-        byte[] aidInApdu = apdu.Skip(dataStart + 2).Take(aid.Length).ToArray();
+        byte[] aidInApdu = [.. apdu.Skip(dataStart + 2).Take(aid.Length)];
         Assert.That(aidInApdu, Is.EqualTo(aid));
     }
 
@@ -69,18 +68,18 @@ public class DeleteCommandTraceTests : TraceBasedTestBase
         byte[] aid = Convert.FromHexString("A0000003080000100001");
         byte[] deletionToken = Convert.FromHexString("20EEDD243F094FAD");
 
-        Result<DeleteCommand, SmartCardError> deleteCommandResult = DeleteCommand.CreateForApplication(
-            aid,
-            deleteRelated: true,
-            deletionToken: deletionToken
-        );
+        Result<DeleteCommand, SmartCardError> deleteCommandResult =
+            DeleteCommand.CreateForApplication(
+                aid,
+                deleteRelated: true,
+                deletionToken: deletionToken
+            );
         DeleteCommand? deleteCommand = deleteCommandResult.Value;
 
         // Act
         byte[]? apdu = deleteCommand.ToApdu();
         Assert.Multiple(() =>
         {
-
             // Assert - The complete APDU structure
             Assert.That(apdu[0], Is.EqualTo(0x80)); // CLA
             Assert.That(apdu[1], Is.EqualTo(0xE4)); // INS
@@ -102,12 +101,12 @@ public class DeleteCommandTraceTests : TraceBasedTestBase
 
         // Verify AID
         int aidOffset = dataStart + 2;
-        byte[] aidInApdu = apdu.Skip(aidOffset).Take(aid.Length).ToArray();
+        byte[] aidInApdu = [.. apdu.Skip(aidOffset).Take(aid.Length)];
         Assert.That(aidInApdu, Is.EqualTo(aid));
 
         // Verify deletion token - appended directly without length prefix
         int tokenOffset = aidOffset + aid.Length;
-        byte[] tokenInApdu = apdu.Skip(tokenOffset).Take(deletionToken.Length).ToArray();
+        byte[] tokenInApdu = [.. apdu.Skip(tokenOffset).Take(deletionToken.Length)];
         Assert.That(tokenInApdu, Is.EqualTo(deletionToken));
     }
 
@@ -119,7 +118,9 @@ public class DeleteCommandTraceTests : TraceBasedTestBase
         Assert.That(CardService, Is.Not.Null);
 
         // From trace: 84E40080134F09A000000308000010007547C55C046E221C
-        byte[] expectedCommand = Convert.FromHexString("84E40080134F09A000000308000010007547C55C046E221C");
+        byte[] expectedCommand = Convert.FromHexString(
+            "84E40080134F09A000000308000010007547C55C046E221C"
+        );
 
         // Act - Send the exact command from trace
         var response = CardService.SendCommand(expectedCommand);
@@ -151,7 +152,8 @@ public class DeleteCommandTraceTests : TraceBasedTestBase
         // 7547C55C046E221C - 8-byte deletion token
         byte[] aid = Convert.FromHexString("A00000030800001000");
         byte[] deletionToken = Convert.FromHexString("7547C55C046E221C");
-        Result<DeleteCommand, SmartCardError> deleteCommandResult = DeleteCommand.CreateForApplication(aid, deleteRelated: true, deletionToken);
+        Result<DeleteCommand, SmartCardError> deleteCommandResult =
+            DeleteCommand.CreateForApplication(aid, deleteRelated: true, deletionToken);
         DeleteCommand? deleteCommand = deleteCommandResult.Value;
 
         // Act - Send the DELETE command (secure channel wrapping is handled by the trace)
@@ -162,7 +164,11 @@ public class DeleteCommandTraceTests : TraceBasedTestBase
         // Assert - From trace: Response is 6A88 (Referenced data not found)
         Assert.Multiple(() =>
         {
-            Assert.That(response.StatusWord, Is.EqualTo(0x6A88), "Should return 'Referenced data not found'");
+            Assert.That(
+                response.StatusWord,
+                Is.EqualTo(0x6A88),
+                "Should return 'Referenced data not found'"
+            );
             Assert.That(response.Data, Is.Not.Null);
             Assert.That(response.Data.Length, Is.EqualTo(0), "Error response should have no data");
         });
@@ -175,14 +181,14 @@ public class DeleteCommandTraceTests : TraceBasedTestBase
 
         // Arrange
         byte[] aid = Convert.FromHexString("A0000003080000100001"); // 10-byte AID from trace
-        Result<DeleteCommand, SmartCardError> deleteCommandResult = DeleteCommand.CreateForApplication(aid, deleteRelated: true);
+        Result<DeleteCommand, SmartCardError> deleteCommandResult =
+            DeleteCommand.CreateForApplication(aid, deleteRelated: true);
         DeleteCommand? deleteCommand = deleteCommandResult.Value;
 
         // Act
         byte[]? apdu = deleteCommand.ToApdu();
         Assert.Multiple(() =>
         {
-
             // Assert - Plain command structure
             Assert.That(apdu[0], Is.EqualTo(0x80)); // CLA (no secure messaging)
             Assert.That(apdu[1], Is.EqualTo(0xE4)); // INS (DELETE)
@@ -196,7 +202,7 @@ public class DeleteCommandTraceTests : TraceBasedTestBase
         });
 
         // Verify AID bytes
-        byte[] aidInApdu = apdu.Skip(7).Take(10).ToArray();
+        byte[] aidInApdu = [.. apdu.Skip(7).Take(10)];
         Assert.Multiple(() =>
         {
             Assert.That(aidInApdu, Is.EqualTo(aid));
@@ -217,10 +223,11 @@ public class DeleteCommandTraceTests : TraceBasedTestBase
         [
             Convert.FromHexString("A0000003080000100000"), // 10 bytes
             Convert.FromHexString("A0000003080000100001"), // 10 bytes
-            Convert.FromHexString("A00000030800") // 6 bytes
+            Convert.FromHexString("A00000030800"), // 6 bytes
         ];
 
-        Result<DeleteCommand, SmartCardError> deleteCommandResult = DeleteCommand.CreateForApplications(aids);
+        Result<DeleteCommand, SmartCardError> deleteCommandResult =
+            DeleteCommand.CreateForApplications(aids);
         DeleteCommand? deleteCommand = deleteCommandResult.Value;
 
         // Act
@@ -244,7 +251,7 @@ public class DeleteCommandTraceTests : TraceBasedTestBase
         offset += 2;
         foreach (byte[] aid in aids)
         {
-            byte[] aidInApdu = apdu.Skip(offset).Take(aid.Length).ToArray();
+            byte[] aidInApdu = [.. apdu.Skip(offset).Take(aid.Length)];
             Assert.That(aidInApdu, Is.EqualTo(aid));
             offset += aid.Length;
         }
@@ -270,11 +277,11 @@ public class DeleteCommandTraceTests : TraceBasedTestBase
         [
             0x0C, // Length of delete confirmation
             0x4F, // AID tag
-            (byte)testAid.Length
+            (byte)testAid.Length,
         ];
         response2.AddRange(testAid);
 
-        DeleteResponse? parsed2 = DeleteResponse.Parse(response2.ToArray(), 0x9000);
+        DeleteResponse? parsed2 = DeleteResponse.Parse([.. response2], 0x9000);
         Assert.Multiple(() =>
         {
             Assert.That(parsed2.IsSuccessful, Is.True);

@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Transport;
@@ -25,7 +24,8 @@ public static class SecurityValidation
     public static Result<byte[], SmartCardError> ValidateResponseInputs(
         byte[] response,
         SessionKeys sessionKeys,
-        ImmutableArray<byte> macChainingValue)
+        ImmutableArray<byte> macChainingValue
+    )
     {
         if (response.Length < 2)
         {
@@ -50,7 +50,8 @@ public static class SecurityValidation
     public static Result<IApduCommand, SmartCardError> ValidateCommandInputs(
         IApduCommand command,
         SessionKeys sessionKeys,
-        ImmutableArray<byte> macChainingValue)
+        ImmutableArray<byte> macChainingValue
+    )
     {
         if (macChainingValue.IsDefaultOrEmpty)
         {
@@ -83,12 +84,10 @@ public static class SecurityValidation
             return false;
         }
 
-        ushort sw = (ushort)((response[response.Length - 2] << 8) | response[response.Length - 1]);
+        ushort sw = (ushort)(response[^2] << 8 | response[^1]);
 
         // Per GP spec: R-MAC only for success and warning status words
-        return sw == StatusWords.Success ||
-               (sw & 0xFF00) == 0x6200 ||
-               (sw & 0xFF00) == 0x6300;
+        return sw == Gp4Net.Constants.Constants.StatusWords.Legacy.Success || (sw & 0xFF00) == 0x6200 || (sw & 0xFF00) == 0x6300;
     }
 
     /// <summary>

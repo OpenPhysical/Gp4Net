@@ -5,7 +5,6 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
-using Gp4Net.Domain.Security;
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
 
@@ -22,7 +21,8 @@ public static class CommandProcessing
     public delegate Task<Result<CommandResult, SmartCardError>> CommandProcessor(
         IApduCommand command,
         CommandEnvironment environment,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Immutable environment containing all dependencies for command processing.
@@ -31,9 +31,9 @@ public static class CommandProcessing
         ICardChannel Channel,
         IApduTransport Transport,
         Maybe<SecureChannelState> SecureChannel,
-        ISecureChannelService SecureChannelService,
         ILogger Logger,
-        CommandOptions Options = null)
+        CommandOptions Options = null
+    )
     {
         /// <summary>
         /// Creates a new environment with updated secure channel state.
@@ -64,7 +64,8 @@ public static class CommandProcessing
         byte[] Data,
         StatusWord StatusWord,
         CommandEnvironment UpdatedEnvironment,
-        CommandMetadata Metadata = null)
+        CommandMetadata Metadata = null
+    )
     {
         /// <summary>
         /// Creates a successful result.
@@ -73,7 +74,8 @@ public static class CommandProcessing
             byte[] data,
             StatusWord statusWord,
             CommandEnvironment environment,
-            CommandMetadata metadata = null)
+            CommandMetadata metadata = null
+        )
         {
             return new(data, statusWord, environment, metadata ?? new CommandMetadata());
         }
@@ -81,8 +83,8 @@ public static class CommandProcessing
         /// <summary>
         /// Checks if the command was successful.
         /// </summary>
-        public bool IsSuccess => StatusWord == Constants.StatusWords.Success ||
-                                (StatusWord & 0xFF00) == 0x6100;
+        public bool IsSuccess =>
+            StatusWord == Constants.Constants.StatusWords.Legacy.Success || (StatusWord & 0xFF00) == 0x6100;
     }
 
     /// <summary>
@@ -96,5 +98,6 @@ public static class CommandProcessing
         bool SecureChannelUnwrapped = false,
         bool ResponseLogged = false,
         int RetryCount = 0,
-        Maybe<InitializeUpdateResponse> InitializeUpdateResponse = default);
+        Maybe<InitializeUpdateResponse> InitializeUpdateResponse = default
+    );
 }

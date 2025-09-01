@@ -29,25 +29,30 @@ public class EmptyCardService : ISmartCardService
     public IPipelineContext Context => _context;
 
     public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
-        IApduCommand command, 
-        CancellationToken cancellationToken = default)
+        IApduCommand command,
+        CancellationToken cancellationToken = default
+    )
     {
         return await Task.FromResult(
             Result.Failure<CommandResponse, SmartCardError>(
-                SmartCardError.CommunicationError("Empty card service - no operation supported")));
+                SmartCardError.CommunicationError("Empty card service - no operation supported")
+            )
+        );
     }
 
     public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
-        IApduCommand command, 
-        CommandOptions options, 
-        CancellationToken cancellationToken = default)
+        IApduCommand command,
+        CommandOptions options,
+        CancellationToken cancellationToken = default
+    )
     {
         return await ExecuteCommandAsync(command, cancellationToken);
     }
 
     public Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context)
     {
-        return Maybe<IPipelineContext>.From(context)
+        return Maybe<IPipelineContext>
+            .From(context)
             .ToResult(SmartCardError.InvalidArgument("Context cannot be null"))
             .Map(validContext => (ISmartCardService)new EmptyCardService(validContext));
     }
@@ -58,35 +63,48 @@ public class EmptyCardService : ISmartCardService
         return Result.Success<ISmartCardService, SmartCardError>(new EmptyCardService(newContext));
     }
 
-    public async Task<Result<bool, SmartCardError>> IsConnectedAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<bool, SmartCardError>> IsConnectedAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         return await Task.FromResult(Result.Success<bool, SmartCardError>(false));
     }
 
-    public async Task<Result<byte[], SmartCardError>> GetAtrAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<byte[], SmartCardError>> GetAtrAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         return await Task.FromResult(
             Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CommunicationError("Empty card service - no ATR available")));
+                SmartCardError.CommunicationError("Empty card service - no ATR available")
+            )
+        );
     }
 
-    public async Task<Result<string[], SmartCardError>> GetReadersAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<string[], SmartCardError>> GetReadersAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         return await Task.FromResult(Result.Success<string[], SmartCardError>([]));
     }
 
-    public async Task<Result<bool, SmartCardError>> IsSecureChannelEstablishedAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<bool, SmartCardError>> IsSecureChannelEstablishedAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         return await Task.FromResult(Result.Success<bool, SmartCardError>(false));
     }
 
     public async Task<Result<CommandResponse, SmartCardError>> SendCommandAsync(
-        byte[] command, 
-        CancellationToken cancellationToken = default)
+        byte[] command,
+        CancellationToken cancellationToken = default
+    )
     {
         return await Task.FromResult(
             Result.Success<CommandResponse, SmartCardError>(
-                CommandResponse.Failure(0x6F00, _context))); // Generic error response
+                CommandResponse.Failure(0x6F00, _context)
+            )
+        ); // Generic error response
     }
 
     public void Dispose()

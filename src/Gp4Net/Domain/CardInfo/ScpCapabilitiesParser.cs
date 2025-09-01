@@ -1,16 +1,20 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Core.Tlv;
+using Gp4Net.Services;
+using static Gp4Net.Services.TlvService;
 using Gp4Net.Domain.Protocol;
 
 namespace Gp4Net.Domain.CardInfo;
 
 /// <summary>
 /// Parses SCP (Secure Channel Protocol) capabilities from card capability data.
+/// This parser delegates to UnifiedTlvParser for TLV operations.
 /// </summary>
+[Obsolete("Use UnifiedTlvParser with domain-specific SCP parsing logic for new code. This class will be removed in a future version.")]
 public static class ScpCapabilitiesParser
 {
     /// <summary>
@@ -36,12 +40,17 @@ public static class ScpCapabilitiesParser
             return new ScpInformation(new List<ScpProtocolInfo>());
         }
 
-        Dictionary<byte, List<ScpImplementation>> protocols = new Dictionary<byte, List<ScpImplementation>>();
+        Dictionary<byte, List<ScpImplementation>> protocols =
+            new Dictionary<byte, List<ScpImplementation>>();
 
         try
         {
-            // Use TlvParser to properly parse TLV structure
-            ParseElements(TlvParser.ParseAll(data), protocols);
+            // Use TlvParser which internally delegates to UnifiedTlvParser
+            var parseResult = TlvParser.ParseMultiple(data.ToImmutableArray());
+            if (parseResult.IsSuccess)
+            {
+                ParseElements(parseResult.Value.Objects, protocols);
+            }
         }
         catch
         {
@@ -50,10 +59,9 @@ public static class ScpCapabilitiesParser
         }
 
         // Convert to structured information
-        List<ScpProtocolInfo> protocolList = protocols
+        List<ScpProtocolInfo> protocolList = [.. protocols
             .Select(kvp => new ScpProtocolInfo(kvp.Key, kvp.Value.Distinct().ToList()))
-            .OrderBy(p => p.Version)
-            .ToList();
+            .OrderBy(p => p.Version)];
 
         return new ScpInformation(protocolList);
     }
@@ -61,113 +69,167 @@ public static class ScpCapabilitiesParser
     /// <summary>
     /// Recursively parses TLV elements to extract SCP information.
     /// </summary>
-    private static void ParseElements(IEnumerable<TlvObject> elements, Dictionary<byte, List<ScpImplementation>> protocols)
+    private static void ParseElements(
+        ImmutableArray<TlvObject> elements,
+        Dictionary<byte, List<ScpImplementation>> protocols
+    )
     {
-        foreach (TlvObject element in elements)
+        var processedElements = elements
+            .Select(element => element.Tag.ToNumber().Match(
+                tagValue => ProcessElement(element, tagValue, protocols),
+                error => UnitResult.Failure<SmartCardError>(error)
+            ))
+            .ToArray();
+        
+        // Force evaluation of the sequence to ensure side effects occur
+        var _ = processedElements.Length;
+    }
+
+    /// <summary>
+    /// Processes a single TLV element for SCP information.
+    /// </summary>
+    private static UnitResult<SmartCardError> ProcessElement(TlvObject element, uint tagValue, Dictionary<byte, List<ScpImplementation>> protocols)
+    {
+        switch (tagValue)
         {
-            Result<uint, SmartCardError> tagNumber = element.GetTagNumber();
-            if (tagNumber.IsFailure) continue;
-
-            switch (tagNumber.Value)
-            {
-                case 0xA0: // Constructed tag containing SCP information
-                    // Per GP Card Spec, A0 tag in capabilities contains nested TLV
-                    if (element.Value != null && element.Value.Length > 0)
+            case 0xA0: // Constructed tag containing SCP information
+                // Per GP Card Spec, A0 tag in capabilities contains nested TLV
+                if (element.TlvData.Bytes.Length > 0)
+                {
+                    var innerParseResult = TlvParser.ParseMultiple(element.TlvData.Bytes);
+                    if (innerParseResult.IsSuccess)
                     {
-                        try
-                        {
-                            // Parse inner TLV structure
-                            IReadOnlyList<TlvObject> innerElements = TlvParser.ParseAll(element.Value);
-                            ParseA0Contents(innerElements, protocols);
-                        }
-                        catch
-                        {
-                            // If parsing inner structure fails, continue
-                        }
+                        ParseA0Contents(innerParseResult.Value.Objects, protocols);
                     }
-                    break;
+                }
+                break;
 
-                // Tags 80-87 outside A0 context are not SCP related per GP Card Spec Table H-5
-                case 0x80: // Outside A0 context - not SCP related
-                case 0x81: // Outside A0 context - privileges  
-                case 0x82: // Outside A0 context - privileges
-                case 0x83: // Outside A0 context - privileges  
-                case 0x84: // Outside A0 context - privileges
-                case 0x85: // Outside A0 context - privileges  
-                case 0x86: // Outside A0 context - privileges
-                case 0x87: // Outside A0 context - privileges
-                    // These tags outside A0 are privilege/capability indicators, not SCP
-                    break;
-
-                default:
-                    break;
-            }
+            // Tags 80-87 outside A0 context are not SCP related per GP Card Spec Table H-5
+            case 0x80: // Outside A0 context - not SCP related
+            case 0x81: // Outside A0 context - privileges
+            case 0x82: // Outside A0 context - privileges
+            case 0x83: // Outside A0 context - privileges
+            case 0x84: // Outside A0 context - privileges
+            case 0x85: // Outside A0 context - privileges
+            case 0x86: // Outside A0 context - privileges
+            case 0x87: // Outside A0 context - privileges
+                // These tags outside A0 are privilege/capability indicators, not SCP
+                break;
         }
+        
+        return UnitResult.Success<SmartCardError>();
     }
 
     /// <summary>
     /// Parses A0 tag contents to extract SCP information per GP Card Spec Table H-5.
     /// </summary>
-    private static void ParseA0Contents(IEnumerable<TlvObject> elements, Dictionary<byte, List<ScpImplementation>> protocols)
+    private static void ParseA0Contents(
+        ImmutableArray<TlvObject> elements,
+        Dictionary<byte, List<ScpImplementation>> protocols
+    )
     {
-        byte? currentScpType = null;
+        var initialState = new A0ParsingState(Maybe<byte>.None, protocols);
+        
+        var finalState = elements
+            .Select(element => element.Tag.ToNumber().Match(
+                tagValue => new { Element = element, TagValue = Maybe<uint>.From(tagValue) },
+                error => new { Element = element, TagValue = Maybe<uint>.None }
+            ))
+            .Where(x => x.TagValue.HasValue)
+            .Aggregate(initialState, (state, x) => 
+                x.TagValue.Match(
+                    tagValue => ProcessA0Element(x.Element, tagValue, state),
+                    () => state
+                ));
+    }
 
-        foreach (TlvObject element in elements)
+    /// <summary>
+    /// State object for A0 parsing to maintain immutability.
+    /// </summary>
+    private record A0ParsingState(Maybe<byte> CurrentScpType, Dictionary<byte, List<ScpImplementation>> Protocols);
+
+    /// <summary>
+    /// Processes a single A0 element and returns updated state.
+    /// </summary>
+    private static A0ParsingState ProcessA0Element(TlvObject element, uint tagValue, A0ParsingState state)
+    {
+        return tagValue switch
         {
-            Result<uint, SmartCardError> tagNumber = element.GetTagNumber();
-            if (tagNumber.IsFailure) continue;
+            0x80 => ProcessScpTypeTag(element, state),
+            0x81 => ProcessScpOptionsTag(element, state),
+            0x82 or 0x83 or 0x84 => state, // Additional SCP-specific options, handled in future versions
+            _ => state
+        };
+    }
 
-            switch (tagNumber.Value)
-            {
-                case 0x80: // SCP type ('02', '03', '10', '11', '80', '81')
-                    if (element.Value != null && element.Value.Length > 0)
-                    {
-                        byte scpVersion = element.Value[0];
-                        // Valid SCP versions per GP specification
-                        if (scpVersion is 0x02 or 0x03 or 0x10 or 0x11 or 0x80 or 0x81)
-                        {
-                            currentScpType = scpVersion;
-                            if (!protocols.ContainsKey(scpVersion))
-                            {
-                                protocols[scpVersion] = [];
-                            }
-                        }
-                    }
-                    break;
+    /// <summary>
+    /// Processes SCP type tag (0x80).
+    /// </summary>
+    private static A0ParsingState ProcessScpTypeTag(TlvObject element, A0ParsingState state)
+    {
+        if (element.TlvData.Bytes.Length == 0)
+            return state;
 
-                case 0x81: // List of supported options for that protocol
-                    if (element.Value != null && element.Value.Length > 0 && currentScpType.HasValue)
-                    {
-                        foreach (byte optionByte in element.Value)
-                        {
-                            // Each byte is an implementation option
-                            if (Enum.IsDefined(typeof(ScpImplementation), optionByte))
-                            {
-                                ScpImplementation impl = (ScpImplementation)optionByte;
-                                if (currentScpType.Value == 0x02 && impl.IsScp02())
-                                {
-                                    protocols[currentScpType.Value].Add(impl);
-                                }
-                                else if (currentScpType.Value == 0x03 && impl.IsScp03())
-                                {
-                                    protocols[currentScpType.Value].Add(impl);
-                                }
-                                else if (currentScpType.Value == 0x10)
-                                {
-                                    // SCP10 implementation options
-                                    protocols[currentScpType.Value].Add(impl);
-                                }
-                            }
-                        }
-                    }
-                    break;
+        byte scpVersion = element.TlvData.Bytes[0];
+        
+        // Valid SCP versions per GP specification
+        if (scpVersion is not (0x02 or 0x03 or 0x10 or 0x11 or 0x80 or 0x81))
+            return state;
 
-                case 0x82: // Supported keys for SCP03
-                case 0x83: // Supported TLS cipher suites for SCP81
-                case 0x84: // Maximum length of Pre Shared Key
-                    // These are additional SCP-specific options, not parsed for now
-                    break;
-            }
+        if (!state.Protocols.ContainsKey(scpVersion))
+        {
+            state.Protocols[scpVersion] = [];
         }
+
+        return state with { CurrentScpType = Maybe<byte>.From(scpVersion) };
+    }
+
+    /// <summary>
+    /// Processes SCP options tag (0x81).
+    /// </summary>
+    private static A0ParsingState ProcessScpOptionsTag(TlvObject element, A0ParsingState state)
+    {
+        return state.CurrentScpType.Match(
+            scpType => ProcessOptionsWithScpType(element, scpType, state),
+            () => state
+        );
+    }
+
+    /// <summary>
+    /// Processes options when SCP type is available.
+    /// </summary>
+    private static A0ParsingState ProcessOptionsWithScpType(TlvObject element, byte scpType, A0ParsingState state)
+    {
+        var optionBytes = element.TlvData.Bytes.ToArray();
+        
+        if (optionBytes.Length == 0)
+            return state;
+
+        var validImplementations = optionBytes
+            .Where(optionByte => Enum.IsDefined(typeof(ScpImplementation), optionByte))
+            .Select(optionByte => (ScpImplementation)optionByte)
+            .Where(impl => IsValidImplementationForScpType(impl, scpType))
+            .ToList();
+
+        // Create new protocols dictionary with added implementations
+        var updatedProtocols = new Dictionary<byte, List<ScpImplementation>>(state.Protocols);
+        var existingImplementations = updatedProtocols[scpType];
+        updatedProtocols[scpType] = existingImplementations.Concat(validImplementations).Distinct().ToList();
+
+        return state with { Protocols = updatedProtocols };
+    }
+
+    /// <summary>
+    /// Determines if an implementation is valid for the given SCP type.
+    /// </summary>
+    private static bool IsValidImplementationForScpType(ScpImplementation impl, byte scpType)
+    {
+        return scpType switch
+        {
+            0x02 => impl.IsScp02(),
+            0x03 => impl.IsScp03(),
+            0x10 => true, // SCP10 implementation options
+            _ => false
+        };
     }
 }

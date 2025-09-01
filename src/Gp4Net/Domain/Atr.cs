@@ -13,14 +13,14 @@ namespace Gp4Net.Domain;
 /// The ATR is defined by ISO/IEC 7816-3 and provides information about the card's capabilities,
 /// supported protocols, and historical bytes. This immutable value object ensures ATR data
 /// integrity and provides functional methods for parsing and validation.
-/// 
+///
 /// ATR structure per ISO 7816-3:
 /// - Initial character (TS): Indicates bit order and voltage convention
 /// - Format character (T0): Encodes interface characters presence
 /// - Interface characters (TAi, TBi, TCi, TDi): Protocol parameters
 /// - Historical bytes: Card-specific information
 /// - Check character (TCK): Checksum for certain protocol types
-/// 
+///
 /// Valid ATR length: 2 to 33 bytes per specification.
 /// </remarks>
 [PublicAPI]
@@ -44,7 +44,8 @@ public sealed record Atr
     /// <summary>
     /// Gets the format character (T0) which encodes the presence of interface characters.
     /// </summary>
-    public Maybe<byte> FormatCharacter => Value.Length > 1 ? Maybe<byte>.From(Value[1]) : Maybe<byte>.None;
+    public Maybe<byte> FormatCharacter =>
+        Value.Length > 1 ? Maybe<byte>.From(Value[1]) : Maybe<byte>.None;
 
     /// <summary>
     /// Gets whether this is a direct convention ATR (TS = 0x3B).
@@ -72,10 +73,11 @@ public sealed record Atr
     /// <returns>Success with ATR if valid, or failure with validation error.</returns>
     public static Result<Atr, string> FromBytes(byte[] bytes)
     {
-        return Maybe<byte[]>.From(bytes)
+        return Maybe<byte[]>
+            .From(bytes)
             .Map(ValidateAtrBytes)
             .GetValueOrDefault(Result.Failure<byte[], string>("ATR bytes cannot be null"))
-            .Map(validBytes => new Atr([..validBytes]));
+            .Map(validBytes => new Atr([.. validBytes]));
     }
 
     /// <summary>
@@ -85,8 +87,7 @@ public sealed record Atr
     /// <returns>Success with ATR if valid, or failure with validation error.</returns>
     public static Result<Atr, string> FromImmutableArray(ImmutableArray<byte> bytes)
     {
-        return ValidateAtrBytes(bytes.ToArray())
-            .Map(validBytes => new Atr(bytes));
+        return ValidateAtrBytes([.. bytes]).Map(validBytes => new Atr(bytes));
     }
 
     /// <summary>
@@ -112,7 +113,9 @@ public sealed record Atr
         byte ts = bytes[0];
         if (ts != 0x3B && ts != 0x3F)
         {
-            return Result.Failure<byte[], string>($"Invalid initial character: 0x{ts:X2}. Must be 0x3B (direct) or 0x3F (inverse)");
+            return Result.Failure<byte[], string>(
+                $"Invalid initial character: 0x{ts:X2}. Must be 0x3B (direct) or 0x3F (inverse)"
+            );
         }
 
         // Additional validation could be added here for:
@@ -129,9 +132,7 @@ public sealed record Atr
     /// <returns>Hexadecimal string representation of the ATR.</returns>
     public override string ToString()
     {
-        return Value.Length == 0
-            ? "Empty ATR"
-            : Convert.ToHexString(Value.ToArray());
+        return Value.Length == 0 ? "Empty ATR" : Convert.ToHexString([.. Value]);
     }
 
     /// <summary>
@@ -140,9 +141,7 @@ public sealed record Atr
     /// <returns>Formatted hexadecimal string with spaces.</returns>
     public string ToFormattedString()
     {
-        return Value.Length == 0
-            ? "Empty ATR"
-            : string.Join(" ", Value.Select(b => $"{b:X2}"));
+        return Value.Length == 0 ? "Empty ATR" : string.Join(" ", Value.Select(b => $"{b:X2}"));
     }
 
     /// <summary>
@@ -151,7 +150,7 @@ public sealed record Atr
     /// <returns>Copy of the ATR bytes as a byte array.</returns>
     public byte[] ToByteArray()
     {
-        return Value.ToArray();
+        return [.. Value];
     }
 
     /// <summary>
@@ -182,10 +181,9 @@ public sealed record Atr
             return Maybe<ImmutableArray<byte>>.From(ImmutableArray<byte>.Empty);
         }
 
-        ImmutableArray<byte> historicalBytes = [
-            ..Value
-                .Skip(historicalBytesStart)
-                .Take(historicalBytesCount)
+        ImmutableArray<byte> historicalBytes =
+        [
+            .. Value.Skip(historicalBytesStart).Take(historicalBytesCount),
         ];
 
         return Maybe<ImmutableArray<byte>>.From(historicalBytes);
@@ -204,10 +202,14 @@ public sealed record Atr
         // Count TAi, TBi, TCi, TDi based on high nibble of T0
         int interfaceIndicator = (t0 & 0xF0) >> 4;
 
-        if ((interfaceIndicator & 0x1) != 0) count++; // TAi present
-        if ((interfaceIndicator & 0x2) != 0) count++; // TBi present
-        if ((interfaceIndicator & 0x4) != 0) count++; // TCi present
-        if ((interfaceIndicator & 0x8) != 0) count++; // TDi present
+        if ((interfaceIndicator & 0x1) != 0)
+            count++; // TAi present
+        if ((interfaceIndicator & 0x2) != 0)
+            count++; // TBi present
+        if ((interfaceIndicator & 0x4) != 0)
+            count++; // TCi present
+        if ((interfaceIndicator & 0x8) != 0)
+            count++; // TDi present
 
         // Note: This is simplified. In reality, TDi can indicate additional interface characters
         // A full implementation would need to parse the entire chain of TDi characters

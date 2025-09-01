@@ -24,7 +24,10 @@ public class DeleteCommandTests
         byte[] aid = Convert.FromHexString("A000000003000000");
 
         // Act
-        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication(aid, deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication(
+            aid,
+            deleteRelated: false
+        );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -43,7 +46,10 @@ public class DeleteCommandTests
         byte[] aid = Convert.FromHexString("A000000003000000");
 
         // Act
-        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication(aid, deleteRelated: true);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication(
+            aid,
+            deleteRelated: true
+        );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -62,7 +68,11 @@ public class DeleteCommandTests
         byte[] deletionToken = Convert.FromHexString("20EEDD243F094FAD");
 
         // Act
-        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication(aid, deleteRelated: true, deletionToken);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication(
+            aid,
+            deleteRelated: true,
+            deletionToken
+        );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -75,7 +85,10 @@ public class DeleteCommandTests
     public void CreateForApplication_WithNullAid_ReturnsFailure()
     {
         // Act
-        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication(null!, deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication(
+            null!,
+            deleteRelated: false
+        );
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -86,7 +99,10 @@ public class DeleteCommandTests
     public void CreateForApplication_WithEmptyAid_ReturnsFailure()
     {
         // Act
-        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication([], deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplication(
+            [],
+            deleteRelated: false
+        );
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -100,7 +116,10 @@ public class DeleteCommandTests
         byte[] packageAid = Convert.FromHexString("A000000003080000");
 
         // Act
-        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForPackage(packageAid, deleteRelated: true);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForPackage(
+            packageAid,
+            deleteRelated: true
+        );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -116,11 +135,14 @@ public class DeleteCommandTests
         [
             Convert.FromHexString("A000000003000000"),
             Convert.FromHexString("A000000003000001"),
-            Convert.FromHexString("A000000003000002")
+            Convert.FromHexString("A000000003000002"),
         ];
 
         // Act
-        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplications(aids, deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplications(
+            aids,
+            deleteRelated: false
+        );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -136,7 +158,10 @@ public class DeleteCommandTests
     public void CreateForApplications_WithNullList_ReturnsFailure()
     {
         // Act
-        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplications(null!, deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplications(
+            null!,
+            deleteRelated: false
+        );
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -147,7 +172,10 @@ public class DeleteCommandTests
     public void CreateForApplications_WithEmptyList_ReturnsFailure()
     {
         // Act
-        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplications(Array.Empty<byte[]>(), deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplications(
+            Array.Empty<byte[]>(),
+            deleteRelated: false
+        );
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -158,15 +186,18 @@ public class DeleteCommandTests
     public void CreateForApplications_WithNullAidInList_ReturnsFailure()
     {
         // Arrange
-        byte[][] aids = new byte[][]
+        byte[][] aids = new[]
         {
             Convert.FromHexString("A000000003000000"),
             null!,
-            Convert.FromHexString("A000000003000002")
+            Convert.FromHexString("A000000003000002"),
         };
 
         // Act
-        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplications(aids, deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplications(
+            aids,
+            deleteRelated: false
+        );
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -181,7 +212,10 @@ public class DeleteCommandTests
         byte keyVersion = 0x73;
 
         // Act
-        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForKey(keyIdentifier, keyVersion);
+        Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForKey(
+            keyIdentifier,
+            keyVersion
+        );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -197,7 +231,10 @@ public class DeleteCommandTests
     {
         // Arrange
         byte[] aid = Convert.FromHexString("A000000003000000");
-        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(aid, deleteRelated: false);
+        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(
+            aid,
+            deleteRelated: false
+        );
         DeleteCommand? command = commandResult.Value;
 
         // Act
@@ -221,7 +258,11 @@ public class DeleteCommandTests
         // Arrange
         byte[] aid = Convert.FromHexString("A000000003000000");
         byte[] deletionToken = Convert.FromHexString("20EEDD243F094FAD");
-        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(aid, deleteRelated: true, deletionToken);
+        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(
+            aid,
+            deleteRelated: true,
+            deletionToken
+        );
         DeleteCommand? command = commandResult.Value;
 
         // Act
@@ -243,7 +284,10 @@ public class DeleteCommandTests
 
         // Verify deletion token is appended directly (no TLV wrapper)
         int tokenOffset = 7 + aid.Length;
-        _ = apdu.Skip(tokenOffset).Take(deletionToken.Length).Should().BeEquivalentTo(deletionToken);
+        _ = apdu.Skip(tokenOffset)
+            .Take(deletionToken.Length)
+            .Should()
+            .BeEquivalentTo(deletionToken);
     }
 
     [Test]
@@ -254,9 +298,11 @@ public class DeleteCommandTests
         [
             Convert.FromHexString("A00000030800001000"), // 9 bytes
             Convert.FromHexString("A0000003080000"), // 7 bytes
-            Convert.FromHexString("A000000308") // 5 bytes
+            Convert.FromHexString("A000000308"), // 5 bytes
         ];
-        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplications(aids);
+        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplications(
+            aids
+        );
         DeleteCommand? command = commandResult.Value;
 
         // Act
@@ -284,7 +330,9 @@ public class DeleteCommandTests
     {
         // Arrange
         byte[] aid = Convert.FromHexString("A000000003000000");
-        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(aid);
+        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(
+            aid
+        );
         DeleteCommand? command = commandResult.Value;
 
         // Act
@@ -302,7 +350,9 @@ public class DeleteCommandTests
     {
         // Arrange
         byte[] aid = Convert.FromHexString("A000000003000000");
-        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(aid);
+        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(
+            aid
+        );
         DeleteCommand? command = commandResult.Value;
 
         // Act
@@ -320,7 +370,7 @@ public class DeleteCommandTests
     {
         // Arrange
         byte[] responseData = [0x00]; // Length of delete confirmation = 0
-        ushort statusWord = (ushort)0x9000;
+        ushort statusWord = 0x9000;
 
         // Act
         DeleteResponse? response = DeleteResponse.Parse(responseData, statusWord);
@@ -336,13 +386,14 @@ public class DeleteCommandTests
     {
         // Arrange
         byte[] deletedAid = Convert.FromHexString("A000000003000000");
-        byte[] responseData = new byte[]
-        {
+        byte[] responseData =
+        [
             0x0A, // Length of delete confirmation (2 + 8)
             0x4F, // AID tag
-            0x08, // AID length (8 bytes)
-        }.Concat(deletedAid).ToArray();
-        ushort statusWord = (ushort)0x9000;
+            0x08,
+            .. deletedAid, // AID length (8 bytes)
+        ];
+        ushort statusWord = 0x9000;
 
         // Act
         DeleteResponse? response = DeleteResponse.Parse(responseData, statusWord);
@@ -359,7 +410,7 @@ public class DeleteCommandTests
     {
         // Arrange
         byte[] responseData = [0x81, 0x80]; // Extended length: 128 bytes
-        ushort statusWord = (ushort)0x9000;
+        ushort statusWord = 0x9000;
 
         // Act
         DeleteResponse? response = DeleteResponse.Parse(responseData, statusWord);
@@ -375,13 +426,13 @@ public class DeleteCommandTests
         // Arrange
         (ushort, string)[] testCases =
         [
-            ((ushort)0x9000, "Deletion successful"),
-            ((ushort)0x6A80, "Incorrect data or AID not found"),
-            ((ushort)0x6A82, "Application not found"),
-            ((ushort)0x6985, "Conditions not satisfied (dependencies exist)"),
-            ((ushort)0x6A88, "Referenced data not found"),
-            ((ushort)0x6F00, "Generic failure during deletion"),
-            ((ushort)0x1234, "Unknown error: 1234") // Unknown status
+            (0x9000, "Deletion successful"),
+            (0x6A80, "Incorrect data or AID not found"),
+            (0x6A82, "Application not found"),
+            (0x6985, "Conditions not satisfied (dependencies exist)"),
+            (0x6A88, "Referenced data not found"),
+            (0x6F00, "Generic failure during deletion"),
+            (0x1234, "Unknown error: 1234"), // Unknown status
         ];
 
         foreach ((ushort statusWord, string expectedDescription) in testCases)
@@ -400,9 +451,11 @@ public class DeleteCommandTests
     {
         // Arrange
         byte[] aid = Convert.FromHexString("A000000003000000");
-        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(aid);
+        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(
+            aid
+        );
         DeleteCommand? command = commandResult.Value;
-        byte[][] originalAids = command.Aids.ToArray();
+        byte[][] originalAids = [.. command.Aids];
 
         // Act - Attempt to modify the returned AID list
         // This should not affect the command's internal state

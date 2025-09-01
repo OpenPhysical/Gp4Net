@@ -15,7 +15,6 @@ namespace Gp4Net.Tool.Commands.Card;
 /// </summary>
 public static class CardInfoTableBuilder
 {
-
     /// <summary>
     /// Base type for all table rows, enabling type-safe UI composition.
     /// </summary>
@@ -55,7 +54,8 @@ public static class CardInfoTableBuilder
     /// <returns>Sequence of semantic table rows</returns>
     public static IEnumerable<TableRow> BuildCardInfoRows(
         CardInformation cardInfo,
-        bool isSecureChannelEstablished)
+        bool isSecureChannelEstablished
+    )
     {
         return new[]
         {
@@ -64,9 +64,8 @@ public static class CardInfoTableBuilder
             BuildManufacturingInfo(cardInfo),
             BuildPlatformInfo(cardInfo),
             BuildSecurityCapabilities(cardInfo),
-            BuildKeyInformation(cardInfo)
-        }
-        .SelectMany(rows => rows);
+            BuildKeyInformation(cardInfo),
+        }.SelectMany(rows => rows);
     }
 
     /// <summary>
@@ -77,8 +76,11 @@ public static class CardInfoTableBuilder
         return
         [
             new StatusRow("Connection", true, "Connected"),
-            new StatusRow("Secure Channel", isSecureChannelEstablished,
-                isSecureChannelEstablished ? "Active" : "Not established")
+            new StatusRow(
+                "Secure Channel",
+                isSecureChannelEstablished,
+                isSecureChannelEstablished ? "Active" : "Not established"
+            ),
         ];
     }
 
@@ -88,13 +90,15 @@ public static class CardInfoTableBuilder
     private static IEnumerable<TableRow> BuildCardIdentification(CardInformation cardInfo)
     {
         // ATR is optional
-        TableRow[] atrRows = cardInfo.Atr
-            .Map(atr => new TableRow[] { new PropertyRow("ATR", $"[dim]{Convert.ToHexString(atr)}[/]") })
+        TableRow[] atrRows = cardInfo
+            .Atr.Map(atr =>
+                new TableRow[] { new PropertyRow("ATR", $"[dim]{Convert.ToHexString(atr)}[/]") }
+            )
             .GetValueOrDefault([]);
 
         // ISD information with nested details
-        IEnumerable<TableRow> isdRows = cardInfo.IsdInfo
-            .Map(isd => BuildIsdDetails(isd))
+        IEnumerable<TableRow> isdRows = cardInfo
+            .IsdInfo.Map(isd => BuildIsdDetails(isd))
             .GetValueOrDefault([new StatusRow("ISD", false, "Not accessible")]);
 
         return atrRows.Concat(isdRows);
@@ -108,9 +112,7 @@ public static class CardInfoTableBuilder
         StatusRow statusRow = new StatusRow("ISD", true, "Available");
 
         // Build FCI rows using functional composition with ISD prefix
-        IEnumerable<TableRow> fciRows = isd.Fci.Match(
-            fci => CreateIsdFciRows(fci),
-            () => []);
+        IEnumerable<TableRow> fciRows = isd.Fci.Match(fci => CreateIsdFciRows(fci), () => []);
 
         return new[] { statusRow }.Concat(fciRows);
     }
@@ -122,7 +124,10 @@ public static class CardInfoTableBuilder
     private static IEnumerable<TableRow> CreateIsdFciRows(FileControlInformation fci)
     {
         // Build rows using functional composition with "ISD " prefix
-        PropertyRow[] aidRows = [new PropertyRow("ISD AID", Convert.ToHexString(fci.ApplicationAid))];
+        PropertyRow[] aidRows =
+        [
+            new PropertyRow("ISD AID", Convert.ToHexString(fci.ApplicationAid)),
+        ];
 
         TableRow[] labelRows = fci.ApplicationLabel.Match(
             Some: label => [new PropertyRow("ISD Application Label", label)],
@@ -192,8 +197,8 @@ public static class CardInfoTableBuilder
     /// </summary>
     private static IEnumerable<TableRow> BuildManufacturingInfo(CardInformation cardInfo)
     {
-        return cardInfo.Cplc
-            .Map(cplc => BuildCplcDetails(cplc, cardInfo.ChipDetails))
+        return cardInfo
+            .Cplc.Map(cplc => BuildCplcDetails(cplc, cardInfo.ChipDetails))
             .GetValueOrDefault([]);
     }
 
@@ -205,38 +210,57 @@ public static class CardInfoTableBuilder
         List<TableRow> rows =
         [
             new SectionHeader("Manufacturing"),
-            new PropertyRow("IC Fabricator", $"{cplc.GetManufacturerName()} (0x{cplc.IcFabricator:X4})"),
+            new PropertyRow(
+                "IC Fabricator",
+                $"{cplc.GetManufacturerName()} (0x{cplc.IcFabricator:X4})"
+            ),
             new PropertyRow("IC Type", $"{cplc.GetChipModel()} (0x{cplc.IcType:X4})"),
-            new PropertyRow("Operating System", $"{cplc.GetOperatingSystemName()} (0x{cplc.OperatingSystemId:X4})")
+            new PropertyRow(
+                "Operating System",
+                $"{cplc.GetOperatingSystemName()} (0x{cplc.OperatingSystemId:X4})"
+            ),
         ];
 
         // Add date fields with validation
-        rows.AddRange([
-            BuildDateRow("OS Release Date", cplc.OperatingSystemReleaseDate),
-            BuildDateRow("IC Fabrication Date", cplc.IcFabricationDate),
-            new PropertyRow("IC Serial Number", $"0x{cplc.IcSerialNumber:X8} ({cplc.IcSerialNumber})"),
-            new PropertyRow("IC Batch ID", $"0x{cplc.IcBatchIdentifier:X4}")
-        ]);
+        rows.AddRange(
+            [
+                BuildDateRow("OS Release Date", cplc.OperatingSystemReleaseDate),
+                BuildDateRow("IC Fabrication Date", cplc.IcFabricationDate),
+                new PropertyRow(
+                    "IC Serial Number",
+                    $"0x{cplc.IcSerialNumber:X8} ({cplc.IcSerialNumber})"
+                ),
+                new PropertyRow("IC Batch ID", $"0x{cplc.IcBatchIdentifier:X4}"),
+            ]
+        );
 
         // Additional CPLC fields if present
-        rows.AddRange([
-            BuildDateRow("Module Packaging Date", cplc.IcModulePackagingDate),
-            BuildDateRow("Embedding Date", cplc.IcEmbeddingDate),
-            new PropertyRow("Pre-Personalizer", $"0x{cplc.IcPrePersonalizer:X4}"),
-            BuildDateRow("Pre-Perso Equip Date", cplc.IcPrePersonalizationEquipmentDate),
-            new PropertyRow("Pre-Perso Equip ID", $"0x{cplc.IcPrePersonalizationEquipmentId:X8}"),
-            BuildDateRow("Personalization Date", cplc.IcPersonalizationDate)
-        ]);
+        rows.AddRange(
+            [
+                BuildDateRow("Module Packaging Date", cplc.IcModulePackagingDate),
+                BuildDateRow("Embedding Date", cplc.IcEmbeddingDate),
+                new PropertyRow("Pre-Personalizer", $"0x{cplc.IcPrePersonalizer:X4}"),
+                BuildDateRow("Pre-Perso Equip Date", cplc.IcPrePersonalizationEquipmentDate),
+                new PropertyRow(
+                    "Pre-Perso Equip ID",
+                    $"0x{cplc.IcPrePersonalizationEquipmentId:X8}"
+                ),
+                BuildDateRow("Personalization Date", cplc.IcPersonalizationDate),
+            ]
+        );
 
         // Enhanced chip information if available
         chipInfo.Match(
             Some: chip =>
             {
                 rows.Add(new SectionHeader("Chip Details"));
-                rows.Add(new PropertyRow("Chip Platform", $"{chip.Platform} ({chip.Architecture})"));
+                rows.Add(
+                    new PropertyRow("Chip Platform", $"{chip.Platform} ({chip.Architecture})")
+                );
 
                 chip.MemoryConfig.Match(
-                    Some: _ => rows.Add(new PropertyRow("Memory Config", chip.GetMemoryDescription())),
+                    Some: _ =>
+                        rows.Add(new PropertyRow("Memory Config", chip.GetMemoryDescription())),
                     None: () => { }
                 );
 
@@ -283,7 +307,10 @@ public static class CardInfoTableBuilder
                     if (!string.IsNullOrEmpty(oidSection))
                     {
                         // Parse the OID section and add formatted rows
-                        string[] oidLines = oidSection.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                        string[] oidLines = oidSection.Split(
+                            '\n',
+                            StringSplitOptions.RemoveEmptyEntries
+                        );
                         string currentOid = "";
 
                         foreach (string line in oidLines)
@@ -294,18 +321,25 @@ public static class CardInfoTableBuilder
                                 // This is an OID line
                                 currentOid = trimmedLine;
                             }
-                            else if (trimmedLine.StartsWith("-> ") && !string.IsNullOrEmpty(currentOid))
+                            else if (
+                                trimmedLine.StartsWith("-> ") && !string.IsNullOrEmpty(currentOid)
+                            )
                             {
                                 // This is a description line
                                 string description = trimmedLine.Substring(3); // Remove "-> "
                                 rows.Add(new PropertyRow($"  {currentOid}", description));
 
                                 // Check for GP version info
-                                if (currentOid.StartsWith("1.2.840.114283.2.") && currentOid != "1.2.840.114283.2")
+                                if (
+                                    currentOid.StartsWith("1.2.840.114283.2.")
+                                    && currentOid != "1.2.840.114283.2"
+                                )
                                 {
-                                    IEnumerable<string> versionParts = currentOid.Split('.').Skip(4);
+                                    IEnumerable<string> versionParts = currentOid
+                                        .Split('.')
+                                        .Skip(4);
                                     string version = string.Join(".", versionParts);
-                                    rows.Add(new PropertyRow($"    Version", version));
+                                    rows.Add(new PropertyRow("    Version", version));
                                 }
                                 currentOid = "";
                             }
@@ -314,11 +348,18 @@ public static class CardInfoTableBuilder
                     else
                     {
                         // Fallback to basic OID display
-                        rows.AddRange(cardData.Oids.Take(5).Select(oid =>
-                        {
-                            string description = GlobalPlatformOids.GetDescription(oid);
-                            return new PropertyRow($"  {oid}", description ?? "Unknown OID");
-                        }));
+                        rows.AddRange(
+                            cardData
+                                .Oids.Take(5)
+                                .Select(oid =>
+                                {
+                                    string description = GlobalPlatformOids.GetDescription(oid);
+                                    return new PropertyRow(
+                                        $"  {oid}",
+                                        description ?? "Unknown OID"
+                                    );
+                                })
+                        );
                     }
                 }
 
@@ -330,7 +371,12 @@ public static class CardInfoTableBuilder
                     {
                         byte scpId = scpData[0];
                         byte implOptions = scpData[1];
-                        rows.Add(new PropertyRow("SCP from Card Data", $"SCP{scpId:X2} i={implOptions:X2}"));
+                        rows.Add(
+                            new PropertyRow(
+                                "SCP from Card Data",
+                                $"SCP{scpId:X2} i={implOptions:X2}"
+                            )
+                        );
                     }
                 }
             },
@@ -358,7 +404,8 @@ public static class CardInfoTableBuilder
             {
                 // Parse detailed capabilities using the comprehensive CardCapabilities.ToString()
                 string capabilitiesText = cap.ToString();
-                IEnumerable<string> capabilityLines = capabilitiesText.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                IEnumerable<string> capabilityLines = capabilitiesText
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
                     .Skip(1) // Skip "Card Capabilities:" header
                     .Where(line => !string.IsNullOrWhiteSpace(line))
                     .Take(8); // Limit to most important capabilities
@@ -368,14 +415,20 @@ public static class CardInfoTableBuilder
                     string trimmedLine = line.Trim();
                     if (trimmedLine.StartsWith("Supports SCP"))
                     {
-                        rows.Add(new PropertyRow("SCP Protocol", trimmedLine.Replace("Supports ", "")));
+                        rows.Add(
+                            new PropertyRow("SCP Protocol", trimmedLine.Replace("Supports ", ""))
+                        );
                     }
-                    else if (trimmedLine.StartsWith("Supported") && trimmedLine.Contains("privileges"))
+                    else if (
+                        trimmedLine.StartsWith("Supported") && trimmedLine.Contains("privileges")
+                    )
                     {
                         string[] parts = trimmedLine.Split(':');
                         if (parts.Length == 2)
                         {
-                            rows.Add(new PropertyRow(parts[0].Replace("Supported ", ""), parts[1].Trim()));
+                            rows.Add(
+                                new PropertyRow(parts[0].Replace("Supported ", ""), parts[1].Trim())
+                            );
                         }
                     }
                     else if (trimmedLine.StartsWith("Supported") && trimmedLine.Contains("hash"))
@@ -391,7 +444,9 @@ public static class CardInfoTableBuilder
                         string[] parts = trimmedLine.Split(':');
                         if (parts.Length == 2)
                         {
-                            string cipherType = parts[0].Replace("Supported ", "").Replace(" ciphers", "");
+                            string cipherType = parts[0]
+                                .Replace("Supported ", "")
+                                .Replace(" ciphers", "");
                             rows.Add(new PropertyRow($"{cipherType} Ciphers", parts[1].Trim()));
                         }
                     }
@@ -406,7 +461,8 @@ public static class CardInfoTableBuilder
 
         // Security domain status
         cardInfo.SecurityStatus.Match(
-            Some: status => rows.Add(new PropertyRow("Security Status", status.GetShortDescription())),
+            Some: status =>
+                rows.Add(new PropertyRow("Security Status", status.GetShortDescription())),
             None: () => { }
         );
 
@@ -416,13 +472,24 @@ public static class CardInfoTableBuilder
             {
                 if (divData.Length >= 12 && divData[0] == 0xCF && divData[1] == 0x0A)
                 {
-                    string scpSupport = DiversificationDataParser.ParseScpSupport(Maybe<byte[]>.From(divData));
-                    if (scpSupport.Length > 0 && !scpSupport.Contains("None") && !scpSupport.Contains("error"))
+                    string scpSupport = DiversificationDataParser.ParseScpSupport(
+                        Maybe<byte[]>.From(divData)
+                    );
+                    if (
+                        scpSupport.Length > 0
+                        && !scpSupport.Contains("None")
+                        && !scpSupport.Contains("error")
+                    )
                     {
                         rows.Add(new PropertyRow("SCP Support (CF)", scpSupport));
                     }
                 }
-                rows.Add(new PropertyRow("Diversification Data", $"[dim]{Convert.ToHexString(divData)}[/]"));
+                rows.Add(
+                    new PropertyRow(
+                        "Diversification Data",
+                        $"[dim]{Convert.ToHexString(divData)}[/]"
+                    )
+                );
             },
             None: () => { }
         );
@@ -436,10 +503,9 @@ public static class CardInfoTableBuilder
     private static IEnumerable<TableRow> BuildScpSupport(CardInformation cardInfo)
     {
         // Prefer detailed SCP info over basic capabilities
-        return cardInfo.ScpInfo
-            .Map(scp => BuildDetailedScpRows(scp))
-            .Or(() => cardInfo.Capabilities
-                .Map(cap => BuildBasicScpRows(cap)))
+        return cardInfo
+            .ScpInfo.Map(scp => BuildDetailedScpRows(scp))
+            .Or(() => cardInfo.Capabilities.Map(cap => BuildBasicScpRows(cap)))
             .GetValueOrDefault([]);
     }
 
@@ -448,20 +514,26 @@ public static class CardInfoTableBuilder
     /// </summary>
     private static IEnumerable<TableRow> BuildDetailedScpRows(ScpInformation scp)
     {
-        return scp.Protocols.SelectMany((protocol, index) =>
-        {
-            List<TableRow> rows = [];
+        return scp.Protocols.SelectMany(
+            (protocol, index) =>
+            {
+                List<TableRow> rows = [];
 
-            // First protocol on main line, others indented
-            string prefix = index == 0 ? "" : "  ";
-            rows.Add(new PropertyRow($"{prefix}SCP Support", protocol.ToShortString()));
+                // First protocol on main line, others indented
+                string prefix = index == 0 ? "" : "  ";
+                rows.Add(new PropertyRow($"{prefix}SCP Support", protocol.ToShortString()));
 
-            // Show implementation details
-            rows.AddRange(protocol.ImplementationOptions.Select(impl =>
-                new PropertyRow($"  {impl:X2}", GetImplementationDescription(impl))));
+                // Show implementation details
+                rows.AddRange(
+                    protocol.ImplementationOptions.Select(impl => new PropertyRow(
+                        $"  {impl:X2}",
+                        GetImplementationDescription(impl)
+                    ))
+                );
 
-            return rows;
-        });
+                return rows;
+            }
+        );
     }
 
     /// <summary>
@@ -477,8 +549,9 @@ public static class CardInfoTableBuilder
             if (scpInfo.Protocols.Count > 0)
             {
                 rows.Add(new PropertyRow("SCP Support", scpInfo.Protocols[0].ToShortString()));
-                rows.AddRange(scpInfo.Protocols.Skip(1).Select(p =>
-                    new PropertyRow("", p.ToShortString())));
+                rows.AddRange(
+                    scpInfo.Protocols.Skip(1).Select(p => new PropertyRow("", p.ToShortString()))
+                );
             }
         }
 
@@ -490,9 +563,7 @@ public static class CardInfoTableBuilder
     /// </summary>
     private static IEnumerable<TableRow> BuildKeyInformation(CardInformation cardInfo)
     {
-        return cardInfo.KeyInfo
-            .Map(keyInfo => BuildKeyRows(keyInfo))
-            .GetValueOrDefault([]);
+        return cardInfo.KeyInfo.Map(keyInfo => BuildKeyRows(keyInfo)).GetValueOrDefault([]);
     }
 
     /// <summary>
@@ -513,12 +584,17 @@ public static class CardInfoTableBuilder
             if (keySets.Count() > 1)
                 rows.Add(new PropertyRow($"Key Set v{keySet.Key}", ""));
 
-            rows.AddRange(keySet.OrderBy(k => k.KeyId).Select(key =>
-            {
-                string keyName = GetKeyName(key.KeyId);
-                string keyDesc = $"v{key.KeyVersion} {key.PrimaryKeyType} ({key.KeyLength} bit)";
-                return new PropertyRow($"  {keyName}", keyDesc);
-            }));
+            rows.AddRange(
+                keySet
+                    .OrderBy(k => k.KeyId)
+                    .Select(key =>
+                    {
+                        string keyName = GetKeyName(key.KeyId);
+                        string keyDesc =
+                            $"v{key.KeyVersion} {key.PrimaryKeyType} ({key.KeyLength} bit)";
+                        return new PropertyRow($"  {keyName}", keyDesc);
+                    })
+            );
         }
 
         return rows;
@@ -539,13 +615,14 @@ public static class CardInfoTableBuilder
     /// Gets semantic key name based on key ID.
     /// Per GP specification, standard key IDs have specific purposes.
     /// </summary>
-    private static string GetKeyName(byte keyId) => keyId switch
-    {
-        1 => "ENC Key",
-        2 => "MAC Key",
-        3 => "KEK Key",
-        _ => $"Key {keyId}"
-    };
+    private static string GetKeyName(byte keyId) =>
+        keyId switch
+        {
+            1 => "ENC Key",
+            2 => "MAC Key",
+            3 => "KEK Key",
+            _ => $"Key {keyId}",
+        };
 
     /// <summary>
     /// Gets human-readable description for SCP implementation option.
@@ -567,7 +644,7 @@ public static class CardInfoTableBuilder
             ScpImplementation.Scp03I11 => "AES-128 (no R-MAC)",
             ScpImplementation.Scp03I60 => "Random card challenge",
             ScpImplementation.Scp03I70 => "Pseudo-random card challenge",
-            _ => $"Implementation 0x{((byte)implementation):X2}"
+            _ => $"Implementation 0x{(byte)implementation:X2}",
         };
     }
 
@@ -580,11 +657,18 @@ public static class CardInfoTableBuilder
         if (oidSectionStart == -1)
             return "";
 
-        int oidSectionEnd = cardDataString.IndexOf("\nSecure Channel Protocol Info:", oidSectionStart);
+        int oidSectionEnd = cardDataString.IndexOf(
+            "\nSecure Channel Protocol Info:",
+            oidSectionStart
+        );
         if (oidSectionEnd == -1)
             oidSectionEnd = cardDataString.Length;
 
-        return cardDataString.Substring(oidSectionStart + "Parsed OIDs:\n".Length,
-            oidSectionEnd - oidSectionStart - "Parsed OIDs:\n".Length).Trim();
+        return cardDataString
+            .Substring(
+                oidSectionStart + "Parsed OIDs:\n".Length,
+                oidSectionEnd - oidSectionStart - "Parsed OIDs:\n".Length
+            )
+            .Trim();
     }
 }

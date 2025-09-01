@@ -16,16 +16,12 @@ public static class CommandRegistrationService
     /// <summary>
     /// Registers all commands marked with CommandHandler attribute from the specified assembly.
     /// </summary>
-    public static void RegisterCommandHandlers(
-        this IServiceCollection services,
-        Assembly assembly
-    )
+    public static void RegisterCommandHandlers(this IServiceCollection services, Assembly assembly)
     {
-        List<Type> commandTypes = assembly
+        List<Type> commandTypes = [.. assembly
             .GetTypes()
             .Where(type => type.GetCustomAttribute<CommandHandlerAttribute>() != null)
-            .Where(type => !type.IsAbstract && !type.IsInterface)
-            .ToList();
+            .Where(type => !type.IsAbstract && !type.IsInterface)];
 
         foreach (Type commandType in commandTypes)
         {
@@ -33,8 +29,7 @@ public static class CommandRegistrationService
             Type commandInterface = commandType
                 .GetInterfaces()
                 .FirstOrDefault(i =>
-                    i.IsGenericType
-                    && i.GetGenericTypeDefinition() == typeof(IPipelineCommand<>)
+                    i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IPipelineCommand<>)
                 );
 
             if (commandInterface == null)
@@ -58,20 +53,19 @@ public static class CommandRegistrationService
     /// </summary>
     public static IEnumerable<CommandHandlerInfo> GetCommandHandlers(Assembly assembly)
     {
-        List<Type> commandTypes = assembly
+        List<Type> commandTypes = [.. assembly
             .GetTypes()
             .Where(type => type.GetCustomAttribute<CommandHandlerAttribute>() != null)
-            .Where(type => !type.IsAbstract && !type.IsInterface)
-            .ToList();
+            .Where(type => !type.IsAbstract && !type.IsInterface)];
 
         foreach (Type commandType in commandTypes)
         {
-            CommandHandlerAttribute attribute = commandType.GetCustomAttribute<CommandHandlerAttribute>()!;
+            CommandHandlerAttribute attribute =
+                commandType.GetCustomAttribute<CommandHandlerAttribute>()!;
             Type commandInterface = commandType
                 .GetInterfaces()
                 .FirstOrDefault(i =>
-                    i.IsGenericType
-                    && i.GetGenericTypeDefinition() == typeof(IPipelineCommand<>)
+                    i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IPipelineCommand<>)
                 );
 
             if (commandInterface == null)
@@ -91,7 +85,7 @@ public static class CommandRegistrationService
                 Description = attribute.Description,
                 CommandType = commandType,
                 SettingsType = settingsType,
-                PipelineCommandType = pipelineCommandType
+                PipelineCommandType = pipelineCommandType,
             };
         }
     }

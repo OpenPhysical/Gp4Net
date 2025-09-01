@@ -27,19 +27,22 @@ public class InitializeUpdateResponseParsingTests
         [
             ([], "INITIALIZE UPDATE response too short: 0 bytes, expected at least 28"),
             (new byte[10], "INITIALIZE UPDATE response too short: 10 bytes, expected at least 28"),
-            (new byte[27], "INITIALIZE UPDATE response too short: 27 bytes, expected at least 28")
+            (new byte[27], "INITIALIZE UPDATE response too short: 27 bytes, expected at least 28"),
         ];
 
         foreach ((byte[] response, string expectedError) in testCases)
         {
             // Act
-            Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(response);
+            Result<InitializeUpdateResponse, SmartCardError> result =
+                InitializeUpdateResponse.Parse(response);
 
             // Assert
             _ = result.IsFailure.Should().BeTrue("Too short response should be rejected");
             _ = result.Error.Message.Should().Contain(expectedError);
 
-            TestContext.Out.WriteLine($"✓ Response of {response.Length} bytes correctly rejected: {result.Error.Message}");
+            TestContext.Out.WriteLine(
+                $"✓ Response of {response.Length} bytes correctly rejected: {result.Error.Message}"
+            );
         }
     }
 
@@ -81,10 +84,14 @@ public class InitializeUpdateResponseParsingTests
         response[27] = 0xD8;
 
         // Act
-        Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(response);
+        Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(
+            response
+        );
 
         // Assert
-        _ = result.IsSuccess.Should().BeTrue("Minimum valid SCP02 response should parse successfully");
+        _ = result
+            .IsSuccess.Should()
+            .BeTrue("Minimum valid SCP02 response should parse successfully");
 
         InitializeUpdateResponse? parsed = result.Value;
         _ = parsed.KeyVersion.Should().Be(0x01);
@@ -97,7 +104,9 @@ public class InitializeUpdateResponseParsingTests
         TestContext.Out.WriteLine("✓ Minimum valid SCP02 response parsed successfully");
         TestContext.Out.WriteLine($"Key version: 0x{parsed.KeyVersion:X2}");
         TestContext.Out.WriteLine($"SCP ID: 0x{parsed.ScpId:X2}");
-        TestContext.Out.WriteLine($"Sequence counter: {Convert.ToHexString(parsed.SequenceCounter)}");
+        TestContext.Out.WriteLine(
+            $"Sequence counter: {Convert.ToHexString(parsed.SequenceCounter)}"
+        );
         TestContext.Out.WriteLine($"Card challenge: {Convert.ToHexString(parsed.CardChallenge)}");
     }
 
@@ -137,7 +146,9 @@ public class InitializeUpdateResponseParsingTests
         response[31] = 0x02;
 
         // Act
-        Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(response);
+        Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(
+            response
+        );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue("Valid SCP03 response should parse successfully");
@@ -154,7 +165,9 @@ public class InitializeUpdateResponseParsingTests
         TestContext.Out.WriteLine($"Key version: 0x{parsed.KeyVersion:X2}");
         TestContext.Out.WriteLine($"SCP ID: 0x{parsed.ScpId:X2}");
         TestContext.Out.WriteLine($"Implementation parameter: 0x{parsed.ScpParameter:X2}");
-        TestContext.Out.WriteLine($"Sequence counter: {Convert.ToHexString(parsed.SequenceCounter)}");
+        TestContext.Out.WriteLine(
+            $"Sequence counter: {Convert.ToHexString(parsed.SequenceCounter)}"
+        );
         TestContext.Out.WriteLine($"Card challenge: {Convert.ToHexString(parsed.CardChallenge)}");
     }
 
@@ -162,16 +175,22 @@ public class InitializeUpdateResponseParsingTests
     public void Parse_WithRealGpProScp02ClrTrace_ShouldParseCorrectly()
     {
         // Arrange - Real INITIALIZE UPDATE response from GP Pro CLR trace
-        byte[] realResponse = Convert.FromHexString("0000234555808320483901020011C284EC19415D17F4198ADCD5102D");
+        byte[] realResponse = Convert.FromHexString(
+            "0000234555808320483901020011C284EC19415D17F4198ADCD5102D"
+        );
 
         // Act
-        Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(realResponse);
+        Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(
+            realResponse
+        );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue("Real GP Pro CLR response should parse successfully");
 
         InitializeUpdateResponse? parsed = result.Value;
-        _ = parsed.KeyDiversificationData.Should().Equal(Convert.FromHexString("00002345558083204839"));
+        _ = parsed
+            .KeyDiversificationData.Should()
+            .Equal(Convert.FromHexString("00002345558083204839"));
         _ = parsed.KeyVersion.Should().Be(0x01);
         _ = parsed.ScpId.Should().Be(0x02);
         _ = parsed.ScpParameter.Should().Be(0x00); // SCP02 padding
@@ -182,23 +201,31 @@ public class InitializeUpdateResponseParsingTests
         TestContext.Out.WriteLine("✓ Real GP Pro CLR trace parsed correctly");
         TestContext.Out.WriteLine($"KDD: {Convert.ToHexString(parsed.KeyDiversificationData)}");
         TestContext.Out.WriteLine($"Key version: 0x{parsed.KeyVersion:X2}");
-        TestContext.Out.WriteLine($"SCP: 0x{parsed.ScpId:X2} (parameter 0x{parsed.ScpParameter:X2})");
+        TestContext.Out.WriteLine(
+            $"SCP: 0x{parsed.ScpId:X2} (parameter 0x{parsed.ScpParameter:X2})"
+        );
     }
 
     [Test]
     public void Parse_WithRealGpProScp02MacTrace_ShouldParseCorrectly()
     {
         // Arrange - Real INITIALIZE UPDATE response from GP Pro MAC trace
-        byte[] realResponse = Convert.FromHexString("00002345558083204839010200123E6DB216F8D58177E15BAA128DF9");
+        byte[] realResponse = Convert.FromHexString(
+            "00002345558083204839010200123E6DB216F8D58177E15BAA128DF9"
+        );
 
         // Act
-        Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(realResponse);
+        Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(
+            realResponse
+        );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue("Real GP Pro MAC response should parse successfully");
 
         InitializeUpdateResponse? parsed = result.Value;
-        _ = parsed.KeyDiversificationData.Should().Equal(Convert.FromHexString("00002345558083204839"));
+        _ = parsed
+            .KeyDiversificationData.Should()
+            .Equal(Convert.FromHexString("00002345558083204839"));
         _ = parsed.KeyVersion.Should().Be(0x01);
         _ = parsed.ScpId.Should().Be(0x02);
         _ = parsed.ScpParameter.Should().Be(0x00); // SCP02 padding
@@ -208,7 +235,9 @@ public class InitializeUpdateResponseParsingTests
 
         TestContext.Out.WriteLine("✓ Real GP Pro MAC trace parsed correctly");
         TestContext.Out.WriteLine($"KDD: {Convert.ToHexString(parsed.KeyDiversificationData)}");
-        TestContext.Out.WriteLine($"Sequence counter: {Convert.ToHexString(parsed.SequenceCounter)}");
+        TestContext.Out.WriteLine(
+            $"Sequence counter: {Convert.ToHexString(parsed.SequenceCounter)}"
+        );
     }
 
     [Test]
@@ -228,16 +257,26 @@ public class InitializeUpdateResponseParsingTests
         response[11] = 0x02; // SCP ID
         Array.Copy(new byte[] { 0x00, 0x01 }, 0, response, 12, 2); // Sequence counter
         Array.Copy(new byte[] { 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6 }, 0, response, 14, 6); // Card challenge
-        Array.Copy(new byte[] { 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8 }, 0, response, 20, 8); // Card cryptogram
+        Array.Copy(
+            new byte[] { 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8 },
+            0,
+            response,
+            20,
+            8
+        ); // Card cryptogram
 
         // Act
-        Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(response);
+        Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(
+            response
+        );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue("Parser should handle corrupted KDD gracefully");
 
         InitializeUpdateResponse? parsed = result.Value;
-        _ = parsed.KeyDiversificationData.Should().Equal(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF });
+        _ = parsed
+            .KeyDiversificationData.Should()
+            .Equal(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF);
         _ = parsed.KeyVersion.Should().Be(0x01);
         _ = parsed.ScpId.Should().Be(0x02);
 
@@ -260,15 +299,29 @@ public class InitializeUpdateResponseParsingTests
         // Remaining fields
         Array.Copy(new byte[] { 0x00, 0x01 }, 0, response, 12, 2); // Sequence counter
         Array.Copy(new byte[] { 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6 }, 0, response, 14, 6); // Card challenge
-        Array.Copy(new byte[] { 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8 }, 0, response, 20, 8); // Card cryptogram
+        Array.Copy(
+            new byte[] { 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8 },
+            0,
+            response,
+            20,
+            8
+        ); // Card cryptogram
 
         // Act
-        Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(response);
+        Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(
+            response
+        );
 
         // Assert - Parser should fail secure for unknown SCP versions
-        _ = result.IsFailure.Should().BeTrue("Parser should fail immediately for unknown SCP versions");
-        _ = result.Error.Message.Should().Contain("Unsupported SCP version", "Error should specify unsupported version");
-        _ = result.Error.Message.Should().Contain("01", "Error should include the unsupported version number");
+        _ = result
+            .IsFailure.Should()
+            .BeTrue("Parser should fail immediately for unknown SCP versions");
+        _ = result
+            .Error.Message.Should()
+            .Contain("Unsupported SCP version", "Error should specify unsupported version");
+        _ = result
+            .Error.Message.Should()
+            .Contain("01", "Error should include the unsupported version number");
 
         TestContext.Out.WriteLine("✓ Unknown SCP version correctly rejected (fail secure)");
         TestContext.Out.WriteLine($"Error: {result.Error.Message}");
@@ -286,7 +339,13 @@ public class InitializeUpdateResponseParsingTests
         response[11] = 0x02; // SCP ID
         Array.Copy(new byte[] { 0x00, 0x01 }, 0, response, 12, 2); // Sequence counter
         Array.Copy(new byte[] { 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6 }, 0, response, 14, 6); // Card challenge
-        Array.Copy(new byte[] { 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8 }, 0, response, 20, 8); // Card cryptogram
+        Array.Copy(
+            new byte[] { 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8 },
+            0,
+            response,
+            20,
+            8
+        ); // Card cryptogram
 
         // Extra trailing bytes (should be ignored for SCP02)
         response[28] = 0xAA;
@@ -295,7 +354,9 @@ public class InitializeUpdateResponseParsingTests
         response[31] = 0xDD;
 
         // Act
-        Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(response);
+        Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(
+            response
+        );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue("Parser should handle extra trailing bytes");
@@ -303,13 +364,15 @@ public class InitializeUpdateResponseParsingTests
         InitializeUpdateResponse? parsed = result.Value;
         _ = parsed.KeyVersion.Should().Be(0x01);
         _ = parsed.ScpId.Should().Be(0x02);
-        _ = parsed.SequenceCounter.Should().Equal(new byte[] { 0x00, 0x01 });
+        _ = parsed.SequenceCounter.Should().Equal(0x00, 0x01);
         _ = parsed.CardChallenge.Length.Should().Be(6, "SCP02 card challenge should be 6 bytes");
         _ = parsed.CardCryptogram.Length.Should().Be(8);
 
         TestContext.Out.WriteLine("✓ Extra trailing bytes handled correctly");
         TestContext.Out.WriteLine($"Response length: {response.Length} bytes (28 valid + 4 extra)");
-        TestContext.Out.WriteLine($"Parsed card challenge: {Convert.ToHexString(parsed.CardChallenge)}");
+        TestContext.Out.WriteLine(
+            $"Parsed card challenge: {Convert.ToHexString(parsed.CardChallenge)}"
+        );
     }
 
     [Test]
@@ -318,13 +381,12 @@ public class InitializeUpdateResponseParsingTests
         // Arrange - Test various field boundary conditions
         (string, int, bool)[] testCases =
         [
-
             // (description, responseLength, expectedSuccess)
             ("Exactly 28 bytes (minimum SCP02)", 28, true),
             ("29 bytes (SCP02 + 1)", 29, true),
             ("30 bytes (SCP02 + 2)", 30, true),
             ("32 bytes (typical SCP03)", 32, true),
-            ("35 bytes (SCP03 + extra)", 35, true)
+            ("35 bytes (SCP03 + extra)", 35, true),
         ];
 
         foreach ((string description, int responseLength, bool expectedSuccess) in testCases)
@@ -341,11 +403,14 @@ public class InitializeUpdateResponseParsingTests
             {
                 response[12] = 0x70; // Implementation parameter
                 // Card challenge (8 bytes)
-                for (int i = 0; i < 8; i++) response[13 + i] = (byte)(0xC1 + i);
-                // Card cryptogram (8 bytes)  
-                for (int i = 0; i < 8; i++) response[21 + i] = (byte)(0xD1 + i);
+                for (int i = 0; i < 8; i++)
+                    response[13 + i] = (byte)(0xC1 + i);
+                // Card cryptogram (8 bytes)
+                for (int i = 0; i < 8; i++)
+                    response[21 + i] = (byte)(0xD1 + i);
                 // Sequence counter (remaining bytes)
-                for (int i = 29; i < responseLength; i++) response[i] = (byte)(i - 28);
+                for (int i = 29; i < responseLength; i++)
+                    response[i] = (byte)(i - 28);
             }
             else // SCP02
             {
@@ -353,13 +418,16 @@ public class InitializeUpdateResponseParsingTests
                 response[12] = 0x00;
                 response[13] = 0x01;
                 // Card challenge (6 bytes)
-                for (int i = 0; i < 6; i++) response[14 + i] = (byte)(0xC1 + i);
+                for (int i = 0; i < 6; i++)
+                    response[14 + i] = (byte)(0xC1 + i);
                 // Card cryptogram (8 bytes)
-                for (int i = 0; i < 8; i++) response[20 + i] = (byte)(0xD1 + i);
+                for (int i = 0; i < 8; i++)
+                    response[20 + i] = (byte)(0xD1 + i);
             }
 
             // Act
-            Result<InitializeUpdateResponse, SmartCardError> result = InitializeUpdateResponse.Parse(response);
+            Result<InitializeUpdateResponse, SmartCardError> result =
+                InitializeUpdateResponse.Parse(response);
 
             // Assert
             if (expectedSuccess)

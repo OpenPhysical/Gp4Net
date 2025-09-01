@@ -1,4 +1,3 @@
-using System;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -18,7 +17,8 @@ public class DataObjectParserTests
         string dataObject = "9F70:040102";
 
         // Act
-        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result =
+            DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -34,7 +34,8 @@ public class DataObjectParserTests
         string dataObject = "9F70=040102";
 
         // Act
-        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result =
+            DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -50,7 +51,8 @@ public class DataObjectParserTests
         string dataObject = "DF21:112233445566778899AABBCCDDEEFF00";
 
         // Act
-        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result =
+            DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -68,7 +70,8 @@ public class DataObjectParserTests
         string dataObject = "C0:01020304";
 
         // Act
-        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result =
+            DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -84,7 +87,8 @@ public class DataObjectParserTests
         string dataObject = "9F70:";
 
         // Act
-        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result =
+            DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -99,7 +103,8 @@ public class DataObjectParserTests
     public void ParseRawDataObject_WithEmptyInput_ReturnsFailure(string dataObject)
     {
         // Act
-        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result =
+            DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -113,7 +118,8 @@ public class DataObjectParserTests
         string? dataObject = null;
 
         // Act
-        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result =
+            DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -128,7 +134,8 @@ public class DataObjectParserTests
     public void ParseRawDataObject_WithInvalidFormat_ReturnsFailure(string dataObject)
     {
         // Act
-        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result =
+            DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -142,7 +149,8 @@ public class DataObjectParserTests
     public void ParseRawDataObject_WithInvalidHexTag_ReturnsFailure(string dataObject)
     {
         // Act
-        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result =
+            DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -156,11 +164,14 @@ public class DataObjectParserTests
     public void ParseRawDataObject_WithOddHexData_ReturnsFailure(string dataObject)
     {
         // Act
-        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result =
+            DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
-        _ = result.Error.Message.Should().ContainAny("even number of hex characters", "hex characters");
+        _ = result
+            .Error.Message.Should()
+            .ContainAny("even number of hex characters", "hex characters");
     }
 
     [Test]
@@ -171,7 +182,8 @@ public class DataObjectParserTests
     public void ValidateDataObject_WithValidTag_ReturnsTrue(string dataObject, ushort expectedTag)
     {
         // Arrange
-        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result =
+            DataObjectParser.ParseRawDataObject(dataObject);
         _ = result.IsSuccess.Should().BeTrue();
         (ushort tag, byte[] data) = result.Value;
 
@@ -233,7 +245,8 @@ public class DataObjectParserTests
     public void ParseRawDataObject_IsCaseInsensitive(string dataObject)
     {
         // Act
-        Result<(ushort tag, byte[] data), SmartCardError> result = DataObjectParser.ParseRawDataObject(dataObject);
+        Result<(ushort tag, byte[] data), SmartCardError> result =
+            DataObjectParser.ParseRawDataObject(dataObject);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();

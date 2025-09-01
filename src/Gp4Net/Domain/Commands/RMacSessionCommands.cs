@@ -106,7 +106,8 @@ public class BeginRMacSessionCommand
         SecurityLevel securityLevel,
         byte cla = Cla80,
         byte[] data = null,
-        byte[] mac = null)
+        byte[] mac = null
+    )
     {
         // Validate security level
         if (!Enum.IsDefined(typeof(SecurityLevel), securityLevel))
@@ -120,7 +121,9 @@ public class BeginRMacSessionCommand
         if (cla != Cla80 && cla != ClaC0 && cla != ClaE0)
         {
             return Result.Failure<BeginRMacSessionCommand, SmartCardError>(
-                SmartCardError.InvalidArgument($"Invalid CLA byte: 0x{cla:X2}. Must be 0x80, 0xC0, or 0xE0")
+                SmartCardError.InvalidArgument(
+                    $"Invalid CLA byte: 0x{cla:X2}. Must be 0x80, 0xC0, or 0xE0"
+                )
             );
         }
 
@@ -229,7 +232,8 @@ public class EndRMacSessionCommand
     public static Result<EndRMacSessionCommand, SmartCardError> Create(
         SecurityLevel securityLevel,
         byte cla = Cla80,
-        byte[] mac = null)
+        byte[] mac = null
+    )
     {
         // Validate security level
         if (!Enum.IsDefined(typeof(SecurityLevel), securityLevel))
@@ -243,7 +247,9 @@ public class EndRMacSessionCommand
         if (cla != Cla80 && cla != ClaC0 && cla != ClaE0)
         {
             return Result.Failure<EndRMacSessionCommand, SmartCardError>(
-                SmartCardError.InvalidArgument($"Invalid CLA byte: 0x{cla:X2}. Must be 0x80, 0xC0, or 0xE0")
+                SmartCardError.InvalidArgument(
+                    $"Invalid CLA byte: 0x{cla:X2}. Must be 0x80, 0xC0, or 0xE0"
+                )
             );
         }
 
@@ -309,7 +315,9 @@ public class EndRMacSessionResponse
         if (responseData.Length != 8)
         {
             return Result.Failure<EndRMacSessionResponse, SmartCardError>(
-                SmartCardError.InvalidData($"Response must be exactly 8 bytes, but got {responseData.Length} bytes")
+                SmartCardError.InvalidData(
+                    $"Response must be exactly 8 bytes, but got {responseData.Length} bytes"
+                )
             );
         }
 

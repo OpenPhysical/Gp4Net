@@ -90,10 +90,7 @@ public class PutKeyCommand : IApduCommand
     /// </summary>
     byte IApduCommand.Cla
     {
-        get
-        {
-            return Cla;
-        }
+        get { return Cla; }
     }
 
     /// <summary>
@@ -101,10 +98,7 @@ public class PutKeyCommand : IApduCommand
     /// </summary>
     byte IApduCommand.Ins
     {
-        get
-        {
-            return Ins;
-        }
+        get { return Ins; }
     }
 
     /// <summary>
@@ -112,10 +106,7 @@ public class PutKeyCommand : IApduCommand
     /// </summary>
     public byte P1
     {
-        get
-        {
-            return (byte)UsageQualifier;
-        }
+        get { return (byte)UsageQualifier; }
     }
 
     /// <summary>
@@ -123,10 +114,7 @@ public class PutKeyCommand : IApduCommand
     /// </summary>
     public byte P2
     {
-        get
-        {
-            return (byte)KekIdentifier;
-        }
+        get { return (byte)KekIdentifier; }
     }
 
     /// <summary>
@@ -150,10 +138,7 @@ public class PutKeyCommand : IApduCommand
     /// </summary>
     public Maybe<int> ExpectedResponseLength
     {
-        get
-        {
-            return Maybe<int>.From(KeyDataBlocks.Count * 3);
-        }
+        get { return Maybe<int>.From(KeyDataBlocks.Count * 3); }
     }
 
     /// <summary>
@@ -161,10 +146,7 @@ public class PutKeyCommand : IApduCommand
     /// </summary>
     public bool IsExtendedLength
     {
-        get
-        {
-            return false;
-        }
+        get { return false; }
     }
 
     /// <summary>
@@ -192,7 +174,8 @@ public class PutKeyCommand : IApduCommand
     /// <returns>A Result containing the PutKeyCommand or an error.</returns>
     public static Result<PutKeyCommand, SmartCardError> Create(
         byte keyVersion,
-        IList<KeyDataBlock> keyDataBlocks)
+        IList<KeyDataBlock> keyDataBlocks
+    )
     {
         if (keyDataBlocks == null)
         {
@@ -205,9 +188,8 @@ public class PutKeyCommand : IApduCommand
         }
 
         // Determine usage qualifier based on number of keys
-        KeyUsageQualifier usageQualifier = keyDataBlocks.Count == 1 ?
-            KeyUsageQualifier.SingleKey :
-            KeyUsageQualifier.MultipleKeys;
+        KeyUsageQualifier usageQualifier =
+            keyDataBlocks.Count == 1 ? KeyUsageQualifier.SingleKey : KeyUsageQualifier.MultipleKeys;
 
         // For now, we always use plain text (no key encryption)
         KeyEncryptionKeyIdentifier kekIdentifier = KeyEncryptionKeyIdentifier.None;
@@ -237,14 +219,7 @@ public class PutKeyCommand : IApduCommand
             dataLength += block.ToBytes().Length;
         }
 
-        List<byte> apdu =
-        [
-            Cla,
-            Ins,
-            (byte)UsageQualifier,
-            (byte)KekIdentifier,
-            (byte)dataLength
-        ];
+        List<byte> apdu = [Cla, Ins, (byte)UsageQualifier, (byte)KekIdentifier, (byte)dataLength];
 
         // Add key data blocks
         foreach (KeyDataBlock block in KeyDataBlocks)
@@ -379,7 +354,10 @@ public class KeyDataBlock
     /// <param name="keyValue">The 8-byte DES key value.</param>
     /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
     /// <returns>A Result containing the KeyDataBlock for DES or an error.</returns>
-    public static Result<KeyDataBlock, SmartCardError> CreateDesKey(byte[] keyValue, byte[] keyCheckValue = null)
+    public static Result<KeyDataBlock, SmartCardError> CreateDesKey(
+        byte[] keyValue,
+        byte[] keyCheckValue = null
+    )
     {
         if (keyValue == null)
         {
@@ -388,12 +366,16 @@ public class KeyDataBlock
 
         if (keyValue.Length != 8)
         {
-            return SmartCardError.InvalidArgument($"DES key must be 8 bytes, got {keyValue.Length} bytes.");
+            return SmartCardError.InvalidArgument(
+                $"DES key must be 8 bytes, got {keyValue.Length} bytes."
+            );
         }
 
         if (keyCheckValue != null && keyCheckValue.Length != 3)
         {
-            return SmartCardError.InvalidArgument($"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes.");
+            return SmartCardError.InvalidArgument(
+                $"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes."
+            );
         }
 
         return new KeyDataBlock(KeyType.Des, keyValue, keyCheckValue);
@@ -417,12 +399,16 @@ public class KeyDataBlock
 
         if (keyValue.Length != 16)
         {
-            return SmartCardError.InvalidArgument($"3DES double-length key must be 16 bytes, got {keyValue.Length} bytes.");
+            return SmartCardError.InvalidArgument(
+                $"3DES double-length key must be 16 bytes, got {keyValue.Length} bytes."
+            );
         }
 
         if (keyCheckValue != null && keyCheckValue.Length != 3)
         {
-            return SmartCardError.InvalidArgument($"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes.");
+            return SmartCardError.InvalidArgument(
+                $"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes."
+            );
         }
 
         return new KeyDataBlock(KeyType.TripleDes2Key, keyValue, keyCheckValue);
@@ -446,12 +432,16 @@ public class KeyDataBlock
 
         if (keyValue.Length != 24)
         {
-            return SmartCardError.InvalidArgument($"3DES triple-length key must be 24 bytes, got {keyValue.Length} bytes.");
+            return SmartCardError.InvalidArgument(
+                $"3DES triple-length key must be 24 bytes, got {keyValue.Length} bytes."
+            );
         }
 
         if (keyCheckValue != null && keyCheckValue.Length != 3)
         {
-            return SmartCardError.InvalidArgument($"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes.");
+            return SmartCardError.InvalidArgument(
+                $"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes."
+            );
         }
 
         return new KeyDataBlock(KeyType.TripleDes3Key, keyValue, keyCheckValue);
@@ -463,7 +453,10 @@ public class KeyDataBlock
     /// <param name="keyValue">The 16-byte AES key value.</param>
     /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
     /// <returns>A Result containing the KeyDataBlock for AES-128 or an error.</returns>
-    public static Result<KeyDataBlock, SmartCardError> CreateAes128Key(byte[] keyValue, byte[] keyCheckValue = null)
+    public static Result<KeyDataBlock, SmartCardError> CreateAes128Key(
+        byte[] keyValue,
+        byte[] keyCheckValue = null
+    )
     {
         if (keyValue == null)
         {
@@ -472,12 +465,16 @@ public class KeyDataBlock
 
         if (keyValue.Length != 16)
         {
-            return SmartCardError.InvalidArgument($"AES-128 key must be 16 bytes, got {keyValue.Length} bytes.");
+            return SmartCardError.InvalidArgument(
+                $"AES-128 key must be 16 bytes, got {keyValue.Length} bytes."
+            );
         }
 
         if (keyCheckValue != null && keyCheckValue.Length != 3)
         {
-            return SmartCardError.InvalidArgument($"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes.");
+            return SmartCardError.InvalidArgument(
+                $"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes."
+            );
         }
 
         return new KeyDataBlock(KeyType.Aes128, keyValue, keyCheckValue);
@@ -489,7 +486,10 @@ public class KeyDataBlock
     /// <param name="keyValue">The 24-byte AES key value.</param>
     /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
     /// <returns>A Result containing the KeyDataBlock for AES-192 or an error.</returns>
-    public static Result<KeyDataBlock, SmartCardError> CreateAes192Key(byte[] keyValue, byte[] keyCheckValue = null)
+    public static Result<KeyDataBlock, SmartCardError> CreateAes192Key(
+        byte[] keyValue,
+        byte[] keyCheckValue = null
+    )
     {
         if (keyValue == null)
         {
@@ -498,12 +498,16 @@ public class KeyDataBlock
 
         if (keyValue.Length != 24)
         {
-            return SmartCardError.InvalidArgument($"AES-192 key must be 24 bytes, got {keyValue.Length} bytes.");
+            return SmartCardError.InvalidArgument(
+                $"AES-192 key must be 24 bytes, got {keyValue.Length} bytes."
+            );
         }
 
         if (keyCheckValue != null && keyCheckValue.Length != 3)
         {
-            return SmartCardError.InvalidArgument($"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes.");
+            return SmartCardError.InvalidArgument(
+                $"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes."
+            );
         }
 
         return new KeyDataBlock(KeyType.Aes192, keyValue, keyCheckValue);
@@ -515,7 +519,10 @@ public class KeyDataBlock
     /// <param name="keyValue">The 32-byte AES key value.</param>
     /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
     /// <returns>A Result containing the KeyDataBlock for AES-256 or an error.</returns>
-    public static Result<KeyDataBlock, SmartCardError> CreateAes256Key(byte[] keyValue, byte[] keyCheckValue = null)
+    public static Result<KeyDataBlock, SmartCardError> CreateAes256Key(
+        byte[] keyValue,
+        byte[] keyCheckValue = null
+    )
     {
         if (keyValue == null)
         {
@@ -524,12 +531,16 @@ public class KeyDataBlock
 
         if (keyValue.Length != 32)
         {
-            return SmartCardError.InvalidArgument($"AES-256 key must be 32 bytes, got {keyValue.Length} bytes.");
+            return SmartCardError.InvalidArgument(
+                $"AES-256 key must be 32 bytes, got {keyValue.Length} bytes."
+            );
         }
 
         if (keyCheckValue != null && keyCheckValue.Length != 3)
         {
-            return SmartCardError.InvalidArgument($"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes.");
+            return SmartCardError.InvalidArgument(
+                $"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes."
+            );
         }
 
         return new KeyDataBlock(KeyType.Aes256, keyValue, keyCheckValue);
@@ -553,9 +564,7 @@ public class PutKeyResponse
     /// <param name="keyCheckValues">The key check values.</param>
     public PutKeyResponse(IList<byte[]> keyCheckValues)
     {
-        KeyCheckValues = new List<byte[]>(
-            keyCheckValues?.Select(kcv => (byte[])kcv.Clone()) ?? []
-        );
+        KeyCheckValues = new List<byte[]>(keyCheckValues?.Select(kcv => (byte[])kcv.Clone()) ?? []);
     }
 
     /// <summary>
@@ -572,7 +581,9 @@ public class PutKeyResponse
 
         if (response.Length % 3 != 0)
         {
-            return SmartCardError.InvalidResponse($"Invalid response length {response.Length}, expected multiple of 3 bytes for key check values.");
+            return SmartCardError.InvalidResponse(
+                $"Invalid response length {response.Length}, expected multiple of 3 bytes for key check values."
+            );
         }
 
         List<byte[]> keyCheckValues = [];
@@ -580,7 +591,7 @@ public class PutKeyResponse
         // Each key check value is 3 bytes
         for (int i = 0; i + 2 < response.Length; i += 3)
         {
-            byte[] kcv = response.Skip(i).Take(3).ToArray();
+            byte[] kcv = [.. response.Skip(i).Take(3)];
             keyCheckValues.Add(kcv);
         }
 

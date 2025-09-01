@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
-using Org.BouncyCastle.Asn1;
 using CSharpFunctionalExtensions;
+using Org.BouncyCastle.Asn1;
 
 namespace Gp4Net.Tool.Commands.Debug;
 
@@ -13,7 +13,6 @@ namespace Gp4Net.Tool.Commands.Debug;
 /// </summary>
 public static class Asn1TableBuilder
 {
-
     /// <summary>
     /// Base type for all ASN.1 display rows, enabling type-safe UI composition.
     /// </summary>
@@ -33,28 +32,18 @@ public static class Asn1TableBuilder
     /// <summary>
     /// Row indicating the start of a container (sequence, set, etc).
     /// </summary>
-    public record ContainerHeaderRow(
-        int Depth,
-        string ContainerType,
-        int ElementCount
-    ) : Asn1Row;
+    public record ContainerHeaderRow(int Depth, string ContainerType, int ElementCount) : Asn1Row;
 
     /// <summary>
     /// Row indicating an element within a container.
     /// </summary>
-    public record ElementHeaderRow(
-        int Depth,
-        int ElementIndex,
-        string Description
-    ) : Asn1Row;
+    public record ElementHeaderRow(int Depth, int ElementIndex, string Description) : Asn1Row;
 
     /// <summary>
     /// Row for nested ASN.1 detection.
     /// </summary>
-    public record NestedAsn1HeaderRow(
-        int Depth,
-        string Message = "Nested ASN.1 detected:"
-    ) : Asn1Row;
+    public record NestedAsn1HeaderRow(int Depth, string Message = "Nested ASN.1 detected:")
+        : Asn1Row;
 
     /// <summary>
     /// Summary information row.
@@ -77,7 +66,8 @@ public static class Asn1TableBuilder
     public static IEnumerable<Asn1Row> BuildAsn1Rows(
         byte[] data,
         bool showBytes = false,
-        bool showOffsets = true)
+        bool showOffsets = true
+    )
     {
         if (data == null || data.Length == 0)
         {
@@ -86,7 +76,7 @@ public static class Asn1TableBuilder
         }
 
         yield return new SummaryRow($"Parsing {data.Length} bytes of ASN.1 data:");
-        yield return new InfoRow($"Raw hex: {Convert.ToHexString(data)}", "info");
+        yield return new InfoRow($"Raw hex: {Convert.ToHexString(data)}");
 
         (Asn1Object asn1Object, string error) parseResult = TryParseAsn1(data);
         if (parseResult.asn1Object == null)
@@ -95,7 +85,9 @@ public static class Asn1TableBuilder
             yield break;
         }
 
-        foreach (Asn1Row row in BuildAsn1ObjectRows(parseResult.asn1Object, 0, 0, showBytes, showOffsets))
+        foreach (
+            Asn1Row row in BuildAsn1ObjectRows(parseResult.asn1Object, 0, 0, showBytes, showOffsets)
+        )
         {
             yield return row;
         }
@@ -109,7 +101,8 @@ public static class Asn1TableBuilder
         int depth,
         int offset,
         bool showBytes,
-        bool showOffsets)
+        bool showOffsets
+    )
     {
         string typeInfo = GetAsn1TypeInfo(obj);
         string offsetStr = showOffsets ? $"@{offset:X4}" : "";
@@ -144,7 +137,8 @@ public static class Asn1TableBuilder
         int depth,
         int offset,
         bool showBytes,
-        bool showOffsets)
+        bool showOffsets
+    )
     {
         switch (obj)
         {
@@ -154,7 +148,15 @@ public static class Asn1TableBuilder
                 for (int i = 0; i < sequence.Count; i++)
                 {
                     yield return new ElementHeaderRow(depth + 1, i, $"Element {i}:");
-                    foreach (Asn1Row row in BuildAsn1ObjectRows(sequence[i].ToAsn1Object(), depth + 2, seqOffset, showBytes, showOffsets))
+                    foreach (
+                        Asn1Row row in BuildAsn1ObjectRows(
+                            sequence[i].ToAsn1Object(),
+                            depth + 2,
+                            seqOffset,
+                            showBytes,
+                            showOffsets
+                        )
+                    )
                     {
                         yield return row;
                     }
@@ -168,7 +170,15 @@ public static class Asn1TableBuilder
                 for (int i = 0; i < set.Count; i++)
                 {
                     yield return new ElementHeaderRow(depth + 1, i, $"Element {i}:");
-                    foreach (Asn1Row row in BuildAsn1ObjectRows(set[i].ToAsn1Object(), depth + 2, setOffset, showBytes, showOffsets))
+                    foreach (
+                        Asn1Row row in BuildAsn1ObjectRows(
+                            set[i].ToAsn1Object(),
+                            depth + 2,
+                            setOffset,
+                            showBytes,
+                            showOffsets
+                        )
+                    )
                     {
                         yield return row;
                     }
@@ -186,7 +196,15 @@ public static class Asn1TableBuilder
                     if (nestedResult.asn1Object != null)
                     {
                         yield return new NestedAsn1HeaderRow(depth + 1);
-                        foreach (Asn1Row row in BuildAsn1ObjectRows(nestedResult.asn1Object, depth + 2, 0, showBytes, showOffsets))
+                        foreach (
+                            Asn1Row row in BuildAsn1ObjectRows(
+                                nestedResult.asn1Object,
+                                depth + 2,
+                                0,
+                                showBytes,
+                                showOffsets
+                            )
+                        )
                         {
                             yield return row;
                         }
@@ -203,14 +221,22 @@ public static class Asn1TableBuilder
     {
         return obj switch
         {
-            DerOctetString octetString => Maybe<string>.From($"Value: {Convert.ToHexString(octetString.GetOctets())} ({octetString.GetOctets().Length} bytes)"),
+            DerOctetString octetString => Maybe<string>.From(
+                $"Value: {Convert.ToHexString(octetString.GetOctets())} ({octetString.GetOctets().Length} bytes)"
+            ),
             DerInteger integer => Maybe<string>.From($"Value: {integer.Value}"),
             DerObjectIdentifier oid => Maybe<string>.From($"OID: {oid.Id}"),
             DerUtf8String utf8 => Maybe<string>.From($"Value: \"{utf8.GetString()}\""),
-            DerPrintableString printable => Maybe<string>.From($"Value: \"{printable.GetString()}\""),
-            DerBitString bitString => Maybe<string>.From($"Bits: {Convert.ToHexString(bitString.GetBytes())} (unused bits: {bitString.PadBits})"),
-            _ when obj.GetEncoded()?.Length > 0 => Maybe<string>.From($"Raw data: {Convert.ToHexString(obj.GetEncoded())}"),
-            _ => Maybe<string>.None
+            DerPrintableString printable => Maybe<string>.From(
+                $"Value: \"{printable.GetString()}\""
+            ),
+            DerBitString bitString => Maybe<string>.From(
+                $"Bits: {Convert.ToHexString(bitString.GetBytes())} (unused bits: {bitString.PadBits})"
+            ),
+            _ when obj.GetEncoded()?.Length > 0 => Maybe<string>.From(
+                $"Raw data: {Convert.ToHexString(obj.GetEncoded())}"
+            ),
+            _ => Maybe<string>.None,
         };
     }
 
@@ -232,31 +258,36 @@ public static class Asn1TableBuilder
                     offset,
                     typeInfo,
                     value = value.GetValueOrDefault(""),
-                    rawBytes = rawBytes.GetValueOrDefault("")
+                    rawBytes = rawBytes.GetValueOrDefault(""),
                 },
                 ContainerHeaderRow(var depth, var containerType, var elementCount) => new
                 {
                     type = "container",
                     depth,
                     containerType,
-                    elementCount
+                    elementCount,
                 },
                 ElementHeaderRow(var depth, var elementIndex, var description) => new
                 {
                     type = "element",
                     depth,
                     elementIndex,
-                    description
+                    description,
                 },
                 NestedAsn1HeaderRow(var depth, var message) => new
                 {
                     type = "nested",
                     depth,
-                    message
+                    message,
                 },
                 SummaryRow(var message) => new { type = "summary", message },
-                InfoRow(var message, var severity) => new { type = "info", message, severity },
-                _ => new { type = "unknown", data = row.ToString() }
+                InfoRow(var message, var severity) => new
+                {
+                    type = "info",
+                    message,
+                    severity,
+                },
+                _ => new { type = "unknown", data = row.ToString() },
             };
 
             data.Add(item);
@@ -303,7 +334,7 @@ public static class Asn1TableBuilder
             1 => "Application",
             2 => "Context",
             3 => "Private",
-            _ => "Unknown"
+            _ => "Unknown",
         };
 
         string typeStr = obj.GetType().Name;
@@ -327,21 +358,18 @@ public static class Asn1TableBuilder
         {
             return lengthByte.ToString();
         }
-        else
+        int lengthBytes = lengthByte & 0x7F;
+        if (lengthBytes == 0)
         {
-            int lengthBytes = lengthByte & 0x7F;
-            if (lengthBytes == 0)
-            {
-                return "indefinite";
-            }
-
-            int length = 0;
-            for (int i = 0; i < lengthBytes && i + 2 < encoded.Length; i++)
-            {
-                length = (length << 8) | encoded[i + 2];
-            }
-            return $"{length} (long form, {lengthBytes} bytes)";
+            return "indefinite";
         }
+
+        int length = 0;
+        for (int i = 0; i < lengthBytes && i + 2 < encoded.Length; i++)
+        {
+            length = length << 8 | encoded[i + 2];
+        }
+        return $"{length} (long form, {lengthBytes} bytes)";
     }
 
     /// <summary>
@@ -360,10 +388,7 @@ public static class Asn1TableBuilder
         {
             return 2; // Tag + short length
         }
-        else
-        {
-            return 2 + (lengthByte & 0x7F); // Tag + long length indicator + length bytes
-        }
+        return 2 + (lengthByte & 0x7F); // Tag + long length indicator + length bytes
     }
 
     /// <summary>
@@ -391,12 +416,9 @@ public static class Asn1TableBuilder
             // Short form - check if data length matches
             return data.Length >= length + 2;
         }
-        else
-        {
-            // Long form
-            int lengthBytes = length & 0x7F;
-            return lengthBytes is > 0 and <= 4 && data.Length >= lengthBytes + 2;
-        }
-    }
 
+        // Long form
+        int lengthBytes = length & 0x7F;
+        return lengthBytes is > 0 and <= 4 && data.Length >= lengthBytes + 2;
+    }
 }

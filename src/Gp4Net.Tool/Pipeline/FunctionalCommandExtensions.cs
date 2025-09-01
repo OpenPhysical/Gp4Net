@@ -18,7 +18,8 @@ public static class FunctionalCommandExtensions
     /// </summary>
     public static async Task<Result<T, string>> ExecuteFunctionalAsync<T>(
         this ICliExecutionContext context,
-        Func<ICliExecutionContext, Task<Result<T, string>>> commandLogic)
+        Func<ICliExecutionContext, Task<Result<T, string>>> commandLogic
+    )
     {
         try
         {
@@ -31,24 +32,28 @@ public static class FunctionalCommandExtensions
     }
 
     /// <summary>
-    /// Ensures a card connection using functional patterns.
+    /// Ensures a card connection.
     /// </summary>
     public static async Task<Result<ICliExecutionContext, string>> RequireCardConnectionFunctional(
         this ICliExecutionContext context,
-        string readerName = null)
+        string readerName = null
+    )
     {
-        Result<bool, SmartCardError> connectionResult = await context.CardService.IsConnectedAsync();
+        Result<bool, SmartCardError> connectionResult =
+            await context.CardService.IsConnectedAsync();
         return await connectionResult.Match(
-            isConnected => isConnected 
-                ? Task.FromResult(Result.Success<ICliExecutionContext, string>(context))
-                : EstablishConnection(context, readerName),
+            isConnected =>
+                isConnected
+                    ? Task.FromResult(Result.Success<ICliExecutionContext, string>(context))
+                    : EstablishConnection(context, readerName),
             error => Task.FromResult(Result.Failure<ICliExecutionContext, string>(error.Message))
         );
     }
 
     private static async Task<Result<ICliExecutionContext, string>> EstablishConnection(
-        ICliExecutionContext context, 
-        string readerName)
+        ICliExecutionContext context,
+        string readerName
+    )
     {
         try
         {
@@ -62,12 +67,13 @@ public static class FunctionalCommandExtensions
     }
 
     /// <summary>
-    /// Ensures a secure channel using functional patterns.
+    /// Ensures a secure channel.
     /// </summary>
     public static async Task<Result<ICliExecutionContext, string>> RequireSecureChannelFunctional(
         this ICliExecutionContext context,
         byte securityLevel = 1,
-        string keyset = null)
+        string keyset = null
+    )
     {
         try
         {
@@ -80,13 +86,13 @@ public static class FunctionalCommandExtensions
         }
     }
 
-
     /// <summary>
     /// Chains functional operations on the CLI context.
     /// </summary>
     public static async Task<Result<TResult, string>> ThenAsync<TResult>(
         this Task<Result<ICliExecutionContext, string>> contextTask,
-        Func<ICliExecutionContext, Task<Result<TResult, string>>> operation)
+        Func<ICliExecutionContext, Task<Result<TResult, string>>> operation
+    )
     {
         Result<ICliExecutionContext, string> contextResult = await contextTask;
         return await contextResult.Bind(operation);
@@ -97,7 +103,8 @@ public static class FunctionalCommandExtensions
     /// </summary>
     public static async Task<Result<ICliExecutionContext, string>> ThenAsync(
         this Task<Result<ICliExecutionContext, string>> contextTask,
-        Func<ICliExecutionContext, Task<Result<ICliExecutionContext, string>>> operation)
+        Func<ICliExecutionContext, Task<Result<ICliExecutionContext, string>>> operation
+    )
     {
         Result<ICliExecutionContext, string> contextResult = await contextTask;
         return await contextResult.Bind(operation);
@@ -108,31 +115,36 @@ public static class FunctionalCommandExtensions
     /// </summary>
     public static async Task<Result<TResult, string>> MapAsync<TResult>(
         this Task<Result<ICliExecutionContext, string>> contextTask,
-        Func<ICliExecutionContext, TResult> mapper)
+        Func<ICliExecutionContext, TResult> mapper
+    )
     {
         Result<ICliExecutionContext, string> contextResult = await contextTask;
         return contextResult.Map(mapper);
     }
 
     /// <summary>
-    /// Executes a card command using functional patterns with connection and error handling.
+    /// Executes a card command with connection and error handling.
     /// </summary>
     public static async Task<int> ExecuteCardCommandFunctional(
         this ICliExecutionContext context,
         CommandSettings settings,
-        Func<ICliExecutionContext, Task<Result<bool, string>>> commandLogic)
+        Func<ICliExecutionContext, Task<Result<bool, string>>> commandLogic
+    )
     {
-        Result<ICliExecutionContext, string> connectionResult = await context.RequireCardConnectionFunctional();
+        Result<ICliExecutionContext, string> connectionResult =
+            await context.RequireCardConnectionFunctional();
         Result<bool, string> commandResult = await connectionResult.Match(
             async ctx => await commandLogic(ctx),
-            error => Task.FromResult(Result.Failure<bool, string>(error)));
-            
+            error => Task.FromResult(Result.Failure<bool, string>(error))
+        );
+
         return commandResult.Match(
-                success => 0,
-                error =>
-                {
-                    context.Display.Error($"Command failed: {error}");
-                    return 1;
-                });
+            success => 0,
+            error =>
+            {
+                context.Display.Error($"Command failed: {error}");
+                return 1;
+            }
+        );
     }
 }

@@ -6,9 +6,9 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Pipeline;
 using Gp4Net.Services;
-using Gp4Net.Tool.Services;
 using Gp4Net.Tests.Infrastructure;
-using Gp4Net.Tests.TestHelpers;
+using Gp4Net.Tool.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Integration;
@@ -20,9 +20,12 @@ namespace Gp4Net.Tests.Integration;
 [TestFixture]
 public abstract class TraceBasedTestBase : IDisposable
 {
-    protected Maybe<ISmartCardService> CardService { get; private set; } = Maybe<ISmartCardService>.None;
-    protected Maybe<IGlobalPlatformService> GlobalPlatformService { get; private set; } = Maybe<IGlobalPlatformService>.None;
-    protected Maybe<IDomainServiceFactory> ServiceFactory { get; private set; } = Maybe<IDomainServiceFactory>.None;
+    protected Maybe<ISmartCardService> CardService { get; private set; } =
+        Maybe<ISmartCardService>.None;
+    protected Maybe<IGlobalPlatformService> GlobalPlatformService { get; private set; } =
+        Maybe<IGlobalPlatformService>.None;
+    protected Maybe<IDomainServiceFactory> ServiceFactory { get; private set; } =
+        Maybe<IDomainServiceFactory>.None;
     protected string TracePath { get; }
     protected string ReaderName { get; private set; } = string.Empty;
     private bool _disposed;
@@ -35,18 +38,17 @@ public abstract class TraceBasedTestBase : IDisposable
         // Create reader name with optional operations filter
         ReaderName = operations.Match(
             ops => TraceBasedCardServiceExtensions.CreateTraceReaderName(TracePath, ops),
-            () => TraceBasedCardServiceExtensions.CreateTraceReaderName(TracePath, null));
-        
+            () => TraceBasedCardServiceExtensions.CreateTraceReaderName(TracePath, null)
+        );
+
         // Initialize as None until connected
         CardService = Maybe<ISmartCardService>.None;
         GlobalPlatformService = Maybe<IGlobalPlatformService>.None;
         ServiceFactory = Maybe<IDomainServiceFactory>.None;
     }
 
-    protected TraceBasedTestBase(string traceFileName) 
-        : this(traceFileName, Maybe<string>.None)
-    {
-    }
+    protected TraceBasedTestBase(string traceFileName)
+        : this(traceFileName, Maybe<string>.None) { }
 
     /// <summary>
     /// Connects to the trace-based card service and sets up functional services.
@@ -55,7 +57,9 @@ public abstract class TraceBasedTestBase : IDisposable
     {
         operations
             .Where(ops => !string.IsNullOrEmpty(ops))
-            .Do(ops => ReaderName = TraceBasedCardServiceExtensions.CreateTraceReaderName(TracePath, ops));
+            .Do(ops =>
+                ReaderName = TraceBasedCardServiceExtensions.CreateTraceReaderName(TracePath, ops)
+            );
 
         // Create a trace-based card service using TestCardService adapter
         var virtualCardService = new VirtualCardService();
@@ -66,7 +70,9 @@ public abstract class TraceBasedTestBase : IDisposable
 
         // Create functional services using the factory pattern
         ServiceFactory = Maybe<IDomainServiceFactory>.From(CreateTestServiceFactory());
-        GlobalPlatformService = Maybe<IGlobalPlatformService>.From(new EmptyGlobalPlatformService());
+        GlobalPlatformService = Maybe<IGlobalPlatformService>.From(
+            new EmptyGlobalPlatformService()
+        );
 
         return Task.CompletedTask;
     }
@@ -85,11 +91,10 @@ public abstract class TraceBasedTestBase : IDisposable
     protected virtual IDomainServiceFactory CreateTestServiceFactory()
     {
         // Create minimal functional dependencies for testing
-        TestApduTransportFactory transportFactory = new TestApduTransportFactory();
-        TestSecureChannelManager secureChannelManager = new TestSecureChannelManager();
-        var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<DomainServiceFactory>.Instance;
+        TestKeysetResolver keysetResolver = new TestKeysetResolver();
+        var logger = Maybe<ILogger<GlobalPlatformServiceInstance>>.None;
 
-        return new DomainServiceFactory(transportFactory, secureChannelManager, logger);
+        return new DomainServiceFactory(keysetResolver, logger);
     }
 
     /// <summary>
@@ -100,13 +105,66 @@ public abstract class TraceBasedTestBase : IDisposable
         // Try valid organized directory structure locations only
         string[] possiblePaths =
         [
-            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "Operations", "Installation", fileName),
-            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "Operations", "Deletion", fileName),
-            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "Operations", "CardManagement", fileName),
-            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "Protocol", "SCP02", fileName),
-            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "Protocol", "SCP03", fileName),
-            Path.Combine(TestContextHelper.GetProjectRootDirectory(), "tests", "Gp4Net.Tests", "TestData", "Traces", "Complex", fileName),
-            fileName // Absolute path
+            Path.Combine(
+                TestContextHelper.GetProjectRootDirectory(),
+                "tests",
+                "Gp4Net.Tests",
+                "TestData",
+                "Traces",
+                "Operations",
+                "Installation",
+                fileName
+            ),
+            Path.Combine(
+                TestContextHelper.GetProjectRootDirectory(),
+                "tests",
+                "Gp4Net.Tests",
+                "TestData",
+                "Traces",
+                "Operations",
+                "Deletion",
+                fileName
+            ),
+            Path.Combine(
+                TestContextHelper.GetProjectRootDirectory(),
+                "tests",
+                "Gp4Net.Tests",
+                "TestData",
+                "Traces",
+                "Operations",
+                "CardManagement",
+                fileName
+            ),
+            Path.Combine(
+                TestContextHelper.GetProjectRootDirectory(),
+                "tests",
+                "Gp4Net.Tests",
+                "TestData",
+                "Traces",
+                "Protocol",
+                "SCP02",
+                fileName
+            ),
+            Path.Combine(
+                TestContextHelper.GetProjectRootDirectory(),
+                "tests",
+                "Gp4Net.Tests",
+                "TestData",
+                "Traces",
+                "Protocol",
+                "SCP03",
+                fileName
+            ),
+            Path.Combine(
+                TestContextHelper.GetProjectRootDirectory(),
+                "tests",
+                "Gp4Net.Tests",
+                "TestData",
+                "Traces",
+                "Complex",
+                fileName
+            ),
+            fileName, // Absolute path
         ];
 
         foreach (string path in possiblePaths)
@@ -117,7 +175,9 @@ public abstract class TraceBasedTestBase : IDisposable
             }
         }
 
-        throw new FileNotFoundException($"Trace file '{fileName}' not found in any expected location");
+        throw new FileNotFoundException(
+            $"Trace file '{fileName}' not found in any expected location"
+        );
     }
 
     /// <summary>
@@ -127,24 +187,45 @@ public abstract class TraceBasedTestBase : IDisposable
     {
         var response = CardService!.SendCommand(command);
 
-        Assert.That(response.StatusWord, Is.EqualTo(0x9000),
-            string.IsNullOrEmpty(description) ? "Command should succeed" : description);
+        Assert.That(
+            response.StatusWord,
+            Is.EqualTo(0x9000),
+            string.IsNullOrEmpty(description) ? "Command should succeed" : description
+        );
     }
 
     /// <summary>
     /// Asserts that a command returns the expected status word.
     /// </summary>
-    protected async Task AssertCommandReturnsAsync(byte[] command, ushort expectedSw, string description = "")
+    protected async Task AssertCommandReturnsAsync(
+        byte[] command,
+        ushort expectedSw,
+        string description = ""
+    )
     {
         var response = await CardService
             .ToResult("Card service not available")
             .Bind(async service => await service.SendCommandAsync(command))
             .Match(
                 success => Task.FromResult(success),
-                error => Task.FromResult(new Gp4Net.Core.CommandResponse([], 0x6F00, new ImmutablePipelineContext(), new Dictionary<string, object>())));
+                error =>
+                    Task.FromResult(
+                        new Gp4Net.Core.CommandResponse(
+                            [],
+                            0x6F00,
+                            new ImmutablePipelineContext(),
+                            new Dictionary<string, object>()
+                        )
+                    )
+            );
 
-        Assert.That(response.StatusWord, Is.EqualTo(expectedSw),
-            string.IsNullOrEmpty(description) ? $"Command should return SW={expectedSw:X4}" : description);
+        Assert.That(
+            response.StatusWord,
+            Is.EqualTo(expectedSw),
+            string.IsNullOrEmpty(description)
+                ? $"Command should return SW={expectedSw:X4}"
+                : description
+        );
     }
 
     /// <summary>
@@ -156,18 +237,32 @@ public abstract class TraceBasedTestBase : IDisposable
             .ToResult("Card service not available")
             .Bind(async service =>
             {
-                Result<CommandResponse, SmartCardError> result = await service.SendCommandAsync(command);
+                Result<CommandResponse, SmartCardError> result = await service.SendCommandAsync(
+                    command
+                );
                 return result;
             })
             .Match(
                 success => Task.FromResult(success),
-                error => Task.FromResult(new Gp4Net.Core.CommandResponse([], 0x6F00, new ImmutablePipelineContext(), new Dictionary<string, object>())));
+                error =>
+                    Task.FromResult(
+                        new Gp4Net.Core.CommandResponse(
+                            [],
+                            0x6F00,
+                            new ImmutablePipelineContext(),
+                            new Dictionary<string, object>()
+                        )
+                    )
+            );
     }
 
     /// <summary>
     /// Executes a functional operation with proper Result handling.
     /// </summary>
-    protected async Task<T> ExecuteAsync<T>(Func<IGlobalPlatformService, Task<Result<T, SmartCardError>>> operation, string operationName = "")
+    protected async Task<T> ExecuteAsync<T>(
+        Func<IGlobalPlatformService, Task<Result<T, SmartCardError>>> operation,
+        string operationName = ""
+    )
     {
         Result result = await GlobalPlatformService
             .ToResult($"Global platform service not available for {operationName}")
@@ -182,7 +277,8 @@ public abstract class TraceBasedTestBase : IDisposable
                     : $"{operationName} failed: {error.Message}";
                 Assert.Fail(message);
                 return default(T)!; // This will never be reached
-            });
+            }
+        );
     }
 
     /// <summary>
@@ -190,7 +286,8 @@ public abstract class TraceBasedTestBase : IDisposable
     /// </summary>
     protected async Task<SmartCardError> ExecuteExpectingErrorAsync<T>(
         Func<IGlobalPlatformService, Task<Result<T, SmartCardError>>> operation,
-        string operationName = "")
+        string operationName = ""
+    )
     {
         Result<T, SmartCardError> result = await operation(GlobalPlatformService!);
 
@@ -203,7 +300,8 @@ public abstract class TraceBasedTestBase : IDisposable
                 Assert.Fail(message);
                 return default(SmartCardError)!; // This will never be reached
             },
-            error => error);
+            error => error
+        );
     }
 
     [TearDown]

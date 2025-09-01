@@ -69,7 +69,10 @@ public class CapFileLoadingWorkflow
                 .GetValueOrDefault([]);
             LoadedPackageAid = loadedPackageAid.Map(aid => (byte[])aid.Clone());
             InstalledAppletAids = installedAppletAids
-                .Map(aids => (IReadOnlyList<byte[]>)new List<byte[]>(aids.Select(aid => (byte[])aid.Clone())))
+                .Map(aids =>
+                    (IReadOnlyList<byte[]>)new List<byte[]>(aids.Select(aid => (byte[])aid.Clone()))
+                )
+                // @TODO NO FALLBACK. SUCCEED OR FAIL.
                 .GetValueOrDefault([]);
         }
     }
@@ -93,10 +96,13 @@ public class CapFileLoadingWorkflow
     {
         if (capFileData is null)
             return Result.Failure<IList<IApduCommand>, SmartCardError>(
-                SmartCardError.InvalidArgument("CAP file data cannot be null"));
+                SmartCardError.InvalidArgument("CAP file data cannot be null")
+            );
 
         // Parse the CAP file to extract package and applet information
-        Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(capFileData);
+        Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(
+            capFileData
+        );
         if (capFileResult.IsFailure)
         {
             return Result.Failure<IList<IApduCommand>, SmartCardError>(capFileResult.Error);
@@ -114,44 +120,50 @@ public class CapFileLoadingWorkflow
             // - The Load File Data Block is encrypted
             // Since we don't use tokens or DAP blocks, we'll omit the hash to avoid verification errors
 
-            Result<InstallCommand.InstallForLoadCommand, SmartCardError> installForLoadResult = InstallCommandBuilder.CreateForLoad(
-                capFile.PackageAid,
-                securityDomainAid.HasValue ? securityDomainAid.Value : null,
-                hash: null,  // Omit hash as it's optional and may cause verification issues
-                maxDataBlockSize: (ushort)maxLoadBlockSize  // Pass max block size for load parameters
-            );
+            Result<InstallCommand.InstallForLoadCommand, SmartCardError> installForLoadResult =
+                InstallCommandBuilder.CreateForLoad(
+                    capFile.PackageAid,
+                    securityDomainAid.HasValue ? securityDomainAid.Value : null,
+                    hash: null, // Omit hash as it's optional and may cause verification issues
+                    maxDataBlockSize: (ushort)maxLoadBlockSize // Pass max block size for load parameters
+                );
 
             if (installForLoadResult.IsFailure)
             {
-                return Result.Failure<IList<IApduCommand>, SmartCardError>(installForLoadResult.Error);
+                return Result.Failure<IList<IApduCommand>, SmartCardError>(
+                    installForLoadResult.Error
+                );
             }
             commands.Add(installForLoadResult.Value);
 
             // Step 2: LOAD commands (split CAP file into blocks)
             // Use the CAP file structure directly to avoid double conversion
-            Result<IList<LoadCommand>, SmartCardError> loadCommandsResult = LoadCommand.CreateFromCapFile(capFile, maxLoadBlockSize);
+            Result<IList<LoadCommand>, SmartCardError> loadCommandsResult =
+                LoadCommand.CreateFromCapFile(capFile, maxLoadBlockSize);
             if (loadCommandsResult.IsFailure)
             {
-                return Result.Failure<IList<IApduCommand>, SmartCardError>(loadCommandsResult.Error);
+                return Result.Failure<IList<IApduCommand>, SmartCardError>(
+                    loadCommandsResult.Error
+                );
             }
             commands.AddRange(loadCommandsResult.Value);
 
             // Step 3: INSTALL [for install] commands for each applet (if requested)
             if (installApplets && capFile.Applets.Count > 0)
             {
-                foreach (AppletInfo applet in capFile.Applets)
+                // @TODO NO IMPERATIVE LOOP.
+                foreach (var installForInstallResult in capFile.Applets.Select(applet => makeSelectableAfterInstall
+                             ? InstallCommandBuilder.CreateForInstallAndMakeSelectable(
+                                 capFile.PackageAid,
+                                 applet.Aid
+                             )
+                             : InstallCommandBuilder.CreateForInstall(capFile.PackageAid, applet.Aid)))
                 {
-                    Result<InstallCommand.InstallForInstallCommand, SmartCardError> installForInstallResult = makeSelectableAfterInstall
-                        ? InstallCommandBuilder.CreateForInstallAndMakeSelectable(
-                            capFile.PackageAid,
-                            applet.Aid)
-                        : InstallCommandBuilder.CreateForInstall(
-                            capFile.PackageAid,
-                            applet.Aid);
-
                     if (installForInstallResult.IsFailure)
                     {
-                        return Result.Failure<IList<IApduCommand>, SmartCardError>(installForInstallResult.Error);
+                        return Result.Failure<IList<IApduCommand>, SmartCardError>(
+                            installForInstallResult.Error
+                        );
                     }
                     commands.Add(installForInstallResult.Value);
                 }
@@ -162,7 +174,8 @@ public class CapFileLoadingWorkflow
         catch (Exception ex)
         {
             return Result.Failure<IList<IApduCommand>, SmartCardError>(
-                SmartCardError.InvalidData($"Failed to create loading commands: {ex.Message}"));
+                SmartCardError.InvalidData($"Failed to create loading commands: {ex.Message}")
+            );
         }
     }
 
@@ -185,7 +198,9 @@ public class CapFileLoadingWorkflow
 
         try
         {
-            Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(capFileData);
+            Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(
+                capFileData
+            );
             if (capFileResult.IsFailure)
             {
                 return new CapFileValidationResult(
@@ -214,10 +229,10 @@ public class CapFileLoadingWorkflow
             byte[] requiredComponents =
             [
                 CapFileStructure.ComponentTags.Header,
-                CapFileStructure.ComponentTags.Directory
+                CapFileStructure.ComponentTags.Directory,
             ];
 
-            HashSet<byte> presentTags = capFile.Components.Select(c => c.Tag).ToHashSet();
+            HashSet<byte> presentTags = [.. capFile.Components.Select(c => c.Tag)];
             foreach (byte requiredTag in requiredComponents)
             {
                 if (!presentTags.Contains(requiredTag))
@@ -242,7 +257,11 @@ public class CapFileLoadingWorkflow
                 ? Maybe<string>.None
                 : Maybe<string>.From(string.Join("; ", validationErrors));
 
-            return new CapFileValidationResult(isValid, errorMessage, Maybe<CapFileStructure>.From(capFile));
+            return new CapFileValidationResult(
+                isValid,
+                errorMessage,
+                Maybe<CapFileStructure>.From(capFile)
+            );
         }
         catch (Exception ex)
         {
@@ -293,7 +312,9 @@ public class CapFileLoadingWorkflow
     /// <returns>The estimated memory requirements in bytes.</returns>
     public static MemoryRequirements EstimateMemoryRequirements(byte[] capFileData)
     {
-        Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(capFileData);
+        Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(
+            capFileData
+        );
         if (capFileResult.IsFailure)
         {
             // Return default requirements on parse failure
@@ -305,13 +326,17 @@ public class CapFileLoadingWorkflow
         // Basic estimation - in practice this would be more sophisticated
         int codeSize = capFile
             .Components.Where(c =>
-                c.Tag is CapFileStructure.ComponentTags.Method or CapFileStructure.ComponentTags.Class
+                c.Tag
+                    is CapFileStructure.ComponentTags.Method
+                        or CapFileStructure.ComponentTags.Class
             )
             .Sum(c => c.Size);
 
         int dataSize = capFile
             .Components.Where(c =>
-                c.Tag is CapFileStructure.ComponentTags.StaticField or CapFileStructure.ComponentTags.ConstantPool
+                c.Tag
+                    is CapFileStructure.ComponentTags.StaticField
+                        or CapFileStructure.ComponentTags.ConstantPool
             )
             .Sum(c => c.Size);
 

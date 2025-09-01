@@ -4,9 +4,9 @@
 // -----------------------------------------------------------------------------
 
 using System;
-using Org.BouncyCastle.Utilities;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Org.BouncyCastle.Utilities;
 
 namespace Gp4Net.Domain.Keys;
 
@@ -71,7 +71,7 @@ public abstract class KeySet : IKeySet
     /// </summary>
     public byte[] DekKey { get; }
 
-    private bool _disposed = false;
+    private bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the KeySet class.
@@ -127,7 +127,13 @@ public class Scp02KeySet : KeySet
     /// <summary>
     /// Private constructor for successful creation.
     /// </summary>
-    private Scp02KeySet(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
+    private Scp02KeySet(
+        byte[] encKey,
+        byte[] macKey,
+        byte[] dekKey,
+        byte keyVersion = 0,
+        byte keyId = 0
+    )
         : base(keyVersion, keyId, encKey, macKey, dekKey)
     {
         // Default to static ENC key if no session key provided
@@ -143,18 +149,29 @@ public class Scp02KeySet : KeySet
     /// <param name="keyVersion">The key version number (default is 0).</param>
     /// <param name="keyId">The key identifier (default is 0).</param>
     /// <returns>A Result containing the KeySet or an error.</returns>
-    public static Result<Scp02KeySet, SmartCardError> Create(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
+    public static Result<Scp02KeySet, SmartCardError> Create(
+        byte[] encKey,
+        byte[] macKey,
+        byte[] dekKey,
+        byte keyVersion = 0,
+        byte keyId = 0
+    )
     {
         Result<bool, SmartCardError> encKeyValidation = ValidateKey(encKey, nameof(encKey));
-        if (encKeyValidation.IsFailure) return Result.Failure<Scp02KeySet, SmartCardError>(encKeyValidation.Error);
+        if (encKeyValidation.IsFailure)
+            return Result.Failure<Scp02KeySet, SmartCardError>(encKeyValidation.Error);
 
         Result<bool, SmartCardError> macKeyValidation = ValidateKey(macKey, nameof(macKey));
-        if (macKeyValidation.IsFailure) return Result.Failure<Scp02KeySet, SmartCardError>(macKeyValidation.Error);
+        if (macKeyValidation.IsFailure)
+            return Result.Failure<Scp02KeySet, SmartCardError>(macKeyValidation.Error);
 
         Result<bool, SmartCardError> dekKeyValidation = ValidateKey(dekKey, nameof(dekKey));
-        if (dekKeyValidation.IsFailure) return Result.Failure<Scp02KeySet, SmartCardError>(dekKeyValidation.Error);
+        if (dekKeyValidation.IsFailure)
+            return Result.Failure<Scp02KeySet, SmartCardError>(dekKeyValidation.Error);
 
-        return Result.Success<Scp02KeySet, SmartCardError>(new Scp02KeySet(encKey, macKey, dekKey, keyVersion, keyId));
+        return Result.Success<Scp02KeySet, SmartCardError>(
+            new Scp02KeySet(encKey, macKey, dekKey, keyVersion, keyId)
+        );
     }
 
     private static Result<bool, SmartCardError> ValidateKey(byte[] key, string paramName)
@@ -166,7 +183,9 @@ public class Scp02KeySet : KeySet
 
         if (key.Length != 16 && key.Length != 24)
         {
-            return SmartCardError.InvalidArgument($"3DES key {paramName} must be 16 or 24 bytes, got {key.Length} bytes");
+            return SmartCardError.InvalidArgument(
+                $"3DES key {paramName} must be 16 or 24 bytes, got {key.Length} bytes"
+            );
         }
 
         return true;
@@ -187,7 +206,13 @@ public class Scp03KeySet : KeySet
     /// <summary>
     /// Private constructor for successful creation.
     /// </summary>
-    public Scp03KeySet(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
+    public Scp03KeySet(
+        byte[] encKey,
+        byte[] macKey,
+        byte[] dekKey,
+        byte keyVersion = 0,
+        byte keyId = 0
+    )
         : base(keyVersion, keyId, encKey, macKey, dekKey)
     {
         // Default to static MAC key if no session key provided
@@ -203,21 +228,37 @@ public class Scp03KeySet : KeySet
     /// <param name="keyVersion">The key version number (default is 0).</param>
     /// <param name="keyId">The key identifier (default is 0).</param>
     /// <returns>A Result containing the KeySet or an error.</returns>
-    public static Result<Scp03KeySet, SmartCardError> Create(byte[] encKey, byte[] macKey, byte[] dekKey, byte keyVersion = 0, byte keyId = 0)
+    public static Result<Scp03KeySet, SmartCardError> Create(
+        byte[] encKey,
+        byte[] macKey,
+        byte[] dekKey,
+        byte keyVersion = 0,
+        byte keyId = 0
+    )
     {
         Result<bool, SmartCardError> encKeyValidation = ValidateKey(encKey, nameof(encKey));
-        if (encKeyValidation.IsFailure) return Result.Failure<Scp03KeySet, SmartCardError>(encKeyValidation.Error);
+        if (encKeyValidation.IsFailure)
+            return Result.Failure<Scp03KeySet, SmartCardError>(encKeyValidation.Error);
 
         Result<bool, SmartCardError> macKeyValidation = ValidateKey(macKey, nameof(macKey));
-        if (macKeyValidation.IsFailure) return Result.Failure<Scp03KeySet, SmartCardError>(macKeyValidation.Error);
+        if (macKeyValidation.IsFailure)
+            return Result.Failure<Scp03KeySet, SmartCardError>(macKeyValidation.Error);
 
         Result<bool, SmartCardError> dekKeyValidation = ValidateKey(dekKey, nameof(dekKey));
-        if (dekKeyValidation.IsFailure) return Result.Failure<Scp03KeySet, SmartCardError>(dekKeyValidation.Error);
+        if (dekKeyValidation.IsFailure)
+            return Result.Failure<Scp03KeySet, SmartCardError>(dekKeyValidation.Error);
 
-        Result<bool, SmartCardError> lengthMatchValidation = ValidateKeyLengthsMatch(encKey, macKey, dekKey);
-        if (lengthMatchValidation.IsFailure) return Result.Failure<Scp03KeySet, SmartCardError>(lengthMatchValidation.Error);
+        Result<bool, SmartCardError> lengthMatchValidation = ValidateKeyLengthsMatch(
+            encKey,
+            macKey,
+            dekKey
+        );
+        if (lengthMatchValidation.IsFailure)
+            return Result.Failure<Scp03KeySet, SmartCardError>(lengthMatchValidation.Error);
 
-        return Result.Success<Scp03KeySet, SmartCardError>(new Scp03KeySet(encKey, macKey, dekKey, keyVersion, keyId));
+        return Result.Success<Scp03KeySet, SmartCardError>(
+            new Scp03KeySet(encKey, macKey, dekKey, keyVersion, keyId)
+        );
     }
 
     private static Result<bool, SmartCardError> ValidateKey(byte[] key, string paramName)
@@ -229,17 +270,25 @@ public class Scp03KeySet : KeySet
 
         if (key.Length != 16 && key.Length != 24 && key.Length != 32)
         {
-            return SmartCardError.InvalidArgument($"AES key {paramName} must be 16, 24, or 32 bytes, got {key.Length} bytes");
+            return SmartCardError.InvalidArgument(
+                $"AES key {paramName} must be 16, 24, or 32 bytes, got {key.Length} bytes"
+            );
         }
 
         return true;
     }
 
-    private static Result<bool, SmartCardError> ValidateKeyLengthsMatch(byte[] encKey, byte[] macKey, byte[] dekKey)
+    private static Result<bool, SmartCardError> ValidateKeyLengthsMatch(
+        byte[] encKey,
+        byte[] macKey,
+        byte[] dekKey
+    )
     {
         if (encKey.Length != macKey.Length || macKey.Length != dekKey.Length)
         {
-            return SmartCardError.InvalidArgument($"All AES keys must have the same length. Got ENC: {encKey.Length}, MAC: {macKey.Length}, DEK: {dekKey.Length} bytes");
+            return SmartCardError.InvalidArgument(
+                $"All AES keys must have the same length. Got ENC: {encKey.Length}, MAC: {macKey.Length}, DEK: {dekKey.Length} bytes"
+            );
         }
 
         return true;

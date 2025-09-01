@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -27,7 +29,9 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
     /// </summary>
     public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
     {
-        Result<ICliExecutionContext, SmartCardError> connectionResult = await context.WithVerbose(settings.Verbose).RequireCardConnection(settings.GetReaderName());
+        Result<ICliExecutionContext, SmartCardError> connectionResult = await context
+            .WithVerbose(settings.Verbose)
+            .RequireCardConnection(settings.GetReaderName());
 
         return await connectionResult.Match(
             async connectedCtx => await GetDataObjectsAsync(connectedCtx, settings),
@@ -35,10 +39,14 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
             {
                 AnsiConsole.MarkupLine($"[red]Connection error: {connectionError.Message}[/]");
                 return await Task.FromResult(1);
-            });
+            }
+        );
     }
 
-    private static async Task<int> GetDataObjectsAsync(ICliExecutionContext context, Settings settings)
+    private static async Task<int> GetDataObjectsAsync(
+        ICliExecutionContext context,
+        Settings settings
+    )
     {
         try
         {
@@ -46,32 +54,32 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
 
             return dataObject switch
             {
-                "iin"
-                    => await GetSingleDataObjectAsync(
-                        context,
-                        settings,
-                        "IIN",
-                        GetDataCommand.DataObjects.IssuerIdentificationNumber
-                    ),
-                "cin"
-                    => await GetSingleDataObjectAsync(
-                        context,
-                        settings,
-                        "CIN",
-                        GetDataCommand.DataObjects.CardImageNumber
-                    ),
-                "manager-url"
-                    => await GetSingleDataObjectAsync(
-                        context,
-                        settings,
-                        "Manager URL",
-                        GetDataCommand.DataObjects.SecurityDomainManagerUrl
-                    ),
+                "iin" => await GetSingleDataObjectAsync(
+                    context,
+                    settings,
+                    "IIN",
+                    GetDataCommand.DataObjects.IssuerIdentificationNumber
+                ),
+                "cin" => await GetSingleDataObjectAsync(
+                    context,
+                    settings,
+                    "CIN",
+                    GetDataCommand.DataObjects.CardImageNumber
+                ),
+                "manager-url" => await GetSingleDataObjectAsync(
+                    context,
+                    settings,
+                    "Manager URL",
+                    GetDataCommand.DataObjects.SecurityDomainManagerUrl
+                ),
                 "opid" => await GetOpidDataAsync(context, settings),
                 "all" => await GetAllDataAsync(context, settings),
-                _ when dataObject.StartsWith("0x")
-                    => await GetRawDataObjectAsync(context, settings, dataObject),
-                _ => HandleInvalidDataObject(context, dataObject)
+                _ when dataObject.StartsWith("0x") => await GetRawDataObjectAsync(
+                    context,
+                    settings,
+                    dataObject
+                ),
+                _ => HandleInvalidDataObject(context, dataObject),
             };
         }
         catch (Exception ex)
@@ -90,17 +98,21 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
     {
         try
         {
-            Result<byte[], SmartCardError> dataResult = await context.GetGlobalPlatformService().GetDataAsync(tag);
+            Result<byte[], SmartCardError> dataResult = await context
+                .GetGlobalPlatformService()
+                .GetDataAsync(tag);
             if (dataResult.IsSuccess)
             {
-                DisplaySingleDataObject(context, settings, name, new GetDataResponse(tag, dataResult.Value));
+                DisplaySingleDataObject(
+                    context,
+                    settings,
+                    name,
+                    new GetDataResponse(tag, dataResult.Value)
+                );
                 return 0;
             }
-            else
-            {
-                context.Display.Warning($"Could not retrieve {name}: {dataResult.Error.Message}");
-                return 1;
-            }
+            context.Display.Warning($"Could not retrieve {name}: {dataResult.Error.Message}");
+            return 1;
         }
         catch (Exception ex)
         {
@@ -119,12 +131,7 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
         {
             if (
                 !hexTag.StartsWith("0x")
-                || !ushort.TryParse(
-                    hexTag.AsSpan(2),
-                    System.Globalization.NumberStyles.HexNumber,
-                    null,
-                    out ushort tag
-                )
+                || !ushort.TryParse(hexTag.AsSpan(2), NumberStyles.HexNumber, null, out ushort tag)
             )
             {
                 context.Display.Error(
@@ -133,7 +140,9 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 return 1;
             }
 
-            Result<byte[], SmartCardError> dataResult = await context.GetGlobalPlatformService().GetDataAsync(tag);
+            Result<byte[], SmartCardError> dataResult = await context
+                .GetGlobalPlatformService()
+                .GetDataAsync(tag);
             if (dataResult.IsSuccess)
             {
                 DisplaySingleDataObject(
@@ -144,11 +153,10 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 );
                 return 0;
             }
-            else
-            {
-                context.Display.Warning($"Tag {hexTag} is not supported by this card: {dataResult.Error.Message}");
-                return 1;
-            }
+            context.Display.Warning(
+                $"Tag {hexTag} is not supported by this card: {dataResult.Error.Message}"
+            );
+            return 1;
         }
         catch (Exception ex)
         {
@@ -162,26 +170,34 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
         try
         {
             // Get all three required components
-            Result<byte[], SmartCardError> iinResult = await context.GetGlobalPlatformService().GetDataAsync(
-                GetDataCommand.DataObjects.IssuerIdentificationNumber
-            );
-            Result<byte[], SmartCardError> cinResult = await context.GetGlobalPlatformService().GetDataAsync(
-                GetDataCommand.DataObjects.CardImageNumber
-            );
-            Result<byte[], SmartCardError> urlResult = await context.GetGlobalPlatformService().GetDataAsync(
-                GetDataCommand.DataObjects.SecurityDomainManagerUrl
-            );
+            Result<byte[], SmartCardError> iinResult = await context
+                .GetGlobalPlatformService()
+                .GetDataAsync(GetDataCommand.DataObjects.IssuerIdentificationNumber);
+            Result<byte[], SmartCardError> cinResult = await context
+                .GetGlobalPlatformService()
+                .GetDataAsync(GetDataCommand.DataObjects.CardImageNumber);
+            Result<byte[], SmartCardError> urlResult = await context
+                .GetGlobalPlatformService()
+                .GetDataAsync(GetDataCommand.DataObjects.SecurityDomainManagerUrl);
 
             if (iinResult.IsFailure || cinResult.IsFailure || urlResult.IsFailure)
             {
-                context.Display.Error("One or more required OPID components are not available on this card");
+                context.Display.Error(
+                    "One or more required OPID components are not available on this card"
+                );
                 return 1;
             }
 
             // All OPID components should be ASCII per specification
-            Result<string, SmartCardError> iinDecodeResult = EncodingUtils.SafeAsciiDecode(iinResult.Value);
-            Result<string, SmartCardError> cinDecodeResult = EncodingUtils.SafeAsciiDecode(cinResult.Value);
-            Result<string, SmartCardError> urlDecodeResult = EncodingUtils.SafeAsciiDecode(urlResult.Value);
+            Result<string, SmartCardError> iinDecodeResult = iinResult.Bind(bytes => 
+                Result.Success<string, SmartCardError>(Encoding.ASCII.GetString(bytes))
+            );
+            Result<string, SmartCardError> cinDecodeResult = cinResult.Bind(bytes => 
+                Result.Success<string, SmartCardError>(Encoding.ASCII.GetString(bytes))
+            );
+            Result<string, SmartCardError> urlDecodeResult = urlResult.Bind(bytes => 
+                Result.Success<string, SmartCardError>(Encoding.ASCII.GetString(bytes))
+            );
 
             if (iinDecodeResult.IsFailure)
             {
@@ -195,7 +211,9 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
             }
             if (urlDecodeResult.IsFailure)
             {
-                context.Display.Error($"Invalid Manager URL encoding: {urlDecodeResult.Error.Message}");
+                context.Display.Error(
+                    $"Invalid Manager URL encoding: {urlDecodeResult.Error.Message}"
+                );
                 return 1;
             }
 
@@ -212,39 +230,27 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 DisplayOpidData(context, settings, opid, iin, cin, managerUrl);
                 return 0;
             }
-            else
-            {
-                OpidValidationResult validation = OpidValidator.ValidateCardData(iin, cin, managerUrl);
-                context.Display.Error(
-                    $"Card data does not represent a valid OPID: {validation.ErrorMessage}"
-                );
+            OpidValidationResult validation = OpidValidator.ValidateCardData(iin, cin, managerUrl);
+            context.Display.Error(
+                $"Card data does not represent a valid OPID: {validation.ErrorMessage}"
+            );
 
-                // Show the individual components for debugging
-                Table table = new Table()
-                    .AddColumn("Component")
-                    .AddColumn("Value")
-                    .AddColumn("Status");
-                _ = table.AddRow(
-                    "IIN",
-                    iin,
-                    iin.Length == 4 && iin.All(char.IsDigit) ? "[green]✓[/]" : "[red]✗[/]"
-                );
-                _ = table.AddRow(
-                    "CIN",
-                    cin,
-                    cin.All(char.IsDigit) ? "[green]✓[/]" : "[red]✗[/]"
-                );
-                _ = table.AddRow(
-                    "Manager URL",
-                    managerUrl,
-                    managerUrl == OpenPhysicalId.OpenPhysicalManagerUrl
-                        ? "[green]✓[/]"
-                        : "[red]✗[/]"
-                );
+            // Show the individual components for debugging
+            Table table = new Table().AddColumn("Component").AddColumn("Value").AddColumn("Status");
+            _ = table.AddRow(
+                "IIN",
+                iin,
+                iin.Length == 4 && iin.All(char.IsDigit) ? "[green]✓[/]" : "[red]✗[/]"
+            );
+            _ = table.AddRow("CIN", cin, cin.All(char.IsDigit) ? "[green]✓[/]" : "[red]✗[/]");
+            _ = table.AddRow(
+                "Manager URL",
+                managerUrl,
+                managerUrl == OpenPhysicalId.OpenPhysicalManagerUrl ? "[green]✓[/]" : "[red]✗[/]"
+            );
 
-                AnsiConsole.Write(table);
-                return 1;
-            }
+            AnsiConsole.Write(table);
+            return 1;
         }
         catch (Exception ex)
         {
@@ -263,30 +269,26 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
         [
             ("IIN", GetDataCommand.DataObjects.IssuerIdentificationNumber),
             ("CIN", GetDataCommand.DataObjects.CardImageNumber),
-            (
-                "Manager URL",
-                GetDataCommand.DataObjects.SecurityDomainManagerUrl
-            ),
+            ("Manager URL", GetDataCommand.DataObjects.SecurityDomainManagerUrl),
             ("Card Data", GetDataCommand.DataObjects.CardData),
             ("Card Capabilities", GetDataCommand.DataObjects.CardCapabilities),
-            (
-                "Key Info Template",
-                GetDataCommand.DataObjects.KeyInformationTemplate
-            ),
-            (
-                "Diversification Data",
-                GetDataCommand.DataObjects.DiversificationData
-            )
+            ("Key Info Template", GetDataCommand.DataObjects.KeyInformationTemplate),
+            ("Diversification Data", GetDataCommand.DataObjects.DiversificationData),
         ];
 
         foreach ((string name, ushort tag) in dataObjects)
         {
             try
             {
-                Result<byte[], SmartCardError> dataResult = await context.GetGlobalPlatformService().GetDataAsync(tag);
+                Result<byte[], SmartCardError> dataResult = await context
+                    .GetGlobalPlatformService()
+                    .GetDataAsync(tag);
                 if (dataResult.IsSuccess)
                 {
-                    results[name] = FormatDataForDisplay(new GetDataResponse(tag, dataResult.Value), settings.Format);
+                    results[name] = FormatDataForDisplay(
+                        new GetDataResponse(tag, dataResult.Value),
+                        settings.Format
+                    );
                 }
                 else
                 {
@@ -308,31 +310,30 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
             && results.ContainsKey("Manager URL")
         )
         {
-            try
-            {
-                string iin = System.Text.Encoding.ASCII.GetString(
-                    Convert.FromHexString(results["IIN"])
-                );
-                string cin = System.Text.Encoding.ASCII.GetString(
-                    Convert.FromHexString(results["CIN"])
-                );
-                Result<string, SmartCardError> urlDecodeResult = EncodingUtils.SafeAsciiDecode(
-                    Convert.FromHexString(results["Manager URL"])
-                );
-                if (urlDecodeResult.IsSuccess)
-                {
-                    string url = urlDecodeResult.Value;
-                    if (OpenPhysicalId.TryFromCardData(iin, cin, url, out OpenPhysicalId opid) && opid != null)
-                    {
-                        results["OPID"] = opid.ToDisplayFormat();
-                    }
-                }
-                // If URL decode fails, just skip OPID reconstruction
-            }
-            catch
-            {
-                // OPID reconstruction failed, that's okay
-            }
+            // Functional OPID reconstruction with proper error handling
+            Result<OpenPhysicalId, SmartCardError> opidResult = Result.Success<byte[], SmartCardError>(Convert.FromHexString(results["IIN"]))
+                .Map(bytes => Encoding.ASCII.GetString(bytes))
+                .Bind(iin =>
+                    Result.Success<byte[], SmartCardError>(Convert.FromHexString(results["CIN"]))
+                        .Map(bytes => Encoding.ASCII.GetString(bytes))
+                        .Bind(cin =>
+                            Result.Success<byte[], SmartCardError>(Convert.FromHexString(results["Manager URL"]))
+                                .Map(bytes => Encoding.ASCII.GetString(bytes))
+                                .Bind(url =>
+                                {
+                                    if (OpenPhysicalId.TryFromCardData(iin, cin, url, out OpenPhysicalId opid))
+                                    {
+                                        return Result.Success<OpenPhysicalId, SmartCardError>(opid);
+                                    }
+                                    return Result.Failure<OpenPhysicalId, SmartCardError>(
+                                        SmartCardError.InvalidArgument("Failed to construct OPID from card data")
+                                    );
+                                })));
+
+            opidResult.Match(
+                opid => results["OPID"] = opid.ToDisplayFormat(),
+                error => { /* OPID reconstruction failed, that's okay */ }
+            );
         }
 
         DisplayAllData(context, settings, results, errors);
@@ -361,14 +362,14 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 AnsiConsole.WriteLine(Convert.ToHexString(response.Data));
                 break;
             case "raw":
-                Console.Out.Write(System.Text.Encoding.UTF8.GetString(response.Data));
+                Console.Out.Write(Encoding.UTF8.GetString(response.Data));
                 break;
             case "json":
                 var jsonData = new
                 {
                     name,
                     value = Convert.ToHexString(response.Data),
-                    length = response.Data.Length
+                    length = response.Data.Length,
                 };
                 AnsiConsole.WriteLine(
                     JsonSerializer.Serialize(
@@ -380,10 +381,7 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
             default: // table
                 Table table = new Table().AddColumn("Property").AddColumn("Value");
                 _ = table.AddRow("Name", name);
-                _ = table.AddRow(
-                    "Value (Hex)",
-                    $"[dim]{Convert.ToHexString(response.Data)}[/]"
-                );
+                _ = table.AddRow("Value (Hex)", $"[dim]{Convert.ToHexString(response.Data)}[/]");
                 _ = table.AddRow("Value (Text)", TryDecodeAsText(response.Data));
                 _ = table.AddRow("Length", $"{response.Data.Length} bytes");
                 AnsiConsole.Write(table);
@@ -404,9 +402,7 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
         {
             case "hex":
                 AnsiConsole.WriteLine(
-                    Convert.ToHexString(
-                        System.Text.Encoding.ASCII.GetBytes(opid.ToDisplayFormat())
-                    )
+                    Convert.ToHexString(Encoding.ASCII.GetBytes(opid.ToDisplayFormat()))
                 );
                 break;
             case "raw":
@@ -419,7 +415,7 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                     iin,
                     cin,
                     managerUrl,
-                    format = opid.Format.ToString()
+                    format = opid.Format.ToString(),
                 };
                 AnsiConsole.WriteLine(
                     JsonSerializer.Serialize(
@@ -484,8 +480,8 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
         return format.ToLowerInvariant() switch
         {
             "hex" => Convert.ToHexString(response.Data),
-            "raw" => System.Text.Encoding.UTF8.GetString(response.Data),
-            _ => $"[dim]{Convert.ToHexString(response.Data)}[/]"
+            "raw" => Encoding.UTF8.GetString(response.Data),
+            _ => $"[dim]{Convert.ToHexString(response.Data)}[/]",
         };
     }
 
@@ -493,7 +489,7 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
     {
         try
         {
-            string text = System.Text.Encoding.UTF8.GetString(data);
+            string text = Encoding.UTF8.GetString(data);
             return text.All(c => !char.IsControl(c) || char.IsWhiteSpace(c))
                 ? text
                 : "[binary data]";

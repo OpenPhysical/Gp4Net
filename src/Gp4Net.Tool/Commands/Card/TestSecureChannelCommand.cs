@@ -31,7 +31,8 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
     public TestSecureChannelCommand(
         IDisplayService displayService,
         IDomainServiceFactory domainServiceFactory,
-        IKeysetResolver keysetResolver)
+        IKeysetResolver keysetResolver
+    )
     {
         _displayService = displayService;
         _domainServiceFactory = domainServiceFactory;
@@ -77,32 +78,39 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
                 {
                     _displayService.Error($"Secure channel test failed: {error.Message}");
                     return Task.FromResult(1);
-                });
+                }
+            );
     }
 
     private Result<ISmartCardService, SmartCardError> CreateSmartCardService()
     {
         return Result.Failure<ISmartCardService, SmartCardError>(
-            SmartCardError.CommunicationError("Direct SmartCardService creation requires dependency injection setup that is not available in current context"));
+            SmartCardError.CommunicationError(
+                "Direct SmartCardService creation requires dependency injection setup that is not available in current context"
+            )
+        );
     }
 
     private async Task<Result<bool, SmartCardError>> EstablishConnectionAndTest(
         ISmartCardService smartCardService,
-        Settings settings)
+        Settings settings
+    )
     {
         // Check if already connected
         Result<bool, SmartCardError> isConnectedResult = await smartCardService.IsConnectedAsync();
         if (isConnectedResult.IsFailure)
         {
             return Result.Failure<bool, SmartCardError>(
-                SmartCardError.CommunicationError("Cannot determine connection status"));
+                SmartCardError.CommunicationError("Cannot determine connection status")
+            );
         }
 
         if (!isConnectedResult.Value)
         {
             _displayService.Error("Not connected to card. Use 'card connect' first.");
             return Result.Failure<bool, SmartCardError>(
-                SmartCardError.CommunicationError("Card not connected"));
+                SmartCardError.CommunicationError("Card not connected")
+            );
         }
 
         return await TestSecureChannelEstablishment(smartCardService, settings);
@@ -110,7 +118,8 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
 
     private async Task<Result<bool, SmartCardError>> TestSecureChannelEstablishment(
         ISmartCardService smartCardService,
-        Settings settings)
+        Settings settings
+    )
     {
         _displayService.Info("Testing secure channel establishment...");
 
@@ -119,40 +128,68 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
 
         // Create proper KeySet from GP test keys
         byte protocolVersion = settings.UseScp03 ? (byte)0x03 : (byte)0x02;
-        KeySet keySet = protocolVersion == 0x03
-            ? GpTestKeys.CreateScp03TestKeySet(0x00) as KeySet
-            : GpTestKeys.CreateScp02TestKeySet(0x00) as KeySet;
+        Result<KeySet, SmartCardError> keySetResult =
+            protocolVersion == 0x03
+                ? GpTestKeys.CreateScp03TestKeySet().Map(keySet => (KeySet)keySet)
+                : GpTestKeys.CreateScp02TestKeySet().Map(keySet => (KeySet)keySet);
 
+        return await keySetResult.Match(
+            async keySet => await ExecuteTestWithKeySet(smartCardService, keySet, settings),
+            error =>
+            {
+                _displayService.Error($"Failed to create test keyset: {error.Message}");
+                return Task.FromResult(Result.Failure<bool, SmartCardError>(error));
+            }
+        );
+    }
+
+    /// <summary>
+    /// Executes the secure channel test with the resolved keyset.
+    /// </summary>
+    private async Task<Result<bool, SmartCardError>> ExecuteTestWithKeySet(
+        ISmartCardService smartCardService,
+        KeySet keySet,
+        Settings settings
+    )
+    {
         SecurityLevel securityLevel = (SecurityLevel)settings.SecurityLevel;
 
-        Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+        Stopwatch sw = Stopwatch.StartNew();
 
         // Create GlobalPlatform service and establish secure channel
         var gpService = _domainServiceFactory.CreateGlobalPlatformService(smartCardService);
-        var secureChannelResult = await gpService.EstablishSecureChannelAsync(keySet, securityLevel);
+        var secureChannelResult = await gpService.EstablishSecureChannelAsync(
+            keySet,
+            securityLevel
+        );
 
         sw.Stop();
 
         return await secureChannelResult.Match(
             async _ =>
             {
-                _displayService.Success($"✓ Secure channel established successfully in {sw.ElapsedMilliseconds}ms");
+                _displayService.Success(
+                    $"✓ Secure channel established successfully in {sw.ElapsedMilliseconds}ms"
+                );
                 return await TestSecureMessaging(gpService);
             },
             error =>
             {
                 _displayService.Error($"✗ Failed to establish secure channel: {error.Message}");
                 return Task.FromResult(Result.Failure<bool, SmartCardError>(error));
-            });
+            }
+        );
     }
 
-    private async Task<Result<bool, SmartCardError>> TestSecureMessaging(IGlobalPlatformService gpService)
+    private async Task<Result<bool, SmartCardError>> TestSecureMessaging(
+        IGlobalPlatformService gpService
+    )
     {
         _displayService.Info("Testing secure messaging...");
 
         // Test with GET STATUS command through secure channel
-        Result<ImmutableList<ApplicationInfo>, SmartCardError> getStatusResult = await gpService.GetStatusAsync(
-            Gp4Net.Domain.Commands.GetStatusCommand.StatusSubset.IssuerSecurityDomain);
+        Result<ImmutableList<ApplicationInfo>, SmartCardError> getStatusResult =
+            await gpService.GetStatusAsync();
 
         return getStatusResult.Match(
             applications =>
@@ -163,8 +200,11 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
             },
             error =>
             {
-                _displayService.Warning($"! Secure channel established but command failed: {error.Message}");
+                _displayService.Warning(
+                    $"! Secure channel established but command failed: {error.Message}"
+                );
                 return Result.Success<bool, SmartCardError>(true); // Still consider secure channel test successful
-            });
+            }
+        );
     }
 }

@@ -33,7 +33,7 @@ public static class CplcDateParser
             return Maybe<DateTime>.None;
         }
 
-        // Check bounds to avoid DateTime overflow 
+        // Check bounds to avoid DateTime overflow
         // Since ushort max is 65535, and BaseDate is 2000-01-01, max date would be ~2179
         // This is well within DateTime range, but we validate for safety
         // No additional check needed - ushort range is inherently safe

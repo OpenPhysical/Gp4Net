@@ -1,10 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Domain.Security;
 using Gp4Net.Pipeline;
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
@@ -28,7 +28,8 @@ public class SmartCardService : ISmartCardService
     public SmartCardService(
         CommandEnvironment environment,
         CommandProcessor processor,
-        ILogger<SmartCardService> logger)
+        ILogger<SmartCardService> logger
+    )
     {
         _environment = environment;
         _processor = processor;
@@ -41,9 +42,9 @@ public class SmartCardService : ISmartCardService
         get
         {
             // Build context from environment for backward compatibility
-            IPipelineContext context = ImmutablePipelineContext.Empty
-                .With<ICardChannel>("CardChannel", _environment.Channel)
-                .With<IApduTransport>("ApduTransport", _environment.Transport);
+            IPipelineContext context = ImmutablePipelineContext
+                .Empty.With("CardChannel", _environment.Channel)
+                .With("ApduTransport", _environment.Transport);
 
             if (_environment.SecureChannel.HasValue)
             {
@@ -57,7 +58,8 @@ public class SmartCardService : ISmartCardService
     /// <inheritdoc/>
     public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
         IApduCommand command,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         return await ExecuteCommandAsync(command, CommandOptions.Default, cancellationToken);
     }
@@ -66,37 +68,53 @@ public class SmartCardService : ISmartCardService
     public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
         IApduCommand command,
         CommandOptions options,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         // Create environment with options
-        CommandEnvironment environmentWithOptions = _environment with { Options = options };
+        CommandEnvironment environmentWithOptions = _environment with
+        {
+            Options = options,
+        };
 
         try
         {
             // Execute command through functional processor
-            Result<CommandResult, SmartCardError> result = await _processor(command, environmentWithOptions, cancellationToken);
+            Result<CommandResult, SmartCardError> result = await _processor(
+                command,
+                environmentWithOptions,
+                cancellationToken
+            );
 
             // Convert CommandResult to CommandResponse for backward compatibility
             return result.Map(cmdResult => new CommandResponse(
                 cmdResult.Data,
                 cmdResult.StatusWord,
                 Context, // Use the Context property which builds from environment
-                new System.Collections.Generic.Dictionary<string, object>
+                new Dictionary<string, object>
                 {
-                    [ResponseMetadata.ExecutionTime] = cmdResult.Metadata?.ExecutionTime ?? TimeSpan.Zero,
-                    [ResponseMetadata.TransmittedBytes] = cmdResult.Metadata?.TransmittedBytes ?? [],
+                    [ResponseMetadata.ExecutionTime] =
+                        cmdResult.Metadata?.ExecutionTime ?? TimeSpan.Zero,
+                    [ResponseMetadata.TransmittedBytes] =
+                        cmdResult.Metadata?.TransmittedBytes ?? [],
                     [ResponseMetadata.ReceivedBytes] = cmdResult.Metadata?.ReceivedBytes ?? [],
-                    [ResponseMetadata.SecureChannelWrapped] = cmdResult.Metadata?.SecureChannelWrapped ?? false,
-                    [ResponseMetadata.RetryCount] = cmdResult.Metadata?.RetryCount ?? 0
-                }));
+                    [ResponseMetadata.SecureChannelWrapped] =
+                        cmdResult.Metadata?.SecureChannelWrapped ?? false,
+                    [ResponseMetadata.RetryCount] = cmdResult.Metadata?.RetryCount ?? 0,
+                }
+            ));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Unexpected error executing command");
             return Result.Failure<CommandResponse, SmartCardError>(
-                SmartCardError.CommunicationError("Unexpected error executing command", Maybe<Exception>.From(ex)));
+                SmartCardError.CommunicationError(
+                    "Unexpected error executing command",
+                    Maybe<Exception>.From(ex)
+                )
+            );
         }
     }
 
@@ -104,33 +122,41 @@ public class SmartCardService : ISmartCardService
     public Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context)
     {
         // Extract values from context to build new environment using functional composition
-        Result<ICardChannel, SmartCardError> channelResult = context.Get<ICardChannel>("CardChannel")
+        Result<ICardChannel, SmartCardError> channelResult = context
+            .Get<ICardChannel>("CardChannel")
             .ToResult(SmartCardError.InvalidArgument("Context must contain CardChannel"));
-        Result<IApduTransport, SmartCardError> transportResult = context.Get<IApduTransport>("ApduTransport")
+        Result<IApduTransport, SmartCardError> transportResult = context
+            .Get<IApduTransport>("ApduTransport")
             .ToResult(SmartCardError.InvalidArgument("Context must contain ApduTransport"));
-        Maybe<SecureChannelState> secureChannel = context.Get<Domain.SecureChannelState>("SecureChannelSession");
+        Maybe<SecureChannelState> secureChannel = context.Get<SecureChannelState>(
+            "SecureChannelSession"
+        );
 
         return channelResult
-            .Bind(channel => transportResult
-                .Map(transport => new CommandEnvironment(
+            .Bind(channel =>
+                transportResult.Map(transport => new CommandEnvironment(
                     channel,
                     transport,
                     secureChannel,
-                    _environment.SecureChannelService,
                     _logger,
-                    _environment.Options)))
-            .Map(newEnvironment => (ISmartCardService)new SmartCardService(newEnvironment, _processor, _logger));
+                    _environment.Options
+                ))
+            )
+            .Map(newEnvironment =>
+                (ISmartCardService)new SmartCardService(newEnvironment, _processor, _logger)
+            );
     }
 
     /// <inheritdoc/>
     public Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value)
     {
         // Special handling for known context values
-        if (key == "SecureChannelSession" && value is Domain.SecureChannelState secureChannel)
+        if (key == "SecureChannelSession" && value is SecureChannelState secureChannel)
         {
             CommandEnvironment newEnvironment = _environment.WithSecureChannel(secureChannel);
             return Result.Success<ISmartCardService, SmartCardError>(
-                new SmartCardService(newEnvironment, _processor, _logger));
+                new SmartCardService(newEnvironment, _processor, _logger)
+            );
         }
 
         // For other values, use the context-based approach
@@ -139,69 +165,101 @@ public class SmartCardService : ISmartCardService
     }
 
     /// <inheritdoc/>
-    public async Task<Result<bool, SmartCardError>> IsConnectedAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<bool, SmartCardError>> IsConnectedAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         return await Task.FromResult(
-            Maybe<ICardChannel>.From(_environment.Channel)
+            Maybe<ICardChannel>
+                .From(_environment.Channel)
                 .Bind(_ => Maybe<IApduTransport>.From(_environment.Transport))
                 .Match(
                     _ => Result.Success<bool, SmartCardError>(true),
-                    () => Result.Success<bool, SmartCardError>(false)));
+                    () => Result.Success<bool, SmartCardError>(false)
+                )
+        );
     }
 
     /// <inheritdoc/>
-    public Task<Result<byte[], SmartCardError>> GetAtrAsync(CancellationToken cancellationToken = default)
+    public Task<Result<byte[], SmartCardError>> GetAtrAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         // ATR is not directly available from ICardChannel interface
         // Would need to be stored during connection establishment
         return Task.FromResult(
             Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CommunicationError("ATR not available from current channel interface")));
+                SmartCardError.CommunicationError(
+                    "ATR not available from current channel interface"
+                )
+            )
+        );
     }
 
     /// <inheritdoc/>
-    public async Task<Result<string[], SmartCardError>> GetReadersAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<string[], SmartCardError>> GetReadersAsync(
+        CancellationToken cancellationToken = default
+    )
     {
-        return await Task.FromResult(
-            Result.Success<string[], SmartCardError>(["Default Reader"]));
+        return await Task.FromResult(Result.Success<string[], SmartCardError>(["Default Reader"]));
     }
 
     /// <inheritdoc/>
-    public async Task<Result<bool, SmartCardError>> IsSecureChannelEstablishedAsync(CancellationToken cancellationToken = default)
+    public async Task<Result<bool, SmartCardError>> IsSecureChannelEstablishedAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         return await Task.FromResult(
-            Result.Success<bool, SmartCardError>(_environment.SecureChannel.HasValue));
+            Result.Success<bool, SmartCardError>(_environment.SecureChannel.HasValue)
+        );
     }
 
     /// <inheritdoc/>
     public async Task<Result<CommandResponse, SmartCardError>> SendCommandAsync(
         byte[] command,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         Result<IApduCommand, SmartCardError> parseResult = ParseApduCommand(command);
         if (parseResult.IsFailure)
         {
             return Result.Failure<CommandResponse, SmartCardError>(parseResult.Error);
         }
-        
+
         return await ExecuteCommandAsync(parseResult.Value, cancellationToken);
     }
-    
+
     private static Result<IApduCommand, SmartCardError> ParseApduCommand(byte[] command)
     {
         return command.Length switch
         {
             4 => Result.Success<IApduCommand, SmartCardError>(
-                new SimpleApduCommand(command[0], command[1], command[2], command[3], [], Maybe<int>.None)),
+                new SimpleApduCommand(
+                    command[0],
+                    command[1],
+                    command[2],
+                    command[3],
+                    [],
+                    Maybe<int>.None
+                )
+            ),
             5 => Result.Success<IApduCommand, SmartCardError>(
-                new SimpleApduCommand(command[0], command[1], command[2], command[3], [], 
-                    Maybe<int>.From(command[4] == 0 ? 256 : command[4]))),
-            _ when command.Length > 5 => ParseApduWithData(command),
+                new SimpleApduCommand(
+                    command[0],
+                    command[1],
+                    command[2],
+                    command[3],
+                    [],
+                    Maybe<int>.From(command[4] == 0 ? 256 : command[4])
+                )
+            ),
+            > 5 => ParseApduWithData(command),
             _ => Result.Failure<IApduCommand, SmartCardError>(
-                SmartCardError.InvalidArgument("Invalid APDU command length"))
+                SmartCardError.InvalidArgument("Invalid APDU command length")
+            ),
         };
     }
-    
+
     private static Result<IApduCommand, SmartCardError> ParseApduWithData(byte[] command)
     {
         byte cla = command[0];
@@ -209,16 +267,17 @@ public class SmartCardService : ISmartCardService
         byte p1 = command[2];
         byte p2 = command[3];
         byte lc = command[4];
-        
+
         if (command.Length == 5 + lc)
         {
             // Case 3: command with data, no response expected
             byte[] data = new byte[lc];
             Array.Copy(command, 5, data, 0, lc);
             return Result.Success<IApduCommand, SmartCardError>(
-                new SimpleApduCommand(cla, ins, p1, p2, data, Maybe<int>.None));
+                new SimpleApduCommand(cla, ins, p1, p2, data, Maybe<int>.None)
+            );
         }
-        else if (command.Length == 5 + lc + 1)
+        if (command.Length == 5 + lc + 1)
         {
             // Case 4: command with data and expected response
             byte[] data = new byte[lc];
@@ -226,11 +285,13 @@ public class SmartCardService : ISmartCardService
             byte le = command[5 + lc];
             int expectedLength = le == 0 ? 256 : le;
             return Result.Success<IApduCommand, SmartCardError>(
-                new SimpleApduCommand(cla, ins, p1, p2, data, Maybe<int>.From(expectedLength)));
+                new SimpleApduCommand(cla, ins, p1, p2, data, Maybe<int>.From(expectedLength))
+            );
         }
-        
+
         return Result.Failure<IApduCommand, SmartCardError>(
-            SmartCardError.InvalidArgument("Invalid APDU command format"));
+            SmartCardError.InvalidArgument("Invalid APDU command format")
+        );
     }
 
     /// <inheritdoc/>
@@ -257,14 +318,16 @@ public static class SmartCardServiceExtensions
     public static async Task<Result<CommandResponse[], SmartCardError>> ExecuteCommandsAsync(
         this ISmartCardService service,
         IApduCommand[] commands,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         CommandResponse[] responses = new CommandResponse[commands.Length];
         ISmartCardService currentService = service;
 
         for (int i = 0; i < commands.Length; i++)
         {
-            Result<CommandResponse, SmartCardError> result = await currentService.ExecuteCommandAsync(commands[i], cancellationToken);
+            Result<CommandResponse, SmartCardError> result =
+                await currentService.ExecuteCommandAsync(commands[i], cancellationToken);
 
             if (result.IsFailure)
             {
@@ -277,7 +340,8 @@ public static class SmartCardServiceExtensions
             // Update service with new context for next command
             if (!ReferenceEquals(response.UpdatedContext, currentService.Context))
             {
-                Result<ISmartCardService, SmartCardError> contextResult = currentService.WithContext(response.UpdatedContext);
+                Result<ISmartCardService, SmartCardError> contextResult =
+                    currentService.WithContext(response.UpdatedContext);
                 if (contextResult.IsFailure)
                 {
                     return Result.Failure<CommandResponse[], SmartCardError>(contextResult.Error);
@@ -296,9 +360,13 @@ public static class SmartCardServiceExtensions
         this ISmartCardService service,
         IApduCommand command,
         Func<CommandResponse, T> mapper,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
-        Result<CommandResponse, SmartCardError> result = await service.ExecuteCommandAsync(command, cancellationToken);
+        Result<CommandResponse, SmartCardError> result = await service.ExecuteCommandAsync(
+            command,
+            cancellationToken
+        );
         return result.Map(mapper);
     }
 }
@@ -327,19 +395,20 @@ internal class SimpleApduCommand : IApduCommand
     public Maybe<int> ExpectedResponseLength { get; }
 
     /// <inheritdoc/>
-    public bool IsExtendedLength => 
+    public bool IsExtendedLength =>
         Data.Length > 255 || ExpectedResponseLength.GetValueOrDefault(0) > 256;
 
     /// <summary>
     /// Initializes a new instance of SimpleApduCommand.
     /// </summary>
     public SimpleApduCommand(
-        byte cla, 
-        byte ins, 
-        byte p1, 
-        byte p2, 
-        byte[] data, 
-        Maybe<int> expectedResponseLength)
+        byte cla,
+        byte ins,
+        byte p1,
+        byte p2,
+        byte[] data,
+        Maybe<int> expectedResponseLength
+    )
     {
         Cla = cla;
         Ins = ins;

@@ -28,7 +28,11 @@ public class AppletLifecycleTests
     /// <returns>Result containing the JsonDocument or error message</returns>
     private static Result<JsonDocument, string> LoadInstallationTraceFile(string traceFile)
     {
-        string tracePath = Path.Combine(TestContext.CurrentContext.TestDirectory, InstallationTracePath, traceFile);
+        string tracePath = Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            InstallationTracePath,
+            traceFile
+        );
 
         if (!File.Exists(tracePath))
             return Result.Failure<JsonDocument, string>($"Trace file not found: {tracePath}");
@@ -41,7 +45,9 @@ public class AppletLifecycleTests
         }
         catch (Exception ex)
         {
-            return Result.Failure<JsonDocument, string>($"Failed to parse trace file {traceFile}: {ex.Message}");
+            return Result.Failure<JsonDocument, string>(
+                $"Failed to parse trace file {traceFile}: {ex.Message}"
+            );
         }
     }
 
@@ -51,7 +57,10 @@ public class AppletLifecycleTests
     /// <param name="testData">The trace data</param>
     /// <param name="traceFile">Trace file name for error reporting</param>
     /// <returns>Result containing the exchanges element or error message</returns>
-    private static Result<JsonElement, string> ValidateExchangesExist(JsonDocument testData, string traceFile) =>
+    private static Result<JsonElement, string> ValidateExchangesExist(
+        JsonDocument testData,
+        string traceFile
+    ) =>
         testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement)
             ? Result.Success<JsonElement, string>(exchangesElement)
             : Result.Failure<JsonElement, string>($"No exchanges found in trace {traceFile}");
@@ -63,28 +72,35 @@ public class AppletLifecycleTests
     /// <param name="description">Test description</param>
     /// <param name="traceFile">Trace file name</param>
     /// <returns>Result indicating validation success or failure</returns>
-    private static UnitResult<string> ValidateAppletInstallation(JsonElement exchangesElement, string description, string traceFile)
+    private static UnitResult<string> ValidateAppletInstallation(
+        JsonElement exchangesElement,
+        string description,
+        string traceFile
+    )
     {
         TestContext.Out.WriteLine($"Testing {description}");
         TestContext.Out.WriteLine($"Trace file: {traceFile}");
 
-        List<JsonElement> exchanges = exchangesElement.EnumerateArray().ToList();
+        List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
         var commandResponsePairs = exchanges
             .Select(e => new
             {
                 Command = e.GetProperty("command").GetString()!,
-                Response = e.GetProperty("response").GetString()!
+                Response = e.GetProperty("response").GetString()!,
             })
             .ToList();
 
-        // Analyze installation patterns using functional approach
+        // Analyze installation patterns
         var secureChannelCommands = commandResponsePairs
             .Where(pair => pair.Command.StartsWith("8050") || pair.Command.StartsWith("8482"))
             .ToList();
 
         var installForLoadCommands = commandResponsePairs
-            .Where(pair => (pair.Command.StartsWith("80E6") || pair.Command.StartsWith("84E6")) &&
-                          pair.Command.Length >= 6 && pair.Command.Substring(4, 2) == "02")
+            .Where(pair =>
+                (pair.Command.StartsWith("80E6") || pair.Command.StartsWith("84E6"))
+                && pair.Command.Length >= 6
+                && pair.Command.Substring(4, 2) == "02"
+            )
             .ToList();
 
         var loadCommands = commandResponsePairs
@@ -92,8 +108,11 @@ public class AppletLifecycleTests
             .ToList();
 
         var installForInstallCommands = commandResponsePairs
-            .Where(pair => (pair.Command.StartsWith("80E6") || pair.Command.StartsWith("84E6")) &&
-                          pair.Command.Length >= 6 && pair.Command.Substring(4, 2) == "0C")
+            .Where(pair =>
+                (pair.Command.StartsWith("80E6") || pair.Command.StartsWith("84E6"))
+                && pair.Command.Length >= 6
+                && pair.Command.Substring(4, 2) == "0C"
+            )
             .ToList();
 
         // Validate required operations
@@ -123,7 +142,9 @@ public class AppletLifecycleTests
             .ToList();
 
         if (failedLoadCommands.Any())
-            return UnitResult.Failure<string>($"LOAD command #{failedLoadCommands.First().index} should succeed");
+            return UnitResult.Failure<string>(
+                $"LOAD command #{failedLoadCommands.First().index} should succeed"
+            );
 
         var failedInstallForInstallCommands = installForInstallCommands
             .Where(pair => !pair.Response.EndsWith("9000"))
@@ -133,15 +154,29 @@ public class AppletLifecycleTests
             return UnitResult.Failure<string>("INSTALL [for install] should succeed");
 
         // Log successful findings
-        _ = installForLoadCommands.Select(pair => $"✓ Found INSTALL [for load]: {pair.Command}")
-            .Concat(loadCommands.Take(3).Select((pair, index) =>
-                $"✓ Found LOAD command #{index + 1}: {pair.Command.Substring(0, Math.Min(pair.Command.Length, 20))}..."))
-            .Concat(installForInstallCommands.Select(pair => $"✓ Found INSTALL [for install]: {pair.Command}"))
-            .Aggregate("", (current, message) =>
-            {
-                TestContext.Out.WriteLine(message);
-                return current;
-            });
+        _ = installForLoadCommands
+            .Select(pair => $"✓ Found INSTALL [for load]: {pair.Command}")
+            .Concat(
+                loadCommands
+                    .Take(3)
+                    .Select(
+                        (pair, index) =>
+                            $"✓ Found LOAD command #{index + 1}: {pair.Command.Substring(0, Math.Min(pair.Command.Length, 20))}..."
+                    )
+            )
+            .Concat(
+                installForInstallCommands.Select(pair =>
+                    $"✓ Found INSTALL [for install]: {pair.Command}"
+                )
+            )
+            .Aggregate(
+                "",
+                (current, message) =>
+                {
+                    TestContext.Out.WriteLine(message);
+                    return current;
+                }
+            );
 
         // Log workflow type
         if (installForInstallCommands.Any())
@@ -150,10 +185,14 @@ public class AppletLifecycleTests
         }
         else
         {
-            TestContext.Out.WriteLine("✓ CAP loading workflow (load only - install phase may be separate)");
+            TestContext.Out.WriteLine(
+                "✓ CAP loading workflow (load only - install phase may be separate)"
+            );
         }
 
-        TestContext.Out.WriteLine($"✓ {description} completed with {loadCommands.Count} LOAD commands");
+        TestContext.Out.WriteLine(
+            $"✓ {description} completed with {loadCommands.Count} LOAD commands"
+        );
         return UnitResult.Success<string>();
     }
 
@@ -164,7 +203,9 @@ public class AppletLifecycleTests
     public void AppletLifecycle_Should_Install_Applets(string traceFile, string description) =>
         LoadInstallationTraceFile(traceFile)
             .Bind(testData => ValidateExchangesExist(testData, traceFile))
-            .Bind(exchangesElement => ValidateAppletInstallation(exchangesElement, description, traceFile))
+            .Bind(exchangesElement =>
+                ValidateAppletInstallation(exchangesElement, description, traceFile)
+            )
             .Match(
                 success => Assert.Pass("Test completed successfully"),
                 failure => Assert.Inconclusive(failure)
@@ -176,7 +217,11 @@ public class AppletLifecycleTests
     [TestCase("gp_pro_applet_uninstall.json", "Standard applet uninstallation")]
     public void AppletLifecycle_Should_Uninstall_Applets(string traceFile, string description)
     {
-        string tracePath = Path.Combine(TestContext.CurrentContext.TestDirectory, DeletionTracePath, traceFile);
+        string tracePath = Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            DeletionTracePath,
+            traceFile
+        );
 
         if (!File.Exists(tracePath))
         {
@@ -224,29 +269,42 @@ public class AppletLifecycleTests
                 }
                 else if (response.EndsWith("6A88"))
                 {
-                    TestContext.Out.WriteLine($"  DELETE #{deleteCommands} returned Data Not Found (6A88) - valid for non-existent applet");
+                    TestContext.Out.WriteLine(
+                        $"  DELETE #{deleteCommands} returned Data Not Found (6A88) - valid for non-existent applet"
+                    );
                 }
                 else
                 {
-                    Assert.Fail($"DELETE command #{deleteCommands} should succeed (9000) or return 6A88 (data not found), but got {response}");
+                    Assert.Fail(
+                        $"DELETE command #{deleteCommands} should succeed (9000) or return 6A88 (data not found), but got {response}"
+                    );
                 }
             }
         }
 
-        _ = foundSecureChannel.Should().BeTrue($"Applet uninstallation requires secure channel");
-        _ = foundDelete.Should().BeTrue($"Uninstallation should include DELETE commands");
+        _ = foundSecureChannel.Should().BeTrue("Applet uninstallation requires secure channel");
+        _ = foundDelete.Should().BeTrue("Uninstallation should include DELETE commands");
         _ = deleteCommands.Should().BeGreaterThan(0, "Should have at least one DELETE command");
 
-        TestContext.Out.WriteLine($"✓ {description} completed with {deleteCommands} DELETE commands");
+        TestContext.Out.WriteLine(
+            $"✓ {description} completed with {deleteCommands} DELETE commands"
+        );
     }
 
     /// <summary>
     /// Test combined install/uninstall workflows that demonstrate complete applet lifecycle.
     /// </summary>
     [TestCase("install_uninstall.json", "Complete install and uninstall workflow")]
-    public void AppletLifecycle_Should_Execute_Complete_Workflow(string traceFile, string description)
+    public void AppletLifecycle_Should_Execute_Complete_Workflow(
+        string traceFile,
+        string description
+    )
     {
-        string tracePath = Path.Combine(TestContext.CurrentContext.TestDirectory, DeletionTracePath, traceFile);
+        string tracePath = Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            DeletionTracePath,
+            traceFile
+        );
 
         if (!File.Exists(tracePath))
         {
@@ -265,7 +323,7 @@ public class AppletLifecycleTests
             return;
         }
 
-        List<JsonElement> exchanges = exchangesElement.EnumerateArray().ToList();
+        List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
 
         // Track workflow phases
         bool hasInstallPhase = false;
@@ -279,53 +337,70 @@ public class AppletLifecycleTests
             string command = exchanges[i].GetProperty("command").GetString()!;
 
             // INSTALL [for load] - P1=02
-            if (command.StartsWith("80E6") && command.Length >= 6 && command.Substring(4, 2) == "02")
+            if (
+                command.StartsWith("80E6")
+                && command.Length >= 6
+                && command.Substring(4, 2) == "02"
+            )
             {
                 hasInstallPhase = true;
-                if (installForLoadIndex == -1) installForLoadIndex = i;
+                if (installForLoadIndex == -1)
+                    installForLoadIndex = i;
             }
 
             // INSTALL [for install] - P1=0C
-            if (command.StartsWith("80E6") && command.Length >= 6 && command.Substring(4, 2) == "0C")
+            if (
+                command.StartsWith("80E6")
+                && command.Length >= 6
+                && command.Substring(4, 2) == "0C"
+            )
             {
-                if (installForInstallIndex == -1) installForInstallIndex = i;
+                if (installForInstallIndex == -1)
+                    installForInstallIndex = i;
             }
 
             // DELETE commands (including secure messaging variants)
             if (command.StartsWith("80E4") || command.StartsWith("84E4"))
             {
                 hasUninstallPhase = true;
-                if (deleteIndex == -1) deleteIndex = i;
+                if (deleteIndex == -1)
+                    deleteIndex = i;
             }
         }
 
         // Not all workflow traces have both phases - validate based on what's actually present
         if (hasInstallPhase && hasUninstallPhase)
         {
-            TestContext.Out.WriteLine($"✓ Complete install/uninstall workflow detected");
+            TestContext.Out.WriteLine("✓ Complete install/uninstall workflow detected");
         }
         else if (hasInstallPhase)
         {
-            TestContext.Out.WriteLine($"✓ Installation-only workflow detected");
+            TestContext.Out.WriteLine("✓ Installation-only workflow detected");
         }
         else if (hasUninstallPhase)
         {
-            TestContext.Out.WriteLine($"✓ Uninstallation-only workflow detected");
+            TestContext.Out.WriteLine("✓ Uninstallation-only workflow detected");
         }
         else
         {
-            Assert.Fail($"Workflow should include either installation or uninstallation phase");
+            Assert.Fail("Workflow should include either installation or uninstallation phase");
         }
 
         // Validate workflow sequence (install should come before uninstall)
         if (installForInstallIndex > -1 && deleteIndex > -1)
         {
-            _ = installForInstallIndex.Should().BeLessThan(deleteIndex,
-                "INSTALL [for install] should come before DELETE in workflow");
+            _ = installForInstallIndex
+                .Should()
+                .BeLessThan(
+                    deleteIndex,
+                    "INSTALL [for install] should come before DELETE in workflow"
+                );
 
-            TestContext.Out.WriteLine($"✓ Workflow sequence validated:");
+            TestContext.Out.WriteLine("✓ Workflow sequence validated:");
             TestContext.Out.WriteLine($"  INSTALL [for load] at position {installForLoadIndex}");
-            TestContext.Out.WriteLine($"  INSTALL [for install] at position {installForInstallIndex}");
+            TestContext.Out.WriteLine(
+                $"  INSTALL [for install] at position {installForInstallIndex}"
+            );
             TestContext.Out.WriteLine($"  DELETE at position {deleteIndex}");
         }
 
@@ -341,7 +416,11 @@ public class AppletLifecycleTests
     [TestCase("gp_pro_applet_uninstall.json", DeletionTracePath)]
     public void AppletLifecycle_Should_Follow_Command_Sequence(string traceFile, string basePath)
     {
-        string tracePath = Path.Combine(TestContext.CurrentContext.TestDirectory, basePath, traceFile);
+        string tracePath = Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            basePath,
+            traceFile
+        );
 
         if (!File.Exists(tracePath))
         {
@@ -358,7 +437,7 @@ public class AppletLifecycleTests
             return;
         }
 
-        List<JsonElement> exchanges = exchangesElement.EnumerateArray().ToList();
+        List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
 
         // For installation traces, validate installation sequence
         if (traceFile.Contains("install") && !traceFile.Contains("uninstall"))
@@ -371,15 +450,26 @@ public class AppletLifecycleTests
             {
                 string command = exchanges[i].GetProperty("command").GetString()!;
 
-                if ((command.StartsWith("80E6") || command.StartsWith("84E6")) && command.Substring(4, 2) == "02" && installForLoadIndex == -1)
+                if (
+                    (command.StartsWith("80E6") || command.StartsWith("84E6"))
+                    && command.Substring(4, 2) == "02"
+                    && installForLoadIndex == -1
+                )
                 {
                     installForLoadIndex = i;
                 }
-                else if ((command.StartsWith("80E8") || command.StartsWith("84E8")) && firstLoadIndex == -1)
+                else if (
+                    (command.StartsWith("80E8") || command.StartsWith("84E8"))
+                    && firstLoadIndex == -1
+                )
                 {
                     firstLoadIndex = i;
                 }
-                else if ((command.StartsWith("80E6") || command.StartsWith("84E6")) && command.Substring(4, 2) == "0C" && installForInstallIndex == -1)
+                else if (
+                    (command.StartsWith("80E6") || command.StartsWith("84E6"))
+                    && command.Substring(4, 2) == "0C"
+                    && installForInstallIndex == -1
+                )
                 {
                     installForInstallIndex = i;
                 }
@@ -387,10 +477,18 @@ public class AppletLifecycleTests
 
             if (installForLoadIndex > -1 && firstLoadIndex > -1 && installForInstallIndex > -1)
             {
-                _ = installForLoadIndex.Should().BeLessThan(firstLoadIndex,
-                    "INSTALL [for load] should come before LOAD commands");
-                _ = firstLoadIndex.Should().BeLessThan(installForInstallIndex,
-                    "LOAD commands should come before INSTALL [for install]");
+                _ = installForLoadIndex
+                    .Should()
+                    .BeLessThan(
+                        firstLoadIndex,
+                        "INSTALL [for load] should come before LOAD commands"
+                    );
+                _ = firstLoadIndex
+                    .Should()
+                    .BeLessThan(
+                        installForInstallIndex,
+                        "LOAD commands should come before INSTALL [for install]"
+                    );
 
                 TestContext.Out.WriteLine($"✓ Installation sequence validated for {traceFile}");
             }
@@ -399,13 +497,18 @@ public class AppletLifecycleTests
         // For uninstall traces, ensure DELETE commands are present and properly formed
         if (traceFile.Contains("uninstall"))
         {
-            List<JsonElement> deleteCommands = exchanges.Where((ex, i) =>
-            {
-                string cmd = ex.GetProperty("command").GetString()!;
-                return cmd.StartsWith("80E4") || cmd.StartsWith("84E4");
-            }).ToList();
+            List<JsonElement> deleteCommands = [.. exchanges
+                .Where(
+                    (ex, i) =>
+                    {
+                        string cmd = ex.GetProperty("command").GetString()!;
+                        return cmd.StartsWith("80E4") || cmd.StartsWith("84E4");
+                    }
+                )];
 
-            _ = deleteCommands.Count.Should().BeGreaterThan(0, "Uninstall should have DELETE commands");
+            _ = deleteCommands
+                .Count.Should()
+                .BeGreaterThan(0, "Uninstall should have DELETE commands");
 
             foreach (JsonElement deleteCmd in deleteCommands)
             {
@@ -413,15 +516,19 @@ public class AppletLifecycleTests
                 // DELETE commands may return 9000 (success) or 6A88 (data not found) - both are valid
                 if (response.EndsWith("9000"))
                 {
-                    TestContext.Out.WriteLine($"  DELETE succeeded (9000)");
+                    TestContext.Out.WriteLine("  DELETE succeeded (9000)");
                 }
                 else if (response.EndsWith("6A88"))
                 {
-                    TestContext.Out.WriteLine($"  DELETE returned Data Not Found (6A88) - valid for non-existent applet");
+                    TestContext.Out.WriteLine(
+                        "  DELETE returned Data Not Found (6A88) - valid for non-existent applet"
+                    );
                 }
                 else
                 {
-                    Assert.Fail($"DELETE commands should succeed (9000) or return data not found (6A88), but got {response}");
+                    Assert.Fail(
+                        $"DELETE commands should succeed (9000) or return data not found (6A88), but got {response}"
+                    );
                 }
             }
 
@@ -434,9 +541,16 @@ public class AppletLifecycleTests
     /// </summary>
     [TestCase("gp_pro_install_scp03.json", InstallationTracePath)]
     [TestCase("gp_pro_applet_uninstall.json", DeletionTracePath)]
-    public void AppletLifecycle_Should_Have_Proper_Response_Handling(string traceFile, string basePath)
+    public void AppletLifecycle_Should_Have_Proper_Response_Handling(
+        string traceFile,
+        string basePath
+    )
     {
-        string tracePath = Path.Combine(TestContext.CurrentContext.TestDirectory, basePath, traceFile);
+        string tracePath = Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            basePath,
+            traceFile
+        );
 
         if (!File.Exists(tracePath))
         {
@@ -462,8 +576,14 @@ public class AppletLifecycleTests
             string response = exchange.GetProperty("response").GetString()!;
 
             // Count applet-related commands (including secure messaging variants)
-            if (command.StartsWith("80E6") || command.StartsWith("80E8") || command.StartsWith("80E4") ||
-                command.StartsWith("84E6") || command.StartsWith("84E8") || command.StartsWith("84E4"))
+            if (
+                command.StartsWith("80E6")
+                || command.StartsWith("80E8")
+                || command.StartsWith("80E4")
+                || command.StartsWith("84E6")
+                || command.StartsWith("84E8")
+                || command.StartsWith("84E4")
+            )
             {
                 totalCommands++;
 
@@ -476,11 +596,15 @@ public class AppletLifecycleTests
                     if (response.EndsWith("6A88")) // Data not found is valid for DELETE
                     {
                         validCommands++;
-                        TestContext.Out.WriteLine($"DELETE command with valid 6A88 response for {command}: {response}");
+                        TestContext.Out.WriteLine(
+                            $"DELETE command with valid 6A88 response for {command}: {response}"
+                        );
                     }
                     else
                     {
-                        TestContext.Out.WriteLine($"Invalid DELETE response for {command}: {response}");
+                        TestContext.Out.WriteLine(
+                            $"Invalid DELETE response for {command}: {response}"
+                        );
                     }
                 }
                 else
@@ -491,9 +615,15 @@ public class AppletLifecycleTests
         }
 
         _ = totalCommands.Should().BeGreaterThan(0, "Should have applet-related commands");
-        _ = validCommands.Should().Be(totalCommands,
-            "All applet commands should have valid responses (9000 for most, 9000 or 6A88 for DELETE)");
+        _ = validCommands
+            .Should()
+            .Be(
+                totalCommands,
+                "All applet commands should have valid responses (9000 for most, 9000 or 6A88 for DELETE)"
+            );
 
-        TestContext.Out.WriteLine($"✓ Response validation: {validCommands}/{totalCommands} commands valid");
+        TestContext.Out.WriteLine(
+            $"✓ Response validation: {validCommands}/{totalCommands} commands valid"
+        );
     }
 }

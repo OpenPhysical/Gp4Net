@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using Gp4Net.Tool.Commands.Card;
 using Spectre.Console;
 
@@ -20,7 +21,8 @@ public static class CardInfoDisplayService
     public static void DisplayCardInfoTable(
         IEnumerable<CardInfoTableBuilder.TableRow> rows,
         string title = "Card Information",
-        Color borderColor = Color.Cyan)
+        Maybe<Color> borderColor = default
+    )
     {
         Table table = new Table()
             .AddColumn(new TableColumn("Property").NoWrap())
@@ -30,10 +32,12 @@ public static class CardInfoDisplayService
         RenderSemanticRows(table, rows);
 
         // Display with consistent styling
-        AnsiConsole.Write(
-            new Panel(table)
-                .Header($"[bold]{title}[/]")
-                .BorderColor(borderColor));
+        var panel = new Panel(table).Header($"[bold]{title}[/]");
+        var styledPanel = borderColor.Match(
+            color => panel.BorderColor(color),
+            () => panel.BorderColor(Color.Aqua)
+        );
+        AnsiConsole.Write(styledPanel);
     }
 
     /// <summary>
@@ -42,7 +46,8 @@ public static class CardInfoDisplayService
     /// <param name="isSecureChannelEstablished">Whether secure channel is active</param>
     public static void DisplayKeysetSuggestions(bool isSecureChannelEstablished)
     {
-        if (isSecureChannelEstablished) return;
+        if (isSecureChannelEstablished)
+            return;
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[yellow]More information is available with a secure channel.[/]");
@@ -53,12 +58,13 @@ public static class CardInfoDisplayService
     /// Pure function to render semantic rows to Spectre.Console table using functional composition.
     /// Uses pattern matching to apply appropriate formatting per row type.
     /// </summary>
-    private static void RenderSemanticRows(Table table, IEnumerable<CardInfoTableBuilder.TableRow> rows)
+    private static void RenderSemanticRows(
+        Table table,
+        IEnumerable<CardInfoTableBuilder.TableRow> rows
+    )
     {
         // Use functional composition with Select to transform rows to side effects, then execute
-        List<Table> _ = rows
-            .Select(row => RenderSingleRow(table, row))
-            .ToList(); // Execute the side effects
+        List<Table> _ = [.. rows.Select(row => RenderSingleRow(table, row))]; // Execute the side effects
     }
 
     /// <summary>
@@ -68,24 +74,27 @@ public static class CardInfoDisplayService
     {
         return row switch
         {
-            CardInfoTableBuilder.PropertyRow(var name, var value) =>
-                table.AddRow(name, value),
+            CardInfoTableBuilder.PropertyRow(var name, var value) => table.AddRow(name, value),
 
-            CardInfoTableBuilder.SectionHeader(var title) =>
-                table.AddEmptyRow().AddRow($"[bold]{title}[/]", ""),
+            CardInfoTableBuilder.SectionHeader(var title) => table
+                .AddEmptyRow()
+                .AddRow($"[bold]{title}[/]", ""),
 
-            CardInfoTableBuilder.StatusRow(var name, var isAvailable, var details) =>
-                table.AddRow(
-                    $"{(isAvailable ? "[green]✓[/]" : "[red]✗[/]")} {name}",
-                    details.Length > 0 ? details : (isAvailable ? "Available" : "Not Available")),
+            CardInfoTableBuilder.StatusRow(var name, var isAvailable, var details) => table.AddRow(
+                $"{(isAvailable ? "[green]✓[/]" : "[red]✗[/]")} {name}",
+                details.Length > 0 ? details
+                    : isAvailable ? "Available"
+                    : "Not Available"
+            ),
 
-            CardInfoTableBuilder.ErrorRow(var name, var message) =>
-                table.AddRow($"[red]{name}[/]", $"[red]{message}[/]"),
+            CardInfoTableBuilder.ErrorRow(var name, var message) => table.AddRow(
+                $"[red]{name}[/]",
+                $"[red]{message}[/]"
+            ),
 
-            CardInfoTableBuilder.InfoRow(var message) =>
-                table.AddRow("", $"[dim]{message}[/]"),
+            CardInfoTableBuilder.InfoRow(var message) => table.AddRow("", $"[dim]{message}[/]"),
 
-            _ => table
+            _ => table,
         };
     }
 }

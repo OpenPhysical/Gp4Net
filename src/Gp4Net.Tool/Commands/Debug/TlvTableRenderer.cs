@@ -29,11 +29,21 @@ public static class TlvTableRenderer
     {
         switch (row)
         {
-            case TlvTableBuilder.TlvDataRow(var elementIndex, var depth, var tagInfo, var lengthInfo, var content, var asciiContent, var rawBytes):
+            case TlvTableBuilder.TlvDataRow(
+                var elementIndex,
+                var depth,
+                var tagInfo,
+                var lengthInfo,
+                var content,
+                var asciiContent,
+                var rawBytes
+            ):
                 string indent = new string(' ', depth * 2);
 
                 // Main element info
-                AnsiConsole.MarkupLine($"{indent}[cyan]Element {elementIndex}[/]: [white]{tagInfo}[/]");
+                AnsiConsole.MarkupLine(
+                    $"{indent}[cyan]Element {elementIndex}[/]: [white]{tagInfo}[/]"
+                );
                 AnsiConsole.MarkupLine($"{indent}  Length: {lengthInfo}");
 
                 // Content display
@@ -76,7 +86,7 @@ public static class TlvTableRenderer
                     "warning" => "yellow",
                     "error" => "red",
                     "success" => "green",
-                    _ => "dim"
+                    _ => "dim",
                 };
                 AnsiConsole.MarkupLine($"[{color}]{message}[/]");
                 AnsiConsole.WriteLine();
@@ -99,7 +109,15 @@ public static class TlvTableRenderer
         {
             switch (row)
             {
-                case TlvTableBuilder.TlvDataRow(var elementIndex, var depth, var tagInfo, var lengthInfo, var content, var asciiContent, var rawBytes):
+                case TlvTableBuilder.TlvDataRow(
+                    var elementIndex,
+                    var depth,
+                    var tagInfo,
+                    var lengthInfo,
+                    var content,
+                    var asciiContent,
+                    var rawBytes
+                ):
                     string indent = new string(' ', depth * 2);
                     _ = table.AddRow(
                         $"{indent}{elementIndex}",
@@ -111,12 +129,7 @@ public static class TlvTableRenderer
 
                 case TlvTableBuilder.NestedTlvHeaderRow(var depth, var message):
                     string nestedIndent = new string(' ', depth * 2);
-                    _ = table.AddRow(
-                        "",
-                        $"{nestedIndent}Nested TLV",
-                        "",
-                        ""
-                    );
+                    _ = table.AddRow("", $"{nestedIndent}Nested TLV", "", "");
                     break;
 
                 case TlvTableBuilder.TagInterpretationRow(var depth, var interpretation):
@@ -155,7 +168,8 @@ public static class TlvTableRenderer
         {
             int start = result.IndexOf('[');
             int end = result.IndexOf(']', start + 1);
-            if (start == -1 || end == -1) break;
+            if (start == -1 || end == -1)
+                break;
 
             string tag = result.Substring(start, end - start + 1);
             if (tag == "[/]")

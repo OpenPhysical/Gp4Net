@@ -5,7 +5,6 @@ using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Transport;
 using NUnit.Framework;
@@ -52,18 +51,41 @@ public class SupplementalSecurityDomainTests
         byte[] hostChallenge = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
         byte[] initUpdateCommand =
         [
-            0x80, 0x50, 0x00, 0x00, 0x08,
-            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 // Host challenge
+            0x80,
+            0x50,
+            0x00,
+            0x00,
+            0x08,
+            0x01,
+            0x02,
+            0x03,
+            0x04,
+            0x05,
+            0x06,
+            0x07,
+            0x08, // Host challenge
         ];
 
         // Act
         ApduResponse response = _virtualCard.ProcessCommand(initUpdateCommand);
 
         // Assert
-        _ = response.StatusWord.Should().Be(StatusWords.Success, "INITIALIZE UPDATE should succeed with implicitly selected ISD");
-        _ = response.Data.Length.Should().BeGreaterThanOrEqualTo(28, "INITIALIZE UPDATE response should contain key diversification data, key info, card challenge, and cryptogram");
+        _ = response
+            .StatusWord.Should()
+            .Be(
+                StatusWords.Success,
+                "INITIALIZE UPDATE should succeed with implicitly selected ISD"
+            );
+        _ = response
+            .Data.Length.Should()
+            .BeGreaterThanOrEqualTo(
+                28,
+                "INITIALIZE UPDATE response should contain key diversification data, key info, card challenge, and cryptogram"
+            );
 
-        TestContext.Out.WriteLine($"✅ INITIALIZE UPDATE succeeded with implicit ISD selection: {Convert.ToHexString(response.Data)}{response.StatusWord:X4}");
+        TestContext.Out.WriteLine(
+            $"✅ INITIALIZE UPDATE succeeded with implicit ISD selection: {Convert.ToHexString(response.Data)}{response.StatusWord:X4}"
+        );
     }
 
     /// <summary>
@@ -81,18 +103,38 @@ public class SupplementalSecurityDomainTests
         byte[] hostChallenge = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
         byte[] initUpdateCommand =
         [
-            0x80, 0x50, 0x00, 0x00, 0x08,
-            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 // Host challenge
+            0x80,
+            0x50,
+            0x00,
+            0x00,
+            0x08,
+            0x01,
+            0x02,
+            0x03,
+            0x04,
+            0x05,
+            0x06,
+            0x07,
+            0x08, // Host challenge
         ];
 
         // Act
         ApduResponse response = _virtualCard.ProcessCommand(initUpdateCommand);
 
         // Assert
-        _ = response.StatusWord.Should().Be(StatusWords.Success, "INITIALIZE UPDATE should succeed after explicit ISD selection");
-        _ = response.Data.Length.Should().BeGreaterThanOrEqualTo(28, "INITIALIZE UPDATE response should be complete");
+        _ = response
+            .StatusWord.Should()
+            .Be(
+                StatusWords.Success,
+                "INITIALIZE UPDATE should succeed after explicit ISD selection"
+            );
+        _ = response
+            .Data.Length.Should()
+            .BeGreaterThanOrEqualTo(28, "INITIALIZE UPDATE response should be complete");
 
-        TestContext.Out.WriteLine($"✅ INITIALIZE UPDATE succeeded after explicit ISD selection: {Convert.ToHexString(response.Data)}{response.StatusWord:X4}");
+        TestContext.Out.WriteLine(
+            $"✅ INITIALIZE UPDATE succeeded after explicit ISD selection: {Convert.ToHexString(response.Data)}{response.StatusWord:X4}"
+        );
     }
 
     /// <summary>
@@ -104,31 +146,61 @@ public class SupplementalSecurityDomainTests
     {
         // Arrange - Install a regular application without SecurityDomain privileges
         ImmutableArray<byte> appAid = [0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x01];
-        Result<CardState, SmartCardError> installResult = _virtualCard.CurrentState.InstallApplication(
-            appAid,
-            "Test Application",
-            ImmutableArray<byte>.Empty, // Associated with ISD
-            ApplicationPrivileges.None  // NO SecurityDomain privilege
-        );
+        Result<CardState, SmartCardError> installResult =
+            _virtualCard.CurrentState.InstallApplication(
+                appAid,
+                "Test Application",
+                ImmutableArray<byte>.Empty // NO SecurityDomain privilege
+            );
 
         _ = installResult.IsSuccess.Should().BeTrue("Application installation should succeed");
 
         // Update card state with the new application context
         CardState newState = _virtualCard.CurrentState.WithApplicationContext(
-            _virtualCard.CurrentState.ApplicationContext
-                .InstallApplication(appAid, "Test Application", ImmutableArray<byte>.Empty, ApplicationPrivileges.None)
+            _virtualCard
+                .CurrentState.ApplicationContext.InstallApplication(
+                    appAid,
+                    "Test Application",
+                    ImmutableArray<byte>.Empty
+                )
                 .Value
         );
 
         // Select the regular application
-        byte[] selectAppCommand = [0x00, 0xA4, 0x04, 0x00, 0x08, 0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x01];
+        byte[] selectAppCommand =
+        [
+            0x00,
+            0xA4,
+            0x04,
+            0x00,
+            0x08,
+            0xA0,
+            0x00,
+            0x00,
+            0x01,
+            0x51,
+            0x00,
+            0x00,
+            0x01,
+        ];
         ApduResponse selectResponse = _virtualCard.ProcessCommand(selectAppCommand);
         // Note: This might fail if the application isn't properly selectable - that's OK for this test
 
         byte[] initUpdateCommand =
         [
-            0x80, 0x50, 0x00, 0x00, 0x08,
-            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 // Host challenge
+            0x80,
+            0x50,
+            0x00,
+            0x00,
+            0x08,
+            0x01,
+            0x02,
+            0x03,
+            0x04,
+            0x05,
+            0x06,
+            0x07,
+            0x08, // Host challenge
         ];
 
         // Act
@@ -141,17 +213,27 @@ public class SupplementalSecurityDomainTests
         if (selectResponse.StatusWord == StatusWords.Success)
         {
             // If selection succeeded, INITIALIZE UPDATE should fail due to insufficient privileges
-            _ = response.StatusWord.Should().Be((StatusWord)0x6985,
-                "INITIALIZE UPDATE should fail when regular application (without SecurityDomain privileges) is selected");
+            _ = response
+                .StatusWord.Should()
+                .Be(
+                    0x6985,
+                    "INITIALIZE UPDATE should fail when regular application (without SecurityDomain privileges) is selected"
+                );
         }
         else
         {
             // If selection failed, we're still on ISD and INITIALIZE UPDATE should succeed
-            _ = response.StatusWord.Should().Be(StatusWords.Success,
-                "INITIALIZE UPDATE should succeed when falling back to ISD after failed application selection");
+            _ = response
+                .StatusWord.Should()
+                .Be(
+                    StatusWords.Success,
+                    "INITIALIZE UPDATE should succeed when falling back to ISD after failed application selection"
+                );
         }
 
-        TestContext.Out.WriteLine($"✅ INITIALIZE UPDATE properly handled regular application selection scenario");
+        TestContext.Out.WriteLine(
+            "✅ INITIALIZE UPDATE properly handled regular application selection scenario"
+        );
     }
 
     /// <summary>
@@ -165,33 +247,55 @@ public class SupplementalSecurityDomainTests
         ImmutableArray<byte> ssdAid = [0xA0, 0x00, 0x00, 0x01, 0x51, 0x53, 0x44, 0x01]; // Supplemental Security Domain AID
 
         // Install supplemental Security Domain with SecurityDomain privileges
-        Result<CardState, SmartCardError> installSsdResult = _virtualCard.CurrentState.InstallApplication(
-            ssdAid,
-            "Test Supplemental Security Domain",
-            ImmutableArray<byte>.Empty, // Associated with ISD
-            ApplicationPrivileges.SecurityDomain // HAS SecurityDomain privilege
-        );
+        Result<CardState, SmartCardError> installSsdResult =
+            _virtualCard.CurrentState.InstallApplication(
+                ssdAid,
+                "Test Supplemental Security Domain",
+                ImmutableArray<byte>.Empty, // Associated with ISD
+                ApplicationPrivileges.SecurityDomain // HAS SecurityDomain privilege
+            );
 
-        _ = installSsdResult.IsSuccess.Should().BeTrue("Supplemental Security Domain installation should succeed");
+        _ = installSsdResult
+            .IsSuccess.Should()
+            .BeTrue("Supplemental Security Domain installation should succeed");
 
         // For this test, we'll assume the SSD can be selected and has proper secure channel capabilities
         // In a real implementation, the virtual card would need to support SSD selection and key management
 
         byte[] initUpdateCommand =
         [
-            0x80, 0x50, 0x00, 0x00, 0x08,
-            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 // Host challenge
+            0x80,
+            0x50,
+            0x00,
+            0x00,
+            0x08,
+            0x01,
+            0x02,
+            0x03,
+            0x04,
+            0x05,
+            0x06,
+            0x07,
+            0x08, // Host challenge
         ];
 
         // Act - Try INITIALIZE UPDATE (will work with ISD since SSD selection isn't fully implemented yet)
         ApduResponse response = _virtualCard.ProcessCommand(initUpdateCommand);
 
         // Assert
-        _ = response.StatusWord.Should().Be(StatusWords.Success,
-            "INITIALIZE UPDATE should succeed - either with ISD or properly configured SSD");
+        _ = response
+            .StatusWord.Should()
+            .Be(
+                StatusWords.Success,
+                "INITIALIZE UPDATE should succeed - either with ISD or properly configured SSD"
+            );
 
-        TestContext.Out.WriteLine($"✅ INITIALIZE UPDATE handled supplemental Security Domain scenario: {response.StatusWord:X4}");
-        TestContext.Out.WriteLine($"Note: Full SSD selection and key management would be implemented in production virtual card");
+        TestContext.Out.WriteLine(
+            $"✅ INITIALIZE UPDATE handled supplemental Security Domain scenario: {response.StatusWord:X4}"
+        );
+        TestContext.Out.WriteLine(
+            "Note: Full SSD selection and key management would be implemented in production virtual card"
+        );
     }
 
     /// <summary>
@@ -205,22 +309,43 @@ public class SupplementalSecurityDomainTests
         _virtualCard.Reset();
 
         // Verify ISD is implicitly selected after reset
-        _ = _virtualCard.IsSelected.Should().BeTrue("ISD should be implicitly selected after reset per GP Card Spec v2.3.1");
+        _ = _virtualCard
+            .IsSelected.Should()
+            .BeTrue("ISD should be implicitly selected after reset per GP Card Spec v2.3.1");
 
         byte[] initUpdateCommand =
         [
-            0x80, 0x50, 0x00, 0x00, 0x08,
-            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 // Host challenge
+            0x80,
+            0x50,
+            0x00,
+            0x00,
+            0x08,
+            0x01,
+            0x02,
+            0x03,
+            0x04,
+            0x05,
+            0x06,
+            0x07,
+            0x08, // Host challenge
         ];
 
         // Act
         ApduResponse response = _virtualCard.ProcessCommand(initUpdateCommand);
 
         // Assert
-        _ = response.StatusWord.Should().Be(StatusWords.Success,
-            "INITIALIZE UPDATE should succeed immediately after reset with implicit ISD selection");
-        _ = response.Data.Length.Should().BeGreaterThanOrEqualTo(28, "Response should be complete INITIALIZE UPDATE response");
+        _ = response
+            .StatusWord.Should()
+            .Be(
+                StatusWords.Success,
+                "INITIALIZE UPDATE should succeed immediately after reset with implicit ISD selection"
+            );
+        _ = response
+            .Data.Length.Should()
+            .BeGreaterThanOrEqualTo(28, "Response should be complete INITIALIZE UPDATE response");
 
-        TestContext.Out.WriteLine($"✅ INITIALIZE UPDATE succeeded after card reset with implicit ISD: {Convert.ToHexString(response.Data)}{response.StatusWord:X4}");
+        TestContext.Out.WriteLine(
+            $"✅ INITIALIZE UPDATE succeeded after card reset with implicit ISD: {Convert.ToHexString(response.Data)}{response.StatusWord:X4}"
+        );
     }
 }

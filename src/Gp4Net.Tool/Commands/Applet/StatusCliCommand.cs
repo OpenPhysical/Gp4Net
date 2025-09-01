@@ -34,22 +34,24 @@ public class StatusCommand : IPipelineCommand<StatusCommand.Settings>
         return await context.ExecuteAsync(async ctx =>
         {
             ctx.Display.Info("Starting applet status retrieval...");
-            
+
             IGlobalPlatformService gpService = ctx.GetGlobalPlatformService();
-            
+
             if (!settings.NoCardInfo)
             {
                 await DisplayCardInfoAsync(ctx);
             }
 
-            Result<ImmutableList<ApplicationInfo>, SmartCardError> statusResult = await RetrieveApplicationStatus(gpService);
+            Result<ImmutableList<ApplicationInfo>, SmartCardError> statusResult =
+                await RetrieveApplicationStatus(gpService);
             return await statusResult.Match(
                 async applications => await ProcessApplications(ctx, applications, settings),
                 error =>
                 {
                     ctx.Display.Error($"Failed to get applet status: {error.Message}");
                     return Task.FromResult(1);
-                });
+                }
+            );
         });
     }
 
@@ -59,35 +61,41 @@ public class StatusCommand : IPipelineCommand<StatusCommand.Settings>
         return Task.CompletedTask;
     }
 
-    private static async Task<Result<ImmutableList<ApplicationInfo>, SmartCardError>> RetrieveApplicationStatus(
-        IGlobalPlatformService globalPlatformService)
+    private static async Task<
+        Result<ImmutableList<ApplicationInfo>, SmartCardError>
+    > RetrieveApplicationStatus(IGlobalPlatformService globalPlatformService)
     {
-        return await globalPlatformService.GetStatusAsync(StatusSubset.ApplicationsAndSupplementaryDomains);
+        return await globalPlatformService.GetStatusAsync(
+            StatusSubset.ApplicationsAndSupplementaryDomains
+        );
     }
 
     private static Task<int> ProcessApplications(
         ICliExecutionContext context,
-        ImmutableList<ApplicationInfo> applications, 
-        Settings settings)
+        ImmutableList<ApplicationInfo> applications,
+        Settings settings
+    )
     {
         return Task.FromResult(DisplayApplications(context, applications, settings));
     }
 
     private static int DisplayApplications(
         ICliExecutionContext context,
-        ImmutableList<ApplicationInfo> applications, 
-        Settings settings)
+        ImmutableList<ApplicationInfo> applications,
+        Settings settings
+    )
     {
         // Build semantic rows using pure functional composition
-        List<ApplicationTableBuilder.ApplicationRow> semanticRows = ApplicationTableBuilder.BuildApplicationRows(
-            applications,
-            showExtended: false,
-            showSummary: true,
-            filter: null
-        ).ToList();
+        List<ApplicationTableBuilder.ApplicationRow> semanticRows = [.. ApplicationTableBuilder
+            .BuildApplicationRows(
+                applications,
+                showExtended: false,
+                showSummary: true,
+                filter: null
+            )];
 
         // Check if we have any applications to display
-        List<ApplicationTableBuilder.ApplicationDataRow> applicationRows = semanticRows.OfType<ApplicationTableBuilder.ApplicationDataRow>().ToList();
+        List<ApplicationTableBuilder.ApplicationDataRow> applicationRows = [.. semanticRows.OfType<ApplicationTableBuilder.ApplicationDataRow>()];
         if (!applicationRows.Any())
         {
             context.Display.Warning("No applets found on card");
@@ -111,15 +119,20 @@ public class StatusCommand : IPipelineCommand<StatusCommand.Settings>
     /// <summary>
     /// Displays detailed information for each application using Spectre.Console formatting.
     /// </summary>
-    private static void DisplayDetailedApplicationInfo(ICliExecutionContext context, IReadOnlyList<ApplicationInfo> applications)
+    private static void DisplayDetailedApplicationInfo(
+        ICliExecutionContext context,
+        IReadOnlyList<ApplicationInfo> applications
+    )
     {
-        List<Table> tables = applications
-            .Select(CreateApplicationDetailsTable)
-            .ToList();
+        List<Table> tables = [.. applications.Select(CreateApplicationDetailsTable)];
 
         // Display all tables functionally by writing them to console
         bool displayResult = tables
-            .Select(table => { AnsiConsole.Write(table); return true; })
+            .Select(table =>
+            {
+                AnsiConsole.Write(table);
+                return true;
+            })
             .All(success => success);
     }
 
@@ -134,13 +147,11 @@ public class StatusCommand : IPipelineCommand<StatusCommand.Settings>
         _ = table.AddRow("State", $"[yellow]{app.LifecycleState}[/]");
         _ = table.AddRow("Privileges", string.Join(", ", app.Privileges.Select(p => p.ToString())));
 
-        app.Version.Match(
-            version => table.AddRow("Version", $"[green]{version}[/]"),
-            () => { }
-        );
+        app.Version.Match(version => table.AddRow("Version", $"[green]{version}[/]"), () => { });
 
         app.AssociatedSecurityDomain.Match(
-            securityDomain => table.AddRow("Associated SD", $"[dim]{Convert.ToHexString(securityDomain)}[/]"),
+            securityDomain =>
+                table.AddRow("Associated SD", $"[dim]{Convert.ToHexString(securityDomain)}[/]"),
             () => { }
         );
 

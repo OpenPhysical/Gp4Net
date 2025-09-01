@@ -6,7 +6,6 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Domain.Commands;
-using Gp4Net.Tests.TestHelpers;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Integration;
@@ -20,7 +19,8 @@ public class LoadCommandTraceTests : TraceBasedTestBase
 {
     private readonly string _capFilePath;
 
-    public LoadCommandTraceTests() : base(TraceFiles.GpShellInstallJson)
+    public LoadCommandTraceTests()
+        : base(TraceFiles.GpShellInstallJson)
     {
         // Get the CAP file used in the trace
         _capFilePath = Path.Combine(
@@ -39,7 +39,10 @@ public class LoadCommandTraceTests : TraceBasedTestBase
         int maxBlockSize = 245;
 
         // Act - Generate LOAD commands
-        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize);
+        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(
+            capFileData,
+            maxBlockSize
+        );
         Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
         IList<LoadCommand>? loadCommands = result.Value;
 
@@ -69,8 +72,11 @@ public class LoadCommandTraceTests : TraceBasedTestBase
 
         // Verify the total payload size respects maxBlockSize
         byte payloadSize = apdu[4]; // Lc field
-        Assert.That(payloadSize, Is.LessThanOrEqualTo(maxBlockSize),
-            $"Payload size {payloadSize} should not exceed maxBlockSize {maxBlockSize}");
+        Assert.That(
+            payloadSize,
+            Is.LessThanOrEqualTo(maxBlockSize),
+            $"Payload size {payloadSize} should not exceed maxBlockSize {maxBlockSize}"
+        );
 
         // The length encoding should match the total CAP file size
         uint totalSize = (uint)capFileData.Length;
@@ -80,8 +86,11 @@ public class LoadCommandTraceTests : TraceBasedTestBase
         byte[] expectedTlvHeader = CreateExpectedTlvHeader(totalSize);
         for (int i = 0; i < expectedTlvHeader.Length; i++)
         {
-            Assert.That(apdu[5 + i], Is.EqualTo(expectedTlvHeader[i]),
-                $"TLV header byte {i} should match expected encoding");
+            Assert.That(
+                apdu[5 + i],
+                Is.EqualTo(expectedTlvHeader[i]),
+                $"TLV header byte {i} should match expected encoding"
+            );
         }
     }
 
@@ -106,14 +115,14 @@ public class LoadCommandTraceTests : TraceBasedTestBase
             case <= 0xFFFFFF:
                 header.Add(0x83);
                 header.Add((byte)(totalSize >> 16));
-                header.Add((byte)((totalSize >> 8) & 0xFF));
+                header.Add((byte)(totalSize >> 8 & 0xFF));
                 header.Add((byte)(totalSize & 0xFF));
                 break;
             default:
                 header.Add(0x84);
                 header.Add((byte)(totalSize >> 24));
-                header.Add((byte)((totalSize >> 16) & 0xFF));
-                header.Add((byte)((totalSize >> 8) & 0xFF));
+                header.Add((byte)(totalSize >> 16 & 0xFF));
+                header.Add((byte)(totalSize >> 8 & 0xFF));
                 header.Add((byte)(totalSize & 0xFF));
                 break;
         }
@@ -131,7 +140,10 @@ public class LoadCommandTraceTests : TraceBasedTestBase
         int capFileSize = capFileData.Length;
 
         // Act
-        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize: 245);
+        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(
+            capFileData,
+            maxBlockSize: 245
+        );
         Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
         IList<LoadCommand>? loadCommands = result.Value;
 
@@ -141,7 +153,11 @@ public class LoadCommandTraceTests : TraceBasedTestBase
         // Each block can carry up to 245 bytes of actual data
 
         // The trace shows many LOAD commands, let's verify we generate a reasonable number
-        Assert.That(loadCommands.Count > 100, Is.True, $"Expected many LOAD commands, got {loadCommands.Count}");
+        Assert.That(
+            loadCommands.Count > 100,
+            Is.True,
+            $"Expected many LOAD commands, got {loadCommands.Count}"
+        );
 
         // Verify block numbering (wraps at 256 due to byte limit)
         for (int i = 0; i < loadCommands.Count; i++)
@@ -168,7 +184,10 @@ public class LoadCommandTraceTests : TraceBasedTestBase
         byte[] originalCapData = File.ReadAllBytes(_capFilePath);
 
         // Act
-        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(originalCapData, maxBlockSize: 245);
+        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(
+            originalCapData,
+            maxBlockSize: 245
+        );
         Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
         IList<LoadCommand>? loadCommands = result.Value;
 
@@ -217,7 +236,7 @@ public class LoadCommandTraceTests : TraceBasedTestBase
         }
 
         // Assert
-        byte[] reassembled = reassembledData.ToArray();
+        byte[] reassembled = [.. reassembledData];
         Assert.That(reassembled.Length, Is.EqualTo(originalCapData.Length));
         Assert.That(reassembled, Is.EqualTo(originalCapData));
     }
@@ -231,7 +250,9 @@ public class LoadCommandTraceTests : TraceBasedTestBase
         byte[] capFileData = File.ReadAllBytes(_capFilePath);
 
         // Act & Assert
-        Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(capFileData);
+        Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(
+            capFileData
+        );
         Assert.That(capFileResult.IsSuccess, Is.True, "Failed to parse CAP file");
         CapFileStructure? capFile = capFileResult.Value;
         Assert.Multiple(() =>
@@ -244,7 +265,11 @@ public class LoadCommandTraceTests : TraceBasedTestBase
 
         // The trace mentions OpenFIPS201-v1_10_2-chainfix.cap
         // This is a substantial applet with multiple components
-        Assert.That(capFile.Components.Count >= 5, Is.True, $"Expected multiple components, got {capFile.Components.Count}");
+        Assert.That(
+            capFile.Components.Count >= 5,
+            Is.True,
+            $"Expected multiple components, got {capFile.Components.Count}"
+        );
     }
 
     [Test]
@@ -257,7 +282,9 @@ public class LoadCommandTraceTests : TraceBasedTestBase
         const int maxBlockSize = 245;
 
         // Act
-        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(capFileData, maxBlockSize);
+        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(
+            capFileData
+        );
         Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
         IList<LoadCommand>? loadCommands = result.Value;
 
@@ -273,7 +300,11 @@ public class LoadCommandTraceTests : TraceBasedTestBase
 
             // The data portion (excluding header and Le) should respect limits
             int dataLength = apdu.Length - 6; // Minus CLA INS P1 P2 Lc Le
-            Assert.That(dataLength <= maxBlockSize + 10, Is.True, $"Data length {dataLength} exceeds reasonable limits");
+            Assert.That(
+                dataLength <= maxBlockSize + 10,
+                Is.True,
+                $"Data length {dataLength} exceeds reasonable limits"
+            );
         }
     }
 
@@ -296,11 +327,19 @@ public class LoadCommandTraceTests : TraceBasedTestBase
             Assert.That(traceLoadCommand[2], Is.EqualTo(0x00), "P1 should be 0x00 (continuation)");
             Assert.That(traceLoadCommand[3], Is.EqualTo(0x00), "P2 should be 0x00 (block 0)");
             Assert.That(traceLoadCommand[4], Is.EqualTo(0xEF), "Lc should be 0xEF (239 bytes)");
-            Assert.That(traceLoadCommand.Length, Is.EqualTo(244), "Total APDU length should be 5 + 239 = 244 bytes");
+            Assert.That(
+                traceLoadCommand.Length,
+                Is.EqualTo(244),
+                "Total APDU length should be 5 + 239 = 244 bytes"
+            );
 
             // Verify TLV header in data payload
             Assert.That(traceLoadCommand[5], Is.EqualTo(0xC4), "CAP data tag should be 0xC4");
-            Assert.That(traceLoadCommand[6], Is.EqualTo(0x82), "Length encoding should be 0x82 (extended length)");
+            Assert.That(
+                traceLoadCommand[6],
+                Is.EqualTo(0x82),
+                "Length encoding should be 0x82 (extended length)"
+            );
         });
     }
 }

@@ -27,7 +27,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Nerdbank.GitVersioning" Version="3.6.*" PrivateAssets="all" />
     <None Include="$(SolutionDir)assets/logo_64x64.png" Pack="true" PackagePath="" />
     <None Include="$(SolutionDir)docs/LICENSE" Pack="true" PackagePath="" />
     <None Include="$(SolutionDir)README.md" Pack="true" PackagePath="" />

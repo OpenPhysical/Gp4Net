@@ -43,8 +43,10 @@ public class SecurityDomainStatus
     {
         return data.Match(
             Some: bytes => ParseFromBytes(bytes),
-            None: () => Result.Failure<SecurityDomainStatus, SmartCardError>(
-                SmartCardError.InvalidData("Security domain status data cannot be null"))
+            None: () =>
+                Result.Failure<SecurityDomainStatus, SmartCardError>(
+                    SmartCardError.InvalidData("Security domain status data cannot be null")
+                )
         );
     }
 
@@ -53,14 +55,18 @@ public class SecurityDomainStatus
         if (data.Length < 3) // Minimum: tag (1) + length (1) + state (1)
         {
             return Result.Failure<SecurityDomainStatus, SmartCardError>(
-                SmartCardError.InvalidData($"Security domain status data too short: {data.Length} bytes"));
+                SmartCardError.InvalidData(
+                    $"Security domain status data too short: {data.Length} bytes"
+                )
+            );
         }
 
         // Verify tag
         if (data[0] != 0xC1)
         {
             return Result.Failure<SecurityDomainStatus, SmartCardError>(
-                SmartCardError.InvalidData($"Invalid tag: expected 0xC1, got 0x{data[0]:X2}"));
+                SmartCardError.InvalidData($"Invalid tag: expected 0xC1, got 0x{data[0]:X2}")
+            );
         }
 
         // Get length
@@ -68,19 +74,22 @@ public class SecurityDomainStatus
         if (data.Length < 2 + length)
         {
             return Result.Failure<SecurityDomainStatus, SmartCardError>(
-                SmartCardError.InvalidData($"Data length mismatch: expected {2 + length}, got {data.Length}"));
+                SmartCardError.InvalidData(
+                    $"Data length mismatch: expected {2 + length}, got {data.Length}"
+                )
+            );
         }
 
         // Extract state byte
         byte stateByte = data[2];
 
         // Extract additional data if present
-        Maybe<byte[]> additionalData = length > 1
-            ? Maybe<byte[]>.From(data[3..(2 + length)])
-            : Maybe<byte[]>.None;
+        Maybe<byte[]> additionalData =
+            length > 1 ? Maybe<byte[]>.From(data[3..(2 + length)]) : Maybe<byte[]>.None;
 
         return Result.Success<SecurityDomainStatus, SmartCardError>(
-            new SecurityDomainStatus(data, stateByte, additionalData));
+            new SecurityDomainStatus(data, stateByte, additionalData)
+        );
     }
 
     /// <summary>
@@ -93,7 +102,7 @@ public class SecurityDomainStatus
         {
             0x7F => IsdState.CardLocked,
             0xFF => IsdState.Terminated,
-            _ => (IsdState)(StateByte & 0x0F) // For normal states, mask the flags
+            _ => (IsdState)(StateByte & 0x0F), // For normal states, mask the flags
         };
     }
 
@@ -128,11 +137,11 @@ public class SecurityDomainStatus
                     // Single byte counter
                     return Maybe<ushort>.From(data[0]);
                 case >= 2:
-                    {
-                        // Two byte counter (big-endian)
-                        ushort counter = (ushort)((data[data.Length - 2] << 8) | data[data.Length - 1]);
-                        return Maybe<ushort>.From(counter);
-                    }
+                {
+                    // Two byte counter (big-endian)
+                    ushort counter = (ushort)(data[^2] << 8 | data[^1]);
+                    return Maybe<ushort>.From(counter);
+                }
                 default:
                     return Maybe<ushort>.None;
             }
@@ -145,7 +154,7 @@ public class SecurityDomainStatus
     public override string ToString()
     {
         StringBuilder sb = new StringBuilder();
-        _ = sb.Append($"Security Domain Status: ");
+        _ = sb.Append("Security Domain Status: ");
         _ = sb.Append($"State={GetIsdState()}");
 
         if (IsPersonalized())
@@ -158,10 +167,8 @@ public class SecurityDomainStatus
             _ = sb.Append(" [Locked]");
         }
 
-        GetSequenceCounter().Match(
-            Some: counter => sb.Append($", Sequence=0x{counter:X4}"),
-            None: () => { }
-        );
+        GetSequenceCounter()
+            .Match(Some: counter => sb.Append($", Sequence=0x{counter:X4}"), None: () => { });
 
         return sb.ToString();
     }
@@ -176,7 +183,7 @@ public class SecurityDomainStatus
             GetIsdState().ToString(),
             IsPersonalized() ? "Personalized" : null,
             IsLocked() ? "Locked" : null,
-            GetSequenceCounter().Match(c => $"Seq:0x{c:X4}", () => null)
+            GetSequenceCounter().Match(c => $"Seq:0x{c:X4}", () => null),
         }.Where(p => p != null);
 
         return string.Join(", ", parts);
@@ -216,5 +223,5 @@ public enum IsdState : byte
     /// <summary>
     /// Unknown or invalid state.
     /// </summary>
-    Unknown = 0x00
+    Unknown = 0x00,
 }

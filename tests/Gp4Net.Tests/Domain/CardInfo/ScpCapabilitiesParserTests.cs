@@ -189,7 +189,9 @@ public class ScpCapabilitiesParserTests
         //   - 80 01 02 (SCP type = SCP02)
         //   - 81 04 15355575 (implementation options: 0x15, 0x35, 0x55, 0x75)
         // - Other tags for privileges and capabilities
-        byte[] data = Convert.FromHexString("A0098001028104153555758103E5BEC082031E030083010284010285017B86010C87017B");
+        byte[] data = Convert.FromHexString(
+            "A0098001028104153555758103E5BEC082031E030083010284010285017B86010C87017B"
+        );
 
         // Act
         string? result = ScpCapabilitiesParser.Parse(data);
@@ -226,7 +228,7 @@ public class ScpCapabilitiesParserTests
         // Arrange - Two A0 tags, each containing SCP information
         // Per GP Card Spec, each A0 tag contains one SCP:
         // First A0: SCP02 with no options
-        // Second A0: SCP03 with no options  
+        // Second A0: SCP03 with no options
         byte[] data = Convert.FromHexString("A003800102A003800103");
 
         // Act

@@ -126,5 +126,5 @@ public enum CardEnvironment
     /// <summary>
     /// Virtual/emulated card for testing.
     /// </summary>
-    Virtual
+    Virtual,
 }

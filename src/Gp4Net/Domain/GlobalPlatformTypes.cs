@@ -40,7 +40,7 @@ public enum LifecycleState : byte
     /// <summary>
     /// Unknown state.
     /// </summary>
-    Unknown = 0x00
+    Unknown = 0x00,
 }
 
 /// <summary>
@@ -140,9 +140,8 @@ public enum Privilege : uint
     /// <summary>
     /// Mandated DAP verification privilege.
     /// </summary>
-    MandatedDapVerification = 0x000001
+    MandatedDapVerification = 0x000001,
 }
-
 
 /// <summary>
 /// Constants used throughout the GlobalPlatform implementation.

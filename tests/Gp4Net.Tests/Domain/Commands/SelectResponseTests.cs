@@ -70,10 +70,13 @@ public class SelectResponseTests
             _ = aid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
 
             response.Fci.Match(
-                fci => fci.MaxCommandDataLength.Match(
-                    value => value.Should().Be(255),
-                    () => false.Should().BeTrue("MaxCommandDataLength should have a value")),
-                () => false.Should().BeTrue("FCI should have a value"));
+                fci =>
+                    fci.MaxCommandDataLength.Match(
+                        value => value.Should().Be(255),
+                        () => false.Should().BeTrue("MaxCommandDataLength should have a value")
+                    ),
+                () => false.Should().BeTrue("FCI should have a value")
+            );
         }
     }
 
@@ -81,21 +84,27 @@ public class SelectResponseTests
     public void Parse_WithComplexFci_ParsesAllFields()
     {
         TlvTestBuilder tlvBuilder = new TlvTestBuilder();
-        tlvBuilder.Add(0x6F, builder =>
-        {
-            builder.Add(0x84, Convert.FromHexString("A0000000030000")); // AID
-            builder.Add(0x50, Encoding.UTF8.GetBytes("ISD")); // Label
-            builder.Add(0x87, [0x01]); // Priority
-            builder.Add(0xA5, subBuilder =>
+        tlvBuilder.Add(
+            0x6F,
+            builder =>
             {
-                subBuilder.Add(0x9F65, [0x01, 0x00]); // Max command length (256)
-                subBuilder.Add(0x9F66, [0x02, 0x00]); // Max response length (512)
-                subBuilder.Add(0x42, [0x12, 0x34]); // Issuer ID
-                subBuilder.Add(0x45, [0x56, 0x78]); // Card Image
-                subBuilder.Add(0x66, [0x9A, 0xBC]); // Card Data
-            });
-            builder.Add(0xBF0C, [0xDE, 0xF0]); // Discretionary Data
-        });
+                builder.Add(0x84, Convert.FromHexString("A0000000030000")); // AID
+                builder.Add(0x50, Encoding.UTF8.GetBytes("ISD")); // Label
+                builder.Add(0x87, [0x01]); // Priority
+                builder.Add(
+                    0xA5,
+                    subBuilder =>
+                    {
+                        subBuilder.Add(0x9F65, [0x01, 0x00]); // Max command length (256)
+                        subBuilder.Add(0x9F66, [0x02, 0x00]); // Max response length (512)
+                        subBuilder.Add(0x42, [0x12, 0x34]); // Issuer ID
+                        subBuilder.Add(0x45, [0x56, 0x78]); // Card Image
+                        subBuilder.Add(0x66, [0x9A, 0xBC]); // Card Data
+                    }
+                );
+                builder.Add(0xBF0C, [0xDE, 0xF0]); // Discretionary Data
+            }
+        );
 
         byte[] fciData = tlvBuilder.Build();
         Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(fciData);
@@ -108,26 +117,73 @@ public class SelectResponseTests
             _ = response.Fci.Match(
                 fci =>
                 {
-                    _ = fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A0000000030000"));
+                    _ = fci
+                        .ApplicationAid.Should()
+                        .BeEquivalentTo(Convert.FromHexString("A0000000030000"));
                     _ = fci.ApplicationLabel.Match(
-                        label => { _ = label.Should().Be("ISD"); return true; },
-                        () => { _ = false.Should().BeTrue("ApplicationLabel should have a value"); return false; });
+                        label =>
+                        {
+                            _ = label.Should().Be("ISD");
+                            return true;
+                        },
+                        () =>
+                        {
+                            _ = false.Should().BeTrue("ApplicationLabel should have a value");
+                            return false;
+                        }
+                    );
                     _ = fci.ApplicationPriorityIndicator.Match(
-                        value => { _ = value.Should().Be(0x01); return true; },
-                        () => { _ = false.Should().BeTrue("ApplicationPriorityIndicator should have a value"); return false; });
+                        value =>
+                        {
+                            _ = value.Should().Be(0x01);
+                            return true;
+                        },
+                        () =>
+                        {
+                            _ = false
+                                .Should()
+                                .BeTrue("ApplicationPriorityIndicator should have a value");
+                            return false;
+                        }
+                    );
                     _ = fci.MaxCommandDataLength.Match(
-                        value => { _ = value.Should().Be(256); return true; },
-                        () => { _ = false.Should().BeTrue("MaxCommandDataLength should have a value"); return false; });
+                        value =>
+                        {
+                            _ = value.Should().Be(256);
+                            return true;
+                        },
+                        () =>
+                        {
+                            _ = false.Should().BeTrue("MaxCommandDataLength should have a value");
+                            return false;
+                        }
+                    );
                     _ = fci.MaxResponseDataLength.Match(
-                        value => { _ = value.Should().Be(512); return true; },
-                        () => { _ = false.Should().BeTrue("MaxResponseDataLength should have a value"); return false; });
-                    _ = fci.IssuerIdentificationNumber.Should().BeEquivalentTo(new byte[] { 0x12, 0x34 });
+                        value =>
+                        {
+                            _ = value.Should().Be(512);
+                            return true;
+                        },
+                        () =>
+                        {
+                            _ = false.Should().BeTrue("MaxResponseDataLength should have a value");
+                            return false;
+                        }
+                    );
+                    _ = fci
+                        .IssuerIdentificationNumber.Should()
+                        .BeEquivalentTo(new byte[] { 0x12, 0x34 });
                     _ = fci.CardImageNumber.Should().BeEquivalentTo(new byte[] { 0x56, 0x78 });
                     _ = fci.CardData.Should().BeEquivalentTo(new byte[] { 0x9A, 0xBC });
                     _ = fci.DiscretionaryData.Should().BeEquivalentTo(new byte[] { 0xDE, 0xF0 });
                     return true;
                 },
-                () => { _ = false.Should().BeTrue("FCI should have a value"); return false; });
+                () =>
+                {
+                    _ = false.Should().BeTrue("FCI should have a value");
+                    return false;
+                }
+            );
         }
     }
 
@@ -135,15 +191,21 @@ public class SelectResponseTests
     public void Parse_WithSingleByteMaxLengths_ParsesCorrectly()
     {
         TlvTestBuilder tlvBuilder = new TlvTestBuilder();
-        tlvBuilder.Add(0x6F, builder =>
-        {
-            builder.Add(0x84, Convert.FromHexString("A000000151000000"));
-            builder.Add(0xA5, subBuilder =>
+        tlvBuilder.Add(
+            0x6F,
+            builder =>
             {
-                subBuilder.Add(0x9F65, [0xFF]); // Single byte max command
-                subBuilder.Add(0x9F66, [0x80]); // Single byte max response
-            });
-        });
+                builder.Add(0x84, Convert.FromHexString("A000000151000000"));
+                builder.Add(
+                    0xA5,
+                    subBuilder =>
+                    {
+                        subBuilder.Add(0x9F65, [0xFF]); // Single byte max command
+                        subBuilder.Add(0x9F66, [0x80]); // Single byte max response
+                    }
+                );
+            }
+        );
 
         byte[] fciData = tlvBuilder.Build();
         Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(fciData);
@@ -157,14 +219,37 @@ public class SelectResponseTests
                 fci =>
                 {
                     _ = fci.MaxCommandDataLength.Match(
-                        value => { _ = value.Should().Be(255); return true; },
-                        () => { _ = false.Should().BeTrue("MaxCommandDataLength should have a value"); return false; });
+                        value =>
+                        {
+                            _ = value.Should().Be(255);
+                            return true;
+                        },
+                        () =>
+                        {
+                            _ = false.Should().BeTrue("MaxCommandDataLength should have a value");
+                            return false;
+                        }
+                    );
                     _ = fci.MaxResponseDataLength.Match(
-                        value => { _ = value.Should().Be(128); return true; },
-                        () => { _ = false.Should().BeTrue("MaxResponseDataLength should have a value"); return false; });
+                        value =>
+                        {
+                            _ = value.Should().Be(128);
+                            return true;
+                        },
+                        () =>
+                        {
+                            _ = false.Should().BeTrue("MaxResponseDataLength should have a value");
+                            return false;
+                        }
+                    );
                     return true;
                 },
-                () => { _ = false.Should().BeTrue("FCI should have a value"); return false; });
+                () =>
+                {
+                    _ = false.Should().BeTrue("FCI should have a value");
+                    return false;
+                }
+            );
         }
     }
 
@@ -172,11 +257,14 @@ public class SelectResponseTests
     public void Parse_WithEmptyApplicationLabel_ParsesCorrectly()
     {
         TlvTestBuilder tlvBuilder = new TlvTestBuilder();
-        tlvBuilder.Add(0x6F, builder =>
-        {
-            builder.Add(0x84, Convert.FromHexString("A000000151000000"));
-            builder.Add(0x50, []); // Empty label
-        });
+        tlvBuilder.Add(
+            0x6F,
+            builder =>
+            {
+                builder.Add(0x84, Convert.FromHexString("A000000151000000"));
+                builder.Add(0x50, []); // Empty label
+            }
+        );
 
         byte[] fciData = tlvBuilder.Build();
         Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(fciData);
@@ -190,11 +278,25 @@ public class SelectResponseTests
                 fci =>
                 {
                     _ = fci.ApplicationLabel.Match(
-                        label => { _ = label.Should().Be(""); return true; },
-                        () => { _ = false.Should().BeTrue("ApplicationLabel should have a value"); return false; });
+                        label =>
+                        {
+                            _ = label.Should().Be("");
+                            return true;
+                        },
+                        () =>
+                        {
+                            _ = false.Should().BeTrue("ApplicationLabel should have a value");
+                            return false;
+                        }
+                    );
                     return true;
                 },
-                () => { _ = false.Should().BeTrue("FCI should have a value"); return false; });
+                () =>
+                {
+                    _ = false.Should().BeTrue("FCI should have a value");
+                    return false;
+                }
+            );
         }
     }
 
@@ -202,11 +304,14 @@ public class SelectResponseTests
     public void Parse_WithEmptyPriorityIndicator_HandlesGracefully()
     {
         TlvTestBuilder tlvBuilder = new TlvTestBuilder();
-        tlvBuilder.Add(0x6F, builder =>
-        {
-            builder.Add(0x84, Convert.FromHexString("A000000151000000"));
-            builder.Add(0x87, []); // Empty priority
-        });
+        tlvBuilder.Add(
+            0x6F,
+            builder =>
+            {
+                builder.Add(0x84, Convert.FromHexString("A000000151000000"));
+                builder.Add(0x87, []); // Empty priority
+            }
+        );
 
         byte[] fciData = tlvBuilder.Build();
         Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(fciData);
@@ -222,7 +327,12 @@ public class SelectResponseTests
                     _ = fci.ApplicationPriorityIndicator.HasValue.Should().BeFalse();
                     return true;
                 },
-                () => { _ = false.Should().BeTrue("FCI should have a value"); return false; });
+                () =>
+                {
+                    _ = false.Should().BeTrue("FCI should have a value");
+                    return false;
+                }
+            );
         }
     }
 
@@ -230,11 +340,14 @@ public class SelectResponseTests
     public void Parse_WithPdolTag_IgnoresItGracefully()
     {
         TlvTestBuilder tlvBuilder = new TlvTestBuilder();
-        tlvBuilder.Add(0x6F, builder =>
-        {
-            builder.Add(0x84, Convert.FromHexString("A000000151000000"));
-            builder.Add(0x9F38, [0x9F, 0x66, 0x02]); // PDOL
-        });
+        tlvBuilder.Add(
+            0x6F,
+            builder =>
+            {
+                builder.Add(0x84, Convert.FromHexString("A000000151000000"));
+                builder.Add(0x9F38, [0x9F, 0x66, 0x02]); // PDOL
+            }
+        );
 
         byte[] fciData = tlvBuilder.Build();
         Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(fciData);
@@ -247,10 +360,17 @@ public class SelectResponseTests
             _ = response.Fci.Match(
                 fci =>
                 {
-                    _ = fci.ApplicationAid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
+                    _ = fci
+                        .ApplicationAid.Should()
+                        .BeEquivalentTo(Convert.FromHexString("A000000151000000"));
                     return true;
                 },
-                () => { _ = false.Should().BeTrue("FCI should have a value"); return false; });
+                () =>
+                {
+                    _ = false.Should().BeTrue("FCI should have a value");
+                    return false;
+                }
+            );
         }
     }
 
@@ -330,9 +450,9 @@ public class FileControlInformationTests
     {
         byte[] aid = Convert.FromHexString("A000000151000000");
         string label = "Test App";
-        byte priority = (byte)0x01;
-        ushort maxCommand = (ushort)255;
-        ushort maxResponse = (ushort)256;
+        byte priority = 0x01;
+        ushort maxCommand = 255;
+        ushort maxResponse = 256;
         byte[] issuerNumber = [0x12, 0x34];
         byte[] cardImage = [0x56, 0x78];
         byte[] cardData = [0x9A, 0xBC];

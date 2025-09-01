@@ -35,10 +35,7 @@ public class OpenPhysicalId
     /// </summary>
     public static string ManagerUrl
     {
-        get
-        {
-            return OpenPhysicalManagerUrl;
-        }
+        get { return OpenPhysicalManagerUrl; }
     }
 
     /// <summary>
@@ -185,23 +182,23 @@ public class OpenPhysicalId
         // Apply the appropriate dash pattern based on format
         return Format switch
         {
-            OpidFormat.Format2
-                => $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 3)}-{fullDigits.Substring(7, 3)}",
-            OpidFormat.Format3
-                => $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 3)}-{fullDigits.Substring(7, 4)}",
-            OpidFormat.Format4
-                => $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 4)}",
-            OpidFormat.Format5
-                => $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 5)}",
-            OpidFormat.Format6
-                => $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 5)}-{fullDigits.Substring(9, 5)}",
-            OpidFormat.Format7
-                => $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 4)}-{fullDigits.Substring(12, 4)}",
-            OpidFormat.Format8
-                => $"{fullDigits.Substring(0, 5)}-{fullDigits.Substring(5, 4)}-{fullDigits.Substring(9, 4)}-{fullDigits.Substring(13, 4)}",
-            OpidFormat.Format9
-                => $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 4)}-{fullDigits.Substring(12, 5)}",
-            _ => throw new InvalidOperationException($"Unknown format: {Format}")
+            OpidFormat.Format2 =>
+                $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 3)}-{fullDigits.Substring(7, 3)}",
+            OpidFormat.Format3 =>
+                $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 3)}-{fullDigits.Substring(7, 4)}",
+            OpidFormat.Format4 =>
+                $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 4)}",
+            OpidFormat.Format5 =>
+                $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 5)}",
+            OpidFormat.Format6 =>
+                $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 5)}-{fullDigits.Substring(9, 5)}",
+            OpidFormat.Format7 =>
+                $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 4)}-{fullDigits.Substring(12, 4)}",
+            OpidFormat.Format8 =>
+                $"{fullDigits.Substring(0, 5)}-{fullDigits.Substring(5, 4)}-{fullDigits.Substring(9, 4)}-{fullDigits.Substring(13, 4)}",
+            OpidFormat.Format9 =>
+                $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 4)}-{fullDigits.Substring(12, 5)}",
+            _ => throw new InvalidOperationException($"Unknown format: {Format}"),
         };
     }
 
@@ -222,9 +219,9 @@ public class OpenPhysicalId
     public override bool Equals(object obj)
     {
         return obj is OpenPhysicalId other
-               && Iin == other.Iin
-               && Cin == other.Cin
-               && Format == other.Format;
+            && Iin == other.Iin
+            && Cin == other.Cin
+            && Format == other.Format;
     }
 
     /// <summary>

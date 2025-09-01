@@ -3,14 +3,18 @@ using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
+using Gp4Net.CardEmulator.Services;
 using Gp4Net.Core;
+using Gp4Net.Domain;
 using Gp4Net.Domain.CardInfo;
+using Gp4Net.Domain.Commands;
+using Gp4Net.Domain.Keys;
 using Gp4Net.Services;
 using Gp4Net.Tool.Commands.Card;
-using Gp4Net.CardEmulator.Services;
 using NUnit.Framework;
+using Spectre.Console.Cli;
 using Spectre.Console.Testing;
-using Gp4Net.Tests.TestHelpers;
+using CardInformation = Gp4Net.Services.CardInformation;
 
 namespace Gp4Net.Tests.Tool.Commands.Card;
 
@@ -27,7 +31,7 @@ public class InfoCommandTests
     {
         _virtualCardService = new VirtualCardService();
         _virtualCardService.SetupComprehensiveTestEnvironment();
-        
+
         // Use library approach - direct service injection
         _globalPlatformService = new EmptyGlobalPlatformService();
         _console = new TestConsole();
@@ -120,105 +124,156 @@ public class FailingGlobalPlatformService : IGlobalPlatformService
 {
     public ISmartCardService CardService { get; } = new EmptySmartCardService();
 
-    public Task<Result<SelectResponse, SmartCardError>> SelectIsdAsync(CancellationToken cancellationToken = default)
+    public Task<Result<SelectResponse, SmartCardError>> SelectIsdAsync(
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<SelectResponse, SmartCardError>(
-            SmartCardError.CommunicationError("Test failure - ISD selection failed")));
+        return Task.FromResult(
+            Result.Failure<SelectResponse, SmartCardError>(
+                SmartCardError.CommunicationError("Test failure - ISD selection failed")
+            )
+        );
     }
 
     public Task<Result<SecureChannelState, SmartCardError>> EstablishSecureChannelAsync(
-        KeySet keySet, 
-        SecurityLevel securityLevel = SecurityLevel.CMac, 
-        CancellationToken cancellationToken = default)
+        KeySet keySet,
+        SecurityLevel securityLevel = SecurityLevel.CMac,
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<SecureChannelState, SmartCardError>(
-            SmartCardError.CommunicationError("Test failure - secure channel establishment failed")));
+        return Task.FromResult(
+            Result.Failure<SecureChannelState, SmartCardError>(
+                SmartCardError.CommunicationError(
+                    "Test failure - secure channel establishment failed"
+                )
+            )
+        );
     }
 
     public Task<Result<SecureChannelState, SmartCardError>> EstablishSecureChannelAsync(
-        string keysetName, 
-        SecurityLevel securityLevel = SecurityLevel.CMac, 
-        byte keyVersion = 1, 
-        CancellationToken cancellationToken = default)
+        string keysetName,
+        SecurityLevel securityLevel = SecurityLevel.CMac,
+        byte keyVersion = 1,
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<SecureChannelState, SmartCardError>(
-            SmartCardError.CommunicationError("Test failure - secure channel establishment failed")));
+        return Task.FromResult(
+            Result.Failure<SecureChannelState, SmartCardError>(
+                SmartCardError.CommunicationError(
+                    "Test failure - secure channel establishment failed"
+                )
+            )
+        );
     }
 
     public Task<Result<SecureChannelState, SmartCardError>> EstablishSecureChannelAsync(
-        string encKey, 
-        string macKey, 
-        string dekKey, 
-        byte keyVersion, 
-        SecurityLevel securityLevel = SecurityLevel.CMac, 
-        CancellationToken cancellationToken = default)
+        string encKey,
+        string macKey,
+        string dekKey,
+        byte keyVersion,
+        SecurityLevel securityLevel = SecurityLevel.CMac,
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<SecureChannelState, SmartCardError>(
-            SmartCardError.CommunicationError("Test failure - secure channel establishment failed")));
+        return Task.FromResult(
+            Result.Failure<SecureChannelState, SmartCardError>(
+                SmartCardError.CommunicationError(
+                    "Test failure - secure channel establishment failed"
+                )
+            )
+        );
     }
 
-    public Task<Result<CardInformation, SmartCardError>> GetCardInfoAsync(CancellationToken cancellationToken = default)
+    public Task<Result<CardInformation, SmartCardError>> GetCardInfoAsync(
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<CardInformation, SmartCardError>(
-            SmartCardError.CommunicationError("Test failure - card info retrieval failed")));
+        return Task.FromResult(
+            Result.Failure<CardInformation, SmartCardError>(
+                SmartCardError.CommunicationError("Test failure - card info retrieval failed")
+            )
+        );
     }
 
     public Task<Result<ImmutableList<ApplicationInfo>, SmartCardError>> GetStatusAsync(
-        StatusSubset subset = StatusSubset.IssuerSecurityDomain, 
-        CancellationToken cancellationToken = default)
+        GetStatusCommand.StatusSubset subset = GetStatusCommand.StatusSubset.IssuerSecurityDomain,
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<ImmutableList<ApplicationInfo>, SmartCardError>(
-            SmartCardError.CommunicationError("Test failure")));
+        return Task.FromResult(
+            Result.Failure<ImmutableList<ApplicationInfo>, SmartCardError>(
+                SmartCardError.CommunicationError("Test failure")
+            )
+        );
     }
 
-    public Task<Result<InstallationResult, SmartCardError>> InstallCapFileAsync(
-        byte[] capFileData, 
-        Maybe<InstallOptions> options = default, 
-        CancellationToken cancellationToken = default)
+    public Task<Result<Results.InstallationResult, SmartCardError>> InstallCapFileAsync(
+        byte[] capFileData,
+        Maybe<InstallOptions> options = default,
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<InstallationResult, SmartCardError>(
-            SmartCardError.CommunicationError("Test failure")));
+        return Task.FromResult(
+            Result.Failure<InstallationResult, SmartCardError>(
+                SmartCardError.CommunicationError("Test failure")
+            )
+        );
     }
 
     public Task<Result<bool, SmartCardError>> DeleteApplicationAsync(
-        byte[] aid, 
-        bool deleteRelated = false, 
-        CancellationToken cancellationToken = default)
+        byte[] aid,
+        bool deleteRelated = false,
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<bool, SmartCardError>(
-            SmartCardError.CommunicationError("Test failure")));
+        return Task.FromResult(
+            Result.Failure<bool, SmartCardError>(SmartCardError.CommunicationError("Test failure"))
+        );
     }
 
     public Task<Result<bool, SmartCardError>> PutKeysAsync(
-        KeySet keySet, 
-        byte keyVersion, 
-        CancellationToken cancellationToken = default)
+        KeySet keySet,
+        byte keyVersion,
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<bool, SmartCardError>(
-            SmartCardError.CommunicationError("Test failure")));
+        return Task.FromResult(
+            Result.Failure<bool, SmartCardError>(SmartCardError.CommunicationError("Test failure"))
+        );
     }
 
-    public Task<Result<CplcData, SmartCardError>> GetCplcAsync(CancellationToken cancellationToken = default)
+    public Task<Result<CplcData, SmartCardError>> GetCplcAsync(
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<CplcData, SmartCardError>(
-            SmartCardError.CommunicationError("Test failure")));
+        return Task.FromResult(
+            Result.Failure<CplcData, SmartCardError>(
+                SmartCardError.CommunicationError("Test failure")
+            )
+        );
     }
 
     public Task<Result<byte[], SmartCardError>> GetDataAsync(
-        ushort tag, 
-        CancellationToken cancellationToken = default)
+        ushort tag,
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<byte[], SmartCardError>(
-            SmartCardError.CommunicationError("Test failure")));
+        return Task.FromResult(
+            Result.Failure<byte[], SmartCardError>(
+                SmartCardError.CommunicationError("Test failure")
+            )
+        );
     }
 
     public Task<Result<bool, SmartCardError>> SetLifecycleStateAsync(
-        byte[] aid, 
-        LifecycleState state, 
-        CancellationToken cancellationToken = default)
+        byte[] aid,
+        LifecycleState state,
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<bool, SmartCardError>(
-            SmartCardError.CommunicationError("Test failure")));
+        return Task.FromResult(
+            Result.Failure<bool, SmartCardError>(SmartCardError.CommunicationError("Test failure"))
+        );
     }
 }
 
@@ -233,9 +288,10 @@ public static class TestCommandContext
     public static CommandContext Create()
     {
         return new CommandContext(
-            ImmutableArray<string>.Empty, 
-            "test", 
-            null, 
-            CancellationToken.None);
+            ImmutableArray<string>.Empty,
+            "test",
+            null,
+            CancellationToken.None
+        );
     }
 }

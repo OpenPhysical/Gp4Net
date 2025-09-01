@@ -13,9 +13,7 @@ public static class ResultExtensions
     /// <summary>
     /// Enables LINQ Select for Result monad (functor map).
     /// </summary>
-    public static Result<T2, E> Select<T1, T2, E>(
-        this Result<T1, E> result,
-        Func<T1, T2> selector)
+    public static Result<T2, E> Select<T1, T2, E>(this Result<T1, E> result, Func<T1, T2> selector)
     {
         return result.Map(selector);
     }
@@ -25,7 +23,8 @@ public static class ResultExtensions
     /// </summary>
     public static Result<T2, E> SelectMany<T1, T2, E>(
         this Result<T1, E> result,
-        Func<T1, Result<T2, E>> bind)
+        Func<T1, Result<T2, E>> bind
+    )
     {
         return result.Bind(bind);
     }
@@ -37,7 +36,8 @@ public static class ResultExtensions
     public static Result<T3, E> SelectMany<T1, T2, T3, E>(
         this Result<T1, E> result,
         Func<T1, Result<T2, E>> bind,
-        Func<T1, T2, T3> project)
+        Func<T1, T2, T3> project
+    )
     {
         return result.Bind(t1 => bind(t1).Map(t2 => project(t1, t2)));
     }
@@ -47,7 +47,8 @@ public static class ResultExtensions
     /// </summary>
     public static async Task<Result<T2, E>> Select<T1, T2, E>(
         this Task<Result<T1, E>> resultTask,
-        Func<T1, T2> selector)
+        Func<T1, T2> selector
+    )
     {
         Result<T1, E> result = await resultTask;
         return result.Map(selector);
@@ -58,12 +59,11 @@ public static class ResultExtensions
     /// </summary>
     public static async Task<Result<T2, E>> SelectMany<T1, T2, E>(
         this Task<Result<T1, E>> resultTask,
-        Func<T1, Task<Result<T2, E>>> bind)
+        Func<T1, Task<Result<T2, E>>> bind
+    )
     {
         Result<T1, E> result = await resultTask;
-        return result.IsSuccess
-            ? await bind(result.Value)
-            : Result.Failure<T2, E>(result.Error);
+        return result.IsSuccess ? await bind(result.Value) : Result.Failure<T2, E>(result.Error);
     }
 
     /// <summary>
@@ -72,7 +72,8 @@ public static class ResultExtensions
     public static async Task<Result<T3, E>> SelectMany<T1, T2, T3, E>(
         this Task<Result<T1, E>> resultTask,
         Func<T1, Task<Result<T2, E>>> bind,
-        Func<T1, T2, T3> project)
+        Func<T1, T2, T3> project
+    )
     {
         Result<T1, E> result = await resultTask;
         if (result.IsFailure)
@@ -89,7 +90,8 @@ public static class ResultExtensions
     /// </summary>
     public static async Task<Result<T, E>> TryAsync<T, E>(
         Func<Task<T>> operation,
-        Func<Exception, E> onError)
+        Func<Exception, E> onError
+    )
     {
         try
         {
@@ -105,9 +107,7 @@ public static class ResultExtensions
     /// <summary>
     /// Synchronous version of Try for operations that might throw.
     /// </summary>
-    public static Result<T, E> Try<T, E>(
-        Func<T> operation,
-        Func<Exception, E> onError)
+    public static Result<T, E> Try<T, E>(Func<T> operation, Func<Exception, E> onError)
     {
         try
         {
@@ -126,7 +126,8 @@ public static class ResultExtensions
     /// </summary>
     public static Result<(T1, T2), E> Combine<T1, T2, E>(
         this Result<T1, E> result1,
-        Result<T2, E> result2)
+        Result<T2, E> result2
+    )
     {
         return result1.Bind(t1 => result2.Map(t2 => (t1, t2)));
     }
@@ -138,24 +139,18 @@ public static class ResultExtensions
     public static Result<(T1, T2, T3), E> Combine<T1, T2, T3, E>(
         this Result<T1, E> result1,
         Result<T2, E> result2,
-        Result<T3, E> result3)
+        Result<T3, E> result3
+    )
     {
-        return result1.Bind(t1 =>
-            result2.Bind(t2 =>
-                result3.Map(t3 => (t1, t2, t3))));
+        return result1.Bind(t1 => result2.Bind(t2 => result3.Map(t3 => (t1, t2, t3))));
     }
-
 
     /// <summary>
     /// Converts Maybe&lt;T&gt; to Result&lt;T, E&gt; with specified error for None case.
     /// </summary>
-    public static Result<T, E> ToResult<T, E>(
-        this Maybe<T> maybe,
-        E error)
+    public static Result<T, E> ToResult<T, E>(this Maybe<T> maybe, E error)
     {
-        return maybe.HasValue
-            ? Result.Success<T, E>(maybe.Value)
-            : Result.Failure<T, E>(error);
+        return maybe.HasValue ? Result.Success<T, E>(maybe.Value) : Result.Failure<T, E>(error);
     }
 
     /// <summary>
@@ -163,9 +158,7 @@ public static class ResultExtensions
     /// </summary>
     public static Maybe<T> ToMaybe<T, E>(this Result<T, E> result)
     {
-        return result.IsSuccess
-            ? Maybe<T>.From(result.Value)
-            : Maybe<T>.None;
+        return result.IsSuccess ? Maybe<T>.From(result.Value) : Maybe<T>.None;
     }
 
     /// <summary>
@@ -173,9 +166,7 @@ public static class ResultExtensions
     /// </summary>
     public static UnitResult<E> ToUnitResult<T, E>(this Result<T, E> result)
     {
-        return result.IsSuccess
-            ? UnitResult.Success<E>()
-            : UnitResult.Failure<E>(result.Error);
+        return result.IsSuccess ? UnitResult.Success<E>() : UnitResult.Failure(result.Error);
     }
 
     /// <summary>
@@ -201,13 +192,9 @@ public static class ResultExtensions
     /// <summary>
     /// Enables binding operations on UnitResult.
     /// </summary>
-    public static UnitResult<E> Bind<E>(
-        this UnitResult<E> unitResult,
-        Func<UnitResult<E>> bind)
+    public static UnitResult<E> Bind<E>(this UnitResult<E> unitResult, Func<UnitResult<E>> bind)
     {
-        return unitResult.IsSuccess
-            ? bind()
-            : unitResult;
+        return unitResult.IsSuccess ? bind() : unitResult;
     }
 
     /// <summary>
@@ -216,25 +203,21 @@ public static class ResultExtensions
     /// </summary>
     public static UnitResult<E> Bind<E>(
         this UnitResult<E> unitResult,
-        Func<object, UnitResult<E>> bind)
+        Func<object, UnitResult<E>> bind
+    )
     {
-        return unitResult.IsSuccess
-            ? bind(new object())
-            : unitResult;
+        return unitResult.IsSuccess ? bind(new object()) : unitResult;
     }
-
-
 
     /// <summary>
     /// Enables async binding operations on UnitResult.
     /// </summary>
     public static async Task<UnitResult<E>> Bind<E>(
         this UnitResult<E> unitResult,
-        Func<Task<UnitResult<E>>> bind)
+        Func<Task<UnitResult<E>>> bind
+    )
     {
-        return unitResult.IsSuccess
-            ? await bind()
-            : unitResult;
+        return unitResult.IsSuccess ? await bind() : unitResult;
     }
 
     /// <summary>
@@ -242,12 +225,10 @@ public static class ResultExtensions
     /// </summary>
     public static async Task<UnitResult<E>> Bind<T, E>(
         this Task<Result<T, E>> resultTask,
-        Func<T, Task<UnitResult<E>>> bind)
+        Func<T, Task<UnitResult<E>>> bind
+    )
     {
         Result<T, E> result = await resultTask;
-        return result.IsSuccess
-            ? await bind(result.Value)
-            : UnitResult.Failure<E>(result.Error);
+        return result.IsSuccess ? await bind(result.Value) : UnitResult.Failure(result.Error);
     }
-
 }

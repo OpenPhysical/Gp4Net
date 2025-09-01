@@ -1,12 +1,9 @@
 using System;
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using Gp4Net.CardEmulator.Core;
+using Gp4Net.Core;
+using Gp4Net.Cryptography;
 using JetBrains.Annotations;
-using Org.BouncyCastle.Crypto.Engines;
-using Org.BouncyCastle.Crypto.Modes;
-using Org.BouncyCastle.Crypto.Parameters;
-using Org.BouncyCastle.Security;
 
 namespace Gp4Net.CardEmulator.Persistence;
 
@@ -29,9 +26,10 @@ public class AeadEncryptionService : IDisposable
     /// <param name="cardUuid">Card UUID used as AAD for identity binding.</param>
     /// <returns>Encrypted payload with IV, ciphertext, and authentication tag.</returns>
     public Result<EncryptedPayload, SmartCardError> Encrypt(
-        byte[] key, 
-        byte[] plaintext, 
-        CardUuid cardUuid)
+        byte[] key,
+        byte[] plaintext,
+        CardUuid cardUuid
+    )
     {
         return EnsureNotDisposed()
             .Bind(_ => ValidateEncryptionInputs(key, plaintext, cardUuid))
@@ -49,7 +47,8 @@ public class AeadEncryptionService : IDisposable
     public Result<byte[], SmartCardError> Decrypt(
         byte[] key,
         EncryptedPayload encryptedPayload,
-        CardUuid cardUuid)
+        CardUuid cardUuid
+    )
     {
         return EnsureNotDisposed()
             .Bind(_ => ValidateDecryptionInputs(key, encryptedPayload, cardUuid))
@@ -60,14 +59,16 @@ public class AeadEncryptionService : IDisposable
     {
         return _disposed
             ? Result.Failure<bool, SmartCardError>(
-                SmartCardError.CommunicationError("AEAD service has been disposed"))
+                SmartCardError.CommunicationError("AEAD service has been disposed")
+            )
             : Result.Success<bool, SmartCardError>(true);
     }
 
     private static Result<bool, SmartCardError> ValidateEncryptionInputs(
-        byte[] key, 
-        byte[] plaintext, 
-        CardUuid cardUuid)
+        byte[] key,
+        byte[] plaintext,
+        CardUuid cardUuid
+    )
     {
         return ValidateKey(key)
             .Bind(_ => ValidatePlaintext(plaintext))
@@ -77,7 +78,8 @@ public class AeadEncryptionService : IDisposable
     private static Result<bool, SmartCardError> ValidateDecryptionInputs(
         byte[] key,
         EncryptedPayload encryptedPayload,
-        CardUuid cardUuid)
+        CardUuid cardUuid
+    )
     {
         return ValidateKey(key)
             .Bind(_ => ValidateEncryptedPayload(encryptedPayload))
@@ -86,7 +88,8 @@ public class AeadEncryptionService : IDisposable
 
     private static Result<bool, SmartCardError> ValidateKey(byte[] key)
     {
-        return Maybe<byte[]>.From(key)
+        return Maybe<byte[]>
+            .From(key)
             .Where(k => k.Length == 32)
             .ToResult(SmartCardError.InvalidArgument("Encryption key must be 32 bytes (AES-256)"))
             .Map(_ => true);
@@ -94,14 +97,18 @@ public class AeadEncryptionService : IDisposable
 
     private static Result<bool, SmartCardError> ValidatePlaintext(byte[] plaintext)
     {
-        return Maybe<byte[]>.From(plaintext)
+        return Maybe<byte[]>
+            .From(plaintext)
             .ToResult(SmartCardError.InvalidArgument("Plaintext cannot be null"))
             .Map(_ => true);
     }
 
-    private static Result<bool, SmartCardError> ValidateEncryptedPayload(EncryptedPayload encryptedPayload)
+    private static Result<bool, SmartCardError> ValidateEncryptedPayload(
+        EncryptedPayload encryptedPayload
+    )
     {
-        return Maybe<EncryptedPayload>.From(encryptedPayload)
+        return Maybe<EncryptedPayload>
+            .From(encryptedPayload)
             .Where(payload => payload.IsValid)
             .ToResult(SmartCardError.InvalidArgument("Invalid encrypted payload structure"))
             .Map(_ => true);
@@ -111,14 +118,16 @@ public class AeadEncryptionService : IDisposable
     {
         return cardUuid.IsEmpty
             ? Result.Failure<bool, SmartCardError>(
-                SmartCardError.InvalidArgument("Card UUID cannot be empty"))
+                SmartCardError.InvalidArgument("Card UUID cannot be empty")
+            )
             : Result.Success<bool, SmartCardError>(true);
     }
 
     private static Result<EncryptedPayload, SmartCardError> ExecuteEncryption(
         byte[] key,
         byte[] plaintext,
-        CardUuid cardUuid)
+        CardUuid cardUuid
+    )
     {
         return ExecuteAesGcmEncryption(key, plaintext, cardUuid);
     }
@@ -126,69 +135,57 @@ public class AeadEncryptionService : IDisposable
     private static Result<EncryptedPayload, SmartCardError> ExecuteAesGcmEncryption(
         byte[] key,
         byte[] plaintext,
-        CardUuid cardUuid)
+        CardUuid cardUuid
+    )
     {
-        return GenerateSecureIv()
-            .Bind(iv => PerformBouncyCastleEncryption(key, plaintext, cardUuid, iv));
+        return CryptoService.Utils.GenerateRandomBytes(12) // 96-bit IV for GCM
+            .Bind(iv => PerformUnifiedCryptoEncryption(key, plaintext, cardUuid, iv));
     }
 
-    private static Result<byte[], SmartCardError> GenerateSecureIv()
-    {
-        return Result.Try(() =>
-        {
-            SecureRandom secureRandom = new SecureRandom();
-            byte[] iv = new byte[12]; // 96-bit IV for GCM
-            secureRandom.NextBytes(iv);
-            return iv;
-        }, ex => SmartCardError.CryptographicError($"Failed to generate secure IV: {ex.Message}"));
-    }
-
-    private static Result<EncryptedPayload, SmartCardError> PerformBouncyCastleEncryption(
+    private static Result<EncryptedPayload, SmartCardError> PerformUnifiedCryptoEncryption(
         byte[] key,
         byte[] plaintext,
         CardUuid cardUuid,
-        byte[] iv)
+        byte[] iv
+    )
     {
-        return Result.Try(() =>
-        {
-            // Initialize AES-GCM cipher with BouncyCastle
-            AesEngine aesEngine = new AesEngine();
-            GcmBlockCipher gcmCipher = new GcmBlockCipher(aesEngine);
-            
-            byte[] aad = cardUuid.ToByteArray();
-            AeadParameters aeadParameters = new AeadParameters(
-                new KeyParameter(key),
-                128, // 16-byte authentication tag in bits
-                iv,
-                aad);
-            
-            gcmCipher.Init(true, aeadParameters); // true for encryption
-            
-            // Encrypt plaintext and generate authentication tag
-            byte[] ciphertextWithTag = new byte[gcmCipher.GetOutputSize(plaintext.Length)];
-            int outputLen = gcmCipher.ProcessBytes(plaintext, 0, plaintext.Length, ciphertextWithTag, 0);
-            outputLen += gcmCipher.DoFinal(ciphertextWithTag, outputLen);
-            
-            // Split ciphertext and authentication tag
-            byte[] ciphertext = new byte[plaintext.Length];
-            byte[] authTag = new byte[16]; // 128-bit tag = 16 bytes
-            
-            Array.Copy(ciphertextWithTag, 0, ciphertext, 0, plaintext.Length);
-            Array.Copy(ciphertextWithTag, plaintext.Length, authTag, 0, 16);
-            
-            return new EncryptedPayload(
-                Algorithm: "aes-256-gcm",
-                IV: iv,
-                Ciphertext: ciphertext,
-                AuthTag: authTag
-            );
-        }, ex => SmartCardError.CryptographicError($"AES-GCM encryption failed: {ex.Message}"));
+        byte[] aad = cardUuid.ToByteArray();
+        return CryptoService.Aead.EncryptAesGcm(key, iv, plaintext, aad, 128)
+            .Bind(ciphertextWithTag => ExtractCiphertextAndTag(ciphertextWithTag, plaintext.Length, iv));
+    }
+
+    private static Result<EncryptedPayload, SmartCardError> ExtractCiphertextAndTag(
+        byte[] ciphertextWithTag,
+        int plaintextLength,
+        byte[] iv
+    )
+    {
+        return Result.Try(
+            () =>
+            {
+                // Split ciphertext and authentication tag (last 16 bytes)
+                byte[] ciphertext = new byte[plaintextLength];
+                byte[] authTag = new byte[16]; // 128-bit tag = 16 bytes
+
+                Array.Copy(ciphertextWithTag, 0, ciphertext, 0, plaintextLength);
+                Array.Copy(ciphertextWithTag, plaintextLength, authTag, 0, 16);
+
+                return new EncryptedPayload(
+                    Algorithm: "aes-256-gcm",
+                    IV: iv,
+                    Ciphertext: ciphertext,
+                    AuthTag: authTag
+                );
+            },
+            ex => SmartCardError.CryptographicError($"Failed to extract ciphertext and tag: {ex.Message}")
+        );
     }
 
     private static Result<byte[], SmartCardError> ExecuteDecryption(
         byte[] key,
         EncryptedPayload encryptedPayload,
-        CardUuid cardUuid)
+        CardUuid cardUuid
+    )
     {
         return ExecuteAesGcmDecryption(key, encryptedPayload, cardUuid);
     }
@@ -196,41 +193,52 @@ public class AeadEncryptionService : IDisposable
     private static Result<byte[], SmartCardError> ExecuteAesGcmDecryption(
         byte[] key,
         EncryptedPayload encryptedPayload,
-        CardUuid cardUuid)
+        CardUuid cardUuid
+    )
     {
-        return Result.Try(() =>
-        {
-            // Initialize AES-GCM cipher with BouncyCastle
-            AesEngine aesEngine = new AesEngine();
-            GcmBlockCipher gcmCipher = new GcmBlockCipher(aesEngine);
-            
-            byte[] aad = cardUuid.ToByteArray();
-            AeadParameters aeadParameters = new AeadParameters(
-                new KeyParameter(key),
-                128, // 16-byte authentication tag in bits
-                encryptedPayload.IV,
-                aad);
-            
-            gcmCipher.Init(false, aeadParameters); // false for decryption
-            
-            // Combine ciphertext and authentication tag for decryption
-            byte[] ciphertextWithTag = new byte[encryptedPayload.Ciphertext.Length + encryptedPayload.AuthTag.Length];
-            Array.Copy(encryptedPayload.Ciphertext, 0, ciphertextWithTag, 0, encryptedPayload.Ciphertext.Length);
-            Array.Copy(encryptedPayload.AuthTag, 0, ciphertextWithTag, encryptedPayload.Ciphertext.Length, encryptedPayload.AuthTag.Length);
-            
-            // Decrypt and verify authentication tag
-            byte[] plaintext = new byte[gcmCipher.GetOutputSize(ciphertextWithTag.Length)];
-            int outputLen = gcmCipher.ProcessBytes(ciphertextWithTag, 0, ciphertextWithTag.Length, plaintext, 0);
-            outputLen += gcmCipher.DoFinal(plaintext, outputLen);
-            
-            // Trim plaintext to actual size (remove padding)
-            byte[] result = new byte[encryptedPayload.Ciphertext.Length];
-            Array.Copy(plaintext, 0, result, 0, encryptedPayload.Ciphertext.Length);
-            
-            return result;
-        }, ex => ex.Message.Contains("mac check failed") || ex.Message.Contains("authentication")
-            ? SmartCardError.IntegrityError($"AEAD authentication failed: {ex.Message}")
-            : SmartCardError.CryptographicError($"AES-GCM decryption failed: {ex.Message}"));
+        return CombineCiphertextAndTag(encryptedPayload)
+            .Bind(ciphertextWithTag =>
+            {
+                byte[] aad = cardUuid.ToByteArray();
+                return CryptoService.Aead.DecryptAesGcm(
+                    key, 
+                    encryptedPayload.IV, 
+                    ciphertextWithTag, 
+                    aad, 
+                    128
+                );
+            });
+    }
+
+    private static Result<byte[], SmartCardError> CombineCiphertextAndTag(
+        EncryptedPayload encryptedPayload
+    )
+    {
+        return Result.Try(
+            () =>
+            {
+                // Combine ciphertext and authentication tag for decryption
+                byte[] ciphertextWithTag = new byte[
+                    encryptedPayload.Ciphertext.Length + encryptedPayload.AuthTag.Length
+                ];
+                Array.Copy(
+                    encryptedPayload.Ciphertext,
+                    0,
+                    ciphertextWithTag,
+                    0,
+                    encryptedPayload.Ciphertext.Length
+                );
+                Array.Copy(
+                    encryptedPayload.AuthTag,
+                    0,
+                    ciphertextWithTag,
+                    encryptedPayload.Ciphertext.Length,
+                    encryptedPayload.AuthTag.Length
+                );
+                return ciphertextWithTag;
+            },
+            ex => SmartCardError.CryptographicError($"Failed to combine ciphertext and tag: {ex.Message}")
+        );
     }
 
     /// <summary>

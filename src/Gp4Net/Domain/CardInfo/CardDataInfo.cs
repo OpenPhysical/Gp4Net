@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Core.Tlv;
+using Gp4Net.Services;
+using static Gp4Net.Services.TlvService;
 using Org.BouncyCastle.Asn1;
 
 namespace Gp4Net.Domain.CardInfo;
@@ -35,16 +37,17 @@ public record CardDataInfo(
     /// <summary>
     /// Creates an empty CardDataInfo for cases where no card data is available.
     /// </summary>
-    public static CardDataInfo Empty => new(
-        [],
-        new Dictionary<ushort, byte[]>(),
-        Maybe<Version>.None,
-        Maybe<byte[]>.None,
-        Maybe<byte[]>.None,
-        Maybe<byte[]>.None,
-        [],
-        Maybe<string>.None
-    );
+    public static CardDataInfo Empty =>
+        new(
+            [],
+            new Dictionary<ushort, byte[]>(),
+            Maybe<Version>.None,
+            Maybe<byte[]>.None,
+            Maybe<byte[]>.None,
+            Maybe<byte[]>.None,
+            [],
+            Maybe<string>.None
+        );
 
     /// <summary>
     /// Indicates whether this card data contains any meaningful information.
@@ -71,24 +74,33 @@ public record CardDataInfo(
     /// </summary>
     private static Result<CardDataInfo, SmartCardError> ParseCardDataElements(byte[] data)
     {
-        return Result.Try(() =>
-        {
-            IReadOnlyDictionary<ushort, byte[]> tags = ParseTlvTags(data);
-            IReadOnlyList<string> oids = ExtractOids(data);
-            Maybe<string> gpVersionFromOid = ExtractGpVersionFromOids(oids);
-            Maybe<Version> gpVersion = ExtractGpVersionFromTags(tags);
+        return Result.Try(
+            () =>
+            {
+                IReadOnlyDictionary<ushort, byte[]> tags = ParseTlvTags(data);
+                IReadOnlyList<string> oids = ExtractOids(data);
+                Maybe<string> gpVersionFromOid = ExtractGpVersionFromOids(oids);
+                Maybe<Version> gpVersion = ExtractGpVersionFromTags(tags);
 
-            return new CardDataInfo(
-                data,
-                tags,
-                gpVersion,
-                tags.TryGetValue(0x64, out byte[] scpInfo) ? Maybe<byte[]>.From(scpInfo) : Maybe<byte[]>.None,
-                tags.TryGetValue(0x65, out byte[] configDetails) ? Maybe<byte[]>.From(configDetails) : Maybe<byte[]>.None,
-                tags.TryGetValue(0x66, out byte[] chipDetails) ? Maybe<byte[]>.From(chipDetails) : Maybe<byte[]>.None,
-                oids,
-                gpVersionFromOid
-            );
-        }, ex => SmartCardError.InvalidData($"Failed to parse card data: {ex.Message}"));
+                return new CardDataInfo(
+                    data,
+                    tags,
+                    gpVersion,
+                    tags.TryGetValue(0x64, out byte[] scpInfo)
+                        ? Maybe<byte[]>.From(scpInfo)
+                        : Maybe<byte[]>.None,
+                    tags.TryGetValue(0x65, out byte[] configDetails)
+                        ? Maybe<byte[]>.From(configDetails)
+                        : Maybe<byte[]>.None,
+                    tags.TryGetValue(0x66, out byte[] chipDetails)
+                        ? Maybe<byte[]>.From(chipDetails)
+                        : Maybe<byte[]>.None,
+                    oids,
+                    gpVersionFromOid
+                );
+            },
+            ex => SmartCardError.InvalidData($"Failed to parse card data: {ex.Message}")
+        );
     }
 
     /// <summary>
@@ -97,18 +109,18 @@ public record CardDataInfo(
     /// </summary>
     private static IReadOnlyDictionary<ushort, byte[]> ParseTlvTags(byte[] data)
     {
-        Dictionary<ushort, byte[]> tags = new Dictionary<ushort, byte[]>();
-
-        foreach (TlvObject element in TlvParser.ParseAll(data))
-        {
-            Result<uint, SmartCardError> tagNumber = element.GetTagNumber();
-            if (tagNumber.IsSuccess)
-            {
-                tags[(ushort)tagNumber.Value] = element.Value;
-            }
-        }
-
-        return tags;
+        return TlvParser.ParseMultiple(data.ToImmutableArray())
+            .Match(
+                onSuccess: parseResult => parseResult.Objects
+                    .Select(element => element.Tag.ToNumber()
+                        .Match(
+                            onSuccess: tagNumber => new { HasTag = true, Tag = (ushort)tagNumber, Data = element.TlvData.Bytes.ToArray() },
+                            onFailure: _ => new { HasTag = false, Tag = (ushort)0, Data = Array.Empty<byte>() }
+                        ))
+                    .Where(x => x.HasTag)
+                    .ToDictionary(x => x.Tag, x => x.Data),
+                onFailure: _ => new Dictionary<ushort, byte[]>()
+            );
     }
 
     /// <summary>
@@ -117,37 +129,31 @@ public record CardDataInfo(
     /// </summary>
     private static IReadOnlyList<string> ExtractOids(byte[] data)
     {
-        List<string> oids = [];
-        ExtractOidsRecursive(data, oids);
-        return oids;
+        return ExtractOidsRecursive(data).Distinct().ToImmutableList();
     }
 
     /// <summary>
     /// Recursively extracts OIDs from TLV structures.
     /// </summary>
-    private static void ExtractOidsRecursive(byte[] data, List<string> oids)
+    private static IEnumerable<string> ExtractOidsRecursive(byte[] data)
     {
-        foreach (TlvObject element in TlvParser.ParseAll(data))
-        {
-            Result<uint, SmartCardError> tagNumber = element.GetTagNumber();
-            if (tagNumber.IsSuccess && tagNumber.Value == 0x06)
-            {
-                // Parse OID using BouncyCastle ASN.1 parser
-                ParseOid(element.Value).Match(
-                    Some: oid => { if (!oids.Contains(oid)) oids.Add(oid); },
-                    None: () => { /* Skip invalid OIDs */ }
-                );
-            }
-            else if (element.Value.Length >= 2)
-            {
-                // Recursively parse nested structures
-                List<TlvObject> nestedElements = TlvParser.ParseAll(element.Value).ToList();
-                if (nestedElements.Any())
-                {
-                    ExtractOidsRecursive(element.Value, oids);
-                }
-            }
-        }
+        return TlvParser.ParseMultiple(data.ToImmutableArray())
+            .Match(
+                onSuccess: parseResult => parseResult.Objects.SelectMany(element => 
+                    element.Tag.ToNumber().Match(
+                        onSuccess: tagNumber => tagNumber == 0x06
+                            ? ParseOid(element.TlvData.Bytes.ToArray())
+                                .Match(
+                                    Some: oid => new[] { oid },
+                                    None: () => Enumerable.Empty<string>()
+                                )
+                            : element.TlvData.Bytes.Length >= 2
+                                ? ExtractOidsRecursive(element.TlvData.Bytes.ToArray())
+                                : Enumerable.Empty<string>(),
+                        onFailure: _ => Enumerable.Empty<string>()
+                    )),
+                onFailure: _ => Enumerable.Empty<string>()
+            );
     }
 
     /// <summary>
@@ -164,7 +170,9 @@ public record CardDataInfo(
             Buffer.BlockCopy(oidBytes, 0, derBytes, 2, oidBytes.Length);
 
             Asn1Object asn1Object = Asn1Object.FromByteArray(derBytes);
-            return asn1Object is DerObjectIdentifier oidObj ? Maybe<string>.From(oidObj.Id) : Maybe<string>.None;
+            return asn1Object is DerObjectIdentifier oidObj
+                ? Maybe<string>.From(oidObj.Id)
+                : Maybe<string>.None;
         }
         catch
         {
@@ -178,8 +186,9 @@ public record CardDataInfo(
     /// </summary>
     private static Maybe<string> ExtractGpVersionFromOids(IReadOnlyList<string> oids)
     {
-        string result = oids
-            .Where(oid => oid.StartsWith("1.2.840.114283.2.") && oid != "1.2.840.114283.2")
+        string result = oids.Where(oid =>
+                oid.StartsWith("1.2.840.114283.2.") && oid != "1.2.840.114283.2"
+            )
             .Select(oid => oid.Split('.'))
             .Where(parts => parts.Length >= 7)
             .Select(parts => string.Join(".", parts.Skip(4)))
@@ -204,17 +213,20 @@ public record CardDataInfo(
     /// </summary>
     private static Maybe<Version> ParseGlobalPlatformVersion(byte[] data)
     {
-        if (data.Length == 0) return Maybe<Version>.None;
+        if (data.Length == 0)
+            return Maybe<Version>.None;
 
         try
         {
             // Parse as BCD (Binary Coded Decimal) format
             return data.Length switch
             {
-                >= 3 => Maybe<Version>.From(new Version(BcdToByte(data[0]), BcdToByte(data[1]), BcdToByte(data[2]))),
+                >= 3 => Maybe<Version>.From(
+                    new Version(BcdToByte(data[0]), BcdToByte(data[1]), BcdToByte(data[2]))
+                ),
                 2 => Maybe<Version>.From(new Version(BcdToByte(data[0]), BcdToByte(data[1]))),
                 1 => Maybe<Version>.From(new Version(BcdToByte(data[0]), 0)),
-                _ => Maybe<Version>.None
+                _ => Maybe<Version>.None,
             };
         }
         catch
@@ -227,7 +239,7 @@ public record CardDataInfo(
                     >= 3 => Maybe<Version>.From(new Version(data[0], data[1], data[2])),
                     2 => Maybe<Version>.From(new Version(data[0], data[1])),
                     1 => Maybe<Version>.From(new Version(data[0], 0)),
-                    _ => Maybe<Version>.None
+                    _ => Maybe<Version>.None,
                 };
             }
             catch
@@ -243,7 +255,7 @@ public record CardDataInfo(
     /// </summary>
     private static int BcdToByte(byte bcd)
     {
-        return ((bcd >> 4) * 10) + (bcd & 0x0F);
+        return (bcd >> 4) * 10 + (bcd & 0x0F);
     }
 
     /// <summary>
@@ -254,12 +266,12 @@ public record CardDataInfo(
         List<string> parts =
         [
             $"Data = {(Data.Length > 0 ? $"System.Byte[{Data.Length}]" : "System.Byte[]")}",
-            $"Tags = System.Collections.Generic.Dictionary`2[System.UInt16,System.Byte[]]",
+            "Tags = System.Collections.Generic.Dictionary`2[System.UInt16,System.Byte[]]",
             $"GlobalPlatformVersion = {(GlobalPlatformVersion.HasValue ? GlobalPlatformVersion.Value.ToString() : "No value")}",
             $"SecureChannelProtocolInfo = {(SecureChannelProtocolInfo.HasValue ? "System.Byte[]" : "No value")}",
             $"CardConfigurationDetails = {(CardConfigurationDetails.HasValue ? "System.Byte[]" : "No value")}",
             $"CardChipDetails = {(CardChipDetails.HasValue ? "System.Byte[]" : "No value")}",
-            $"Oids = System.Collections.Generic.List`1[System.String]"
+            "Oids = System.Collections.Generic.List`1[System.String]",
         ];
 
         if (GlobalPlatformVersionFromOid.HasValue)
@@ -321,19 +333,22 @@ public record CardDataInfo(
         return oid switch
         {
             // GlobalPlatform OIDs per GP Card Specification v2.3.1 Section H.1
-            "1.2.840.114283.1" => "Card Recognition Data, also identifies GlobalPlatform as the Tag Allocation Authority",
+            "1.2.840.114283.1" =>
+                "Card Recognition Data, also identifies GlobalPlatform as the Tag Allocation Authority",
             "1.2.840.114283.2" => "Card Management Type and Version",
-            "1.2.840.114283.3" => "Card Identification Scheme - card uniquely identified by IIN and CIN",
+            "1.2.840.114283.3" =>
+                "Card Identification Scheme - card uniquely identified by IIN and CIN",
 
             // JavaCard OIDs (Oracle/Sun Microsystems enterprise OID space)
             "1.3.6.1.4.1.42.2.110.1.3" => "JavaCard Runtime Environment version 3.x",
 
             // Pattern matching for versioned OIDs
             _ when oid.StartsWith("1.2.840.114283.2.") => "Card Management Type and Version",
-            _ when oid.StartsWith("1.2.840.114283.4.") => "Secure Channel Protocol of Security Domain and implementation options",
+            _ when oid.StartsWith("1.2.840.114283.4.") =>
+                "Secure Channel Protocol of Security Domain and implementation options",
             _ when oid.StartsWith("1.3.6.1.4.1.42.2.110.") => "JavaCard Runtime Environment",
 
-            _ => "Unknown OID"
+            _ => "Unknown OID",
         };
     }
 }

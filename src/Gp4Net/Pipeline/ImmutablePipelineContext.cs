@@ -17,9 +17,8 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     /// <summary>
     /// Initializes a new instance of ImmutablePipelineContext.
     /// </summary>
-    public ImmutablePipelineContext() : this(ImmutableDictionary<string, object>.Empty)
-    {
-    }
+    public ImmutablePipelineContext()
+        : this(ImmutableDictionary<string, object>.Empty) { }
 
     /// <summary>
     /// Initializes a new instance of ImmutablePipelineContext with initial values.
@@ -48,18 +47,13 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     /// <inheritdoc/>
     public IPipelineContext Without(string key)
     {
-        return _values.ContainsKey(key)
-            ? new ImmutablePipelineContext(_values.Remove(key))
-            : this;
+        return _values.ContainsKey(key) ? new ImmutablePipelineContext(_values.Remove(key)) : this;
     }
 
     /// <inheritdoc/>
     public ImmutableArray<string> Keys
     {
-        get
-        {
-            return [.. _values.Keys];
-        }
+        get { return [.. _values.Keys]; }
     }
 
     /// <inheritdoc/>
@@ -90,10 +84,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     /// </summary>
     public static IPipelineContext Empty
     {
-        get
-        {
-            return new ImmutablePipelineContext();
-        }
+        get { return new ImmutablePipelineContext(); }
     }
 
     /// <summary>
@@ -114,14 +105,15 @@ public sealed class ImmutablePipelineContext : IPipelineContext
 
     public override string ToString()
     {
-        IEnumerable<string> items = _values.Select(kvp => $"{kvp.Key}: {kvp.Value?.GetType().Name ?? "null"}");
+        IEnumerable<string> items = _values.Select(kvp =>
+            $"{kvp.Key}: {kvp.Value?.GetType().Name ?? "null"}"
+        );
         return $"PipelineContext[{string.Join(", ", items)}]";
     }
 
     public override bool Equals(object obj)
     {
-        return obj is ImmutablePipelineContext other &&
-        _values.SequenceEqual(other._values);
+        return obj is ImmutablePipelineContext other && _values.SequenceEqual(other._values);
     }
 
     public override int GetHashCode()
@@ -136,19 +128,26 @@ public sealed class ImmutablePipelineContext : IPipelineContext
 public static class PipelineContextExtensions
 {
     /// <summary>
-    /// Gets a required value from the context using functional error handling.
+    /// Gets a required value from the context.
     /// </summary>
     /// <typeparam name="T">The type of value to retrieve.</typeparam>
     /// <param name="context">The pipeline context.</param>
     /// <param name="key">The key to look up.</param>
     /// <returns>A result containing the value or an error if not found.</returns>
-    public static Result<T, SmartCardError> GetRequired<T>(this IPipelineContext context, string key)
+    public static Result<T, SmartCardError> GetRequired<T>(
+        this IPipelineContext context,
+        string key
+    )
     {
-        return context.Get<T>(key).Match(
-            value => Result.Success<T, SmartCardError>(value),
-            () => Result.Failure<T, SmartCardError>(
-                SmartCardError.InvalidArgument($"Required context value '{key}' not found."))
-        );
+        return context
+            .Get<T>(key)
+            .Match(
+                value => Result.Success<T, SmartCardError>(value),
+                () =>
+                    Result.Failure<T, SmartCardError>(
+                        SmartCardError.InvalidArgument($"Required context value '{key}' not found.")
+                    )
+            );
     }
 
     /// <summary>
@@ -164,10 +163,7 @@ public static class PipelineContextExtensions
     /// </summary>
     public static T GetOrAdd<T>(this IPipelineContext context, string key, Func<T> factory)
     {
-        return context.Get<T>(key).Match(
-            value => value,
-            factory
-        );
+        return context.Get<T>(key).Match(value => value, factory);
     }
 
     /// <summary>
@@ -183,14 +179,10 @@ public static class PipelineContextExtensions
     /// </summary>
     public static IPipelineContext Merge(this IPipelineContext context, IPipelineContext other)
     {
-        IPipelineContext result = context;
-        foreach (string key in other.Keys)
-        {
-            context.Get<object>(key).Execute(value =>
-            {
-                result = result.With(key, value);
-            });
-        }
-        return result;
+        return other.Keys.Aggregate(
+            context,
+            (current, key) =>
+                other.Get<object>(key).Match(value => current.With(key, value), () => current)
+        );
     }
 }

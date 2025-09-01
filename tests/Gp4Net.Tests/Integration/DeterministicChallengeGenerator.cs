@@ -1,3 +1,5 @@
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Domain.Protocol;
 
 namespace Gp4Net.Tests.Integration;
@@ -23,5 +25,5 @@ public class DeterministicChallengeGenerator : IChallengeGenerator
     /// </summary>
     /// <param name="length">Requested challenge length (ignored).</param>
     /// <returns>The predetermined challenge bytes.</returns>
-    public byte[] GenerateChallenge(int length) => _challenge;
+    public Result<byte[], SmartCardError> GenerateChallenge(int length) => Result.Success<byte[], SmartCardError>(_challenge);
 }

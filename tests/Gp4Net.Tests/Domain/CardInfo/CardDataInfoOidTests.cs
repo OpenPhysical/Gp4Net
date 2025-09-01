@@ -1,8 +1,9 @@
-using Gp4Net.Domain.CardInfo;
-using NUnit.Framework;
+using System;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain.CardInfo;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.CardInfo;
 
@@ -93,7 +94,7 @@ public class CardDataInfoOidTests
             0x02,
             0x6E,
             0x01,
-            0x03 // OID: 1.3.6.1.4.1.42.2.110.1.3
+            0x03, // OID: 1.3.6.1.4.1.42.2.110.1.3
         ];
 
         // Act
@@ -126,14 +127,17 @@ public class CardDataInfoOidTests
             0x6B,
             0x02,
             0x02,
-            0x03 // 1.2.840.114283.2.2.3
+            0x03, // 1.2.840.114283.2.2.3
         ];
 
         // Act
         Result<CardDataInfo, SmartCardError> cardData = CardDataInfo.Parse(data);
 
         // Assert
-        _ = cardData.Value.GlobalPlatformVersionFromOid.GetValueOrDefault().Should().BeEquivalentTo("2.2.3");
+        _ = cardData
+            .Value.GlobalPlatformVersionFromOid.GetValueOrDefault()
+            .Should()
+            .BeEquivalentTo("2.2.3");
     }
 
     [Test]
@@ -156,7 +160,7 @@ public class CardDataInfoOidTests
             0x64,
             0x02,
             0x03,
-            0x70 // SCP info
+            0x70, // SCP info
         ];
 
         // Act
@@ -181,7 +185,7 @@ public class CardDataInfoOidTests
             0x73,
             0x02,
             0x02,
-            0x03 // Just GP version bytes - tag 73, length 2, value 02 03
+            0x03, // Just GP version bytes - tag 73, length 2, value 02 03
         ];
 
         // Act
@@ -191,7 +195,10 @@ public class CardDataInfoOidTests
         _ = cardData.Value.Oids.Should().BeEmpty();
         _ = cardData.Value.GlobalPlatformVersionFromOid.HasValue.Should().BeFalse();
         _ = cardData.Value.GlobalPlatformVersion.HasValue.Should().BeTrue();
-        _ = cardData.Value.GlobalPlatformVersion.GetValueOrDefault().Should().BeEquivalentTo(new System.Version(2, 3));
+        _ = cardData
+            .Value.GlobalPlatformVersion.GetValueOrDefault()
+            .Should()
+            .BeEquivalentTo(new Version(2, 3));
     }
 
     [Test]
@@ -218,7 +225,7 @@ public class CardDataInfoOidTests
             0x66,
             0x02,
             0xFF,
-            0xEE // Chip details
+            0xEE, // Chip details
         ];
 
         // Act
@@ -226,10 +233,22 @@ public class CardDataInfoOidTests
 
         // Assert
         _ = cardData.Value.Tags.Should().HaveCount(4);
-        _ = cardData.Value.GlobalPlatformVersion.GetValueOrDefault().Should().BeEquivalentTo(new System.Version(2, 2, 3));
-        _ = cardData.Value.SecureChannelProtocolInfo.GetValueOrDefault().Should().BeEquivalentTo(new byte[] { 0x03, 0x70 });
-        _ = cardData.Value.CardConfigurationDetails.GetValueOrDefault().Should().BeEquivalentTo(new byte[] { 0x01, 0x02, 0x03, 0x04 });
-        _ = cardData.Value.CardChipDetails.GetValueOrDefault().Should().BeEquivalentTo(new byte[] { 0xFF, 0xEE });
+        _ = cardData
+            .Value.GlobalPlatformVersion.GetValueOrDefault()
+            .Should()
+            .BeEquivalentTo(new Version(2, 2, 3));
+        _ = cardData
+            .Value.SecureChannelProtocolInfo.GetValueOrDefault()
+            .Should()
+            .BeEquivalentTo(new byte[] { 0x03, 0x70 });
+        _ = cardData
+            .Value.CardConfigurationDetails.GetValueOrDefault()
+            .Should()
+            .BeEquivalentTo(new byte[] { 0x01, 0x02, 0x03, 0x04 });
+        _ = cardData
+            .Value.CardChipDetails.GetValueOrDefault()
+            .Should()
+            .BeEquivalentTo(new byte[] { 0xFF, 0xEE });
     }
 
     [Test]
@@ -256,7 +275,7 @@ public class CardDataInfoOidTests
             0x03, // OID for GP 2.2.3 (1.2.840.114283.2.2.3)
             0x64,
             0x01,
-            0x03 // SCP tag
+            0x03, // SCP tag
         ];
 
         // Act
@@ -266,29 +285,21 @@ public class CardDataInfoOidTests
         _ = cardData.Value.Tags.Should().HaveCount(3); // Tags 73, 06, and 64
         _ = cardData.Value.Oids.Should().HaveCount(1);
         _ = cardData.Value.Oids[0].Should().BeEquivalentTo("1.2.840.114283.2.2.3");
-        _ = cardData.Value.GlobalPlatformVersionFromOid.GetValueOrDefault().Should().BeEquivalentTo("2.2.3");
-        _ = cardData.Value.GlobalPlatformVersion.GetValueOrDefault().Should().BeEquivalentTo(new System.Version(2, 2, 1)); // From tag 73
+        _ = cardData
+            .Value.GlobalPlatformVersionFromOid.GetValueOrDefault()
+            .Should()
+            .BeEquivalentTo("2.2.3");
+        _ = cardData
+            .Value.GlobalPlatformVersion.GetValueOrDefault()
+            .Should()
+            .BeEquivalentTo(new Version(2, 2, 1)); // From tag 73
     }
 
     [Test]
     public void Parse_NonGlobalPlatformOid_ParsedButNoVersionExtracted()
     {
         // Arrange - NIST OID
-        byte[] data =
-        [
-            0x06,
-            0x0A,
-            0x2B,
-            0x06,
-            0x01,
-            0x04,
-            0x01,
-            0x2A,
-            0x02,
-            0x6E,
-            0x01,
-            0x03
-        ];
+        byte[] data = [0x06, 0x0A, 0x2B, 0x06, 0x01, 0x04, 0x01, 0x2A, 0x02, 0x6E, 0x01, 0x03];
 
         // Act
         Result<CardDataInfo, SmartCardError> cardData = CardDataInfo.Parse(data);

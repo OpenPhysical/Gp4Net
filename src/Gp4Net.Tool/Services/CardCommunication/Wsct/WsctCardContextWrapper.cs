@@ -23,10 +23,7 @@ public class WsctCardContextWrapper : ICardContextWrapper
     /// <inheritdoc />
     public IReadOnlyList<string> Readers
     {
-        get
-        {
-            return _context.Readers ?? [];
-        }
+        get { return _context.Readers ?? []; }
     }
 
     /// <inheritdoc />
@@ -56,7 +53,6 @@ public class WsctCardContextWrapper : ICardContextWrapper
         }
         return ErrorCode.Success;
     }
-
 
     /// <inheritdoc />
     public void Dispose()

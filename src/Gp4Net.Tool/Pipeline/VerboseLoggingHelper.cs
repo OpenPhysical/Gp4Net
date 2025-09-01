@@ -43,7 +43,7 @@ public static class VerboseLoggingHelper
                         Layout = new PatternLayout(
                             "%date [%thread] %-5level %logger - %message%newline"
                         ),
-                        Threshold = Level.Debug
+                        Threshold = Level.Debug,
                     };
                     _verboseAppender.ActivateOptions();
 

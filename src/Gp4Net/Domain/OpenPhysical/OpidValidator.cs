@@ -90,11 +90,7 @@ public static class OpidValidator
     /// <param name="cin">The Card Image Number.</param>
     /// <param name="managerUrl">The manager URL.</param>
     /// <returns>A validation result for the card data.</returns>
-    public static OpidValidationResult ValidateCardData(
-        string iin,
-        string cin,
-        string managerUrl
-    )
+    public static OpidValidationResult ValidateCardData(string iin, string cin, string managerUrl)
     {
         // Check manager URL
         if (managerUrl != OpenPhysicalId.OpenPhysicalManagerUrl)
@@ -112,9 +108,7 @@ public static class OpidValidator
 
         if (iin.Length != 4)
         {
-            return OpidValidationResult.Failure(
-                $"IIN must be exactly 4 digits, got {iin.Length}"
-            );
+            return OpidValidationResult.Failure($"IIN must be exactly 4 digits, got {iin.Length}");
         }
 
         if (!iin.All(char.IsDigit))
@@ -137,9 +131,7 @@ public static class OpidValidator
         string fullDigits = iin + cin;
         if (fullDigits.Length < 5)
         {
-            return OpidValidationResult.Failure(
-                "Combined IIN and CIN must have at least 5 digits"
-            );
+            return OpidValidationResult.Failure("Combined IIN and CIN must have at least 5 digits");
         }
 
         if (!int.TryParse(fullDigits.Substring(4, 1), out int formatIndicator))

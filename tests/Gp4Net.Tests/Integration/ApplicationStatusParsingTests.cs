@@ -4,10 +4,9 @@ using System.Collections.Immutable;
 using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Domain.Modules;
+using Gp4Net.Services;
 using Gp4Net.Pipeline;
 using NUnit.Framework;
 
@@ -24,23 +23,28 @@ public class ApplicationStatusParsingTests
             data,
             StatusWords.Success,
             new ImmutablePipelineContext(),
-            new Dictionary<string, object>());
+            new Dictionary<string, object>()
+        );
     }
 
     [Test]
     public void Parse_Apps_And_SDs_From_TLV_Response()
     {
         // From docs/traces/gp_pro_list_success.txt: response to 84F28002 ...
-        const string resp = "E3264F08A0000001510000009F700101C5039EFE80C407A0000001515350CC08A000000151000000";
+        const string resp =
+            "E3264F08A0000001510000009F700101C5039EFE80C407A0000001515350CC08A000000151000000";
 
         CommandResponse r = MakeResponse(resp);
-        Result<ImmutableList<ApplicationInfo>, SmartCardError> parsed = ResponseParser.ParseGetStatusResponse(r);
+        Result<ImmutableList<ApplicationInfo>, SmartCardError> parsed =
+            GlobalPlatformService.Responses.ParseGetStatusResponse(r);
 
         _ = parsed.IsSuccess.Should().BeTrue();
         ImmutableList<ApplicationInfo>? list = parsed.Value;
 
         // Should include ISD AID with lifecycle (0x01) and privileges (C5: 03 9E FE)
-        ApplicationInfo? isd = list.FirstOrDefault(static x => Convert.ToHexString(x.Aid) == "A000000151000000");
+        ApplicationInfo? isd = list.FirstOrDefault(static x =>
+            Convert.ToHexString(x.Aid) == "A000000151000000"
+        );
         _ = isd.Should().NotBeNull();
         _ = isd!.LifecycleState.Should().Be(LifecycleState.Loaded);
         _ = isd.Privileges.Should().NotBeEmpty();
@@ -49,6 +53,9 @@ public class ApplicationStatusParsingTests
         // C4 (Executable Load File AID) is carried on the application entry per Table 11-36.
         // Verify it is captured on the parsed application model.
         _ = isd!.ExecutableLoadFileAid.HasValue.Should().BeTrue();
-        _ = Convert.ToHexString(isd.ExecutableLoadFileAid.GetValueOrThrow()).Should().Be("A0000001515350");
+        _ = Convert
+            .ToHexString(isd.ExecutableLoadFileAid.GetValueOrThrow())
+            .Should()
+            .Be("A0000001515350");
     }
 }

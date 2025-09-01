@@ -12,14 +12,21 @@ public record SmartCardError(
     string Message,
     Maybe<ushort> StatusWord,
     Maybe<Exception> InnerException,
-    Maybe<IReadOnlyDictionary<string, object>> Context)
+    Maybe<IReadOnlyDictionary<string, object>> Context
+)
 {
     /// <summary>
     /// Creates a simple error with just code and message.
     /// </summary>
     private static SmartCardError Simple(string code, string message)
     {
-        return new(code, message, Maybe<ushort>.None, Maybe<Exception>.None, Maybe<IReadOnlyDictionary<string, object>>.None);
+        return new(
+            code,
+            message,
+            Maybe<ushort>.None,
+            Maybe<Exception>.None,
+            Maybe<IReadOnlyDictionary<string, object>>.None
+        );
     }
 
     /// <summary>
@@ -27,7 +34,13 @@ public record SmartCardError(
     /// </summary>
     private static SmartCardError WithStatus(string code, string message, ushort sw)
     {
-        return new(code, message, Maybe<ushort>.From(sw), Maybe<Exception>.None, Maybe<IReadOnlyDictionary<string, object>>.None);
+        return new(
+            code,
+            message,
+            Maybe<ushort>.From(sw),
+            Maybe<Exception>.None,
+            Maybe<IReadOnlyDictionary<string, object>>.None
+        );
     }
 
     /// <summary>
@@ -43,7 +56,13 @@ public record SmartCardError(
     /// </summary>
     public static SmartCardError CommunicationError(string message, Maybe<Exception> ex = default)
     {
-        return new("COMM_ERROR", message, Maybe<ushort>.None, ex, Maybe<IReadOnlyDictionary<string, object>>.None);
+        return new(
+            "COMMUNICATION_ERROR",
+            message,
+            Maybe<ushort>.None,
+            ex,
+            Maybe<IReadOnlyDictionary<string, object>>.None
+        );
     }
 
     /// <summary>
@@ -51,7 +70,13 @@ public record SmartCardError(
     /// </summary>
     public static SmartCardError SecurityError(string message, Maybe<ushort> sw = default)
     {
-        return new("SECURITY_ERROR", message, sw, Maybe<Exception>.None, Maybe<IReadOnlyDictionary<string, object>>.None);
+        return new(
+            "SECURITY_ERROR",
+            message,
+            sw,
+            Maybe<Exception>.None,
+            Maybe<IReadOnlyDictionary<string, object>>.None
+        );
     }
 
     /// <summary>
@@ -111,6 +136,14 @@ public record SmartCardError(
     }
 
     /// <summary>
+    /// Creates an error for wrong length with custom message (6700).
+    /// </summary>
+    public static SmartCardError WrongLength(string message)
+    {
+        return WithStatus("WRONG_LENGTH", message, 0x6700);
+    }
+
+    /// <summary>
     /// Creates an error for incorrect data (6A80).
     /// </summary>
     public static SmartCardError IncorrectData()
@@ -124,6 +157,30 @@ public record SmartCardError(
     public static SmartCardError SecurityStatusNotSatisfied()
     {
         return WithStatus("SECURITY_STATUS_NOT_SATISFIED", "Security status not satisfied", 0x6982);
+    }
+
+    /// <summary>
+    /// Creates an error for security status not satisfied with custom message (6982).
+    /// </summary>
+    public static SmartCardError SecurityStatusNotSatisfied(string message)
+    {
+        return WithStatus("SECURITY_STATUS_NOT_SATISFIED", message, 0x6982);
+    }
+
+    /// <summary>
+    /// Creates an error for algorithm not supported (6A81).
+    /// </summary>
+    public static SmartCardError AlgorithmNotSupported()
+    {
+        return WithStatus("ALGORITHM_NOT_SUPPORTED", "Algorithm not supported", 0x6A81);
+    }
+
+    /// <summary>
+    /// Creates an error for conditions of use not satisfied (6985).
+    /// </summary>
+    public static SmartCardError ConditionsOfUseNotSatisfied()
+    {
+        return WithStatus("CONDITIONS_OF_USE_NOT_SATISFIED", "Conditions of use not satisfied", 0x6985);
     }
 
     /// <summary>
@@ -187,7 +244,13 @@ public record SmartCardError(
     /// </summary>
     public static SmartCardError UnexpectedError(string message, Maybe<Exception> ex = default)
     {
-        return new("UNEXPECTED_ERROR", message, Maybe<ushort>.None, ex, Maybe<IReadOnlyDictionary<string, object>>.None);
+        return new(
+            "UNEXPECTED_ERROR",
+            message,
+            Maybe<ushort>.None,
+            ex,
+            Maybe<IReadOnlyDictionary<string, object>>.None
+        );
     }
 
     /// <summary>
@@ -196,6 +259,22 @@ public record SmartCardError(
     public static SmartCardError ConditionsNotSatisfied()
     {
         return WithStatus("CONDITIONS_NOT_SATISFIED", "Conditions of use not satisfied", 0x6985);
+    }
+
+    /// <summary>
+    /// Creates an error for incorrect P1 P2 parameters (6A86).
+    /// </summary>
+    public static SmartCardError IncorrectP1P2()
+    {
+        return WithStatus("INCORRECT_P1P2", "Incorrect P1 P2", 0x6A86);
+    }
+
+    /// <summary>
+    /// Creates an error for incorrect P1 P2 parameters with custom message (6A86).
+    /// </summary>
+    public static SmartCardError IncorrectP1P2(string message)
+    {
+        return WithStatus("INCORRECT_P1P2", message, 0x6A86);
     }
 
     /// <summary>
@@ -211,10 +290,12 @@ public record SmartCardError(
     /// </summary>
     public SmartCardError WithContext(string key, object value)
     {
-        IReadOnlyDictionary<string, object> currentContext = Context.GetValueOrDefault(new Dictionary<string, object>());
+        IReadOnlyDictionary<string, object> currentContext = Context.GetValueOrDefault(
+            new Dictionary<string, object>()
+        );
         Dictionary<string, object> newContext = new Dictionary<string, object>(currentContext)
         {
-            [key] = value
+            [key] = value,
         };
         return this with { Context = Maybe<IReadOnlyDictionary<string, object>>.From(newContext) };
     }
@@ -224,7 +305,9 @@ public record SmartCardError(
     /// </summary>
     public SmartCardError WithContext(IReadOnlyDictionary<string, object> additionalContext)
     {
-        IReadOnlyDictionary<string, object> currentContext = Context.GetValueOrDefault(new Dictionary<string, object>());
+        IReadOnlyDictionary<string, object> currentContext = Context.GetValueOrDefault(
+            new Dictionary<string, object>()
+        );
         Dictionary<string, object> newContext = new Dictionary<string, object>(currentContext);
         foreach (KeyValuePair<string, object> kvp in additionalContext)
         {
@@ -266,13 +349,14 @@ public record SmartCardError(
             0x6F00 => "No precise diagnostics",
             _ when (sw & 0xFF00) == 0x6100 => $"More data available ({sw & 0xFF} bytes)",
             _ when (sw & 0xFF00) == 0x6C00 => $"Wrong length ({sw & 0xFF} bytes expected)",
-            _ => $"Unknown status word: {sw:X4}"
+            _ => $"Unknown status word: {sw:X4}",
         };
     }
 
     public override string ToString()
     {
-        return StatusWord.Map(sw => $"{Code}: {Message} (SW={sw:X4})")
+        return StatusWord
+            .Map(sw => $"{Code}: {Message} (SW={sw:X4})")
             .GetValueOrDefault($"{Code}: {Message}");
     }
 }
@@ -283,7 +367,7 @@ public record SmartCardError(
 public static class ErrorCodes
 {
     public const string Success = "SUCCESS";
-    public const string CommunicationError = "COMM_ERROR";
+    public const string CommunicationError = "COMMUNICATION_ERROR";
     public const string SecurityError = "SECURITY_ERROR";
     public const string InvalidData = "INVALID_DATA";
     public const string Unsupported = "UNSUPPORTED";
@@ -299,119 +383,143 @@ public static class ErrorCodes
 /// <summary>
 /// Strongly typed error for null parameter violations.
 /// </summary>
-public record NullParameterError(string ParameterName) : SmartCardError(
-    "NULL_PARAMETER",
-    $"Parameter '{ParameterName}' cannot be null",
-    Maybe<ushort>.None,
-    Maybe<Exception>.None,
-    Maybe<IReadOnlyDictionary<string, object>>.None);
+public record NullParameterError(string ParameterName)
+    : SmartCardError(
+        "NULL_PARAMETER",
+        $"Parameter '{ParameterName}' cannot be null",
+        Maybe<ushort>.None,
+        Maybe<Exception>.None,
+        Maybe<IReadOnlyDictionary<string, object>>.None
+    );
 
 /// <summary>
 /// Strongly typed error for invalid length violations.
 /// </summary>
-public record InvalidLengthError(string Field, int Expected, int Actual) : SmartCardError(
-    "INVALID_LENGTH",
-    $"Field '{Field}' must be {Expected} bytes, got {Actual}",
-    Maybe<ushort>.None,
-    Maybe<Exception>.None,
-    Maybe<IReadOnlyDictionary<string, object>>.None);
+public record InvalidLengthError(string Field, int Expected, int Actual)
+    : SmartCardError(
+        "INVALID_LENGTH",
+        $"Field '{Field}' must be {Expected} bytes, got {Actual}",
+        Maybe<ushort>.None,
+        Maybe<Exception>.None,
+        Maybe<IReadOnlyDictionary<string, object>>.None
+    );
 
 /// <summary>
 /// Strongly typed error for invalid format violations.
 /// </summary>
-public record InvalidFormatError(string Field, string ExpectedFormat) : SmartCardError(
-    "INVALID_FORMAT",
-    $"Field '{Field}' has invalid format, expected {ExpectedFormat}",
-    Maybe<ushort>.None,
-    Maybe<Exception>.None,
-    Maybe<IReadOnlyDictionary<string, object>>.None);
+public record InvalidFormatError(string Field, string ExpectedFormat)
+    : SmartCardError(
+        "INVALID_FORMAT",
+        $"Field '{Field}' has invalid format, expected {ExpectedFormat}",
+        Maybe<ushort>.None,
+        Maybe<Exception>.None,
+        Maybe<IReadOnlyDictionary<string, object>>.None
+    );
 
 /// <summary>
 /// Strongly typed error for cryptographic operation failures.
 /// </summary>
-public record CryptographicError(string Operation, string Details) : SmartCardError(
-    "CRYPTOGRAPHIC_ERROR",
-    $"Cryptographic operation '{Operation}' failed: {Details}",
-    Maybe<ushort>.None,
-    Maybe<Exception>.None,
-    Maybe<IReadOnlyDictionary<string, object>>.None);
+public record CryptographicError(string Operation, string Details)
+    : SmartCardError(
+        "CRYPTOGRAPHIC_ERROR",
+        $"Cryptographic operation '{Operation}' failed: {Details}",
+        Maybe<ushort>.None,
+        Maybe<Exception>.None,
+        Maybe<IReadOnlyDictionary<string, object>>.None
+    );
 
 /// <summary>
 /// Strongly typed error for authentication failures.
 /// </summary>
-public record AuthenticationFailedError(string Reason) : SmartCardError(
-    "AUTHENTICATION_FAILED",
-    $"Authentication failed: {Reason}",
-    Maybe<ushort>.From((ushort)0x6300),
-    Maybe<Exception>.None,
-    Maybe<IReadOnlyDictionary<string, object>>.None);
+public record AuthenticationFailedError(string Reason)
+    : SmartCardError(
+        "AUTHENTICATION_FAILED",
+        $"Authentication failed: {Reason}",
+        Maybe<ushort>.From(0x6300),
+        Maybe<Exception>.None,
+        Maybe<IReadOnlyDictionary<string, object>>.None
+    );
 
 /// <summary>
 /// Strongly typed error for cryptogram verification failures.
 /// </summary>
-public record CryptogramVerificationError(string Details) : SmartCardError(
-    "CRYPTOGRAM_VERIFICATION_FAILED",
-    $"Cryptogram verification failed: {Details}",
-    Maybe<ushort>.None,
-    Maybe<Exception>.None,
-    Maybe<IReadOnlyDictionary<string, object>>.None);
+public record CryptogramVerificationError(string Details)
+    : SmartCardError(
+        "CRYPTOGRAM_VERIFICATION_FAILED",
+        $"Cryptogram verification failed: {Details}",
+        Maybe<ushort>.None,
+        Maybe<Exception>.None,
+        Maybe<IReadOnlyDictionary<string, object>>.None
+    );
 
 /// <summary>
 /// Strongly typed error for unsupported protocol operations.
 /// </summary>
-public record UnsupportedProtocolError(string Protocol) : SmartCardError(
-    "UNSUPPORTED_PROTOCOL",
-    $"Protocol '{Protocol}' is not supported",
-    Maybe<ushort>.None,
-    Maybe<Exception>.None,
-    Maybe<IReadOnlyDictionary<string, object>>.None);
+public record UnsupportedProtocolError(string Protocol)
+    : SmartCardError(
+        "UNSUPPORTED_PROTOCOL",
+        $"Protocol '{Protocol}' is not supported",
+        Maybe<ushort>.None,
+        Maybe<Exception>.None,
+        Maybe<IReadOnlyDictionary<string, object>>.None
+    );
 
 /// <summary>
 /// Strongly typed error for unsupported implementation features.
 /// </summary>
-public record UnsupportedImplementationError(string Implementation) : SmartCardError(
-    "UNSUPPORTED_IMPLEMENTATION",
-    $"Implementation '{Implementation}' is not supported",
-    Maybe<ushort>.None,
-    Maybe<Exception>.None,
-    Maybe<IReadOnlyDictionary<string, object>>.None);
+public record UnsupportedImplementationError(string Implementation)
+    : SmartCardError(
+        "UNSUPPORTED_IMPLEMENTATION",
+        $"Implementation '{Implementation}' is not supported",
+        Maybe<ushort>.None,
+        Maybe<Exception>.None,
+        Maybe<IReadOnlyDictionary<string, object>>.None
+    );
 
 /// <summary>
 /// Strongly typed error for invalid key operations.
 /// </summary>
-public record InvalidKeyError(string KeyType, string Reason) : SmartCardError(
-    "INVALID_KEY",
-    $"Invalid {KeyType} key: {Reason}",
-    Maybe<ushort>.None,
-    Maybe<Exception>.None,
-    Maybe<IReadOnlyDictionary<string, object>>.None);
+public record InvalidKeyError(string KeyType, string Reason)
+    : SmartCardError(
+        "INVALID_KEY",
+        $"Invalid {KeyType} key: {Reason}",
+        Maybe<ushort>.None,
+        Maybe<Exception>.None,
+        Maybe<IReadOnlyDictionary<string, object>>.None
+    );
 
 /// <summary>
 /// Strongly typed error for missing required data.
 /// </summary>
-public record MissingDataError(string DataType) : SmartCardError(
-    "MISSING_DATA",
-    $"Required data '{DataType}' is missing",
-    Maybe<ushort>.None,
-    Maybe<Exception>.None,
-    Maybe<IReadOnlyDictionary<string, object>>.None);
+public record MissingDataError(string DataType)
+    : SmartCardError(
+        "MISSING_DATA",
+        $"Required data '{DataType}' is missing",
+        Maybe<ushort>.None,
+        Maybe<Exception>.None,
+        Maybe<IReadOnlyDictionary<string, object>>.None
+    );
 
 /// <summary>
 /// Strongly typed error for empty data violations.
 /// </summary>
-public record EmptyDataError(string FieldName) : SmartCardError(
-    "EMPTY_DATA",
-    $"Field '{FieldName}' cannot be empty",
-    Maybe<ushort>.None,
-    Maybe<Exception>.None,
-    Maybe<IReadOnlyDictionary<string, object>>.None);
+public record EmptyDataError(string FieldName)
+    : SmartCardError(
+        "EMPTY_DATA",
+        $"Field '{FieldName}' cannot be empty",
+        Maybe<ushort>.None,
+        Maybe<Exception>.None,
+        Maybe<IReadOnlyDictionary<string, object>>.None
+    );
 
 /// <summary>
 /// Strongly typed error for invalid data violations.
 /// </summary>
-public record InvalidDataError(string Field, string Reason) : SmartCardError(
-    "INVALID_DATA",
-    $"Field '{Field}': {Reason}",
-    Maybe<ushort>.None,
-    Maybe<Exception>.None,
-    Maybe<IReadOnlyDictionary<string, object>>.None);
+public record InvalidDataError(string Field, string Reason)
+    : SmartCardError(
+        "INVALID_DATA",
+        $"Field '{Field}': {Reason}",
+        Maybe<ushort>.None,
+        Maybe<Exception>.None,
+        Maybe<IReadOnlyDictionary<string, object>>.None
+    );

@@ -25,5 +25,5 @@ public enum SecureChannelOperation
     /// General secure messaging operation.
     /// Used for bidirectional secure communication.
     /// </summary>
-    SecureMessaging
+    SecureMessaging,
 }

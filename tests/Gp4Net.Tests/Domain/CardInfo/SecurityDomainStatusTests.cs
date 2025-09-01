@@ -29,7 +29,7 @@ public class SecurityDomainStatusTests
         _ = status.IsPersonalized().Should().BeFalse();
         _ = status.IsLocked().Should().BeFalse();
         _ = status.GetSequenceCounter().HasValue.Should().BeTrue();
-        _ = status.GetSequenceCounter().Value.Should().Be((ushort)0x04);
+        _ = status.GetSequenceCounter().Value.Should().Be(0x04);
     }
 
     [Test]
@@ -49,7 +49,7 @@ public class SecurityDomainStatusTests
         _ = status.IsPersonalized().Should().BeFalse();
         _ = status.IsLocked().Should().BeFalse();
         _ = status.GetSequenceCounter().HasValue.Should().BeTrue();
-        _ = status.GetSequenceCounter().Value.Should().Be((ushort)0x0046);
+        _ = status.GetSequenceCounter().Value.Should().Be(0x0046);
     }
 
     [Test]
@@ -165,7 +165,9 @@ public class SecurityDomainStatusTests
     public void Parse_WithNullData_ReturnsFailure()
     {
         // Act
-        Result<SecurityDomainStatus, SmartCardError> result = SecurityDomainStatus.Parse(Maybe<byte[]>.None);
+        Result<SecurityDomainStatus, SmartCardError> result = SecurityDomainStatus.Parse(
+            Maybe<byte[]>.None
+        );
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -207,7 +209,10 @@ public class SecurityDomainStatusTests
     [TestCase("C1020004", 0x0004)] // Two byte counter
     [TestCase("C103000046", 0x0046)] // Three bytes, counter in last two
     [TestCase("C104AA001234", 0x1234)] // Four bytes, counter in last two
-    public void GetSequenceCounter_WithVariousFormats_ReturnsExpectedValue(string hex, int expectedCounter)
+    public void GetSequenceCounter_WithVariousFormats_ReturnsExpectedValue(
+        string hex,
+        int expectedCounter
+    )
     {
         // Arrange
         byte[] data = Convert.FromHexString(hex);

@@ -23,32 +23,43 @@ public class CliContext : ICliExecutionContext
 
     public IDisplayService Display { get; }
     public ISmartCardService CardService { get; }
-    
+    public IKeysetResolver KeysetResolver => _keysetResolver;
+
     /// <summary>
     /// Pure function for establishing secure channels from user requests.
     /// Eliminates imperative command-level keyset resolution.
     /// </summary>
-    public Func<SecureChannelRequest, CancellationToken, Task<Result<SecureChannelExecutionContext, SmartCardError>>> EstablishSecureChannelAsync { get; }
+    public Func<
+        SecureChannelRequest,
+        CancellationToken,
+        Task<Result<SecureChannelExecutionContext, SmartCardError>>
+    > EstablishSecureChannelAsync { get; }
 
     public CliContext(
         IDisplayService display,
         ISmartCardService cardService,
         IDomainServiceFactory domainServiceFactory,
         IKeysetResolver keysetResolver,
-        ILogger<CliContext> logger = null)
+        ILogger<CliContext> logger = null
+    )
     {
         // Pure assignment - dependency injection framework ensures non-null services
         Display = display;
         CardService = cardService;
         _keysetResolver = keysetResolver;
         _logger = logger;
-        
+
         // Create domain service once during construction using pure function
         _globalPlatformService = domainServiceFactory.CreateGlobalPlatformService(CardService);
-        
+
         // Create pure function for secure channel establishment
-        EstablishSecureChannelAsync = (request, cancellationToken) => 
-            SecureChannelOperations.EstablishFromRequestAsync(request, CardService, _keysetResolver, cancellationToken);
+        EstablishSecureChannelAsync = (request, cancellationToken) =>
+            SecureChannelOperations.EstablishFromRequestAsync(
+                request,
+                CardService,
+                _keysetResolver,
+                cancellationToken
+            );
     }
 
     /// <summary>
@@ -60,7 +71,9 @@ public class CliContext : ICliExecutionContext
     /// <summary>
     /// Ensures a card connection is established using pure functional patterns.
     /// </summary>
-    public Task<Result<ICliExecutionContext, SmartCardError>> RequireCardConnection(Maybe<string> readerName = default)
+    public Task<Result<ICliExecutionContext, SmartCardError>> RequireCardConnection(
+        Maybe<string> readerName = default
+    )
     {
         // Pure functional card connection handling
         // Reader resolution and connection is managed by the smart card service
@@ -72,7 +85,8 @@ public class CliContext : ICliExecutionContext
     /// </summary>
     public Task<Result<ICliExecutionContext, SmartCardError>> RequireSecureChannel(
         byte securityLevel = 1,
-        Maybe<string> keyset = default)
+        Maybe<string> keyset = default
+    )
     {
         // Secure channel establishment is now handled by pure pipeline functions
         return Task.FromResult(Result.Success<ICliExecutionContext, SmartCardError>(this));
@@ -99,14 +113,15 @@ public class CliContext : ICliExecutionContext
     /// </summary>
     private async Task<int> ExecuteCommandWithErrorHandling(Func<Task<int>> commandExecution)
     {
-        return await Result.Try(commandExecution, ex => ex)
-            .Match(
-                async successTask => await successTask,
-                error =>
-                {
-                    _logger?.LogError(error, "Command execution failed");
-                    Display.Exception(error);
-                    return Task.FromResult(1);
-                });
+        try
+        {
+            return await commandExecution();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Command execution failed: {ErrorMessage}", ex.Message);
+            Display.Exception(ex);
+            return 1;
+        }
     }
 }

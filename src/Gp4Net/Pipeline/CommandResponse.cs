@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 
 namespace Gp4Net.Pipeline;
@@ -12,17 +11,15 @@ public record CommandResponse(
     byte[] Data,
     StatusWord StatusWord,
     IPipelineContext UpdatedContext,
-    IReadOnlyDictionary<string, object> Metadata)
+    IReadOnlyDictionary<string, object> Metadata
+)
 {
     /// <summary>
     /// Gets a value indicating whether the command was successful (SW=9000).
     /// </summary>
     public bool IsSuccess
     {
-        get
-        {
-            return StatusWord == StatusWords.Success;
-        }
+        get { return StatusWord == Constants.Constants.StatusWords.Legacy.Success; }
     }
 
     /// <summary>
@@ -31,13 +28,15 @@ public record CommandResponse(
     public static CommandResponse Success(
         byte[] data = null,
         IPipelineContext context = null,
-        IReadOnlyDictionary<string, object> metadata = null)
+        IReadOnlyDictionary<string, object> metadata = null
+    )
     {
         return new(
             data ?? [],
-            StatusWords.Success,
+            Constants.Constants.StatusWords.Legacy.Success,
             context ?? ImmutablePipelineContext.Empty,
-            metadata ?? new Dictionary<string, object>());
+            metadata ?? new Dictionary<string, object>()
+        );
     }
 
     /// <summary>
@@ -46,13 +45,15 @@ public record CommandResponse(
     public static CommandResponse Failure(
         StatusWord statusWord,
         IPipelineContext context = null,
-        IReadOnlyDictionary<string, object> metadata = null)
+        IReadOnlyDictionary<string, object> metadata = null
+    )
     {
         return new(
             [],
             statusWord,
             context ?? ImmutablePipelineContext.Empty,
-            metadata ?? new Dictionary<string, object>());
+            metadata ?? new Dictionary<string, object>()
+        );
     }
 
     /// <summary>
@@ -63,7 +64,8 @@ public record CommandResponse(
         return IsSuccess
             ? Result.Success<CommandResponse, SmartCardError>(this)
             : Result.Failure<CommandResponse, SmartCardError>(
-                SmartCardError.FromStatusWord(StatusWord));
+                SmartCardError.FromStatusWord(StatusWord)
+            );
     }
 
     /// <summary>
@@ -73,7 +75,7 @@ public record CommandResponse(
     {
         Dictionary<string, object> newMetadata = new Dictionary<string, object>(Metadata)
         {
-            [key] = value
+            [key] = value,
         };
         return this with { Metadata = newMetadata };
     }
@@ -89,7 +91,8 @@ public record CommandResponse(
     /// <summary>
     /// Creates a new response with a context value added.
     /// </summary>
-    public CommandResponse WithContextValue<T>(string key, T value) where T : class
+    public CommandResponse WithContextValue<T>(string key, T value)
+        where T : class
     {
         return this with { UpdatedContext = UpdatedContext.With(key, value) };
     }

@@ -50,26 +50,26 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
     /// <param name="context">The command context.</param>
     /// <param name="settings">The command settings.</param>
     /// <returns>0 if validation succeeds, 1 if failed.</returns>
-    public override async Task<int> ExecuteAsync(
-        CommandContext context,
-        Settings settings
-    )
+    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
     {
         return await ValidateCapFileExists(settings.CapFile)
-            .Bind(_ => 
+            .Bind(_ =>
             {
                 _displayService.Info($"Validating CAP file: {settings.CapFile}");
                 return Result.Success<bool, SmartCardError>(true);
             })
             .Bind(_ => LoadAndValidateCapFile(settings.CapFile))
-            .Bind(async result => await ProcessValidationResult(result.validationResult, result.capFileData, settings))
+            .Bind(async result =>
+                await ProcessValidationResult(result.validationResult, result.capFileData, settings)
+            )
             .Match(
                 success => Task.FromResult(0),
                 error =>
                 {
                     _displayService.Error($"Validation failed: {error.Message}");
                     return Task.FromResult(1);
-                });
+                }
+            );
     }
 
     private static Result<bool, SmartCardError> ValidateCapFileExists(string capFilePath)
@@ -77,32 +77,43 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         return File.Exists(capFilePath)
             ? Result.Success<bool, SmartCardError>(true)
             : Result.Failure<bool, SmartCardError>(
-                SmartCardError.InvalidArgument($"CAP file not found: {capFilePath}"));
+                SmartCardError.InvalidArgument($"CAP file not found: {capFilePath}")
+            );
     }
 
-    private async Task<Result<(CapFileValidationResult validationResult, byte[] capFileData), SmartCardError>> LoadAndValidateCapFile(string capFilePath)
+    private async Task<
+        Result<(CapFileValidationResult validationResult, byte[] capFileData), SmartCardError>
+    > LoadAndValidateCapFile(string capFilePath)
     {
-        return await Result.Try(async () =>
+        return await Result.Try(
+            async () =>
             {
                 byte[] capFileData = await File.ReadAllBytesAsync(capFilePath);
                 _displayService.Info($"File size: {capFileData.Length} bytes");
 
-                CapFileValidationResult validationResult = CapFileLoadingWorkflow.ValidateCapFile(capFileData);
+                CapFileValidationResult validationResult = CapFileLoadingWorkflow.ValidateCapFile(
+                    capFileData
+                );
                 return (validationResult, capFileData);
             },
-            ex => SmartCardError.InvalidArgument($"Failed to load/validate CAP file: {ex.Message}"));
+            ex => SmartCardError.InvalidArgument($"Failed to load/validate CAP file: {ex.Message}")
+        );
     }
 
     private async Task<Result<bool, SmartCardError>> ProcessValidationResult(
         CapFileValidationResult validationResult,
         byte[] capFileData,
-        Settings settings)
+        Settings settings
+    )
     {
         if (!validationResult.IsValid)
         {
-            string errorMessage = validationResult.ErrorMessage.GetValueOrDefault("Unknown validation error");
+            string errorMessage = validationResult.ErrorMessage.GetValueOrDefault(
+                "Unknown validation error"
+            );
             return Result.Failure<bool, SmartCardError>(
-                SmartCardError.InvalidArgument($"CAP file validation failed: {errorMessage}"));
+                SmartCardError.InvalidArgument($"CAP file validation failed: {errorMessage}")
+            );
         }
 
         _displayService.Success("✓ CAP file is valid");
@@ -113,13 +124,15 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             {
                 _displayService.Warning("Warning: CAP file structure not available");
                 return Task.FromResult(Result.Success<bool, SmartCardError>(true));
-            });
+            }
+        );
     }
 
     private async Task<Result<bool, SmartCardError>> DisplayCapFileAnalysis(
         CapFileStructure capFile,
         byte[] capFileData,
-        Settings settings)
+        Settings settings
+    )
     {
         return await Task.Run(() =>
         {
@@ -128,9 +141,16 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             DisplaySecurityAnalysis(capFile);
             DisplayDetailedInformation(capFile, settings.Verbose);
 
-            _ = Maybe<ManifestInfo>.From(capFile.Manifest).Match(
-                manifest => { DisplayManifestInformation(manifest, _packageRegistry); return true; },
-                () => true);
+            _ = Maybe<ManifestInfo>
+                .From(capFile.Manifest)
+                .Match(
+                    manifest =>
+                    {
+                        DisplayManifestInformation(manifest, _packageRegistry);
+                        return true;
+                    },
+                    () => true
+                );
 
             DisplayClassFileInfo(capFileData);
 
@@ -153,8 +173,14 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
         _ = table.AddRow("Format", "ZIP/JAR");
         _ = table.AddRow("Package AID", $"[dim]{Convert.ToHexString(capFile.PackageAid)}[/]");
-        _ = table.AddRow("Package Version", $"{capFile.PackageVersion.Major}.{capFile.PackageVersion.Minor}");
-        _ = table.AddRow("CAP File Version", $"{capFile.CapFileVersion.Major}.{capFile.CapFileVersion.Minor}");
+        _ = table.AddRow(
+            "Package Version",
+            $"{capFile.PackageVersion.Major}.{capFile.PackageVersion.Minor}"
+        );
+        _ = table.AddRow(
+            "CAP File Version",
+            $"{capFile.CapFileVersion.Major}.{capFile.CapFileVersion.Minor}"
+        );
 
         // Create header flags display functionally
         string headerFlags = CreateHeaderFlagsDisplay(capFile.HeaderFlags);
@@ -178,20 +204,17 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         [
             (0x01, "INT"),
             (0x02, "EXPORT"),
-            (0x04, "APPLET")
+            (0x04, "APPLET"),
         ];
 
-        List<string> flagsInterpreted = flagMappings
+        List<string> flagsInterpreted = [.. flagMappings
             .Where(mapping => (headerFlags & mapping.mask) != 0)
-            .Select(mapping => mapping.name)
-            .ToList();
+            .Select(mapping => mapping.name)];
 
         return flagsInterpreted.Any()
             ? $"0x{headerFlags:X2} ({string.Join(", ", flagsInterpreted)})"
             : $"0x{headerFlags:X2}";
     }
-
-
 
     private static void DisplayDetailedInformation(CapFileStructure capFile, bool verbose)
     {
@@ -272,9 +295,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         bool hasExport = capFile.Components.Any(c =>
             c.Tag == CapFileStructure.ComponentTags.Export
         );
-        bool hasDebug = capFile.Components.Any(c =>
-            c.Tag == CapFileStructure.ComponentTags.Debug
-        );
+        bool hasDebug = capFile.Components.Any(c => c.Tag == CapFileStructure.ComponentTags.Debug);
 
         List<string> sensitiveComponents = [];
         if (hasExport)
@@ -298,9 +319,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         }
 
         // Analyze imports for crypto usage
-        if (
-            capFile.Manifest?.ImportedPackages is { Count: > 0 }
-        )
+        if (capFile.Manifest?.ImportedPackages is { Count: > 0 })
         {
             List<string> cryptoImports = [];
             foreach (ImportedPackage import in capFile.Manifest.ImportedPackages)
@@ -353,7 +372,9 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
     {
         try
         {
-            MemoryRequirements memoryReq = CapFileLoadingWorkflow.EstimateMemoryRequirements(capFileData);
+            MemoryRequirements memoryReq = CapFileLoadingWorkflow.EstimateMemoryRequirements(
+                capFileData
+            );
 
             AnsiConsole.MarkupLine("[bold]Memory Requirements (Estimated):[/]");
 
@@ -599,7 +620,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
                 // Display class names (limit to first 20)
                 AnsiConsole.WriteLine("Classes found:");
-                List<string> sortedClasses = classNames.OrderBy(c => c).ToList();
+                List<string> sortedClasses = [.. classNames.OrderBy(c => c)];
                 foreach (string className in sortedClasses.Take(20))
                 {
                     AnsiConsole.WriteLine($"  • {className}");
@@ -611,9 +632,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             }
             else
             {
-                AnsiConsole.MarkupLine(
-                    "[dim]No Java class files found (standard CAP format)[/]"
-                );
+                AnsiConsole.MarkupLine("[dim]No Java class files found (standard CAP format)[/]");
             }
 
             // Show other file types if present
@@ -629,7 +648,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         }
         catch (Exception)
         {
-            AnsiConsole.MarkupLine($"[dim]Standard binary CAP format (no embedded files)[/]");
+            AnsiConsole.MarkupLine("[dim]Standard binary CAP format (no embedded files)[/]");
         }
     }
 
@@ -662,7 +681,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             offset += 4;
 
             // Read array_init_count
-            ushort arrayInitCount = (ushort)((data[offset] << 8) | data[offset + 1]);
+            ushort arrayInitCount = (ushort)(data[offset] << 8 | data[offset + 1]);
             offset += 2;
 
             AnsiConsole.WriteLine($"Found {arrayInitCount} initialized arrays:");
@@ -677,7 +696,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
                 }
 
                 byte type = data[offset++];
-                ushort count = (ushort)((data[offset] << 8) | data[offset + 1]);
+                ushort count = (ushort)(data[offset] << 8 | data[offset + 1]);
                 offset += 2;
 
                 if (offset + count > data.Length)
@@ -708,7 +727,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         // Display as hexdump
         for (int i = 0; i < data.Length; i += 16)
         {
-            byte[] lineBytes = data.Skip(i).Take(16).ToArray();
+            byte[] lineBytes = [.. data.Skip(i).Take(16)];
             string hex = string.Join(" ", lineBytes.Select(b => $"{b:X2}"));
             string ascii = new string(
                 [.. lineBytes.Select(b => b is >= 32 and < 127 ? (char)b : '.')]

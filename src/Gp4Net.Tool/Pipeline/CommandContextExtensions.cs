@@ -20,7 +20,6 @@ public static class CommandContextExtensions
     //     return await context.RequireCardConnection(readerName);
     // }
 
-
     /// <summary>
     /// Sets verbose mode on the display service.
     /// </summary>
@@ -36,6 +35,4 @@ public static class CommandContextExtensions
         }
         return context;
     }
-
-
 }

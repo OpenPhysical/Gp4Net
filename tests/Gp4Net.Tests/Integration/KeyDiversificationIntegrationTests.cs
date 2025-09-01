@@ -34,7 +34,9 @@ public class KeyDiversificationIntegrationTests
         public static readonly byte TestKeyVersion = 0x00;
 
         // Standard GP test key (commonly used in GP implementations)
-        public static readonly byte[] BaseTestKey = Convert.FromHexString("404142434445464748494A4B4C4D4E4F");
+        public static readonly byte[] BaseTestKey = Convert.FromHexString(
+            "404142434445464748494A4B4C4D4E4F"
+        );
     }
 
     [Test]
@@ -52,10 +54,14 @@ public class KeyDiversificationIntegrationTests
         );
 
         // Act - Get standard test keys (diversification removed from test key provider)
-        Result<IKeySet, SmartCardError> keySetResult = GpTestKeys.GetTestKeys(Maybe<InitializeUpdateResponse>.From(initUpdateResponse));
+        Result<IKeySet, SmartCardError> keySetResult = GpTestKeys.GetTestKeys(
+            Maybe<InitializeUpdateResponse>.From(initUpdateResponse)
+        );
 
         // Assert
-        _ = keySetResult.IsSuccess.Should().BeTrue("Key diversification should succeed with test data");
+        _ = keySetResult
+            .IsSuccess.Should()
+            .BeTrue("Key diversification should succeed with test data");
         IKeySet? keySet = keySetResult.Value;
 
         // Validate key set properties
@@ -63,10 +69,18 @@ public class KeyDiversificationIntegrationTests
         _ = keySet.KeyVersion.Should().Be(TestVectors.TestKeyVersion);
 
         // Verify we get the standard test keys (404142...4F)
-        _ = keySet.EncKey.Should().BeEquivalentTo(GpTestKeys.StandardTestKey,
-            "Test key provider should return standard test key for ENC");
-        _ = keySet.MacKey.Should().BeEquivalentTo(GpTestKeys.StandardTestKey,
-            "Test key provider should return standard test key for MAC");
+        _ = keySet
+            .EncKey.Should()
+            .BeEquivalentTo(
+                GpTestKeys.GpTestKey,
+                "Test key provider should return standard test key for ENC"
+            );
+        _ = keySet
+            .MacKey.Should()
+            .BeEquivalentTo(
+                GpTestKeys.GpTestKey,
+                "Test key provider should return standard test key for MAC"
+            );
 
         // All keys should be 16 bytes (2-key 3DES)
         _ = keySet.EncKey.Length.Should().Be(16, "SCP02 encryption key should be 16 bytes");
@@ -75,9 +89,11 @@ public class KeyDiversificationIntegrationTests
         // For SCP02, verify we have a proper IKeySet implementation
         _ = keySet.Should().BeAssignableTo<IKeySet>();
 
-        TestContext.Out.WriteLine($"=== SCP02 Test Vector Key Diversification ===");
+        TestContext.Out.WriteLine("=== SCP02 Test Vector Key Diversification ===");
         TestContext.Out.WriteLine($"KDD:             {Convert.ToHexString(TestVectors.TestKdd)}");
-        TestContext.Out.WriteLine($"Sequence:        {Convert.ToHexString(TestVectors.TestSequenceCounter_1)}");
+        TestContext.Out.WriteLine(
+            $"Sequence:        {Convert.ToHexString(TestVectors.TestSequenceCounter_1)}"
+        );
         TestContext.Out.WriteLine($"Diversified ENC: {Convert.ToHexString(keySet.EncKey)}");
         TestContext.Out.WriteLine($"Diversified MAC: {Convert.ToHexString(keySet.MacKey)}");
     }
@@ -91,21 +107,25 @@ public class KeyDiversificationIntegrationTests
         // Arrange - Create two responses with different sequence counters
         InitializeUpdateResponse response1 = CreateInitializeUpdateResponse(
             TestVectors.TestKdd,
-            TestVectors.TestSequenceCounter_1,  // 0011
+            TestVectors.TestSequenceCounter_1, // 0011
             TestVectors.TestScpId,
             TestVectors.TestKeyVersion
         );
 
         InitializeUpdateResponse response2 = CreateInitializeUpdateResponse(
             TestVectors.TestKdd,
-            TestVectors.TestSequenceCounter_2,  // 0012
+            TestVectors.TestSequenceCounter_2, // 0012
             TestVectors.TestScpId,
             TestVectors.TestKeyVersion
         );
 
         // Act - Diversify keys for both sequences
-        Result<IKeySet, SmartCardError> keys1Result = GpTestKeys.GetTestKeys(Maybe<InitializeUpdateResponse>.From(response1));
-        Result<IKeySet, SmartCardError> keys2Result = GpTestKeys.GetTestKeys(Maybe<InitializeUpdateResponse>.From(response2));
+        Result<IKeySet, SmartCardError> keys1Result = GpTestKeys.GetTestKeys(
+            Maybe<InitializeUpdateResponse>.From(response1)
+        );
+        Result<IKeySet, SmartCardError> keys2Result = GpTestKeys.GetTestKeys(
+            Maybe<InitializeUpdateResponse>.From(response2)
+        );
 
         // Assert
         _ = keys1Result.IsSuccess.Should().BeTrue("First diversification should succeed");
@@ -115,10 +135,18 @@ public class KeyDiversificationIntegrationTests
         IKeySet? keys2 = keys2Result.Value;
 
         // Different sequence counters should produce different keys
-        _ = keys1.EncKey.Should().NotBeEquivalentTo(keys2.EncKey,
-            "Different sequence counters should produce different encryption keys");
-        _ = keys1.MacKey.Should().NotBeEquivalentTo(keys2.MacKey,
-            "Different sequence counters should produce different MAC keys");
+        _ = keys1
+            .EncKey.Should()
+            .NotBeEquivalentTo(
+                keys2.EncKey,
+                "Different sequence counters should produce different encryption keys"
+            );
+        _ = keys1
+            .MacKey.Should()
+            .NotBeEquivalentTo(
+                keys2.MacKey,
+                "Different sequence counters should produce different MAC keys"
+            );
 
         TestContext.Out.WriteLine("=== Keys with seq=0011 ===");
         TestContext.Out.WriteLine($"ENC: {Convert.ToHexString(keys1.EncKey)}");
@@ -135,32 +163,46 @@ public class KeyDiversificationIntegrationTests
         // This validates the fallback behavior
 
         // Arrange - Create response without diversification data using factory function
-        Result<InitializeUpdateResponse, SmartCardError> cardResponseResult = InitializeUpdateResponse.Create(
-            keyDiversificationData: null, // No diversification data
-            keyVersion: 0x00,
-            scpId: 0x02,
-            sequenceCounter: Convert.FromHexString("0001"),
-            cardChallenge: Convert.FromHexString("1234567890AB"), // 6 bytes for SCP02
-            cardCryptogram: Convert.FromHexString("1234567890ABCDEF") // 8 bytes
-        );
+        Result<InitializeUpdateResponse, SmartCardError> cardResponseResult =
+            InitializeUpdateResponse.Create(
+                keyDiversificationData: null, // No diversification data
+                keyVersion: 0x00,
+                scpId: 0x02,
+                sequenceCounter: Convert.FromHexString("0001"),
+                cardChallenge: Convert.FromHexString("1234567890AB"), // 6 bytes for SCP02
+                cardCryptogram: Convert.FromHexString("1234567890ABCDEF") // 8 bytes
+            );
 
-        cardResponseResult.Should().BeSuccess("Factory should create valid response without diversification data");
+        cardResponseResult
+            .Should()
+            .BeSuccess("Factory should create valid response without diversification data");
 
         // Act & Assert - Use functional composition
         var result = cardResponseResult
-            .Bind(cardResponse => GpTestKeys.GetTestKeySet(cardResponse.ScpId, cardResponse.KeyVersion))
-            .Bind(keySet => GpTestKeys.GetTestKeySet(0x02, 0x00)
-                .Map(staticKeys => (keySet, staticKeys)));
+            .Bind(cardResponse =>
+                GpTestKeys.GetTestKeySet(cardResponse.ScpId, cardResponse.KeyVersion)
+            )
+            .Bind(keySet =>
+                GpTestKeys.GetTestKeySet(0x02, 0x00).Map(staticKeys => (keySet, staticKeys))
+            );
 
-        result.Should().BeSuccess();
+        _ = result.IsSuccess.Should().BeTrue();
         result.Match(
             success: tuple =>
             {
                 var (keySet, staticKeys) = tuple;
-                keySet.EncKey.Should().BeEquivalentTo(staticKeys.EncKey,
-                    "Without diversification data, should return static encryption key");
-                keySet.MacKey.Should().BeEquivalentTo(staticKeys.MacKey,
-                    "Without diversification data, should return static MAC key");
+                keySet
+                    .EncKey.Should()
+                    .BeEquivalentTo(
+                        staticKeys.EncKey,
+                        "Without diversification data, should return static encryption key"
+                    );
+                keySet
+                    .MacKey.Should()
+                    .BeEquivalentTo(
+                        staticKeys.MacKey,
+                        "Without diversification data, should return static MAC key"
+                    );
             },
             failure: error => Assert.Fail($"Should not fail: {error}")
         );
@@ -173,17 +215,20 @@ public class KeyDiversificationIntegrationTests
         // This validates proper error handling
 
         // Act - Try to create response without sequence counter (should fail at factory level)
-        Result<InitializeUpdateResponse, SmartCardError> factoryResult = InitializeUpdateResponse.Create(
-            keyDiversificationData: TestVectors.TestKdd,
-            keyVersion: 0x00,
-            scpId: 0x02,
-            sequenceCounter: null, // Missing sequence counter  
-            cardChallenge: Convert.FromHexString("1234567890AB"), // 6 bytes for SCP02
-            cardCryptogram: Convert.FromHexString("1234567890ABCDEF")
-        );
+        Result<InitializeUpdateResponse, SmartCardError> factoryResult =
+            InitializeUpdateResponse.Create(
+                keyDiversificationData: TestVectors.TestKdd,
+                keyVersion: 0x00,
+                scpId: 0x02,
+                sequenceCounter: null, // Missing sequence counter
+                cardChallenge: Convert.FromHexString("1234567890AB"), // 6 bytes for SCP02
+                cardCryptogram: Convert.FromHexString("1234567890ABCDEF")
+            );
 
         // Assert - Factory should reject invalid SCP02 configuration
-        _ = factoryResult.IsFailure.Should().BeTrue("Factory should reject SCP02 response without sequence counter");
+        _ = factoryResult
+            .IsFailure.Should()
+            .BeTrue("Factory should reject SCP02 response without sequence counter");
         _ = factoryResult.Error.Message.Should().Contain("sequence counter");
         _ = factoryResult.Error.Message.Should().Contain("SCP02");
     }
@@ -195,17 +240,20 @@ public class KeyDiversificationIntegrationTests
         // This validates input validation
 
         // Act - Try to create response with too-short sequence counter (should fail at factory level)
-        Result<InitializeUpdateResponse, SmartCardError> factoryResult = InitializeUpdateResponse.Create(
-            keyDiversificationData: TestVectors.TestKdd,
-            keyVersion: 0x00,
-            scpId: 0x02,
-            sequenceCounter: Convert.FromHexString("00"), // Only 1 byte, should be at least 2
-            cardChallenge: Convert.FromHexString("1234567890AB"), // 6 bytes for SCP02
-            cardCryptogram: Convert.FromHexString("1234567890ABCDEF")
-        );
+        Result<InitializeUpdateResponse, SmartCardError> factoryResult =
+            InitializeUpdateResponse.Create(
+                keyDiversificationData: TestVectors.TestKdd,
+                keyVersion: 0x00,
+                scpId: 0x02,
+                sequenceCounter: Convert.FromHexString("00"), // Only 1 byte, should be at least 2
+                cardChallenge: Convert.FromHexString("1234567890AB"), // 6 bytes for SCP02
+                cardCryptogram: Convert.FromHexString("1234567890ABCDEF")
+            );
 
         // Assert - Factory should reject invalid sequence counter length
-        _ = factoryResult.IsFailure.Should().BeTrue("Factory should reject short sequence counter for SCP02");
+        _ = factoryResult
+            .IsFailure.Should()
+            .BeTrue("Factory should reject short sequence counter for SCP02");
         _ = factoryResult.Error.Message.Should().Contain("sequence counter");
         _ = factoryResult.Error.Message.Should().Contain("2 bytes");
     }
@@ -225,20 +273,24 @@ public class KeyDiversificationIntegrationTests
         );
 
         // Act
-        Result<IKeySet, SmartCardError> keySetResult = GpTestKeys.GetTestKeySet(cardResponse.ScpId, cardResponse.KeyVersion);
+        Result<IKeySet, SmartCardError> keySetResult = GpTestKeys.GetTestKeySet(
+            cardResponse.ScpId,
+            cardResponse.KeyVersion
+        );
 
         // Assert - Compare with static keys using functional composition
-        Result<(IKeySet keySet, IKeySet staticKeys), SmartCardError> comparison = keySetResult
-            .Bind(keySet => GpTestKeys.GetTestKeySet(0x03, 0x00)
-                .Map(staticKeys => (keySet, staticKeys)));
+        Result<(IKeySet keySet, IKeySet staticKeys), SmartCardError> comparison = keySetResult.Bind(
+            keySet => GpTestKeys.GetTestKeySet(0x03).Map(staticKeys => (keySet, staticKeys))
+        );
 
-        comparison.Should().BeSuccess("SCP03 diversification should succeed");
+        _ = comparison.IsSuccess.Should().BeTrue("SCP03 diversification should succeed");
         comparison.Match(
             success: tuple =>
             {
                 var (keySet, staticKeys) = tuple;
-                keySet.EncKey.Should().BeEquivalentTo(staticKeys.EncKey,
-                    "SCP03 currently returns static keys");
+                keySet
+                    .EncKey.Should()
+                    .BeEquivalentTo(staticKeys.EncKey, "SCP03 currently returns static keys");
             },
             failure: error => Assert.Fail($"Should not fail: {error}")
         );
@@ -251,15 +303,18 @@ public class KeyDiversificationIntegrationTests
         // This validates error handling for unknown SCP versions
 
         // Arrange - Try to create response with unsupported SCP version (should fail at factory level)
-        Result<InitializeUpdateResponse, SmartCardError> factoryResult = CreateInitializeUpdateResponseResult(
-            TestVectors.TestKdd,
-            TestVectors.TestSequenceCounter_1,
-            0x01, // SCP01 - unsupported
-            0x00
-        );
+        Result<InitializeUpdateResponse, SmartCardError> factoryResult =
+            CreateInitializeUpdateResponseResult(
+                TestVectors.TestKdd,
+                TestVectors.TestSequenceCounter_1,
+                0x01, // SCP01 - unsupported
+                0x00
+            );
 
         // Assert - Factory should reject unsupported SCP version
-        _ = factoryResult.IsFailure.Should().BeTrue("Factory should reject unsupported SCP version");
+        _ = factoryResult
+            .IsFailure.Should()
+            .BeTrue("Factory should reject unsupported SCP version");
         _ = factoryResult.Error.Message.Should().Contain("Unsupported SCP version");
         _ = factoryResult.Error.Message.Should().Contain("01");
     }
@@ -279,22 +334,34 @@ public class KeyDiversificationIntegrationTests
         );
 
         // Act - Diversify keys twice
-        Result<IKeySet, SmartCardError> keySet1Result = GpTestKeys.GetTestKeySet(cardResponse.ScpId, cardResponse.KeyVersion);
-        Result<IKeySet, SmartCardError> keySet2Result = GpTestKeys.GetTestKeySet(cardResponse.ScpId, cardResponse.KeyVersion);
+        Result<IKeySet, SmartCardError> keySet1Result = GpTestKeys.GetTestKeySet(
+            cardResponse.ScpId,
+            cardResponse.KeyVersion
+        );
+        Result<IKeySet, SmartCardError> keySet2Result = GpTestKeys.GetTestKeySet(
+            cardResponse.ScpId,
+            cardResponse.KeyVersion
+        );
 
         // Assert - Compare key sets using functional composition
-        Result<(IKeySet keySet1, IKeySet keySet2), SmartCardError> comparison = keySet1Result
-            .Bind(keySet1 => keySet2Result.Map(keySet2 => (keySet1, keySet2)));
+        Result<(IKeySet keySet1, IKeySet keySet2), SmartCardError> comparison = keySet1Result.Bind(
+            keySet1 => keySet2Result.Map(keySet2 => (keySet1, keySet2))
+        );
 
-        comparison.Should().BeSuccess("Both key derivations should succeed");
+        _ = comparison.IsSuccess.Should().BeTrue("Both key derivations should succeed");
         comparison.Match(
             success: tuple =>
             {
                 var (keySet1, keySet2) = tuple;
-                keySet1.EncKey.Should().BeEquivalentTo(keySet2.EncKey,
-                    "Same input should produce same encryption key");
-                keySet1.MacKey.Should().BeEquivalentTo(keySet2.MacKey,
-                    "Same input should produce same MAC key");
+                keySet1
+                    .EncKey.Should()
+                    .BeEquivalentTo(
+                        keySet2.EncKey,
+                        "Same input should produce same encryption key"
+                    );
+                keySet1
+                    .MacKey.Should()
+                    .BeEquivalentTo(keySet2.MacKey, "Same input should produce same MAC key");
             },
             failure: error => Assert.Fail($"Should not fail: {error}")
         );
@@ -307,38 +374,46 @@ public class KeyDiversificationIntegrationTests
         // Uses test vectors and validates the complete diversification → session key derivation pipeline
 
         // Arrange - Use test vectors for functional validation
-        Result<InitializeUpdateResponse, SmartCardError> factoryResult = InitializeUpdateResponse.Create(
-            keyDiversificationData: TestVectors.TestKdd,
-            keyVersion: TestVectors.TestKeyVersion,
-            scpId: TestVectors.TestScpId,
-            sequenceCounter: TestVectors.TestSequenceCounter_1,
-            cardChallenge: Convert.FromHexString("C284EC19415D"), // 6 bytes for SCP02
-            cardCryptogram: Convert.FromHexString("17F4198ADCD5102D") // 8 bytes
-        );
+        Result<InitializeUpdateResponse, SmartCardError> factoryResult =
+            InitializeUpdateResponse.Create(
+                keyDiversificationData: TestVectors.TestKdd,
+                keyVersion: TestVectors.TestKeyVersion,
+                scpId: TestVectors.TestScpId,
+                sequenceCounter: TestVectors.TestSequenceCounter_1,
+                cardChallenge: Convert.FromHexString("C284EC19415D"), // 6 bytes for SCP02
+                cardCryptogram: Convert.FromHexString("17F4198ADCD5102D") // 8 bytes
+            );
 
-        factoryResult.Should().BeSuccess("Factory should create valid response with test data");
+        _ = factoryResult.IsSuccess.Should().BeTrue("Factory should create valid response with test data");
 
         // Act - Complete pipeline: Diversification → Session Key Derivation using functional composition
         var sessionKeysResult = factoryResult
-            .Bind(initUpdateResponse => GpTestKeys.GetTestKeySet(initUpdateResponse.ScpId, initUpdateResponse.KeyVersion))
+            .Bind(initUpdateResponse =>
+                GpTestKeys.GetTestKeySet(initUpdateResponse.ScpId, initUpdateResponse.KeyVersion)
+            )
             .Bind(diversifiedKeys =>
             {
-                Result<byte[], SmartCardError> sessionEncResult = Scp02Protocol.DeriveScp02SessionKey(
-                    diversifiedKeys.EncKey,
-                    Convert.FromHexString("0182"), // SCP02 S-ENC constant
-                    TestVectors.TestSequenceCounter_1);
+                Result<byte[], SmartCardError> sessionEncResult =
+                    Scp02Protocol.DeriveScp02SessionKey(
+                        diversifiedKeys.EncKey,
+                        Convert.FromHexString("0182"), // SCP02 S-ENC constant
+                        TestVectors.TestSequenceCounter_1
+                    );
 
-                Result<byte[], SmartCardError> sessionMacResult = Scp02Protocol.DeriveScp02SessionKey(
-                    diversifiedKeys.MacKey,
-                    Convert.FromHexString("0101"), // SCP02 S-MAC constant
-                    TestVectors.TestSequenceCounter_1);
+                Result<byte[], SmartCardError> sessionMacResult =
+                    Scp02Protocol.DeriveScp02SessionKey(
+                        diversifiedKeys.MacKey,
+                        Convert.FromHexString("0101"), // SCP02 S-MAC constant
+                        TestVectors.TestSequenceCounter_1
+                    );
 
-                return sessionEncResult
-                    .Bind(sessionEnc => sessionMacResult.Map(sessionMac => (diversifiedKeys, sessionEnc, sessionMac)));
+                return sessionEncResult.Bind(sessionEnc =>
+                    sessionMacResult.Map(sessionMac => (diversifiedKeys, sessionEnc, sessionMac))
+                );
             });
 
         // Assert - Validate the pipeline produces working keys
-        sessionKeysResult.Should().BeSuccess("Complete key derivation pipeline should succeed");
+        _ = sessionKeysResult.IsSuccess.Should().BeTrue("Complete key derivation pipeline should succeed");
         sessionKeysResult.Match(
             success: tuple =>
             {
@@ -346,23 +421,47 @@ public class KeyDiversificationIntegrationTests
 
                 // Validate that the diversification pipeline produces consistent, working keys
                 // Verify session keys are derived correctly (should be different from base diversified keys)
-                derivedSessionEnc.Should().NotBeEquivalentTo(diversifiedKeys.EncKey,
-                    "Session ENC key should be different from diversified base ENC key");
-                derivedSessionMac.Should().NotBeEquivalentTo(diversifiedKeys.MacKey,
-                    "Session MAC key should be different from diversified base MAC key");
+                derivedSessionEnc
+                    .Should()
+                    .NotBeEquivalentTo(
+                        diversifiedKeys.EncKey,
+                        "Session ENC key should be different from diversified base ENC key"
+                    );
+                derivedSessionMac
+                    .Should()
+                    .NotBeEquivalentTo(
+                        diversifiedKeys.MacKey,
+                        "Session MAC key should be different from diversified base MAC key"
+                    );
 
                 // Verify keys have proper length for 2-key 3DES
-                derivedSessionEnc.Length.Should().Be(16, "Session ENC key should be 16 bytes for 2-key 3DES");
-                derivedSessionMac.Length.Should().Be(16, "Session MAC key should be 16 bytes for 2-key 3DES");
+                derivedSessionEnc
+                    .Length.Should()
+                    .Be(16, "Session ENC key should be 16 bytes for 2-key 3DES");
+                derivedSessionMac
+                    .Length.Should()
+                    .Be(16, "Session MAC key should be 16 bytes for 2-key 3DES");
 
                 TestContext.Out.WriteLine("=== End-to-End Key Diversification Validation ===");
-                TestContext.Out.WriteLine($"KDD:                  {Convert.ToHexString(TestVectors.TestKdd)}");
-                TestContext.Out.WriteLine($"Sequence Counter:     {Convert.ToHexString(TestVectors.TestSequenceCounter_1)}");
-                TestContext.Out.WriteLine($"Diversified ENC:      {Convert.ToHexString(diversifiedKeys.EncKey)}");
-                TestContext.Out.WriteLine($"Diversified MAC:      {Convert.ToHexString(diversifiedKeys.MacKey)}");
-                TestContext.Out.WriteLine($"Session S-ENC:        {Convert.ToHexString(derivedSessionEnc)}");
-                TestContext.Out.WriteLine($"Session S-MAC:        {Convert.ToHexString(derivedSessionMac)}");
-                TestContext.Out.WriteLine($"✓ Functional diversification pipeline validated!");
+                TestContext.Out.WriteLine(
+                    $"KDD:                  {Convert.ToHexString(TestVectors.TestKdd)}"
+                );
+                TestContext.Out.WriteLine(
+                    $"Sequence Counter:     {Convert.ToHexString(TestVectors.TestSequenceCounter_1)}"
+                );
+                TestContext.Out.WriteLine(
+                    $"Diversified ENC:      {Convert.ToHexString(diversifiedKeys.EncKey)}"
+                );
+                TestContext.Out.WriteLine(
+                    $"Diversified MAC:      {Convert.ToHexString(diversifiedKeys.MacKey)}"
+                );
+                TestContext.Out.WriteLine(
+                    $"Session S-ENC:        {Convert.ToHexString(derivedSessionEnc)}"
+                );
+                TestContext.Out.WriteLine(
+                    $"Session S-MAC:        {Convert.ToHexString(derivedSessionMac)}"
+                );
+                TestContext.Out.WriteLine("✓ Functional diversification pipeline validated!");
             },
             failure: error => Assert.Fail($"Key derivation pipeline should not fail: {error}")
         );
@@ -383,29 +482,39 @@ public class KeyDiversificationIntegrationTests
         );
 
         // Act
-        Result<IKeySet, SmartCardError> keySetResult = GpTestKeys.GetTestKeySet(cardResponse.ScpId, cardResponse.KeyVersion);
+        Result<IKeySet, SmartCardError> keySetResult = GpTestKeys.GetTestKeySet(
+            cardResponse.ScpId,
+            cardResponse.KeyVersion
+        );
 
         // Assert - Test that the keys work for session key derivation (SCP02) using functional composition
         byte[] sequenceCounter = TestVectors.TestSequenceCounter_1;
 
-        Result<(IKeySet keySet, byte[] sessionEnc, byte[] sessionMac), SmartCardError> sessionKeysResult = keySetResult
-            .Bind(keySet =>
-            {
-                Result<byte[], SmartCardError> sessionEncResult = Scp02Protocol.DeriveScp02SessionKey(
-                    keySet.EncKey,
-                    Convert.FromHexString("0182"), // SCP02 S-ENC constant
-                    sequenceCounter);
+        Result<
+            (IKeySet keySet, byte[] sessionEnc, byte[] sessionMac),
+            SmartCardError
+        > sessionKeysResult = keySetResult.Bind(keySet =>
+        {
+            Result<byte[], SmartCardError> sessionEncResult = Scp02Protocol.DeriveScp02SessionKey(
+                keySet.EncKey,
+                Convert.FromHexString("0182"), // SCP02 S-ENC constant
+                sequenceCounter
+            );
 
-                Result<byte[], SmartCardError> sessionMacResult = Scp02Protocol.DeriveScp02SessionKey(
-                    keySet.MacKey,
-                    Convert.FromHexString("0101"), // SCP02 S-MAC constant
-                    sequenceCounter);
+            Result<byte[], SmartCardError> sessionMacResult = Scp02Protocol.DeriveScp02SessionKey(
+                keySet.MacKey,
+                Convert.FromHexString("0101"), // SCP02 S-MAC constant
+                sequenceCounter
+            );
 
-                return sessionEncResult
-                    .Bind(sessionEnc => sessionMacResult.Map(sessionMac => (keySet, sessionEnc, sessionMac)));
-            });
+            return sessionEncResult.Bind(sessionEnc =>
+                sessionMacResult.Map(sessionMac => (keySet, sessionEnc, sessionMac))
+            );
+        });
 
-        sessionKeysResult.Should().BeSuccess("Session key derivation should work with diversified keys");
+        sessionKeysResult
+            .Should()
+            .BeSuccess("Session key derivation should work with diversified keys");
         sessionKeysResult.Match(
             success: tuple =>
             {
@@ -415,10 +524,18 @@ public class KeyDiversificationIntegrationTests
                 sessionEnc.Length.Should().Be(16, "Session ENC key should be 16 bytes");
                 sessionMac.Length.Should().Be(16, "Session MAC key should be 16 bytes");
 
-                TestContext.Out.WriteLine($"Diversified base ENC: {Convert.ToHexString(keySet.EncKey)}");
-                TestContext.Out.WriteLine($"Diversified base MAC: {Convert.ToHexString(keySet.MacKey)}");
-                TestContext.Out.WriteLine($"Session ENC derived:  {Convert.ToHexString(sessionEnc)}");
-                TestContext.Out.WriteLine($"Session MAC derived:  {Convert.ToHexString(sessionMac)}");
+                TestContext.Out.WriteLine(
+                    $"Diversified base ENC: {Convert.ToHexString(keySet.EncKey)}"
+                );
+                TestContext.Out.WriteLine(
+                    $"Diversified base MAC: {Convert.ToHexString(keySet.MacKey)}"
+                );
+                TestContext.Out.WriteLine(
+                    $"Session ENC derived:  {Convert.ToHexString(sessionEnc)}"
+                );
+                TestContext.Out.WriteLine(
+                    $"Session MAC derived:  {Convert.ToHexString(sessionMac)}"
+                );
             },
             failure: error => Assert.Fail($"Session key derivation should not fail: {error}")
         );
@@ -428,11 +545,15 @@ public class KeyDiversificationIntegrationTests
     /// Helper method to create InitializeUpdateResponse for testing using functional factory pattern.
     /// Uses the public factory function with proper validation.
     /// </summary>
-    private static Result<InitializeUpdateResponse, SmartCardError> CreateInitializeUpdateResponseResult(
+    private static Result<
+        InitializeUpdateResponse,
+        SmartCardError
+    > CreateInitializeUpdateResponseResult(
         byte[] kdd,
         byte[] sequenceCounter,
         byte scpId,
-        byte keyVersion)
+        byte keyVersion
+    )
     {
         byte scpVersion = (byte)(scpId & 0x03);
 
@@ -441,7 +562,7 @@ public class KeyDiversificationIntegrationTests
         {
             0x02 => Convert.FromHexString("1234567890AB"), // 6 bytes for SCP02
             0x03 => Convert.FromHexString("1234567890ABCDEF"), // 8 bytes for SCP03
-            _ => Convert.FromHexString("1234567890AB") // Default to 6 bytes
+            _ => Convert.FromHexString("1234567890AB"), // Default to 6 bytes
         };
 
         return InitializeUpdateResponse.Create(
@@ -461,10 +582,16 @@ public class KeyDiversificationIntegrationTests
         byte[] kdd,
         byte[] sequenceCounter,
         byte scpId,
-        byte keyVersion)
+        byte keyVersion
+    )
     {
-        Result<InitializeUpdateResponse, SmartCardError> result = CreateInitializeUpdateResponseResult(kdd, sequenceCounter, scpId, keyVersion);
-        _ = result.IsSuccess.Should().BeTrue($"Expected successful creation but got: {(result.IsFailure ? result.Error.Message : "unknown error")}");
+        Result<InitializeUpdateResponse, SmartCardError> result =
+            CreateInitializeUpdateResponseResult(kdd, sequenceCounter, scpId, keyVersion);
+        _ = result
+            .IsSuccess.Should()
+            .BeTrue(
+                $"Expected successful creation but got: {(result.IsFailure ? result.Error.Message : "unknown error")}"
+            );
         return result.Value;
     }
 }

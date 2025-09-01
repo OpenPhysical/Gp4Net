@@ -1,104 +1,164 @@
 using System;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Core;
 
 /// <summary>
 /// Represents a parsed APDU command with header and data fields.
+/// Immutable record following functional programming principles.
 /// </summary>
 [PublicAPI]
-public class ApduCommand
+public sealed record ApduCommand
 {
     /// <summary>
     /// Gets the class byte (CLA).
     /// </summary>
-    public byte Cla { get; }
+    public byte Cla { get; init; }
 
     /// <summary>
     /// Gets the instruction byte (INS).
     /// </summary>
-    public byte Ins { get; }
+    public byte Ins { get; init; }
 
     /// <summary>
     /// Gets the parameter 1 byte (P1).
     /// </summary>
-    public byte P1 { get; }
+    public byte P1 { get; init; }
 
     /// <summary>
     /// Gets the parameter 2 byte (P2).
     /// </summary>
-    public byte P2 { get; }
+    public byte P2 { get; init; }
 
     /// <summary>
     /// Gets the command data.
     /// </summary>
-    public byte[] Data { get; }
+    public byte[] Data { get; init; }
 
     /// <summary>
-    /// Gets the expected response length (Le). Null if not specified.
+    /// Gets the expected response length (Le). Use Maybe for optional values.
     /// </summary>
-    public byte? Le { get; }
+    public Maybe<byte> Le { get; init; }
 
     /// <summary>
     /// Gets the raw APDU bytes.
     /// </summary>
-    public byte[] RawBytes { get; }
+    public byte[] RawBytes { get; init; }
 
     /// <summary>
-    /// Initializes a new instance of the ApduCommand class.
+    /// Initializes a new instance of the ApduCommand record.
+    /// </summary>
+    private ApduCommand()
+    {
+        Data = [];
+        RawBytes = [];
+    }
+    /// <summary>
+    /// Functional factory method that creates ApduCommand using Result pattern.
     /// </summary>
     /// <param name="rawBytes">The raw APDU command bytes.</param>
-    public ApduCommand(byte[] rawBytes)
+    /// <returns>Result containing ApduCommand or error.</returns>
+    public static Result<ApduCommand, SmartCardError> Create(byte[] rawBytes)
     {
-        ArgumentNullException.ThrowIfNull(rawBytes);
-        if (rawBytes.Length < 4)
-            throw new ArgumentException("APDU must be at least 4 bytes long", nameof(rawBytes));
+        return Maybe
+            .From(rawBytes)
+            .ToResult(SmartCardError.InvalidArgument("APDU bytes cannot be null"))
+            .Ensure(
+                bytes => bytes.Length >= 4,
+                SmartCardError.InvalidArgument("APDU must be at least 4 bytes long")
+            )
+            .Bind(ValidateApduFormat)
+            .Map(bytes => CreateUnsafe(bytes));
+    }
 
-        RawBytes = (byte[])rawBytes.Clone();
-
-        Cla = rawBytes[0];
-        Ins = rawBytes[1];
-        P1 = rawBytes[2];
-        P2 = rawBytes[3];
-
-        switch (rawBytes.Length)
+    /// <summary>
+    /// Validates APDU format according to ISO 7816 specification.
+    /// </summary>
+    private static Result<byte[], SmartCardError> ValidateApduFormat(byte[] rawBytes)
+    {
+        return rawBytes.Length switch
         {
-            case 4:
-                // Case 1: No data, no Le
-                Data = [];
-                Le = null;
-                break;
-            case 5:
-                // Case 2: No data, Le present
-                Data = [];
-                Le = rawBytes[4];
-                break;
-            default:
-            {
-                // Case 3 or 4: Data present
-                byte lc = rawBytes[4];
+            4 => Result.Success<byte[], SmartCardError>(rawBytes), // Case 1: No Lc, no Le
+            5 => Result.Success<byte[], SmartCardError>(rawBytes), // Case 2: No Lc, Le present
+            >= 6 when rawBytes.Length == 5 + rawBytes[4] => Result.Success<byte[], SmartCardError>(
+                rawBytes
+            ), // Case 3: Lc present, data, no Le
+            >= 7 when rawBytes.Length == 6 + rawBytes[4] => Result.Success<byte[], SmartCardError>(
+                rawBytes
+            ), // Case 4: Lc present, data, Le present
+            _ => Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidArgument("Invalid APDU format")
+            ),
+        };
+    }
 
-                if (rawBytes.Length == 5 + lc)
-                {
-                    // Case 3: Data present, no Le
-                    Data = new byte[lc];
-                    Array.Copy(rawBytes, 5, Data, 0, lc);
-                    Le = null;
-                }
-                else if (rawBytes.Length == 5 + lc + 1)
-                {
-                    // Case 4: Data present, Le present
-                    Data = new byte[lc];
-                    Array.Copy(rawBytes, 5, Data, 0, lc);
-                    Le = rawBytes[5 + lc];
-                }
-                else
-                {
-                    throw new ArgumentException("Invalid APDU format", nameof(rawBytes));
-                }
-                break;
+    /// <summary>
+    /// Creates ApduCommand without validation. Used internally after validation in Create method.
+    /// </summary>
+    private static ApduCommand CreateUnsafe(byte[] rawBytes) => 
+        ParseApduBytes(rawBytes);
+
+    /// <summary>
+    /// Parses raw APDU bytes into structured components following ISO 7816 specification.
+    /// </summary>
+    private static ApduCommand ParseApduBytes(byte[] rawBytes) =>
+        rawBytes.Length switch
+        {
+            4 => new ApduCommand
+            {
+                Cla = rawBytes[0],
+                Ins = rawBytes[1],
+                P1 = rawBytes[2],
+                P2 = rawBytes[3],
+                Data = [],
+                Le = Maybe<byte>.None,
+                RawBytes = (byte[])rawBytes.Clone()
+            },
+            5 => new ApduCommand
+            {
+                Cla = rawBytes[0],
+                Ins = rawBytes[1],
+                P1 = rawBytes[2],
+                P2 = rawBytes[3],
+                Data = [],
+                Le = Maybe<byte>.From(rawBytes[4]),
+                RawBytes = (byte[])rawBytes.Clone()
+            },
+            _ => ParseApduWithData(rawBytes)
+        };
+
+    /// <summary>
+    /// Parses APDU with data component (Case 3 or 4).
+    /// </summary>
+    private static ApduCommand ParseApduWithData(byte[] rawBytes)
+    {
+        byte lc = rawBytes[4];
+        byte[] data = new byte[lc];
+        Array.Copy(rawBytes, 5, data, 0, lc);
+
+        return rawBytes.Length == 5 + lc
+            ? new ApduCommand
+            {
+                Cla = rawBytes[0],
+                Ins = rawBytes[1],
+                P1 = rawBytes[2],
+                P2 = rawBytes[3],
+                Data = data,
+                Le = Maybe<byte>.None,
+                RawBytes = (byte[])rawBytes.Clone()
             }
-        }
+            : new ApduCommand
+            {
+                Cla = rawBytes[0],
+                Ins = rawBytes[1],
+                P1 = rawBytes[2],
+                P2 = rawBytes[3],
+                Data = data,
+                Le = Maybe<byte>.From(rawBytes[5 + lc]),
+                RawBytes = (byte[])rawBytes.Clone()
+            };
     }
 
     /// <summary>
@@ -106,10 +166,7 @@ public class ApduCommand
     /// </summary>
     public bool IsSelect
     {
-        get
-        {
-            return Ins == 0xA4;
-        }
+        get { return Ins == 0xA4; }
     }
 
     /// <summary>
@@ -117,10 +174,7 @@ public class ApduCommand
     /// </summary>
     public bool IsInitializeUpdate
     {
-        get
-        {
-            return Cla == 0x80 && Ins == 0x50;
-        }
+        get { return Cla == 0x80 && Ins == 0x50; }
     }
 
     /// <summary>
@@ -128,10 +182,7 @@ public class ApduCommand
     /// </summary>
     public bool IsExternalAuthenticate
     {
-        get
-        {
-            return Cla == 0x84 && Ins == 0x82;
-        }
+        get { return Cla == 0x84 && Ins == 0x82; }
     }
 
     /// <summary>
@@ -139,10 +190,7 @@ public class ApduCommand
     /// </summary>
     public bool IsInstall
     {
-        get
-        {
-            return Cla is 0x80 or 0x84 && Ins == 0xE6;
-        }
+        get { return Cla is 0x80 or 0x84 && Ins == 0xE6; }
     }
 
     /// <summary>
@@ -150,10 +198,7 @@ public class ApduCommand
     /// </summary>
     public bool IsLoad
     {
-        get
-        {
-            return Cla is 0x80 or 0x84 && Ins == 0xE8;
-        }
+        get { return Cla is 0x80 or 0x84 && Ins == 0xE8; }
     }
 
     /// <summary>
@@ -161,10 +206,7 @@ public class ApduCommand
     /// </summary>
     public bool IsGetStatus
     {
-        get
-        {
-            return Cla is 0x80 or 0x84 && Ins == 0xF2;
-        }
+        get { return Cla is 0x80 or 0x84 && Ins == 0xF2; }
     }
 
     /// <summary>
@@ -172,10 +214,7 @@ public class ApduCommand
     /// </summary>
     public bool IsDelete
     {
-        get
-        {
-            return Cla is 0x80 or 0x84 && Ins == 0xE4;
-        }
+        get { return Cla is 0x80 or 0x84 && Ins == 0xE4; }
     }
 
     /// <summary>
@@ -183,10 +222,7 @@ public class ApduCommand
     /// </summary>
     public bool IsGetData
     {
-        get
-        {
-            return Ins == 0xCA;
-        }
+        get { return Ins == 0xCA; }
     }
 
     /// <summary>
@@ -194,10 +230,7 @@ public class ApduCommand
     /// </summary>
     public bool IsPutKey
     {
-        get
-        {
-            return Cla is 0x80 or 0x84 && Ins == 0xD8;
-        }
+        get { return Cla is 0x80 or 0x84 && Ins == 0xD8; }
     }
 
     /// <summary>
@@ -205,10 +238,7 @@ public class ApduCommand
     /// </summary>
     public bool IsSetStatus
     {
-        get
-        {
-            return Cla is 0x80 or 0x84 && Ins == 0xF0;
-        }
+        get { return Cla is 0x80 or 0x84 && Ins == 0xF0; }
     }
 
     /// <summary>
@@ -218,6 +248,6 @@ public class ApduCommand
     public override string ToString()
     {
         return $"{Cla:X2} {Ins:X2} {P1:X2} {P2:X2} [{Data.Length:X2}] {Convert.ToHexString(Data)}"
-               + (Le.HasValue ? $" [{Le.Value:X2}]" : "");
+            + Le.Map(le => $" [{le:X2}]").GetValueOrDefault("");
     }
 }

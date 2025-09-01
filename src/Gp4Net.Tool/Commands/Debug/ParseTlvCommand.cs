@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
 using System.Threading.Tasks;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
@@ -63,12 +62,13 @@ public class ParseTlvCommand : IPipelineCommand<ParseTlvCommand.Settings>
             byte[] data = Convert.FromHexString(cleanHex);
 
             // Build semantic rows using pure functional composition
-            List<TlvTableBuilder.TlvRow> semanticRows = TlvTableBuilder.BuildTlvRows(
-                data,
-                showBytes: settings.ShowBytes,
-                showOffsets: settings.ShowOffsets,
-                recursive: settings.Recursive
-            ).ToList();
+            List<TlvTableBuilder.TlvRow> semanticRows = [.. TlvTableBuilder
+                .BuildTlvRows(
+                    data,
+                    showBytes: settings.ShowBytes,
+                    showOffsets: settings.ShowOffsets,
+                    recursive: settings.Recursive
+                )];
 
             // Display based on format using pure functions
             switch (settings.Format.ToLowerInvariant())
@@ -96,5 +96,4 @@ public class ParseTlvCommand : IPipelineCommand<ParseTlvCommand.Settings>
             return Task.FromResult(1);
         }
     }
-
 }

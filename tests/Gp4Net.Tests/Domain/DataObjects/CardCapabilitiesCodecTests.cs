@@ -17,49 +17,87 @@ namespace Gp4Net.Tests.Domain.DataObjects;
 public class CardCapabilitiesCodecTests
 {
     private static readonly byte[] Scp02OnlyCapabilities = Convert.FromHexString(
-        "664C" + // Tag 66, Length 4C (76 bytes)
-        "0601" + // Card recognition data length
-        "42" +   // Card recognition OID
-        "6002" + // Card management type and version
-        "0200" + // Version 2.0
-        "6301" + // Card identification scheme
-        "00" +   // Scheme 0
-        "6401" + // Secure channel protocol
-        "02" +   // SCP02
-        "6501" + // Implementation
-        "15" +   // i=15
-        "6602" + // Key types
-        "8010" + // DES keys, 16 bytes
-        "6501" + // Implementation
-        "04" +   // i=04
-        "6602" + // Key types
-        "8010" + // DES keys, 16 bytes
-        "6501" + // Implementation
-        "1A" +   // i=1A
-        "6602" + // Key types
-        "8010"   // DES keys, 16 bytes
+        "664C"
+            + // Tag 66, Length 4C (76 bytes)
+            "0601"
+            + // Card recognition data length
+            "42"
+            + // Card recognition OID
+            "6002"
+            + // Card management type and version
+            "0200"
+            + // Version 2.0
+            "6301"
+            + // Card identification scheme
+            "00"
+            + // Scheme 0
+            "6401"
+            + // Secure channel protocol
+            "02"
+            + // SCP02
+            "6501"
+            + // Implementation
+            "15"
+            + // i=15
+            "6602"
+            + // Key types
+            "8010"
+            + // DES keys, 16 bytes
+            "6501"
+            + // Implementation
+            "04"
+            + // i=04
+            "6602"
+            + // Key types
+            "8010"
+            + // DES keys, 16 bytes
+            "6501"
+            + // Implementation
+            "1A"
+            + // i=1A
+            "6602"
+            + // Key types
+            "8010" // DES keys, 16 bytes
     );
 
     private static readonly byte[] DualProtocolCapabilities = Convert.FromHexString(
-        "6654" + // Tag 66, Length 54 (84 bytes)
-        "0601" + // Card recognition data
-        "42" +   // OID
-        "6002" + // Card management type/version
-        "0200" + // Version 2.0
-        "6301" + // Card identification scheme
-        "00" +   // Scheme 0
-        "6401" + // SCP protocol
-        "02" +   // SCP02
-        "6501" + // Implementation
-        "15" +   // i=15
-        "6602" + // Key types
-        "8010" + // DES keys, 16 bytes
-        "6401" + // SCP protocol
-        "03" +   // SCP03
-        "6501" + // Implementation
-        "70" +   // i=70
-        "6602" + // Key types
-        "8020"   // AES keys, 32 bytes
+        "6654"
+            + // Tag 66, Length 54 (84 bytes)
+            "0601"
+            + // Card recognition data
+            "42"
+            + // OID
+            "6002"
+            + // Card management type/version
+            "0200"
+            + // Version 2.0
+            "6301"
+            + // Card identification scheme
+            "00"
+            + // Scheme 0
+            "6401"
+            + // SCP protocol
+            "02"
+            + // SCP02
+            "6501"
+            + // Implementation
+            "15"
+            + // i=15
+            "6602"
+            + // Key types
+            "8010"
+            + // DES keys, 16 bytes
+            "6401"
+            + // SCP protocol
+            "03"
+            + // SCP03
+            "6501"
+            + // Implementation
+            "70"
+            + // i=70
+            "6602"
+            + // Key types
+            "8020" // AES keys, 32 bytes
     );
 
     [Test]
@@ -80,21 +118,21 @@ public class CardCapabilitiesCodecTests
                         new ScpImplementationSpecifier
                         {
                             Implementation = 0x15,
-                            KeyTypes = { 0x80, 0x10 } // DES, 16 bytes
+                            KeyTypes = { 0x80, 0x10 }, // DES, 16 bytes
                         },
                         new ScpImplementationSpecifier
                         {
                             Implementation = 0x04,
-                            KeyTypes = { 0x80, 0x10 }
+                            KeyTypes = { 0x80, 0x10 },
                         },
                         new ScpImplementationSpecifier
                         {
                             Implementation = 0x1A,
-                            KeyTypes = { 0x80, 0x10 }
-                        }
-                    }
-                }
-            }
+                            KeyTypes = { 0x80, 0x10 },
+                        },
+                    },
+                },
+            },
         };
 
         Result<byte[], SmartCardError> encodedResult = CardCapabilitiesCodec.Encode(capabilities);
@@ -126,9 +164,9 @@ public class CardCapabilitiesCodecTests
                         new ScpImplementationSpecifier
                         {
                             Implementation = 0x15,
-                            KeyTypes = { 0x80, 0x10 }
-                        }
-                    }
+                            KeyTypes = { 0x80, 0x10 },
+                        },
+                    },
                 },
                 new SecureChannelProtocol
                 {
@@ -138,11 +176,11 @@ public class CardCapabilitiesCodecTests
                         new ScpImplementationSpecifier
                         {
                             Implementation = 0x70,
-                            KeyTypes = { 0x80, 0x20 } // AES, 32 bytes
-                        }
-                    }
-                }
-            }
+                            KeyTypes = { 0x80, 0x20 }, // AES, 32 bytes
+                        },
+                    },
+                },
+            },
         };
 
         Result<byte[], SmartCardError> encodedResult = CardCapabilitiesCodec.Encode(capabilities);
@@ -165,13 +203,28 @@ public class CardCapabilitiesCodecTests
         // Simple SCP02 capabilities for testing
         byte[] testData =
         [
-            0x66, 0x14, // Tag and length
-            0x06, 0x01, 0x42, // Card recognition OID
-            0x60, 0x02, 0x02, 0x00, // Card management v2.0
-            0x63, 0x01, 0x00, // Card identification scheme
-            0x64, 0x01, 0x02, // SCP02
-            0x65, 0x01, 0x15, // i=15
-            0x66, 0x02, 0x80, 0x10 // DES, 16 bytes
+            0x66,
+            0x14, // Tag and length
+            0x06,
+            0x01,
+            0x42, // Card recognition OID
+            0x60,
+            0x02,
+            0x02,
+            0x00, // Card management v2.0
+            0x63,
+            0x01,
+            0x00, // Card identification scheme
+            0x64,
+            0x01,
+            0x02, // SCP02
+            0x65,
+            0x01,
+            0x15, // i=15
+            0x66,
+            0x02,
+            0x80,
+            0x10, // DES, 16 bytes
         ];
 
         Result<CardCapabilities, SmartCardError> result = CardCapabilitiesCodec.Decode(testData);
@@ -180,7 +233,9 @@ public class CardCapabilitiesCodecTests
         CardCapabilities? capabilities = result.Value;
 
         _ = capabilities.CardRecognitionData.Should().BeEquivalentTo(new byte[] { 0x42 });
-        _ = capabilities.CardManagementTypeAndVersion.Should().BeEquivalentTo(new byte[] { 0x02, 0x00 });
+        _ = capabilities
+            .CardManagementTypeAndVersion.Should()
+            .BeEquivalentTo(new byte[] { 0x02, 0x00 });
         _ = capabilities.CardIdentificationScheme.Should().Be(0x00);
         _ = capabilities.SecureChannelProtocols.Should().HaveCount(1);
 
@@ -201,7 +256,9 @@ public class CardCapabilitiesCodecTests
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
         _ = result.Error.Code.Should().Be("INVALID_DATA");
-        _ = result.Error.Message.Should().Contain("Invalid card capabilities data format - expected tag 0x66");
+        _ = result
+            .Error.Message.Should()
+            .Contain("Invalid card capabilities data format - expected tag 0x66");
     }
 
     [Test]
@@ -222,14 +279,14 @@ public class CardCapabilitiesCodecTests
                         new ScpImplementationSpecifier
                         {
                             Implementation = 0x15,
-                            KeyTypes = { 0x80, 0x10 }
+                            KeyTypes = { 0x80, 0x10 },
                         },
                         new ScpImplementationSpecifier
                         {
                             Implementation = 0x55,
-                            KeyTypes = { 0x80, 0x10 }
-                        }
-                    }
+                            KeyTypes = { 0x80, 0x10 },
+                        },
+                    },
                 },
                 new SecureChannelProtocol
                 {
@@ -239,11 +296,11 @@ public class CardCapabilitiesCodecTests
                         new ScpImplementationSpecifier
                         {
                             Implementation = 0x70,
-                            KeyTypes = { 0x80, 0x20 }
-                        }
-                    }
-                }
-            }
+                            KeyTypes = { 0x80, 0x20 },
+                        },
+                    },
+                },
+            },
         };
 
         Result<byte[], SmartCardError> encodedResult = CardCapabilitiesCodec.Encode(original);
@@ -255,7 +312,9 @@ public class CardCapabilitiesCodecTests
         CardCapabilities? result = decoded.Value;
 
         _ = result.CardRecognitionData.Should().BeEquivalentTo(original.CardRecognitionData);
-        _ = result.CardManagementTypeAndVersion.Should().BeEquivalentTo(original.CardManagementTypeAndVersion);
+        _ = result
+            .CardManagementTypeAndVersion.Should()
+            .BeEquivalentTo(original.CardManagementTypeAndVersion);
         _ = result.CardIdentificationScheme.Should().Be(original.CardIdentificationScheme);
         _ = result.SecureChannelProtocols.Count.Should().Be(original.SecureChannelProtocols.Count);
 
@@ -293,8 +352,11 @@ public class CardCapabilitiesCodecTests
     {
         byte[] minimalData =
         [
-            0x66, 0x03, // Tag with minimal length
-            0x63, 0x01, 0x00 // Just card identification scheme
+            0x66,
+            0x03, // Tag with minimal length
+            0x63,
+            0x01,
+            0x00, // Just card identification scheme
         ];
 
         Result<CardCapabilities, SmartCardError> result = CardCapabilitiesCodec.Decode(minimalData);
@@ -312,7 +374,7 @@ public class CardCapabilitiesCodecTests
         CardCapabilities capabilities = new CardCapabilities
         {
             CardRecognitionData = Convert.FromHexString("42"),
-            CardIdentificationScheme = 0x00
+            CardIdentificationScheme = 0x00,
         };
 
         Result<byte[], SmartCardError> encodedResult = CardCapabilitiesCodec.Encode(capabilities);
@@ -332,14 +394,31 @@ public class CardCapabilitiesCodecTests
     {
         byte[] testData =
         [
-            0x66, 0x17, // Tag and length (23 bytes)
-            0x63, 0x01, 0x00, // Card identification scheme
-            0x64, 0x01, 0x02, // SCP02
-            0x65, 0x01, 0x15, // i=15
-            0x66, 0x02, 0x80, 0x10, // DES, 16 bytes
-            0x65, 0x01, 0x04, // i=04
-            0x66, 0x02, 0x80, 0x10, // DES, 16 bytes
-            0x65, 0x01, 0x1A // i=1A
+            0x66,
+            0x17, // Tag and length (23 bytes)
+            0x63,
+            0x01,
+            0x00, // Card identification scheme
+            0x64,
+            0x01,
+            0x02, // SCP02
+            0x65,
+            0x01,
+            0x15, // i=15
+            0x66,
+            0x02,
+            0x80,
+            0x10, // DES, 16 bytes
+            0x65,
+            0x01,
+            0x04, // i=04
+            0x66,
+            0x02,
+            0x80,
+            0x10, // DES, 16 bytes
+            0x65,
+            0x01,
+            0x1A, // i=1A
         ];
 
         Result<CardCapabilities, SmartCardError> result = CardCapabilitiesCodec.Decode(testData);

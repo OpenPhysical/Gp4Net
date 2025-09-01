@@ -53,7 +53,7 @@ public static class ReaderTableRenderer
                         "warning" => "yellow",
                         "error" => "red",
                         "success" => "green",
-                        _ => "blue"
+                        _ => "blue",
                     };
                     AnsiConsole.MarkupLine($"[{color}]{message}[/]");
                     break;
@@ -117,7 +117,9 @@ public static class ReaderTableRenderer
     /// </summary>
     public static void RenderPostTableRows(IEnumerable<ReaderTableBuilder.ReaderRow> rows)
     {
-        IEnumerable<ReaderTableBuilder.ReaderRow> postTableRows = rows.Where(r => r is ReaderTableBuilder.SummaryRow or ReaderTableBuilder.InfoRow);
+        IEnumerable<ReaderTableBuilder.ReaderRow> postTableRows = rows.Where(r =>
+            r is ReaderTableBuilder.SummaryRow or ReaderTableBuilder.InfoRow
+        );
 
         foreach (ReaderTableBuilder.ReaderRow row in postTableRows)
         {
@@ -134,7 +136,7 @@ public static class ReaderTableRenderer
                         "warning" => "yellow",
                         "error" => "red",
                         "success" => "green",
-                        _ => "blue"
+                        _ => "blue",
                     };
                     AnsiConsole.MarkupLine($"[{color}]{message}[/]");
                     break;

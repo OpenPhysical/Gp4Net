@@ -1,7 +1,8 @@
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
+using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
 
@@ -36,7 +37,7 @@ public enum SecureChannelPhase
     /// <summary>
     /// After explicit termination or session end.
     /// </summary>
-    Terminated
+    Terminated,
 }
 
 /// <summary>
@@ -47,7 +48,8 @@ public record InitializeUpdateData(
     byte[] CardChallenge,
     ushort SequenceCounter,
     byte[] CardCryptogram,
-    ScpVersion ProtocolVersion)
+    ScpVersion ProtocolVersion
+)
 {
     /// <summary>
     /// Validates the initialize update data.
@@ -59,11 +61,14 @@ public record InitializeUpdateData(
                 ? CardCryptogram.Length == 8
                     ? Result.Success<InitializeUpdateData, SmartCardError>(this)
                     : Result.Failure<InitializeUpdateData, SmartCardError>(
-                        new InvalidLengthError("CardCryptogram", 8, CardCryptogram.Length))
+                        new InvalidLengthError("CardCryptogram", 8, CardCryptogram.Length)
+                    )
                 : Result.Failure<InitializeUpdateData, SmartCardError>(
-                    new InvalidLengthError("CardChallenge", 6, CardChallenge.Length))
+                    new InvalidLengthError("CardChallenge", 6, CardChallenge.Length)
+                )
             : Result.Failure<InitializeUpdateData, SmartCardError>(
-                new InvalidLengthError("HostChallenge", 8, HostChallenge.Length));
+                new InvalidLengthError("HostChallenge", 8, HostChallenge.Length)
+            );
     }
 }
 
@@ -74,7 +79,8 @@ public record AuthenticatedState(
     SessionKeys Keys,
     SecurityLevel Level,
     byte[] InitialMacChaining,
-    ScpImplementation Implementation)
+    ScpImplementation Implementation
+)
 {
     /// <summary>
     /// Validates the authenticated state.
@@ -85,9 +91,11 @@ public record AuthenticatedState(
             ? InitialMacChaining.Length == 8
                 ? Result.Success<AuthenticatedState, SmartCardError>(this)
                 : Result.Failure<AuthenticatedState, SmartCardError>(
-                    new InvalidLengthError("InitialMacChaining", 8, InitialMacChaining.Length))
+                    new InvalidLengthError("InitialMacChaining", 8, InitialMacChaining.Length)
+                )
             : Result.Failure<AuthenticatedState, SmartCardError>(
-                new NullParameterError(nameof(Keys)));
+                new NullParameterError(nameof(Keys))
+            );
     }
 }
 
@@ -104,7 +112,8 @@ public record SecureChannelLifecycle(
     SecureChannelPhase Phase,
     Maybe<InitializeUpdateData> InitData,
     Maybe<AuthenticatedState> AuthState,
-    Maybe<TerminationReason> TerminationInfo)
+    Maybe<TerminationReason> TerminationInfo
+)
 {
     /// <summary>
     /// Creates an initial state with no secure channel.
@@ -120,7 +129,8 @@ public record SecureChannelLifecycle(
     /// <summary>
     /// Checks if the secure channel can be initiated.
     /// </summary>
-    public bool CanInitiate => Phase is SecureChannelPhase.NotInitiated or SecureChannelPhase.Terminated;
+    public bool CanInitiate =>
+        Phase is SecureChannelPhase.NotInitiated or SecureChannelPhase.Terminated;
 
     /// <summary>
     /// Checks if the secure channel can be authenticated.
@@ -131,17 +141,13 @@ public record SecureChannelLifecycle(
     /// Gets the current security level if authenticated.
     /// </summary>
     public Maybe<SecurityLevel> CurrentSecurityLevel =>
-        IsAuthenticated
-            ? AuthState.Map(state => state.Level)
-            : Maybe<SecurityLevel>.None;
+        IsAuthenticated ? AuthState.Map(state => state.Level) : Maybe<SecurityLevel>.None;
 
     /// <summary>
     /// Gets the session keys if authenticated.
     /// </summary>
     public Maybe<SessionKeys> SessionKeys =>
-        IsAuthenticated
-            ? AuthState.Map(state => state.Keys)
-            : Maybe<SessionKeys>.None;
+        IsAuthenticated ? AuthState.Map(state => state.Keys) : Maybe<SessionKeys>.None;
 }
 
 /// <summary>
@@ -155,18 +161,22 @@ public static class SecureChannelLifecycleTransitions
     /// </summary>
     public static Result<SecureChannelLifecycle, SmartCardError> InitiateChannel(
         this SecureChannelLifecycle current,
-        InitializeUpdateData initData)
+        InitializeUpdateData initData
+    )
     {
         if (!current.CanInitiate)
             return Result.Failure<SecureChannelLifecycle, SmartCardError>(
-                new AuthenticationFailedError($"Cannot initiate from phase {current.Phase}"));
+                new AuthenticationFailedError($"Cannot initiate from phase {current.Phase}")
+            );
 
-        return initData.Validate()
+        return initData
+            .Validate()
             .Map(_ => new SecureChannelLifecycle(
                 Phase: SecureChannelPhase.Initiated,
                 InitData: Maybe.From(initData),
                 AuthState: Maybe.None,
-                TerminationInfo: Maybe.None));
+                TerminationInfo: Maybe.None
+            ));
     }
 
     /// <summary>
@@ -178,20 +188,30 @@ public static class SecureChannelLifecycleTransitions
         SessionKeys keys,
         SecurityLevel level,
         byte[] externalAuthMac,
-        ScpImplementation implementation)
+        ScpImplementation implementation
+    )
     {
         if (!current.CanAuthenticate)
             return Result.Failure<SecureChannelLifecycle, SmartCardError>(
-                new AuthenticationFailedError($"Cannot authenticate from phase {current.Phase}"));
+                new AuthenticationFailedError($"Cannot authenticate from phase {current.Phase}")
+            );
 
-        AuthenticatedState authState = new AuthenticatedState(keys, level, externalAuthMac, implementation);
+        AuthenticatedState authState = new AuthenticatedState(
+            keys,
+            level,
+            externalAuthMac,
+            implementation
+        );
 
-        return authState.Validate()
-            .Map(_ => current with
-            {
-                Phase = SecureChannelPhase.Authenticated,
-                AuthState = Maybe.From(authState)
-            });
+        return authState
+            .Validate()
+            .Map(_ =>
+                current with
+                {
+                    Phase = SecureChannelPhase.Authenticated,
+                    AuthState = Maybe.From(authState),
+                }
+            );
     }
 
     /// <summary>
@@ -200,12 +220,13 @@ public static class SecureChannelLifecycleTransitions
     public static SecureChannelLifecycle AbortChannel(
         this SecureChannelLifecycle current,
         string reason,
-        Maybe<ushort> statusWord = default)
+        Maybe<ushort> statusWord = default
+    )
     {
         return current with
         {
             Phase = SecureChannelPhase.Aborted,
-            TerminationInfo = Maybe.From(new TerminationReason(reason, statusWord))
+            TerminationInfo = Maybe.From(new TerminationReason(reason, statusWord)),
         };
     }
 
@@ -214,12 +235,13 @@ public static class SecureChannelLifecycleTransitions
     /// </summary>
     public static SecureChannelLifecycle TerminateChannel(
         this SecureChannelLifecycle current,
-        string reason)
+        string reason
+    )
     {
         return current with
         {
             Phase = SecureChannelPhase.Terminated,
-            TerminationInfo = Maybe.From(new TerminationReason(reason))
+            TerminationInfo = Maybe.From(new TerminationReason(reason)),
         };
     }
 
@@ -228,26 +250,35 @@ public static class SecureChannelLifecycleTransitions
     /// This bridges to the existing SecureChannelState for compatibility.
     /// </summary>
     public static Result<SecureChannelState, SmartCardError> ToSecureChannelState(
-        this SecureChannelLifecycle lifecycle)
+        this SecureChannelLifecycle lifecycle
+    )
     {
         if (!lifecycle.IsAuthenticated)
             return Result.Failure<SecureChannelState, SmartCardError>(
-                new AuthenticationFailedError("Secure channel not authenticated"));
+                new AuthenticationFailedError("Secure channel not authenticated")
+            );
 
-        return lifecycle.AuthState
-            .ToResult((SmartCardError)new MissingDataError("AuthenticationState"))
-            .Bind(authState => lifecycle.InitData
-                .ToResult((SmartCardError)new MissingDataError("InitializationData"))
-                .Bind(initData => MacChainingState.Create(
-                    authState.InitialMacChaining,
-                    initData.ProtocolVersion,
-                    (byte)authState.Implementation)
-                    .Map(macChaining => new SecureChannelState(
-                        ProtocolVersion: initData.ProtocolVersion,
-                        SecurityLevel: authState.Level,
-                        SessionKeys: authState.Keys,
-                        MacChaining: macChaining,
-                        EncryptionCounter: 0,
-                        SessionId: ImmutableArray<byte>.Empty))));
+        return lifecycle
+            .AuthState.ToResult((SmartCardError)new MissingDataError("AuthenticationState"))
+            .Bind(authState =>
+                lifecycle
+                    .InitData.ToResult((SmartCardError)new MissingDataError("InitializationData"))
+                    .Bind(initData =>
+                        MacChainingState
+                            .Create(
+                                authState.InitialMacChaining,
+                                initData.ProtocolVersion,
+                                (byte)authState.Implementation
+                            )
+                            .Map(macChaining => new SecureChannelState(
+                                ProtocolVersion: initData.ProtocolVersion,
+                                SecurityLevel: authState.Level,
+                                SessionKeys: authState.Keys,
+                                MacChaining: macChaining,
+                                EncryptionCounter: 0,
+                                SessionId: ImmutableArray<byte>.Empty
+                            ))
+                    )
+            );
     }
 }

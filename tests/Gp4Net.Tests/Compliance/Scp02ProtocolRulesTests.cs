@@ -26,19 +26,27 @@ public class Scp02ProtocolRulesTests
     [TestCase(0x03, SecurityLevel.CDecryption, "C-DECRYPTION and C-MAC")]
     [TestCase(0x10, SecurityLevel.RMac, "R-MAC only")]
     [TestCase(0x11, SecurityLevel.CMac | SecurityLevel.RMac, "C-MAC and R-MAC")]
-    [TestCase(0x13, SecurityLevel.CDecryption | SecurityLevel.RMac,
-              "C-DECRYPTION, C-MAC, and R-MAC")]
+    [TestCase(
+        0x13,
+        SecurityLevel.CDecryption | SecurityLevel.RMac,
+        "C-DECRYPTION, C-MAC, and R-MAC"
+    )]
     public void Scp02_Should_Map_External_Authenticate_P1_To_Correct_Security_Level(
         byte p1Value,
         SecurityLevel expectedSecurityLevel,
-        string description)
+        string description
+    )
     {
         // Act - Parse P1 parameter per GP Table E-11
         SecurityLevel parsedSecurityLevel = ParseExternalAuthenticateP1(p1Value);
 
         // Assert
-        _ = parsedSecurityLevel.Should().Be(expectedSecurityLevel,
-            $"GP Table E-11: P1=0x{p1Value:X2} should map to {description}");
+        _ = parsedSecurityLevel
+            .Should()
+            .Be(
+                expectedSecurityLevel,
+                $"GP Table E-11: P1=0x{p1Value:X2} should map to {description}"
+            );
     }
 
     /// <summary>
@@ -57,16 +65,21 @@ public class Scp02ProtocolRulesTests
             SecurityLevel.CDecryption, // CDecryption already includes CMac
             SecurityLevel.CMac | SecurityLevel.RMac,
             SecurityLevel.CDecryption | SecurityLevel.RMac,
-            SecurityLevel.CDecryption | SecurityLevel.RMac
+            SecurityLevel.CDecryption | SecurityLevel.RMac,
         ];
 
         // Act & Assert
-        _ = securityLevelsToTest.Should().AllSatisfy(level =>
-        {
-            bool shouldBeAuthenticated = RequiresAuthentication(level);
-            _ = shouldBeAuthenticated.Should().BeTrue(
-                $"GP Section E.1.6: Security level {level} should require AUTHENTICATED flag");
-        });
+        _ = securityLevelsToTest
+            .Should()
+            .AllSatisfy(level =>
+            {
+                bool shouldBeAuthenticated = RequiresAuthentication(level);
+                _ = shouldBeAuthenticated
+                    .Should()
+                    .BeTrue(
+                        $"GP Section E.1.6: Security level {level} should require AUTHENTICATED flag"
+                    );
+            });
     }
 
     /// <summary>
@@ -85,16 +98,22 @@ public class Scp02ProtocolRulesTests
             new { Condition = "Card session termination", ShouldTerminate = true },
             new { Condition = "Explicit API termination", ShouldTerminate = true },
             new { Condition = "Valid command processing", ShouldTerminate = false },
-            new { Condition = "R-MAC session begin", ShouldTerminate = false }
+            new { Condition = "R-MAC session begin", ShouldTerminate = false },
         };
 
         // Act & Assert
-        _ = terminationConditions.Should().AllSatisfy(testCase =>
-        {
-            bool shouldTerminate = ShouldTerminateSecureChannelSession(testCase.Condition);
-            _ = shouldTerminate.Should().Be(testCase.ShouldTerminate,
-                $"GP Section E.1.6: {testCase.Condition} should {(testCase.ShouldTerminate ? "" : "not ")}terminate session");
-        });
+        _ = terminationConditions
+            .Should()
+            .AllSatisfy(testCase =>
+            {
+                bool shouldTerminate = ShouldTerminateSecureChannelSession(testCase.Condition);
+                _ = shouldTerminate
+                    .Should()
+                    .Be(
+                        testCase.ShouldTerminate,
+                        $"GP Section E.1.6: {testCase.Condition} should {(testCase.ShouldTerminate ? "" : "not ")}terminate session"
+                    );
+            });
     }
 
     /// <summary>
@@ -111,16 +130,22 @@ public class Scp02ProtocolRulesTests
             "Session abortion",
             "New session initiation",
             "Card reset",
-            "Power off"
+            "Power off",
         ];
 
         // Act & Assert
-        _ = resetEvents.Should().AllSatisfy(eventType =>
-        {
-            SecurityLevel securityLevelAfterEvent = GetSecurityLevelAfterEvent(eventType);
-            _ = securityLevelAfterEvent.Should().Be(SecurityLevel.None,
-                $"GP Section E.1.6: {eventType} should reset Current Security Level to NO_SECURITY_LEVEL");
-        });
+        _ = resetEvents
+            .Should()
+            .AllSatisfy(eventType =>
+            {
+                SecurityLevel securityLevelAfterEvent = GetSecurityLevelAfterEvent(eventType);
+                _ = securityLevelAfterEvent
+                    .Should()
+                    .Be(
+                        SecurityLevel.None,
+                        $"GP Section E.1.6: {eventType} should reset Current Security Level to NO_SECURITY_LEVEL"
+                    );
+            });
     }
 
     /// <summary>
@@ -128,21 +153,34 @@ public class Scp02ProtocolRulesTests
     /// Tests that implementation parameter bitmaps follow specification structure.
     /// </summary>
     [Test]
-    [TestCase(ScpImplementation.Scp02I15, 0x15, "CLR mode: Explicit, modified APDU, 3 keys, ICV encryption")]
+    [TestCase(
+        ScpImplementation.Scp02I15,
+        0x15,
+        "CLR mode: Explicit, modified APDU, 3 keys, ICV encryption"
+    )]
     [TestCase(ScpImplementation.Scp02I55, 0x55, "ENC mode: Well-known challenge, ICV encryption")]
-    [TestCase(ScpImplementation.Scp02I1A, 0x1A, "Implicit mode with MAC over AID and ICV encryption")]
+    [TestCase(
+        ScpImplementation.Scp02I1A,
+        0x1A,
+        "Implicit mode with MAC over AID and ICV encryption"
+    )]
     [TestCase(ScpImplementation.Scp02I75, 0x75, "RENC mode: Maximum security features")]
     public void Scp02_Should_Have_Correct_Implementation_Parameter_Bitmap(
         ScpImplementation implementation,
         byte expectedValue,
-        string description)
+        string description
+    )
     {
         // Act - Get implementation parameter value
         byte actualValue = (byte)implementation;
 
         // Assert - GP Table E-1 compliance
-        _ = actualValue.Should().Be(expectedValue,
-            $"GP Table E-1: {description} should have parameter value 0x{expectedValue:X2}");
+        _ = actualValue
+            .Should()
+            .Be(
+                expectedValue,
+                $"GP Table E-1: {description} should have parameter value 0x{expectedValue:X2}"
+            );
 
         // Verify bitmap structure consistency
         VerifyImplementationBitmapConsistency(implementation);
@@ -158,27 +196,48 @@ public class Scp02ProtocolRulesTests
         // Arrange - All defined SCP02 implementations
         ScpImplementation[] scp02Implementations =
         [
-            ScpImplementation.Scp02I00, ScpImplementation.Scp02I02, ScpImplementation.Scp02I04,
-            ScpImplementation.Scp02I05, ScpImplementation.Scp02I0A, ScpImplementation.Scp02I14,
-            ScpImplementation.Scp02I15, ScpImplementation.Scp02I1A, ScpImplementation.Scp02I24,
-            ScpImplementation.Scp02I25, ScpImplementation.Scp02I2A, ScpImplementation.Scp02I34,
-            ScpImplementation.Scp02I35, ScpImplementation.Scp02I3A, ScpImplementation.Scp02I44,
-            ScpImplementation.Scp02I45, ScpImplementation.Scp02I4A, ScpImplementation.Scp02I54,
-            ScpImplementation.Scp02I55, ScpImplementation.Scp02I64, ScpImplementation.Scp02I65,
-            ScpImplementation.Scp02I6A, ScpImplementation.Scp02I74, ScpImplementation.Scp02I75,
-            ScpImplementation.Scp02I7A
+            ScpImplementation.Scp02I00,
+            ScpImplementation.Scp02I02,
+            ScpImplementation.Scp02I04,
+            ScpImplementation.Scp02I05,
+            ScpImplementation.Scp02I0A,
+            ScpImplementation.Scp02I14,
+            ScpImplementation.Scp02I15,
+            ScpImplementation.Scp02I1A,
+            ScpImplementation.Scp02I24,
+            ScpImplementation.Scp02I25,
+            ScpImplementation.Scp02I2A,
+            ScpImplementation.Scp02I34,
+            ScpImplementation.Scp02I35,
+            ScpImplementation.Scp02I3A,
+            ScpImplementation.Scp02I44,
+            ScpImplementation.Scp02I45,
+            ScpImplementation.Scp02I4A,
+            ScpImplementation.Scp02I54,
+            ScpImplementation.Scp02I55,
+            ScpImplementation.Scp02I64,
+            ScpImplementation.Scp02I65,
+            ScpImplementation.Scp02I6A,
+            ScpImplementation.Scp02I74,
+            ScpImplementation.Scp02I75,
+            ScpImplementation.Scp02I7A,
         ];
 
         // Act & Assert
-        _ = scp02Implementations.Should().AllSatisfy(implementation =>
-        {
-            byte parameterValue = (byte)implementation;
-            bool bit8IsZero = (parameterValue & 0x80) == 0;
+        _ = scp02Implementations
+            .Should()
+            .AllSatisfy(implementation =>
+            {
+                byte parameterValue = (byte)implementation;
+                bool bit8IsZero = (parameterValue & 0x80) == 0;
 
-            _ = bit8IsZero.Should().BeTrue(
-                $"GP Table E-1: Implementation {implementation.GetAlias()} (i={parameterValue:X2}) " +
-                $"should have reserved bit b8 set to 0");
-        });
+                _ = bit8IsZero
+                    .Should()
+                    .BeTrue(
+                        $"GP Table E-1: Implementation {implementation.GetAlias()} (i={parameterValue:X2}) "
+                            + $"should have reserved bit b8 set to 0"
+                    );
+            });
     }
 
     // Helper methods for protocol rules testing
@@ -189,9 +248,12 @@ public class Scp02ProtocolRulesTests
         SecurityLevel level = SecurityLevel.None;
 
         // Bit mapping per GP specification
-        if ((p1 & 0x01) != 0) level |= SecurityLevel.CMac;        // b1: C-MAC
-        if ((p1 & 0x02) != 0) level |= SecurityLevel.CDecryption; // b2: C-DECRYPTION  
-        if ((p1 & 0x10) != 0) level |= SecurityLevel.RMac;        // b5: R-MAC
+        if ((p1 & 0x01) != 0)
+            level |= SecurityLevel.CMac; // b1: C-MAC
+        if ((p1 & 0x02) != 0)
+            level |= SecurityLevel.CDecryption; // b2: C-DECRYPTION
+        if ((p1 & 0x10) != 0)
+            level |= SecurityLevel.RMac; // b5: R-MAC
 
         return level;
     }
@@ -214,7 +276,7 @@ public class Scp02ProtocolRulesTests
             "Explicit API termination" => true,
             "Valid command processing" => false,
             "R-MAC session begin" => false,
-            _ => false
+            _ => false,
         };
     }
 
@@ -228,7 +290,7 @@ public class Scp02ProtocolRulesTests
             "New session initiation" => SecurityLevel.None,
             "Card reset" => SecurityLevel.None,
             "Power off" => SecurityLevel.None,
-            _ => SecurityLevel.CMac // Assume some security for other events
+            _ => SecurityLevel.CMac, // Assume some security for other events
         };
     }
 
@@ -247,31 +309,38 @@ public class Scp02ProtocolRulesTests
         byte parameterValue = (byte)implementation;
 
         // Bit b1 (0x01): 3 Secure Channel Keys
-        _ = ((parameterValue & 0x01) != 0).Should().Be(uses3Keys,
-            "Bit b1 should match Uses3Keys() result");
+        _ = ((parameterValue & 0x01) != 0)
+            .Should()
+            .Be(uses3Keys, "Bit b1 should match Uses3Keys() result");
 
         // Bit b2 (0x02): C-MAC on unmodified APDU (inverted logic)
-        _ = ((parameterValue & 0x02) == 0).Should().Be(usesModifiedApdu,
-            "Bit b2 should match UsesModifiedApdu() result (inverted)");
+        _ = ((parameterValue & 0x02) == 0)
+            .Should()
+            .Be(usesModifiedApdu, "Bit b2 should match UsesModifiedApdu() result (inverted)");
 
         // Bit b3 (0x04): Initiation mode explicit
-        _ = ((parameterValue & 0x04) != 0).Should().Be(isExplicitMode,
-            "Bit b3 should match IsExplicitMode() result");
+        _ = ((parameterValue & 0x04) != 0)
+            .Should()
+            .Be(isExplicitMode, "Bit b3 should match IsExplicitMode() result");
 
         // Bit b4 (0x08): ICV set to MAC over AID
-        _ = ((parameterValue & 0x08) != 0).Should().Be(hasMacOverAid,
-            "Bit b4 should match HasMacOverAid() result");
+        _ = ((parameterValue & 0x08) != 0)
+            .Should()
+            .Be(hasMacOverAid, "Bit b4 should match HasMacOverAid() result");
 
         // Bit b5 (0x10): ICV encryption for C-MAC session
-        _ = ((parameterValue & 0x10) != 0).Should().Be(hasIcvEncryption,
-            "Bit b5 should match HasIcvEncryption() result");
+        _ = ((parameterValue & 0x10) != 0)
+            .Should()
+            .Be(hasIcvEncryption, "Bit b5 should match HasIcvEncryption() result");
 
         // Bit b6 (0x20): R-MAC support
-        _ = ((parameterValue & 0x20) != 0).Should().Be(hasRMacSupport,
-            "Bit b6 should match HasRMacSupport() result");
+        _ = ((parameterValue & 0x20) != 0)
+            .Should()
+            .Be(hasRMacSupport, "Bit b6 should match HasRMacSupport() result");
 
         // Bit b7 (0x40): Well-known pseudo-random algorithm
-        _ = ((parameterValue & 0x40) != 0).Should().Be(usesWellKnownChallenge,
-            "Bit b7 should match UsesWellKnownChallenge() result");
+        _ = ((parameterValue & 0x40) != 0)
+            .Should()
+            .Be(usesWellKnownChallenge, "Bit b7 should match UsesWellKnownChallenge() result");
     }
 }

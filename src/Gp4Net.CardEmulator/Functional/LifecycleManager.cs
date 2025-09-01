@@ -10,6 +10,7 @@ namespace Gp4Net.CardEmulator.Functional;
 /// Pure functional lifecycle state management per GlobalPlatform Card Specification v2.3.1 Section 5.
 /// Implements state transitions for applications, load files, and executable modules.
 /// </summary>
+// @TODO Does this overlap with ApplicationContext?  Eliminate DRY violations.
 [PublicAPI]
 public static class LifecycleManager
 {
@@ -19,11 +20,13 @@ public static class LifecycleManager
     public static class ApplicationLifecycleStates
     {
         /// <summary>Application is installed but cannot be selected.</summary>
-        public const byte Installed = 0x03;
+        public const byte Installed = Gp4Net.Constants.Constants.GlobalPlatform.LifecycleStates.Installed;
+
         /// <summary>Application can be selected and executed.</summary>
-        public const byte Selectable = 0x07;
+        public const byte Selectable = Gp4Net.Constants.Constants.GlobalPlatform.LifecycleStates.Selectable;
+
         /// <summary>Application is blocked and cannot be selected or executed.</summary>
-        public const byte Locked = 0x83;
+        public const byte Locked = Gp4Net.Constants.Constants.GlobalPlatform.LifecycleStates.Locked;
     }
 
     /// <summary>
@@ -32,7 +35,8 @@ public static class LifecycleManager
     public static class LoadFileLifecycleStates
     {
         /// <summary>Load file has been successfully loaded onto the card.</summary>
-        public const byte Loaded = 0x01;
+        public const byte Loaded = Gp4Net.Constants.Constants.GlobalPlatform.LifecycleStates.Loaded;
+
         /// <summary>Load file is locked and cannot be used for installations.</summary>
         public const byte Locked = 0x81;
     }
@@ -43,9 +47,10 @@ public static class LifecycleManager
     public static class ExecutableModuleLifecycleStates
     {
         /// <summary>Executable module is loaded and can be used for application installation.</summary>
-        public const byte Loaded = 0x01;
+        public const byte Loaded = Gp4Net.Constants.Constants.GlobalPlatform.LifecycleStates.Loaded;
+
         /// <summary>Executable module is installed and can be selected.</summary>
-        public const byte Installed = 0x03;
+        public const byte Installed = Gp4Net.Constants.Constants.GlobalPlatform.LifecycleStates.Installed;
     }
 
     /// <summary>
@@ -53,15 +58,17 @@ public static class LifecycleManager
     /// Returns Result with the new state if valid, or an error if the transition is invalid.
     /// </summary>
     public static Result<byte, SmartCardError> ValidateApplicationStateTransition(
-        byte currentState, byte newState, string context = "")
+        byte currentState,
+        byte newState,
+        string context = ""
+    )
     {
         // GP Section 5.1.2 - Valid application lifecycle transitions
         ImmutableHashSet<byte> validTransitions = GetValidApplicationTransitions(currentState);
-        
+
         if (!validTransitions.Contains(newState))
         {
-            return Result.Failure<byte, SmartCardError>(
-                SmartCardError.ConditionsNotSatisfied());
+            return Result.Failure<byte, SmartCardError>(SmartCardError.ConditionsNotSatisfied());
         }
 
         return Result.Success<byte, SmartCardError>(newState);
@@ -71,15 +78,17 @@ public static class LifecycleManager
     /// Validates whether a load file lifecycle state transition is allowed per GP specification.
     /// </summary>
     public static Result<byte, SmartCardError> ValidateLoadFileStateTransition(
-        byte currentState, byte newState, string context = "")
+        byte currentState,
+        byte newState,
+        string context = ""
+    )
     {
         // GP Section 5.2.2 - Valid load file lifecycle transitions
         ImmutableHashSet<byte> validTransitions = GetValidLoadFileTransitions(currentState);
-        
+
         if (!validTransitions.Contains(newState))
         {
-            return Result.Failure<byte, SmartCardError>(
-                SmartCardError.ConditionsNotSatisfied());
+            return Result.Failure<byte, SmartCardError>(SmartCardError.ConditionsNotSatisfied());
         }
 
         return Result.Success<byte, SmartCardError>(newState);
@@ -89,20 +98,27 @@ public static class LifecycleManager
     /// Creates a new application with the specified lifecycle state, validating the initial state.
     /// </summary>
     public static Result<InstalledApplication, SmartCardError> CreateApplicationWithState(
-        byte[] aid, byte[] executableModuleAid, byte lifeCycleState, byte privileges)
+        byte[] aid,
+        byte[] executableModuleAid,
+        byte lifeCycleState,
+        byte privileges
+    )
     {
         // Validate initial state is appropriate for new applications
-        if (lifeCycleState != ApplicationLifecycleStates.Installed && 
-            lifeCycleState != ApplicationLifecycleStates.Selectable)
+        if (
+            lifeCycleState != ApplicationLifecycleStates.Installed
+            && lifeCycleState != ApplicationLifecycleStates.Selectable
+        )
         {
             return Result.Failure<InstalledApplication, SmartCardError>(
-                SmartCardError.InvalidArgument("Invalid initial application lifecycle state"));
+                SmartCardError.InvalidArgument("Invalid initial application lifecycle state")
+            );
         }
 
         InstalledApplication application = new InstalledApplication(
             Aid: aid,
             ExecutableModuleAid: executableModuleAid,
-            LifeCycleState: lifeCycleState,
+            LifecycleState: lifeCycleState,
             Privileges: privileges,
             ApplicationData: ImmutableDictionary<string, byte[]>.Empty
         );
@@ -114,20 +130,25 @@ public static class LifecycleManager
     /// Creates a new load file with the specified lifecycle state, validating the initial state.
     /// </summary>
     public static Result<LoadFile, SmartCardError> CreateLoadFileWithState(
-        byte[] aid, byte[] securityDomainAid, byte lifeCycleState, ImmutableList<ExecutableModule> modules)
+        byte[] aid,
+        byte[] securityDomainAid,
+        byte lifeCycleState,
+        ImmutableList<ExecutableModule> modules
+    )
     {
         // Validate initial state is appropriate for new load files
         if (lifeCycleState != LoadFileLifecycleStates.Loaded)
         {
             return Result.Failure<LoadFile, SmartCardError>(
-                SmartCardError.InvalidArgument("Invalid initial load file lifecycle state"));
+                SmartCardError.InvalidArgument("Invalid initial load file lifecycle state")
+            );
         }
 
         LoadFile loadFile = new LoadFile(
             Aid: aid,
-            SecurityDomainAid: securityDomainAid,
-            LifeCycleState: lifeCycleState,
-            Modules: modules
+            AssociatedSecurityDomainAid: securityDomainAid,
+            LifecycleState: lifeCycleState,
+            ExecutableModules: modules
         );
 
         return Result.Success<LoadFile, SmartCardError>(loadFile);
@@ -137,20 +158,24 @@ public static class LifecycleManager
     /// Transitions an application to a new lifecycle state with validation.
     /// </summary>
     public static Result<InstalledApplication, SmartCardError> TransitionApplicationState(
-        InstalledApplication application, byte newState)
+        InstalledApplication application,
+        byte newState
+    )
     {
-        return ValidateApplicationStateTransition(application.LifeCycleState, newState)
-            .Map(validatedState => application with { LifeCycleState = validatedState });
+        return ValidateApplicationStateTransition(application.LifecycleState, newState)
+            .Map(validatedState => application with { LifecycleState = validatedState });
     }
 
     /// <summary>
     /// Transitions a load file to a new lifecycle state with validation.
     /// </summary>
     public static Result<LoadFile, SmartCardError> TransitionLoadFileState(
-        LoadFile loadFile, byte newState)
+        LoadFile loadFile,
+        byte newState
+    )
     {
-        return ValidateLoadFileStateTransition(loadFile.LifeCycleState, newState)
-            .Map(validatedState => loadFile with { LifeCycleState = validatedState });
+        return ValidateLoadFileStateTransition(loadFile.LifecycleState, newState)
+            .Map(validatedState => loadFile with { LifecycleState = validatedState });
     }
 
     /// <summary>
@@ -162,11 +187,13 @@ public static class LifecycleManager
         {
             ApplicationLifecycleStates.Installed => ImmutableHashSet.Create(
                 ApplicationLifecycleStates.Selectable,
-                ApplicationLifecycleStates.Locked),
+                ApplicationLifecycleStates.Locked
+            ),
             ApplicationLifecycleStates.Selectable => ImmutableHashSet.Create(
-                ApplicationLifecycleStates.Locked),
+                ApplicationLifecycleStates.Locked
+            ),
             ApplicationLifecycleStates.Locked => ImmutableHashSet<byte>.Empty, // Terminal state
-            _ => ImmutableHashSet<byte>.Empty
+            _ => ImmutableHashSet<byte>.Empty,
         };
     }
 
@@ -178,9 +205,10 @@ public static class LifecycleManager
         return currentState switch
         {
             LoadFileLifecycleStates.Loaded => ImmutableHashSet.Create(
-                LoadFileLifecycleStates.Locked),
+                LoadFileLifecycleStates.Locked
+            ),
             LoadFileLifecycleStates.Locked => ImmutableHashSet<byte>.Empty, // Terminal state
-            _ => ImmutableHashSet<byte>.Empty
+            _ => ImmutableHashSet<byte>.Empty,
         };
     }
 
@@ -192,14 +220,14 @@ public static class LifecycleManager
         return state switch
         {
             ApplicationLifecycleStates.Installed => "INSTALLED",
-            ApplicationLifecycleStates.Selectable => "SELECTABLE", 
+            ApplicationLifecycleStates.Selectable => "SELECTABLE",
             ApplicationLifecycleStates.Locked => "LOCKED",
             LoadFileLifecycleStates.Loaded => "LOADED",
             0x81 => "LOCKED", // LoadFileLifecycleStates.Locked
             // Note: ExecutableModuleLifecycleStates constants overlap with Application states
             0x0F => "CARD_LOCKED",
             0x7F => "TERMINATED",
-            _ => $"Unknown (0x{state:X2})"
+            _ => $"Unknown (0x{state:X2})",
         };
     }
 
@@ -223,46 +251,58 @@ public static class LifecycleManager
     /// Updates card state with a transitioned application, maintaining functional immutability.
     /// </summary>
     public static Result<CardState, SmartCardError> UpdateApplicationLifecycle(
-        CardState state, string applicationKey, byte newLifecycleState)
+        CardState state,
+        string applicationKey,
+        byte newLifecycleState
+    )
     {
         if (!state.Applications.TryGetValue(applicationKey, out InstalledApplication? application))
         {
             return Result.Failure<CardState, SmartCardError>(
-                SmartCardError.ReferencedDataNotFound());
+                SmartCardError.ReferencedDataNotFound()
+            );
         }
 
         return TransitionApplicationState(application, newLifecycleState)
-            .Map(updatedApplication => state with 
-            { 
-                Applications = state.Applications.SetItem(applicationKey, updatedApplication) 
-            });
+            .Map(updatedApplication =>
+                state with
+                {
+                    Applications = state.Applications.SetItem(applicationKey, updatedApplication),
+                }
+            );
     }
 
     /// <summary>
     /// Updates card state with a transitioned load file, maintaining functional immutability.
     /// </summary>
     public static Result<CardState, SmartCardError> UpdateLoadFileLifecycle(
-        CardState state, byte[] loadFileAid, byte newLifecycleState)
+        CardState state,
+        byte[] loadFileAid,
+        byte newLifecycleState
+    )
     {
-        // Find matching load file index using explicit validation  
-        (LoadFile LoadFile, int Index)[] matchingLoadFiles = state.LoadFiles
-            .Select((lf, index) => (LoadFile: lf, Index: index))
+        // Find matching load file index using explicit validation
+        (LoadFile LoadFile, int Index)[] matchingLoadFiles = state
+            .LoadFiles.Select((lf, index) => (LoadFile: lf, Index: index))
             .Where(x => x.LoadFile.Aid.SequenceEqual(loadFileAid))
             .ToArray();
 
         if (matchingLoadFiles.Length == 0)
         {
             return Result.Failure<CardState, SmartCardError>(
-                SmartCardError.ReferencedDataNotFound());
+                SmartCardError.ReferencedDataNotFound()
+            );
         }
 
         int loadFileIndex = matchingLoadFiles.First().Index;
         LoadFile loadFile = state.LoadFiles[loadFileIndex];
-        
+
         return TransitionLoadFileState(loadFile, newLifecycleState)
-            .Map(updatedLoadFile => state with 
-            { 
-                LoadFiles = state.LoadFiles.SetItem(loadFileIndex, updatedLoadFile) 
-            });
+            .Map(updatedLoadFile =>
+                state with
+                {
+                    LoadFiles = state.LoadFiles.SetItem(loadFileIndex, updatedLoadFile),
+                }
+            );
     }
 }

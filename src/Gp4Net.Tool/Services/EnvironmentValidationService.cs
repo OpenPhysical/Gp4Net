@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -25,16 +26,15 @@ public class EnvironmentValidationService : IEnvironmentValidationService
     /// </summary>
     private static readonly byte[][] WellKnownTestKeys =
     [
-
         // Standard GP test key (404142434445464748494A4B4C4D4E4F)
-        GpTestKeys.StandardTestKey,
-        // Zero key
-        GpTestKeys.ZeroTestKey,
-        // All ones key
-        GpTestKeys.AllOnesTestKey,
+        GpTestKeys.GpTestKey,
+        // Zero key (common but not GP standard)
+        Convert.FromHexString("00000000000000000000000000000000"),
+        // All ones key (common but not GP standard)
+        Convert.FromHexString("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),
         // Other common test keys
         Convert.FromHexString("000102030405060708090A0B0C0D0E0F"), // Sequential
-        Convert.FromHexString("DEADBEEFDEADBEEFDEADBEEFDEADBEEF") // DEADBEEF pattern
+        Convert.FromHexString("DEADBEEFDEADBEEFDEADBEEFDEADBEEF"), // DEADBEEF pattern
     ];
 
     /// <summary>
@@ -42,8 +42,18 @@ public class EnvironmentValidationService : IEnvironmentValidationService
     /// </summary>
     private static readonly string[] ProductionCardIndicators =
     [
-        "NXP", "INFINEON", "SAMSUNG", "GEMALTO", "IDEMIA", "OBERTHUR", "GIESECKE",
-        "MORPHO", "SAFENET", "SMARTCARD", "PRODUCTION", "COMMERCIAL"
+        "NXP",
+        "INFINEON",
+        "SAMSUNG",
+        "GEMALTO",
+        "IDEMIA",
+        "OBERTHUR",
+        "GIESECKE",
+        "MORPHO",
+        "SAFENET",
+        "SMARTCARD",
+        "PRODUCTION",
+        "COMMERCIAL",
     ];
 
     /// <summary>
@@ -51,7 +61,13 @@ public class EnvironmentValidationService : IEnvironmentValidationService
     /// </summary>
     private static readonly string[] TestCardIndicators =
     [
-        "TEST", "DEVELOPMENT", "SAMPLE", "EVALUATION", "DEMO", "JCOP", "VIRTUAL"
+        "TEST",
+        "DEVELOPMENT",
+        "SAMPLE",
+        "EVALUATION",
+        "DEMO",
+        "JCOP",
+        "VIRTUAL",
     ];
 
     /// <summary>
@@ -77,17 +93,23 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         try
         {
             // Detect card environment
-            Result<CardEnvironment, SmartCardError> cardEnvResult = await DetectCardEnvironmentAsync(channel, transport, cancellationToken);
+            Result<CardEnvironment, SmartCardError> cardEnvResult =
+                await DetectCardEnvironmentAsync(channel, transport, cancellationToken);
             if (cardEnvResult.IsFailure)
             {
-                return Result.Failure<EnvironmentValidationResult, SmartCardError>(cardEnvResult.Error);
+                return Result.Failure<EnvironmentValidationResult, SmartCardError>(
+                    cardEnvResult.Error
+                );
             }
 
             CardEnvironment cardEnvironment = cardEnvResult.Value;
             bool isTestKeySet = IsTestKeySet(keySet);
 
             // Analyze safety of the combination
-            (bool isSafe, string message, string[] warnings) = AnalyzeSafety(cardEnvironment, isTestKeySet);
+            (bool isSafe, string message, string[] warnings) = AnalyzeSafety(
+                cardEnvironment,
+                isTestKeySet
+            );
 
             EnvironmentValidationResult result = new EnvironmentValidationResult(
                 isSafe,
@@ -153,7 +175,11 @@ public class EnvironmentValidationService : IEnvironmentValidationService
             }
 
             // Try to get CPLC data to identify card type
-            Result<byte[], SmartCardError> cplcResult = await GetCplcDataAsync(channel, transport, cancellationToken);
+            Result<byte[], SmartCardError> cplcResult = await GetCplcDataAsync(
+                channel,
+                transport,
+                cancellationToken
+            );
             if (cplcResult.IsSuccess)
             {
                 CardEnvironment environment = AnalyzeCplcData(cplcResult.Value);
@@ -164,7 +190,11 @@ public class EnvironmentValidationService : IEnvironmentValidationService
             }
 
             // Fallback: analyze card behavior patterns
-            CardEnvironment behaviorEnvironment = await AnalyzeCardBehaviorAsync(channel, transport, cancellationToken);
+            CardEnvironment behaviorEnvironment = await AnalyzeCardBehaviorAsync(
+                channel,
+                transport,
+                cancellationToken
+            );
             return Result.Success<CardEnvironment, SmartCardError>(behaviorEnvironment);
         }
         catch (Exception ex)
@@ -178,10 +208,10 @@ public class EnvironmentValidationService : IEnvironmentValidationService
     {
         // Check if the channel implementation suggests a virtual card
         string channelType = channel.GetType().Name;
-        return channelType.Contains("Virtual") ||
-               channelType.Contains("Mock") ||
-               channelType.Contains("Trace") ||
-               channelType.Contains("Emulator");
+        return channelType.Contains("Virtual")
+            || channelType.Contains("Mock")
+            || channelType.Contains("Trace")
+            || channelType.Contains("Emulator");
     }
 
     private static async Task<Result<byte[], SmartCardError>> GetCplcDataAsync(
@@ -193,13 +223,19 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         try
         {
             // GET DATA for CPLC (Card Production Life Cycle) - tag 9F7F
-            Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardProductionLifeCycle);
+            Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(
+                GetDataCommand.DataObjects.CardProductionLifeCycle
+            );
             if (commandResult.IsFailure)
             {
                 return Result.Failure<byte[], SmartCardError>(commandResult.Error);
             }
 
-            ApduResponse response = await transport.TransmitAsync(commandResult.Value, channel, cancellationToken);
+            ApduResponse response = await transport.TransmitAsync(
+                commandResult.Value,
+                channel,
+                cancellationToken
+            );
 
             if (response.IsSuccess && response.Data.Length > 0)
             {
@@ -224,20 +260,28 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         {
             // Convert CPLC data to string for analysis
             string cplcString = Convert.ToHexString(cplcData);
-            string cplcText = System.Text.Encoding.ASCII.GetString(cplcData.Where(b => b is >= 32 and <= 126).ToArray());
+            string cplcText = Encoding.ASCII.GetString(
+                [.. cplcData.Where(b => b is >= 32 and <= 126)]
+            );
 
             // Check for production indicators
-            if (ProductionCardIndicators.Any(indicator =>
-                    cplcString.Contains(indicator, StringComparison.OrdinalIgnoreCase) ||
-                    cplcText.Contains(indicator, StringComparison.OrdinalIgnoreCase)))
+            if (
+                ProductionCardIndicators.Any(indicator =>
+                    cplcString.Contains(indicator, StringComparison.OrdinalIgnoreCase)
+                    || cplcText.Contains(indicator, StringComparison.OrdinalIgnoreCase)
+                )
+            )
             {
                 return CardEnvironment.Production;
             }
 
             // Check for test indicators
-            if (TestCardIndicators.Any(indicator =>
-                    cplcString.Contains(indicator, StringComparison.OrdinalIgnoreCase) ||
-                    cplcText.Contains(indicator, StringComparison.OrdinalIgnoreCase)))
+            if (
+                TestCardIndicators.Any(indicator =>
+                    cplcString.Contains(indicator, StringComparison.OrdinalIgnoreCase)
+                    || cplcText.Contains(indicator, StringComparison.OrdinalIgnoreCase)
+                )
+            )
             {
                 return CardEnvironment.Test;
             }
@@ -259,14 +303,20 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         try
         {
             // Try SELECT ISD (Issuer Security Domain)
-            Result<SelectCommand, SmartCardError> selectResult = SelectCommand.Create(GpTestKeys.TestAids.IsdAid);
+            Result<SelectCommand, SmartCardError> selectResult = SelectCommand.Create(
+                GpTestKeys.TestAids.IsdAid
+            );
             if (selectResult.IsFailure)
             {
                 return CardEnvironment.Test;
             }
 
             SelectCommand selectCmd = selectResult.Value;
-            ApduResponse response = await transport.TransmitAsync(selectCmd, channel, cancellationToken);
+            ApduResponse response = await transport.TransmitAsync(
+                selectCmd,
+                channel,
+                cancellationToken
+            );
 
             if (!response.IsSuccess)
             {
@@ -291,16 +341,8 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         return (cardEnvironment, isTestKeySet) switch
         {
             // Safe combinations
-            (CardEnvironment.Test, true) => (
-                true,
-                "Safe: Test keys with test card",
-                []
-            ),
-            (CardEnvironment.Virtual, true) => (
-                true,
-                "Safe: Test keys with virtual card",
-                []
-            ),
+            (CardEnvironment.Test, true) => (true, "Safe: Test keys with test card", []),
+            (CardEnvironment.Virtual, true) => (true, "Safe: Test keys with virtual card", []),
             (CardEnvironment.Production, false) => (
                 true,
                 "Safe: Production keys with production card",
@@ -311,7 +353,10 @@ public class EnvironmentValidationService : IEnvironmentValidationService
             (CardEnvironment.Production, true) => (
                 false,
                 "DANGEROUS: Test keys should not be used with production cards",
-                ["Using test keys on production cards may cause lockout", "Verify card type before proceeding"]
+                [
+                    "Using test keys on production cards may cause lockout",
+                    "Verify card type before proceeding",
+                ]
             ),
 
             // Questionable combinations
@@ -333,11 +378,7 @@ public class EnvironmentValidationService : IEnvironmentValidationService
                 ["Card type could not be determined", "Production keys may be risky"]
             ),
 
-            _ => (
-                false,
-                "Unknown combination",
-                new[] { "Unable to assess safety" }
-            )
+            _ => (false, "Unknown combination", new[] { "Unable to assess safety" }),
         };
     }
 }

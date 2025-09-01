@@ -42,7 +42,7 @@ public class CardCommandSettings : CommandSettings
     /// <summary>
     /// Gets the reader name as Maybe type.
     /// </summary>
-    public Maybe<string> GetReaderName() => 
+    public Maybe<string> GetReaderName() =>
         string.IsNullOrWhiteSpace(ReaderName) ? Maybe<string>.None : Maybe<string>.From(ReaderName);
 }
 
@@ -76,12 +76,12 @@ public class SecureCommandSettings : CommandSettings
     /// <summary>
     /// Gets the reader name as Maybe type.
     /// </summary>
-    public Maybe<string> GetReaderName() => 
+    public Maybe<string> GetReaderName() =>
         string.IsNullOrWhiteSpace(ReaderName) ? Maybe<string>.None : Maybe<string>.From(ReaderName);
 
     /// <summary>
     /// Gets the keyset as Maybe type.
     /// </summary>
-    public Maybe<string> GetKeyset() => 
+    public Maybe<string> GetKeyset() =>
         string.IsNullOrWhiteSpace(Keyset) ? Maybe<string>.None : Maybe<string>.From(Keyset);
 }

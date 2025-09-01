@@ -42,39 +42,48 @@ public class ComplexTraceDiscoveryTests
     private static Result<string, string> ValidateTraceDirectory(string traceDirectory) =>
         Directory.Exists(traceDirectory)
             ? Result.Success<string, string>(traceDirectory)
-            : Result.Failure<string, string>($"Complex trace directory not found: {traceDirectory}");
+            : Result.Failure<string, string>(
+                $"Complex trace directory not found: {traceDirectory}"
+            );
 
     /// <summary>
     /// Functional helper to discover and analyze trace files.
     /// </summary>
     /// <param name="traceDirectory">The directory containing traces</param>
     /// <returns>Result containing discovered traces or error message</returns>
-    private static Result<List<TraceMetadata>, string> DiscoverAndAnalyzeTraces(string traceDirectory)
+    private static Result<List<TraceMetadata>, string> DiscoverAndAnalyzeTraces(
+        string traceDirectory
+    )
     {
         string[] jsonFiles = Directory.GetFiles(traceDirectory, "*.json");
 
         if (jsonFiles.Length == 0)
-            return Result.Failure<List<TraceMetadata>, string>("Should have complex traces to analyze");
+            return Result.Failure<List<TraceMetadata>, string>(
+                "Should have complex traces to analyze"
+            );
 
         TestContext.Out.WriteLine($"Discovered {jsonFiles.Length} complex trace files:");
 
-        List<TraceMetadata> discoveredTraces = jsonFiles
+        List<TraceMetadata> discoveredTraces = [.. jsonFiles
             .Select(filePath =>
             {
                 string fileName = Path.GetFileName(filePath);
                 TraceMetadata metadata = AnalyzeTrace(filePath, fileName);
 
                 TestContext.Out.WriteLine($"✓ {fileName}: {metadata.Description}");
-                TestContext.Out.WriteLine($"  Categories: {string.Join(", ", metadata.Categories)}");
-                TestContext.Out.WriteLine($"  Command types: {string.Join(", ", metadata.CommandTypes.Take(5))}");
+                TestContext.Out.WriteLine(
+                    $"  Categories: {string.Join(", ", metadata.Categories)}"
+                );
+                TestContext.Out.WriteLine(
+                    $"  Command types: {string.Join(", ", metadata.CommandTypes.Take(5))}"
+                );
                 if (metadata.CommandTypes.Count > 5)
                 {
                     TestContext.Out.WriteLine($"  ... and {metadata.CommandTypes.Count - 5} more");
                 }
 
                 return metadata;
-            })
-            .ToList();
+            })];
 
         return Result.Success<List<TraceMetadata>, string>(discoveredTraces);
     }
@@ -91,11 +100,15 @@ public class ComplexTraceDiscoveryTests
             return UnitResult.Failure<string>("All traces should be automatically categorized");
 
         // Ensure variety in trace types
-        List<string> allCategories = discoveredTraces.SelectMany(t => t.Categories).Distinct().ToList();
+        List<string> allCategories = [.. discoveredTraces
+            .SelectMany(t => t.Categories)
+            .Distinct()];
         if (allCategories.Count <= 1)
             return UnitResult.Failure<string>("Complex traces should span multiple categories");
 
-        TestContext.Out.WriteLine($"Total categories discovered: {string.Join(", ", allCategories)}");
+        TestContext.Out.WriteLine(
+            $"Total categories discovered: {string.Join(", ", allCategories)}"
+        );
         return UnitResult.Success<string>();
     }
 
@@ -104,7 +117,9 @@ public class ComplexTraceDiscoveryTests
     /// </summary>
     [Test]
     public void ComplexTraces_Should_Be_Discoverable_And_Valid() =>
-        ValidateTraceDirectory(Path.Combine(TestContext.CurrentContext.TestDirectory, ComplexTracePath))
+        ValidateTraceDirectory(
+                Path.Combine(TestContext.CurrentContext.TestDirectory, ComplexTracePath)
+            )
             .Bind(DiscoverAndAnalyzeTraces)
             .Bind(ValidateDiscoveredTraces)
             .Match(
@@ -119,7 +134,11 @@ public class ComplexTraceDiscoveryTests
     /// <returns>Result containing the JsonDocument or error message</returns>
     private static Result<JsonDocument, string> LoadTraceFile(string traceFile)
     {
-        string tracePath = Path.Combine(TestContext.CurrentContext.TestDirectory, ComplexTracePath, traceFile);
+        string tracePath = Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            ComplexTracePath,
+            traceFile
+        );
 
         if (!File.Exists(tracePath))
             return Result.Failure<JsonDocument, string>($"Trace file not found: {tracePath}");
@@ -132,7 +151,9 @@ public class ComplexTraceDiscoveryTests
         }
         catch (Exception ex)
         {
-            return Result.Failure<JsonDocument, string>($"Failed to parse trace file {traceFile}: {ex.Message}");
+            return Result.Failure<JsonDocument, string>(
+                $"Failed to parse trace file {traceFile}: {ex.Message}"
+            );
         }
     }
 
@@ -142,34 +163,42 @@ public class ComplexTraceDiscoveryTests
     /// <param name="testData">The trace data</param>
     /// <param name="description">Test description</param>
     /// <returns>Result indicating validation success or failure</returns>
-    private static UnitResult<string> ValidateConfigurationWorkflow(JsonDocument testData, string description)
+    private static UnitResult<string> ValidateConfigurationWorkflow(
+        JsonDocument testData,
+        string description
+    )
     {
         TestContext.Out.WriteLine($"Testing {description}");
 
         if (!testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement))
             return UnitResult.Failure<string>("Configuration trace should contain exchanges");
 
-        List<JsonElement> exchanges = exchangesElement.EnumerateArray().ToList();
+        List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
         if (exchanges.Count == 0)
             return UnitResult.Failure<string>("Configuration should have command exchanges");
 
-        // Analyze configuration patterns using functional approach
-        HashSet<string> commandTypes = exchanges
+        // Analyze configuration patterns
+        HashSet<string> commandTypes = [.. exchanges
             .Select(exchange => exchange.GetProperty("command").GetString()!)
             .Where(command => command.Length >= 4)
-            .Select(command => command.Substring(0, 4))
-            .ToHashSet();
+            .Select(command => command.Substring(0, 4))];
 
         bool hasInitialization = commandTypes.Contains("8050") || commandTypes.Contains("00A4");
         bool hasMultiplePhases = commandTypes.Count >= 3;
 
         if (!hasInitialization)
-            return UnitResult.Failure<string>($"Configuration should include initialization for {description}");
+            return UnitResult.Failure<string>(
+                $"Configuration should include initialization for {description}"
+            );
 
         if (!hasMultiplePhases)
-            return UnitResult.Failure<string>($"Complex configuration should have multiple command phases for {description}");
+            return UnitResult.Failure<string>(
+                $"Complex configuration should have multiple command phases for {description}"
+            );
 
-        TestContext.Out.WriteLine($"✓ Found {commandTypes.Count} different command types in configuration");
+        TestContext.Out.WriteLine(
+            $"✓ Found {commandTypes.Count} different command types in configuration"
+        );
         TestContext.Out.WriteLine($"✓ {description} workflow validated");
 
         return UnitResult.Success<string>();
@@ -180,7 +209,10 @@ public class ComplexTraceDiscoveryTests
     /// </summary>
     [TestCase("configure_gpshell.json", "GPShell configuration workflow")]
     [TestCase("configure_gpshell_log.json", "GPShell configuration with detailed logging")]
-    public void ComplexTraces_Should_Handle_Configuration_Workflows(string traceFile, string description) =>
+    public void ComplexTraces_Should_Handle_Configuration_Workflows(
+        string traceFile,
+        string description
+    ) =>
         LoadTraceFile(traceFile)
             .Bind(testData => ValidateConfigurationWorkflow(testData, description))
             .Match(
@@ -195,33 +227,36 @@ public class ComplexTraceDiscoveryTests
     /// <param name="description">Test description</param>
     /// <param name="traceFile">Trace file name</param>
     /// <returns>Result indicating validation success or failure</returns>
-    private static UnitResult<string> ValidateProtocolChanges(JsonDocument testData, string description, string traceFile)
+    private static UnitResult<string> ValidateProtocolChanges(
+        JsonDocument testData,
+        string description,
+        string traceFile
+    )
     {
         TestContext.Out.WriteLine($"Testing {description}");
 
         if (!testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement))
             return UnitResult.Failure<string>("Protocol change trace should contain exchanges");
 
-        List<JsonElement> exchanges = exchangesElement.EnumerateArray().ToList();
-        List<string> commands = exchanges.Select(e => e.GetProperty("command").GetString()!).ToList();
+        List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
+        List<string> commands = [.. exchanges.Select(e => e.GetProperty("command").GetString()!)];
 
-        // Analyze protocol patterns using functional approach
+        // Analyze protocol patterns
         bool hasInitializeUpdate = commands.Any(cmd => cmd.StartsWith("8050"));
         bool hasExternalAuth = commands.Any(cmd => cmd.StartsWith("8482"));
-        List<string> scp03Commands = commands
+        List<string> scp03Commands = [.. commands
             .Where(cmd => cmd.Length >= 2)
             .Where(cmd =>
             {
                 byte cla = Convert.ToByte(cmd.Substring(0, 2), 16);
                 return (cla & 0x04) != 0 || (cla & 0x0C) != 0;
             })
-            .Take(3)
-            .ToList();
+            .Take(3)];
 
         if (!hasInitializeUpdate)
             return UnitResult.Failure<string>("Protocol change should include initialization");
 
-        // Log findings using functional approach
+        // Log findings
         if (hasInitializeUpdate)
             TestContext.Out.WriteLine("✓ Found INITIALIZE UPDATE for protocol negotiation");
 
@@ -232,7 +267,9 @@ public class ComplexTraceDiscoveryTests
         }
         else
         {
-            TestContext.Out.WriteLine("✓ Protocol negotiation phase detected (no authentication in this trace)");
+            TestContext.Out.WriteLine(
+                "✓ Protocol negotiation phase detected (no authentication in this trace)"
+            );
         }
 
         if (traceFile.Contains("scp03"))
@@ -240,16 +277,22 @@ public class ComplexTraceDiscoveryTests
             if (scp03Commands.Any())
             {
                 TestContext.Out.WriteLine("✓ SCP03 secure messaging commands detected");
-                _ = scp03Commands.Select(cmd => $"✓ Found SCP03 secure messaging: {cmd}")
-                    .Aggregate("", (current, message) =>
-                    {
-                        TestContext.Out.WriteLine(message);
-                        return current;
-                    });
+                _ = scp03Commands
+                    .Select(cmd => $"✓ Found SCP03 secure messaging: {cmd}")
+                    .Aggregate(
+                        "",
+                        (current, message) =>
+                        {
+                            TestContext.Out.WriteLine(message);
+                            return current;
+                        }
+                    );
             }
             else
             {
-                TestContext.Out.WriteLine("✓ SCP03 protocol negotiation without secure messaging (negotiation phase only)");
+                TestContext.Out.WriteLine(
+                    "✓ SCP03 protocol negotiation without secure messaging (negotiation phase only)"
+                );
             }
         }
 
@@ -261,7 +304,10 @@ public class ComplexTraceDiscoveryTests
     /// Test protocol change and adaptation workflows.
     /// </summary>
     [TestCase("globalplatform_scp03_change.json", "SCP03 protocol change workflow")]
-    public void ComplexTraces_Should_Handle_Protocol_Changes(string traceFile, string description) =>
+    public void ComplexTraces_Should_Handle_Protocol_Changes(
+        string traceFile,
+        string description
+    ) =>
         LoadTraceFile(traceFile)
             .Bind(testData => ValidateProtocolChanges(testData, description, traceFile))
             .Match(
@@ -275,23 +321,26 @@ public class ComplexTraceDiscoveryTests
     /// <param name="testData">The trace data</param>
     /// <param name="description">Test description</param>
     /// <returns>Result indicating validation success or failure</returns>
-    private static UnitResult<string> ValidateListingOperations(JsonDocument testData, string description)
+    private static UnitResult<string> ValidateListingOperations(
+        JsonDocument testData,
+        string description
+    )
     {
         TestContext.Out.WriteLine($"Testing {description}");
 
         if (!testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement))
             return UnitResult.Failure<string>("Listing trace should contain exchanges");
 
-        List<JsonElement> exchanges = exchangesElement.EnumerateArray().ToList();
+        List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
         var commandResponsePairs = exchanges
             .Select(e => new
             {
                 Command = e.GetProperty("command").GetString()!,
-                Response = e.GetProperty("response").GetString()!
+                Response = e.GetProperty("response").GetString()!,
             })
             .ToList();
 
-        // Analyze listing patterns using functional approach
+        // Analyze listing patterns
         bool foundSelect = commandResponsePairs.Any(pair => pair.Command.StartsWith("00A4"));
         var statusCommands = commandResponsePairs
             .Where(pair => pair.Command.StartsWith("80F2") || pair.Command.StartsWith("80CA"))
@@ -301,9 +350,11 @@ public class ComplexTraceDiscoveryTests
             return UnitResult.Failure<string>("Listing should include card/application selection");
 
         if (!statusCommands.Any())
-            return UnitResult.Failure<string>("Listing should include GET STATUS or GET DATA commands");
+            return UnitResult.Failure<string>(
+                "Listing should include GET STATUS or GET DATA commands"
+            );
 
-        // Log findings using functional approach
+        // Log findings
         if (foundSelect)
             TestContext.Out.WriteLine("✓ Found SELECT command for listing context");
 
@@ -312,17 +363,22 @@ public class ComplexTraceDiscoveryTests
             {
                 CommandType = pair.Command.StartsWith("80F2") ? "GET STATUS" : "GET DATA",
                 HasData = pair.Response.Length > 4 && pair.Response.EndsWith("9000"),
-                DataLength = pair.Response.Length > 4 ? pair.Response.Length - 4 : 0
+                DataLength = pair.Response.Length > 4 ? pair.Response.Length - 4 : 0,
             })
             .Where(info => info.HasData)
             .Select(info => $"✓ {info.CommandType} returned {info.DataLength / 2} bytes of data")
-            .Aggregate("", (current, message) =>
-            {
-                TestContext.Out.WriteLine(message);
-                return current;
-            });
+            .Aggregate(
+                "",
+                (current, message) =>
+                {
+                    TestContext.Out.WriteLine(message);
+                    return current;
+                }
+            );
 
-        TestContext.Out.WriteLine($"✓ Found {statusCommands.Count} status commands in listing operation");
+        TestContext.Out.WriteLine(
+            $"✓ Found {statusCommands.Count} status commands in listing operation"
+        );
         TestContext.Out.WriteLine($"✓ {description} completed successfully");
 
         return UnitResult.Success<string>();
@@ -332,7 +388,10 @@ public class ComplexTraceDiscoveryTests
     /// Test comprehensive listing and enumeration operations.
     /// </summary>
     [TestCase("gp_pro_list_success.json", "Successful listing operation")]
-    public void ComplexTraces_Should_Handle_Listing_Operations(string traceFile, string description) =>
+    public void ComplexTraces_Should_Handle_Listing_Operations(
+        string traceFile,
+        string description
+    ) =>
         LoadTraceFile(traceFile)
             .Bind(testData => ValidateListingOperations(testData, description))
             .Match(
@@ -345,31 +404,40 @@ public class ComplexTraceDiscoveryTests
     /// </summary>
     /// <param name="traceDirectory">The directory containing traces</param>
     /// <returns>Result containing analysis results or error message</returns>
-    private static Result<List<(string fileName, bool isValid, string[] findings)>, string> PerformComprehensiveAnalysisOnAllTraces(string traceDirectory)
+    private static Result<
+        List<(string fileName, bool isValid, string[] findings)>,
+        string
+    > PerformComprehensiveAnalysisOnAllTraces(string traceDirectory)
     {
         string[] jsonFiles = Directory.GetFiles(traceDirectory, "*.json");
 
-        List<(string fileName, bool isValid, string[] findings)> analysisResults = jsonFiles
+        List<(string fileName, bool isValid, string[] findings)> analysisResults = [.. jsonFiles
             .Select(filePath =>
             {
                 string fileName = Path.GetFileName(filePath);
                 (bool isValid, string[] findings) = PerformComprehensiveAnalysis(filePath);
 
                 TestContext.Out.WriteLine($"Analysis of {fileName}:");
-                _ = findings.Aggregate("", (current, finding) =>
-                {
-                    TestContext.Out.WriteLine($"  {finding}");
-                    return current;
-                });
+                _ = findings.Aggregate(
+                    "",
+                    (current, finding) =>
+                    {
+                        TestContext.Out.WriteLine($"  {finding}");
+                        return current;
+                    }
+                );
 
                 return (fileName, isValid, findings);
-            })
-            .ToList();
+            })];
 
-        List<(string fileName, bool isValid, string[] findings)> invalidTraces = analysisResults.Where(result => !result.isValid).ToList();
+        List<(string fileName, bool isValid, string[] findings)> invalidTraces = [.. analysisResults.Where(result => !result.isValid)];
         return invalidTraces.Any()
-            ? Result.Failure<List<(string fileName, bool isValid, string[] findings)>, string>($"Comprehensive analysis should pass for {invalidTraces.First().fileName}")
-            : Result.Success<List<(string fileName, bool isValid, string[] findings)>, string>(analysisResults);
+            ? Result.Failure<List<(string fileName, bool isValid, string[] findings)>, string>(
+                $"Comprehensive analysis should pass for {invalidTraces.First().fileName}"
+            )
+            : Result.Success<List<(string fileName, bool isValid, string[] findings)>, string>(
+                analysisResults
+            );
     }
 
     /// <summary>
@@ -377,7 +445,9 @@ public class ComplexTraceDiscoveryTests
     /// </summary>
     /// <param name="analysisResults">The analysis results</param>
     /// <returns>Result indicating validation success or failure</returns>
-    private static UnitResult<string> ValidateComprehensiveAnalysis(List<(string fileName, bool isValid, string[] findings)> analysisResults)
+    private static UnitResult<string> ValidateComprehensiveAnalysis(
+        List<(string fileName, bool isValid, string[] findings)> analysisResults
+    )
     {
         int totalFindings = analysisResults.SelectMany(r => r.findings).Count();
         int validTraces = analysisResults.Count(r => r.isValid);
@@ -398,7 +468,9 @@ public class ComplexTraceDiscoveryTests
     /// </summary>
     [Test]
     public void ComplexTraces_Should_Pass_Comprehensive_Analysis() =>
-        ValidateTraceDirectory(Path.Combine(TestContext.CurrentContext.TestDirectory, ComplexTracePath))
+        ValidateTraceDirectory(
+                Path.Combine(TestContext.CurrentContext.TestDirectory, ComplexTracePath)
+            )
             .Bind(PerformComprehensiveAnalysisOnAllTraces)
             .Bind(ValidateComprehensiveAnalysis)
             .Match(
@@ -414,7 +486,7 @@ public class ComplexTraceDiscoveryTests
         TraceMetadata metadata = new TraceMetadata
         {
             FileName = fileName,
-            Description = GenerateDescription(fileName)
+            Description = GenerateDescription(fileName),
         };
 
         try
@@ -425,7 +497,7 @@ public class ComplexTraceDiscoveryTests
             // Analyze exchanges
             if (testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement))
             {
-                List<JsonElement> exchanges = exchangesElement.EnumerateArray().ToList();
+                List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
                 metadata.ExchangeCount = exchanges.Count;
 
                 HashSet<string> commandTypes = new HashSet<string>();
@@ -438,14 +510,14 @@ public class ComplexTraceDiscoveryTests
                         _ = commandTypes.Add(commandType);
 
                         // Check for secure channel indicators
-                        if (commandType == "8050" || commandType == "8482")
+                        if (commandType is "8050" or "8482")
                         {
                             metadata.HasSecureChannel = true;
                         }
                     }
                 }
 
-                metadata.CommandTypes = commandTypes.ToList();
+                metadata.CommandTypes = [.. commandTypes];
                 metadata.HasComplexWorkflow = commandTypes.Count >= 4;
             }
 
@@ -469,8 +541,7 @@ public class ComplexTraceDiscoveryTests
         string name = Path.GetFileNameWithoutExtension(fileName);
 
         // Convert underscores to spaces and title case
-        string[] words = name.Split('_').Select(word =>
-            char.ToUpper(word[0]) + word.Substring(1).ToLower()).ToArray();
+        string[] words = [.. name.Split('_').Select(word => char.ToUpper(word[0]) + word.Substring(1).ToLower())];
 
         return string.Join(" ", words);
     }
@@ -545,8 +616,10 @@ public class ComplexTraceDiscoveryTests
                 int validExchanges = 0;
                 foreach (JsonElement exchange in exchangesElement.EnumerateArray())
                 {
-                    if (exchange.TryGetProperty("command", out _) &&
-                        exchange.TryGetProperty("response", out _))
+                    if (
+                        exchange.TryGetProperty("command", out _)
+                        && exchange.TryGetProperty("response", out _)
+                    )
                     {
                         validExchanges++;
                     }
@@ -554,11 +627,13 @@ public class ComplexTraceDiscoveryTests
 
                 if (validExchanges == exchangeCount)
                 {
-                    findings.Add($"✓ All exchanges have valid command/response structure");
+                    findings.Add("✓ All exchanges have valid command/response structure");
                 }
                 else
                 {
-                    findings.Add($"❌ {exchangeCount - validExchanges} exchanges have invalid structure");
+                    findings.Add(
+                        $"❌ {exchangeCount - validExchanges} exchanges have invalid structure"
+                    );
                     isValid = false;
                 }
             }

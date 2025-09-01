@@ -12,7 +12,6 @@ namespace Gp4Net.Tool.Commands.Card;
 /// </summary>
 public static class ReaderTableBuilder
 {
-
     /// <summary>
     /// Base type for all reader display rows, enabling type-safe UI composition.
     /// </summary>
@@ -21,11 +20,7 @@ public static class ReaderTableBuilder
     /// <summary>
     /// Row displaying reader information with standard columns.
     /// </summary>
-    public record ReaderDataRow(
-        string Index,
-        string Name,
-        string Status = "Available"
-    ) : ReaderRow;
+    public record ReaderDataRow(string Index, string Name, string Status = "Available") : ReaderRow;
 
     /// <summary>
     /// Header row indicating the start of a section.
@@ -51,7 +46,8 @@ public static class ReaderTableBuilder
     /// <returns>Sequence of semantic reader rows</returns>
     public static IEnumerable<ReaderRow> BuildReaderRows(
         IReadOnlyList<string> readers,
-        bool showSummary = true)
+        bool showSummary = true
+    )
     {
         if (readers.Count == 0)
         {
@@ -80,12 +76,15 @@ public static class ReaderTableBuilder
     /// </summary>
     public static string ToJson(IReadOnlyList<string> readers)
     {
-        var data = readers.Select((reader, index) => new
-        {
-            index = index,
-            name = reader,
-            status = "Available"
-        });
+        var data = readers.Select(
+            (reader, index) =>
+                new
+                {
+                    index,
+                    name = reader,
+                    status = "Available",
+                }
+        );
 
         return JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
     }
@@ -97,9 +96,7 @@ public static class ReaderTableBuilder
     {
         List<string> lines = ["Index,Name,Status"];
 
-        lines.AddRange(readers.Select((reader, index) =>
-            $"{index},\"{reader}\",Available"
-        ));
+        lines.AddRange(readers.Select((reader, index) => $"{index},\"{reader}\",Available"));
 
         return string.Join(Environment.NewLine, lines);
     }

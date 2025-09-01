@@ -15,7 +15,6 @@ namespace Gp4Net.Tool.Commands.Applet;
 /// </summary>
 public static class ApplicationTableBuilder
 {
-
     /// <summary>
     /// Base type for all application display rows, inheriting from semantic row system.
     /// </summary>
@@ -61,11 +60,13 @@ public static class ApplicationTableBuilder
         IReadOnlyList<ApplicationInfo> applications,
         bool showExtended = false,
         bool showSummary = false,
-        string filter = null)
+        string filter = null
+    )
     {
-        IReadOnlyList<ApplicationInfo> filteredApps = string.IsNullOrEmpty(filter) || filter == "all"
-            ? applications
-            : FilterApplications(applications, filter);
+        IReadOnlyList<ApplicationInfo> filteredApps =
+            string.IsNullOrEmpty(filter) || filter == "all"
+                ? applications
+                : FilterApplications(applications, filter);
 
         if (filteredApps.Count == 0)
         {
@@ -74,7 +75,9 @@ public static class ApplicationTableBuilder
         }
 
         // Group applications by type for better organization
-        IOrderedEnumerable<IGrouping<ApplicationType, ApplicationInfo>> grouped = filteredApps.GroupBy(a => a.Type).OrderBy(g => GetTypePriority(g.Key));
+        IOrderedEnumerable<IGrouping<ApplicationType, ApplicationInfo>> grouped = filteredApps
+            .GroupBy(a => a.Type)
+            .OrderBy(g => GetTypePriority(g.Key));
 
         foreach (IGrouping<ApplicationType, ApplicationInfo> group in grouped)
         {
@@ -98,14 +101,19 @@ public static class ApplicationTableBuilder
     /// <summary>
     /// Builds a single application data row with appropriate formatting.
     /// </summary>
-    private static ApplicationDataRow BuildApplicationDataRow(ApplicationInfo app, bool showExtended)
+    private static ApplicationDataRow BuildApplicationDataRow(
+        ApplicationInfo app,
+        bool showExtended
+    )
     {
         return new ApplicationDataRow(
             Type: GetTypeDisplay(app.Type),
             Aid: $"[cyan]{Convert.ToHexString(app.Aid)}[/]",
             State: GetStateDisplay(app.LifecycleState),
             Privileges: GetPrivilegesDisplay(app.Privileges),
-            Version: showExtended ? Maybe<string>.From(app.Version.GetValueOrDefault("-")) : Maybe<string>.None,
+            Version: showExtended
+                ? Maybe<string>.From(app.Version.GetValueOrDefault("-"))
+                : Maybe<string>.None,
             AssociatedSecurityDomain: showExtended && app.AssociatedSecurityDomain.HasValue
                 ? Maybe<string>.From(Convert.ToHexString(app.AssociatedSecurityDomain.Value))
                 : Maybe<string>.From("-")
@@ -126,7 +134,7 @@ public static class ApplicationTableBuilder
             version = a.Version.GetValueOrDefault(),
             associatedSD = a.AssociatedSecurityDomain.HasValue
                 ? Convert.ToHexString(a.AssociatedSecurityDomain.Value)
-                : null
+                : null,
         });
 
         return JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
@@ -139,14 +147,16 @@ public static class ApplicationTableBuilder
     {
         List<string> lines = ["Type,AID,State,Privileges,Version,AssociatedSD"];
 
-        lines.AddRange(applications.Select(app =>
-            $"{app.Type}," +
-            $"{Convert.ToHexString(app.Aid)}," +
-            $"{app.LifecycleState}," +
-            $"\"{string.Join(";", app.Privileges.Select(p => p.ToString()))}\"," +
-            $"{app.Version.GetValueOrDefault("")}," +
-            $"{(app.AssociatedSecurityDomain.HasValue ? Convert.ToHexString(app.AssociatedSecurityDomain.Value) : "")}"
-        ));
+        lines.AddRange(
+            applications.Select(app =>
+                $"{app.Type},"
+                + $"{Convert.ToHexString(app.Aid)},"
+                + $"{app.LifecycleState},"
+                + $"\"{string.Join(";", app.Privileges.Select(p => p.ToString()))}\","
+                + $"{app.Version.GetValueOrDefault("")},"
+                + $"{(app.AssociatedSecurityDomain.HasValue ? Convert.ToHexString(app.AssociatedSecurityDomain.Value) : "")}"
+            )
+        );
 
         return string.Join(Environment.NewLine, lines);
     }
@@ -154,20 +164,40 @@ public static class ApplicationTableBuilder
     /// <summary>
     /// Filters applications based on filter criteria using pure functions.
     /// </summary>
-    private static IReadOnlyList<ApplicationInfo> FilterApplications(IReadOnlyList<ApplicationInfo> applications, string filter)
+    private static IReadOnlyList<ApplicationInfo> FilterApplications(
+        IReadOnlyList<ApplicationInfo> applications,
+        string filter
+    )
     {
         return filter.ToLowerInvariant() switch
         {
-            "isd" => applications.Where(a => a.Type == ApplicationType.IssuerSecurityDomain).ToList(),
-            "ssd" => applications.Where(a => a.Type == ApplicationType.SupplementarySecurityDomain).ToList(),
-            "app" or "applet" => applications.Where(a => a.Type == ApplicationType.Application).ToList(),
-            "pkg" or "package" => applications.Where(a => a.Type == ApplicationType.LoadFile).ToList(),
-            "selectable" => applications.Where(a => a.LifecycleState == LifecycleState.Selectable).ToList(),
+            "isd" => applications
+                .Where(a => a.Type == ApplicationType.IssuerSecurityDomain)
+                .ToList(),
+            "ssd" => applications
+                .Where(a => a.Type == ApplicationType.SupplementarySecurityDomain)
+                .ToList(),
+            "app" or "applet" => applications
+                .Where(a => a.Type == ApplicationType.Application)
+                .ToList(),
+            "pkg" or "package" => applications
+                .Where(a => a.Type == ApplicationType.LoadFile)
+                .ToList(),
+            "selectable" => applications
+                .Where(a => a.LifecycleState == LifecycleState.Selectable)
+                .ToList(),
             "locked" => applications.Where(a => a.LifecycleState == LifecycleState.Locked).ToList(),
-            "installed" => applications.Where(a => a.LifecycleState == LifecycleState.Installed).ToList(),
-            _ when filter.Length >= 6 => applications.Where(a =>
-                Convert.ToHexString(a.Aid).Contains(filter.ToUpperInvariant(), StringComparison.OrdinalIgnoreCase)).ToList(),
-            _ => applications
+            "installed" => applications
+                .Where(a => a.LifecycleState == LifecycleState.Installed)
+                .ToList(),
+            _ when filter.Length >= 6 => applications
+                .Where(a =>
+                    Convert
+                        .ToHexString(a.Aid)
+                        .Contains(filter.ToUpperInvariant(), StringComparison.OrdinalIgnoreCase)
+                )
+                .ToList(),
+            _ => applications,
         };
     }
 
@@ -183,7 +213,7 @@ public static class ApplicationTableBuilder
             ApplicationType.Application => "Application",
             ApplicationType.LoadFile => "Load File",
             ApplicationType.ExecutableLoadFile => "Executable Load File",
-            _ => "Unknown"
+            _ => "Unknown",
         };
     }
 
@@ -199,7 +229,7 @@ public static class ApplicationTableBuilder
             ApplicationType.Application => "[green]App[/]",
             ApplicationType.LoadFile => "[blue]Pkg[/]",
             ApplicationType.ExecutableLoadFile => "[blue]Exec[/]",
-            _ => type.ToString()
+            _ => type.ToString(),
         };
     }
 
@@ -215,14 +245,17 @@ public static class ApplicationTableBuilder
             LifecycleState.Locked => "[red]Locked[/]",
             LifecycleState.Installed => "[cyan]Installed[/]",
             LifecycleState.Terminated => "[red]Terminated[/]",
-            _ => state.ToString()
+            _ => state.ToString(),
         };
     }
 
     /// <summary>
     /// Gets the display string for privileges.
     /// </summary>
-    private static string GetPrivilegesDisplay(IReadOnlyList<Privilege> privileges, int maxDisplayCount = 3)
+    private static string GetPrivilegesDisplay(
+        IReadOnlyList<Privilege> privileges,
+        int maxDisplayCount = 3
+    )
     {
         if (privileges.Count == 0)
         {
@@ -249,8 +282,7 @@ public static class ApplicationTableBuilder
             ApplicationType.Application => 3,
             ApplicationType.LoadFile => 4,
             ApplicationType.ExecutableLoadFile => 5,
-            _ => 99
+            _ => 99,
         };
     }
-
 }

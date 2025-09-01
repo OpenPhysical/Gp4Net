@@ -13,7 +13,8 @@ public record ExecutableLoadFile(
     LifecycleState LifecycleState,
     Maybe<string> Version,
     ImmutableList<ExecutableModule> ExecutableModules,
-    Maybe<byte[]> AssociatedSecurityDomainAid = default)
+    Maybe<byte[]> AssociatedSecurityDomainAid = default
+)
 {
     /// <summary>
     /// Gets the AID as a hexadecimal string.
@@ -54,7 +55,8 @@ public record ExecutableLoadFile(
 public record ExecutableModule(
     byte[] Aid,
     Maybe<string> Name = default,
-    Maybe<string> Version = default)
+    Maybe<string> Version = default
+)
 {
     /// <summary>
     /// Gets the AID as a hexadecimal string.
@@ -90,5 +92,5 @@ public enum ExecutableLoadFileState : byte
     /// <summary>
     /// Load file is logically deleted.
     /// </summary>
-    LogicallyDeleted = 0x80
+    LogicallyDeleted = 0x80,
 }

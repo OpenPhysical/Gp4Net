@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Transport;
+using Gp4Net.Cryptography;
 using JetBrains.Annotations;
+using static Gp4Net.Cryptography.CryptoService;
 
 namespace Gp4Net.Domain.Security;
 
@@ -13,12 +13,14 @@ namespace Gp4Net.Domain.Security;
 /// Clean functional implementation of secure channel service following MacCalculations pattern.
 /// All methods delegate to static cryptographic and security functions - no dependency injection complexity.
 /// This service acts as a thin wrapper providing the interface while delegating to pure static functions.
-/// 
+///
 /// DEPRECATED: This service is being replaced by the unified ScpService in the Protocol namespace.
 /// Use ScpService for new code - it provides a cleaner, more functional API.
 /// </summary>
 [PublicAPI]
-[Obsolete("Use ScpService from Gp4Net.Domain.Protocol namespace for new code. This will be removed in a future version.")]
+[Obsolete(
+    "Use ScpService from Gp4Net.Domain.Protocol namespace for new code. This will be removed in a future version."
+)]
 public class SecureChannelService : ISecureChannelService
 {
     /// <summary>
@@ -36,43 +38,59 @@ public class SecureChannelService : ISecureChannelService
         SecurityLevel securityLevel,
         byte protocolVersion,
         byte[] initialMacChainingValue,
-        byte implementationParameter = 0x00)
+        byte implementationParameter = 0x00
+    )
     {
         return protocolVersion switch
         {
-            0x02 => EstablishScp02Channel(sessionKeys, securityLevel, initialMacChainingValue, implementationParameter),
-            0x03 => EstablishScp03Channel(sessionKeys, securityLevel, initialMacChainingValue, implementationParameter),
+            0x02 => EstablishScp02Channel(
+                sessionKeys,
+                securityLevel,
+                initialMacChainingValue,
+                implementationParameter
+            ),
+            0x03 => EstablishScp03Channel(
+                sessionKeys,
+                securityLevel,
+                initialMacChainingValue,
+                implementationParameter
+            ),
             _ => Result.Failure<SecureChannelState, SmartCardError>(
-                SmartCardError.InvalidArgument($"Unsupported protocol version: {protocolVersion:X2}"))
+                SmartCardError.InvalidArgument(
+                    $"Unsupported protocol version: {protocolVersion:X2}"
+                )
+            ),
         };
     }
 
     /// <inheritdoc />
     public Result<(byte[] wrappedCommand, SecureChannelState newState), SmartCardError> WrapCommand(
         IApduCommand command,
-        SecureChannelState state)
+        SecureChannelState state
+    )
     {
-        return ValidateCommand(command)
-            .Bind(_ => ValidateStateForOperation(state, SecureChannelOperation.CommandWrapping))
-            .Bind(_ => ApplyProtocolSpecificCommandSecurity(command, state));
+        // Delegate to unified ScpService.Security for consistency
+        return Gp4Net.Services.ScpService.Security.ApplyCommandSecurity(command, state);
     }
 
     /// <inheritdoc />
-    public Result<(byte[] unwrappedResponse, SecureChannelState newState), SmartCardError> UnwrapResponse(
-        byte[] response,
-        SecureChannelState state)
+    public Result<
+        (byte[] unwrappedResponse, SecureChannelState newState),
+        SmartCardError
+    > UnwrapResponse(byte[] response, SecureChannelState state)
     {
-        return ValidateResponse(response)
-            .Bind(_ => ValidateStateForOperation(state, SecureChannelOperation.ResponseUnwrapping))
-            .Bind(_ => ApplyProtocolSpecificResponseSecurity(response, state));
+        // Delegate to unified ScpService.Security for consistency
+        return Gp4Net.Services.ScpService.Security.ProcessResponse(response, state);
     }
 
     /// <inheritdoc />
     public Result<SecureChannelState, SmartCardError> ValidateStateForOperation(
         SecureChannelState state,
-        SecureChannelOperation operationType)
+        SecureChannelOperation operationType
+    )
     {
-        return state.Validate()
+        return state
+            .Validate()
             .Bind(validatedState => ValidateOperationCompatibility(validatedState, operationType));
     }
 
@@ -83,7 +101,9 @@ public class SecureChannelService : ISecureChannelService
         Maybe<IApduCommand> commandMaybe = Maybe<IApduCommand>.From(command);
         return commandMaybe.HasValue
             ? Result.Success<IApduCommand, SmartCardError>(command)
-            : Result.Failure<IApduCommand, SmartCardError>(SmartCardError.InvalidArgument("Command cannot be null"));
+            : Result.Failure<IApduCommand, SmartCardError>(
+                SmartCardError.InvalidArgument("Command cannot be null")
+            );
     }
 
     private static Result<byte[], SmartCardError> ValidateResponse(byte[] response)
@@ -91,70 +111,94 @@ public class SecureChannelService : ISecureChannelService
         Maybe<byte[]> responseMaybe = Maybe<byte[]>.From(response);
         return responseMaybe.HasValue && response.Length >= 2
             ? Result.Success<byte[], SmartCardError>(response)
-            : Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidArgument("Response must be at least 2 bytes"));
+            : Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidArgument("Response must be at least 2 bytes")
+            );
     }
 
     private static Result<SecureChannelState, SmartCardError> ValidateOperationCompatibility(
         SecureChannelState state,
-        SecureChannelOperation operationType)
+        SecureChannelOperation operationType
+    )
     {
         return operationType switch
         {
             SecureChannelOperation.CommandWrapping => ValidateCommandWrappingCapabilities(state),
-            SecureChannelOperation.ResponseUnwrapping => ValidateResponseUnwrappingCapabilities(state),
-            SecureChannelOperation.SecureMessaging => Result.Success<SecureChannelState, SmartCardError>(state),
+            SecureChannelOperation.ResponseUnwrapping => ValidateResponseUnwrappingCapabilities(
+                state
+            ),
+            SecureChannelOperation.SecureMessaging => Result.Success<
+                SecureChannelState,
+                SmartCardError
+            >(state),
             _ => Result.Failure<SecureChannelState, SmartCardError>(
-                SmartCardError.InvalidArgument($"Unsupported operation type: {operationType}"))
+                SmartCardError.InvalidArgument($"Unsupported operation type: {operationType}")
+            ),
         };
     }
 
-    private static Result<SecureChannelState, SmartCardError> ValidateCommandWrappingCapabilities(SecureChannelState state)
+    private static Result<SecureChannelState, SmartCardError> ValidateCommandWrappingCapabilities(
+        SecureChannelState state
+    )
     {
         // For command wrapping, we need at least C-MAC capability
         if (!state.HasCommandMac)
         {
             return Result.Failure<SecureChannelState, SmartCardError>(
-                SmartCardError.SecurityError("Command wrapping requires C-MAC capability"));
+                SmartCardError.SecurityError("Command wrapping requires C-MAC capability")
+            );
         }
 
         return Result.Success<SecureChannelState, SmartCardError>(state);
     }
 
-    private static Result<SecureChannelState, SmartCardError> ValidateResponseUnwrappingCapabilities(SecureChannelState state)
+    private static Result<
+        SecureChannelState,
+        SmartCardError
+    > ValidateResponseUnwrappingCapabilities(SecureChannelState state)
     {
         // For response unwrapping, we need at least R-MAC capability
         if (!state.HasResponseMac)
         {
             return Result.Failure<SecureChannelState, SmartCardError>(
-                SmartCardError.SecurityError("Response unwrapping requires R-MAC capability"));
+                SmartCardError.SecurityError("Response unwrapping requires R-MAC capability")
+            );
         }
 
         return Result.Success<SecureChannelState, SmartCardError>(state);
     }
 
-    private static Result<(byte[] wrappedCommand, SecureChannelState newState), SmartCardError> ApplyProtocolSpecificCommandSecurity(
-        IApduCommand command,
-        SecureChannelState state)
+    private static Result<
+        (byte[] wrappedCommand, SecureChannelState newState),
+        SmartCardError
+    > ApplyProtocolSpecificCommandSecurity(IApduCommand command, SecureChannelState state)
     {
         return state.ProtocolVersion switch
         {
             ScpVersion.Scp02 => ApplyScp02CommandSecurity(command, state),
             ScpVersion.Scp03 => ApplyScp03CommandSecurity(command, state),
             _ => Result.Failure<(byte[], SecureChannelState), SmartCardError>(
-                SmartCardError.InvalidArgument($"Unsupported protocol version: {state.ProtocolVersion:X2}"))
+                SmartCardError.InvalidArgument(
+                    $"Unsupported protocol version: {state.ProtocolVersion:X2}"
+                )
+            ),
         };
     }
 
-    private static Result<(byte[] unwrappedResponse, SecureChannelState newState), SmartCardError> ApplyProtocolSpecificResponseSecurity(
-        byte[] response,
-        SecureChannelState state)
+    private static Result<
+        (byte[] unwrappedResponse, SecureChannelState newState),
+        SmartCardError
+    > ApplyProtocolSpecificResponseSecurity(byte[] response, SecureChannelState state)
     {
         return state.ProtocolVersion switch
         {
             ScpVersion.Scp02 => ApplyScp02ResponseSecurity(response, state),
             ScpVersion.Scp03 => ApplyScp03ResponseSecurity(response, state),
             _ => Result.Failure<(byte[], SecureChannelState), SmartCardError>(
-                SmartCardError.InvalidArgument($"Unsupported protocol version: {state.ProtocolVersion:X2}"))
+                SmartCardError.InvalidArgument(
+                    $"Unsupported protocol version: {state.ProtocolVersion:X2}"
+                )
+            ),
         };
     }
 
@@ -167,16 +211,22 @@ public class SecureChannelService : ISecureChannelService
         SessionKeys sessionKeys,
         SecurityLevel securityLevel,
         byte[] initialMacChainingValue,
-        byte implementationParameter)
+        byte implementationParameter
+    )
     {
-        return MacChainingState.Create(initialMacChainingValue, ScpVersion.Scp02, implementationParameter)
-            .Bind(macState => SecureChannelState.Create(
-                sessionKeys,
-                securityLevel,
-                ScpVersion.Scp02,
-                initialMacChainingValue,
-                implementationParameter)
-                .Bind(state => state.UpdateCounterAndMac(0, macState)));
+        return MacChainingState
+            .Create(initialMacChainingValue, ScpVersion.Scp02, implementationParameter)
+            .Bind(macState =>
+                SecureChannelState
+                    .Create(
+                        sessionKeys,
+                        securityLevel,
+                        ScpVersion.Scp02,
+                        initialMacChainingValue,
+                        implementationParameter
+                    )
+                    .Bind(state => state.UpdateCounterAndMac(0, macState))
+            );
     }
 
     /// <summary>
@@ -186,16 +236,22 @@ public class SecureChannelService : ISecureChannelService
         SessionKeys sessionKeys,
         SecurityLevel securityLevel,
         byte[] initialMacChainingValue,
-        byte implementationParameter)
+        byte implementationParameter
+    )
     {
-        return MacChainingState.Create(initialMacChainingValue, ScpVersion.Scp03, implementationParameter)
-            .Bind(macState => SecureChannelState.Create(
-                sessionKeys,
-                securityLevel,
-                ScpVersion.Scp03,
-                initialMacChainingValue,
-                implementationParameter)
-                .Bind(state => state.UpdateCounterAndMac(0, macState)));
+        return MacChainingState
+            .Create(initialMacChainingValue, ScpVersion.Scp03, implementationParameter)
+            .Bind(macState =>
+                SecureChannelState
+                    .Create(
+                        sessionKeys,
+                        securityLevel,
+                        ScpVersion.Scp03,
+                        initialMacChainingValue,
+                        implementationParameter
+                    )
+                    .Bind(state => state.UpdateCounterAndMac(0, macState))
+            );
     }
 
     // Protocol-specific command security methods
@@ -205,19 +261,27 @@ public class SecureChannelService : ISecureChannelService
     /// </summary>
     private static Result<(byte[], SecureChannelState), SmartCardError> ApplyScp02CommandSecurity(
         IApduCommand command,
-        SecureChannelState state)
+        SecureChannelState state
+    )
     {
         // Convert IApduCommand to byte array for processing
         byte[] commandBytes = command.ToByteArray();
-        
+
         return state.SecurityLevel.HasCMac()
-            ? ApplyCommandMacScp02(commandBytes, state)
-                .Bind(macResult => state.SecurityLevel.HasCEncryption()
-                    ? ApplyCommandEncryptionScp02(macResult.commandWithMac, macResult.newState)
-                    : Result.Success<(byte[], SecureChannelState), SmartCardError>(macResult))
+                ? ApplyCommandMacScp02(commandBytes, state)
+                    .Bind(macResult =>
+                        state.SecurityLevel.HasCEncryption()
+                            ? ApplyCommandEncryptionScp02(
+                                macResult.commandWithMac,
+                                macResult.newState
+                            )
+                            : Result.Success<(byte[], SecureChannelState), SmartCardError>(
+                                macResult
+                            )
+                    )
             : state.SecurityLevel.HasCEncryption()
                 ? ApplyCommandEncryptionScp02(commandBytes, state)
-                : Result.Success<(byte[], SecureChannelState), SmartCardError>((commandBytes, state));
+            : Result.Success<(byte[], SecureChannelState), SmartCardError>((commandBytes, state));
     }
 
     /// <summary>
@@ -225,19 +289,27 @@ public class SecureChannelService : ISecureChannelService
     /// </summary>
     private static Result<(byte[], SecureChannelState), SmartCardError> ApplyScp03CommandSecurity(
         IApduCommand command,
-        SecureChannelState state)
+        SecureChannelState state
+    )
     {
         // Convert IApduCommand to byte array for processing
         byte[] commandBytes = command.ToByteArray();
-        
+
         return state.SecurityLevel.HasCMac()
-            ? ApplyCommandMacScp03(commandBytes, state)
-                .Bind(macResult => state.SecurityLevel.HasCEncryption()
-                    ? ApplyCommandEncryptionScp03(macResult.commandWithMac, macResult.newState)
-                    : Result.Success<(byte[], SecureChannelState), SmartCardError>(macResult))
+                ? ApplyCommandMacScp03(commandBytes, state)
+                    .Bind(macResult =>
+                        state.SecurityLevel.HasCEncryption()
+                            ? ApplyCommandEncryptionScp03(
+                                macResult.commandWithMac,
+                                macResult.newState
+                            )
+                            : Result.Success<(byte[], SecureChannelState), SmartCardError>(
+                                macResult
+                            )
+                    )
             : state.SecurityLevel.HasCEncryption()
                 ? ApplyCommandEncryptionScp03(commandBytes, state)
-                : Result.Success<(byte[], SecureChannelState), SmartCardError>((commandBytes, state));
+            : Result.Success<(byte[], SecureChannelState), SmartCardError>((commandBytes, state));
     }
 
     // Protocol-specific response security methods
@@ -247,16 +319,23 @@ public class SecureChannelService : ISecureChannelService
     /// </summary>
     private static Result<(byte[], SecureChannelState), SmartCardError> ApplyScp02ResponseSecurity(
         byte[] response,
-        SecureChannelState state)
+        SecureChannelState state
+    )
     {
         return state.SecurityLevel.HasRMac()
-            ? VerifyResponseMacScp02(response, state)
-                .Bind(verifyResult => state.SecurityLevel.HasREncryption()
-                    ? DecryptResponseScp02(verifyResult.verifiedResponse, verifyResult.newState)
-                    : Result.Success<(byte[], SecureChannelState), SmartCardError>(verifyResult))
-            : state.SecurityLevel.HasREncryption()
-                ? DecryptResponseScp02(response, state)
-                : Result.Success<(byte[], SecureChannelState), SmartCardError>((response, state));
+                ? VerifyResponseMacScp02(response, state)
+                    .Bind(verifyResult =>
+                        state.SecurityLevel.HasREncryption()
+                            ? DecryptResponseScp02(
+                                verifyResult.verifiedResponse,
+                                verifyResult.newState
+                            )
+                            : Result.Success<(byte[], SecureChannelState), SmartCardError>(
+                                verifyResult
+                            )
+                    )
+            : state.SecurityLevel.HasREncryption() ? DecryptResponseScp02(response, state)
+            : Result.Success<(byte[], SecureChannelState), SmartCardError>((response, state));
     }
 
     /// <summary>
@@ -264,16 +343,23 @@ public class SecureChannelService : ISecureChannelService
     /// </summary>
     private static Result<(byte[], SecureChannelState), SmartCardError> ApplyScp03ResponseSecurity(
         byte[] response,
-        SecureChannelState state)
+        SecureChannelState state
+    )
     {
         return state.SecurityLevel.HasRMac()
-            ? VerifyResponseMacScp03(response, state)
-                .Bind(verifyResult => state.SecurityLevel.HasREncryption()
-                    ? DecryptResponseScp03(verifyResult.verifiedResponse, verifyResult.newState)
-                    : Result.Success<(byte[], SecureChannelState), SmartCardError>(verifyResult))
-            : state.SecurityLevel.HasREncryption()
-                ? DecryptResponseScp03(response, state)
-                : Result.Success<(byte[], SecureChannelState), SmartCardError>((response, state));
+                ? VerifyResponseMacScp03(response, state)
+                    .Bind(verifyResult =>
+                        state.SecurityLevel.HasREncryption()
+                            ? DecryptResponseScp03(
+                                verifyResult.verifiedResponse,
+                                verifyResult.newState
+                            )
+                            : Result.Success<(byte[], SecureChannelState), SmartCardError>(
+                                verifyResult
+                            )
+                    )
+            : state.SecurityLevel.HasREncryption() ? DecryptResponseScp03(response, state)
+            : Result.Success<(byte[], SecureChannelState), SmartCardError>((response, state));
     }
 
     // Helper methods for command security operations
@@ -281,18 +367,26 @@ public class SecureChannelService : ISecureChannelService
     /// <summary>
     /// Applies C-MAC to SCP02 command using MacCalculations.
     /// </summary>
-    private static Result<(byte[] commandWithMac, SecureChannelState newState), SmartCardError> ApplyCommandMacScp02(
-        byte[] command,
-        SecureChannelState state)
+    private static Result<
+        (byte[] commandWithMac, SecureChannelState newState),
+        SmartCardError
+    > ApplyCommandMacScp02(byte[] command, SecureChannelState state)
     {
-        // Use existing MacCalculations for SCP02 C-MAC calculation
-        byte[] macInput = CryptographicOperations.BuildMacInput(command[0], command[1], command[2], command[3], 
-            command.Length > 5 ? command[5..] : [], ScpVersion.Scp02);
-        
-        return MacCalculations.CalculateScp02CommandMac(state.SessionKeys.SMac, macInput)
+        // Use UnifiedCryptoService for SCP02 C-MAC calculation
+        byte[] macInput = CryptoService.Utils.BuildMacInput(
+            command[0],
+            command[1],
+            command[2],
+            command[3],
+            command.Length > 5 ? command[5..] : [],
+            ScpVersion.Scp02
+        );
+
+        return CryptoService.Mac
+            .CalculateScp02CommandMac(state.SessionKeys.SMac, macInput)
             .Map(mac =>
             {
-                byte[] commandWithMac = CryptographicOperations.ConcatenateArrays(command, mac);
+                byte[] commandWithMac = CryptoService.Utils.ConcatenateArrays(command, mac);
                 return (commandWithMac, state); // State update would happen here
             });
     }
@@ -300,18 +394,26 @@ public class SecureChannelService : ISecureChannelService
     /// <summary>
     /// Applies C-MAC to SCP03 command using MacCalculations.
     /// </summary>
-    private static Result<(byte[] commandWithMac, SecureChannelState newState), SmartCardError> ApplyCommandMacScp03(
-        byte[] command,
-        SecureChannelState state)
+    private static Result<
+        (byte[] commandWithMac, SecureChannelState newState),
+        SmartCardError
+    > ApplyCommandMacScp03(byte[] command, SecureChannelState state)
     {
-        // Use existing MacCalculations for SCP03 C-MAC calculation
-        byte[] macInput = CryptographicOperations.BuildMacInput(command[0], command[1], command[2], command[3], 
-            command.Length > 5 ? command[5..] : [], ScpVersion.Scp03);
-        
-        return MacCalculations.CalculateScp03CommandMac(state.SessionKeys.SMac, macInput)
+        // Use UnifiedCryptoService for SCP03 C-MAC calculation
+        byte[] macInput = CryptoService.Utils.BuildMacInput(
+            command[0],
+            command[1],
+            command[2],
+            command[3],
+            command.Length > 5 ? command[5..] : [],
+            ScpVersion.Scp03
+        );
+
+        return CryptoService.Mac
+            .CalculateScp03CommandMac(state.SessionKeys.SMac, macInput)
             .Map(mac =>
             {
-                byte[] commandWithMac = CryptographicOperations.ConcatenateArrays(command, mac);
+                byte[] commandWithMac = CryptoService.Utils.ConcatenateArrays(command, mac);
                 return (commandWithMac, state); // State update would happen here
             });
     }
@@ -321,9 +423,10 @@ public class SecureChannelService : ISecureChannelService
     /// </summary>
     private static Result<(byte[], SecureChannelState), SmartCardError> ApplyCommandEncryptionScp02(
         byte[] command,
-        SecureChannelState state)
+        SecureChannelState state
+    )
     {
-        // Implementation would use CryptographicOperations.Encrypt3DesCbc
+        // Implementation would use UnifiedCryptoService.Cipher.Encrypt3DesCbc
         return Result.Success<(byte[], SecureChannelState), SmartCardError>((command, state));
     }
 
@@ -332,9 +435,10 @@ public class SecureChannelService : ISecureChannelService
     /// </summary>
     private static Result<(byte[], SecureChannelState), SmartCardError> ApplyCommandEncryptionScp03(
         byte[] command,
-        SecureChannelState state)
+        SecureChannelState state
+    )
     {
-        // Implementation would use CryptographicOperations.EncryptAesCbc
+        // Implementation would use UnifiedCryptoService.Cipher.EncryptAesCbc
         return Result.Success<(byte[], SecureChannelState), SmartCardError>((command, state));
     }
 
@@ -343,22 +447,24 @@ public class SecureChannelService : ISecureChannelService
     /// <summary>
     /// Verifies R-MAC on SCP02 response using MacCalculations.
     /// </summary>
-    private static Result<(byte[] verifiedResponse, SecureChannelState newState), SmartCardError> VerifyResponseMacScp02(
-        byte[] response,
-        SecureChannelState state)
+    private static Result<
+        (byte[] verifiedResponse, SecureChannelState newState),
+        SmartCardError
+    > VerifyResponseMacScp02(byte[] response, SecureChannelState state)
     {
-        // Implementation would use MacCalculations for R-MAC verification
+        // Implementation would use UnifiedCryptoService.Mac for R-MAC verification
         return Result.Success<(byte[], SecureChannelState), SmartCardError>((response, state));
     }
 
     /// <summary>
     /// Verifies R-MAC on SCP03 response using MacCalculations.
     /// </summary>
-    private static Result<(byte[] verifiedResponse, SecureChannelState newState), SmartCardError> VerifyResponseMacScp03(
-        byte[] response,
-        SecureChannelState state)
+    private static Result<
+        (byte[] verifiedResponse, SecureChannelState newState),
+        SmartCardError
+    > VerifyResponseMacScp03(byte[] response, SecureChannelState state)
     {
-        // Implementation would use MacCalculations for R-MAC verification
+        // Implementation would use UnifiedCryptoService.Mac for R-MAC verification
         return Result.Success<(byte[], SecureChannelState), SmartCardError>((response, state));
     }
 
@@ -367,9 +473,10 @@ public class SecureChannelService : ISecureChannelService
     /// </summary>
     private static Result<(byte[], SecureChannelState), SmartCardError> DecryptResponseScp02(
         byte[] response,
-        SecureChannelState state)
+        SecureChannelState state
+    )
     {
-        // Implementation would use CryptographicOperations.Decrypt3DesCbc
+        // Implementation would use UnifiedCryptoService.Cipher.Decrypt3DesCbc
         return Result.Success<(byte[], SecureChannelState), SmartCardError>((response, state));
     }
 
@@ -378,9 +485,10 @@ public class SecureChannelService : ISecureChannelService
     /// </summary>
     private static Result<(byte[], SecureChannelState), SmartCardError> DecryptResponseScp03(
         byte[] response,
-        SecureChannelState state)
+        SecureChannelState state
+    )
     {
-        // Implementation would use CryptographicOperations.DecryptAesCbc
+        // Implementation would use UnifiedCryptoService.Cipher.DecryptAesCbc
         return Result.Success<(byte[], SecureChannelState), SmartCardError>((response, state));
     }
 }

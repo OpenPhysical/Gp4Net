@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Transport;
@@ -35,11 +34,12 @@ public static class ApduBuilder
         {
             // Security check: Validate data length against APDU limits
             int dataLength = command.Data.Length;
-            if (dataLength > ApduConstants.MaxApduDataLength)
+            if (dataLength > Constants.Constants.Apdu.Formats.MaxApduDataLength)
             {
                 throw new ArgumentException(
-                    $"Data length ({dataLength}) exceeds maximum APDU data length ({ApduConstants.MaxApduDataLength})",
-                    nameof(command));
+                    $"Data length ({dataLength}) exceeds maximum APDU data length ({Constants.Constants.Apdu.Formats.MaxApduDataLength})",
+                    nameof(command)
+                );
             }
 
             // Add Lc (data length)
@@ -50,7 +50,8 @@ public static class ApduBuilder
                 {
                     throw new ArgumentException(
                         $"Extended APDU data length ({dataLength}) exceeds 16-bit limit (65535)",
-                        nameof(command));
+                        nameof(command)
+                    );
                 }
 
                 // Extended length format
@@ -65,7 +66,8 @@ public static class ApduBuilder
                 {
                     throw new ArgumentException(
                         $"Short APDU data length ({dataLength}) exceeds byte limit (255)",
-                        nameof(command));
+                        nameof(command)
+                    );
                 }
 
                 // Short length format
@@ -81,11 +83,12 @@ public static class ApduBuilder
             int expectedLength = command.ExpectedResponseLength.Value;
 
             // Security check: Validate expected response length
-            if (expectedLength > ApduConstants.MaxExtendedLength)
+            if (expectedLength > Constants.Constants.Apdu.Formats.MaxExtendedLength)
             {
                 throw new ArgumentException(
-                    $"Expected response length ({expectedLength}) exceeds maximum ({ApduConstants.MaxExtendedLength})",
-                    nameof(command));
+                    $"Expected response length ({expectedLength}) exceeds maximum ({Constants.Constants.Apdu.Formats.MaxExtendedLength})",
+                    nameof(command)
+                );
             }
 
             if (command.IsExtendedLength && expectedLength > 255)
@@ -95,7 +98,8 @@ public static class ApduBuilder
                 {
                     throw new ArgumentException(
                         $"Extended APDU expected length ({expectedLength}) exceeds 16-bit limit (65535)",
-                        nameof(command));
+                        nameof(command)
+                    );
                 }
 
                 // Extended length format
@@ -115,7 +119,8 @@ public static class ApduBuilder
                 {
                     throw new ArgumentException(
                         $"Short APDU expected length ({expectedLength}) exceeds limit (256)",
-                        nameof(command));
+                        nameof(command)
+                    );
                 }
 
                 // Short length format
@@ -124,7 +129,7 @@ public static class ApduBuilder
             }
         }
 
-        return apduBytes.ToArray();
+        return [.. apduBytes];
     }
 
     /// <summary>
@@ -137,7 +142,14 @@ public static class ApduBuilder
     /// <param name="data">Command data.</param>
     /// <param name="le">Expected response length.</param>
     /// <returns>The APDU byte array.</returns>
-    public static byte[] BuildApdu(byte cla, byte ins, byte p1, byte p2, byte[] data = null, Maybe<int> le = default)
+    public static byte[] BuildApdu(
+        byte cla,
+        byte ins,
+        byte p1,
+        byte p2,
+        byte[] data = null,
+        Maybe<int> le = default
+    )
     {
         SimpleApduCommand command = new SimpleApduCommand(cla, ins, p1, p2, data, le);
         return BuildApdu(command);
@@ -158,7 +170,8 @@ public static class ApduBuilder
         {
             get
             {
-                return Data.Length > 255 || ExpectedResponseLength.Map(len => len > 255).GetValueOrDefault(false);
+                return Data.Length > 255
+                    || ExpectedResponseLength.Map(len => len > 255).GetValueOrDefault(false);
             }
         }
 

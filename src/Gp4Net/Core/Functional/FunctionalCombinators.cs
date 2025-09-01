@@ -18,11 +18,14 @@ public static class FunctionalCombinators
     /// Returns the first successful result or the last failure.
     /// </summary>
     public static async Task<Result<T, E>> FirstSuccess<T, E>(
-        this IEnumerable<Func<Task<Result<T, E>>>> operations)
+        this IEnumerable<Func<Task<Result<T, E>>>> operations
+    )
     {
-        List<Func<Task<Result<T, E>>>> operationsList = operations.ToList();
+        List<Func<Task<Result<T, E>>>> operationsList = [.. operations];
         if (!operationsList.Any())
-            return Result.Failure<T, E>((E)(object)SmartCardError.InvalidArgument("No operations provided"));
+            return Result.Failure<T, E>(
+                (E)(object)SmartCardError.InvalidArgument("No operations provided")
+            );
 
         Maybe<Result<T, E>> lastFailure = Maybe<Result<T, E>>.None;
 
@@ -35,18 +38,24 @@ public static class FunctionalCombinators
         }
 
         return lastFailure.GetValueOrDefault(
-            Result.Failure<T, E>((E)(object)SmartCardError.InvalidArgument("No operations executed")));
+            Result.Failure<T, E>(
+                (E)(object)SmartCardError.InvalidArgument("No operations executed")
+            )
+        );
     }
 
     /// <summary>
     /// Tries multiple operations in parallel and returns the first successful result.
     /// </summary>
     public static async Task<Result<T, E>> FirstSuccessParallel<T, E>(
-        this IEnumerable<Func<Task<Result<T, E>>>> operations)
+        this IEnumerable<Func<Task<Result<T, E>>>> operations
+    )
     {
-        List<Task<Result<T, E>>> tasks = operations.Select(op => op()).ToList();
+        List<Task<Result<T, E>>> tasks = [.. operations.Select(op => op())];
         if (!tasks.Any())
-            return Result.Failure<T, E>((E)(object)SmartCardError.InvalidArgument("No operations provided"));
+            return Result.Failure<T, E>(
+                (E)(object)SmartCardError.InvalidArgument("No operations provided")
+            );
 
         Result<T, E>[] results = await Task.WhenAll(tasks);
         Result<T, E> successResult = results.FirstOrDefault(r => r.IsSuccess);
@@ -59,13 +68,11 @@ public static class FunctionalCombinators
     /// </summary>
     public static async Task<ImmutableList<T>> MapSuccessful<S, T, E>(
         this IEnumerable<S> source,
-        Func<S, Task<Result<T, E>>> operation)
+        Func<S, Task<Result<T, E>>> operation
+    )
     {
         Result<T, E>[] results = await Task.WhenAll(source.Select(operation));
-        return results
-            .Where(r => r.IsSuccess)
-            .Select(r => r.Value)
-            .ToImmutableList();
+        return [.. results.Where(r => r.IsSuccess).Select(r => r.Value)];
     }
 
     /// <summary>
@@ -73,7 +80,8 @@ public static class FunctionalCombinators
     /// </summary>
     public static async Task<Result<ImmutableList<T>, E>> TraverseResult<S, T, E>(
         this IEnumerable<S> source,
-        Func<S, Task<Result<T, E>>> operation)
+        Func<S, Task<Result<T, E>>> operation
+    )
     {
         ImmutableList<T>.Builder results = ImmutableList.CreateBuilder<T>();
 
@@ -93,7 +101,8 @@ public static class FunctionalCombinators
     /// Fails fast on first error.
     /// </summary>
     public static Result<ImmutableList<T>, E> SequenceResult<T, E>(
-        this IEnumerable<Result<T, E>> results)
+        this IEnumerable<Result<T, E>> results
+    )
     {
         ImmutableList<T>.Builder values = ImmutableList.CreateBuilder<T>();
 
@@ -113,7 +122,8 @@ public static class FunctionalCombinators
     public static async Task<Result<TAcc, E>> FoldResult<T, TAcc, E>(
         this IEnumerable<T> source,
         TAcc initial,
-        Func<TAcc, T, Task<Result<TAcc, E>>> folder)
+        Func<TAcc, T, Task<Result<TAcc, E>>> folder
+    )
     {
         TAcc accumulator = initial;
 
@@ -135,14 +145,16 @@ public static class FunctionalCombinators
         Func<Task<Result<T, E>>> operation,
         int maxRetries = 3,
         TimeSpan? initialDelay = null,
-        Func<Result<T, E>, bool> shouldRetry = null)
+        Func<Result<T, E>, bool> shouldRetry = null
+    )
     {
         TimeSpan delay = initialDelay ?? TimeSpan.FromMilliseconds(100);
         shouldRetry ??= result => result.IsFailure;
 
         Maybe<Result<T, E>> lastResult = Maybe<Result<T, E>>.None;
 
-        return await Enumerable.Range(0, maxRetries + 1)
+        return await Enumerable
+            .Range(0, maxRetries + 1)
             .Select(async attempt =>
             {
                 if (attempt > 0)
@@ -165,7 +177,8 @@ public static class FunctionalCombinators
     /// </summary>
     private static async Task<T> FirstOrDefaultAsync<T>(
         this IEnumerable<Task<T>> tasks,
-        Func<Task<T>, Task<bool>> predicate)
+        Func<Task<T>, Task<bool>> predicate
+    )
     {
         foreach (Task<T> task in tasks)
         {
@@ -179,9 +192,7 @@ public static class FunctionalCombinators
     /// <summary>
     /// Maps a value in a task.
     /// </summary>
-    private static async Task<T2> Map<T1, T2>(
-        this Task<T1> task,
-        Func<T1, T2> mapper)
+    private static async Task<T2> Map<T1, T2>(this Task<T1> task, Func<T1, T2> mapper)
     {
         T1 result = await task;
         return mapper(result);
@@ -191,7 +202,8 @@ public static class FunctionalCombinators
     /// Partitions a sequence of Results into successes and failures.
     /// </summary>
     public static (ImmutableList<T> Successes, ImmutableList<E> Failures) Partition<T, E>(
-        this IEnumerable<Result<T, E>> results)
+        this IEnumerable<Result<T, E>> results
+    )
     {
         ImmutableList<T>.Builder successes = ImmutableList.CreateBuilder<T>();
         ImmutableList<E>.Builder failures = ImmutableList.CreateBuilder<E>();
@@ -212,7 +224,8 @@ public static class FunctionalCombinators
     /// </summary>
     public static IEnumerable<T> Unfold<T, TState>(
         TState initial,
-        Func<TState, Maybe<(T value, TState next)>> generator)
+        Func<TState, Maybe<(T value, TState next)>> generator
+    )
     {
         TState state = initial;
 
@@ -233,7 +246,8 @@ public static class FunctionalCombinators
     /// </summary>
     public static async Task<ImmutableList<T>> UnfoldAsync<T, TState>(
         TState initial,
-        Func<TState, Task<Maybe<(T value, TState next)>>> generator)
+        Func<TState, Task<Maybe<(T value, TState next)>>> generator
+    )
     {
         ImmutableList<T>.Builder results = ImmutableList.CreateBuilder<T>();
         TState state = initial;

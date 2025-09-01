@@ -26,7 +26,11 @@ public class CardManagementOperationTests
     /// <returns>Result containing the JsonDocument or error message</returns>
     private static Result<JsonDocument, string> LoadTraceFile(string traceFile)
     {
-        string tracePath = Path.Combine(TestContext.CurrentContext.TestDirectory, TraceDataPath, traceFile);
+        string tracePath = Path.Combine(
+            TestContext.CurrentContext.TestDirectory,
+            TraceDataPath,
+            traceFile
+        );
 
         if (!File.Exists(tracePath))
             return Result.Failure<JsonDocument, string>($"Trace file not found: {tracePath}");
@@ -39,7 +43,9 @@ public class CardManagementOperationTests
         }
         catch (Exception ex)
         {
-            return Result.Failure<JsonDocument, string>($"Failed to parse trace file {traceFile}: {ex.Message}");
+            return Result.Failure<JsonDocument, string>(
+                $"Failed to parse trace file {traceFile}: {ex.Message}"
+            );
         }
     }
 
@@ -49,7 +55,10 @@ public class CardManagementOperationTests
     /// <param name="testData">The trace data</param>
     /// <param name="traceFile">Trace file name for error reporting</param>
     /// <returns>Result containing the exchanges element or error message</returns>
-    private static Result<JsonElement, string> ValidateExchangesExist(JsonDocument testData, string traceFile) =>
+    private static Result<JsonElement, string> ValidateExchangesExist(
+        JsonDocument testData,
+        string traceFile
+    ) =>
         testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement)
             ? Result.Success<JsonElement, string>(exchangesElement)
             : Result.Failure<JsonElement, string>($"No exchanges found in trace {traceFile}");
@@ -61,62 +70,83 @@ public class CardManagementOperationTests
     /// <param name="description">Test description</param>
     /// <param name="traceFile">Trace file name</param>
     /// <returns>Result indicating validation success or failure</returns>
-    private static UnitResult<string> ValidateCardInformationRetrieval(JsonElement exchangesElement, string description, string traceFile)
+    private static UnitResult<string> ValidateCardInformationRetrieval(
+        JsonElement exchangesElement,
+        string description,
+        string traceFile
+    )
     {
         TestContext.Out.WriteLine($"Testing {description}");
         TestContext.Out.WriteLine($"Trace file: {traceFile}");
 
-        List<JsonElement> exchanges = exchangesElement.EnumerateArray().ToList();
+        List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
         var commandResponsePairs = exchanges
             .Select(e => new
             {
                 Command = e.GetProperty("command").GetString()!,
-                Response = e.GetProperty("response").GetString()!
+                Response = e.GetProperty("response").GetString()!,
             })
             .ToList();
 
-        // Analyze card information patterns using functional approach
-        var selectCommands = commandResponsePairs.Where(pair => pair.Command.StartsWith("00A4")).ToList();
+        // Analyze card information patterns
+        var selectCommands = commandResponsePairs
+            .Where(pair => pair.Command.StartsWith("00A4"))
+            .ToList();
         var statusCommands = commandResponsePairs
-            .Where(pair => pair.Command.StartsWith("80F2") || pair.Command.StartsWith("84F2") ||
-                          pair.Command.StartsWith("80CA") || pair.Command.StartsWith("84CA"))
+            .Where(pair =>
+                pair.Command.StartsWith("80F2")
+                || pair.Command.StartsWith("84F2")
+                || pair.Command.StartsWith("80CA")
+                || pair.Command.StartsWith("84CA")
+            )
             .ToList();
 
         if (!selectCommands.Any())
-            return UnitResult.Failure<string>($"Card info operation should include SELECT for {description}");
+            return UnitResult.Failure<string>(
+                $"Card info operation should include SELECT for {description}"
+            );
 
         if (!statusCommands.Any())
-            return UnitResult.Failure<string>($"Card info operation should include card information commands for {description}");
+            return UnitResult.Failure<string>(
+                $"Card info operation should include card information commands for {description}"
+            );
 
         // Validate SELECT responses and log findings
-        List<string> selectValidation = selectCommands
+        List<string> selectValidation = [.. selectCommands
             .Where(pair => !pair.Response.EndsWith("9000"))
-            .Select(pair => pair.Command)
-            .ToList();
+            .Select(pair => pair.Command)];
 
         if (selectValidation.Any())
             return UnitResult.Failure<string>("SELECT command should succeed");
 
         // Log successful findings
-        _ = selectCommands.Select(pair => $"✓ Found SELECT command: {pair.Command}")
-            .Aggregate("", (current, message) =>
-            {
-                TestContext.Out.WriteLine(message);
-                return current;
-            });
+        _ = selectCommands
+            .Select(pair => $"✓ Found SELECT command: {pair.Command}")
+            .Aggregate(
+                "",
+                (current, message) =>
+                {
+                    TestContext.Out.WriteLine(message);
+                    return current;
+                }
+            );
 
-        _ = statusCommands.Select(pair => new
-        {
-            Command = pair.Command,
-            Response = pair.Response,
-            IsSuccessful = pair.Response.EndsWith("9000")
-        })
+        _ = statusCommands
+            .Select(pair => new
+            {
+                pair.Command,
+                pair.Response,
+                IsSuccessful = pair.Response.EndsWith("9000"),
+            })
             .Select(info =>
             {
                 TestContext.Out.WriteLine($"✓ Found card info command: {info.Command}");
                 if (info.IsSuccessful)
                 {
-                    string responsePreview = info.Response.Substring(0, Math.Min(info.Response.Length - 4, 40));
+                    string responsePreview = info.Response.Substring(
+                        0,
+                        Math.Min(info.Response.Length - 4, 40)
+                    );
                     TestContext.Out.WriteLine($"  Status response: {responsePreview}...");
                 }
                 return info;
@@ -132,10 +162,15 @@ public class CardManagementOperationTests
     /// Validates that card status and information queries work correctly.
     /// </summary>
     [TestCase("gp_pro_card_info.json", "Card information retrieval")]
-    public void CardManagement_Should_Retrieve_Card_Information(string traceFile, string description) =>
+    public void CardManagement_Should_Retrieve_Card_Information(
+        string traceFile,
+        string description
+    ) =>
         LoadTraceFile(traceFile)
             .Bind(testData => ValidateExchangesExist(testData, traceFile))
-            .Bind(exchangesElement => ValidateCardInformationRetrieval(exchangesElement, description, traceFile))
+            .Bind(exchangesElement =>
+                ValidateCardInformationRetrieval(exchangesElement, description, traceFile)
+            )
             .Match(
                 success => Assert.Pass("Test completed successfully"),
                 failure => Assert.Inconclusive(failure)
@@ -148,24 +183,35 @@ public class CardManagementOperationTests
     /// <param name="description">Test description</param>
     /// <param name="traceFile">Trace file name</param>
     /// <returns>Result indicating validation success or failure</returns>
-    private static UnitResult<string> ValidateLockOperations(JsonElement exchangesElement, string description, string traceFile)
+    private static UnitResult<string> ValidateLockOperations(
+        JsonElement exchangesElement,
+        string description,
+        string traceFile
+    )
     {
         TestContext.Out.WriteLine($"Testing {description}");
 
-        List<JsonElement> exchanges = exchangesElement.EnumerateArray().ToList();
+        List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
         var commandResponsePairs = exchanges
             .Select(e => new
             {
                 Command = e.GetProperty("command").GetString()!,
-                Response = e.GetProperty("response").GetString()!
+                Response = e.GetProperty("response").GetString()!,
             })
             .ToList();
 
-        // Analyze lock operation patterns using functional approach
-        var initUpdateCommands = commandResponsePairs.Where(pair => pair.Command.StartsWith("8050")).ToList();
-        var authCommands = commandResponsePairs.Where(pair => pair.Command.StartsWith("8482")).ToList();
+        // Analyze lock operation patterns
+        var initUpdateCommands = commandResponsePairs
+            .Where(pair => pair.Command.StartsWith("8050"))
+            .ToList();
+        var authCommands = commandResponsePairs
+            .Where(pair => pair.Command.StartsWith("8482"))
+            .ToList();
         var statusCommands = commandResponsePairs
-            .Where(pair => (pair.Command.StartsWith("80F0") || pair.Command.StartsWith("84F0")) && pair.Command.Length >= 6)
+            .Where(pair =>
+                (pair.Command.StartsWith("80F0") || pair.Command.StartsWith("84F0"))
+                && pair.Command.Length >= 6
+            )
             .ToList();
         var managementCommands = commandResponsePairs
             .Where(pair => pair.Command.StartsWith("80D8") || pair.Command.StartsWith("84D8"))
@@ -175,13 +221,17 @@ public class CardManagementOperationTests
 
         // Validate required operations
         if (!initUpdateCommands.Any())
-            return UnitResult.Failure<string>("Lock operation requires secure channel establishment");
+            return UnitResult.Failure<string>(
+                "Lock operation requires secure channel establishment"
+            );
 
         if (!authCommands.Any())
             return UnitResult.Failure<string>("Lock operation requires authentication");
 
         if (!allManagementCommands.Any())
-            return UnitResult.Failure<string>("Management operation should include SET STATUS or management commands");
+            return UnitResult.Failure<string>(
+                "Management operation should include SET STATUS or management commands"
+            );
 
         // Validate responses and log findings
         var failedStatusCommands = statusCommands
@@ -199,15 +249,23 @@ public class CardManagementOperationTests
             return UnitResult.Failure<string>("Management operation should succeed");
 
         // Log successful findings
-        _ = initUpdateCommands.Select(_ => "✓ Found INITIALIZE UPDATE for lock operation")
+        _ = initUpdateCommands
+            .Select(_ => "✓ Found INITIALIZE UPDATE for lock operation")
             .Concat(authCommands.Select(_ => "✓ Found EXTERNAL AUTHENTICATE for lock operation"))
             .Concat(statusCommands.Select(pair => $"✓ Found SET STATUS command: {pair.Command}"))
-            .Concat(managementCommands.Select(pair => $"✓ Found management operation (PUT KEY): {pair.Command}"))
-            .Aggregate("", (current, message) =>
-            {
-                TestContext.Out.WriteLine(message);
-                return current;
-            });
+            .Concat(
+                managementCommands.Select(pair =>
+                    $"✓ Found management operation (PUT KEY): {pair.Command}"
+                )
+            )
+            .Aggregate(
+                "",
+                (current, message) =>
+                {
+                    TestContext.Out.WriteLine(message);
+                    return current;
+                }
+            );
 
         TestContext.Out.WriteLine($"✓ {description} sequence validated");
         return UnitResult.Success<string>();
@@ -217,10 +275,15 @@ public class CardManagementOperationTests
     /// Test card lock operations including secure channel establishment and lock command execution.
     /// </summary>
     [TestCase("gp_pro_lock.json", "Card lock operation")]
-    public void CardManagement_Should_Execute_Lock_Operations(string traceFile, string description) =>
+    public void CardManagement_Should_Execute_Lock_Operations(
+        string traceFile,
+        string description
+    ) =>
         LoadTraceFile(traceFile)
             .Bind(testData => ValidateExchangesExist(testData, traceFile))
-            .Bind(exchangesElement => ValidateLockOperations(exchangesElement, description, traceFile))
+            .Bind(exchangesElement =>
+                ValidateLockOperations(exchangesElement, description, traceFile)
+            )
             .Match(
                 success => Assert.Pass("Test completed successfully"),
                 failure => Assert.Inconclusive(failure)
@@ -233,29 +296,38 @@ public class CardManagementOperationTests
     /// <param name="description">Test description</param>
     /// <param name="traceFile">Trace file name</param>
     /// <returns>Result indicating validation success or failure</returns>
-    private static UnitResult<string> ValidateUnlockOperations(JsonElement exchangesElement, string description, string traceFile)
+    private static UnitResult<string> ValidateUnlockOperations(
+        JsonElement exchangesElement,
+        string description,
+        string traceFile
+    )
     {
         TestContext.Out.WriteLine($"Testing {description}");
 
-        List<JsonElement> exchanges = exchangesElement.EnumerateArray().ToList();
+        List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
         var commandResponsePairs = exchanges
             .Select(e => new
             {
                 Command = e.GetProperty("command").GetString()!,
-                Response = e.GetProperty("response").GetString()!
+                Response = e.GetProperty("response").GetString()!,
             })
             .ToList();
 
-        // Analyze unlock operation patterns using functional approach
+        // Analyze unlock operation patterns
         var secureChannelCommands = commandResponsePairs
             .Where(pair => pair.Command.StartsWith("8050") || pair.Command.StartsWith("8482"))
             .ToList();
 
         var unlockCommands = commandResponsePairs
             .Where(pair =>
-                pair.Command.StartsWith("80F0") || pair.Command.StartsWith("84F0") || // SET STATUS
-                pair.Command.StartsWith("80D8") || pair.Command.StartsWith("84D8") || // PUT KEY / UNKNOWN D8
-                (pair.Command.StartsWith("84CA") && pair.Command.Contains("E008"))) // GET DATA with specific unlock parameters
+                pair.Command.StartsWith("80F0")
+                || pair.Command.StartsWith("84F0")
+                || // SET STATUS
+                pair.Command.StartsWith("80D8")
+                || pair.Command.StartsWith("84D8")
+                || // PUT KEY / UNKNOWN D8
+                pair.Command.StartsWith("84CA") && pair.Command.Contains("E008")
+            ) // GET DATA with specific unlock parameters
             .ToList();
 
         bool isFactoryTrace = traceFile.Contains("factory");
@@ -280,12 +352,16 @@ public class CardManagementOperationTests
         }
 
         // Log successful findings
-        _ = unlockCommands.Select(pair => $"✓ Found unlock command: {pair.Command}")
-            .Aggregate("", (current, message) =>
-            {
-                TestContext.Out.WriteLine(message);
-                return current;
-            });
+        _ = unlockCommands
+            .Select(pair => $"✓ Found unlock command: {pair.Command}")
+            .Aggregate(
+                "",
+                (current, message) =>
+                {
+                    TestContext.Out.WriteLine(message);
+                    return current;
+                }
+            );
 
         TestContext.Out.WriteLine($"✓ {description} validated");
         return UnitResult.Success<string>();
@@ -296,10 +372,15 @@ public class CardManagementOperationTests
     /// </summary>
     [TestCase("gp_pro_factory_unlock.json", "Factory unlock operation")]
     [TestCase("gp_pro_card_unlock_not_factory.json", "Standard unlock operation")]
-    public void CardManagement_Should_Execute_Unlock_Operations(string traceFile, string description) =>
+    public void CardManagement_Should_Execute_Unlock_Operations(
+        string traceFile,
+        string description
+    ) =>
         LoadTraceFile(traceFile)
             .Bind(testData => ValidateExchangesExist(testData, traceFile))
-            .Bind(exchangesElement => ValidateUnlockOperations(exchangesElement, description, traceFile))
+            .Bind(exchangesElement =>
+                ValidateUnlockOperations(exchangesElement, description, traceFile)
+            )
             .Match(
                 success => Assert.Pass("Test completed successfully"),
                 failure => Assert.Inconclusive(failure)
@@ -312,20 +393,24 @@ public class CardManagementOperationTests
     /// <param name="description">Test description</param>
     /// <param name="traceFile">Trace file name</param>
     /// <returns>Result indicating validation success or failure</returns>
-    private static UnitResult<string> ValidateKeyManagementOperations(JsonElement exchangesElement, string description, string traceFile)
+    private static UnitResult<string> ValidateKeyManagementOperations(
+        JsonElement exchangesElement,
+        string description,
+        string traceFile
+    )
     {
         TestContext.Out.WriteLine($"Testing {description}");
 
-        List<JsonElement> exchanges = exchangesElement.EnumerateArray().ToList();
+        List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
         var commandResponsePairs = exchanges
             .Select(e => new
             {
                 Command = e.GetProperty("command").GetString()!,
-                Response = e.GetProperty("response").GetString()!
+                Response = e.GetProperty("response").GetString()!,
             })
             .ToList();
 
-        // Analyze key management patterns using functional approach
+        // Analyze key management patterns
         var secureChannelCommands = commandResponsePairs
             .Where(pair => pair.Command.StartsWith("8050") || pair.Command.StartsWith("8482"))
             .ToList();
@@ -336,7 +421,9 @@ public class CardManagementOperationTests
 
         // Validate required operations
         if (!secureChannelCommands.Any())
-            return UnitResult.Failure<string>("Key management requires secure channel authentication");
+            return UnitResult.Failure<string>(
+                "Key management requires secure channel authentication"
+            );
 
         if (!putKeyCommands.Any())
             return UnitResult.Failure<string>("Key management should contain PUT KEY commands");
@@ -350,12 +437,16 @@ public class CardManagementOperationTests
             return UnitResult.Failure<string>("PUT KEY command should succeed");
 
         // Log successful findings
-        _ = putKeyCommands.Select(pair => $"✓ Found PUT KEY command: {pair.Command}")
-            .Aggregate("", (current, message) =>
-            {
-                TestContext.Out.WriteLine(message);
-                return current;
-            });
+        _ = putKeyCommands
+            .Select(pair => $"✓ Found PUT KEY command: {pair.Command}")
+            .Aggregate(
+                "",
+                (current, message) =>
+                {
+                    TestContext.Out.WriteLine(message);
+                    return current;
+                }
+            );
 
         TestContext.Out.WriteLine($"✓ {description} completed successfully");
         return UnitResult.Success<string>();
@@ -365,10 +456,15 @@ public class CardManagementOperationTests
     /// Test key management operations including key installation and updates.
     /// </summary>
     [TestCase("gp_pro_factory_key_put.json", "Factory key installation")]
-    public void CardManagement_Should_Execute_Key_Management_Operations(string traceFile, string description) =>
+    public void CardManagement_Should_Execute_Key_Management_Operations(
+        string traceFile,
+        string description
+    ) =>
         LoadTraceFile(traceFile)
             .Bind(testData => ValidateExchangesExist(testData, traceFile))
-            .Bind(exchangesElement => ValidateKeyManagementOperations(exchangesElement, description, traceFile))
+            .Bind(exchangesElement =>
+                ValidateKeyManagementOperations(exchangesElement, description, traceFile)
+            )
             .Match(
                 success => Assert.Pass("Test completed successfully"),
                 failure => Assert.Inconclusive(failure)
@@ -379,25 +475,37 @@ public class CardManagementOperationTests
     /// </summary>
     /// <param name="exchanges">List of exchanges</param>
     /// <returns>Result containing sequence indices or error message</returns>
-    private static Result<(int initUpdate, int externalAuth, int privileged), string> AnalyzeAuthenticationSequence(List<JsonElement> exchanges)
+    private static Result<
+        (int initUpdate, int externalAuth, int privileged),
+        string
+    > AnalyzeAuthenticationSequence(List<JsonElement> exchanges)
     {
         var commandsWithIndices = exchanges
-            .Select((exchange, index) => new
-            {
-                Index = index,
-                Command = exchange.GetProperty("command").GetString()!
-            })
+            .Select(
+                (exchange, index) =>
+                    new { Index = index, Command = exchange.GetProperty("command").GetString()! }
+            )
             .ToList();
 
-        var initUpdateCommands = commandsWithIndices.Where(item => item.Command.StartsWith("8050")).ToList();
-        var externalAuthCommands = commandsWithIndices.Where(item => item.Command.StartsWith("8482")).ToList();
-        var privilegedCommands = commandsWithIndices.Where(item => item.Command.StartsWith("80D8") || item.Command.StartsWith("80F0")).ToList();
+        var initUpdateCommands = commandsWithIndices
+            .Where(item => item.Command.StartsWith("8050"))
+            .ToList();
+        var externalAuthCommands = commandsWithIndices
+            .Where(item => item.Command.StartsWith("8482"))
+            .ToList();
+        var privilegedCommands = commandsWithIndices
+            .Where(item => item.Command.StartsWith("80D8") || item.Command.StartsWith("80F0"))
+            .ToList();
 
         int initUpdateIndex = initUpdateCommands.Any() ? initUpdateCommands.Last().Index : -1;
         int externalAuthIndex = externalAuthCommands.Any() ? externalAuthCommands.Last().Index : -1;
-        int privilegedCommandIndex = privilegedCommands.Any() ? privilegedCommands.First().Index : -1;
+        int privilegedCommandIndex = privilegedCommands.Any()
+            ? privilegedCommands.First().Index
+            : -1;
 
-        return Result.Success<(int, int, int), string>((initUpdateIndex, externalAuthIndex, privilegedCommandIndex));
+        return Result.Success<(int, int, int), string>(
+            (initUpdateIndex, externalAuthIndex, privilegedCommandIndex)
+        );
     }
 
     /// <summary>
@@ -406,7 +514,10 @@ public class CardManagementOperationTests
     /// <param name="sequenceIndices">The sequence indices tuple</param>
     /// <param name="traceFile">Trace file name</param>
     /// <returns>Result indicating validation success or failure</returns>
-    private static UnitResult<string> ValidateAuthenticationSequence((int initUpdate, int externalAuth, int privileged) sequenceIndices, string traceFile)
+    private static UnitResult<string> ValidateAuthenticationSequence(
+        (int initUpdate, int externalAuth, int privileged) sequenceIndices,
+        string traceFile
+    )
     {
         (int initUpdateIndex, int externalAuthIndex, int privilegedCommandIndex) = sequenceIndices;
 
@@ -415,16 +526,24 @@ public class CardManagementOperationTests
             return UnitResult.Success<string>();
 
         if (initUpdateIndex < 0)
-            return UnitResult.Failure<string>("Should have INITIALIZE UPDATE before privileged commands");
+            return UnitResult.Failure<string>(
+                "Should have INITIALIZE UPDATE before privileged commands"
+            );
 
         if (externalAuthIndex < 0)
-            return UnitResult.Failure<string>("Should have EXTERNAL AUTHENTICATE before privileged commands");
+            return UnitResult.Failure<string>(
+                "Should have EXTERNAL AUTHENTICATE before privileged commands"
+            );
 
         if (initUpdateIndex >= externalAuthIndex)
-            return UnitResult.Failure<string>("INITIALIZE UPDATE should come before EXTERNAL AUTHENTICATE");
+            return UnitResult.Failure<string>(
+                "INITIALIZE UPDATE should come before EXTERNAL AUTHENTICATE"
+            );
 
         if (externalAuthIndex >= privilegedCommandIndex)
-            return UnitResult.Failure<string>("EXTERNAL AUTHENTICATE should come before privileged commands");
+            return UnitResult.Failure<string>(
+                "EXTERNAL AUTHENTICATE should come before privileged commands"
+            );
 
         // Log successful validation
         TestContext.Out.WriteLine($"✓ Authentication sequence validated for {traceFile}");
@@ -441,8 +560,11 @@ public class CardManagementOperationTests
     /// <param name="exchangesElement">The exchanges JSON element</param>
     /// <param name="traceFile">Trace file name</param>
     /// <returns>Result indicating validation success or failure</returns>
-    private static UnitResult<string> ValidateCompleteAuthenticationSequence(JsonElement exchangesElement, string traceFile) =>
-        AnalyzeAuthenticationSequence(exchangesElement.EnumerateArray().ToList())
+    private static UnitResult<string> ValidateCompleteAuthenticationSequence(
+        JsonElement exchangesElement,
+        string traceFile
+    ) =>
+        AnalyzeAuthenticationSequence([.. exchangesElement.EnumerateArray()])
             .Bind(sequenceIndices => ValidateAuthenticationSequence(sequenceIndices, traceFile));
 
     /// <summary>
@@ -455,7 +577,9 @@ public class CardManagementOperationTests
     public void CardManagement_Should_Follow_Authentication_Sequence(string traceFile) =>
         LoadTraceFile(traceFile)
             .Bind(testData => ValidateExchangesExist(testData, traceFile))
-            .Bind(exchangesElement => ValidateCompleteAuthenticationSequence(exchangesElement, traceFile))
+            .Bind(exchangesElement =>
+                ValidateCompleteAuthenticationSequence(exchangesElement, traceFile)
+            )
             .Match(
                 success => Assert.Pass("Test completed successfully"),
                 failure => Assert.Inconclusive(failure)

@@ -21,11 +21,13 @@ public class KeyInformationTemplateTests
             0x01, // Key ID = 1
             0x01, // Key version = 1
             0x82, // 3DES-3KEY
-            0xFF // Not available
+            0xFF, // Not available
         ];
 
         // Act
-        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(data);
+        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(
+            data
+        );
 
         // Assert
         _ = template.IsSuccess.Should().BeTrue();
@@ -50,11 +52,13 @@ public class KeyInformationTemplateTests
             0x03, // Tag C0, length 3
             0x10, // Key ID = 16
             0x02, // Key version = 2
-            0x88 // AES
+            0x88, // AES
         ];
 
         // Act
-        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(data);
+        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(
+            data
+        );
 
         // Assert
         _ = template.Should().NotBeNull();
@@ -77,11 +81,13 @@ public class KeyInformationTemplateTests
             0x03, // Key version = 3
             0x80, // DES
             0x81, // 3DES-2KEY
-            0x82 // 3DES-3KEY
+            0x82, // 3DES-3KEY
         ];
 
         // Act
-        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(data);
+        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(
+            data
+        );
 
         // Assert
         KeyEntry? key = template.Value.Keys.First();
@@ -124,11 +130,13 @@ public class KeyInformationTemplateTests
             0x02,
             0x01,
             0x88,
-            0xFF // Key 2, version 1, AES
+            0xFF, // Key 2, version 1, AES
         ];
 
         // Act - Parse the value inside E0 tag
-        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(data[2..]);
+        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(
+            data[2..]
+        );
 
         // Assert
         _ = template.Value.Keys.Should().HaveCount(4);
@@ -164,11 +172,13 @@ public class KeyInformationTemplateTests
             0x03,
             0x01,
             0x02,
-            0x88 // Key 1, version 2, AES
+            0x88, // Key 1, version 2, AES
         ];
 
         // Act
-        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(data);
+        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(
+            data
+        );
         string? output = template.Value.Keys.First().ToString();
 
         // Assert
@@ -182,24 +192,12 @@ public class KeyInformationTemplateTests
     public void KeyInformationTemplate_ToString_FormatsCorrectly()
     {
         // Arrange
-        byte[] data =
-        [
-            0xC0,
-            0x04,
-            0x01,
-            0x01,
-            0x82,
-            0xFF,
-            0xC0,
-            0x04,
-            0x02,
-            0x01,
-            0x88,
-            0xFF
-        ];
+        byte[] data = [0xC0, 0x04, 0x01, 0x01, 0x82, 0xFF, 0xC0, 0x04, 0x02, 0x01, 0x88, 0xFF];
 
         // Act
-        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(data);
+        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(
+            data
+        );
         string? output = template.ToString();
 
         // Assert
@@ -229,7 +227,9 @@ public class KeyInformationTemplateTests
         byte[] emptyData = [];
 
         // Act
-        Result<KeyInformationTemplate, SmartCardError> result = KeyInformationTemplate.Parse(emptyData);
+        Result<KeyInformationTemplate, SmartCardError> result = KeyInformationTemplate.Parse(
+            emptyData
+        );
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -246,11 +246,13 @@ public class KeyInformationTemplateTests
             0xC0,
             0x02, // Tag C0, length 2
             0x01,
-            0x01 // Only ID and version, no type
+            0x01, // Only ID and version, no type
         ];
 
         // Act
-        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(data);
+        Result<KeyInformationTemplate, SmartCardError> template = KeyInformationTemplate.Parse(
+            data
+        );
 
         // Assert
         _ = template.Value.Keys.Should().BeEmpty(); // Should not add incomplete key

@@ -31,7 +31,7 @@ public static class SecurityDomainDataParser
             {
                 if (data[offset] == 0x9F && offset + 1 < data.Length)
                 {
-                    int tag = (data[offset] << 8) | data[offset + 1];
+                    int tag = data[offset] << 8 | data[offset + 1];
                     if (offset + 2 < data.Length)
                     {
                         byte length = data[offset + 2];
@@ -44,7 +44,7 @@ public static class SecurityDomainDataParser
                                 case 0x9F65: // Maximum APDU size
                                     if (length >= 2)
                                     {
-                                        int maxApdu = (value[0] << 8) | value[1];
+                                        int maxApdu = value[0] << 8 | value[1];
                                         result.Add($"Max APDU: {maxApdu} bytes");
                                     }
                                     break;
@@ -87,7 +87,7 @@ public static class SecurityDomainDataParser
             0x0F => "Personalized",
             0x83 => "Blocked",
             0x87 => "Locked",
-            _ => $"0x{state:X2}"
+            _ => $"0x{state:X2}",
         };
     }
 }

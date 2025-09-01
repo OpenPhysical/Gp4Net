@@ -74,7 +74,9 @@ public class GetDataCommandTests
     public void GetApdu_AlwaysReturnsNewArray()
     {
         // Arrange
-        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardData);
+        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(
+            GetDataCommand.DataObjects.CardData
+        );
         _ = commandResult.IsSuccess.Should().BeTrue();
         GetDataCommand? command = commandResult.Value;
 
@@ -91,7 +93,9 @@ public class GetDataCommandTests
     public void ToString_ReturnsDescriptiveString()
     {
         // Arrange
-        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardData);
+        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(
+            GetDataCommand.DataObjects.CardData
+        );
         _ = commandResult.IsSuccess.Should().BeTrue();
         GetDataCommand? command = commandResult.Value;
 
@@ -129,7 +133,9 @@ public class GetDataCommandTests
         // Lc: Not present (no command data)
         // Le: 0x00 (receive all available bytes)
 
-        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardData);
+        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(
+            GetDataCommand.DataObjects.CardData
+        );
         _ = commandResult.IsSuccess.Should().BeTrue();
         GetDataCommand? command = commandResult.Value;
         byte[]? apdu = ApduBuilder.BuildApdu(command);
@@ -145,7 +151,10 @@ public class GetDataCommandTests
     [TestCase((ushort)0x0067, "Card Capabilities")]
     [TestCase((ushort)0x00E0, "Key Information Template")]
     [TestCase((ushort)0x9F7F, "Card Production Life Cycle")]
-    public void GetDataCommand_ForCommonObjects_HasDescriptiveNames(ushort dataObject, string expectedDescription)
+    public void GetDataCommand_ForCommonObjects_HasDescriptiveNames(
+        ushort dataObject,
+        string expectedDescription
+    )
     {
         // This test documents common data objects and their purposes
         Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(dataObject);
@@ -182,7 +191,9 @@ public class GetDataCommandTests
         byte[] identifier = [0x00, 0x9F, 0x70];
 
         // Act
-        Result<GetDataCommand, SmartCardError> result = GetDataCommand.CreateFor3ByteIdentifier(identifier);
+        Result<GetDataCommand, SmartCardError> result = GetDataCommand.CreateFor3ByteIdentifier(
+            identifier
+        );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -193,7 +204,9 @@ public class GetDataCommandTests
     public void CreateFor3ByteIdentifier_WithNullIdentifier_ReturnsError()
     {
         // Act
-        Result<GetDataCommand, SmartCardError> result = GetDataCommand.CreateFor3ByteIdentifier(null);
+        Result<GetDataCommand, SmartCardError> result = GetDataCommand.CreateFor3ByteIdentifier(
+            null
+        );
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -209,7 +222,9 @@ public class GetDataCommandTests
     public void CreateFor3ByteIdentifier_WithInvalidLength_ReturnsError(byte[] identifier)
     {
         // Act
-        Result<GetDataCommand, SmartCardError> result = GetDataCommand.CreateFor3ByteIdentifier(identifier);
+        Result<GetDataCommand, SmartCardError> result = GetDataCommand.CreateFor3ByteIdentifier(
+            identifier
+        );
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();

@@ -27,7 +27,7 @@ internal class TlvTestBuilder
 
     public byte[] Build()
     {
-        return _data.ToArray();
+        return [.. _data];
     }
 
     private void AddTag(int tag)
@@ -42,7 +42,9 @@ internal class TlvTestBuilder
                 _data.Add((byte)(tag & 0xFF));
                 break;
             default:
-                throw new NotSupportedException("Tags larger than 2 bytes not supported in this helper");
+                throw new NotSupportedException(
+                    "Tags larger than 2 bytes not supported in this helper"
+                );
         }
     }
 
@@ -58,7 +60,9 @@ internal class TlvTestBuilder
                 _data.Add((byte)length);
                 break;
             default:
-                throw new NotSupportedException("Lengths larger than 255 not supported in this helper");
+                throw new NotSupportedException(
+                    "Lengths larger than 255 not supported in this helper"
+                );
         }
     }
 }

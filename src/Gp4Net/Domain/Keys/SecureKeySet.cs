@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
-namespace Gp4Net.Domain.Keys;
-
 using System;
 using CSharpFunctionalExtensions;
+
+namespace Gp4Net.Domain.Keys;
 
 /// <summary>
 /// Provides secure storage for a key set with automatic memory cleanup.
@@ -121,14 +121,12 @@ public sealed class SecureKeySet : IDisposable
     public Scp02KeySet ToScp02KeySet()
     {
         ThrowIfDisposed();
-        return Scp02KeySet.Create(
-            _encKey.GetKeyCopy(),
-            _macKey.GetKeyCopy(),
-            _dekKey.GetKeyCopy(),
-            KeyVersion
-        ).Match(
-            onSuccess: keySet => keySet,
-            onFailure: error => throw new InvalidOperationException(error.Message));
+        return Scp02KeySet
+            .Create(_encKey.GetKeyCopy(), _macKey.GetKeyCopy(), _dekKey.GetKeyCopy(), KeyVersion)
+            .Match(
+                onSuccess: keySet => keySet,
+                onFailure: error => throw new InvalidOperationException(error.Message)
+            );
     }
 
     /// <summary>
@@ -138,14 +136,12 @@ public sealed class SecureKeySet : IDisposable
     public Scp03KeySet ToScp03KeySet()
     {
         ThrowIfDisposed();
-        return Scp03KeySet.Create(
-            _encKey.GetKeyCopy(),
-            _macKey.GetKeyCopy(),
-            _dekKey.GetKeyCopy(),
-            KeyVersion
-        ).Match(
-            onSuccess: keySet => keySet,
-            onFailure: error => throw new InvalidOperationException(error.Message));
+        return Scp03KeySet
+            .Create(_encKey.GetKeyCopy(), _macKey.GetKeyCopy(), _dekKey.GetKeyCopy(), KeyVersion)
+            .Match(
+                onSuccess: keySet => keySet,
+                onFailure: error => throw new InvalidOperationException(error.Message)
+            );
     }
 
     /// <summary>

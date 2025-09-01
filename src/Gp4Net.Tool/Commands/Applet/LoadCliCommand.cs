@@ -26,15 +26,12 @@ public class LoadCommand : IPipelineCommand<LoadCommand.Settings>
     /// <param name="context">The CLI execution context.</param>
     /// <param name="settings">The command settings.</param>
     /// <returns>0 if successful, 1 if failed.</returns>
-    public async Task<int> ExecuteAsync(
-        ICliExecutionContext context,
-        Settings settings
-    )
+    public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
     {
         return await context.ExecuteAsync(async ctx =>
         {
             return await ValidateCapFile(settings.CapFile)
-                .Bind(_ => 
+                .Bind(_ =>
                 {
                     ctx.Display.Info("Starting CAP file load operation...");
                     return Result.Success<bool, SmartCardError>(true);
@@ -46,7 +43,8 @@ public class LoadCommand : IPipelineCommand<LoadCommand.Settings>
                     {
                         ctx.Display.Error($"Load failed: {error.Message}");
                         return 1;
-                    });
+                    }
+                );
         });
     }
 
@@ -55,10 +53,14 @@ public class LoadCommand : IPipelineCommand<LoadCommand.Settings>
         return File.Exists(capFilePath)
             ? Result.Success<bool, SmartCardError>(true)
             : Result.Failure<bool, SmartCardError>(
-                SmartCardError.InvalidArgument($"CAP file not found: {capFilePath}"));
+                SmartCardError.InvalidArgument($"CAP file not found: {capFilePath}")
+            );
     }
 
-    private static async Task<Result<bool, SmartCardError>> PerformLoad(ICliExecutionContext context, Settings settings)
+    private static async Task<Result<bool, SmartCardError>> PerformLoad(
+        ICliExecutionContext context,
+        Settings settings
+    )
     {
         context.Display.Info($"Reading CAP file: {settings.CapFile}");
         byte[] capData = await File.ReadAllBytesAsync(settings.CapFile);
@@ -72,9 +74,13 @@ public class LoadCommand : IPipelineCommand<LoadCommand.Settings>
         IGlobalPlatformService gpService = context.GetGlobalPlatformService();
         context.Display.Info("Loading CAP file package...");
         InstallOptions installOptions = new InstallOptions(
-            InstallApplets: false,  // Load only - don't install applets
-            MakeSelectable: false);
-        Result<InstallationResult, SmartCardError> loadResult = await gpService.InstallCapFileAsync(capData, Maybe<InstallOptions>.From(installOptions));
+            InstallApplets: false, // Load only - don't install applets
+            MakeSelectable: false
+        );
+        Result<Results.InstallationResult, SmartCardError> loadResult = await gpService.InstallCapFileAsync(
+            capData,
+            Maybe<InstallOptions>.From(installOptions)
+        );
 
         return loadResult.Match(
             success =>
@@ -86,7 +92,8 @@ public class LoadCommand : IPipelineCommand<LoadCommand.Settings>
             {
                 context.Display.Error($"Load failed: {error.Message}");
                 return Result.Failure<bool, SmartCardError>(error);
-            });
+            }
+        );
     }
 
     private static Task DisplayCardInfoAsync(ICliExecutionContext context)
@@ -96,7 +103,7 @@ public class LoadCommand : IPipelineCommand<LoadCommand.Settings>
     }
 
     /// <summary>
-    /// Settings for the load command.  
+    /// Settings for the load command.
     /// </summary>
     public class Settings : CommandSettings
     {
@@ -144,7 +151,6 @@ public class LoadCommand : IPipelineCommand<LoadCommand.Settings>
         [CommandOption("--no-card-info")]
         [Description("Skip card information display")]
         public bool NoCardInfo { get; set; }
-
 
         /// <summary>
         /// Validates the command settings.

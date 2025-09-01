@@ -39,7 +39,7 @@ public enum SecurityLevel : byte
     /// <summary>
     /// R-ENCRYPTION on responses.
     /// </summary>
-    REncryption = 0x20
+    REncryption = 0x20,
 }
 
 /// <summary>
@@ -125,7 +125,7 @@ public static class SecurityLevelExtensions
             SecurityLevel.CDecryption => "C-MAC + C-DECRYPTION",
             SecurityLevel.RMac => "R-MAC",
             SecurityLevel.REncryption => "R-ENCRYPTION",
-            _ => $"Combined security level: {(int)level:X2}"
+            _ => $"Combined security level: {(int)level:X2}",
         };
     }
 }

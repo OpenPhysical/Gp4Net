@@ -21,7 +21,8 @@ public class ExternalAuthenticateCommandTests
         byte[] mac = Convert.FromHexString("1112131415161718");
 
         // Act
-        Result<ExternalAuthenticateCommand, SmartCardError> result = ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, mac);
+        Result<ExternalAuthenticateCommand, SmartCardError> result =
+            ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, mac);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -35,7 +36,8 @@ public class ExternalAuthenticateCommandTests
     public void CreateWithMac_WithNullHostCryptogram_ReturnsFailure()
     {
         // Act
-        Result<ExternalAuthenticateCommand, SmartCardError> result = ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, null!, new byte[8]);
+        Result<ExternalAuthenticateCommand, SmartCardError> result =
+            ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, null!, new byte[8]);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -53,7 +55,8 @@ public class ExternalAuthenticateCommandTests
         byte[] hostCryptogram = new byte[length];
 
         // Act
-        Result<ExternalAuthenticateCommand, SmartCardError> result = ExternalAuthenticateCommand.CreateWithoutMac(SecurityLevel.CMac, hostCryptogram);
+        Result<ExternalAuthenticateCommand, SmartCardError> result =
+            ExternalAuthenticateCommand.CreateWithoutMac(SecurityLevel.CMac, hostCryptogram);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -72,7 +75,8 @@ public class ExternalAuthenticateCommandTests
         byte[] mac = new byte[length];
 
         // Act
-        Result<ExternalAuthenticateCommand, SmartCardError> result = ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, hostCryptogram, mac);
+        Result<ExternalAuthenticateCommand, SmartCardError> result =
+            ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, hostCryptogram, mac);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -87,7 +91,8 @@ public class ExternalAuthenticateCommandTests
         byte[] hostCryptogram = new byte[8];
 
         // Act
-        Result<ExternalAuthenticateCommand, SmartCardError> result = ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
+        Result<ExternalAuthenticateCommand, SmartCardError> result =
+            ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -101,7 +106,8 @@ public class ExternalAuthenticateCommandTests
         // Arrange
         SecurityLevel securityLevel = SecurityLevel.None;
         byte[] hostCryptogram = Convert.FromHexString("0102030405060708");
-        Result<ExternalAuthenticateCommand, SmartCardError> result = ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
+        Result<ExternalAuthenticateCommand, SmartCardError> result =
+            ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
         _ = result.IsSuccess.Should().BeTrue();
         ExternalAuthenticateCommand? command = result.Value;
 
@@ -126,7 +132,8 @@ public class ExternalAuthenticateCommandTests
         SecurityLevel securityLevel = SecurityLevel.CMac;
         byte[] hostCryptogram = Convert.FromHexString("0102030405060708");
         byte[] mac = Convert.FromHexString("1112131415161718");
-        Result<ExternalAuthenticateCommand, SmartCardError> result = ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, mac);
+        Result<ExternalAuthenticateCommand, SmartCardError> result =
+            ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, mac);
         _ = result.IsSuccess.Should().BeTrue();
         ExternalAuthenticateCommand? command = result.Value;
 
@@ -150,11 +157,14 @@ public class ExternalAuthenticateCommandTests
     [TestCase(SecurityLevel.CDecryption, 0x03)]
     [TestCase(SecurityLevel.CDecryption, 0x03)]
     public void GetApdu_WithDifferentSecurityLevels_SetsP1Correctly(
-        SecurityLevel securityLevel, byte expectedP1)
+        SecurityLevel securityLevel,
+        byte expectedP1
+    )
     {
         // Arrange
         byte[] hostCryptogram = new byte[8];
-        Result<ExternalAuthenticateCommand, SmartCardError> result = ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
+        Result<ExternalAuthenticateCommand, SmartCardError> result =
+            ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
         _ = result.IsSuccess.Should().BeTrue();
         ExternalAuthenticateCommand? command = result.Value;
 
@@ -169,10 +179,8 @@ public class ExternalAuthenticateCommandTests
     public void GetApdu_AlwaysReturnsNewArray()
     {
         // Arrange
-        Result<ExternalAuthenticateCommand, SmartCardError> result = ExternalAuthenticateCommand.CreateWithMac(
-            SecurityLevel.CMac,
-            new byte[8],
-            new byte[8]);
+        Result<ExternalAuthenticateCommand, SmartCardError> result =
+            ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, new byte[8], new byte[8]);
         _ = result.IsSuccess.Should().BeTrue();
         ExternalAuthenticateCommand? command = result.Value;
 
@@ -191,7 +199,8 @@ public class ExternalAuthenticateCommandTests
         // Arrange
         byte[] hostCryptogram = Convert.FromHexString("0102030405060708");
         byte[] mac = Convert.FromHexString("1112131415161718");
-        Result<ExternalAuthenticateCommand, SmartCardError> commandResult = ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, hostCryptogram, mac);
+        Result<ExternalAuthenticateCommand, SmartCardError> commandResult =
+            ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, hostCryptogram, mac);
         _ = commandResult.IsSuccess.Should().BeTrue();
         ExternalAuthenticateCommand? command = commandResult.Value;
 
@@ -215,10 +224,8 @@ public class ExternalAuthenticateCommandTests
         // Data: Host Cryptogram [+ MAC]
         // No Le byte
 
-        Result<ExternalAuthenticateCommand, SmartCardError> result = ExternalAuthenticateCommand.CreateWithMac(
-            SecurityLevel.CMac,
-            new byte[8],
-            new byte[8]);
+        Result<ExternalAuthenticateCommand, SmartCardError> result =
+            ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, new byte[8], new byte[8]);
         _ = result.IsSuccess.Should().BeTrue();
         ExternalAuthenticateCommand? command = result.Value;
         byte[]? apdu = ApduBuilder.BuildApdu(command);
@@ -240,15 +247,16 @@ public class ExternalAuthenticateCommandTests
 
         (SecurityLevel, byte)[] testCases =
         [
-            (SecurityLevel.None, (byte)0x00),
-            (SecurityLevel.CMac, (byte)0x01),
-            (SecurityLevel.CDecryption, (byte)0x03), // C-DEC implies C-MAC
-            (SecurityLevel.CDecryption, (byte)0x03)
+            (SecurityLevel.None, 0x00),
+            (SecurityLevel.CMac, 0x01),
+            (SecurityLevel.CDecryption, 0x03), // C-DEC implies C-MAC
+            (SecurityLevel.CDecryption, 0x03),
         ];
 
         foreach ((SecurityLevel securityLevel, byte expectedP1) in testCases)
         {
-            Result<ExternalAuthenticateCommand, SmartCardError> result = ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, new byte[8]);
+            Result<ExternalAuthenticateCommand, SmartCardError> result =
+                ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, new byte[8]);
             _ = result.IsSuccess.Should().BeTrue();
             ExternalAuthenticateCommand? command = result.Value;
             byte[]? apdu = ApduBuilder.BuildApdu(command);

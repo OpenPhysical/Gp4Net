@@ -20,12 +20,15 @@ public readonly record struct CardUuid(Guid Value)
     /// <returns>A new CardUuid or an error if generation fails.</returns>
     public static Result<CardUuid, SmartCardError> Generate()
     {
-        return Result.Try(() =>
-        {
-            // Guid.NewGuid() uses cryptographically secure random generation
-            Guid uuid = Guid.NewGuid();
-            return new CardUuid(uuid);
-        }, ex => SmartCardError.CryptographicError($"Failed to generate card UUID: {ex.Message}"));
+        return Result.Try(
+            () =>
+            {
+                // Guid.NewGuid() uses cryptographically secure random generation
+                Guid uuid = Guid.NewGuid();
+                return new CardUuid(uuid);
+            },
+            ex => SmartCardError.CryptographicError($"Failed to generate card UUID: {ex.Message}")
+        );
     }
 
     /// <summary>
@@ -39,7 +42,8 @@ public readonly record struct CardUuid(Guid Value)
         if (guid == Guid.Empty)
         {
             return Result.Failure<CardUuid, SmartCardError>(
-                SmartCardError.InvalidArgument("Card UUID cannot be empty"));
+                SmartCardError.InvalidArgument("Card UUID cannot be empty")
+            );
         }
 
         return Result.Success<CardUuid, SmartCardError>(new CardUuid(guid));
@@ -53,7 +57,8 @@ public readonly record struct CardUuid(Guid Value)
     /// <returns>A new CardUuid or an error if the byte array is invalid.</returns>
     public static Result<CardUuid, SmartCardError> FromBytes(Maybe<byte[]> bytes)
     {
-        return bytes.ToResult(SmartCardError.InvalidArgument("UUID byte array cannot be null"))
+        return bytes
+            .ToResult(SmartCardError.InvalidArgument("UUID byte array cannot be null"))
             .Bind(ValidateByteArrayLength)
             .Bind(CreateGuidFromBytes)
             .Bind(FromGuid);
@@ -74,13 +79,18 @@ public readonly record struct CardUuid(Guid Value)
         return bytes.Length == 16
             ? Result.Success<byte[], SmartCardError>(bytes)
             : Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidArgument($"UUID byte array must be 16 bytes, got {bytes.Length}"));
+                SmartCardError.InvalidArgument(
+                    $"UUID byte array must be 16 bytes, got {bytes.Length}"
+                )
+            );
     }
 
     private static Result<Guid, SmartCardError> CreateGuidFromBytes(byte[] bytes)
     {
-        return Result.Try(() => new Guid(bytes), 
-            ex => SmartCardError.InvalidArgument($"Invalid UUID byte array: {ex.Message}"));
+        return Result.Try(
+            () => new Guid(bytes),
+            ex => SmartCardError.InvalidArgument($"Invalid UUID byte array: {ex.Message}")
+        );
     }
 
     /// <summary>
@@ -120,5 +130,5 @@ public readonly record struct CardUuid(Guid Value)
     /// Should not be used in production code.
     /// </summary>
     /// <returns>An empty CardUuid.</returns>
-    internal static CardUuid Empty => new(Guid.Empty);
+    public static CardUuid Empty => new(Guid.Empty);
 }

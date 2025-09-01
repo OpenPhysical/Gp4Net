@@ -29,7 +29,13 @@ public static class Asn1TableRenderer
     {
         switch (row)
         {
-            case Asn1TableBuilder.Asn1DataRow(var depth, var offset, var typeInfo, var value, var rawBytes):
+            case Asn1TableBuilder.Asn1DataRow(
+                var depth,
+                var offset,
+                var typeInfo,
+                var value,
+                var rawBytes
+            ):
                 string indent = new string(' ', depth * 2);
 
                 // Build the main line with offset and type info
@@ -52,9 +58,15 @@ public static class Asn1TableRenderer
                 }
                 break;
 
-            case Asn1TableBuilder.ContainerHeaderRow(var depth, var containerType, var elementCount):
+            case Asn1TableBuilder.ContainerHeaderRow(
+                var depth,
+                var containerType,
+                var elementCount
+            ):
                 string containerIndent = new string(' ', depth * 2);
-                AnsiConsole.MarkupLine($"{containerIndent}  [blue]{containerType} with {elementCount} elements:[/]");
+                AnsiConsole.MarkupLine(
+                    $"{containerIndent}  [blue]{containerType} with {elementCount} elements:[/]"
+                );
                 break;
 
             case Asn1TableBuilder.ElementHeaderRow(var depth, var elementIndex, var description):
@@ -77,7 +89,7 @@ public static class Asn1TableRenderer
                     "warning" => "yellow",
                     "error" => "red",
                     "success" => "green",
-                    _ => "dim"
+                    _ => "dim",
                 };
                 AnsiConsole.MarkupLine($"[{color}]{message}[/]");
                 AnsiConsole.WriteLine();
@@ -120,7 +132,13 @@ public static class Asn1TableRenderer
         {
             switch (row)
             {
-                case Asn1TableBuilder.Asn1DataRow(var depth, var offset, var typeInfo, var value, var rawBytes):
+                case Asn1TableBuilder.Asn1DataRow(
+                    var depth,
+                    var offset,
+                    var typeInfo,
+                    var value,
+                    var rawBytes
+                ):
                     string indent = new string(' ', depth * 2);
                     _ = table.AddRow(
                         offset,
@@ -129,7 +147,11 @@ public static class Asn1TableRenderer
                     );
                     break;
 
-                case Asn1TableBuilder.ContainerHeaderRow(var depth, var containerType, var elementCount):
+                case Asn1TableBuilder.ContainerHeaderRow(
+                    var depth,
+                    var containerType,
+                    var elementCount
+                ):
                     string containerIndent = new string(' ', depth * 2);
                     _ = table.AddRow(
                         "",
@@ -164,7 +186,8 @@ public static class Asn1TableRenderer
         {
             int start = result.IndexOf('[');
             int end = result.IndexOf(']', start + 1);
-            if (start == -1 || end == -1) break;
+            if (start == -1 || end == -1)
+                break;
 
             string tag = result.Substring(start, end - start + 1);
             if (tag == "[/]")

@@ -28,7 +28,7 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
     /// <param name="sw2">The second status byte (SW2).</param>
     public StatusWord(byte sw1, byte sw2)
     {
-        _value = (ushort)((sw1 << 8) | sw2);
+        _value = (ushort)(sw1 << 8 | sw2);
     }
 
     /// <summary>
@@ -36,10 +36,7 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
     /// </summary>
     public ushort Value
     {
-        get
-        {
-            return _value;
-        }
+        get { return _value; }
     }
 
     /// <summary>
@@ -47,10 +44,7 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
     /// </summary>
     public byte SW1
     {
-        get
-        {
-            return (byte)(_value >> 8);
-        }
+        get { return (byte)(_value >> 8); }
     }
 
     /// <summary>
@@ -58,10 +52,7 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
     /// </summary>
     public byte SW2
     {
-        get
-        {
-            return (byte)(_value & 0xFF);
-        }
+        get { return (byte)(_value & 0xFF); }
     }
 
     /// <summary>
@@ -79,12 +70,14 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
     /// <summary>
     /// Determines whether two StatusWord instances are equal.
     /// </summary>
-    public static bool operator ==(StatusWord left, StatusWord right) => left._value == right._value;
+    public static bool operator ==(StatusWord left, StatusWord right) =>
+        left._value == right._value;
 
     /// <summary>
     /// Determines whether two StatusWord instances are not equal.
     /// </summary>
-    public static bool operator !=(StatusWord left, StatusWord right) => left._value != right._value;
+    public static bool operator !=(StatusWord left, StatusWord right) =>
+        left._value != right._value;
 
     /// <summary>
     /// Determines whether one StatusWord is less than another.
@@ -99,12 +92,14 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
     /// <summary>
     /// Determines whether one StatusWord is less than or equal to another.
     /// </summary>
-    public static bool operator <=(StatusWord left, StatusWord right) => left._value <= right._value;
+    public static bool operator <=(StatusWord left, StatusWord right) =>
+        left._value <= right._value;
 
     /// <summary>
     /// Determines whether one StatusWord is greater than or equal to another.
     /// </summary>
-    public static bool operator >=(StatusWord left, StatusWord right) => left._value >= right._value;
+    public static bool operator >=(StatusWord left, StatusWord right) =>
+        left._value >= right._value;
 
     /// <inheritdoc />
     public bool Equals(StatusWord other)
@@ -174,7 +169,7 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
             0x63C2 => "Authentication Failed (2 tries remaining)",
             0x63C3 => "Authentication Failed (3 tries remaining)",
             0x69FF => "Unknown Error",
-            _ => null
+            _ => null,
         };
 
         return description != null ? $"0x{_value:X4} ({description})" : ToString();

@@ -3,12 +3,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
-namespace Gp4Net.Tests.Domain.Keys;
-
 using System;
 using AwesomeAssertions;
 using Gp4Net.Domain.Keys;
 using NUnit.Framework;
+
+namespace Gp4Net.Tests.Domain.Keys;
 
 /// <summary>
 /// Unit tests for the <see cref="SecureSessionKeys"/> class.
@@ -141,12 +141,7 @@ public class SecureSessionKeysTests
     {
         // Arrange
         using (
-            SecureSessionKeys sessionKeys = new SecureSessionKeys(
-                _testSEnc,
-                _testSMac,
-                _testSrMac,
-                null
-            )
+            SecureSessionKeys sessionKeys = new SecureSessionKeys(_testSEnc, _testSMac, _testSrMac)
         )
         {
             bool executed = false;

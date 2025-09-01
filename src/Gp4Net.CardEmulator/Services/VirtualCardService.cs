@@ -30,7 +30,11 @@ public class VirtualCardService : IDisposable
     /// <summary>
     /// Private constructor for creating new instances with state.
     /// </summary>
-    private VirtualCardService(VirtualReaderManager readerManager, Maybe<VirtualCardReader> connectedReader, bool disposed)
+    private VirtualCardService(
+        VirtualReaderManager readerManager,
+        Maybe<VirtualCardReader> connectedReader,
+        bool disposed
+    )
     {
         _readerManager = readerManager;
         _connectedReader = connectedReader;
@@ -43,7 +47,7 @@ public class VirtualCardService : IDisposable
     /// <returns>The virtual reader manager instance.</returns>
     public VirtualReaderManager GetReaderManager()
     {
-        return _disposed 
+        return _disposed
             ? new VirtualReaderManager() // Return empty manager if disposed
             : _readerManager;
     }
@@ -58,10 +62,12 @@ public class VirtualCardService : IDisposable
         if (_disposed)
         {
             return Result.Failure<bool, SmartCardError>(
-                SmartCardError.CommunicationError("Service has been disposed"));
+                SmartCardError.CommunicationError("Service has been disposed")
+            );
         }
 
-        return Maybe<string>.From(readerName)
+        return Maybe<string>
+            .From(readerName)
             .Where(name => !string.IsNullOrEmpty(name))
             .ToResult(SmartCardError.InvalidArgument("Reader name cannot be null or empty"))
             .Bind(name => FindAndConnectToReader(name));
@@ -72,10 +78,14 @@ public class VirtualCardService : IDisposable
     /// </summary>
     private Result<bool, SmartCardError> FindAndConnectToReader(string readerName)
     {
-        Maybe<VirtualCardReader> reader = Maybe<VirtualCardReader>.From(_readerManager.GetReader(readerName));
-        
-        return reader.ToResult(SmartCardError.CommunicationError($"Reader '{readerName}' not found"))
-            .Map(r => r.Connect());
+        Maybe<VirtualCardReader> reader = Maybe<VirtualCardReader>.From(
+            _readerManager.GetReader(readerName)
+        );
+
+        return reader
+            .ToResult(SmartCardError.CommunicationError($"Reader '{readerName}' not found"))
+            .Bind(r => r.Connected())
+            .Map(_ => true);
     }
 
     /// <summary>
@@ -85,7 +95,11 @@ public class VirtualCardService : IDisposable
     /// <returns>A new service instance with the reader connected.</returns>
     public VirtualCardService WithConnectedReader(VirtualCardReader reader)
     {
-        return new VirtualCardService(_readerManager, Maybe<VirtualCardReader>.From(reader), _disposed);
+        return new VirtualCardService(
+            _readerManager,
+            Maybe<VirtualCardReader>.From(reader),
+            _disposed
+        );
     }
 
     /// <summary>
@@ -97,19 +111,22 @@ public class VirtualCardService : IDisposable
     {
         if (_disposed)
         {
-            return VirtualCommandResponse.Failed(SmartCardError.CommunicationError("Service has been disposed"));
+            return VirtualCommandResponse.Failed(
+                SmartCardError.CommunicationError("Service has been disposed")
+            );
         }
 
-        return Maybe<byte[]>.From(command)
+        return Maybe<byte[]>
+            .From(command)
             .Where(cmd => cmd.Length > 0)
             .ToResult(SmartCardError.InvalidArgument("Command cannot be null or empty"))
-            .Bind(cmd => _connectedReader
-                .ToResult(SmartCardError.CommunicationError("No reader is connected"))
-                .Map(reader => reader.TransmitCommand(cmd))
-                .Map(VirtualCommandResponse.FromApduResponse))
-            .Match(
-                success => success,
-                error => VirtualCommandResponse.Failed(error));
+            .Bind(cmd =>
+                _connectedReader
+                    .ToResult(SmartCardError.CommunicationError("No reader is connected"))
+                    .Bind(reader => reader.TransmitCommand(cmd))
+                    .Map(VirtualCommandResponse.FromApduResponse)
+            )
+            .Match(success => success, error => VirtualCommandResponse.Failed(error));
     }
 
     /// <summary>
@@ -118,8 +135,14 @@ public class VirtualCardService : IDisposable
     public VirtualCardService Disconnect()
     {
         _connectedReader.Match(
-            reader => { reader.Disconnect(); return true; },
-            () => true);
+            reader =>
+            {
+                // Functional approach - create new disconnected reader (not used in this context)
+                reader.Disconnected();
+                return true;
+            },
+            () => true
+        );
 
         return new VirtualCardService(_readerManager, Maybe<VirtualCardReader>.None, false);
     }
@@ -180,7 +203,12 @@ public class VirtualCommandResponse
     /// <param name="data">The response data.</param>
     /// <param name="statusWord">The status word.</param>
     /// <param name="error">Any error information.</param>
-    private VirtualCommandResponse(bool isSuccessful, byte[] data, StatusWord statusWord, Maybe<SmartCardError> error)
+    private VirtualCommandResponse(
+        bool isSuccessful,
+        byte[] data,
+        StatusWord statusWord,
+        Maybe<SmartCardError> error
+    )
     {
         IsSuccessful = isSuccessful;
         Data = data ?? [];
@@ -196,15 +224,16 @@ public class VirtualCommandResponse
     public static VirtualCommandResponse FromApduResponse(ApduResponse apduResponse)
     {
         bool isSuccessful = apduResponse.IsSuccessful;
-        Maybe<SmartCardError> error = isSuccessful 
-            ? Maybe<SmartCardError>.None 
+        Maybe<SmartCardError> error = isSuccessful
+            ? Maybe<SmartCardError>.None
             : Maybe<SmartCardError>.From(SmartCardError.FromStatusWord(apduResponse.StatusWord));
 
         return new VirtualCommandResponse(
-            isSuccessful, 
-            apduResponse.Data, 
-            apduResponse.StatusWord, 
-            error);
+            isSuccessful,
+            apduResponse.Data,
+            apduResponse.StatusWord,
+            error
+        );
     }
 
     /// <summary>
@@ -215,10 +244,11 @@ public class VirtualCommandResponse
     public static VirtualCommandResponse Failed(SmartCardError error)
     {
         return new VirtualCommandResponse(
-            false, 
-            [], 
+            false,
+            [],
             0x6F00, // Generic error status word
-            Maybe<SmartCardError>.From(error));
+            Maybe<SmartCardError>.From(error)
+        );
     }
 
     /// <summary>
@@ -229,9 +259,10 @@ public class VirtualCommandResponse
     public static VirtualCommandResponse Success(byte[]? data = null)
     {
         return new VirtualCommandResponse(
-            true, 
-            data ?? [], 
+            true,
+            data ?? [],
             0x9000, // Success status word
-            Maybe<SmartCardError>.None);
+            Maybe<SmartCardError>.None
+        );
     }
 }

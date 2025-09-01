@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
+using Gp4Net.Core;
+using Gp4Net.Services;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 
@@ -21,37 +22,25 @@ public class T0ApduTransport : IApduTransport
     /// <inheritdoc />
     public TransportProtocol Protocol
     {
-        get
-        {
-            return TransportProtocol.T0;
-        }
+        get { return TransportProtocol.T0; }
     }
 
     /// <inheritdoc />
     public int MaxCommandDataLength
     {
-        get
-        {
-            return 255;
-        }
+        get { return 255; }
     }
 
     /// <inheritdoc />
     public int MaxResponseDataLength
     {
-        get
-        {
-            return 256;
-        }
+        get { return 256; }
     }
 
     /// <inheritdoc />
     public bool SupportsExtendedLength
     {
-        get
-        {
-            return false;
-        }
+        get { return false; }
     }
 
     /// <summary>
@@ -69,27 +58,34 @@ public class T0ApduTransport : IApduTransport
         CancellationToken cancellationToken = default
     )
     {
-
+        // Validate extended length support
         if (command.IsExtendedLength)
         {
-            throw new NotSupportedException("T=0 does not support extended length APDUs");
+            return new ApduResponse([], new Core.StatusWord(0x6A, 0x80)); // Wrong parameters P1-P2
         }
 
-        // Build APDU according to T=0 rules
-        byte[] apdu = ApduBuilder.BuildApdu(command);
+        // Build APDU according to T=0 rules using unified service
+        return await ApduService.Formatting.ToBytes(command)
+            .Match(
+                async apdu =>
+                {
+                    _logger.LogDebug("T=0 Transmit: {Apdu}", BitConverter.ToString(apdu));
 
-        _logger.LogDebug("T=0 Transmit: {Apdu}", BitConverter.ToString(apdu));
+                    // Send command
+                    byte[] response = await channel
+                        .TransmitAsync(apdu, cancellationToken)
+                        .ConfigureAwait(false);
 
-        // Send command
-        byte[] response = await channel
-            .TransmitAsync(apdu, cancellationToken)
-            .ConfigureAwait(false);
-
-        // Handle T=0 specific response processing
-        return await ProcessResponseAsync(command, response, channel, cancellationToken)
-            .ConfigureAwait(false);
+                    // Handle T=0 specific response processing
+                    return await ProcessResponseAsync(command, response, channel, cancellationToken)
+                        .ConfigureAwait(false);
+                },
+                error =>
+                {
+                    _logger.LogError("Failed to build APDU: {Error}", error.Message);
+                    return Task.FromResult(new ApduResponse([], new Core.StatusWord(0x69, 0x87))); // Wrong data
+                });
     }
-
 
     private static byte GetLeByte(int expectedLength)
     {
@@ -109,9 +105,9 @@ public class T0ApduTransport : IApduTransport
             throw new InvalidOperationException("Response too short");
         }
 
-        byte sw1 = response[response.Length - 2];
-        byte sw2 = response[response.Length - 1];
-        ushort statusWord = (ushort)((sw1 << 8) | sw2);
+        byte sw1 = response[^2];
+        byte sw2 = response[^1];
+        ushort statusWord = (ushort)(sw1 << 8 | sw2);
 
         byte[] data = new byte[response.Length - 2];
         if (data.Length > 0)
@@ -123,45 +119,45 @@ public class T0ApduTransport : IApduTransport
         {
             // Handle T=0 specific status words
             case 0x61:
+            {
+                // More data available, send GET RESPONSE
+                ApduResponse remainingData = await GetResponseAsync(sw2, channel, cancellationToken)
+                    .ConfigureAwait(false);
+
+                // Security check: Validate combined data size before allocation
+                int totalLength = data.Length + remainingData.Data.Length;
+                if (totalLength > Constants.Constants.Apdu.ChainLimits.MaxTotalResponseSize)
                 {
-                    // More data available, send GET RESPONSE
-                    ApduResponse remainingData = await GetResponseAsync(sw2, channel, cancellationToken)
-                        .ConfigureAwait(false);
-
-                    // Security check: Validate combined data size before allocation
-                    int totalLength = data.Length + remainingData.Data.Length;
-                    if (totalLength > ApduConstants.MaxTotalResponseSize)
-                    {
-                        throw new InvalidOperationException(
-                            $"Combined response size ({totalLength}) exceeds maximum ({ApduConstants.MaxTotalResponseSize})");
-                    }
-
-                    // Combine data
-                    byte[] combinedData = new byte[totalLength];
-                    Array.Copy(data, 0, combinedData, 0, data.Length);
-                    Array.Copy(
-                        remainingData.Data,
-                        0,
-                        combinedData,
-                        data.Length,
-                        remainingData.Data.Length
+                    throw new InvalidOperationException(
+                        $"Combined response size ({totalLength}) exceeds maximum ({Constants.Constants.Apdu.ChainLimits.MaxTotalResponseSize})"
                     );
-
-                    return new ApduResponse(combinedData, remainingData.StatusWord);
                 }
+
+                // Combine data
+                byte[] combinedData = new byte[totalLength];
+                Array.Copy(data, 0, combinedData, 0, data.Length);
+                Array.Copy(
+                    remainingData.Data,
+                    0,
+                    combinedData,
+                    data.Length,
+                    remainingData.Data.Length
+                );
+
+                return new ApduResponse(combinedData, remainingData.StatusWord);
+            }
             case 0x6C when command.ExpectedResponseLength.HasValue:
-                {
-                    // Wrong Le, retry with correct length
-                    _logger.LogDebug("Wrong Le, retrying with Le={Le}", sw2);
+            {
+                // Wrong Le, retry with correct length
+                _logger.LogDebug("Wrong Le, retrying with Le={Le}", sw2);
 
-                    ApduCommandWrapper retryCommand = new ApduCommandWrapper(command, sw2);
-                    return await TransmitAsync(retryCommand, channel, cancellationToken)
-                        .ConfigureAwait(false);
-                }
+                ApduCommandWrapper retryCommand = new ApduCommandWrapper(command, sw2);
+                return await TransmitAsync(retryCommand, channel, cancellationToken)
+                    .ConfigureAwait(false);
+            }
             default:
                 return new ApduResponse(data, statusWord);
         }
-
     }
 
     private async Task<ApduResponse> GetResponseAsync(
@@ -180,17 +176,21 @@ public class T0ApduTransport : IApduTransport
         while (true)
         {
             // Security check: Prevent infinite loops from malicious cards
-            if (chainCount >= ApduConstants.MaxResponseChainLength)
+            if (chainCount >= Constants.Constants.Apdu.ChainLimits.MaxResponseChainLength)
             {
                 throw new InvalidOperationException(
-                    $"Maximum GET RESPONSE chain length ({ApduConstants.MaxResponseChainLength}) exceeded");
+                    $"Maximum GET RESPONSE chain length ({Constants.Constants.Apdu.ChainLimits.MaxResponseChainLength}) exceeded"
+                );
             }
 
             // GET RESPONSE: CLA=00 INS=C0 P1=00 P2=00 Le=currentLength
             byte[] getResponse = [0x00, 0xC0, 0x00, 0x00, currentLength];
 
-            _logger.LogDebug("T=0 GET RESPONSE for {Length} bytes (chain {ChainCount})",
-                currentLength == 0 ? 256 : currentLength, chainCount);
+            _logger.LogDebug(
+                "T=0 GET RESPONSE for {Length} bytes (chain {ChainCount})",
+                currentLength == 0 ? 256 : currentLength,
+                chainCount
+            );
 
             byte[] response = await channel
                 .TransmitAsync(getResponse, cancellationToken)
@@ -201,19 +201,20 @@ public class T0ApduTransport : IApduTransport
                 throw new InvalidOperationException("GET RESPONSE failed");
             }
 
-            byte sw1 = response[response.Length - 2];
-            byte sw2 = response[response.Length - 1];
-            finalStatusWord = (ushort)((sw1 << 8) | sw2);
+            byte sw1 = response[^2];
+            byte sw2 = response[^1];
+            finalStatusWord = (ushort)(sw1 << 8 | sw2);
 
             // Extract data portion
             int dataLength = response.Length - 2;
             if (dataLength > 0)
             {
                 // Security check: Prevent memory exhaustion from excessive response data
-                if (totalSize + dataLength > ApduConstants.MaxTotalResponseSize)
+                if (totalSize + dataLength > Constants.Constants.Apdu.ChainLimits.MaxTotalResponseSize)
                 {
                     throw new InvalidOperationException(
-                        $"Total response size ({totalSize + dataLength}) exceeds maximum ({ApduConstants.MaxTotalResponseSize})");
+                        $"Total response size ({totalSize + dataLength}) exceeds maximum ({Constants.Constants.Apdu.ChainLimits.MaxTotalResponseSize})"
+                    );
                 }
 
                 // Add data to accumulator
@@ -238,7 +239,7 @@ public class T0ApduTransport : IApduTransport
             }
         }
 
-        return new ApduResponse(allData.ToArray(), finalStatusWord);
+        return new ApduResponse([.. allData], finalStatusWord);
     }
 
     /// <summary>
@@ -257,52 +258,31 @@ public class T0ApduTransport : IApduTransport
 
         public byte Cla
         {
-            get
-            {
-                return _inner.Cla;
-            }
+            get { return _inner.Cla; }
         }
         public byte Ins
         {
-            get
-            {
-                return _inner.Ins;
-            }
+            get { return _inner.Ins; }
         }
         public byte P1
         {
-            get
-            {
-                return _inner.P1;
-            }
+            get { return _inner.P1; }
         }
         public byte P2
         {
-            get
-            {
-                return _inner.P2;
-            }
+            get { return _inner.P2; }
         }
         public byte[] Data
         {
-            get
-            {
-                return _inner.Data;
-            }
+            get { return _inner.Data; }
         }
         public Maybe<int> ExpectedResponseLength
         {
-            get
-            {
-                return Maybe<int>.From(_newExpectedLength);
-            }
+            get { return Maybe<int>.From(_newExpectedLength); }
         }
         public bool IsExtendedLength
         {
-            get
-            {
-                return false;
-            }
+            get { return false; }
         }
     }
 }

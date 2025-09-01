@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 
@@ -87,10 +87,7 @@ public class DeleteCommand : IApduCommand
     /// </summary>
     byte IApduCommand.Cla
     {
-        get
-        {
-            return Cla;
-        }
+        get { return Cla; }
     }
 
     /// <summary>
@@ -98,10 +95,7 @@ public class DeleteCommand : IApduCommand
     /// </summary>
     byte IApduCommand.Ins
     {
-        get
-        {
-            return Ins;
-        }
+        get { return Ins; }
     }
 
     /// <summary>
@@ -109,10 +103,7 @@ public class DeleteCommand : IApduCommand
     /// </summary>
     public byte P1
     {
-        get
-        {
-            return (byte)Type;
-        }
+        get { return (byte)Type; }
     }
 
     /// <summary>
@@ -120,10 +111,7 @@ public class DeleteCommand : IApduCommand
     /// </summary>
     public byte P2
     {
-        get
-        {
-            return (byte)Target;
-        }
+        get { return (byte)Target; }
     }
 
     /// <summary>
@@ -131,12 +119,7 @@ public class DeleteCommand : IApduCommand
     /// </summary>
     public byte[] Data
     {
-        get
-        {
-            return GetDeleteData().Match(
-                onSuccess: data => data,
-                onFailure: _ => []);
-        }
+        get { return GetDeleteData().Match(onSuccess: data => data, onFailure: _ => []); }
     }
 
     /// <summary>
@@ -144,10 +127,7 @@ public class DeleteCommand : IApduCommand
     /// </summary>
     public Maybe<int> ExpectedResponseLength
     {
-        get
-        {
-            return Maybe<int>.None;
-        }
+        get { return Maybe<int>.None; }
     }
 
     /// <summary>
@@ -155,10 +135,7 @@ public class DeleteCommand : IApduCommand
     /// </summary>
     public bool IsExtendedLength
     {
-        get
-        {
-            return false;
-        }
+        get { return false; }
     }
 
     /// <summary>
@@ -187,15 +164,19 @@ public class DeleteCommand : IApduCommand
                 // Compute token (simple heuristic: assume single AID, package removal)
                 if (Aids.Count != 1)
                 {
-                    return SmartCardError.InvalidArgument("Delete token calculation requires exactly one AID.");
+                    return SmartCardError.InvalidArgument(
+                        "Delete token calculation requires exactly one AID."
+                    );
                 }
                 // Compute token using the DeleteTokenCalculator
-                Result<byte[], SmartCardError> tokenResult = Cryptography.DeleteTokenCalculator.ComputeDeleteToken(
-                    DeleteTokenKey.Value,
-                    P1,
-                    P2,
-                    Aids[0],
-                    Maybe<byte[]>.None); // No optional TLV for now
+                Result<byte[], SmartCardError> tokenResult =
+                    CryptoService.Keys.ComputeDeleteToken(
+                        DeleteTokenKey.Value,
+                        P1,
+                        P2,
+                        Aids[0],
+                        Maybe<byte[]>.None
+                    ); // No optional TLV for now
 
                 if (tokenResult.IsFailure)
                 {
@@ -221,11 +202,17 @@ public class DeleteCommand : IApduCommand
                 switch (keyRef.Length)
                 {
                     case 2:
-                        data.Add(0xD0); data.Add(1); data.Add(keyRef[0]);
-                        data.Add(0xD2); data.Add(1); data.Add(keyRef[1]);
+                        data.Add(0xD0);
+                        data.Add(1);
+                        data.Add(keyRef[0]);
+                        data.Add(0xD2);
+                        data.Add(1);
+                        data.Add(keyRef[1]);
                         break;
                     case 1:
-                        data.Add(0xD0); data.Add(1); data.Add(keyRef[0]);
+                        data.Add(0xD0);
+                        data.Add(1);
+                        data.Add(keyRef[0]);
                         break;
                 }
             }
@@ -265,21 +252,27 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken = default
     )
     {
-        return Maybe<byte[]>.From(aid).Match(
-            Some: aidValue => aidValue.Length == 0
-                ? SmartCardError.InvalidArgument("AID cannot be empty.")
-                : CreateApplicationDeleteCommand(aidValue, deleteRelated, deletionToken),
-            None: () => SmartCardError.InvalidArgument("AID cannot be null."));
+        return Maybe<byte[]>
+            .From(aid)
+            .Match(
+                Some: aidValue =>
+                    aidValue.Length == 0
+                        ? SmartCardError.InvalidArgument("AID cannot be empty.")
+                        : CreateApplicationDeleteCommand(aidValue, deleteRelated, deletionToken),
+                None: () => SmartCardError.InvalidArgument("AID cannot be null.")
+            );
     }
 
-    private static Result<DeleteCommand, SmartCardError> CreateApplicationDeleteCommand(byte[] aid, bool deleteRelated, Maybe<byte[]> deletionToken)
+    private static Result<DeleteCommand, SmartCardError> CreateApplicationDeleteCommand(
+        byte[] aid,
+        bool deleteRelated,
+        Maybe<byte[]> deletionToken
+    )
     {
         DeleteType type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
             : DeleteType.DeleteObjectOnly;
-        DeleteTarget target = deleteRelated
-            ? DeleteTarget.WithRelated
-            : DeleteTarget.ByAid;
+        DeleteTarget target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, [aid], deletionToken);
     }
 
@@ -296,21 +289,27 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken = default
     )
     {
-        return Maybe<byte[]>.From(aid).Match(
-            Some: aidValue => aidValue.Length == 0
-                ? SmartCardError.InvalidArgument("Package AID cannot be empty.")
-                : CreatePackageDeleteCommand(aidValue, deleteRelated, deletionToken),
-            None: () => SmartCardError.InvalidArgument("Package AID cannot be null."));
+        return Maybe<byte[]>
+            .From(aid)
+            .Match(
+                Some: aidValue =>
+                    aidValue.Length == 0
+                        ? SmartCardError.InvalidArgument("Package AID cannot be empty.")
+                        : CreatePackageDeleteCommand(aidValue, deleteRelated, deletionToken),
+                None: () => SmartCardError.InvalidArgument("Package AID cannot be null.")
+            );
     }
 
-    private static Result<DeleteCommand, SmartCardError> CreatePackageDeleteCommand(byte[] aid, bool deleteRelated, Maybe<byte[]> deletionToken)
+    private static Result<DeleteCommand, SmartCardError> CreatePackageDeleteCommand(
+        byte[] aid,
+        bool deleteRelated,
+        Maybe<byte[]> deletionToken
+    )
     {
         DeleteType type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
             : DeleteType.DeleteObjectOnly;
-        DeleteTarget target = deleteRelated
-            ? DeleteTarget.WithRelated
-            : DeleteTarget.ByAid;
+        DeleteTarget target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, [aid], deletionToken);
     }
 
@@ -327,21 +326,34 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken = default
     )
     {
-        return Maybe<byte[]>.From(aid).Match(
-            Some: aidValue => aidValue.Length == 0
-                ? SmartCardError.InvalidArgument("Executable load file AID cannot be empty.")
-                : CreateExecutableLoadFileDeleteCommand(aidValue, deleteRelated, deletionToken),
-            None: () => SmartCardError.InvalidArgument("Executable load file AID cannot be null."));
+        return Maybe<byte[]>
+            .From(aid)
+            .Match(
+                Some: aidValue =>
+                    aidValue.Length == 0
+                        ? SmartCardError.InvalidArgument(
+                            "Executable load file AID cannot be empty."
+                        )
+                        : CreateExecutableLoadFileDeleteCommand(
+                            aidValue,
+                            deleteRelated,
+                            deletionToken
+                        ),
+                None: () =>
+                    SmartCardError.InvalidArgument("Executable load file AID cannot be null.")
+            );
     }
 
-    private static Result<DeleteCommand, SmartCardError> CreateExecutableLoadFileDeleteCommand(byte[] aid, bool deleteRelated, Maybe<byte[]> deletionToken)
+    private static Result<DeleteCommand, SmartCardError> CreateExecutableLoadFileDeleteCommand(
+        byte[] aid,
+        bool deleteRelated,
+        Maybe<byte[]> deletionToken
+    )
     {
         DeleteType type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
             : DeleteType.DeleteObjectOnly;
-        DeleteTarget target = deleteRelated
-            ? DeleteTarget.WithRelated
-            : DeleteTarget.ByAid;
+        DeleteTarget target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, [aid], deletionToken);
     }
 
@@ -358,39 +370,54 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken = default
     )
     {
-        return Maybe<IList<byte[]>>.From(aids).Match(
-            Some: aidsList => ValidateAndCreateMultipleDeleteCommand(aidsList, deleteRelated, deletionToken),
-            None: () => SmartCardError.InvalidArgument("AIDs list cannot be null."));
+        return Maybe<IList<byte[]>>
+            .From(aids)
+            .Match(
+                Some: aidsList =>
+                    ValidateAndCreateMultipleDeleteCommand(aidsList, deleteRelated, deletionToken),
+                None: () => SmartCardError.InvalidArgument("AIDs list cannot be null.")
+            );
     }
 
-    private static Result<DeleteCommand, SmartCardError> ValidateAndCreateMultipleDeleteCommand(IList<byte[]> aids, bool deleteRelated, Maybe<byte[]> deletionToken)
+    private static Result<DeleteCommand, SmartCardError> ValidateAndCreateMultipleDeleteCommand(
+        IList<byte[]> aids,
+        bool deleteRelated,
+        Maybe<byte[]> deletionToken
+    )
     {
         if (aids.Count == 0)
         {
             return SmartCardError.InvalidArgument("At least one AID must be provided.");
         }
 
-        // Validate all AIDs using functional approach - collect all validation results
-        List<Maybe<SmartCardError>> validationErrors = aids
-            .Select(aid => Maybe<byte[]>.From(aid).Match(
-                Some: aidValue => aidValue.Length == 0
-                    ? Maybe<SmartCardError>.From(SmartCardError.InvalidArgument("AIDs cannot be empty."))
-                    : Maybe<SmartCardError>.None,
-                None: () => Maybe<SmartCardError>.From(SmartCardError.InvalidArgument("AIDs cannot contain null values."))))
-            .Where(error => error.HasValue)
-            .ToList();
+        // Validate all AIDs - collect all validation results
+        List<Maybe<SmartCardError>> validationErrors = [.. aids.Select(aid =>
+                Maybe<byte[]>
+                    .From(aid)
+                    .Match(
+                        Some: aidValue =>
+                            aidValue.Length == 0
+                                ? Maybe<SmartCardError>.From(
+                                    SmartCardError.InvalidArgument("AIDs cannot be empty.")
+                                )
+                                : Maybe<SmartCardError>.None,
+                        None: () =>
+                            Maybe<SmartCardError>.From(
+                                SmartCardError.InvalidArgument("AIDs cannot contain null values.")
+                            )
+                    )
+            )
+            .Where(error => error.HasValue)];
 
         if (validationErrors.Any())
         {
-            return validationErrors.First().Value;  // Return first validation error
+            return validationErrors.First().Value; // Return first validation error
         }
 
         DeleteType type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
             : DeleteType.DeleteObjectOnly;
-        DeleteTarget target = deleteRelated
-            ? DeleteTarget.WithRelated
-            : DeleteTarget.ByAid;
+        DeleteTarget target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, aids, deletionToken);
     }
 
@@ -475,7 +502,7 @@ public class DeleteCommand : IApduCommand
             Ins,
             (byte)Type,
             (byte)Target,
-            (byte)data.Count // Lc
+            (byte)data.Count, // Lc
         ];
 
         apdu.AddRange(data);
@@ -527,7 +554,7 @@ public class DeleteResponse
     {
         Data = Maybe<byte[]>.From(data).Map(d => (byte[])d.Clone()).GetValueOrDefault([]);
         StatusWord = statusWord;
-        IsSuccessful = statusWord == StatusWords.Success;
+        IsSuccessful = statusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.Success;
         DeletionReceipts = deletionReceipts
             .Map(receipts => (IReadOnlyList<DeletionReceipt>)new List<DeletionReceipt>(receipts))
             .GetValueOrDefault([]);
@@ -570,7 +597,9 @@ public class DeleteResponse
                     return new DeleteResponse(
                         Maybe<byte[]>.From(response).GetValueOrDefault([]),
                         statusWord,
-                        deletionReceipts.Count > 0 ? Maybe<IList<DeletionReceipt>>.From(deletionReceipts) : Maybe<IList<DeletionReceipt>>.None
+                        deletionReceipts.Count > 0
+                            ? Maybe<IList<DeletionReceipt>>.From(deletionReceipts)
+                            : Maybe<IList<DeletionReceipt>>.None
                     );
                 }
 
@@ -606,7 +635,9 @@ public class DeleteResponse
         return new DeleteResponse(
             Maybe<byte[]>.From(response).GetValueOrDefault([]),
             statusWord,
-            deletionReceipts.Count > 0 ? Maybe<IList<DeletionReceipt>>.From(deletionReceipts) : Maybe<IList<DeletionReceipt>>.None
+            deletionReceipts.Count > 0
+                ? Maybe<IList<DeletionReceipt>>.From(deletionReceipts)
+                : Maybe<IList<DeletionReceipt>>.None
         );
     }
 
@@ -618,12 +649,13 @@ public class DeleteResponse
     {
         return StatusWord switch
         {
-            _ when StatusWord == StatusWords.Success => "Deletion successful",
-            _ when StatusWord == StatusWords.IncorrectData => "Incorrect data or AID not found",
-            _ when StatusWord == StatusWords.FileNotFound => "Application not found",
-            _ when StatusWord == StatusWords.ConditionsNotSatisfied => "Conditions not satisfied (dependencies exist)",
-            _ when StatusWord == StatusWords.ReferencedDataNotFound => "Referenced data not found",
-            _ when StatusWord == StatusWords.GenericFailure => "Generic failure during deletion",
+            _ when StatusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.Success => "Deletion successful",
+            _ when StatusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.IncorrectData => "Incorrect data or AID not found",
+            _ when StatusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.FileNotFound => "Application not found",
+            _ when StatusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.ConditionsNotSatisfied =>
+                "Conditions not satisfied (dependencies exist)",
+            _ when StatusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.ReferencedDataNotFound => "Referenced data not found",
+            _ when StatusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.GenericFailure => "Generic failure during deletion",
             _ => $"Unknown error: {StatusWord.Value:X}",
         };
     }

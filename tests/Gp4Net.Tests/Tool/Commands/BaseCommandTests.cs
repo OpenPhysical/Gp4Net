@@ -2,14 +2,14 @@ using System;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
+using Gp4Net.CardEmulator.Services;
+using Gp4Net.Core;
 using Gp4Net.Services;
 using Gp4Net.Tool.Pipeline;
 using Gp4Net.Tool.Services;
-using Gp4Net.CardEmulator.Services;
-using Gp4Net.Core;
+using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 using Spectre.Console.Testing;
-using Gp4Net.Tests.TestHelpers;
 
 namespace Gp4Net.Tests.Tool.Commands;
 
@@ -31,7 +31,7 @@ public class BaseCommandTests
     [SetUp]
     public void Setup()
     {
-        _displayService = new DisplayService(false);
+        _displayService = new DisplayService();
         _virtualCardService = new VirtualCardService();
         _virtualCardService.SetupComprehensiveTestEnvironment();
         _smartCardService = new TestCardService(_virtualCardService);
@@ -46,7 +46,7 @@ public class BaseCommandTests
             _smartCardService,
             _domainServiceFactory.GetValueOrDefault(CreateEmptyDomainServiceFactory()),
             _keysetResolver,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<CliContext>.Instance
+            NullLogger<CliContext>.Instance
         );
     }
 
@@ -70,7 +70,8 @@ public class BaseCommandTests
         // Virtual card service handles connection state automatically
 
         // Act
-        Result<ICliExecutionContext, SmartCardError> result = await _cliContext.RequireCardConnection("TestReader");
+        Result<ICliExecutionContext, SmartCardError> result =
+            await _cliContext.RequireCardConnection("TestReader");
 
         // Assert
         _ = result.Should().BeEquivalentTo(_cliContext);
@@ -84,7 +85,8 @@ public class BaseCommandTests
         // Virtual card service handles connection automatically
 
         // Act
-        Result<ICliExecutionContext, SmartCardError> result = await _cliContext.RequireCardConnection("TestReader");
+        Result<ICliExecutionContext, SmartCardError> result =
+            await _cliContext.RequireCardConnection("TestReader");
 
         // Assert
         _ = result.Should().BeEquivalentTo(_cliContext);
@@ -98,7 +100,8 @@ public class BaseCommandTests
         // Virtual card service provides readers and handles connection automatically
 
         // Act
-        Result<ICliExecutionContext, SmartCardError> result = await _cliContext.RequireCardConnection("auto");
+        Result<ICliExecutionContext, SmartCardError> result =
+            await _cliContext.RequireCardConnection("auto");
 
         // Assert
         _ = result.Should().BeEquivalentTo(_cliContext);
@@ -116,11 +119,14 @@ public class BaseCommandTests
             failingCardService,
             _domainServiceFactory,
             _keysetResolver,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<CliContext>.Instance
+            NullLogger<CliContext>.Instance
         );
 
         // Act & Assert
-        Action act = () => { _ = failingContext.RequireCardConnection("auto").GetAwaiter().GetResult(); };
+        Action act = () =>
+        {
+            _ = failingContext.RequireCardConnection("auto").GetAwaiter().GetResult();
+        };
         _ = act.Should().ThrowExactly<InvalidOperationException>();
     }
 
@@ -135,11 +141,14 @@ public class BaseCommandTests
             failingCardService,
             _domainServiceFactory,
             _keysetResolver,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<CliContext>.Instance
+            NullLogger<CliContext>.Instance
         );
 
         // Act & Assert
-        Action act = () => { _ = failingContext.RequireCardConnection("TestReader").GetAwaiter().GetResult(); };
+        Action act = () =>
+        {
+            _ = failingContext.RequireCardConnection("TestReader").GetAwaiter().GetResult();
+        };
         _ = act.Should().ThrowExactly<InvalidOperationException>();
     }
 
@@ -150,7 +159,8 @@ public class BaseCommandTests
         // Virtual card service secure channel state handled automatically
 
         // Act
-        Result<ICliExecutionContext, SmartCardError> result = await _cliContext.RequireSecureChannel();
+        Result<ICliExecutionContext, SmartCardError> result =
+            await _cliContext.RequireSecureChannel();
 
         // Assert
         _ = result.Should().BeEquivalentTo(_cliContext);
@@ -164,7 +174,8 @@ public class BaseCommandTests
         // Virtual card service handles secure channel establishment automatically
 
         // Act
-        Result<ICliExecutionContext, SmartCardError> result = await _cliContext.RequireSecureChannel(1);
+        Result<ICliExecutionContext, SmartCardError> result =
+            await _cliContext.RequireSecureChannel();
 
         // Assert
         _ = result.Should().BeEquivalentTo(_cliContext);
@@ -182,11 +193,14 @@ public class BaseCommandTests
             failingCardService,
             _domainServiceFactory,
             _keysetResolver,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<CliContext>.Instance
+            NullLogger<CliContext>.Instance
         );
 
         // Act & Assert
-        Action act = () => { _ = failingContext.RequireSecureChannel().GetAwaiter().GetResult(); };
+        Action act = () =>
+        {
+            _ = failingContext.RequireSecureChannel().GetAwaiter().GetResult();
+        };
         _ = act.Should().ThrowExactly<InvalidOperationException>();
     }
 
@@ -231,14 +245,17 @@ public class BaseCommandTests
     public async Task ExecuteAsync_WithException_ReturnsErrorCode()
     {
         // Act
-        int result = await _cliContext.ExecuteAsync((Func<ICliExecutionContext, int>)(ctx =>
-            {
-                throw new InvalidOperationException("Test exception");
-            }));
+        int result = await _cliContext.ExecuteAsync(
+            (Func<ICliExecutionContext, int>)(
+                ctx =>
+                {
+                    throw new InvalidOperationException("Test exception");
+                }
+            )
+        );
 
         // Assert
         _ = result.Should().Be(1);
         // Exception handling verified through result code
     }
-
 }

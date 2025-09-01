@@ -1,10 +1,9 @@
 using System;
-using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
-using Gp4Net.Domain.Modules;
+using Gp4Net.Services;
 using Gp4Net.Transport;
 using NUnit.Framework;
 
@@ -84,7 +83,7 @@ public class SelectCommandTests
     {
         byte[] aid = Convert.FromHexString("A000000151000000");
 
-        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid, SelectCommand.SelectMode.First);
+        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.ControlInfo.Should().Be(SelectCommand.FileControlInfo.ReturnFci);
@@ -95,18 +94,26 @@ public class SelectCommandTests
     {
         byte[] aid = Convert.FromHexString("A000000151000000");
 
-        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
+        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(
+            aid,
+            SelectCommand.SelectMode.Next
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         // GP Card Specification v2.3.1 Table 11-81: P2=0x02 for "Next occurrence"
-        _ = result.Value.ControlInfo.Should().Be((SelectCommand.FileControlInfo)SelectCommand.SelectMode.Next);
-        _ = ((byte)result.Value.ControlInfo).Should().Be(0x02, "GP Table 11-81: P2=0x02 for Next occurrence");
+        _ = result
+            .Value.ControlInfo.Should()
+            .Be((SelectCommand.FileControlInfo)SelectCommand.SelectMode.Next);
+        _ = ((byte)result.Value.ControlInfo)
+            .Should()
+            .Be(0x02, "GP Table 11-81: P2=0x02 for Next occurrence");
     }
 
     [Test]
     public void CreateForIssuerSecurityDomain_CreatesCorrectCommand()
     {
-        Result<SelectCommand, SmartCardError> result = SelectCommand.CreateForIssuerSecurityDomain();
+        Result<SelectCommand, SmartCardError> result =
+            SelectCommand.CreateForIssuerSecurityDomain();
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Aid.Should().BeEmpty();
@@ -132,7 +139,8 @@ public class SelectCommandTests
     [Test]
     public void ToApdu_WithEmptyAid_GeneratesCorrectApdu()
     {
-        Result<SelectCommand, SmartCardError> result = SelectCommand.CreateForIssuerSecurityDomain();
+        Result<SelectCommand, SmartCardError> result =
+            SelectCommand.CreateForIssuerSecurityDomain();
         SelectCommand? command = result.Value;
 
         byte[]? apdu = ApduBuilder.BuildApdu(command);
@@ -149,10 +157,7 @@ public class SelectCommandTests
 
         byte[]? apdu = ApduBuilder.BuildApdu(command);
 
-        byte[] expected = new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x08 }
-            .Concat(aid)
-            .Concat(new byte[] { 0x00 })
-            .ToArray();
+        byte[] expected = [0x00, 0xA4, 0x04, 0x00, 0x08, .. aid, .. new byte[] { 0x00 }];
         _ = apdu.Should().BeEquivalentTo(expected);
     }
 
@@ -160,15 +165,15 @@ public class SelectCommandTests
     public void ToApdu_WithNextMode_GeneratesCorrectApdu()
     {
         byte[] aid = Convert.FromHexString("A000000151000000");
-        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
+        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(
+            aid,
+            SelectCommand.SelectMode.Next
+        );
         SelectCommand? command = result.Value;
 
         byte[]? apdu = ApduBuilder.BuildApdu(command);
 
-        byte[] expected = new byte[] { 0x00, 0xA4, 0x04, 0x02, 0x08 }
-            .Concat(aid)
-            .Concat(new byte[] { 0x00 })
-            .ToArray();
+        byte[] expected = [0x00, 0xA4, 0x04, 0x02, 0x08, .. aid, .. new byte[] { 0x00 }];
         _ = apdu.Should().BeEquivalentTo(expected);
     }
 
@@ -234,7 +239,7 @@ public class SelectCommandTests
     [Test]
     public void CreateEmptySelect_IsObsolete_ButWorks()
     {
-        SelectCommand? command = CommandFactory.CreateSelectIsdCommand().Value;
+        SelectCommand? command = GlobalPlatformService.Commands.CreateSelectIsdCommand().Value;
 
         _ = command.Aid.Should().BeEmpty();
         _ = command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
@@ -244,7 +249,9 @@ public class SelectCommandTests
     [Test]
     public void CreateEmptySelect_WithCustomControlInfo_SetsCorrectValue()
     {
-        SelectCommand? command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp).Value;
+        SelectCommand? command = CommandFactory
+            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp)
+            .Value;
 
         _ = command.Aid.Should().BeEmpty();
         _ = command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
@@ -282,7 +289,9 @@ public class SelectCommandTests
     [Test]
     public void ExpectedResponseLength_WithNoResponseData_ReturnsNull()
     {
-        SelectCommand? command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.NoResponseData).Value;
+        SelectCommand? command = CommandFactory
+            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.NoResponseData)
+            .Value;
 
         _ = command.ExpectedResponseLength.HasNoValue.Should().BeTrue();
     }
@@ -290,7 +299,9 @@ public class SelectCommandTests
     [Test]
     public void ExpectedResponseLength_WithReturnFci_Returns256()
     {
-        SelectCommand? command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFci).Value;
+        SelectCommand? command = CommandFactory
+            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFci)
+            .Value;
 
         _ = command.ExpectedResponseLength.Should().Be(256);
     }
@@ -298,7 +309,9 @@ public class SelectCommandTests
     [Test]
     public void ExpectedResponseLength_WithReturnFcp_Returns256()
     {
-        SelectCommand? command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp).Value;
+        SelectCommand? command = CommandFactory
+            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp)
+            .Value;
 
         _ = command.ExpectedResponseLength.Should().Be(256);
     }
@@ -306,7 +319,9 @@ public class SelectCommandTests
     [Test]
     public void ExpectedResponseLength_WithReturnFmd_Returns256()
     {
-        SelectCommand? command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFmd).Value;
+        SelectCommand? command = CommandFactory
+            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFmd)
+            .Value;
 
         _ = command.ExpectedResponseLength.Should().Be(256);
     }
@@ -314,7 +329,9 @@ public class SelectCommandTests
     [Test]
     public void ToApdu_WithNoResponseData_GeneratesCorrectApdu()
     {
-        SelectCommand? command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.NoResponseData).Value;
+        SelectCommand? command = CommandFactory
+            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.NoResponseData)
+            .Value;
 
         byte[]? apdu = ApduBuilder.BuildApdu(command);
 
@@ -324,7 +341,9 @@ public class SelectCommandTests
     [Test]
     public void ToApdu_WithReturnFcp_GeneratesCorrectApdu()
     {
-        SelectCommand? command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp).Value;
+        SelectCommand? command = CommandFactory
+            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp)
+            .Value;
 
         byte[]? apdu = ApduBuilder.BuildApdu(command);
 
@@ -334,7 +353,9 @@ public class SelectCommandTests
     [Test]
     public void ToApdu_WithReturnFmd_GeneratesCorrectApdu()
     {
-        SelectCommand? command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFmd).Value;
+        SelectCommand? command = CommandFactory
+            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFmd)
+            .Value;
 
         byte[]? apdu = ApduBuilder.BuildApdu(command);
 
@@ -345,13 +366,17 @@ public class SelectCommandTests
     public void ToApdu_WithAidAndReturnFcp_GeneratesCorrectApdu()
     {
         byte[] aid = Convert.FromHexString("A000000151000000");
-        SelectCommand? command = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp).Value;
+        SelectCommand? command = CommandFactory
+            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp)
+            .Value;
         // Need to access through Create method since constructor is private
-        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid, SelectCommand.SelectMode.First);
+        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid);
         SelectCommand? createdCommand = result.Value;
 
         // Create manually with ReturnFcp since we can't easily combine Create with different FileControlInfo
-        SelectCommand? manualCommand = CommandFactory.CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp).Value;
+        SelectCommand? manualCommand = CommandFactory
+            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp)
+            .Value;
 
         byte[]? apdu = ApduBuilder.BuildApdu(manualCommand);
 
@@ -366,16 +391,23 @@ public class SelectCommandTests
             SelectCommand.FileControlInfo.ReturnFci,
             SelectCommand.FileControlInfo.ReturnFcp,
             SelectCommand.FileControlInfo.ReturnFmd,
-            SelectCommand.FileControlInfo.NoResponseData
+            SelectCommand.FileControlInfo.NoResponseData,
         ];
 
         foreach (SelectCommand.FileControlInfo option in options)
         {
-            SelectCommand? command = CommandFactory.CreateSelectIsdCommand(option).Value;
+            SelectCommand? command = GlobalPlatformService.Commands.CreateSelectIsdCommand(option).Value;
 
-            _ = command.ControlInfo.Should().Be(option, $"FileControlInfo {option} should be set correctly");
+            _ = command
+                .ControlInfo.Should()
+                .Be(option, $"FileControlInfo {option} should be set correctly");
             _ = command.Aid.Should().BeEmpty($"AID should be empty for {option}");
-            _ = command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName, $"Control should be SelectByName for {option}");
+            _ = command
+                .Control.Should()
+                .Be(
+                    SelectCommand.SelectionControl.SelectByName,
+                    $"Control should be SelectByName for {option}"
+                );
         }
     }
 
@@ -386,12 +418,12 @@ public class SelectCommandTests
     [Test]
     public void GP_Table_11_81_P2_Parameter_First_Occurrence_Should_Be_0x00()
     {
-        // GP Card Specification v2.3.1 Table 11-81: 
+        // GP Card Specification v2.3.1 Table 11-81:
         // b8 b7 b6 b5 b4 b3 b2 b1 | Meaning
         // 0  0  0  0  0  0  0  0  | First or only occurrence
 
         byte[] aid = Convert.FromHexString("A000000151000000");
-        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid, SelectCommand.SelectMode.First);
+        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.P2.Should().Be(0x00, "GP Table 11-81: First occurrence should be P2=0x00");
@@ -405,7 +437,10 @@ public class SelectCommandTests
         // 0  0  0  0  0  0  1  0  | Next occurrence
 
         byte[] aid = Convert.FromHexString("A000000151000000");
-        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
+        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(
+            aid,
+            SelectCommand.SelectMode.Next
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.P2.Should().Be(0x02, "GP Table 11-81: Next occurrence should be P2=0x02");
@@ -421,14 +456,21 @@ public class SelectCommandTests
         byte[] aid = Convert.FromHexString("A000000151000000");
 
         // Test both modes to ensure P1 is consistent
-        Result<SelectCommand, SmartCardError> firstResult = SelectCommand.Create(aid, SelectCommand.SelectMode.First);
-        Result<SelectCommand, SmartCardError> nextResult = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
+        Result<SelectCommand, SmartCardError> firstResult = SelectCommand.Create(aid);
+        Result<SelectCommand, SmartCardError> nextResult = SelectCommand.Create(
+            aid,
+            SelectCommand.SelectMode.Next
+        );
 
         _ = firstResult.IsSuccess.Should().BeTrue();
         _ = nextResult.IsSuccess.Should().BeTrue();
 
-        _ = firstResult.Value.P1.Should().Be(0x04, "GP Table 11-80: Select by name should be P1=0x04");
-        _ = nextResult.Value.P1.Should().Be(0x04, "GP Table 11-80: Select by name should be P1=0x04 regardless of mode");
+        _ = firstResult
+            .Value.P1.Should()
+            .Be(0x04, "GP Table 11-80: Select by name should be P1=0x04");
+        _ = nextResult
+            .Value.P1.Should()
+            .Be(0x04, "GP Table 11-80: Select by name should be P1=0x04 regardless of mode");
     }
 
     [Test]
@@ -438,23 +480,24 @@ public class SelectCommandTests
         // Expected APDU: CLA=0x00, INS=0xA4, P1=0x04, P2=0x00, Lc=8, Data=AID, Le=0x00
 
         byte[] aid = Convert.FromHexString("A000000151000000");
-        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid, SelectCommand.SelectMode.First);
+        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid);
         SelectCommand? command = result.Value;
 
         byte[]? apdu = ApduBuilder.BuildApdu(command);
 
-        byte[] expected = new byte[] {
-            0x00,  // CLA
-            0xA4,  // INS = SELECT
-            0x04,  // P1 = Select by name (GP Table 11-80)
-            0x00,  // P2 = First occurrence (GP Table 11-81)
-            0x08   // Lc = AID length
-        }
-        .Concat(aid)           // AID data
-        .Concat(new byte[] { 0x00 })  // Le
-        .ToArray();
+        byte[] expected =
+        [
+            0x00, // CLA
+            0xA4, // INS = SELECT
+            0x04, // P1 = Select by name (GP Table 11-80)
+            0x00, // P2 = First occurrence (GP Table 11-81)
+            0x08,
+            .. aid,
+            .. new byte[] { 0x00 }, // Lc = AID length
+        ];
 
-        _ = apdu.Should().BeEquivalentTo(expected, "APDU should match GP specification for first occurrence");
+        _ = apdu.Should()
+            .BeEquivalentTo(expected, "APDU should match GP specification for first occurrence");
     }
 
     [Test]
@@ -464,23 +507,27 @@ public class SelectCommandTests
         // Expected APDU: CLA=0x00, INS=0xA4, P1=0x04, P2=0x02, Lc=8, Data=AID, Le=0x00
 
         byte[] aid = Convert.FromHexString("A000000151000000");
-        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
+        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(
+            aid,
+            SelectCommand.SelectMode.Next
+        );
         SelectCommand? command = result.Value;
 
         byte[]? apdu = ApduBuilder.BuildApdu(command);
 
-        byte[] expected = new byte[] {
-            0x00,  // CLA
-            0xA4,  // INS = SELECT
-            0x04,  // P1 = Select by name (GP Table 11-80)
-            0x02,  // P2 = Next occurrence (GP Table 11-81)
-            0x08   // Lc = AID length
-        }
-        .Concat(aid)           // AID data
-        .Concat(new byte[] { 0x00 })  // Le
-        .ToArray();
+        byte[] expected =
+        [
+            0x00, // CLA
+            0xA4, // INS = SELECT
+            0x04, // P1 = Select by name (GP Table 11-80)
+            0x02, // P2 = Next occurrence (GP Table 11-81)
+            0x08,
+            .. aid,
+            .. new byte[] { 0x00 }, // Lc = AID length
+        ];
 
-        _ = apdu.Should().BeEquivalentTo(expected, "APDU should match GP specification for next occurrence");
+        _ = apdu.Should()
+            .BeEquivalentTo(expected, "APDU should match GP specification for next occurrence");
     }
 
     [Test]
@@ -489,18 +536,19 @@ public class SelectCommandTests
         // GP Card Specification v2.3.1: SELECT ISD with empty AID
         // Expected APDU: CLA=0x00, INS=0xA4, P1=0x04, P2=0x00 (no Lc/data, Le=0x00)
 
-        Result<SelectCommand, SmartCardError> result = SelectCommand.CreateForIssuerSecurityDomain();
+        Result<SelectCommand, SmartCardError> result =
+            SelectCommand.CreateForIssuerSecurityDomain();
         SelectCommand? command = result.Value;
 
         byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         byte[] expected =
         [
-            0x00,  // CLA
-            0xA4,  // INS = SELECT
-            0x04,  // P1 = Select by name (GP Table 11-80)
-            0x00,  // P2 = First occurrence (GP Table 11-81)
-            0x00   // Lc = 0 (empty AID for ISD)
+            0x00, // CLA
+            0xA4, // INS = SELECT
+            0x04, // P1 = Select by name (GP Table 11-80)
+            0x00, // P2 = First occurrence (GP Table 11-81)
+            0x00, // Lc = 0 (empty AID for ISD)
         ];
 
         _ = apdu.Should().BeEquivalentTo(expected, "ISD selection should match GP specification");
@@ -519,11 +567,18 @@ public class SelectCommandTests
 
         byte[] aid = Convert.FromHexString("A000000151000000");
 
-        Result<SelectCommand, SmartCardError> firstResult = SelectCommand.Create(aid, SelectCommand.SelectMode.First);
-        Result<SelectCommand, SmartCardError> nextResult = SelectCommand.Create(aid, SelectCommand.SelectMode.Next);
+        Result<SelectCommand, SmartCardError> firstResult = SelectCommand.Create(aid);
+        Result<SelectCommand, SmartCardError> nextResult = SelectCommand.Create(
+            aid,
+            SelectCommand.SelectMode.Next
+        );
 
-        _ = firstResult.Value.P2.Should().Be(0x00, "Fixed: First mode should be P2=0x00 per GP Table 11-81");
-        _ = nextResult.Value.P2.Should().Be(0x02, "Fixed: Next mode should be P2=0x02 per GP Table 11-81");
+        _ = firstResult
+            .Value.P2.Should()
+            .Be(0x00, "Fixed: First mode should be P2=0x00 per GP Table 11-81");
+        _ = nextResult
+            .Value.P2.Should()
+            .Be(0x02, "Fixed: Next mode should be P2=0x02 per GP Table 11-81");
 
         // The values should match SelectMode enum values directly, not from bitwise OR
         _ = firstResult.Value.P2.Should().Be((byte)SelectCommand.SelectMode.First);

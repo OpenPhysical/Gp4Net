@@ -210,7 +210,6 @@ public enum ScpImplementation : byte
     /// Card challenge derived using KDF instead of random
     /// </summary>
     Scp03I70 = 0x70,
-
 }
 
 /// <summary>
@@ -307,15 +306,19 @@ public static class Scp02ImplementationFeatures
         [
             impl.IsExplicitMode() ? "Explicit" : "Implicit",
             impl.UsesModifiedApdu() ? "Modified APDU" : "Unmodified APDU",
-            impl.Uses3Keys() ? "3 Keys" : "1 Base Key"
+            impl.Uses3Keys() ? "3 Keys" : "1 Base Key",
         ];
 
-        if (impl.HasIcvEncryption()) features.Add("ICV Encryption");
-        if (impl.HasRMacSupport()) features.Add("R-MAC");
-        if (impl.UsesWellKnownChallenge()) features.Add("Well-known Challenge");
-        if (impl.HasMacOverAid()) features.Add("MAC over AID");
+        if (impl.HasIcvEncryption())
+            features.Add("ICV Encryption");
+        if (impl.HasRMacSupport())
+            features.Add("R-MAC");
+        if (impl.UsesWellKnownChallenge())
+            features.Add("Well-known Challenge");
+        if (impl.HasMacOverAid())
+            features.Add("MAC over AID");
 
-        return $"i={((byte)impl):X2}: {string.Join(", ", features)}";
+        return $"i={(byte)impl:X2}: {string.Join(", ", features)}";
     }
 
     /// <summary>
@@ -333,7 +336,7 @@ public static class Scp02ImplementationFeatures
             ScpImplementation.Scp02I75 => "RENC",
             ScpImplementation.Scp02I1A => "IMPLICIT",
             ScpImplementation.Scp02I14 => "BASE_KEY",
-            _ => $"{((byte)impl):X2}"
+            _ => $"{(byte)impl:X2}",
         };
     }
 
@@ -354,7 +357,7 @@ public static class Scp02ImplementationFeatures
         {
             // Explicit SCP02 implementations from the enum
             0x00 => true, // Scp02I00
-            0x02 => true, // Scp02I02  
+            0x02 => true, // Scp02I02
             0x04 => true, // Scp02I04
             0x05 => true, // Scp02I05
             0x0A => true, // Scp02I0A
@@ -380,7 +383,7 @@ public static class Scp02ImplementationFeatures
             0x7A => true, // Scp02I7A
 
             // All other values are not SCP02 (including SCP03 and undefined values)
-            _ => false
+            _ => false,
         };
     }
 
@@ -410,8 +413,7 @@ public static class Scp02ImplementationFeatures
             0x20 => 192, // SCP03 AES-192
             0x30 => 256, // SCP03 AES-256
             0x70 => 128, // SCP03 pseudo-random uses AES-128
-            _ => 0       // Not an SCP03 implementation
+            _ => 0, // Not an SCP03 implementation
         };
     }
-
 }

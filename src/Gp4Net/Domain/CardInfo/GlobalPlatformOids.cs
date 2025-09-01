@@ -19,10 +19,7 @@ public static class GlobalPlatformOids
     /// Known GlobalPlatform OIDs and their descriptions.
     /// Based on GlobalPlatform specifications and common implementations.
     /// </summary>
-    private static readonly Dictionary<string, string> KnownOids = new Dictionary<
-        string,
-        string
-    >
+    private static readonly Dictionary<string, string> KnownOids = new Dictionary<string, string>
     {
         // GlobalPlatform main OIDs
         { "1.2.840.114283.1", "GlobalPlatform" },
@@ -53,7 +50,7 @@ public static class GlobalPlatformOids
         { "2.16.840.1.101.3.7.2.96.80", "PIV Card Application" },
         // ISO 7816 related
         { "1.0", "ISO Standard" },
-        { "2.5.29", "X.509 Certificate Extensions" }
+        { "2.5.29", "X.509 Certificate Extensions" },
     };
 
     /// <summary>

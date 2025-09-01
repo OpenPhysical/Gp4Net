@@ -12,13 +12,13 @@ public record CardContent(
     Maybe<ApplicationInfo> IssuerSecurityDomain,
     ImmutableList<ApplicationInfo> Applications,
     ImmutableList<ApplicationInfo> SecurityDomains,
-    ImmutableList<ExecutableLoadFile> ExecutableLoadFiles)
+    ImmutableList<ExecutableLoadFile> ExecutableLoadFiles
+)
 {
     /// <summary>
     /// Gets all applications and security domains combined.
     /// </summary>
-    public ImmutableList<ApplicationInfo> AllApplications =>
-        Applications.AddRange(SecurityDomains);
+    public ImmutableList<ApplicationInfo> AllApplications => Applications.AddRange(SecurityDomains);
 
     /// <summary>
     /// Gets all entities (ISD, apps, SSDs, load files) as a unified collection for display.
@@ -31,7 +31,8 @@ public record CardContent(
 
             // Add ISD first
             IssuerSecurityDomain.Execute(isd =>
-                entities.Add(new CardEntity.IssuerSecurityDomainEntity(isd)));
+                entities.Add(new CardEntity.IssuerSecurityDomainEntity(isd))
+            );
 
             // Add security domains
             foreach (ApplicationInfo ssd in SecurityDomains)
@@ -58,19 +59,21 @@ public record CardContent(
     /// <summary>
     /// Gets summary counts for each entity type.
     /// </summary>
-    public CardContentSummary Summary => new(
-        HasIsd: IssuerSecurityDomain.HasValue,
-        SecurityDomainCount: SecurityDomains.Count,
-        ApplicationCount: Applications.Count,
-        LoadFileCount: ExecutableLoadFiles.Count,
-        ModuleCount: ExecutableLoadFiles.Sum(lf => lf.ModuleCount));
+    public CardContentSummary Summary =>
+        new(
+            HasIsd: IssuerSecurityDomain.HasValue,
+            SecurityDomainCount: SecurityDomains.Count,
+            ApplicationCount: Applications.Count,
+            LoadFileCount: ExecutableLoadFiles.Count,
+            ModuleCount: ExecutableLoadFiles.Sum(lf => lf.ModuleCount)
+        );
 
     /// <summary>
     /// Gets applications by their type.
     /// </summary>
     public ImmutableList<ApplicationInfo> GetApplicationsByType(ApplicationType type)
     {
-        return AllApplications.Where(app => app.Type == type).ToImmutableList();
+        return [.. AllApplications.Where(app => app.Type == type)];
     }
 
     /// <summary>
@@ -78,7 +81,7 @@ public record CardContent(
     /// </summary>
     public ImmutableList<ApplicationInfo> GetApplicationsByState(LifecycleState state)
     {
-        return AllApplications.Where(app => app.LifecycleState == state).ToImmutableList();
+        return [.. AllApplications.Where(app => app.LifecycleState == state)];
     }
 
     /// <summary>
@@ -86,7 +89,7 @@ public record CardContent(
     /// </summary>
     public ImmutableList<ExecutableLoadFile> GetLoadFilesByState(LifecycleState state)
     {
-        return ExecutableLoadFiles.Where(lf => lf.LifecycleState == state).ToImmutableList();
+        return [.. ExecutableLoadFiles.Where(lf => lf.LifecycleState == state)];
     }
 
     /// <summary>
@@ -98,11 +101,13 @@ public record CardContent(
     /// <summary>
     /// Creates an empty CardContent instance.
     /// </summary>
-    public static CardContent Empty => new(
-        IssuerSecurityDomain: Maybe<ApplicationInfo>.None,
-        Applications: ImmutableList<ApplicationInfo>.Empty,
-        SecurityDomains: ImmutableList<ApplicationInfo>.Empty,
-        ExecutableLoadFiles: ImmutableList<ExecutableLoadFile>.Empty);
+    public static CardContent Empty =>
+        new(
+            IssuerSecurityDomain: Maybe<ApplicationInfo>.None,
+            Applications: ImmutableList<ApplicationInfo>.Empty,
+            SecurityDomains: ImmutableList<ApplicationInfo>.Empty,
+            ExecutableLoadFiles: ImmutableList<ExecutableLoadFile>.Empty
+        );
 }
 
 /// <summary>
@@ -113,7 +118,8 @@ public record CardContentSummary(
     int SecurityDomainCount,
     int ApplicationCount,
     int LoadFileCount,
-    int ModuleCount)
+    int ModuleCount
+)
 {
     /// <summary>
     /// Gets the total number of entities on the card.

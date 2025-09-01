@@ -14,17 +14,15 @@ public record ApplicationInfo(
     ApplicationType Type,
     Maybe<string> Version = default,
     Maybe<byte[]> AssociatedSecurityDomain = default,
-    Maybe<byte[]> ExecutableLoadFileAid = default)
+    Maybe<byte[]> ExecutableLoadFileAid = default
+)
 {
     /// <summary>
     /// Gets the application AID as a hexadecimal string.
     /// </summary>
     public string AidHex
     {
-        get
-        {
-            return Convert.ToHexString(Aid);
-        }
+        get { return Convert.ToHexString(Aid); }
     }
 
     /// <summary>
@@ -32,10 +30,7 @@ public record ApplicationInfo(
     /// </summary>
     public string LifecycleStateString
     {
-        get
-        {
-            return LifecycleState.ToString();
-        }
+        get { return LifecycleState.ToString(); }
     }
 
     /// <summary>
@@ -43,10 +38,7 @@ public record ApplicationInfo(
     /// </summary>
     public string TypeString
     {
-        get
-        {
-            return Type.ToString();
-        }
+        get { return Type.ToString(); }
     }
 
     /// <summary>
@@ -62,10 +54,7 @@ public record ApplicationInfo(
     /// </summary>
     public bool IsSelectable
     {
-        get
-        {
-            return LifecycleState == LifecycleState.Selectable;
-        }
+        get { return LifecycleState == LifecycleState.Selectable; }
     }
 
     /// <summary>
@@ -73,10 +62,7 @@ public record ApplicationInfo(
     /// </summary>
     public bool IsIssuerSecurityDomain
     {
-        get
-        {
-            return Type == ApplicationType.IssuerSecurityDomain;
-        }
+        get { return Type == ApplicationType.IssuerSecurityDomain; }
     }
 }
 
@@ -108,5 +94,5 @@ public enum ApplicationType : byte
     /// <summary>
     /// Executable load file.
     /// </summary>
-    ExecutableLoadFile = 0x02
+    ExecutableLoadFile = 0x02,
 }

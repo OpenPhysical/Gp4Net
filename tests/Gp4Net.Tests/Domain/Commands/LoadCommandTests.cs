@@ -16,13 +16,12 @@ namespace Gp4Net.Tests.Domain.Commands;
 [Category("Unit")]
 public class LoadCommandTests
 {
-
     [Test]
     public void Create_ValidParameters_CreatesInstance()
     {
         byte[] data = Convert.FromHexString("DEADBEEF");
 
-        Result<LoadCommand, SmartCardError> result = LoadCommand.Create((byte)0, data, false);
+        Result<LoadCommand, SmartCardError> result = LoadCommand.Create(0, data);
 
         _ = result.IsSuccess.Should().BeTrue();
         LoadCommand? command = result.Value;
@@ -39,7 +38,7 @@ public class LoadCommandTests
     {
         byte[] data = Convert.FromHexString("DEADBEEF");
 
-        Result<LoadCommand, SmartCardError> result = LoadCommand.Create((byte)1, data, true);
+        Result<LoadCommand, SmartCardError> result = LoadCommand.Create(1, data, true);
 
         _ = result.IsSuccess.Should().BeTrue();
         LoadCommand? command = result.Value;
@@ -50,7 +49,7 @@ public class LoadCommandTests
     [Test]
     public void Create_NullData_ReturnsFailure()
     {
-        Result<LoadCommand, SmartCardError> result = LoadCommand.Create((byte)0, data: null!, false);
+        Result<LoadCommand, SmartCardError> result = LoadCommand.Create(0, data: null!);
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
@@ -61,7 +60,7 @@ public class LoadCommandTests
     [Test]
     public void Create_EmptyData_ReturnsFailure()
     {
-        Result<LoadCommand, SmartCardError> result = LoadCommand.Create((byte)0, [], false);
+        Result<LoadCommand, SmartCardError> result = LoadCommand.Create(0, []);
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
@@ -74,7 +73,7 @@ public class LoadCommandTests
     {
         byte[] data = Convert.FromHexString("DEADBEEF");
 
-        Result<LoadCommand, SmartCardError> result = LoadCommand.Create((byte)0, data, false);
+        Result<LoadCommand, SmartCardError> result = LoadCommand.Create(0, data);
 
         _ = result.IsSuccess.Should().BeTrue();
         LoadCommand? command = result.Value;
@@ -86,7 +85,7 @@ public class LoadCommandTests
     {
         byte[] data = Convert.FromHexString("DEADBEEF");
 
-        Result<LoadCommand, SmartCardError> result = LoadCommand.Create((byte)1, data, false);
+        Result<LoadCommand, SmartCardError> result = LoadCommand.Create(1, data);
 
         _ = result.IsSuccess.Should().BeTrue();
         LoadCommand? command = result.Value;
@@ -98,7 +97,10 @@ public class LoadCommandTests
     {
         byte[] capData = Convert.FromHexString("DEADBEEFCAFEBABE");
 
-        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(capData, 255);
+        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(
+            capData,
+            255
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         IList<LoadCommand>? commands = result.Value;
@@ -119,7 +121,10 @@ public class LoadCommandTests
             capData[i] = (byte)(i % 256);
         }
 
-        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(capData, 200);
+        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(
+            capData,
+            200
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         IList<LoadCommand>? commands = result.Value;
@@ -154,7 +159,10 @@ public class LoadCommandTests
         byte[] capData = new byte[100];
         int maxBlockSize = 30;
 
-        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(capData, maxBlockSize);
+        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(
+            capData,
+            maxBlockSize
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         IList<LoadCommand>? commands = result.Value;
@@ -173,11 +181,14 @@ public class LoadCommandTests
             capData[i] = (byte)(i % 256);
         }
 
-        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(capData, 50);
+        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(
+            capData,
+            50
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         IList<LoadCommand>? commands = result.Value;
-        byte[] reconstructed = commands.SelectMany(c => c.Data).ToArray();
+        byte[] reconstructed = [.. commands.SelectMany(c => c.Data)];
         _ = reconstructed.Should().BeEquivalentTo(capData);
     }
 
@@ -209,8 +220,14 @@ public class LoadCommandTests
     {
         byte[] capData = Convert.FromHexString("DEADBEEF");
 
-        Result<IList<LoadCommand>, SmartCardError> result1 = LoadCommand.CreateFromCapFile(capData, 0);
-        Result<IList<LoadCommand>, SmartCardError> result2 = LoadCommand.CreateFromCapFile(capData, 256);
+        Result<IList<LoadCommand>, SmartCardError> result1 = LoadCommand.CreateFromCapFile(
+            capData,
+            0
+        );
+        Result<IList<LoadCommand>, SmartCardError> result2 = LoadCommand.CreateFromCapFile(
+            capData,
+            256
+        );
 
         _ = result1.IsFailure.Should().BeTrue();
         _ = result1.Error.Should().BeOfType<SmartCardError>();
@@ -222,7 +239,7 @@ public class LoadCommandTests
     public void ToApdu_FirstBlock_IncludesTlvHeader()
     {
         byte[] data = Convert.FromHexString("DEADBEEF");
-        Result<LoadCommand, SmartCardError> result = LoadCommand.Create((byte)0, data, false);
+        Result<LoadCommand, SmartCardError> result = LoadCommand.Create(0, data);
         LoadCommand? command = result.Value;
 
         byte[]? apdu = command.ToApdu();
@@ -233,7 +250,7 @@ public class LoadCommandTests
         _ = apdu[3].Should().Be(0x00); // P2 (block number)
 
         // Data should include C4 tag and length
-        byte[] dataField = apdu.Skip(5).Take(apdu[4]).ToArray();
+        byte[] dataField = [.. apdu.Skip(5).Take(apdu[4])];
         _ = dataField[0].Should().Be(0xC4); // TLV tag
         _ = dataField[1].Should().Be(4); // Total length (actual data length)
         _ = dataField.Skip(2).ToArray().Should().BeEquivalentTo(data); // Actual data
@@ -243,7 +260,7 @@ public class LoadCommandTests
     public void ToApdu_ContinuationBlock_DoesNotIncludeTlvHeader()
     {
         byte[] data = Convert.FromHexString("DEADBEEF");
-        Result<LoadCommand, SmartCardError> result = LoadCommand.Create((byte)1, data, false);
+        Result<LoadCommand, SmartCardError> result = LoadCommand.Create(1, data);
         LoadCommand? command = result.Value;
 
         byte[]? apdu = command.ToApdu();
@@ -252,7 +269,7 @@ public class LoadCommandTests
         _ = apdu[3].Should().Be(0x01); // P2 (block number)
 
         // Data should be raw data without TLV header
-        byte[] dataField = apdu.Skip(5).Take(apdu[4]).ToArray();
+        byte[] dataField = [.. apdu.Skip(5).Take(apdu[4])];
         _ = dataField.Should().BeEquivalentTo(data);
     }
 
@@ -260,7 +277,7 @@ public class LoadCommandTests
     public void ToApdu_FinalBlock_SetsFinalP1()
     {
         byte[] data = Convert.FromHexString("DEADBEEF");
-        Result<LoadCommand, SmartCardError> result = LoadCommand.Create((byte)2, data, true);
+        Result<LoadCommand, SmartCardError> result = LoadCommand.Create(2, data, true);
         LoadCommand? command = result.Value;
 
         byte[]? apdu = command.ToApdu();
@@ -278,13 +295,16 @@ public class LoadCommandTests
         {
             largeCapData[i] = (byte)(i % 256);
         }
-        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(largeCapData, 50);
+        Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(
+            largeCapData,
+            50
+        );
         IList<LoadCommand>? commands = result.Value;
         LoadCommand firstCommand = commands[0]; // First block will have the TLV header
 
         byte[]? apdu = firstCommand.ToApdu();
 
-        byte[] dataField = apdu.Skip(5).Take(apdu[4]).ToArray();
+        byte[] dataField = [.. apdu.Skip(5).Take(apdu[4])];
         _ = dataField[0].Should().Be(0xC4); // TLV tag
         _ = dataField[1].Should().Be(0x82); // Length form (2 bytes follow)
         _ = dataField[2].Should().Be(0x12); // Length high byte
@@ -295,7 +315,7 @@ public class LoadCommandTests
     public void ToApdu_IncludesLeField()
     {
         byte[] data = Convert.FromHexString("DEADBEEF");
-        Result<LoadCommand, SmartCardError> result = LoadCommand.Create((byte)0, data, false);
+        Result<LoadCommand, SmartCardError> result = LoadCommand.Create(0, data);
         LoadCommand? command = result.Value;
 
         byte[]? apdu = command.ToApdu();
@@ -365,7 +385,7 @@ public class LoadCommandTests
     public void ToString_ReturnsLoad()
     {
         byte[] data = Convert.FromHexString("DEADBEEF");
-        Result<LoadCommand, SmartCardError> result = LoadCommand.Create((byte)0, data, false);
+        Result<LoadCommand, SmartCardError> result = LoadCommand.Create(0, data);
         LoadCommand? command = result.Value;
 
         string? str = command.ToString();
@@ -439,5 +459,4 @@ public class LoadCommandTests
         // Assert
         _ = description.Should().Be("Success");
     }
-
 }

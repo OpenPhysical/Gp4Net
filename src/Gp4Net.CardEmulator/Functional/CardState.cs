@@ -1,10 +1,11 @@
+using System;
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
+using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Security;
-using Gp4Net.CardEmulator.Core;
+using Gp4Net.Domain.Protocol;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Functional;
@@ -15,11 +16,11 @@ namespace Gp4Net.CardEmulator.Functional;
 /// Uses functional programming patterns with Maybe and immutable secure channel state.
 /// </summary>
 [PublicAPI]
-public record CardState(
+public partial record CardState(
     CardUuid Uuid,
     bool IsSelected,
     byte ScpVersion,
-    Domain.Protocol.ScpImplementation ScpImplementation,
+    ScpImplementation ScpImplementation,
     Maybe<SecureChannelState> SecureChannel,
     Maybe<IKeySet> CurrentKeys,
     Maybe<byte[]> HostChallenge,
@@ -37,17 +38,18 @@ public record CardState(
     /// Creates the initial state for a new card.
     /// Per GP Card Spec v2.3.1 Section 6.4.1: "The Issuer Security Domain is by default the implicitly selectable Application
     /// on all logical channels of all card I/O interfaces supported by the card"
-    /// Per GP Card Spec v2.3.1 Section 6.4.2.1.1: "Once the card session has been established... the Application defined 
+    /// Per GP Card Spec v2.3.1 Section 6.4.2.1.1: "Once the card session has been established... the Application defined
     /// as implicitly selectable on the Basic Logical Channel... shall become the selected Application on the Basic Logical Channel"
     /// </summary>
     public static Result<CardState, SmartCardError> Create()
     {
-        return CardUuid.Generate()
+        return CardUuid
+            .Generate()
             .Map(uuid => new CardState(
                 Uuid: uuid,
                 IsSelected: true, // ISD is implicitly selected by default per GP Card Spec v2.3.1
                 ScpVersion: 0x02,
-                ScpImplementation: Domain.Protocol.ScpImplementation.Scp02I15,
+                ScpImplementation: ScpImplementation.Scp02I15,
                 SecureChannel: Maybe<SecureChannelState>.None,
                 CurrentKeys: Maybe<IKeySet>.None,
                 HostChallenge: Maybe<byte[]>.None,
@@ -69,11 +71,12 @@ public record CardState(
     /// <returns>Initial card state with the specified UUID.</returns>
     public static CardState CreateWithUuid(CardUuid uuid)
     {
+        // @TODO can't we just call the regular creation and use a "with"?
         return new CardState(
             Uuid: uuid,
             IsSelected: true,
             ScpVersion: 0x02,
-            ScpImplementation: Domain.Protocol.ScpImplementation.Scp02I15,
+            ScpImplementation: ScpImplementation.Scp02I15,
             SecureChannel: Maybe<SecureChannelState>.None,
             CurrentKeys: Maybe<IKeySet>.None,
             HostChallenge: Maybe<byte[]>.None,
@@ -93,10 +96,7 @@ public record CardState(
     /// </summary>
     public bool IsSecureChannelEstablished
     {
-        get
-        {
-            return SecureChannel.HasValue;
-        }
+        get { return SecureChannel.HasValue; }
     }
 
     /// <summary>
@@ -115,21 +115,21 @@ public record CardState(
     /// </summary>
     public Maybe<SessionKeys> SessionKeys
     {
-        get
-        {
-            return SecureChannel.Map(sc => sc.SessionKeys);
-        }
+        get { return SecureChannel.Map(sc => sc.SessionKeys); }
     }
+
+    /// <summary>
+    /// Gets the current session keys for compatibility with pipeline integration.
+    /// This is an alias for SessionKeys to match test expectations.
+    /// </summary>
+    public Maybe<SessionKeys> CurrentSessionKeys => SessionKeys;
 
     /// <summary>
     /// Gets the MAC chaining value if a secure channel is established.
     /// </summary>
     public Maybe<ImmutableArray<byte>> MacChainingValue
     {
-        get
-        {
-            return SecureChannel.Map(sc => sc.MacChaining.Value);
-        }
+        get { return SecureChannel.Map(sc => sc.MacChaining.Value); }
     }
 
     /// <summary>
@@ -137,10 +137,7 @@ public record CardState(
     /// </summary>
     public Maybe<uint> EncryptionCounter
     {
-        get
-        {
-            return SecureChannel.Map(sc => sc.EncryptionCounter);
-        }
+        get { return SecureChannel.Map(sc => sc.EncryptionCounter); }
     }
 
     /// <summary>
@@ -152,86 +149,134 @@ public record CardState(
     /// Creates a new state with secure channel established using functional SecureChannelState.
     /// </summary>
     public CardState WithSecureChannel(SecureChannelState secureChannelState) =>
-        this with { SecureChannel = Maybe<SecureChannelState>.From(secureChannelState) };
+        this with
+        {
+            SecureChannel = Maybe<SecureChannelState>.From(secureChannelState),
+        };
 
     /// <summary>
     /// Creates a new state with secure channel cleared.
     /// </summary>
     public CardState WithoutSecureChannel() =>
-        this with { SecureChannel = Maybe<SecureChannelState>.None };
+        this with
+        {
+            SecureChannel = Maybe<SecureChannelState>.None,
+        };
 
     /// <summary>
     /// Creates a new state with updated secure channel state.
     /// This is used when the secure channel state changes (e.g., counter increments).
     /// </summary>
     public CardState WithUpdatedSecureChannel(SecureChannelState newSecureChannelState) =>
-        this with { SecureChannel = Maybe<SecureChannelState>.From(newSecureChannelState) };
+        this with
+        {
+            SecureChannel = Maybe<SecureChannelState>.From(newSecureChannelState),
+        };
+
+    /// <summary>
+    /// Creates a new state with session keys stored directly in secure channel state.
+    /// This method updates the existing secure channel state to include the provided session keys.
+    /// </summary>
+    public CardState WithSessionKeys(SessionKeys sessionKeys)
+    {
+        return SecureChannel.Match(
+            secureChannelState =>
+            {
+                // Update existing secure channel state with new session keys
+                SecureChannelState updatedState = secureChannelState with
+                {
+                    SessionKeys = sessionKeys,
+                };
+                return this with { SecureChannel = Maybe<SecureChannelState>.From(updatedState) };
+            },
+            () =>
+            {
+                // No secure channel state exists - this would be an invalid state
+                // Return unchanged state - session keys should only be set after secure channel establishment
+                return this;
+            }
+        );
+    }
+
+    /// <summary>
+    /// Creates a new state with session keys cleared by clearing the entire secure channel state.
+    /// This is equivalent to clearing the secure channel since session keys are part of secure channel state.
+    /// </summary>
+    public CardState ClearSessionKeys() => WithoutSecureChannel();
 
     /// <summary>
     /// Creates a new state with updated challenges.
     /// </summary>
-    public CardState WithChallenges(Maybe<byte[]> hostChallenge, Maybe<byte[]> cardChallenge) => this with
-    {
-        HostChallenge = hostChallenge,
-        CardChallenge = cardChallenge
-    };
+    public CardState WithChallenges(Maybe<byte[]> hostChallenge, Maybe<byte[]> cardChallenge) =>
+        this with
+        {
+            HostChallenge = hostChallenge,
+            CardChallenge = cardChallenge,
+        };
 
     /// <summary>
     /// Creates a new state with a different UUID. Used for card reset operations.
     /// </summary>
     public CardState WithUuid(CardUuid newUuid) => this with { Uuid = newUuid };
 
-
     /// <summary>
     /// Creates a new state with updated current keys.
     /// </summary>
-    public CardState WithKeys(IKeySet keys) => this with { CurrentKeys = Maybe<IKeySet>.From(keys) };
+    public CardState WithKeys(IKeySet keys) =>
+        this with
+        {
+            CurrentKeys = Maybe<IKeySet>.From(keys),
+        };
 
     /// <summary>
     /// Creates a new state with current keys cleared.
     /// </summary>
     public CardState WithoutKeys() => this with { CurrentKeys = Maybe<IKeySet>.None };
 
-
     /// <summary>
     /// Creates a new state with an added data object.
     /// </summary>
-    public CardState WithDataObject(ushort tag, byte[] data) => this with
-    {
-        DataObjects = DataObjects.SetItem(tag, data)
-    };
+    public CardState WithDataObject(ushort tag, byte[] data) =>
+        this with
+        {
+            DataObjects = DataObjects.SetItem(tag, data),
+        };
 
     /// <summary>
     /// Creates a new state with an installed application.
     /// </summary>
-    public CardState WithApplication(string aid, InstalledApplication application) => this with
-    {
-        Applications = Applications.SetItem(aid, application)
-    };
+    public CardState WithApplication(string aid, InstalledApplication application) =>
+        this with
+        {
+            Applications = Applications.SetItem(aid, application),
+        };
 
     /// <summary>
     /// Creates a new state with a loaded file.
     /// </summary>
-    public CardState WithLoadFile(LoadFile loadFile) => this with
-    {
-        LoadFiles = LoadFiles.Add(loadFile)
-    };
+    public CardState WithLoadFile(LoadFile loadFile) =>
+        this with
+        {
+            LoadFiles = LoadFiles.Add(loadFile),
+        };
 
     /// <summary>
     /// Creates a new state with an installed key set.
     /// </summary>
-    public CardState WithInstalledKey(byte keyVersion, IKeySet keySet) => this with
-    {
-        InstalledKeys = InstalledKeys.SetItem(keyVersion, keySet)
-    };
+    public CardState WithInstalledKey(byte keyVersion, IKeySet keySet) =>
+        this with
+        {
+            InstalledKeys = InstalledKeys.SetItem(keyVersion, keySet),
+        };
 
     /// <summary>
     /// Creates a new state with updated default key version.
     /// </summary>
-    public CardState WithDefaultKeyVersion(byte keyVersion) => this with
-    {
-        DefaultKeyVersion = keyVersion
-    };
+    public CardState WithDefaultKeyVersion(byte keyVersion) =>
+        this with
+        {
+            DefaultKeyVersion = keyVersion,
+        };
 
     /// <summary>
     /// Gets the sequence counter for a specific key version.
@@ -239,11 +284,11 @@ public record CardState(
     /// </summary>
     public byte[] GetSequenceCounter(byte keyVersion)
     {
-        if (SequenceCounters.TryGetValue(keyVersion, out byte[] counter))
+        if (SequenceCounters.TryGetValue(keyVersion, out byte[]? counter) && counter is not null)
             return counter;
-        
+
         // Return appropriate default counter based on SCP version
-        return ScpVersion == 0x02 
+        return ScpVersion == 0x02
             ? [0x00, 0x01] // 2-byte counter for SCP02
             : [0x00, 0x00, 0x01]; // 3-byte counter for SCP03
     }
@@ -265,9 +310,10 @@ public record CardState(
     public CardState WithResetSequenceCounter(byte keyVersion)
     {
         // Return appropriate reset counter based on SCP version
-        byte[] resetCounter = ScpVersion == 0x02 
-            ? [0x00, 0x01] // 2-byte counter for SCP02
-            : [0x00, 0x00, 0x01]; // 3-byte counter for SCP03
+        byte[] resetCounter =
+            ScpVersion == 0x02
+                ? [0x00, 0x01] // 2-byte counter for SCP02
+                : [0x00, 0x00, 0x01]; // 3-byte counter for SCP03
         return this with { SequenceCounters = SequenceCounters.SetItem(keyVersion, resetCounter) };
     }
 
@@ -278,7 +324,7 @@ public record CardState(
     private static byte[] IncrementCounter(byte[] counter)
     {
         byte[] newCounter = new byte[counter.Length];
-        System.Array.Copy(counter, newCounter, counter.Length);
+        Array.Copy(counter, newCounter, counter.Length);
 
         switch (counter.Length)
         {
@@ -286,7 +332,7 @@ public record CardState(
             case 2:
             {
                 // 2-byte counter for SCP02
-                int value = (newCounter[0] << 8) | newCounter[1];
+                int value = newCounter[0] << 8 | newCounter[1];
                 value++;
                 newCounter[0] = (byte)(value >> 8);
                 newCounter[1] = (byte)value;
@@ -295,7 +341,7 @@ public record CardState(
             case 3:
             {
                 // 3-byte counter for SCP03
-                int value = (newCounter[0] << 16) | (newCounter[1] << 8) | newCounter[2];
+                int value = newCounter[0] << 16 | newCounter[1] << 8 | newCounter[2];
                 value++;
                 newCounter[0] = (byte)(value >> 16);
                 newCounter[1] = (byte)(value >> 8);
@@ -303,44 +349,49 @@ public record CardState(
                 break;
             }
         }
-            
+
         return newCounter;
     }
 
     /// <summary>
     /// Creates a new state with updated application selection context.
     /// </summary>
-    public CardState WithApplicationContext(ApplicationSelectionContext newContext) => this with
-    {
-        ApplicationContext = newContext
-    };
+    public CardState WithApplicationContext(ApplicationSelectionContext newContext) =>
+        this with
+        {
+            ApplicationContext = newContext,
+        };
 
     /// <summary>
     /// Selects an application by AID and returns updated card state.
     /// </summary>
-    public Result<CardState, Gp4Net.Core.SmartCardError> SelectApplication(ImmutableArray<byte> aid)
+    public Result<CardState, SmartCardError> SelectApplication(ImmutableArray<byte> aid)
     {
-        return ApplicationContext.SelectApplication(aid)
+        return ApplicationContext
+            .SelectApplication(aid)
             .Map(newContext => WithApplicationContext(newContext));
     }
 
     /// <summary>
     /// Installs a new application and returns updated card state.
     /// </summary>
-    public Result<CardState, Gp4Net.Core.SmartCardError> InstallApplication(
-        ImmutableArray<byte> aid, 
+    public Result<CardState, SmartCardError> InstallApplication(
+        ImmutableArray<byte> aid,
         string name,
         ImmutableArray<byte> associatedSecurityDomainAid,
-        ApplicationPrivileges privileges = ApplicationPrivileges.None)
+        ApplicationPrivileges privileges = ApplicationPrivileges.None
+    )
     {
-        return ApplicationContext.InstallApplication(aid, name, associatedSecurityDomainAid, privileges)
+        return ApplicationContext
+            .InstallApplication(aid, name, associatedSecurityDomainAid, privileges)
             .Map(newContext => WithApplicationContext(newContext));
     }
 
     /// <summary>
     /// Gets the currently selected application.
     /// </summary>
-    public Maybe<VirtualApplication> CurrentlySelectedApplication => ApplicationContext.SelectedApplication;
+    public Maybe<VirtualApplication> CurrentlySelectedApplication =>
+        ApplicationContext.SelectedApplication;
 
     /// <summary>
     /// Checks if the current application has specific privileges.
@@ -355,17 +406,40 @@ public record CardState(
     /// Per GP Card Spec v2.3.1 Section 6.4.2.1.1: After card reset, ISD becomes implicitly selected.
     /// Preserves installed applications, keys, and sequence counters but clears secure channel state.
     /// </summary>
-    public CardState Reset() => CreateWithUuid(Uuid) with
+    public CardState Reset() =>
+        CreateWithUuid(Uuid) with
+        {
+            ScpVersion = ScpVersion,
+            ScpImplementation = ScpImplementation,
+            DataObjects = DataObjects,
+            InstalledKeys = InstalledKeys,
+            DefaultKeyVersion = DefaultKeyVersion,
+            SequenceCounters = SequenceCounters, // Preserve sequence counters across resets
+            ApplicationContext = ApplicationSelectionContext.WithIsd(), // Reset to ISD as implicitly selected
+            IsSelected = true, // ISD is implicitly selected after reset per GP Card Spec v2.3.1
+        };
+
+    /// <summary>
+    /// Updates the MAC chaining value for SCP03.
+    /// Creates a new CardState with updated MAC chaining value in the secure channel.
+    /// </summary>
+    /// <param name="macChaining">The new MAC chaining value.</param>
+    /// <returns>A new CardState with updated MAC chaining.</returns>
+    public CardState WithMacChaining(byte[] macChaining)
     {
-        ScpVersion = ScpVersion,
-        ScpImplementation = ScpImplementation,
-        DataObjects = DataObjects,
-        InstalledKeys = InstalledKeys,
-        DefaultKeyVersion = DefaultKeyVersion,
-        SequenceCounters = SequenceCounters, // Preserve sequence counters across resets
-        ApplicationContext = ApplicationSelectionContext.WithIsd(), // Reset to ISD as implicitly selected
-        IsSelected = true // ISD is implicitly selected after reset per GP Card Spec v2.3.1
-    };
+        return this with
+        {
+            SecureChannel = SecureChannel.Map(sc =>
+            {
+                Result<MacChainingState, SmartCardError> macChainingResult =
+                    MacChainingState.Create(macChaining, sc.ProtocolVersion, 0x00);
+                return macChainingResult.Match(
+                    macChain => sc with { MacChaining = macChain },
+                    _ => sc
+                );
+            }),
+        };
+    }
 }
 
 /// <summary>
@@ -374,7 +448,7 @@ public record CardState(
 public record InstalledApplication(
     byte[] Aid,
     byte[] ExecutableModuleAid,
-    byte LifeCycleState,
+    byte LifecycleState,
     byte Privileges,
     ImmutableDictionary<string, byte[]> ApplicationData
 );
@@ -384,15 +458,12 @@ public record InstalledApplication(
 /// </summary>
 public record LoadFile(
     byte[] Aid,
-    byte[] SecurityDomainAid,
-    byte LifeCycleState,
-    ImmutableList<ExecutableModule> Modules
+    byte[] AssociatedSecurityDomainAid,
+    byte LifecycleState,
+    ImmutableList<ExecutableModule> ExecutableModules
 );
 
 /// <summary>
 /// Represents an executable module within a load file.
 /// </summary>
-public record ExecutableModule(
-    byte[] Aid,
-    byte LifeCycleState
-);
+public record ExecutableModule(byte[] Aid, byte LifecycleState);

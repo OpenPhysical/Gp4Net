@@ -21,7 +21,9 @@ public static class CapInstallationTraceLoader
     /// </summary>
     /// <param name="jsonFilePath">Path to the JSON trace file.</param>
     /// <returns>Result containing parsed installation trace data.</returns>
-    public static Result<CapInstallationTrace, SmartCardError> LoadInstallationTrace(string jsonFilePath)
+    public static Result<CapInstallationTrace, SmartCardError> LoadInstallationTrace(
+        string jsonFilePath
+    )
     {
         return ValidateFilePath(jsonFilePath)
             .Bind(ReadJsonContent)
@@ -36,21 +38,27 @@ public static class CapInstallationTraceLoader
     /// <param name="traceData">Complete trace data.</param>
     /// <returns>Result containing installation command sequence.</returns>
     public static Result<InstallationCommandSequence, SmartCardError> ExtractCommandSequence(
-        CapInstallationTrace traceData)
+        CapInstallationTrace traceData
+    )
     {
         return ExtractSelectCommand(traceData.Exchanges)
-            .Bind(select => ExtractSecureChannelCommands(traceData.Exchanges)
-                .Map(scp => (select, scp)))
-            .Bind(cmds => ExtractInstallCommands(traceData.Exchanges)
-                .Map(install => (cmds.select, cmds.scp, install)))
-            .Bind(cmds => ExtractLoadCommands(traceData.Exchanges)
-                .Map(load => new InstallationCommandSequence(
-                    cmds.select,
-                    cmds.scp,
-                    cmds.install,
-                    load,
-                    Maybe<TraceExchange>.None // Final install command may be missing
-                )));
+            .Bind(select =>
+                ExtractSecureChannelCommands(traceData.Exchanges).Map(scp => (select, scp))
+            )
+            .Bind(cmds =>
+                ExtractInstallCommands(traceData.Exchanges)
+                    .Map(install => (cmds.select, cmds.scp, install))
+            )
+            .Bind(cmds =>
+                ExtractLoadCommands(traceData.Exchanges)
+                    .Map(load => new InstallationCommandSequence(
+                        cmds.select,
+                        cmds.scp,
+                        cmds.install,
+                        load,
+                        Maybe<TraceExchange>.None // Final install command may be missing
+                    ))
+            );
     }
 
     // Private implementation methods
@@ -68,29 +76,39 @@ public static class CapInstallationTraceLoader
 
     private static Result<string, SmartCardError> ReadJsonContent(string filePath)
     {
-        return Result.Try(() =>
-        {
-            string content = File.ReadAllText(filePath);
-            return string.IsNullOrWhiteSpace(content)
-                ? Result.Failure<string, SmartCardError>(SmartCardError.InvalidData("Trace file is empty"))
-                : Result.Success<string, SmartCardError>(content);
-        }, ex => SmartCardError.UnexpectedError($"Failed to read trace file: {ex.Message}"))
+        return Result
+            .Try(
+                () =>
+                {
+                    string content = File.ReadAllText(filePath);
+                    return string.IsNullOrWhiteSpace(content)
+                        ? Result.Failure<string, SmartCardError>(
+                            SmartCardError.InvalidData("Trace file is empty")
+                        )
+                        : Result.Success<string, SmartCardError>(content);
+                },
+                ex => SmartCardError.UnexpectedError($"Failed to read trace file: {ex.Message}")
+            )
             .Bind(result => result);
     }
 
     private static Result<JsonElement, SmartCardError> ParseJsonStructure(string jsonContent)
     {
-        return Result.Try(() => JsonDocument.Parse(jsonContent).RootElement,
-            ex => ex is JsonException
-                ? SmartCardError.InvalidData($"Invalid JSON format: {ex.Message}")
-                : SmartCardError.UnexpectedError($"Failed to parse JSON: {ex.Message}"));
+        return Result.Try(
+            () => JsonDocument.Parse(jsonContent).RootElement,
+            ex =>
+                ex is JsonException
+                    ? SmartCardError.InvalidData($"Invalid JSON format: {ex.Message}")
+                    : SmartCardError.UnexpectedError($"Failed to parse JSON: {ex.Message}")
+        );
     }
 
     private static Result<TraceJsonData, SmartCardError> ExtractInstallationData(JsonElement root)
     {
         return ExtractMetadata(root)
-            .Bind(metadata => ExtractExchanges(root)
-                .Map(exchanges => new TraceJsonData(metadata, exchanges)));
+            .Bind(metadata =>
+                ExtractExchanges(root).Map(exchanges => new TraceJsonData(metadata, exchanges))
+            );
     }
 
     private static Result<TraceMetadata, SmartCardError> ExtractMetadata(JsonElement root)
@@ -98,13 +116,15 @@ public static class CapInstallationTraceLoader
         if (!root.TryGetProperty("metadata", out JsonElement metadataElement))
         {
             return Result.Failure<TraceMetadata, SmartCardError>(
-                SmartCardError.InvalidData("Missing metadata section in trace"));
+                SmartCardError.InvalidData("Missing metadata section in trace")
+            );
         }
 
         if (!metadataElement.TryGetProperty("card", out JsonElement cardElement))
         {
             return Result.Failure<TraceMetadata, SmartCardError>(
-                SmartCardError.InvalidData("Missing card metadata in trace"));
+                SmartCardError.InvalidData("Missing card metadata in trace")
+            );
         }
 
         string atr = cardElement.TryGetProperty("atr", out JsonElement atrElement)
@@ -120,61 +140,96 @@ public static class CapInstallationTraceLoader
             : "UNKNOWN";
 
         return Result.Success<TraceMetadata, SmartCardError>(
-            new TraceMetadata(atr, isdAid, cardType));
+            new TraceMetadata(atr, isdAid, cardType)
+        );
     }
 
-    private static Result<ImmutableArray<TraceExchange>, SmartCardError> ExtractExchanges(JsonElement root)
+    private static Result<ImmutableArray<TraceExchange>, SmartCardError> ExtractExchanges(
+        JsonElement root
+    )
     {
         if (!root.TryGetProperty("exchanges", out JsonElement exchangesElement))
         {
             return Result.Failure<ImmutableArray<TraceExchange>, SmartCardError>(
-                SmartCardError.InvalidData("Missing exchanges section in trace"));
+                SmartCardError.InvalidData("Missing exchanges section in trace")
+            );
         }
 
-        ImmutableArray<TraceExchange>.Builder exchanges = ImmutableArray.CreateBuilder<TraceExchange>();
+        ImmutableArray<TraceExchange>.Builder exchanges =
+            ImmutableArray.CreateBuilder<TraceExchange>();
 
-        return exchangesElement.EnumerateArray()
+        return exchangesElement
+            .EnumerateArray()
             .Select(ParseExchange)
-            .Aggregate(Result.Success<ImmutableArray<TraceExchange>.Builder, SmartCardError>(exchanges),
-                (acc, exchangeResult) => acc.Bind(builder =>
-                    exchangeResult.Map(exchange =>
-                    {
-                        builder.Add(exchange);
-                        return builder;
-                    })))
+            .Aggregate(
+                Result.Success<ImmutableArray<TraceExchange>.Builder, SmartCardError>(exchanges),
+                (acc, exchangeResult) =>
+                    acc.Bind(builder =>
+                        exchangeResult.Map(exchange =>
+                        {
+                            builder.Add(exchange);
+                            return builder;
+                        })
+                    )
+            )
             .Map(builder => builder.ToImmutable());
     }
 
     private static Result<TraceExchange, SmartCardError> ParseExchange(JsonElement exchangeElement)
     {
-        return Result.Try(() =>
-        {
-            int index = exchangeElement.TryGetProperty("index", out JsonElement indexElement)
-                ? indexElement.GetInt32()
-                : 0;
+        return Result.Try(
+            () =>
+            {
+                int index = exchangeElement.TryGetProperty("index", out JsonElement indexElement)
+                    ? indexElement.GetInt32()
+                    : 0;
 
-            string command = exchangeElement.TryGetProperty("command", out JsonElement cmdElement)
-                ? cmdElement.GetString() ?? ""
-                : "";
+                string command = exchangeElement.TryGetProperty(
+                    "command",
+                    out JsonElement cmdElement
+                )
+                    ? cmdElement.GetString() ?? ""
+                    : "";
 
-            string response = exchangeElement.TryGetProperty("response", out JsonElement respElement)
-                ? respElement.GetString() ?? ""
-                : "";
+                string response = exchangeElement.TryGetProperty(
+                    "response",
+                    out JsonElement respElement
+                )
+                    ? respElement.GetString() ?? ""
+                    : "";
 
-            string description = exchangeElement.TryGetProperty("description", out JsonElement descElement)
-                ? descElement.GetString() ?? ""
-                : "";
+                string description = exchangeElement.TryGetProperty(
+                    "description",
+                    out JsonElement descElement
+                )
+                    ? descElement.GetString() ?? ""
+                    : "";
 
-            int responseTime = exchangeElement.TryGetProperty("response_time_ms", out JsonElement timeElement)
-                ? timeElement.GetInt32()
-                : 0;
+                int responseTime = exchangeElement.TryGetProperty(
+                    "response_time_ms",
+                    out JsonElement timeElement
+                )
+                    ? timeElement.GetInt32()
+                    : 0;
 
-            bool secureMessaging = exchangeElement.TryGetProperty("secure_messaging", out JsonElement secureElement)
-                ? secureElement.GetBoolean()
-                : false;
+                bool secureMessaging = exchangeElement.TryGetProperty(
+                    "secure_messaging",
+                    out JsonElement secureElement
+                )
+                    ? secureElement.GetBoolean()
+                    : false;
 
-            return new TraceExchange(index, command, response, description, responseTime, secureMessaging);
-        }, ex => SmartCardError.InvalidData($"Failed to parse exchange: {ex.Message}"));
+                return new TraceExchange(
+                    index,
+                    command,
+                    response,
+                    description,
+                    responseTime,
+                    secureMessaging
+                );
+            },
+            ex => SmartCardError.InvalidData($"Failed to parse exchange: {ex.Message}")
+        );
     }
 
     private static CapInstallationTrace CreateInstallationTrace(TraceJsonData data)
@@ -182,7 +237,8 @@ public static class CapInstallationTraceLoader
         return new CapInstallationTrace(
             data.Metadata,
             data.Exchanges,
-            ExtractCapMetadata(data.Exchanges));
+            ExtractCapMetadata(data.Exchanges)
+        );
     }
 
     private static Maybe<CapMetadata> ExtractCapMetadata(ImmutableArray<TraceExchange> exchanges)
@@ -192,19 +248,24 @@ public static class CapInstallationTraceLoader
         string packageAid = "A00000030800001000"; // From trace analysis
         string appletAid = "A000000308000010000100"; // From trace analysis
 
-        return Maybe<CapMetadata>.From(new CapMetadata(
-            packageAid,
-            appletAid,
-            "com.makina.security.openfips201",
-            "1.10",
-            "da7243300d1f08622a102bfefc40b3f6c86d010aa1fa45efd9e31a0b34b8f959"));
+        return Maybe<CapMetadata>.From(
+            new CapMetadata(
+                packageAid,
+                appletAid,
+                "com.makina.security.openfips201",
+                "1.10",
+                "da7243300d1f08622a102bfefc40b3f6c86d010aa1fa45efd9e31a0b34b8f959"
+            )
+        );
     }
 
     private static Result<TraceExchange, SmartCardError> ExtractSelectCommand(
-        ImmutableArray<TraceExchange> exchanges)
+        ImmutableArray<TraceExchange> exchanges
+    )
     {
         TraceExchange selectExchange = exchanges.FirstOrDefault(e =>
-            e.Command.StartsWith("00A404", StringComparison.OrdinalIgnoreCase));
+            e.Command.StartsWith("00A404", StringComparison.OrdinalIgnoreCase)
+        );
 
         return selectExchange != default
             ? Result.Success<TraceExchange, SmartCardError>(selectExchange)
@@ -212,13 +273,16 @@ public static class CapInstallationTraceLoader
     }
 
     private static Result<SecureChannelCommands, SmartCardError> ExtractSecureChannelCommands(
-        ImmutableArray<TraceExchange> exchanges)
+        ImmutableArray<TraceExchange> exchanges
+    )
     {
         TraceExchange initUpdate = exchanges.FirstOrDefault(e =>
-            e.Command.StartsWith("8050", StringComparison.OrdinalIgnoreCase));
+            e.Command.StartsWith("8050", StringComparison.OrdinalIgnoreCase)
+        );
 
         TraceExchange extAuth = exchanges.FirstOrDefault(e =>
-            e.Command.StartsWith("8482", StringComparison.OrdinalIgnoreCase));
+            e.Command.StartsWith("8482", StringComparison.OrdinalIgnoreCase)
+        );
 
         if (initUpdate == default)
             return SmartCardError.InvalidData("No INITIALIZE UPDATE command found");
@@ -227,14 +291,17 @@ public static class CapInstallationTraceLoader
             return SmartCardError.InvalidData("No EXTERNAL AUTHENTICATE command found");
 
         return Result.Success<SecureChannelCommands, SmartCardError>(
-            new SecureChannelCommands(initUpdate, extAuth));
+            new SecureChannelCommands(initUpdate, extAuth)
+        );
     }
 
     private static Result<TraceExchange, SmartCardError> ExtractInstallCommands(
-        ImmutableArray<TraceExchange> exchanges)
+        ImmutableArray<TraceExchange> exchanges
+    )
     {
         TraceExchange installForLoad = exchanges.FirstOrDefault(e =>
-            e.Command.StartsWith("84E602", StringComparison.OrdinalIgnoreCase));
+            e.Command.StartsWith("84E602", StringComparison.OrdinalIgnoreCase)
+        );
 
         return installForLoad != default
             ? Result.Success<TraceExchange, SmartCardError>(installForLoad)
@@ -242,11 +309,14 @@ public static class CapInstallationTraceLoader
     }
 
     private static Result<ImmutableArray<TraceExchange>, SmartCardError> ExtractLoadCommands(
-        ImmutableArray<TraceExchange> exchanges)
+        ImmutableArray<TraceExchange> exchanges
+    )
     {
-        ImmutableArray<TraceExchange> loadCommands = [
-            ..exchanges
-                .Where(e => e.Command.StartsWith("84E8", StringComparison.OrdinalIgnoreCase))
+        ImmutableArray<TraceExchange> loadCommands =
+        [
+            .. exchanges.Where(e =>
+                e.Command.StartsWith("84E8", StringComparison.OrdinalIgnoreCase)
+            ),
         ];
 
         return loadCommands.Length > 0
@@ -262,16 +332,14 @@ public static class CapInstallationTraceLoader
 public record CapInstallationTrace(
     TraceMetadata Metadata,
     ImmutableArray<TraceExchange> Exchanges,
-    Maybe<CapMetadata> CapInfo);
+    Maybe<CapMetadata> CapInfo
+);
 
 /// <summary>
 /// Trace metadata extracted from JSON.
 /// </summary>
 [PublicAPI]
-public record TraceMetadata(
-    string Atr,
-    string IsdAid,
-    string CardType);
+public record TraceMetadata(string Atr, string IsdAid, string CardType);
 
 /// <summary>
 /// Individual trace exchange.
@@ -283,7 +351,8 @@ public record TraceExchange(
     string Response,
     string Description,
     int ResponseTimeMs,
-    bool SecureMessaging);
+    bool SecureMessaging
+);
 
 /// <summary>
 /// CAP file metadata derived from trace.
@@ -294,7 +363,8 @@ public record CapMetadata(
     string AppletAid,
     string PackageName,
     string Version,
-    string Sha256Hash);
+    string Sha256Hash
+);
 
 /// <summary>
 /// Secure channel command sequence.
@@ -302,7 +372,8 @@ public record CapMetadata(
 [PublicAPI]
 public record SecureChannelCommands(
     TraceExchange InitializeUpdate,
-    TraceExchange ExternalAuthenticate);
+    TraceExchange ExternalAuthenticate
+);
 
 /// <summary>
 /// Complete installation command sequence.
@@ -313,11 +384,10 @@ public record InstallationCommandSequence(
     SecureChannelCommands SecureChannelSetup,
     TraceExchange InstallForLoad,
     ImmutableArray<TraceExchange> LoadCommands,
-    Maybe<TraceExchange> InstallForInstall);
+    Maybe<TraceExchange> InstallForInstall
+);
 
 /// <summary>
 /// Internal data structure for parsing.
 /// </summary>
-internal record TraceJsonData(
-    TraceMetadata Metadata,
-    ImmutableArray<TraceExchange> Exchanges);
+internal record TraceJsonData(TraceMetadata Metadata, ImmutableArray<TraceExchange> Exchanges);

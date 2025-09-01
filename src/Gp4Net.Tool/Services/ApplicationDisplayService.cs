@@ -27,7 +27,7 @@ public class ApplicationDisplayService
             ApplicationType.Application => "Applet",
             ApplicationType.LoadFile => "Load File",
             ApplicationType.ExecutableLoadFile => "Executable Load File",
-            _ => "Unknown"
+            _ => "Unknown",
         };
     }
 
@@ -45,7 +45,7 @@ public class ApplicationDisplayService
             ApplicationType.Application => "[green]App[/]",
             ApplicationType.LoadFile => "[blue]Pkg[/]",
             ApplicationType.ExecutableLoadFile => "[blue]Exec[/]",
-            _ => type.ToString()
+            _ => type.ToString(),
         };
     }
 
@@ -54,6 +54,7 @@ public class ApplicationDisplayService
     /// </summary>
     /// <param name="type">The application type.</param>
     /// <returns>The color name.</returns>
+    // @TODO Evaluate if this is needed or useful.
     public static string GetTypeColor(ApplicationType type)
     {
         return type switch
@@ -63,7 +64,7 @@ public class ApplicationDisplayService
             ApplicationType.Application => "green",
             ApplicationType.LoadFile => "yellow",
             ApplicationType.ExecutableLoadFile => "yellow",
-            _ => "white"
+            _ => "white",
         };
     }
 
@@ -81,7 +82,7 @@ public class ApplicationDisplayService
             LifecycleState.Locked => "[red]Locked[/]",
             LifecycleState.Installed => "[cyan]Installed[/]",
             LifecycleState.Terminated => "[red]Terminated[/]",
-            _ => state.ToString()
+            _ => state.ToString(),
         };
     }
 
@@ -99,7 +100,7 @@ public class ApplicationDisplayService
             LifecycleState.Locked => "red",
             LifecycleState.Installed => "cyan",
             LifecycleState.Terminated => "red",
-            _ => "yellow"
+            _ => "yellow",
         };
     }
 
@@ -109,7 +110,10 @@ public class ApplicationDisplayService
     /// <param name="privileges">The privileges.</param>
     /// <param name="maxDisplayCount">Maximum number of privileges to display before truncating.</param>
     /// <returns>The display string.</returns>
-    public static string GetPrivilegesDisplay(ImmutableList<Privilege> privileges, int maxDisplayCount = 3)
+    public static string GetPrivilegesDisplay(
+        ImmutableList<Privilege> privileges,
+        int maxDisplayCount = 3
+    )
     {
         if (privileges.Count == 0)
         {
@@ -174,7 +178,7 @@ public class ApplicationDisplayService
             GetTypeDisplay(app.Type),
             $"[cyan]{Convert.ToHexString(app.Aid)}[/]",
             GetStateDisplay(app.LifecycleState),
-            GetPrivilegesDisplay(app.Privileges)
+            GetPrivilegesDisplay(app.Privileges),
         ];
 
         if (extended)
@@ -195,7 +199,10 @@ public class ApplicationDisplayService
     /// </summary>
     /// <param name="applications">The applications to display.</param>
     /// <param name="extended">Whether to show extended information.</param>
-    public static void DisplayApplicationTable(IReadOnlyList<ApplicationInfo> applications, bool extended = false)
+    public static void DisplayApplicationTable(
+        IReadOnlyList<ApplicationInfo> applications,
+        bool extended = false
+    )
     {
         Table table = CreateApplicationTable(extended);
 
@@ -223,7 +230,7 @@ public class ApplicationDisplayService
                 version = a.Version,
                 associatedSD = a.AssociatedSecurityDomain.HasValue
                     ? Convert.ToHexString(a.AssociatedSecurityDomain.Value)
-                    : null
+                    : null,
             }),
             new JsonSerializerOptions { WriteIndented = true }
         );
@@ -243,11 +250,11 @@ public class ApplicationDisplayService
         {
             Console.WriteLine(
                 $"{app.Type},"
-                + $"{Convert.ToHexString(app.Aid)},"
-                + $"{app.LifecycleState},"
-                + $"\"{string.Join(";", app.Privileges.Select(p => p.ToString()))}\","
-                + $"{app.Version.GetValueOrDefault("")},"
-                + $"{(app.AssociatedSecurityDomain.HasValue ? Convert.ToHexString(app.AssociatedSecurityDomain.Value) : "")}"
+                    + $"{Convert.ToHexString(app.Aid)},"
+                    + $"{app.LifecycleState},"
+                    + $"\"{string.Join(";", app.Privileges.Select(p => p.ToString()))}\","
+                    + $"{app.Version.GetValueOrDefault("")},"
+                    + $"{(app.AssociatedSecurityDomain.HasValue ? Convert.ToHexString(app.AssociatedSecurityDomain.Value) : "")}"
             );
         }
     }
@@ -258,7 +265,9 @@ public class ApplicationDisplayService
     /// <param name="applications">The applications to display.</param>
     public static void DisplayDetailedInformation(IReadOnlyList<ApplicationInfo> applications)
     {
-        IEnumerable<IGrouping<ApplicationType, ApplicationInfo>> groups = applications.GroupBy(a => a.Type);
+        IEnumerable<IGrouping<ApplicationType, ApplicationInfo>> groups = applications.GroupBy(a =>
+            a.Type
+        );
 
         foreach (IGrouping<ApplicationType, ApplicationInfo> group in groups)
         {
@@ -268,11 +277,11 @@ public class ApplicationDisplayService
             {
                 Panel panel = new Panel(
                     $"[dim]AID:[/] {Convert.ToHexString(app.Aid)}\n"
-                    + $"[dim]State:[/] {app.LifecycleState}\n"
-                    + $"[dim]Privileges:[/] {GetPrivilegesDisplaySimple(app.Privileges)}"
+                        + $"[dim]State:[/] {app.LifecycleState}\n"
+                        + $"[dim]Privileges:[/] {GetPrivilegesDisplaySimple(app.Privileges)}"
                 )
                 {
-                    Header = new PanelHeader($"[bold]{GetTypeDisplayName(app.Type)}[/]")
+                    Header = new PanelHeader($"[bold]{GetTypeDisplayName(app.Type)}[/]"),
                 };
 
                 AnsiConsole.Write(panel);
@@ -290,15 +299,22 @@ public class ApplicationDisplayService
     /// <returns>The filtered applications.</returns>
     public static IReadOnlyList<ApplicationInfo> FilterApplications(
         IReadOnlyList<ApplicationInfo> applications,
-        string filter)
+        string filter
+    )
     {
         return filter.ToLowerInvariant() switch
         {
-            "isd" => applications.Where(a => a.Type == ApplicationType.IssuerSecurityDomain).ToList(),
-            "apps" or "applets" => applications.Where(a => a.Type == ApplicationType.Application).ToList(),
+            "isd" => applications
+                .Where(a => a.Type == ApplicationType.IssuerSecurityDomain)
+                .ToList(),
+            "apps" or "applets" => applications
+                .Where(a => a.Type == ApplicationType.Application)
+                .ToList(),
             "packages" => applications.Where(a => a.Type == ApplicationType.LoadFile).ToList(),
-            "ssd" => applications.Where(a => a.Type == ApplicationType.SupplementarySecurityDomain).ToList(),
-            _ => applications
+            "ssd" => applications
+                .Where(a => a.Type == ApplicationType.SupplementarySecurityDomain)
+                .ToList(),
+            _ => applications,
         };
     }
 }

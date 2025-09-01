@@ -151,8 +151,7 @@ public interface IInitializeUpdateCommandBuilder : ICommandBuilder<InitializeUpd
 /// Builder interface for EXTERNAL AUTHENTICATE commands.
 /// </summary>
 [PublicAPI]
-public interface IExternalAuthenticateCommandBuilder
-    : ICommandBuilder<ExternalAuthenticateCommand>
+public interface IExternalAuthenticateCommandBuilder : ICommandBuilder<ExternalAuthenticateCommand>
 {
     /// <summary>
     /// Sets the security level.
@@ -339,9 +338,7 @@ public interface IPutKeyCommandBuilder : ICommandBuilder<PutKeyCommand>
     /// </summary>
     /// <param name="kekIdentifier">The KEK identifier.</param>
     /// <returns>This builder for chaining.</returns>
-    IPutKeyCommandBuilder WithKekIdentifier(
-        PutKeyCommand.KeyEncryptionKeyIdentifier kekIdentifier
-    );
+    IPutKeyCommandBuilder WithKekIdentifier(PutKeyCommand.KeyEncryptionKeyIdentifier kekIdentifier);
 
     /// <summary>
     /// Adds a key data block.

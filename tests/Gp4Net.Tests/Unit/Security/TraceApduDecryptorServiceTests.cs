@@ -3,14 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
+using ScpVersion = Gp4Net.Cryptography.CryptoService.ScpVersion;
 
 namespace Gp4Net.Tests.Unit.Security;
 
@@ -34,7 +35,7 @@ public class TraceApduDecryptorServiceTests
     [Test]
     public void Constructor_WithNullLogger_ShouldCreateService()
     {
-        TraceApduDecryptorService service = new TraceApduDecryptorService(null);
+        TraceApduDecryptorService service = new TraceApduDecryptorService();
 
         _ = service.Should().NotBeNull();
     }
@@ -52,12 +53,34 @@ public class TraceApduDecryptorServiceTests
     public void DecryptApdu_WithPlaintextApdu_ShouldReturnOriginalApdu(ApduDirection direction)
     {
         // Plaintext APDU (no secure messaging indicator)
-        byte[] plaintextApdu = [0x00, 0xA4, 0x04, 0x00, 0x08, 0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x00];
+        byte[] plaintextApdu =
+        [
+            0x00,
+            0xA4,
+            0x04,
+            0x00,
+            0x08,
+            0xA0,
+            0x00,
+            0x00,
+            0x01,
+            0x51,
+            0x00,
+            0x00,
+            0x00,
+        ];
         SessionKeys sessionKeys = CreateTestSessionKeys();
         SecurityLevel securityLevel = SecurityLevel.None;
-        SecureChannelState sessionState = CreateTestSessionState(sessionKeys, securityLevel, ScpVersion.Scp03);
+        SecureChannelState sessionState = CreateTestSessionState(
+            sessionKeys,
+            securityLevel,
+            (byte)ScpVersion.Scp03
+        );
 
-        Result<(DecryptedApdu decryptedApdu, SecureChannelState updatedState), SmartCardError> result = _service.DecryptApdu(plaintextApdu, direction, sessionState);
+        Result<
+            (DecryptedApdu decryptedApdu, SecureChannelState updatedState),
+            SmartCardError
+        > result = _service.DecryptApdu(plaintextApdu, direction, sessionState);
 
         _ = result.IsSuccess.Should().BeTrue();
         (DecryptedApdu decryptedApdu, SecureChannelState updatedState) = result.Value;
@@ -73,12 +96,42 @@ public class TraceApduDecryptorServiceTests
     public void DecryptApdu_WithSecureCommand_ShouldDetectSecureMessaging()
     {
         // Command with secure messaging indicator (CLA = 0x84)
-        byte[] secureCommand = [0x84, 0x50, 0x00, 0x00, 0x10, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10];
+        byte[] secureCommand =
+        [
+            0x84,
+            0x50,
+            0x00,
+            0x00,
+            0x10,
+            0x01,
+            0x02,
+            0x03,
+            0x04,
+            0x05,
+            0x06,
+            0x07,
+            0x08,
+            0x09,
+            0x0A,
+            0x0B,
+            0x0C,
+            0x0D,
+            0x0E,
+            0x0F,
+            0x10,
+        ];
         SessionKeys sessionKeys = CreateTestSessionKeys();
         SecurityLevel securityLevel = SecurityLevel.CMac;
-        SecureChannelState sessionState = CreateTestSessionState(sessionKeys, securityLevel, ScpVersion.Scp03);
+        SecureChannelState sessionState = CreateTestSessionState(
+            sessionKeys,
+            securityLevel,
+            (byte)ScpVersion.Scp03
+        );
 
-        Result<(DecryptedApdu decryptedApdu, SecureChannelState updatedState), SmartCardError> result = _service.DecryptApdu(secureCommand, ApduDirection.Command, sessionState);
+        Result<
+            (DecryptedApdu decryptedApdu, SecureChannelState updatedState),
+            SmartCardError
+        > result = _service.DecryptApdu(secureCommand, ApduDirection.Command, sessionState);
 
         _ = result.IsSuccess.Should().BeTrue();
         (DecryptedApdu decryptedApdu, _) = result.Value;
@@ -94,7 +147,12 @@ public class TraceApduDecryptorServiceTests
         SecurityLevel securityLevel = SecurityLevel.None;
         ScpVersion protocolVersion = ScpVersion.Scp03;
 
-        Result<DecryptedTrace, SmartCardError> result = _service.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
+        Result<DecryptedTrace, SmartCardError> result = _service.DecryptTrace(
+            exchanges,
+            sessionKeys,
+            securityLevel,
+            protocolVersion
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         DecryptedTrace? decryptedTrace = result.Value;
@@ -109,15 +167,22 @@ public class TraceApduDecryptorServiceTests
     {
         TraceExchange[] exchanges =
         [
-            new TraceExchange(1,
+            new TraceExchange(
+                1,
                 [0x00, 0xA4, 0x04, 0x00, 0x08, 0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x00], // SELECT
-                [0x90, 0x00]) // Success
+                [0x90, 0x00]
+            ), // Success
         ];
         SessionKeys sessionKeys = CreateTestSessionKeys();
         SecurityLevel securityLevel = SecurityLevel.None;
         ScpVersion protocolVersion = ScpVersion.Scp03;
 
-        Result<DecryptedTrace, SmartCardError> result = _service.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
+        Result<DecryptedTrace, SmartCardError> result = _service.DecryptTrace(
+            exchanges,
+            sessionKeys,
+            securityLevel,
+            protocolVersion
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         DecryptedTrace? decryptedTrace = result.Value;
@@ -135,9 +200,11 @@ public class TraceApduDecryptorServiceTests
     {
         TraceExchange[] exchanges =
         [
-            new TraceExchange(1,
+            new TraceExchange(
+                1,
                 [0x84, 0x50, 0x00, 0x00, 0x08, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08],
-                [0x90, 0x00])
+                [0x90, 0x00]
+            ),
         ];
 
         // Invalid session keys (empty components)
@@ -146,7 +213,12 @@ public class TraceApduDecryptorServiceTests
         SecurityLevel securityLevel = SecurityLevel.CMac;
         ScpVersion protocolVersion = ScpVersion.Scp03;
 
-        Result<DecryptedTrace, SmartCardError> result = _service.DecryptTrace(exchanges, invalidKeys, securityLevel, protocolVersion);
+        Result<DecryptedTrace, SmartCardError> result = _service.DecryptTrace(
+            exchanges,
+            invalidKeys,
+            securityLevel,
+            protocolVersion
+        );
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
@@ -154,18 +226,25 @@ public class TraceApduDecryptorServiceTests
 
     [TestCase(ScpVersion.Scp02)]
     [TestCase(ScpVersion.Scp03)]
-    public void DecryptTrace_WithDifferentProtocols_ShouldHandleCorrectly(byte protocolVersion)
+    public void DecryptTrace_WithDifferentProtocols_ShouldHandleCorrectly(ScpVersion protocolVersion)
     {
         TraceExchange[] exchanges =
         [
-            new TraceExchange(1,
+            new TraceExchange(
+                1,
                 [0x00, 0xA4, 0x04, 0x00, 0x00], // SELECT with no data
-                [0x90, 0x00]) // Success
+                [0x90, 0x00]
+            ), // Success
         ];
         SessionKeys sessionKeys = CreateTestSessionKeys();
         SecurityLevel securityLevel = SecurityLevel.None;
 
-        Result<DecryptedTrace, SmartCardError> result = _service.DecryptTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
+        Result<DecryptedTrace, SmartCardError> result = _service.DecryptTrace(
+            exchanges,
+            sessionKeys,
+            securityLevel,
+            protocolVersion
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         DecryptedTrace? decryptedTrace = result.Value;
@@ -176,7 +255,12 @@ public class TraceApduDecryptorServiceTests
     public void DecryptedApdu_Description_ShouldFormatResponseStatusWord()
     {
         byte[] responseBytes = [0x01, 0x02, 0x90, 0x00]; // Data + Success status
-        DecryptedApdu decryptedApdu = new DecryptedApdu(responseBytes, ApduDirection.Response, DecryptionStatus.PlainText, "Test");
+        DecryptedApdu decryptedApdu = new DecryptedApdu(
+            responseBytes,
+            ApduDirection.Response,
+            DecryptionStatus.PlainText,
+            "Test"
+        );
 
         _ = decryptedApdu.Description.Should().Contain("Response: 0x9000 (Success)");
     }
@@ -185,7 +269,12 @@ public class TraceApduDecryptorServiceTests
     public void DecryptedApdu_Description_ShouldFormatCommand()
     {
         byte[] commandBytes = [0x00, 0xA4, 0x04, 0x00];
-        DecryptedApdu decryptedApdu = new DecryptedApdu(commandBytes, ApduDirection.Command, DecryptionStatus.PlainText, "Test");
+        DecryptedApdu decryptedApdu = new DecryptedApdu(
+            commandBytes,
+            ApduDirection.Command,
+            DecryptionStatus.PlainText,
+            "Test"
+        );
 
         _ = decryptedApdu.Description.Should().Contain("Command APDU (4 bytes)");
     }
@@ -194,7 +283,12 @@ public class TraceApduDecryptorServiceTests
     public void DecryptedApdu_DecryptedBytes_ShouldReturnOriginalWhenNotDecrypted()
     {
         byte[] originalBytes = [0x01, 0x02, 0x03];
-        DecryptedApdu decryptedApdu = new DecryptedApdu(originalBytes, ApduDirection.Command, DecryptionStatus.PlainText, "Test");
+        DecryptedApdu decryptedApdu = new DecryptedApdu(
+            originalBytes,
+            ApduDirection.Command,
+            DecryptionStatus.PlainText,
+            "Test"
+        );
 
         _ = decryptedApdu.DecryptedBytes.Should().BeEquivalentTo(originalBytes);
     }
@@ -221,7 +315,12 @@ public class TraceApduDecryptorServiceTests
         SecurityLevel securityLevel = SecurityLevel.CMac;
         ScpVersion protocolVersion = ScpVersion.Scp03;
 
-        DecryptedTrace trace = new DecryptedTrace(exchanges, sessionKeys, securityLevel, protocolVersion);
+        DecryptedTrace trace = new DecryptedTrace(
+            exchanges,
+            sessionKeys,
+            securityLevel,
+            protocolVersion
+        );
 
         _ = trace.Exchanges.Should().BeSameAs(exchanges);
         _ = trace.SessionKeys.Should().Be(sessionKeys);
@@ -234,22 +333,19 @@ public class TraceApduDecryptorServiceTests
         byte[] key = new byte[16]; // AES-128 key for SCP03
         Array.Fill(key, (byte)0x01);
 
-        return new SessionKeys(
-            sEnc: key,
-            sMac: key,
-            sRMac: key,
-            dek: key);
+        return new SessionKeys(sEnc: key, sMac: key, sRMac: key, dek: key);
     }
 
-    private static SecureChannelState CreateTestSessionState(SessionKeys sessionKeys, SecurityLevel securityLevel, byte protocolVersion)
+    private static SecureChannelState CreateTestSessionState(
+        SessionKeys sessionKeys,
+        SecurityLevel securityLevel,
+        byte protocolVersion
+    )
     {
-        byte[] macChaining = protocolVersion == ScpVersion.Scp03 ? new byte[16] : new byte[8];
+        byte[] macChaining = protocolVersion == (byte)ScpVersion.Scp03 ? new byte[16] : new byte[8];
 
-        return SecureChannelState.Create(
-            sessionKeys,
-            securityLevel,
-            protocolVersion,
-            macChaining,
-            0x00).Value;
+        return SecureChannelState
+            .Create(sessionKeys, securityLevel, protocolVersion, macChaining, 0x00)
+            .Value;
     }
 }

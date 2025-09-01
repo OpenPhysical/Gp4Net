@@ -488,65 +488,46 @@
         </member>
         <member name="T:Gp4Net.Tool.Commands.Applet.ListCliCommand">
             <summary>
-            Command to list applications on the card.
+            Command to list applications on the card using library services.
+            Tool handles display, library provides data.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings)">
+        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.#ctor(Gp4Net.Services.IGlobalPlatformService)">
             <summary>
-            Executes the list command to enumerate applications on the card.
+            Initializes a new instance of the ListCliCommand class with direct service injection.
             </summary>
-            <param name="context">The CLI execution context.</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.ExecuteAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings)">
+            <summary>
+            Executes the list command using library services for data and tool for display.
+            </summary>
+            <param name="context">The command context.</param>
             <param name="settings">The command settings.</param>
             <returns>0 if successful, 1 if failed.</returns>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.ResolveKeySetForRetrieval(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings)">
+        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.ExecuteWithService(Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings,System.Threading.CancellationToken)">
             <summary>
-            Resolves the key set to use for card content retrieval.
+            Executes with the service using proper library/tool separation.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.ProcessCardContent(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Domain.CardContent,Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings)">
+        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.EstablishSecureChannelFromSettings(Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings,System.Threading.CancellationToken)">
             <summary>
-            Processes the complete card content for display.
+            Establishes secure channel from settings with functional patterns.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.HandleError(Gp4Net.Core.SmartCardError,System.String,Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings)">
+            <summary>
+            Handles errors with proper tool-layer error display.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.ProcessApplications(System.Collections.Generic.IReadOnlyList{Gp4Net.Domain.ApplicationInfo},Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings)">
+            <summary>
+            Processes applications for display using functional composition.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings">
             <summary>
             Settings for the list command.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.NoCardInfo">
-            <summary>
-            Gets or sets whether to skip card info display.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.Keyset">
-            <summary>
-            Gets or sets the keyset specification.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.KeysetParams">
-            <summary>
-            Gets or sets the keyset parameters.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.KeyEnc">
-            <summary>
-            Gets or sets the encryption key.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.KeyMac">
-            <summary>
-            Gets or sets the MAC key.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.KeyDek">
-            <summary>
-            Gets or sets the DEK key.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.KeyVersion">
-            <summary>
-            Gets or sets the key version.
             </summary>
         </member>
         <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.Filter">
@@ -579,6 +560,14 @@
             Gets or sets whether to use secure channel.
             </summary>
         </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.NoCardInfo">
+            <summary>
+            Gets or sets whether to skip card info display.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.RequiresSecureChannel">
+            <inheritdoc />
+        </member>
         <member name="M:Gp4Net.Tool.Commands.Applet.ListCliCommand.Settings.Validate">
             <summary>
             Validates the command settings.
@@ -600,7 +589,7 @@
         </member>
         <member name="T:Gp4Net.Tool.Commands.Applet.LoadCommand.Settings">
             <summary>
-            Settings for the load command.  
+            Settings for the load command.
             </summary>
         </member>
         <member name="P:Gp4Net.Tool.Commands.Applet.LoadCommand.Settings.CapFile">
@@ -677,7 +666,7 @@
             Command to validate a CAP file without installing it.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Applet.ValidateCommand.#ctor(Gp4Net.Tool.Pipeline.IDisplayService,Gp4Net.Tool.Services.IDomainServiceFactory,Gp4Net.Tool.Services.IKeysetResolver,Gp4Net.Services.PackageRegistry)">
+        <member name="M:Gp4Net.Tool.Commands.Applet.ValidateCommand.#ctor(Gp4Net.Tool.Pipeline.IDisplayService,Gp4Net.Tool.Services.IDomainServiceFactory,Gp4Net.Services.IKeysetResolver,Gp4Net.Services.PackageRegistry)">
             <summary>
             Initializes a new instance of the ValidateCommand class.
             </summary>
@@ -721,75 +710,35 @@
             </summary>
             <returns>Success if valid, or an error message if validation fails.</returns>
         </member>
-        <member name="T:Gp4Net.Tool.Commands.Card.CardInformationGatherer">
+        <member name="T:Gp4Net.Tool.Commands.BaseCommandSettings">
             <summary>
-            Pure functional pipeline to gather and parse card information from multiple GET DATA commands.
-            Eliminates imperative data gathering with functional composition and Result types.
-            Per GP Card Specification v2.3.1, gathers data from standard data objects.
+            Base settings for secure commands with keyset management.
+            Functional approach to command configuration.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.GatherCardInformationAsync(Gp4Net.Services.ISmartCardService,Gp4Net.Services.IGlobalPlatformService)">
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.KeyEnc">
             <summary>
-            Main entry point to gather all available card information using functional composition.
-            Transforms imperative try/catch patterns into Result-based error handling.
-            </summary>
-            <param name="smartCardService">Smart card service for APDU communication</param>
-            <param name="gpService">GlobalPlatform service for high-level operations</param>
-            <returns>Result containing complete CardInformation or SmartCardError</returns>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.GatherBasicCardDataAsync(Gp4Net.Services.ISmartCardService,Gp4Net.Services.IGlobalPlatformService)">
-            <summary>
-            Gathers basic card information that doesn't require secure channel.
-            Uses functional composition to combine multiple GET DATA operations.
+            Gets or sets the encryption key.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.ParseAndEnrichCardInformation(Gp4Net.Tool.Commands.Card.CardInformationGatherer.BasicCardData)">
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.KeyMac">
             <summary>
-            Parses raw card data into structured CardInformation using pure functions.
-            Eliminates mutations and exceptions with functional error handling.
+            Gets or sets the MAC key.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.ParseCardDataSafely(CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.KeyDek">
             <summary>
-            Pure function to parse card data bytes with error handling.
+            Gets or sets the DEK key.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.ParseCapabilitiesSafely(CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.KeyVersion">
             <summary>
-            Pure function to parse capabilities with error handling.
+            Gets or sets the key version.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.ParseKeyInfoSafely(CSharpFunctionalExtensions.Maybe{System.Byte[]})">
+        <member name="P:Gp4Net.Tool.Commands.BaseCommandSettings.RequiresSecureChannel">
             <summary>
-            Pure function to parse key information with error handling.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.ParseSecurityStatusSafely(CSharpFunctionalExtensions.Maybe{System.Byte[]})">
-            <summary>
-            Pure function to parse security status with error handling.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.ExtractScpInfoSafely(CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]})">
-            <summary>
-            Pure function to extract SCP information from capabilities and diversification data.
-            Per GP Card Specification v2.3.1 Section 6.3.1, SCP info can come from either source.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.ExtractChipInfoSafely(CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CardInfo.CplcData})">
-            <summary>
-            Pure function to extract chip information from CPLC data.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Commands.Card.CardInformationGatherer.BasicCardData">
-            <summary>
-            Immutable record to hold basic card data before parsing.
-            Intermediate structure for functional composition.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.CardInformationGatherer.BasicCardData.#ctor(CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Commands.SelectResponse},CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.CardInfo.CplcData},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]})">
-            <summary>
-            Immutable record to hold basic card data before parsing.
-            Intermediate structure for functional composition.
+            Gets whether this command requires a secure channel.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Card.CardInfoTableBuilder">
@@ -968,68 +917,12 @@
         </member>
         <member name="M:Gp4Net.Tool.Commands.Card.ConnectCommand.ConnectAndGetCardInfoAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext)">
             <summary>
-            Connects to card and retrieves basic information using functional patterns.
+            Connects to card and retrieves basic information.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Card.ConnectCommand.Settings">
             <summary>
             Settings for the connect command.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand">
-            <summary>
-            Functional implementation of card info command using pure functions and Result types.
-            Replaces 500+ lines of imperative code with ~50 lines of functional composition.
-            Eliminates all mutations, exceptions, and null checks per CLAUDE.md rules.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.Settings)">
-            <summary>
-            Pure functional execution pipeline for card information display.
-            Transforms imperative try/catch patterns into Result-based composition.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.BuildExecutionContext(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.Settings)">
-            <summary>
-            Pure function to build execution context with card connection.
-            Eliminates imperative context building from original InfoCommand.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.GatherCardInformation(Gp4Net.Tool.Pipeline.ICliExecutionContext)">
-            <summary>
-            Pure function to gather all card information using functional pipeline.
-            Replaces 200+ lines of imperative data gathering with single composition.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.FormatAndDisplayCardInfo(Gp4Net.Domain.CardInfo.CardInformation,Gp4Net.Tool.Pipeline.ICliExecutionContext)">
-            <summary>
-            Pure function to format and display card information.
-            Eliminates the 54 table.AddRow calls with functional table building.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.DisplayKeysetSuggestions(System.Boolean)">
-            <summary>
-            Pure function to display keyset suggestions when secure channel is not established.
-            Improves user experience by suggesting available keysets.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.RenderSemanticRows(Spectre.Console.Table,System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.TableRow})">
-            <summary>
-            Pure function to render semantic rows to Spectre.Console table.
-            Uses pattern matching to apply appropriate formatting per row type.
-            Implements the Functional UI Composition Pattern from CLAUDE.md.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.HandleError(Gp4Net.Core.SmartCardError,Gp4Net.Tool.Pipeline.ICliExecutionContext)">
-            <summary>
-            Pure function to handle errors with consistent formatting.
-            Eliminates scattered error handling patterns.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Commands.Card.FunctionalInfoCommand.Settings">
-            <summary>
-            Settings for the functional info command.
-            Inherits from CardCommandSettings for consistency.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Card.GetIsdDataCommand">
@@ -1065,32 +958,52 @@
         </member>
         <member name="T:Gp4Net.Tool.Commands.Card.InfoCommand">
             <summary>
-            Command to display detailed card information.
+            Command to display detailed card information using library services.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.ExecuteAsync(Gp4Net.Tool.Pipeline.ICliExecutionContext,Gp4Net.Tool.Commands.Card.InfoCommand.Settings)">
+        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.#ctor(Gp4Net.Services.IGlobalPlatformService)">
             <summary>
-            Executes the info command to display detailed card information.
+            Initializes a new instance of the InfoCommand class.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.AddGetDataToTable(Gp4Net.Tool.Pipeline.ICliExecutionContext,Spectre.Console.Table,System.String,System.UInt16)">
+        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.ExecuteAsync(Spectre.Console.Cli.CommandContext,Gp4Net.Tool.Commands.Card.InfoCommand.Settings)">
             <summary>
-            Retrieves data using GET DATA command and adds it to the display table.
-            Provides special handling for different data object types.
+            Executes the info command using library service for data and tool for display.
             </summary>
-            <param name="context">The command context for GP operations.</param>
-            <param name="table">The table to add the data to.</param>
-            <param name="name">The display name for this data.</param>
-            <param name="tag">The data object identifier tag.</param>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.GetImplementationDescription(Gp4Net.Domain.Protocol.ScpImplementation)">
+        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.GetCardInformation">
             <summary>
-            Gets a human-readable description for an SCP implementation option.
+            Gets card information from library service.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.BuildTableRows(Gp4Net.Services.CardInformation,Gp4Net.Tool.Commands.Card.InfoCommand.Settings)">
+            <summary>
+            Builds semantic table rows using tool services.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.ConvertToDomainCardInfo(Gp4Net.Services.CardInformation)">
+            <summary>
+            Converts Services.CardInformation to Domain.CardInfo.CardInformation.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.DisplayCardInfo(System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.TableRow},Gp4Net.Tool.Commands.Card.InfoCommand.Settings)">
+            <summary>
+            Displays card information using tool display service.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.InfoCommand.HandleError(Gp4Net.Core.SmartCardError)">
+            <summary>
+            Handles errors with functional error display.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Card.InfoCommand.Settings">
             <summary>
             Settings for the info command.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Commands.Card.InfoCommand.Settings.Verbose">
+            <summary>
+            Gets or sets whether to show verbose information.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Card.KeysChangeCommand">
@@ -1308,7 +1221,7 @@
             Command to test secure channel establishment with GlobalPlatform test keys.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Card.TestSecureChannelCommand.#ctor(Gp4Net.Tool.Pipeline.IDisplayService,Gp4Net.Tool.Services.IDomainServiceFactory,Gp4Net.Tool.Services.IKeysetResolver)">
+        <member name="M:Gp4Net.Tool.Commands.Card.TestSecureChannelCommand.#ctor(Gp4Net.Tool.Pipeline.IDisplayService,Gp4Net.Tool.Services.IDomainServiceFactory,Gp4Net.Services.IKeysetResolver)">
             <summary>
             Initializes a new instance of the TestSecureChannelCommand class.
             </summary>
@@ -1335,6 +1248,11 @@
             <param name="context">The command context.</param>
             <param name="settings">The command settings.</param>
             <returns>0 if successful, 1 if failed.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Commands.Card.TestSecureChannelCommand.ExecuteTestWithKeySet(Gp4Net.Services.ISmartCardService,Gp4Net.Domain.Keys.KeySet,Gp4Net.Tool.Commands.Card.TestSecureChannelCommand.Settings)">
+            <summary>
+            Executes the secure channel test with the resolved keyset.
+            </summary>
         </member>
         <member name="T:Gp4Net.Tool.Commands.Debug.Asn1TableBuilder">
             <summary>
@@ -1581,7 +1499,7 @@
             <param name="recursive">Whether to parse nested TLV structures</param>
             <returns>Sequence of semantic TLV rows</returns>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.BuildTlvElementRows(Gp4Net.Core.Tlv.TlvObject,System.Int32,System.Int32,System.Boolean,System.Boolean)">
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.BuildTlvElementRows(Gp4Net.Services.TlvService.TlvObject,System.Int32,System.Int32,System.Boolean,System.Boolean)">
             <summary>
             Recursively builds rows for a TLV element and its children.
             </summary>
@@ -1596,7 +1514,7 @@
             Safely tries to parse TLV data without throwing exceptions.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetTagInfo(Gp4Net.Core.Tlv.TlvObject)">
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetTagInfo(Gp4Net.Services.TlvService.TlvObject)">
             <summary>
             Gets tag information for a TLV element.
             </summary>
@@ -1611,22 +1529,22 @@
             Gets tag class description.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetLengthInfo(Gp4Net.Core.Tlv.TlvObject)">
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetLengthInfo(Gp4Net.Services.TlvService.TlvObject)">
             <summary>
             Gets length information string.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetTlvContent(Gp4Net.Core.Tlv.TlvObject)">
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetTlvContent(Gp4Net.Services.TlvService.TlvObject)">
             <summary>
             Gets content display for TLV element.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetAsciiContent(Gp4Net.Core.Tlv.TlvObject)">
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetAsciiContent(Gp4Net.Services.TlvService.TlvObject)">
             <summary>
             Gets ASCII content if printable.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetKnownTagInterpretation(Gp4Net.Core.Tlv.TlvObject)">
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetKnownTagInterpretation(Gp4Net.Services.TlvService.TlvObject)">
             <summary>
             Gets known tag interpretation.
             </summary>
@@ -1636,7 +1554,7 @@
             Gets life cycle state name.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetFullElementBytes(Gp4Net.Core.Tlv.TlvObject)">
+        <member name="M:Gp4Net.Tool.Commands.Debug.TlvTableBuilder.GetFullElementBytes(Gp4Net.Services.TlvService.TlvObject)">
             <summary>
             Reconstructs the full TLV element bytes.
             </summary>
@@ -1978,11 +1896,6 @@
             Empty row for visual spacing in output.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Common.SemanticTableBuilder.EmptyRow.#ctor">
-            <summary>
-            Empty row for visual spacing in output.
-            </summary>
-        </member>
         <member name="T:Gp4Net.Tool.Common.SemanticTableBuilder.DataRow">
             <summary>
             Generic data row with key-value pairs.
@@ -2027,6 +1940,72 @@
             </summary>
             <param name="data">The data pairs to include.</param>
             <returns>A data row containing the specified information.</returns>
+        </member>
+        <member name="T:Gp4Net.Tool.Extensions.CommandSettingsExtensions">
+            <summary>
+            Pure functional extensions for converting command settings to domain requests.
+            Eliminates imperative keyset resolution patterns in commands.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Extensions.CommandSettingsExtensions.ToSecureChannelRequest(Gp4Net.Tool.Commands.SecureCommandSettings)">
+            <summary>
+            Converts SecureCommandSettings to SecureChannelRequest using pure functional transformation.
+            </summary>
+            <param name="settings">The secure command settings.</param>
+            <returns>A secure channel request for pipeline processing.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Extensions.CommandSettingsExtensions.ExtractExplicitKeys(Gp4Net.Tool.Commands.SecureCommandSettings)">
+            <summary>
+            Extracts explicit keys from settings using functional composition.
+            Pure function that handles hex string conversion safely.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Extensions.CommandSettingsExtensions.HasExplicitKeyProperties(Gp4Net.Tool.Commands.SecureCommandSettings)">
+            <summary>
+            Checks if settings have explicit key properties using reflection-free approach.
+            Pure function for property detection.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Extensions.CommandSettingsExtensions.GetEncKeyProperty(Gp4Net.Tool.Commands.SecureCommandSettings)">
+            <summary>
+            Gets encryption key property value using safe property access.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Extensions.CommandSettingsExtensions.GetMacKeyProperty(Gp4Net.Tool.Commands.SecureCommandSettings)">
+            <summary>
+            Gets MAC key property value using safe property access.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Extensions.CommandSettingsExtensions.GetDekKeyProperty(Gp4Net.Tool.Commands.SecureCommandSettings)">
+            <summary>
+            Gets DEK key property value using safe property access.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Extensions.CommandSettingsExtensions.ExtractKeyVersion(Gp4Net.Tool.Commands.SecureCommandSettings)">
+            <summary>
+            Extracts key version from settings with functional fallback.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Extensions.CommandSettingsExtensions.ExtractKeysetParameters(Gp4Net.Tool.Commands.SecureCommandSettings)">
+            <summary>
+            Extracts keyset parameters using safe property access.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Extensions.CommandSettingsExtensions.ExtractHexKey(CSharpFunctionalExtensions.Maybe{System.String})">
+            <summary>
+            Converts hex string to byte array using pure functional error handling.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Extensions.CommandSettingsExtensions.GetPropertyValue(System.Type,System.Object,System.String)">
+            <summary>
+            Safe property value extraction using reflection.
+            Pure function with Maybe return type.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Extensions.CommandSettingsExtensions.HasPropertyWithValue(System.Type,System.Object,System.String)">
+            <summary>
+            Checks if a property exists and has a non-empty value.
+            </summary>
         </member>
         <member name="T:Gp4Net.Tool.Infrastructure.ByteTypeConverter">
             <summary>
@@ -2276,32 +2255,45 @@
         </member>
         <member name="T:Gp4Net.Tool.Pipeline.CliContext">
             <summary>
-            Implementation of CLI execution context using functional patterns.
+            Pure functional implementation of CLI execution context.
+            Eliminates imperative keyset resolution and provides pure pipeline functions.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Pipeline.CliContext.EstablishSecureChannelAsync">
+            <summary>
+            Pure function for establishing secure channels from user requests.
+            Eliminates imperative command-level keyset resolution.
             </summary>
         </member>
         <member name="M:Gp4Net.Tool.Pipeline.CliContext.GetGlobalPlatformService">
             <summary>
-            Gets or creates the GlobalPlatform service instance.
+            Gets the GlobalPlatform service instance.
+            Pure accessor - service created during construction.
             </summary>
         </member>
         <member name="M:Gp4Net.Tool.Pipeline.CliContext.RequireCardConnection(CSharpFunctionalExtensions.Maybe{System.String})">
             <summary>
-            Ensures a card connection is established - functional implementation.
+            Ensures a card connection is established using pure functional patterns.
             </summary>
         </member>
         <member name="M:Gp4Net.Tool.Pipeline.CliContext.RequireSecureChannel(System.Byte,CSharpFunctionalExtensions.Maybe{System.String})">
             <summary>
-            Ensures a secure channel is established - functional implementation.
+            Pure secure channel requirement - handled by EstablishSecureChannelAsync function.
             </summary>
         </member>
         <member name="M:Gp4Net.Tool.Pipeline.CliContext.ExecuteAsync(System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Threading.Tasks.Task{System.Int32}})">
             <summary>
-            Executes command logic with error handling.
+            Executes command logic using pure functional error handling.
             </summary>
         </member>
         <member name="M:Gp4Net.Tool.Pipeline.CliContext.ExecuteAsync(System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Int32})">
             <summary>
-            Executes synchronous command logic with error handling.
+            Executes synchronous command logic using pure functional error handling.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.CliContext.ExecuteCommandWithErrorHandling(System.Func{System.Threading.Tasks.Task{System.Int32}})">
+            <summary>
+            Pure functional error handling for command execution.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Pipeline.CommandContextExtensions">
@@ -2391,12 +2383,12 @@
         </member>
         <member name="M:Gp4Net.Tool.Pipeline.FunctionalCommandExtensions.RequireCardConnectionFunctional(Gp4Net.Tool.Pipeline.ICliExecutionContext,System.String)">
             <summary>
-            Ensures a card connection using functional patterns.
+            Ensures a card connection.
             </summary>
         </member>
         <member name="M:Gp4Net.Tool.Pipeline.FunctionalCommandExtensions.RequireSecureChannelFunctional(Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Byte,System.String)">
             <summary>
-            Ensures a secure channel using functional patterns.
+            Ensures a secure channel.
             </summary>
         </member>
         <member name="M:Gp4Net.Tool.Pipeline.FunctionalCommandExtensions.ThenAsync``1(System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.String}},System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{``0,System.String}}})">
@@ -2416,7 +2408,7 @@
         </member>
         <member name="M:Gp4Net.Tool.Pipeline.FunctionalCommandExtensions.ExecuteCardCommandFunctional(Gp4Net.Tool.Pipeline.ICliExecutionContext,Spectre.Console.Cli.CommandSettings,System.Func{Gp4Net.Tool.Pipeline.ICliExecutionContext,System.Threading.Tasks.Task{CSharpFunctionalExtensions.Result{System.Boolean,System.String}}})">
             <summary>
-            Executes a card command using functional patterns with connection and error handling.
+            Executes a card command with connection and error handling.
             </summary>
         </member>
         <member name="T:Gp4Net.Tool.Pipeline.ICliExecutionContext">
@@ -2435,15 +2427,21 @@
             Gets the smart card service for functional card operations.
             </summary>
         </member>
+        <member name="P:Gp4Net.Tool.Pipeline.ICliExecutionContext.KeysetResolver">
+            <summary>
+            Gets the keyset resolver for resolving keysets by name or parameters.
+            </summary>
+        </member>
         <member name="M:Gp4Net.Tool.Pipeline.ICliExecutionContext.GetGlobalPlatformService">
             <summary>
             Gets the GlobalPlatform service for GP operations.
             Creates the service on demand with proper pipeline context.
             </summary>
         </member>
-        <member name="P:Gp4Net.Tool.Pipeline.ICliExecutionContext.KeysetResolver">
+        <member name="P:Gp4Net.Tool.Pipeline.ICliExecutionContext.EstablishSecureChannelAsync">
             <summary>
-            Gets the keyset resolver for key management.
+            Gets a pure function for establishing secure channels from user requests.
+            Eliminates imperative keyset resolution patterns in commands.
             </summary>
         </member>
         <member name="M:Gp4Net.Tool.Pipeline.ICliExecutionContext.RequireCardConnection(CSharpFunctionalExtensions.Maybe{System.String})">
@@ -2533,6 +2531,74 @@
             Checks if verbose mode is enabled using reflection.
             </summary>
         </member>
+        <member name="T:Gp4Net.Tool.Pipeline.SecureChannelExecutionContext">
+            <summary>
+            Immutable execution context with established secure channel.
+            Pure functional container for secure channel operations.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.SecureChannelExecutionContext.#ctor(Gp4Net.Services.IGlobalPlatformService,Gp4Net.Domain.SecureChannelState)">
+            <summary>
+            Immutable execution context with established secure channel.
+            Pure functional container for secure channel operations.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.SecureChannelOperations">
+            <summary>
+            Pure functional operations for secure channel establishment.
+            Provides functional composition for secure channel pipeline.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.SecureChannelOperations.EstablishFromRequestAsync(Gp4Net.Tool.Pipeline.SecureChannelRequest,Gp4Net.Services.ISmartCardService,Gp4Net.Services.IKeysetResolver,System.Threading.CancellationToken)">
+            <summary>
+            Establishes secure channel from a functional request structure.
+            Pure function that converts request to secure channel operations.
+            </summary>
+            <param name="request">The secure channel request.</param>
+            <param name="cardService">The smart card service.</param>
+            <param name="keysetResolver">The keyset resolver.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>A secure channel execution context or error.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.SecureChannelOperations.EstablishWithExplicitKeysAsync(Gp4Net.Services.IGlobalPlatformService,Gp4Net.Tool.Pipeline.ExplicitKeys,System.Byte,System.Threading.CancellationToken)">
+            <summary>
+            Establishes secure channel with explicit keys.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.SecureChannelOperations.EstablishWithKeysetAsync(Gp4Net.Services.IGlobalPlatformService,System.String,System.Byte,System.Threading.CancellationToken)">
+            <summary>
+            Establishes secure channel with named keyset.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.SecureChannelOperations.EstablishWithDefaultKeysetAsync(Gp4Net.Services.IGlobalPlatformService,System.Byte,System.Threading.CancellationToken)">
+            <summary>
+            Establishes secure channel with default keyset.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.SecureChannelRequest">
+            <summary>
+            Immutable request for secure channel establishment.
+            Pure data structure for functional secure channel pipeline.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.SecureChannelRequest.#ctor(CSharpFunctionalExtensions.Maybe{System.String},CSharpFunctionalExtensions.Maybe{Gp4Net.Tool.Pipeline.ExplicitKeys},CSharpFunctionalExtensions.Maybe{System.Collections.Generic.Dictionary{System.String,System.String}},Gp4Net.Domain.SecurityLevel,System.Byte)">
+            <summary>
+            Immutable request for secure channel establishment.
+            Pure data structure for functional secure channel pipeline.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Pipeline.ExplicitKeys">
+            <summary>
+            Immutable container for explicit key specifications.
+            Pure value object for functional key management.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Pipeline.ExplicitKeys.#ctor(System.Byte[],System.Byte[],System.Byte[])">
+            <summary>
+            Immutable container for explicit key specifications.
+            Pure value object for functional key management.
+            </summary>
+        </member>
         <member name="T:Gp4Net.Tool.Pipeline.VerboseLoggingHelper">
             <summary>
             Helper class to dynamically enable verbose console logging.
@@ -2567,6 +2633,12 @@
             </summary>
             <param name="provider">The service provider to validate.</param>
             <returns>Success if all services are registered, or an error message.</returns>
+        </member>
+        <member name="M:Gp4Net.Tool.Program.TryGetService(System.IServiceProvider,System.Type)">
+            <summary>
+            Functional helper to safely get a service from the container.
+            Returns Result with success/failure instead of using exceptions or null checks.
+            </summary>
         </member>
         <member name="T:Gp4Net.Tool.Services.ApplicationDisplayService">
             <summary>
@@ -2876,9 +2948,9 @@
             CPLC manufacturer codes for identifying card vendors.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Services.CardCompatibilityService.#ctor(Microsoft.Extensions.Logging.ILogger{Gp4Net.Tool.Services.CardCompatibilityService},Gp4Net.Tool.Services.IEnvironmentValidationService)">
+        <member name="M:Gp4Net.Tool.Services.CardCompatibilityService.Create(Microsoft.Extensions.Logging.ILogger{Gp4Net.Tool.Services.CardCompatibilityService},Gp4Net.Tool.Services.IEnvironmentValidationService)">
             <summary>
-            Initializes a new instance of CardCompatibilityService.
+            Creates a new CardCompatibilityService with validated dependencies.
             </summary>
         </member>
         <member name="M:Gp4Net.Tool.Services.CardCompatibilityService.CheckCompatibilityAsync(Gp4Net.Tool.Services.CardOperation,Gp4Net.Domain.Keys.IKeySet,Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
@@ -2890,46 +2962,134 @@
         <member name="M:Gp4Net.Tool.Services.CardCompatibilityService.GetAuthenticationAttemptCountAsync(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
             <inheritdoc />
         </member>
-        <member name="T:Gp4Net.Tool.Services.IDomainServiceFactory">
+        <member name="T:Gp4Net.Tool.Services.CardInfoDisplayService">
             <summary>
-            Factory interface for creating domain services with proper pipeline context.
+            Tool service for displaying card information with consistent formatting.
+            Contains reusable display logic for card info across commands.
             </summary>
         </member>
-        <member name="M:Gp4Net.Tool.Services.IDomainServiceFactory.CreateGlobalPlatformService(Gp4Net.Services.ISmartCardService)">
+        <member name="M:Gp4Net.Tool.Services.CardInfoDisplayService.DisplayCardInfoTable(System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.TableRow},System.String,CSharpFunctionalExtensions.Maybe{Spectre.Console.Color})">
             <summary>
-            Creates a GlobalPlatform service for the given smart card service.
+            Displays card information table with semantic row rendering.
             </summary>
-            <param name="smartCardService">The smart card service to use for communication.</param>
-            <returns>A configured GlobalPlatform service with proper pipeline context.</returns>
+            <param name="rows">Semantic table rows from CardInfoTableBuilder</param>
+            <param name="title">Panel title</param>
+            <param name="borderColor">Panel border color</param>
         </member>
-        <member name="M:Gp4Net.Tool.Services.IDomainServiceFactory.CreateCardContentRetriever(Gp4Net.Services.ISmartCardService)">
+        <member name="M:Gp4Net.Tool.Services.CardInfoDisplayService.DisplayKeysetSuggestions(System.Boolean)">
             <summary>
-            Creates a card content retriever for comprehensive card listing functionality.
+            Displays keyset suggestions when secure channel is not established.
             </summary>
-            <param name="smartCardService">The smart card service to use for communication.</param>
-            <returns>A configured card content retriever with auto-detection capabilities.</returns>
+            <param name="isSecureChannelEstablished">Whether secure channel is active</param>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardInfoDisplayService.RenderSemanticRows(Spectre.Console.Table,System.Collections.Generic.IEnumerable{Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.TableRow})">
+            <summary>
+            Pure function to render semantic rows to Spectre.Console table using functional composition.
+            Uses pattern matching to apply appropriate formatting per row type.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardInfoDisplayService.RenderSingleRow(Spectre.Console.Table,Gp4Net.Tool.Commands.Card.CardInfoTableBuilder.TableRow)">
+            <summary>
+            Renders a single semantic row to the table using pattern matching.
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardOperation">
+            <summary>
+            Represents the type of operation being checked for compatibility.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardOperation.Authentication">
+            <summary>
+            Authentication operation (secure channel establishment).
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardOperation.KeyInstallation">
+            <summary>
+            Key installation or replacement.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardOperation.ApplicationInstallation">
+            <summary>
+            Application installation.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardOperation.ApplicationDeletion">
+            <summary>
+            Application deletion.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardOperation.Personalization">
+            <summary>
+            Card personalization.
+            </summary>
+        </member>
+        <member name="F:Gp4Net.Tool.Services.CardOperation.ReadOnly">
+            <summary>
+            Read-only operations (safe).
+            </summary>
+        </member>
+        <member name="T:Gp4Net.Tool.Services.CardTypeInfo">
+            <summary>
+            Represents detected card type information.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.Manufacturer">
+            <summary>
+            Gets the card manufacturer.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.Family">
+            <summary>
+            Gets the card family or series.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.Model">
+            <summary>
+            Gets the specific card model if detected.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.IsProduction">
+            <summary>
+            Gets whether this is a production card.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.MaxAuthenticationAttempts">
+            <summary>
+            Gets the maximum authentication attempts before lockout if known.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.SupportedProtocols">
+            <summary>
+            Gets supported secure channel protocols.
+            </summary>
+        </member>
+        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.KnownLimitations">
+            <summary>
+            Gets known limitations or risks for this card type.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardTypeInfo.#ctor(System.String,System.String,System.String,System.Boolean,CSharpFunctionalExtensions.Maybe{System.Int32},System.String[],System.String[])">
+            <summary>
+            Initializes a new instance of CardTypeInfo.
+            </summary>
+        </member>
+        <member name="M:Gp4Net.Tool.Services.CardTypeInfo.ToString">
+            <summary>
+            Gets a descriptive name for this card type.
+            </summary>
         </member>
         <member name="T:Gp4Net.Tool.Services.DomainServiceFactory">
             <summary>
-            Factory implementation that creates domain services with proper functional context.
-            Ensures proper functional composition and explicit dependencies.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.DomainServiceFactory.#ctor(Gp4Net.Transport.IApduTransportFactory,Gp4Net.Domain.Protocol.ISecureChannelManager,Microsoft.Extensions.Logging.ILogger{Gp4Net.Tool.Services.DomainServiceFactory})">
-            <summary>
-            Initializes a new instance of the DomainServiceFactory.
+            Factory for creating domain service instances.
+            Creates instance-based services for dependency injection scenarios.
             </summary>
         </member>
         <member name="M:Gp4Net.Tool.Services.DomainServiceFactory.CreateGlobalPlatformService(Gp4Net.Services.ISmartCardService)">
-            <inheritdoc/>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.DomainServiceFactory.CreateCardContentRetriever(Gp4Net.Services.ISmartCardService)">
-            <inheritdoc/>
-        </member>
-        <member name="T:Gp4Net.Tool.Services.LoggerWrapper`1">
             <summary>
-            Logger wrapper to adapt ILogger interfaces.
+            Creates a GlobalPlatform service instance from an existing smart card service.
             </summary>
+            <param name="cardService">The smart card service to wrap.</param>
+            <returns>A configured GlobalPlatform service instance.</returns>
         </member>
         <member name="T:Gp4Net.Tool.Services.EnvironmentValidationService">
             <summary>
@@ -2964,108 +3124,6 @@
         </member>
         <member name="M:Gp4Net.Tool.Services.EnvironmentValidationService.DetectCardEnvironmentAsync(Gp4Net.Transport.ICardChannel,Gp4Net.Transport.IApduTransport,System.Threading.CancellationToken)">
             <inheritdoc />
-        </member>
-        <member name="T:Gp4Net.Tool.Services.FunctionalKeysetResolver">
-            <summary>
-            Pure functional keyset resolver that replaces Lua-based KeysetResolver.
-            Provides key diversification and GP test key resolution without external dependencies.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.ResolveKeyset(System.String,System.Collections.Generic.Dictionary{System.String,System.String},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},System.Byte,CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Commands.InitializeUpdateResponse})">
-            <summary>
-            Resolves a keyset using pure functional implementation instead of Lua scripts.
-            Supports GP test keys with proper diversification based on card response.
-            </summary>
-            <param name="keysetSpec">The keyset specification (only 'gp_test_keys' supported).</param>
-            <param name="keysetParams">Parameters for the keyset (unused in functional implementation).</param>
-            <param name="encKey">Explicit encryption key (overrides keyset).</param>
-            <param name="macKey">Explicit MAC key (overrides keyset).</param>
-            <param name="dekKey">Explicit DEK key (overrides keyset).</param>
-            <param name="keyVersion">The key version.</param>
-            <param name="cardResponse">Card response containing diversification data.</param>
-            <returns>Result containing the resolved keyset or error.</returns>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.ResolveBySpec(System.String,System.Byte,CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Commands.InitializeUpdateResponse})">
-            <summary>
-            Resolves keyset by specification string.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.ResolveGpTestKeys(System.Byte,CSharpFunctionalExtensions.Maybe{Gp4Net.Domain.Commands.InitializeUpdateResponse})">
-            <summary>
-            Resolves GP test keys with optional diversification based on card response.
-            This is the functional replacement for the Lua gp_test_keys.lua script.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.ApplyDiversificationIfPresent(Gp4Net.Domain.Keys.IKeySet,Gp4Net.Domain.Commands.InitializeUpdateResponse,System.Byte)">
-            <summary>
-            Applies diversification if present in the card response.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.ApplyKeyDiversification(Gp4Net.Domain.Keys.IKeySet,System.Byte[],System.Byte)">
-            <summary>
-            Applies key diversification to base GP test keys using card-specific diversification data.
-            This replaces the apply_diversification() function from Lua scripts.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.CreateDiversifiedScp02Keys(Gp4Net.Domain.Keys.Scp02KeySet,System.Byte[],System.Byte)">
-            <summary>
-            Creates diversified SCP02 keys using production key derivation logic.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.CreateDiversifiedScp03Keys(Gp4Net.Domain.Keys.Scp03KeySet,System.Byte[],System.Byte)">
-            <summary>
-            Creates diversified SCP03 keys using production key derivation logic.
-            SCP03 diversification requires AES operations and is card-specific.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.DiversifyKey(System.Byte[],System.Byte[],System.Byte)">
-            <summary>
-            Diversifies a single key using 3DES and diversification data.
-            This is the functional equivalent of key diversification in Lua scripts.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.PadToLength(System.Byte[],System.Int32)">
-            <summary>
-            Pads input data to specified length with zeros.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.CreateKeysetFromExplicitKeys(CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},System.Byte)">
-            <summary>
-            Creates a keyset from explicitly provided keys.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.ValidateAndCreateKeyset(System.Byte[],System.Byte[],System.Byte[],System.Byte)">
-            <summary>
-            Validates key lengths and creates keyset.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.ValidateKeyLength(System.Byte[],System.String)">
-            <summary>
-            Validates that a key has the correct length.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolver.HasExplicitKeys(CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]},CSharpFunctionalExtensions.Maybe{System.Byte[]})">
-            <summary>
-            Checks if any explicit keys are provided.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Services.FunctionalKeysetResolverAdapter">
-            <summary>
-            Adapter class that implements IKeysetResolver interface using the functional implementation.
-            This allows the functional resolver to be used wherever IKeysetResolver is expected.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.FunctionalKeysetResolverAdapter.ResolveKeyset(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Byte[],System.Byte[],System.Byte[],System.Byte,Gp4Net.Domain.Commands.InitializeUpdateResponse)">
-            <summary>
-            Resolves a keyset using the functional implementation.
-            Returns error as SmartCardError wrapped in Result pattern for proper functional handling.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Services.FailedKeyset">
-            <summary>
-            Failed keyset implementation that represents keyset resolution failure.
-            All operations using this keyset should fail as intended.
-            </summary>
         </member>
         <member name="T:Gp4Net.Tool.Services.ICardCompatibilityService">
             <summary>
@@ -3143,90 +3201,19 @@
             Initializes a new instance of CardCompatibilityResult.
             </summary>
         </member>
-        <member name="T:Gp4Net.Tool.Services.CardTypeInfo">
+        <member name="T:Gp4Net.Tool.Services.IDomainServiceFactory">
             <summary>
-            Represents detected card type information.
+            Pure functional factory for domain services.
+            Eliminates imperative service creation patterns in commands.
             </summary>
         </member>
-        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.Manufacturer">
+        <member name="M:Gp4Net.Tool.Services.IDomainServiceFactory.CreateGlobalPlatformService(Gp4Net.Services.ISmartCardService)">
             <summary>
-            Gets the card manufacturer.
+            Creates a GlobalPlatform service from an existing smart card service.
+            Pure function that returns configured service instance.
             </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.Family">
-            <summary>
-            Gets the card family or series.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.Model">
-            <summary>
-            Gets the specific card model if detected.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.IsProduction">
-            <summary>
-            Gets whether this is a production card.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.MaxAuthenticationAttempts">
-            <summary>
-            Gets the maximum authentication attempts before lockout.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.SupportedProtocols">
-            <summary>
-            Gets supported secure channel protocols.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.KnownLimitations">
-            <summary>
-            Gets known limitations or risks for this card type.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.CardTypeInfo.#ctor(System.String,System.String,System.String,System.Boolean,System.Nullable{System.Int32},System.String[],System.String[])">
-            <summary>
-            Initializes a new instance of CardTypeInfo.
-            </summary>
-        </member>
-        <member name="P:Gp4Net.Tool.Services.CardTypeInfo.DisplayName">
-            <summary>
-            Gets a descriptive name for this card type.
-            </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Services.CardOperation">
-            <summary>
-            Represents the type of operation being checked for compatibility.
-            </summary>
-        </member>
-        <member name="F:Gp4Net.Tool.Services.CardOperation.Authentication">
-            <summary>
-            Authentication operation (secure channel establishment).
-            </summary>
-        </member>
-        <member name="F:Gp4Net.Tool.Services.CardOperation.KeyInstallation">
-            <summary>
-            Key installation or replacement.
-            </summary>
-        </member>
-        <member name="F:Gp4Net.Tool.Services.CardOperation.ApplicationInstallation">
-            <summary>
-            Application installation.
-            </summary>
-        </member>
-        <member name="F:Gp4Net.Tool.Services.CardOperation.ApplicationDeletion">
-            <summary>
-            Application deletion.
-            </summary>
-        </member>
-        <member name="F:Gp4Net.Tool.Services.CardOperation.Personalization">
-            <summary>
-            Card personalization.
-            </summary>
-        </member>
-        <member name="F:Gp4Net.Tool.Services.CardOperation.ReadOnly">
-            <summary>
-            Read-only operations (safe).
-            </summary>
+            <param name="cardService">The smart card service to wrap.</param>
+            <returns>A configured GlobalPlatform service.</returns>
         </member>
         <member name="T:Gp4Net.Tool.Services.IEnvironmentValidationService">
             <summary>
@@ -3320,24 +3307,6 @@
             <summary>
             Virtual/emulated card for testing.
             </summary>
-        </member>
-        <member name="T:Gp4Net.Tool.Services.IKeysetResolver">
-            <summary>
-            Interface for resolving keysets from script functions or explicit parameters.
-            </summary>
-        </member>
-        <member name="M:Gp4Net.Tool.Services.IKeysetResolver.ResolveKeyset(System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Byte[],System.Byte[],System.Byte[],System.Byte,Gp4Net.Domain.Commands.InitializeUpdateResponse)">
-            <summary>
-            Resolves a keyset from various sources.
-            </summary>
-            <param name="keysetSpec">The keyset specification (e.g., 'gp_test_keys' or 'script:function').</param>
-            <param name="keysetParams">Parameters for the keyset function.</param>
-            <param name="encKey">Explicit encryption key (overrides keyset).</param>
-            <param name="macKey">Explicit MAC key (overrides keyset).</param>
-            <param name="dekKey">Explicit DEK key (overrides keyset).</param>
-            <param name="keyVersion">The key version.</param>
-            <param name="cardResponse">Optional card response for key diversification.</param>
-            <returns>The resolved keyset.</returns>
         </member>
         <member name="T:Gp4Net.Tool.Services.ReaderNameResolver">
             <summary>

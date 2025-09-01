@@ -1,10 +1,10 @@
 using System.Collections.Immutable;
 using System.Linq;
+using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
 using NUnit.Framework;
-using AwesomeAssertions;
 
 namespace Gp4Net.Tests.Domain.CardInfo;
 
@@ -27,11 +27,13 @@ public class CardCapabilitiesTests
             0x70, // Supported options = 70
             0x82,
             0x01,
-            0x07 // Supported keys = 07 (all AES lengths)
+            0x07, // Supported keys = 07 (all AES lengths)
         ];
 
         // Act
-        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(
+            Maybe<byte[]>.From(data)
+        );
         _ = result.IsSuccess.Should().BeTrue();
         CardCapabilities? capabilities = result.Value;
 
@@ -60,11 +62,13 @@ public class CardCapabilitiesTests
             0x03, // Tag 80, length 3
             0xC0,
             0x00,
-            0x00 // SD privileges
+            0x00, // SD privileges
         ];
 
         // Act
-        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(
+            Maybe<byte[]>.From(data)
+        );
         _ = result.IsSuccess.Should().BeTrue();
         CardCapabilities? capabilities = result.Value;
 
@@ -85,11 +89,13 @@ public class CardCapabilitiesTests
             0x03, // Tag 81, length 3
             0x00,
             0x02,
-            0x00 // App privileges with FinalApplication
+            0x00, // App privileges with FinalApplication
         ];
 
         // Act
-        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(
+            Maybe<byte[]>.From(data)
+        );
         _ = result.IsSuccess.Should().BeTrue();
         CardCapabilities? capabilities = result.Value;
 
@@ -108,11 +114,13 @@ public class CardCapabilitiesTests
             0x82,
             0x02, // Tag 82, length 2
             0x03,
-            0x00 // SHA-1 and SHA-256 supported
+            0x00, // SHA-1 and SHA-256 supported
         ];
 
         // Act
-        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(
+            Maybe<byte[]>.From(data)
+        );
         _ = result.IsSuccess.Should().BeTrue();
         CardCapabilities? capabilities = result.Value;
 
@@ -132,17 +140,21 @@ public class CardCapabilitiesTests
             0x86,
             0x02, // Tag 86 (DAP verification), length 2
             0x01,
-            0x02 // DES_MAC and AES_CMAC_128
+            0x02, // DES_MAC and AES_CMAC_128
         ];
 
         // Act
-        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(
+            Maybe<byte[]>.From(data)
+        );
         _ = result.IsSuccess.Should().BeTrue();
         CardCapabilities? capabilities = result.Value;
 
         // Assert
         _ = capabilities.CipherSuites.ContainsKey(CipherUsage.DapVerification).Should().BeTrue();
-        ImmutableList<CipherSuite>? ciphers = capabilities.CipherSuites[CipherUsage.DapVerification];
+        ImmutableList<CipherSuite>? ciphers = capabilities.CipherSuites[
+            CipherUsage.DapVerification
+        ];
         _ = ciphers.Should().Contain(CipherSuite.Des3Mac);
         _ = ciphers.Should().Contain(CipherSuite.AesCmac128);
     }
@@ -153,7 +165,6 @@ public class CardCapabilitiesTests
         // Arrange - Complex capabilities like from the trace
         byte[] data =
         [
-
             // SCP options
             0xA0,
             0x09,
@@ -189,11 +200,13 @@ public class CardCapabilitiesTests
             0x01,
             0x02,
             0x03,
-            0x04
+            0x04,
         ];
 
         // Act
-        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(
+            Maybe<byte[]>.From(data)
+        );
         _ = result.IsSuccess.Should().BeTrue();
         CardCapabilities? capabilities = result.Value;
 
@@ -233,11 +246,13 @@ public class CardCapabilitiesTests
             0x03,
             0xC0,
             0x00,
-            0x00
+            0x00,
         ];
 
         // Act
-        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
+        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(
+            Maybe<byte[]>.From(data)
+        );
         _ = result.IsSuccess.Should().BeTrue();
         CardCapabilities? capabilities = result.Value;
         string? output = capabilities.ToString();

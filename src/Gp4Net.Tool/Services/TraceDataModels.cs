@@ -12,16 +12,19 @@ public class TraceMetadata
     /// <summary>
     /// Card type identifier.
     /// </summary>
+    // @TODO: We shouldn't hard code this
     public string CardType { get; set; } = "NXP_P71";
 
     /// <summary>
     /// Answer to Reset (ATR) value.
     /// </summary>
+    // @TODO: WTF?  A) Don't hard code this, b) why does this exist at all in a trace datamodel?
     public string Atr { get; set; } = "3BD518FF8191FE1FC38073C821100A";
 
     /// <summary>
     /// Issuer Security Domain AID.
     /// </summary>
+    // @TODO: WTF?  A) Don't hard code this, b) why does this exist at all in a trace datamodel?
     public string IsdAid { get; set; } = "A000000151000000";
 }
 

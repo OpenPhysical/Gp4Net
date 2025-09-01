@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using AwesomeAssertions;
 using Gp4Net.Domain.CardInfo;
 using NUnit.Framework;
@@ -17,8 +16,8 @@ public class ChipInfoTests
         CplcData cplc = new CplcData
         {
             IcFabricator = 0x4790, // NXP
-            IcType = 0xD321,       // P71D321
-            OperatingSystemId = 0x4700 // JCOP4
+            IcType = 0xD321, // P71D321
+            OperatingSystemId = 0x4700, // JCOP4
         };
 
         // Act
@@ -49,8 +48,8 @@ public class ChipInfoTests
         CplcData cplc = new CplcData
         {
             IcFabricator = 0x9999, // Unknown
-            IcType = 0x8888,       // Unknown
-            OperatingSystemId = 0x7777 // Unknown
+            IcType = 0x8888, // Unknown
+            OperatingSystemId = 0x7777, // Unknown
         };
 
         // Act
@@ -75,7 +74,7 @@ public class ChipInfoTests
             Manufacturer = IcFabricator.NXP,
             ChipType = IcType.P71D321,
             Platform = ChipPlatform.SmartMX3,
-            MemoryConfig = P71MemoryConfiguration.P71D351
+            MemoryConfig = P71MemoryConfiguration.P71D351,
         };
 
         // Act
@@ -90,13 +89,12 @@ public class ChipInfoTests
     [TestCase(P71MemoryConfiguration.P71D351, "344KB Flash / 12KB RAM")]
     [TestCase(P71MemoryConfiguration.P71D352, "344KB Flash / 1KB RAM")]
     public void GetMemoryDescription_WithDifferentConfigs_ReturnsCorrectDescription(
-        P71MemoryConfiguration config, string expected)
+        P71MemoryConfiguration config,
+        string expected
+    )
     {
         // Arrange
-        ChipInfo chipInfo = new ChipInfo
-        {
-            MemoryConfig = config
-        };
+        ChipInfo chipInfo = new ChipInfo { MemoryConfig = config };
 
         // Act
         string? description = chipInfo.GetMemoryDescription();
@@ -111,12 +109,12 @@ public class ChipInfoTests
         // Arrange
         ChipInfo chipInfo = new ChipInfo
         {
-            Certifications = new[]
-            {
+            Certifications =
+            [
                 SecurityCertification.CommonCriteriaEAL6Plus,
                 SecurityCertification.FIPS140_2_Level3,
-                SecurityCertification.EMVCo
-            }.ToImmutableList()
+                SecurityCertification.EMVCo,
+            ],
         };
 
         // Act
@@ -134,7 +132,7 @@ public class ChipInfoTests
         {
             JcopVersion = "4",
             JavaCardVersion = "3.0.5",
-            GlobalPlatformVersion = "2.3.1"
+            GlobalPlatformVersion = "2.3.1",
         };
 
         // Act
@@ -150,7 +148,7 @@ public class ChipInfoTests
         // Arrange
         ChipInfo chipInfo = new ChipInfo
         {
-            CryptoCapabilities = CryptoCapabilities.P71D321Standard
+            CryptoCapabilities = CryptoCapabilities.P71D321Standard,
         };
 
         // Act
@@ -169,7 +167,7 @@ public class ChipInfoTests
         // Arrange
         CplcData cplc = new CplcData
         {
-            IcFabricator = 0x4790 // NXP
+            IcFabricator = 0x4790, // NXP
         };
 
         // Act
@@ -183,10 +181,7 @@ public class ChipInfoTests
     public void CplcData_GetManufacturerName_WithUnknownManufacturer_ReturnsHexCode()
     {
         // Arrange
-        CplcData cplc = new CplcData
-        {
-            IcFabricator = 0x9999
-        };
+        CplcData cplc = new CplcData { IcFabricator = 0x9999 };
 
         // Act
         string? name = cplc.GetManufacturerName();
@@ -201,7 +196,7 @@ public class ChipInfoTests
         // Arrange
         CplcData cplc = new CplcData
         {
-            IcType = 0xD321 // P71D321
+            IcType = 0xD321, // P71D321
         };
 
         // Act
@@ -217,7 +212,7 @@ public class ChipInfoTests
         // Arrange
         CplcData cplc = new CplcData
         {
-            OperatingSystemId = 0x4700 // JCOP4
+            OperatingSystemId = 0x4700, // JCOP4
         };
 
         // Act

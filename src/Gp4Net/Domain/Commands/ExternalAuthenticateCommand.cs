@@ -73,19 +73,32 @@ public class ExternalAuthenticateCommand : BaseApduCommand
         byte[] mac
     )
     {
-        return Maybe<byte[]>.From(hostCryptogram).Match(
-            Some: hostCrypto => Maybe<byte[]>.From(mac).Match(
-                Some: macValue => ValidateAndCreateWithMac(securityLevel, hostCrypto, macValue),
-                None: () => SmartCardError.InvalidArgument("MAC cannot be null")),
-            None: () => SmartCardError.InvalidArgument("Host cryptogram cannot be null"));
+        return Maybe<byte[]>
+            .From(hostCryptogram)
+            .Match(
+                Some: hostCrypto =>
+                    Maybe<byte[]>
+                        .From(mac)
+                        .Match(
+                            Some: macValue =>
+                                ValidateAndCreateWithMac(securityLevel, hostCrypto, macValue),
+                            None: () => SmartCardError.InvalidArgument("MAC cannot be null")
+                        ),
+                None: () => SmartCardError.InvalidArgument("Host cryptogram cannot be null")
+            );
     }
 
     private static Result<ExternalAuthenticateCommand, SmartCardError> ValidateAndCreateWithMac(
-        SecurityLevel securityLevel, byte[] hostCryptogram, byte[] mac)
+        SecurityLevel securityLevel,
+        byte[] hostCryptogram,
+        byte[] mac
+    )
     {
         if (hostCryptogram.Length != 8)
         {
-            return SmartCardError.InvalidArgument($"Host cryptogram must be 8 bytes, got {hostCryptogram.Length}");
+            return SmartCardError.InvalidArgument(
+                $"Host cryptogram must be 8 bytes, got {hostCryptogram.Length}"
+            );
         }
 
         if (mac.Length != 8)
@@ -107,9 +120,12 @@ public class ExternalAuthenticateCommand : BaseApduCommand
         byte[] hostCryptogram
     )
     {
-        return Maybe<byte[]>.From(hostCryptogram).Match(
-            Some: hostCrypto => ValidateAndCreateWithoutMac(securityLevel, hostCrypto),
-            None: () => SmartCardError.InvalidArgument("Host cryptogram cannot be null"));
+        return Maybe<byte[]>
+            .From(hostCryptogram)
+            .Match(
+                Some: hostCrypto => ValidateAndCreateWithoutMac(securityLevel, hostCrypto),
+                None: () => SmartCardError.InvalidArgument("Host cryptogram cannot be null")
+            );
     }
 
     /// <summary>
@@ -119,22 +135,30 @@ public class ExternalAuthenticateCommand : BaseApduCommand
     /// <returns>A result containing the command or an error.</returns>
     public static Result<ExternalAuthenticateCommand, SmartCardError> Create(byte[] commandData)
     {
-        return Maybe<byte[]>.From(commandData).Match(
-            Some: data => ParseCommandData(data),
-            None: () => SmartCardError.InvalidArgument("Command data cannot be null"));
+        return Maybe<byte[]>
+            .From(commandData)
+            .Match(
+                Some: data => ParseCommandData(data),
+                None: () => SmartCardError.InvalidArgument("Command data cannot be null")
+            );
     }
 
-    private static Result<ExternalAuthenticateCommand, SmartCardError> ParseCommandData(byte[] commandData)
+    private static Result<ExternalAuthenticateCommand, SmartCardError> ParseCommandData(
+        byte[] commandData
+    )
     {
         if (commandData.Length < 9)
         {
-            return SmartCardError.InvalidArgument($"Command data must be at least 9 bytes (8-byte cryptogram + 1-byte security level), got {commandData.Length}");
+            return SmartCardError.InvalidArgument(
+                $"Command data must be at least 9 bytes (8-byte cryptogram + 1-byte security level), got {commandData.Length}"
+            );
         }
 
         byte[] hostCryptogram = commandData[..8];
         byte securityLevelByte = commandData[8];
 
-        return securityLevelByte.ToEnum<SecurityLevel>()
+        return securityLevelByte
+            .ToEnum<SecurityLevel>()
             .MapError(SmartCardError.InvalidArgument)
             .Bind(securityLevel =>
             {
@@ -144,19 +168,20 @@ public class ExternalAuthenticateCommand : BaseApduCommand
                     byte[] mac = commandData[9..];
                     return CreateWithMac(securityLevel, hostCryptogram, mac);
                 }
-                else
-                {
-                    return CreateWithoutMac(securityLevel, hostCryptogram);
-                }
+                return CreateWithoutMac(securityLevel, hostCryptogram);
             });
     }
 
     private static Result<ExternalAuthenticateCommand, SmartCardError> ValidateAndCreateWithoutMac(
-        SecurityLevel securityLevel, byte[] hostCryptogram)
+        SecurityLevel securityLevel,
+        byte[] hostCryptogram
+    )
     {
         if (hostCryptogram.Length != 8)
         {
-            return SmartCardError.InvalidArgument($"Host cryptogram must be 8 bytes, got {hostCryptogram.Length}");
+            return SmartCardError.InvalidArgument(
+                $"Host cryptogram must be 8 bytes, got {hostCryptogram.Length}"
+            );
         }
 
         return new ExternalAuthenticateCommand(securityLevel, hostCryptogram, []);
@@ -176,28 +201,19 @@ public class ExternalAuthenticateCommand : BaseApduCommand
     /// <inheritdoc />
     public override byte Ins
     {
-        get
-        {
-            return InstructionByte;
-        }
+        get { return InstructionByte; }
     }
 
     /// <inheritdoc />
     public override byte P1
     {
-        get
-        {
-            return (byte)SecurityLevel;
-        }
+        get { return (byte)SecurityLevel; }
     }
 
     /// <inheritdoc />
     public override byte P2
     {
-        get
-        {
-            return 0x00;
-        }
+        get { return 0x00; }
     }
 
     /// <inheritdoc />
@@ -227,7 +243,6 @@ public class ExternalAuthenticateCommand : BaseApduCommand
             // No response data expected
         }
     }
-
 
     /// <summary>
     /// Returns a string representation of this command.

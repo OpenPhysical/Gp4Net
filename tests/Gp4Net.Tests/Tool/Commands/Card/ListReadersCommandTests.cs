@@ -3,19 +3,21 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
-namespace Gp4Net.Tests.Tool.Commands.Card;
-
+using System;
+using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
+using Gp4Net.CardEmulator.Services;
 using Gp4Net.Core;
 using Gp4Net.Services;
 using Gp4Net.Tool.Commands.Card;
 using Gp4Net.Tool.Pipeline;
-using Gp4Net.CardEmulator.Services;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
-using TestHelpers;
+
+namespace Gp4Net.Tests.Tool.Commands.Card;
 
 /// <summary>
 /// Unit tests for the <see cref="ListReadersCommand"/> class.
@@ -38,7 +40,7 @@ public class ListReadersCommandTests
     [SetUp]
     public void SetUp()
     {
-        _displayService = new DisplayService(false);
+        _displayService = new DisplayService();
 
         _virtualCardService = new VirtualCardService();
         _virtualCardService.SetupComprehensiveTestEnvironment();
@@ -53,7 +55,7 @@ public class ListReadersCommandTests
             _smartCardService,
             _globalPlatformService,
             _keysetResolver,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance
+            NullLogger.Instance
         );
 
         _command = new ListReadersCommand();
@@ -121,7 +123,7 @@ public class ListReadersCommandTests
             failingCardService,
             _globalPlatformService,
             _keysetResolver,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance
+            NullLogger.Instance
         );
         ListReadersCommand.Settings settings = new ListReadersCommand.Settings();
 
@@ -149,7 +151,8 @@ public class TestCliContext : ICliExecutionContext
         ISmartCardService smartCardService,
         IGlobalPlatformService globalPlatformService,
         IKeysetResolver keysetResolver,
-        ILogger logger)
+        ILogger logger
+    )
     {
         Display = display;
         CardService = smartCardService;
@@ -160,15 +163,26 @@ public class TestCliContext : ICliExecutionContext
 
     public IGlobalPlatformService GetGlobalPlatformService() => _globalPlatformService;
 
-    public Task<Result<ICliExecutionContext, SmartCardError>> RequireCardConnection(Maybe<string> readerName = default) =>
-        Task.FromResult(Result.Success<ICliExecutionContext, SmartCardError>(this));
+    public Func<
+        SecureChannelRequest,
+        CancellationToken,
+        Task<Result<SecureChannelExecutionContext, SmartCardError>>
+    > EstablishSecureChannelAsync => (request, ct) => 
+        Task.FromResult(Result.Failure<SecureChannelExecutionContext, SmartCardError>(
+            SmartCardError.CommunicationError("Test context does not support secure channels")));
 
-    public Task<Result<ICliExecutionContext, SmartCardError>> RequireSecureChannel(byte securityLevel = 1, Maybe<string> keyset = default) =>
-        Task.FromResult(Result.Success<ICliExecutionContext, SmartCardError>(this));
+    public Task<Result<ICliExecutionContext, SmartCardError>> RequireCardConnection(
+        Maybe<string> readerName = default
+    ) => Task.FromResult(Result.Success<ICliExecutionContext, SmartCardError>(this));
 
-    public Task<int> ExecuteAsync(System.Func<ICliExecutionContext, Task<int>> commandLogic) =>
+    public Task<Result<ICliExecutionContext, SmartCardError>> RequireSecureChannel(
+        byte securityLevel = 1,
+        Maybe<string> keyset = default
+    ) => Task.FromResult(Result.Success<ICliExecutionContext, SmartCardError>(this));
+
+    public Task<int> ExecuteAsync(Func<ICliExecutionContext, Task<int>> commandLogic) =>
         commandLogic(this);
 
-    public Task<int> ExecuteAsync(System.Func<ICliExecutionContext, int> commandLogic) =>
+    public Task<int> ExecuteAsync(Func<ICliExecutionContext, int> commandLogic) =>
         Task.FromResult(commandLogic(this));
 }

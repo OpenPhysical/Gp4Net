@@ -39,7 +39,7 @@ public class SecurityLevelExtensionTests
         // Arrange
         SecurityLevel level = SecurityLevel.CDecryption;
 
-        // Act & Assert  
+        // Act & Assert
         _ = level.HasCDecryption().Should().BeTrue();
     }
 
@@ -66,7 +66,7 @@ public class SecurityLevelExtensionTests
     [Test]
     public void HasCEncryption_WithCDecryptionFlag_ReturnsTrue()
     {
-        // Arrange - CDecryption (0x03) includes CEncryption bit (0x02) 
+        // Arrange - CDecryption (0x03) includes CEncryption bit (0x02)
         // GP Card Specification v2.3.1: CDecryption is a composite flag including encryption capability
         SecurityLevel level = SecurityLevel.CDecryption;
 
@@ -78,27 +78,27 @@ public class SecurityLevelExtensionTests
     public void HasCEncryption_And_HasCDecryption_Should_Have_Correct_Relationships()
     {
         // Arrange - Test the correct relationships between flags
-        SecurityLevel encryptionOnly = SecurityLevel.CEncryption;      // 0x02 - just encryption
+        SecurityLevel encryptionOnly = SecurityLevel.CEncryption; // 0x02 - just encryption
         SecurityLevel decryptionComposite = SecurityLevel.CDecryption; // 0x03 - MAC + encryption
 
         // Act & Assert
         // CEncryption (0x02) should only have encryption, not full decryption capability
         _ = encryptionOnly.HasCEncryption().Should().BeTrue();
-        _ = encryptionOnly.HasCDecryption().Should().BeFalse();  // Needs both MAC (0x01) and encryption (0x02)
+        _ = encryptionOnly.HasCDecryption().Should().BeFalse(); // Needs both MAC (0x01) and encryption (0x02)
 
-        // CDecryption (0x03) should have both capabilities  
-        _ = decryptionComposite.HasCDecryption().Should().BeTrue();   // Has both MAC and encryption bits
-        _ = decryptionComposite.HasCEncryption().Should().BeTrue();   // Includes encryption bit (0x02)
-        _ = decryptionComposite.HasCMac().Should().BeTrue();          // Includes MAC bit (0x01)
+        // CDecryption (0x03) should have both capabilities
+        _ = decryptionComposite.HasCDecryption().Should().BeTrue(); // Has both MAC and encryption bits
+        _ = decryptionComposite.HasCEncryption().Should().BeTrue(); // Includes encryption bit (0x02)
+        _ = decryptionComposite.HasCMac().Should().BeTrue(); // Includes MAC bit (0x01)
     }
 
     [Test]
     public void HasCDecryption_Should_Require_Both_CMac_And_Decryption_Bits()
     {
         // Arrange - CDecryption = 0x03 = CMac (0x01) + Decryption (0x02)
-        SecurityLevel cMacOnly = SecurityLevel.CMac;           // 0x01
-        SecurityLevel encryptionOnly = SecurityLevel.CEncryption; // 0x02  
-        SecurityLevel combined = SecurityLevel.CDecryption;         // 0x03
+        SecurityLevel cMacOnly = SecurityLevel.CMac; // 0x01
+        SecurityLevel encryptionOnly = SecurityLevel.CEncryption; // 0x02
+        SecurityLevel combined = SecurityLevel.CDecryption; // 0x03
 
         // Act & Assert
         _ = cMacOnly.HasCDecryption().Should().BeFalse();
@@ -213,14 +213,14 @@ public class SecurityLevelExtensionTests
         // After the fix, they should check different flags and return different results for some inputs
 
         SecurityLevel encryptionOnly = SecurityLevel.CEncryption; // 0x02
-        SecurityLevel macOnly = SecurityLevel.CMac;               // 0x01
+        SecurityLevel macOnly = SecurityLevel.CMac; // 0x01
 
         // These should be different - proving the methods check different flags
-        _ = encryptionOnly.HasCEncryption().Should().BeTrue();   // Checks CEncryption (0x02)
-        _ = encryptionOnly.HasCDecryption().Should().BeFalse();  // Checks CDecryption (0x03)
+        _ = encryptionOnly.HasCEncryption().Should().BeTrue(); // Checks CEncryption (0x02)
+        _ = encryptionOnly.HasCDecryption().Should().BeFalse(); // Checks CDecryption (0x03)
 
-        _ = macOnly.HasCEncryption().Should().BeFalse();         // Checks CEncryption (0x02) 
-        _ = macOnly.HasCDecryption().Should().BeFalse();         // Checks CDecryption (0x03)
+        _ = macOnly.HasCEncryption().Should().BeFalse(); // Checks CEncryption (0x02)
+        _ = macOnly.HasCDecryption().Should().BeFalse(); // Checks CDecryption (0x03)
 
         // This proves they're checking different flags and the bug is fixed
     }
@@ -230,16 +230,19 @@ public class SecurityLevelExtensionTests
     /// GP Card Specification v2.3.1: Validates security level flag relationships.
     /// </summary>
     [Test]
-    public void SecurityLevel_Flag_Relationships_Should_Be_Consistent([Values(
-        SecurityLevel.None,
-        SecurityLevel.CMac,
-        SecurityLevel.CEncryption,
-        SecurityLevel.CDecryption,
-        SecurityLevel.RMac,
-        SecurityLevel.REncryption,
-        SecurityLevel.CMac | SecurityLevel.RMac,
-        SecurityLevel.CDecryption | SecurityLevel.REncryption
-    )] SecurityLevel level)
+    public void SecurityLevel_Flag_Relationships_Should_Be_Consistent(
+        [Values(
+            SecurityLevel.None,
+            SecurityLevel.CMac,
+            SecurityLevel.CEncryption,
+            SecurityLevel.CDecryption,
+            SecurityLevel.RMac,
+            SecurityLevel.REncryption,
+            SecurityLevel.CMac | SecurityLevel.RMac,
+            SecurityLevel.CDecryption | SecurityLevel.REncryption
+        )]
+            SecurityLevel level
+    )
     {
         // Act
         bool hasCMac = level.HasCMac();

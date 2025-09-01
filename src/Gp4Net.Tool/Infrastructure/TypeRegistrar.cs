@@ -51,7 +51,9 @@ public sealed class TypeRegistrar : ITypeRegistrar
     {
         if (_builder == null)
         {
-            throw new InvalidOperationException("Cannot register types with a pre-built service provider");
+            throw new InvalidOperationException(
+                "Cannot register types with a pre-built service provider"
+            );
         }
         _ = _builder.AddSingleton(service, implementation);
     }
@@ -61,7 +63,9 @@ public sealed class TypeRegistrar : ITypeRegistrar
     {
         if (_builder == null)
         {
-            throw new InvalidOperationException("Cannot register instances with a pre-built service provider");
+            throw new InvalidOperationException(
+                "Cannot register instances with a pre-built service provider"
+            );
         }
         _ = _builder.AddSingleton(service, implementation);
     }
@@ -71,7 +75,9 @@ public sealed class TypeRegistrar : ITypeRegistrar
     {
         if (_builder == null)
         {
-            throw new InvalidOperationException("Cannot register lazy factories with a pre-built service provider");
+            throw new InvalidOperationException(
+                "Cannot register lazy factories with a pre-built service provider"
+            );
         }
         _ = _builder.AddSingleton(service, _ => factory());
     }

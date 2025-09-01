@@ -49,7 +49,7 @@ public class CardCompatibilityService : ICardCompatibilityService
             "Virtual",
             "Test Card",
             isProduction: false,
-            maxAuthenticationAttempts: null,
+            maxAuthenticationAttempts: Maybe<int>.None,
             supportedProtocols: ["SCP02", "SCP03"],
             knownLimitations: []
         ),
@@ -61,7 +61,7 @@ public class CardCompatibilityService : ICardCompatibilityService
             maxAuthenticationAttempts: 10,
             supportedProtocols: ["SCP02", "SCP03"],
             knownLimitations: ["Development card - may reset easily"]
-        )
+        ),
     };
 
     /// <summary>
@@ -75,19 +75,35 @@ public class CardCompatibilityService : ICardCompatibilityService
         [0x4350] = "Gemalto",
         [0x4790] = "STMicroelectronics",
         [0x4440] = "Oberthur",
-        [0x5353] = "Giesecke+Devrient"
+        [0x5353] = "Giesecke+Devrient",
     };
 
     /// <summary>
-    /// Initializes a new instance of CardCompatibilityService.
+    /// Creates a new CardCompatibilityService with validated dependencies.
     /// </summary>
-    public CardCompatibilityService(
+    public static Result<CardCompatibilityService, SmartCardError> Create(
         ILogger<CardCompatibilityService> logger,
         IEnvironmentValidationService environmentValidation
     )
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _environmentValidation = environmentValidation ?? throw new ArgumentNullException(nameof(environmentValidation));
+        return Maybe
+            .From(logger)
+            .ToResult(SmartCardError.InvalidArgument("Logger cannot be null"))
+            .Bind(validLogger => 
+                Maybe
+                    .From(environmentValidation)
+                    .ToResult(SmartCardError.InvalidArgument("Environment validation service cannot be null"))
+                    .Map(validEnvValidation => new CardCompatibilityService(validLogger, validEnvValidation))
+            );
+    }
+
+    private CardCompatibilityService(
+        ILogger<CardCompatibilityService> logger,
+        IEnvironmentValidationService environmentValidation
+    )
+    {
+        _logger = logger;
+        _environmentValidation = environmentValidation;
     }
 
     /// <inheritdoc />
@@ -106,17 +122,28 @@ public class CardCompatibilityService : ICardCompatibilityService
         try
         {
             // Detect card type
-            Result<CardTypeInfo, SmartCardError> cardTypeResult = await DetectCardTypeAsync(channel, transport, cancellationToken);
+            Result<CardTypeInfo, SmartCardError> cardTypeResult = await DetectCardTypeAsync(
+                channel,
+                transport,
+                cancellationToken
+            );
             if (cardTypeResult.IsFailure)
             {
-                return Result.Failure<CardCompatibilityResult, SmartCardError>(cardTypeResult.Error);
+                return Result.Failure<CardCompatibilityResult, SmartCardError>(
+                    cardTypeResult.Error
+                );
             }
 
             CardTypeInfo cardType = cardTypeResult.Value;
 
             // Check environment validation
-            Result<EnvironmentValidationResult, SmartCardError> envResult = await _environmentValidation.ValidateEnvironmentAsync(
-                keySet, channel, transport, cancellationToken);
+            Result<EnvironmentValidationResult, SmartCardError> envResult =
+                await _environmentValidation.ValidateEnvironmentAsync(
+                    keySet,
+                    channel,
+                    transport,
+                    cancellationToken
+                );
 
             if (envResult.IsFailure)
             {
@@ -126,15 +153,30 @@ public class CardCompatibilityService : ICardCompatibilityService
             EnvironmentValidationResult envValidation = envResult.Value;
 
             // Analyze compatibility based on operation type and card characteristics
-            (bool isCompatible, bool isSafe, string message, string[] warnings, string[] recommendations) =
-                AnalyzeCompatibility(operation, keySet, cardType, envValidation);
+            (
+                bool isCompatible,
+                bool isSafe,
+                string message,
+                string[] warnings,
+                string[] recommendations
+            ) = AnalyzeCompatibility(operation, keySet, cardType, envValidation);
 
             CardCompatibilityResult result = new CardCompatibilityResult(
-                isCompatible, isSafe, cardType, message, warnings, recommendations);
+                isCompatible,
+                isSafe,
+                cardType,
+                message,
+                warnings,
+                recommendations
+            );
 
             _logger.LogInformation(
                 "Compatibility check: Operation={Operation}, Card={CardType}, Compatible={IsCompatible}, Safe={IsSafe}",
-                operation, cardType.DisplayName, isCompatible, isSafe);
+                operation,
+                cardType.ToString(),
+                isCompatible,
+                isSafe
+            );
 
             return Result.Success<CardCompatibilityResult, SmartCardError>(result);
         }
@@ -142,7 +184,8 @@ public class CardCompatibilityService : ICardCompatibilityService
         {
             _logger.LogError(ex, "Failed to check card compatibility");
             return Result.Failure<CardCompatibilityResult, SmartCardError>(
-                SmartCardError.UnexpectedError("Compatibility check failed", ex));
+                SmartCardError.UnexpectedError("Compatibility check failed", ex)
+            );
         }
     }
 
@@ -166,7 +209,11 @@ public class CardCompatibilityService : ICardCompatibilityService
             }
 
             // Try to get CPLC data for manufacturer identification
-            Result<byte[], SmartCardError> cplcResult = await GetCplcDataAsync(channel, transport, cancellationToken);
+            Result<byte[], SmartCardError> cplcResult = await GetCplcDataAsync(
+                channel,
+                transport,
+                cancellationToken
+            );
             if (cplcResult.IsSuccess)
             {
                 CardTypeInfo cardType = AnalyzeCplcForCardType(cplcResult.Value);
@@ -193,7 +240,8 @@ public class CardCompatibilityService : ICardCompatibilityService
         {
             _logger.LogError(ex, "Failed to detect card type");
             return Result.Failure<CardTypeInfo, SmartCardError>(
-                SmartCardError.UnexpectedError("Card type detection failed", ex));
+                SmartCardError.UnexpectedError("Card type detection failed", ex)
+            );
         }
     }
 
@@ -208,18 +256,27 @@ public class CardCompatibilityService : ICardCompatibilityService
         {
             // Try to get card status or security status
             // This is card-specific and may not be available on all cards
-            Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.ConfirmationCounter);
+            Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(
+                GetDataCommand.DataObjects.ConfirmationCounter
+            );
             if (commandResult.IsFailure)
             {
                 return Result.Failure<int?, SmartCardError>(commandResult.Error);
             }
 
-            ApduResponse response = await transport.TransmitAsync(commandResult.Value, channel, cancellationToken);
+            ApduResponse response = await transport.TransmitAsync(
+                commandResult.Value,
+                channel,
+                cancellationToken
+            );
 
             if (response.IsSuccess && response.Data.Length > 0)
             {
                 // Parse counter if available (implementation depends on card type)
-                Result<GetDataResponse, SmartCardError> parseResult = GetDataResponse.Parse(GetDataCommand.DataObjects.ConfirmationCounter, response.Data);
+                Result<GetDataResponse, SmartCardError> parseResult = GetDataResponse.Parse(
+                    GetDataCommand.DataObjects.ConfirmationCounter,
+                    response.Data
+                );
                 return parseResult.Map(parsedResponse =>
                 {
                     Maybe<uint> counter = parsedResponse.GetValueAsNumber();
@@ -245,13 +302,19 @@ public class CardCompatibilityService : ICardCompatibilityService
     {
         try
         {
-            Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(GetDataCommand.DataObjects.CardProductionLifeCycle);
+            Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(
+                GetDataCommand.DataObjects.CardProductionLifeCycle
+            );
             if (commandResult.IsFailure)
             {
                 return Result.Failure<byte[], SmartCardError>(commandResult.Error);
             }
             GetDataCommand getDataCmd = commandResult.Value;
-            ApduResponse response = await transport.TransmitAsync(getDataCmd, channel, cancellationToken);
+            ApduResponse response = await transport.TransmitAsync(
+                getDataCmd,
+                channel,
+                cancellationToken
+            );
 
             if (response.IsSuccess && response.Data.Length > 0)
             {
@@ -259,12 +322,14 @@ public class CardCompatibilityService : ICardCompatibilityService
             }
 
             return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CardError("CPLC data not available"));
+                SmartCardError.CardError("CPLC data not available")
+            );
         }
         catch (Exception ex)
         {
             return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CommunicationError("Failed to retrieve CPLC data", ex));
+                SmartCardError.CommunicationError("Failed to retrieve CPLC data", ex)
+            );
         }
     }
 
@@ -278,7 +343,7 @@ public class CardCompatibilityService : ICardCompatibilityService
             }
 
             // Extract manufacturer code from CPLC (typically at offset 8-9)
-            ushort manufacturerCode = (ushort)((cplcData[8] << 8) | cplcData[9]);
+            ushort manufacturerCode = (ushort)(cplcData[8] << 8 | cplcData[9]);
 
             if (CplcManufacturers.TryGetValue(manufacturerCode, out string manufacturer))
             {
@@ -308,13 +373,18 @@ public class CardCompatibilityService : ICardCompatibilityService
         return channel.GetHashCode().ToString("X8");
     }
 
-    private static (bool IsCompatible, bool IsSafe, string Message, string[] Warnings, string[] Recommendations)
-        AnalyzeCompatibility(
-            CardOperation operation,
-            IKeySet keySet,
-            CardTypeInfo cardType,
-            EnvironmentValidationResult envValidation
-        )
+    private static (
+        bool IsCompatible,
+        bool IsSafe,
+        string Message,
+        string[] Warnings,
+        string[] Recommendations
+    ) AnalyzeCompatibility(
+        CardOperation operation,
+        IKeySet keySet,
+        CardTypeInfo cardType,
+        EnvironmentValidationResult envValidation
+    )
     {
         List<string> warnings = [];
         List<string> recommendations = [];
@@ -326,20 +396,31 @@ public class CardCompatibilityService : ICardCompatibilityService
             warnings.AddRange(envValidation.Warnings);
             recommendations.Add("Use appropriate keyset for card environment");
 
-            return (false, false, "Environment validation failed",
-                warnings.ToArray(), recommendations.ToArray());
+            return (
+                false,
+                false,
+                "Environment validation failed",
+                warnings.ToArray(),
+                recommendations.ToArray()
+            );
         }
 
         // Check operation-specific compatibility
         (bool opCompatible, bool opSafe, string opMessage) = operation switch
         {
-            CardOperation.Authentication => CheckAuthenticationCompatibility(keySet, cardType, envValidation),
+            CardOperation.Authentication => CheckAuthenticationCompatibility(
+                keySet,
+                cardType,
+                envValidation
+            ),
             CardOperation.KeyInstallation => CheckKeyInstallationCompatibility(cardType),
-            CardOperation.ApplicationInstallation => CheckApplicationInstallationCompatibility(cardType),
+            CardOperation.ApplicationInstallation => CheckApplicationInstallationCompatibility(
+                cardType
+            ),
             CardOperation.ApplicationDeletion => CheckApplicationDeletionCompatibility(cardType),
             CardOperation.Personalization => CheckPersonalizationCompatibility(cardType),
             CardOperation.ReadOnly => (true, true, "Read-only operations are always safe"),
-            _ => (false, false, "Unknown operation type")
+            _ => (false, false, "Unknown operation type"),
         };
 
         // Add card-specific warnings
@@ -349,12 +430,22 @@ public class CardCompatibilityService : ICardCompatibilityService
         }
 
         // Add operation-specific recommendations
-        if (operation == CardOperation.Authentication && cardType.MaxAuthenticationAttempts.HasValue)
+        if (
+            operation == CardOperation.Authentication
+            && cardType.MaxAuthenticationAttempts.HasValue
+        )
         {
-            recommendations.Add($"Maximum {cardType.MaxAuthenticationAttempts} authentication attempts before lockout");
-            if (cardType.MaxAuthenticationAttempts <= 3)
+            recommendations.Add(
+                cardType.MaxAuthenticationAttempts.Match(
+                    attempts => $"Maximum {attempts} authentication attempts before lockout",
+                    () => "Authentication attempts limit unknown"
+                )
+            );
+            if (cardType.MaxAuthenticationAttempts.Match(attempts => attempts <= 3, () => false))
             {
-                recommendations.Add("CRITICAL: Very few attempts allowed - verify keys before proceeding");
+                recommendations.Add(
+                    "CRITICAL: Very few attempts allowed - verify keys before proceeding"
+                );
             }
         }
 
@@ -378,7 +469,7 @@ public class CardCompatibilityService : ICardCompatibilityService
             return (true, false, "Test keys on production card - high risk of lockout");
         }
 
-        if (cardType.MaxAuthenticationAttempts is <= 3)
+        if (cardType.MaxAuthenticationAttempts.Match(attempts => attempts <= 3, () => false))
         {
             return (true, false, "Card has very limited authentication attempts");
         }
@@ -386,7 +477,9 @@ public class CardCompatibilityService : ICardCompatibilityService
         return (true, true, "Authentication appears safe with current keyset");
     }
 
-    private static (bool Compatible, bool Safe, string Message) CheckKeyInstallationCompatibility(CardTypeInfo cardType)
+    private static (bool Compatible, bool Safe, string Message) CheckKeyInstallationCompatibility(
+        CardTypeInfo cardType
+    )
     {
         if (cardType.IsProduction)
         {
@@ -396,26 +489,44 @@ public class CardCompatibilityService : ICardCompatibilityService
         return (true, true, "Key installation should be safe on development cards");
     }
 
-    private static (bool Compatible, bool Safe, string Message) CheckApplicationInstallationCompatibility(CardTypeInfo cardType)
+    private static (
+        bool Compatible,
+        bool Safe,
+        string Message
+    ) CheckApplicationInstallationCompatibility(CardTypeInfo cardType)
     {
         return (true, true, "Application installation is generally safe");
     }
 
-    private static (bool Compatible, bool Safe, string Message) CheckApplicationDeletionCompatibility(CardTypeInfo cardType)
+    private static (
+        bool Compatible,
+        bool Safe,
+        string Message
+    ) CheckApplicationDeletionCompatibility(CardTypeInfo cardType)
     {
         if (cardType.IsProduction)
         {
-            return (true, false, "Application deletion on production cards may affect other applications");
+            return (
+                true,
+                false,
+                "Application deletion on production cards may affect other applications"
+            );
         }
 
         return (true, true, "Application deletion should be safe on development cards");
     }
 
-    private static (bool Compatible, bool Safe, string Message) CheckPersonalizationCompatibility(CardTypeInfo cardType)
+    private static (bool Compatible, bool Safe, string Message) CheckPersonalizationCompatibility(
+        CardTypeInfo cardType
+    )
     {
         if (cardType.IsProduction)
         {
-            return (false, false, "Personalization operations should not be performed on production cards");
+            return (
+                false,
+                false,
+                "Personalization operations should not be performed on production cards"
+            );
         }
 
         return (true, true, "Personalization is safe on development cards");

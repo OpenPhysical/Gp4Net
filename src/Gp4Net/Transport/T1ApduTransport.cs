@@ -1,6 +1,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
+using Gp4Net.Services;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 
@@ -19,37 +22,25 @@ public class T1ApduTransport : IApduTransport
     /// <inheritdoc />
     public TransportProtocol Protocol
     {
-        get
-        {
-            return TransportProtocol.T1;
-        }
+        get { return TransportProtocol.T1; }
     }
 
     /// <inheritdoc />
     public int MaxCommandDataLength
     {
-        get
-        {
-            return _supportsExtendedLength ? 65535 : 255;
-        }
+        get { return _supportsExtendedLength ? 65535 : 255; }
     }
 
     /// <inheritdoc />
     public int MaxResponseDataLength
     {
-        get
-        {
-            return _supportsExtendedLength ? 65536 : 256;
-        }
+        get { return _supportsExtendedLength ? 65536 : 256; }
     }
 
     /// <inheritdoc />
     public bool SupportsExtendedLength
     {
-        get
-        {
-            return _supportsExtendedLength;
-        }
+        get { return _supportsExtendedLength; }
     }
 
     /// <summary>
@@ -70,25 +61,32 @@ public class T1ApduTransport : IApduTransport
         CancellationToken cancellationToken = default
     )
     {
-
+        // Validate extended length support
         if (command.IsExtendedLength && !_supportsExtendedLength)
         {
-            throw new NotSupportedException("Extended length APDUs not supported");
+            return new ApduResponse([], new StatusWord(0x6A, 0x80)); // Wrong parameters P1-P2
         }
 
-        // Build APDU according to T=1 rules
-        byte[] apdu = ApduBuilder.BuildApdu(command);
+        // Build APDU according to T=1 rules using unified service
+        return await ApduService.Formatting.ToBytes(command)
+            .Match(
+                async apdu =>
+                {
+                    _logger.LogDebug("T=1 Transmit: {Apdu}", BitConverter.ToString(apdu));
 
-        _logger.LogDebug("T=1 Transmit: {Apdu}", BitConverter.ToString(apdu));
+                    // T=1 handles chaining at the protocol level
+                    byte[] response = await channel
+                        .TransmitAsync(apdu, cancellationToken)
+                        .ConfigureAwait(false);
 
-        // T=1 handles chaining at the protocol level
-        byte[] response = await channel
-            .TransmitAsync(apdu, cancellationToken)
-            .ConfigureAwait(false);
-
-        return ProcessResponse(response);
+                    return ProcessResponse(response);
+                },
+                error =>
+                {
+                    _logger.LogError("Failed to build APDU: {Error}", error.Message);
+                    return Task.FromResult(new ApduResponse([], new StatusWord(0x69, 0x87))); // Wrong data
+                });
     }
-
 
     private static byte GetLeByte(int expectedLength)
     {
@@ -100,12 +98,12 @@ public class T1ApduTransport : IApduTransport
     {
         if (response.Length < 2)
         {
-            throw new InvalidOperationException("Response too short");
+            return new ApduResponse([], new StatusWord(0x6F, 0x00)); // No precise diagnosis
         }
 
-        byte sw1 = response[response.Length - 2];
-        byte sw2 = response[response.Length - 1];
-        ushort statusWord = (ushort)((sw1 << 8) | sw2);
+        byte sw1 = response[^2];
+        byte sw2 = response[^1];
+        ushort statusWord = (ushort)(sw1 << 8 | sw2);
 
         byte[] data = new byte[response.Length - 2];
         if (data.Length > 0)

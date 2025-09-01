@@ -6,10 +6,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Domain.Modules;
+using Gp4Net.Services;
 using Gp4Net.Pipeline;
 using Gp4Net.Transport;
 using NUnit.Framework;
@@ -27,12 +26,18 @@ public class LoadFileParsingTests
             data,
             StatusWords.Success,
             new ImmutablePipelineContext(),
-            new Dictionary<string, object>());
+            new Dictionary<string, object>()
+        );
     }
 
-    private static Func<IApduCommand, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> ResponseExecutor(CommandResponse response)
+    private static Func<
+        IApduCommand,
+        CancellationToken,
+        Task<Result<CommandResponse, SmartCardError>>
+    > ResponseExecutor(CommandResponse response)
     {
-        return (_, __) => Task.FromResult(Result.Success<CommandResponse, SmartCardError>(response));
+        return (_, __) =>
+            Task.FromResult(Result.Success<CommandResponse, SmartCardError>(response));
     }
 
     [Test]
@@ -40,15 +45,17 @@ public class LoadFileParsingTests
     {
         // From docs/traces/gp_pro_list_success.txt, response to 84F21002 ... (P1=0x10: load files with modules)
         const string respHex =
-            "E3254F07A00000015153509F700101CE02FFFF8408A000000151535041CC08A000000151000000" +
-            "E3314F0DA00000016443446F634C6974659F700101CE020100840EA00000016443446F634C69746501CC08A000000151000000" +
-            "E31B4F07A00000006202049F700101CE020100CC08A000000151000000" +
-            "E31B4F07A00000006202029F700101CE020103CC08A000000151000000";
+            "E3254F07A00000015153509F700101CE02FFFF8408A000000151535041CC08A000000151000000"
+            + "E3314F0DA00000016443446F634C6974659F700101CE020100840EA00000016443446F634C69746501CC08A000000151000000"
+            + "E31B4F07A00000006202049F700101CE020100CC08A000000151000000"
+            + "E31B4F07A00000006202029F700101CE020103CC08A000000151000000";
 
         CommandResponse response = MakeResponse(respHex);
-        Func<IApduCommand, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> exec = ResponseExecutor(response);
+        Func<IApduCommand, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> exec =
+            ResponseExecutor(response);
 
-        Result<ImmutableList<ExecutableLoadFile>, SmartCardError> result = await CardStatusRetriever.GetExecutableLoadFilesWithModulesAsync(exec);
+        Result<ImmutableList<ExecutableLoadFile>, SmartCardError> result =
+            await GlobalPlatformService.Applications.GetExecutableLoadFilesWithModulesAsync(exec);
 
         _ = result.IsSuccess.Should().BeTrue();
         ImmutableList<ExecutableLoadFile>? elfs = result.Value;
@@ -57,15 +64,23 @@ public class LoadFileParsingTests
         _ = elfs.Count.Should().BeGreaterThanOrEqualTo(4);
 
         // SSD creation package
-        ExecutableLoadFile? ssdPkg = elfs.FirstOrDefault(e => Convert.ToHexString(e.Aid) == "A0000001515350");
+        ExecutableLoadFile? ssdPkg = elfs.FirstOrDefault(e =>
+            Convert.ToHexString(e.Aid) == "A0000001515350"
+        );
         _ = ssdPkg.Should().NotBeNull();
         _ = ssdPkg!.LifecycleState.Should().Be(LifecycleState.Loaded);
         _ = ssdPkg.VersionString.Should().Be("255.255");
         _ = ssdPkg.AssociatedSecurityDomainAid.HasValue.Should().BeTrue();
-        _ = Convert.ToHexString(ssdPkg.AssociatedSecurityDomainAid.GetValueOrThrow()).Should().Be("A000000151000000");
+        _ = Convert
+            .ToHexString(ssdPkg.AssociatedSecurityDomainAid.GetValueOrThrow())
+            .Should()
+            .Be("A000000151000000");
         // Module present
         _ = ssdPkg.ExecutableModules.Count.Should().BeGreaterThanOrEqualTo(1);
-        _ = ssdPkg.ExecutableModules.Any(m => Convert.ToHexString(m.Aid) == "A000000151535041").Should().BeTrue();
+        _ = ssdPkg
+            .ExecutableModules.Any(m => Convert.ToHexString(m.Aid) == "A000000151535041")
+            .Should()
+            .BeTrue();
     }
 
     [Test]
@@ -73,25 +88,32 @@ public class LoadFileParsingTests
     {
         // From docs/traces/gp_pro_list_success.txt, response to 84F22002 ... (P1=0x20: load files only)
         const string respHex =
-            "E31B4F07A00000015153509F700101CE02FFFFCC08A000000151000000" +
-            "E3214F0DA00000016443446F634C6974659F700101CE020100CC08A000000151000000" +
-            "E31B4F07A00000006202049F700101CE020100CC08A000000151000000" +
-            "E31B4F07A00000006202029F700101CE020103CC08A000000151000000";
+            "E31B4F07A00000015153509F700101CE02FFFFCC08A000000151000000"
+            + "E3214F0DA00000016443446F634C6974659F700101CE020100CC08A000000151000000"
+            + "E31B4F07A00000006202049F700101CE020100CC08A000000151000000"
+            + "E31B4F07A00000006202029F700101CE020103CC08A000000151000000";
 
         CommandResponse response = MakeResponse(respHex);
-        Func<IApduCommand, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> exec = ResponseExecutor(response);
+        Func<IApduCommand, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> exec =
+            ResponseExecutor(response);
 
-        Result<ImmutableList<ExecutableLoadFile>, SmartCardError> result = await CardStatusRetriever.GetExecutableLoadFilesAsync(exec);
+        Result<ImmutableList<ExecutableLoadFile>, SmartCardError> result =
+            await GlobalPlatformService.Applications.GetExecutableLoadFilesAsync(exec);
 
         _ = result.IsSuccess.Should().BeTrue();
         ImmutableList<ExecutableLoadFile>? elfs = result.Value;
         _ = elfs.Count.Should().BeGreaterThanOrEqualTo(4);
 
         // DocLite package
-        ExecutableLoadFile? docLite = elfs.FirstOrDefault(e => Convert.ToHexString(e.Aid) == "A00000016443446F634C697465");
+        ExecutableLoadFile? docLite = elfs.FirstOrDefault(e =>
+            Convert.ToHexString(e.Aid) == "A00000016443446F634C697465"
+        );
         _ = docLite.Should().NotBeNull();
         _ = docLite!.VersionString.Should().Be("1.0");
         _ = docLite.LifecycleState.Should().Be(LifecycleState.Loaded);
-        _ = Convert.ToHexString(docLite.AssociatedSecurityDomainAid.GetValueOrThrow()).Should().Be("A000000151000000");
+        _ = Convert
+            .ToHexString(docLite.AssociatedSecurityDomainAid.GetValueOrThrow())
+            .Should()
+            .Be("A000000151000000");
     }
 }

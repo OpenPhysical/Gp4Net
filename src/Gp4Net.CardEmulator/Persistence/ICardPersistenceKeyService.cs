@@ -1,7 +1,7 @@
 using CSharpFunctionalExtensions;
+using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
-using Gp4Net.CardEmulator.Core;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Persistence;

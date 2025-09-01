@@ -17,14 +17,18 @@ public static class CryptographicValidation
     /// <param name="data">The data to validate.</param>
     /// <param name="errorMessage">Custom error message for validation failure.</param>
     /// <returns>Success if both inputs are valid, failure with specified error message otherwise.</returns>
-    public static UnitResult<SmartCardError> ValidateInputs(byte[] key, byte[] data, string errorMessage)
+    public static UnitResult<SmartCardError> ValidateInputs(
+        byte[] key,
+        byte[] data,
+        string errorMessage
+    )
     {
         Maybe<byte[]> keyMaybe = Maybe<byte[]>.From(key);
         Maybe<byte[]> dataMaybe = Maybe<byte[]>.From(data);
 
         return keyMaybe.HasValue && dataMaybe.HasValue
             ? UnitResult.Success<SmartCardError>()
-            : UnitResult.Failure<SmartCardError>(SmartCardError.InvalidArgument(errorMessage));
+            : UnitResult.Failure(SmartCardError.InvalidArgument(errorMessage));
     }
 
     /// <summary>
@@ -34,12 +38,17 @@ public static class CryptographicValidation
     /// <param name="validLengths">Array of valid key lengths in bytes.</param>
     /// <param name="errorMessage">Custom error message prefix for validation failure.</param>
     /// <returns>Success if key length is valid, failure with detailed error message otherwise.</returns>
-    public static UnitResult<SmartCardError> ValidateKeyLength(byte[] key, int[] validLengths, string errorMessage)
+    public static UnitResult<SmartCardError> ValidateKeyLength(
+        byte[] key,
+        int[] validLengths,
+        string errorMessage
+    )
     {
         return validLengths.Contains(key.Length)
             ? UnitResult.Success<SmartCardError>()
-            : UnitResult.Failure<SmartCardError>(
-                SmartCardError.InvalidArgument($"{errorMessage}, got {key.Length}"));
+            : UnitResult.Failure(
+                SmartCardError.InvalidArgument($"{errorMessage}, got {key.Length}")
+            );
     }
 
     /// <summary>
@@ -49,11 +58,15 @@ public static class CryptographicValidation
     /// <param name="blockSize">The required block size in bytes.</param>
     /// <param name="errorMessage">Custom error message for validation failure.</param>
     /// <returns>Success if data is properly padded, failure with specified error message otherwise.</returns>
-    public static UnitResult<SmartCardError> ValidateDataPadding(byte[] data, int blockSize, string errorMessage)
+    public static UnitResult<SmartCardError> ValidateDataPadding(
+        byte[] data,
+        int blockSize,
+        string errorMessage
+    )
     {
-        return (data.Length % blockSize == 0)
+        return data.Length % blockSize == 0
             ? UnitResult.Success<SmartCardError>()
-            : UnitResult.Failure<SmartCardError>(SmartCardError.InvalidArgument(errorMessage));
+            : UnitResult.Failure(SmartCardError.InvalidArgument(errorMessage));
     }
 
     /// <summary>
@@ -66,8 +79,9 @@ public static class CryptographicValidation
     {
         return Maybe<byte[]>.From(input).HasValue
             ? UnitResult.Success<SmartCardError>()
-            : UnitResult.Failure<SmartCardError>(
-                SmartCardError.InvalidArgument($"{parameterName} cannot be null or empty"));
+            : UnitResult.Failure(
+                SmartCardError.InvalidArgument($"{parameterName} cannot be null or empty")
+            );
     }
 
     /// <summary>
@@ -77,11 +91,18 @@ public static class CryptographicValidation
     /// <param name="expectedLength">The expected length in bytes.</param>
     /// <param name="parameterName">Name of the parameter for error reporting.</param>
     /// <returns>Success if length matches, failure with detailed error message otherwise.</returns>
-    public static UnitResult<SmartCardError> ValidateExactLength(byte[] input, int expectedLength, string parameterName)
+    public static UnitResult<SmartCardError> ValidateExactLength(
+        byte[] input,
+        int expectedLength,
+        string parameterName
+    )
     {
         return input.Length == expectedLength
             ? UnitResult.Success<SmartCardError>()
-            : UnitResult.Failure<SmartCardError>(
-                SmartCardError.InvalidArgument($"{parameterName} must be {expectedLength} bytes, got {input.Length}"));
+            : UnitResult.Failure(
+                SmartCardError.InvalidArgument(
+                    $"{parameterName} must be {expectedLength} bytes, got {input.Length}"
+                )
+            );
     }
 }

@@ -17,13 +17,22 @@ namespace Gp4Net.Tests.Domain.Commands;
 [Category("Unit")]
 public class PutKeyCommandTests
 {
-
     private static readonly byte[] ValidDesKey = Convert.FromHexString("0102030405060708");
-    private static readonly byte[] ValidTripleDes2Key = Convert.FromHexString("0102030405060708090A0B0C0D0E0F10");
-    private static readonly byte[] ValidTripleDes3Key = Convert.FromHexString("0102030405060708090A0B0C0D0E0F101112131415161718");
-    private static readonly byte[] ValidAes128Key = Convert.FromHexString("0102030405060708090A0B0C0D0E0F10");
-    private static readonly byte[] ValidAes192Key = Convert.FromHexString("0102030405060708090A0B0C0D0E0F101112131415161718");
-    private static readonly byte[] ValidAes256Key = Convert.FromHexString("0102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F20");
+    private static readonly byte[] ValidTripleDes2Key = Convert.FromHexString(
+        "0102030405060708090A0B0C0D0E0F10"
+    );
+    private static readonly byte[] ValidTripleDes3Key = Convert.FromHexString(
+        "0102030405060708090A0B0C0D0E0F101112131415161718"
+    );
+    private static readonly byte[] ValidAes128Key = Convert.FromHexString(
+        "0102030405060708090A0B0C0D0E0F10"
+    );
+    private static readonly byte[] ValidAes192Key = Convert.FromHexString(
+        "0102030405060708090A0B0C0D0E0F101112131415161718"
+    );
+    private static readonly byte[] ValidAes256Key = Convert.FromHexString(
+        "0102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F20"
+    );
     private static readonly byte[] ValidKeyCheckValue = Convert.FromHexString("123456");
 
     [Test]
@@ -149,7 +158,10 @@ public class PutKeyCommandTests
     [Test]
     public void CreateDesKey_WithValidKeyValueAndCheckValue_ReturnsSuccessResult()
     {
-        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateDesKey(ValidDesKey, ValidKeyCheckValue);
+        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateDesKey(
+            ValidDesKey,
+            ValidKeyCheckValue
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         KeyDataBlock? keyDataBlock = result.Value;
@@ -193,17 +205,24 @@ public class PutKeyCommandTests
     {
         byte[] keyCheckValue = new byte[length];
 
-        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateDesKey(ValidDesKey, keyCheckValue);
+        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateDesKey(
+            ValidDesKey,
+            keyCheckValue
+        );
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
-        _ = result.Error.Message.Should().Contain($"Key check value must be 3 bytes, got {length} bytes");
+        _ = result
+            .Error.Message.Should()
+            .Contain($"Key check value must be 3 bytes, got {length} bytes");
     }
 
     [Test]
     public void CreateTripleDes2Key_WithValidKeyValue_ReturnsSuccessResult()
     {
-        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateTripleDes2Key(ValidTripleDes2Key);
+        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateTripleDes2Key(
+            ValidTripleDes2Key
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         KeyDataBlock? keyDataBlock = result.Value;
@@ -216,7 +235,10 @@ public class PutKeyCommandTests
     [Test]
     public void CreateTripleDes2Key_WithValidKeyValueAndCheckValue_ReturnsSuccessResult()
     {
-        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateTripleDes2Key(ValidTripleDes2Key, ValidKeyCheckValue);
+        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateTripleDes2Key(
+            ValidTripleDes2Key,
+            ValidKeyCheckValue
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         KeyDataBlock? keyDataBlock = result.Value;
@@ -249,13 +271,17 @@ public class PutKeyCommandTests
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
-        _ = result.Error.Message.Should().Contain($"3DES double-length key must be 16 bytes, got {length} bytes");
+        _ = result
+            .Error.Message.Should()
+            .Contain($"3DES double-length key must be 16 bytes, got {length} bytes");
     }
 
     [Test]
     public void CreateTripleDes3Key_WithValidKeyValue_ReturnsSuccessResult()
     {
-        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateTripleDes3Key(ValidTripleDes3Key);
+        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateTripleDes3Key(
+            ValidTripleDes3Key
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         KeyDataBlock? keyDataBlock = result.Value;
@@ -268,7 +294,10 @@ public class PutKeyCommandTests
     [Test]
     public void CreateTripleDes3Key_WithValidKeyValueAndCheckValue_ReturnsSuccessResult()
     {
-        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateTripleDes3Key(ValidTripleDes3Key, ValidKeyCheckValue);
+        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateTripleDes3Key(
+            ValidTripleDes3Key,
+            ValidKeyCheckValue
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         KeyDataBlock? keyDataBlock = result.Value;
@@ -301,7 +330,9 @@ public class PutKeyCommandTests
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
-        _ = result.Error.Message.Should().Contain($"3DES triple-length key must be 24 bytes, got {length} bytes");
+        _ = result
+            .Error.Message.Should()
+            .Contain($"3DES triple-length key must be 24 bytes, got {length} bytes");
     }
 
     [Test]
@@ -320,7 +351,10 @@ public class PutKeyCommandTests
     [Test]
     public void CreateAes128Key_WithValidKeyValueAndCheckValue_ReturnsSuccessResult()
     {
-        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateAes128Key(ValidAes128Key, ValidKeyCheckValue);
+        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateAes128Key(
+            ValidAes128Key,
+            ValidKeyCheckValue
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         KeyDataBlock? keyDataBlock = result.Value;
@@ -353,7 +387,9 @@ public class PutKeyCommandTests
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
-        _ = result.Error.Message.Should().Contain($"AES-128 key must be 16 bytes, got {length} bytes");
+        _ = result
+            .Error.Message.Should()
+            .Contain($"AES-128 key must be 16 bytes, got {length} bytes");
     }
 
     [Test]
@@ -372,7 +408,10 @@ public class PutKeyCommandTests
     [Test]
     public void CreateAes192Key_WithValidKeyValueAndCheckValue_ReturnsSuccessResult()
     {
-        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateAes192Key(ValidAes192Key, ValidKeyCheckValue);
+        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateAes192Key(
+            ValidAes192Key,
+            ValidKeyCheckValue
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         KeyDataBlock? keyDataBlock = result.Value;
@@ -405,7 +444,9 @@ public class PutKeyCommandTests
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
-        _ = result.Error.Message.Should().Contain($"AES-192 key must be 24 bytes, got {length} bytes");
+        _ = result
+            .Error.Message.Should()
+            .Contain($"AES-192 key must be 24 bytes, got {length} bytes");
     }
 
     [Test]
@@ -424,7 +465,10 @@ public class PutKeyCommandTests
     [Test]
     public void CreateAes256Key_WithValidKeyValueAndCheckValue_ReturnsSuccessResult()
     {
-        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateAes256Key(ValidAes256Key, ValidKeyCheckValue);
+        Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateAes256Key(
+            ValidAes256Key,
+            ValidKeyCheckValue
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         KeyDataBlock? keyDataBlock = result.Value;
@@ -457,7 +501,9 @@ public class PutKeyCommandTests
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
-        _ = result.Error.Message.Should().Contain($"AES-256 key must be 32 bytes, got {length} bytes");
+        _ = result
+            .Error.Message.Should()
+            .Contain($"AES-256 key must be 32 bytes, got {length} bytes");
     }
 
     [Test]
@@ -521,7 +567,9 @@ public class PutKeyCommandTests
     [Test]
     public void ToBytes_WithKeyCheckValue_ReturnsCorrectBytes()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey, ValidKeyCheckValue).Value;
+        KeyDataBlock? keyDataBlock = KeyDataBlock
+            .CreateDesKey(ValidDesKey, ValidKeyCheckValue)
+            .Value;
 
         byte[]? bytes = keyDataBlock.ToBytes();
 
@@ -668,7 +716,10 @@ public class PutKeyCommandTests
     public void KeyDataBlock_ValidateAllKeyTypesHaveCorrectEnumValues()
     {
         // Comprehensive validation of all key type enum values
-        Dictionary<KeyDataBlock.KeyType, byte> expectedKeyTypes = new Dictionary<KeyDataBlock.KeyType, byte>
+        Dictionary<KeyDataBlock.KeyType, byte> expectedKeyTypes = new Dictionary<
+            KeyDataBlock.KeyType,
+            byte
+        >
         {
             { KeyDataBlock.KeyType.Des, 0x80 },
             { KeyDataBlock.KeyType.TripleDes2Key, 0x81 },
@@ -679,12 +730,14 @@ public class PutKeyCommandTests
             { KeyDataBlock.KeyType.RsaPublic, 0xA0 },
             { KeyDataBlock.KeyType.RsaPrivate, 0xA1 },
             { KeyDataBlock.KeyType.EccPublic, 0xB0 },
-            { KeyDataBlock.KeyType.EccPrivate, 0xB1 }
+            { KeyDataBlock.KeyType.EccPrivate, 0xB1 },
         };
 
         foreach (KeyValuePair<KeyDataBlock.KeyType, byte> kvp in expectedKeyTypes)
         {
-            _ = ((byte)kvp.Key).Should().Be(kvp.Value, $"KeyType.{kvp.Key} should have value 0x{kvp.Value:X2}");
+            _ = ((byte)kvp.Key)
+                .Should()
+                .Be(kvp.Value, $"KeyType.{kvp.Key} should have value 0x{kvp.Value:X2}");
         }
     }
 
@@ -740,7 +793,9 @@ public class PutKeyCommandTests
     [Test]
     public void ToApdu_WithKeyCheckValue_IncludesCheckValueInData()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey, ValidKeyCheckValue).Value;
+        KeyDataBlock? keyDataBlock = KeyDataBlock
+            .CreateDesKey(ValidDesKey, ValidKeyCheckValue)
+            .Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
         PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
@@ -864,7 +919,9 @@ public class PutKeyCommandTests
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
-        _ = result.Error.Message.Should().Contain($"Invalid response length {length}, expected multiple of 3 bytes");
+        _ = result
+            .Error.Message.Should()
+            .Contain($"Invalid response length {length}, expected multiple of 3 bytes");
     }
 
     [Test]
@@ -893,7 +950,9 @@ public class PutKeyCommandTests
     public void ToApdu_Structure_FollowsGlobalPlatformSpecification()
     {
         // Test that APDU structure follows GlobalPlatform specification exactly
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey, ValidKeyCheckValue).Value;
+        KeyDataBlock? keyDataBlock = KeyDataBlock
+            .CreateDesKey(ValidDesKey, ValidKeyCheckValue)
+            .Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
         PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
@@ -904,10 +963,10 @@ public class PutKeyCommandTests
         _ = apdu.Should().HaveCountGreaterThan(5); // At least header + LC + LE
 
         // Header
-        _ = apdu[0].Should().Be(PutKeyCommand.Cla);  // CLA
-        _ = apdu[1].Should().Be(PutKeyCommand.Ins);  // INS
-        _ = apdu[2].Should().Be((byte)command.UsageQualifier);  // P1
-        _ = apdu[3].Should().Be((byte)command.KekIdentifier);   // P2
+        _ = apdu[0].Should().Be(PutKeyCommand.Cla); // CLA
+        _ = apdu[1].Should().Be(PutKeyCommand.Ins); // INS
+        _ = apdu[2].Should().Be((byte)command.UsageQualifier); // P1
+        _ = apdu[3].Should().Be((byte)command.KekIdentifier); // P2
 
         // LC should match data length
         byte dataLength = apdu[4];
@@ -923,7 +982,9 @@ public class PutKeyCommandTests
     public void ToApdu_WithLargeKeyData_HandlesCorrectly()
     {
         // Test with the largest supported key (AES-256)
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateAes256Key(ValidAes256Key, ValidKeyCheckValue).Value;
+        KeyDataBlock? keyDataBlock = KeyDataBlock
+            .CreateAes256Key(ValidAes256Key, ValidKeyCheckValue)
+            .Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
         PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
@@ -932,7 +993,7 @@ public class PutKeyCommandTests
         // Should handle large key data correctly
         int expectedDataLength = 1 + 1 + 32 + 3; // Type + Length + Key + KCV
         _ = apdu[4].Should().Be((byte)expectedDataLength); // LC
-        _ = apdu[apdu.Length - 1].Should().Be(0x03); // LE (3 bytes expected response)
+        _ = apdu[^1].Should().Be(0x03); // LE (3 bytes expected response)
 
         // Verify key data is properly embedded
         int keyDataStart = 5; // After header and LC
@@ -940,11 +1001,11 @@ public class PutKeyCommandTests
         _ = apdu[keyDataStart + 1].Should().Be(0x20); // 32 bytes length
 
         // Verify actual key data
-        byte[] keyData = apdu.Skip(keyDataStart + 2).Take(32).ToArray();
+        byte[] keyData = [.. apdu.Skip(keyDataStart + 2).Take(32)];
         _ = keyData.Should().BeEquivalentTo(ValidAes256Key);
 
         // Verify KCV
-        byte[] kcvData = apdu.Skip(keyDataStart + 2 + 32).Take(3).ToArray();
+        byte[] kcvData = [.. apdu.Skip(keyDataStart + 2 + 32).Take(3)];
         _ = kcvData.Should().BeEquivalentTo(ValidKeyCheckValue);
     }
 
@@ -989,7 +1050,9 @@ public class PutKeyCommandTests
     [Test]
     public void ToBytes_ImmutabilityGuarantees_ArePreserved()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey, ValidKeyCheckValue).Value;
+        KeyDataBlock? keyDataBlock = KeyDataBlock
+            .CreateDesKey(ValidDesKey, ValidKeyCheckValue)
+            .Value;
         byte[]? bytes1 = keyDataBlock.ToBytes();
         byte[]? bytes2 = keyDataBlock.ToBytes();
 
@@ -1018,5 +1081,4 @@ public class PutKeyCommandTests
         _ = command.KeyDataBlocks.Should().HaveCount(1);
         _ = command.KeyDataBlocks[0].Type.Should().Be(KeyDataBlock.KeyType.Des);
     }
-
 }

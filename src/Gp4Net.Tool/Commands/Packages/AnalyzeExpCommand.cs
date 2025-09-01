@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Spectre.Console;
@@ -35,7 +36,10 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
                 $"[cyan]Analyzing .exp file: {Markup.Escape(settings.ExpFilePath)}[/]"
             );
 
-            ExpFileAnalysis analysis = await AnalyzeExpFileAsync(settings.ExpFilePath, settings.SdkVersion);
+            ExpFileAnalysis analysis = await AnalyzeExpFileAsync(
+                settings.ExpFilePath,
+                settings.SdkVersion
+            );
 
             DisplayAnalysis(analysis, settings);
 
@@ -73,7 +77,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
             FileName = Path.GetFileName(expFilePath),
             SdkVersion = sdkVersion,
             // Extract basic file info
-            RelativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), expFilePath)
+            RelativePath = Path.GetRelativePath(Directory.GetCurrentDirectory(), expFilePath),
         };
 
         // Look for magic bytes and file format indicators
@@ -100,7 +104,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
         }
 
         // Check for common magic bytes
-        byte[] header = fileBytes.Take(16).ToArray();
+        byte[] header = [.. fileBytes.Take(16)];
         string headerHex = Convert.ToHexString(header);
         analysis.HeaderHex = headerHex;
 
@@ -165,7 +169,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
         [
             .. strings
                 .Where(s => s.Contains('.') && s.Length > 5)
-                .Where(s => s.All(c => char.IsLetterOrDigit(c) || c == '.' || c == '/'))
+                .Where(s => s.All(c => char.IsLetterOrDigit(c) || c == '.' || c == '/')),
         ];
     }
 
@@ -223,11 +227,8 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
     private static void ExtractVersionInfo(byte[] fileBytes, ExpFileAnalysis analysis)
     {
         // Look for version-like patterns in the strings
-        List<string> versionPatterns = analysis
-            .ExtractedStrings.Where(s =>
-                System.Text.RegularExpressions.Regex.IsMatch(s, @"\d+\.\d+(\.\d+)?")
-            )
-            .ToList();
+        List<string> versionPatterns = [.. analysis
+            .ExtractedStrings.Where(s => Regex.IsMatch(s, @"\d+\.\d+(\.\d+)?"))];
 
         analysis.PossibleVersions = versionPatterns;
     }
@@ -243,7 +244,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
             byte length = fileBytes[i];
             if (length is >= 5 and <= 16 && i + length < fileBytes.Length)
             {
-                byte[] potentialAid = fileBytes.Skip(i + 1).Take(length).ToArray();
+                byte[] potentialAid = [.. fileBytes.Skip(i + 1).Take(length)];
 
                 // Check if it looks like an AID (starts with A0 or similar)
                 if (
@@ -273,14 +274,14 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
             "Export",
             "Import",
             "EXPORT",
-            "IMPORT"
+            "IMPORT",
         ];
 
         analysis.ExportImportInfo =
         [
             .. analysis.ExtractedStrings.Where(s =>
                 exportImportKeywords.Any(keyword => s.Contains(keyword))
-            )
+            ),
         ];
     }
 
@@ -414,9 +415,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
         _ = basicTable.AddRow("Header (hex)", $"[dim]{analysis.HeaderHex}[/]");
 
         AnsiConsole.Write(
-            new Panel(basicTable)
-                .Header("[bold]Basic File Information[/]")
-                .BorderColor(Color.Blue)
+            new Panel(basicTable).Header("[bold]Basic File Information[/]").BorderColor(Color.Blue)
         );
 
         // Format analysis
@@ -442,18 +441,9 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
                 $"[dim]{Convert.ToHexString(analysis.PackageInfo.Aid)}[/]"
             );
             _ = packageTable.AddRow("Version", analysis.PackageInfo.Version);
-            _ = packageTable.AddRow(
-                "Major Version",
-                analysis.PackageInfo.MajorVersion.ToString()
-            );
-            _ = packageTable.AddRow(
-                "Minor Version",
-                analysis.PackageInfo.MinorVersion.ToString()
-            );
-            _ = packageTable.AddRow(
-                "SDK Version",
-                $"[yellow]{analysis.PackageInfo.SdkVersion}[/]"
-            );
+            _ = packageTable.AddRow("Major Version", analysis.PackageInfo.MajorVersion.ToString());
+            _ = packageTable.AddRow("Minor Version", analysis.PackageInfo.MinorVersion.ToString());
+            _ = packageTable.AddRow("SDK Version", $"[yellow]{analysis.PackageInfo.SdkVersion}[/]");
 
             if (!string.IsNullOrEmpty(analysis.DetectedPackageName))
             {

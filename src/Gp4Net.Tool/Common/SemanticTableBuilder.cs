@@ -38,7 +38,7 @@ public static class SemanticTableBuilder
     /// <summary>
     /// Empty row for visual spacing in output.
     /// </summary>
-    public record EmptyRow() : SemanticRow;
+    public record EmptyRow : SemanticRow;
 
     /// <summary>
     /// Generic data row with key-value pairs.
@@ -51,8 +51,8 @@ public static class SemanticTableBuilder
     /// </summary>
     /// <param name="rows">The collection of rows to compose.</param>
     /// <returns>A composed collection ready for display.</returns>
-    public static IEnumerable<T> ComposeRows<T>(params IEnumerable<T>[] rows) where T : SemanticRow
-        => rows.SelectMany(rowCollection => rowCollection);
+    public static IEnumerable<T> ComposeRows<T>(params IEnumerable<T>[] rows)
+        where T : SemanticRow => rows.SelectMany(rowCollection => rowCollection);
 
     /// <summary>
     /// Adds section header and empty row for visual separation.
@@ -63,10 +63,11 @@ public static class SemanticTableBuilder
     public static IEnumerable<T> CreateSection<T>(string title, IEnumerable<T> content)
         where T : SemanticRow
     {
-        IEnumerable<T> headerRows = typeof(T).IsAssignableFrom(typeof(SectionHeaderRow)) &&
-                                    typeof(T).IsAssignableFrom(typeof(EmptyRow))
-            ? [(T)(SemanticRow)new SectionHeaderRow(title), (T)(SemanticRow)new EmptyRow()]
-            : [];
+        IEnumerable<T> headerRows =
+            typeof(T).IsAssignableFrom(typeof(SectionHeaderRow))
+            && typeof(T).IsAssignableFrom(typeof(EmptyRow))
+                ? [(T)(SemanticRow)new SectionHeaderRow(title), (T)(SemanticRow)new EmptyRow()]
+                : [];
 
         return headerRows.Concat(content);
     }
@@ -77,10 +78,8 @@ public static class SemanticTableBuilder
     /// <typeparam name="T">The target row type.</typeparam>
     /// <param name="row">The semantic row to convert.</param>
     /// <returns>Maybe containing the converted row if successful.</returns>
-    public static Maybe<T> AsRowType<T>(this SemanticRow row) where T : SemanticRow
-        => row is T specificRow
-            ? Maybe<T>.From(specificRow)
-            : Maybe<T>.None;
+    public static Maybe<T> AsRowType<T>(this SemanticRow row)
+        where T : SemanticRow => row is T specificRow ? Maybe<T>.From(specificRow) : Maybe<T>.None;
 
     /// <summary>
     /// Creates a data row from key-value pairs.
@@ -89,7 +88,10 @@ public static class SemanticTableBuilder
     /// <returns>A data row containing the specified information.</returns>
     public static DataRow CreateDataRow(params (string key, string value)[] data)
     {
-        Dictionary<string, string> dictionary = data.ToDictionary(pair => pair.key, pair => pair.value);
+        Dictionary<string, string> dictionary = data.ToDictionary(
+            pair => pair.key,
+            pair => pair.value
+        );
         return new DataRow(dictionary);
     }
 }

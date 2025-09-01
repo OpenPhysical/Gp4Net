@@ -34,7 +34,12 @@ public class Reader
     /// <param name="isAutoDetected">Whether this reader was auto-detected.</param>
     /// <param name="isPartialMatch">Whether this reader was selected via partial match.</param>
     /// <param name="isVirtual">Whether this is a virtual card emulator reader.</param>
-    public Reader(string name, bool isAutoDetected = false, bool isPartialMatch = false, bool isVirtual = false)
+    public Reader(
+        string name,
+        bool isAutoDetected = false,
+        bool isPartialMatch = false,
+        bool isVirtual = false
+    )
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IsAutoDetected = isAutoDetected;

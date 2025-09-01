@@ -1,14 +1,17 @@
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Text;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain.CardInfo;
 using Gp4Net.Services;
-using Gp4Net.Tool.Commands.Card;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
+using CardInformation = Gp4Net.Services.CardInformation;
 
 namespace Gp4Net.Tool.Commands.Card;
 
@@ -17,7 +20,7 @@ namespace Gp4Net.Tool.Commands.Card;
 /// </summary>
 [PublicAPI]
 [CliCommand("info", "Display detailed card information", "card")]
-[System.ComponentModel.Description("Display detailed card information")]
+[Description("Display detailed card information")]
 public class InfoCommand : AsyncCommand<InfoCommand.Settings>
 {
     private readonly IGlobalPlatformService _globalPlatformService;
@@ -41,12 +44,13 @@ public class InfoCommand : AsyncCommand<InfoCommand.Settings>
         return await GetCardInformation()
             .Bind(cardInfo => BuildTableRows(cardInfo, settings))
             .Match(
-                rows => 
+                rows =>
                 {
                     DisplayCardInfo(rows, settings);
                     return 0;
                 },
-                error => HandleError(error));
+                error => HandleError(error)
+            );
     }
 
     /// <summary>
@@ -60,20 +64,49 @@ public class InfoCommand : AsyncCommand<InfoCommand.Settings>
     /// <summary>
     /// Builds semantic table rows using tool services.
     /// </summary>
-    private async Task<Result<IEnumerable<CardInfoTableBuilder.TableRow>, SmartCardError>> BuildTableRows(
-        CardInformation cardInfo, Settings settings)
+    private async Task<
+        Result<IEnumerable<CardInfoTableBuilder.TableRow>, SmartCardError>
+    > BuildTableRows(CardInformation cardInfo, Settings settings)
     {
         // Check secure channel status for enhanced display
         bool isSecureChannelEstablished = false; // Can be enhanced later
-        
-        IEnumerable<CardInfoTableBuilder.TableRow> rows = CardInfoTableBuilder.BuildCardInfoRows(cardInfo, isSecureChannelEstablished);
+
+        Domain.CardInfo.CardInformation domainCardInfo = ConvertToDomainCardInfo(cardInfo);
+        IEnumerable<CardInfoTableBuilder.TableRow> rows = CardInfoTableBuilder.BuildCardInfoRows(
+            domainCardInfo,
+            isSecureChannelEstablished
+        );
         return Result.Success<IEnumerable<CardInfoTableBuilder.TableRow>, SmartCardError>(rows);
+    }
+
+    /// <summary>
+    /// Converts Services.CardInformation to Domain.CardInfo.CardInformation.
+    /// </summary>
+    private static Domain.CardInfo.CardInformation ConvertToDomainCardInfo(
+        CardInformation serviceCardInfo
+    )
+    {
+        return new Domain.CardInfo.CardInformation(
+            Atr: serviceCardInfo.Atr.Map(atr => Encoding.UTF8.GetBytes(atr ?? "")),
+            Cplc: serviceCardInfo.Cplc,
+            Capabilities: Maybe<CardCapabilities>.None, // Not available in service type
+            KeyInfo: Maybe<KeyInformationTemplate>.None, // Not available in service type
+            CardData: Maybe<CardDataInfo>.None, // Not available in service type
+            ScpInfo: Maybe<ScpInformation>.None, // Not available in service type
+            SecurityStatus: Maybe<SecurityDomainStatus>.None, // Not available in service type
+            DiversificationData: Maybe<byte[]>.None, // Not available in service type
+            IsdInfo: serviceCardInfo.IsdInfo,
+            ChipDetails: Maybe<ChipInfo>.None // Not available in service type
+        );
     }
 
     /// <summary>
     /// Displays card information using tool display service.
     /// </summary>
-    private static void DisplayCardInfo(IEnumerable<CardInfoTableBuilder.TableRow> rows, Settings settings)
+    private static void DisplayCardInfo(
+        IEnumerable<CardInfoTableBuilder.TableRow> rows,
+        Settings settings
+    )
     {
         CardInfoDisplayService.DisplayCardInfoTable(rows);
         CardInfoDisplayService.DisplayKeysetSuggestions(false); // Can be enhanced based on secure channel status
@@ -91,12 +124,12 @@ public class InfoCommand : AsyncCommand<InfoCommand.Settings>
     /// <summary>
     /// Settings for the info command.
     /// </summary>
-    public class Settings : CardCommandSettings 
+    public class Settings : CardCommandSettings
     {
         /// <summary>
         /// Gets or sets whether to show verbose information.
         /// </summary>
-        [System.ComponentModel.Description("Show verbose information")]
+        [Description("Show verbose information")]
         public bool Verbose { get; set; }
     }
 }

@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Core.Tlv;
+using Gp4Net.Services;
+using static Gp4Net.Services.TlvService;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
@@ -133,10 +135,7 @@ public class GetDataCommand : IApduCommand
     /// </summary>
     public byte P1
     {
-        get
-        {
-            return (byte)(DataObjectIdentifier >> 8);
-        }
+        get { return (byte)(DataObjectIdentifier >> 8); }
     }
 
     /// <summary>
@@ -144,10 +143,7 @@ public class GetDataCommand : IApduCommand
     /// </summary>
     public byte P2
     {
-        get
-        {
-            return (byte)(DataObjectIdentifier & 0xFF);
-        }
+        get { return (byte)(DataObjectIdentifier & 0xFF); }
     }
 
     /// <summary>
@@ -176,12 +172,15 @@ public class GetDataCommand : IApduCommand
     /// <returns>A Result containing the command or an error.</returns>
     public static Result<GetDataCommand, SmartCardError> CreateFor3ByteIdentifier(byte[] identifier)
     {
-        return Maybe<byte[]>.From(identifier).Match(
-            Some: identifierValue => ValidateAndCreateFor3Byte(identifierValue),
-            None: () => Result.Failure<GetDataCommand, SmartCardError>(
-                SmartCardError.InvalidArgument("Identifier cannot be null")
-            )
-        );
+        return Maybe<byte[]>
+            .From(identifier)
+            .Match(
+                Some: identifierValue => ValidateAndCreateFor3Byte(identifierValue),
+                None: () =>
+                    Result.Failure<GetDataCommand, SmartCardError>(
+                        SmartCardError.InvalidArgument("Identifier cannot be null")
+                    )
+            );
     }
 
     /// <summary>
@@ -189,7 +188,9 @@ public class GetDataCommand : IApduCommand
     /// </summary>
     /// <param name="identifier">The validated identifier.</param>
     /// <returns>A Result containing the command or an error.</returns>
-    private static Result<GetDataCommand, SmartCardError> ValidateAndCreateFor3Byte(byte[] identifier)
+    private static Result<GetDataCommand, SmartCardError> ValidateAndCreateFor3Byte(
+        byte[] identifier
+    )
     {
         if (identifier.Length != 3)
         {
@@ -202,8 +203,10 @@ public class GetDataCommand : IApduCommand
 
         // For 3-byte identifiers, we use the first two bytes as the identifier
         // This is a simplified approach - full implementation would handle 3-byte tags properly
-        ushort twoByteIdentifier = (ushort)((identifier[0] << 8) | identifier[1]);
-        return Result.Success<GetDataCommand, SmartCardError>(new GetDataCommand(twoByteIdentifier));
+        ushort twoByteIdentifier = (ushort)(identifier[0] << 8 | identifier[1]);
+        return Result.Success<GetDataCommand, SmartCardError>(
+            new GetDataCommand(twoByteIdentifier)
+        );
     }
 
     /// <summary>
@@ -218,59 +221,38 @@ public class GetDataCommand : IApduCommand
             Ins,
             P1,
             P2,
-            0x00 // Le (expecting response)
+            0x00, // Le (expecting response)
         ];
     }
 
     // IApduCommand implementation
     byte IApduCommand.Cla
     {
-        get
-        {
-            return Cla;
-        }
+        get { return Cla; }
     }
     byte IApduCommand.Ins
     {
-        get
-        {
-            return Ins;
-        }
+        get { return Ins; }
     }
     byte IApduCommand.P1
     {
-        get
-        {
-            return P1;
-        }
+        get { return P1; }
     }
     byte IApduCommand.P2
     {
-        get
-        {
-            return P2;
-        }
+        get { return P2; }
     }
     byte[] IApduCommand.Data
     {
-        get
-        {
-            return [];
-        }
+        get { return []; }
     }
     Maybe<int> IApduCommand.ExpectedResponseLength
     {
-        get
-        {
-            return Maybe<int>.From(256);
-        }
+        get { return Maybe<int>.From(256); }
     }
     bool IApduCommand.IsExtendedLength
     {
-        get
-        {
-            return false;
-        }
+        get { return false; }
     }
 
     /// <summary>
@@ -309,10 +291,7 @@ public class GetDataResponse
     /// </summary>
     public bool IsTlvFormat
     {
-        get
-        {
-            return TlvObject.HasValue;
-        }
+        get { return TlvObject.HasValue; }
     }
 
     /// <summary>
@@ -338,14 +317,20 @@ public class GetDataResponse
     /// <param name="dataObjectIdentifier">The data object identifier that was requested.</param>
     /// <param name="response">The response data (excluding status word).</param>
     /// <returns>A Result containing the parsed response or an error.</returns>
-    public static Result<GetDataResponse, SmartCardError> Parse(ushort dataObjectIdentifier, byte[] response)
+    public static Result<GetDataResponse, SmartCardError> Parse(
+        ushort dataObjectIdentifier,
+        byte[] response
+    )
     {
-        return Maybe<byte[]>.From(response).Match(
-            Some: responseValue => ParseValidResponse(dataObjectIdentifier, responseValue),
-            None: () => Result.Failure<GetDataResponse, SmartCardError>(
-                SmartCardError.InvalidArgument("Response data cannot be null")
-            )
-        );
+        return Maybe<byte[]>
+            .From(response)
+            .Match(
+                Some: responseValue => ParseValidResponse(dataObjectIdentifier, responseValue),
+                None: () =>
+                    Result.Failure<GetDataResponse, SmartCardError>(
+                        SmartCardError.InvalidArgument("Response data cannot be null")
+                    )
+            );
     }
 
     /// <summary>
@@ -354,14 +339,22 @@ public class GetDataResponse
     /// <param name="dataObjectIdentifier">The data object identifier.</param>
     /// <param name="response">The validated response data.</param>
     /// <returns>A Result containing the parsed response or an error.</returns>
-    private static Result<GetDataResponse, SmartCardError> ParseValidResponse(ushort dataObjectIdentifier, byte[] response)
+    private static Result<GetDataResponse, SmartCardError> ParseValidResponse(
+        ushort dataObjectIdentifier,
+        byte[] response
+    )
     {
-        return TlvParser.ParseSingle(response).Match(
-            Some: tlvObject => Result.Success<GetDataResponse, SmartCardError>(
-                new GetDataResponse(dataObjectIdentifier, response, tlvObject)),
-            None: () => Result.Failure<GetDataResponse, SmartCardError>(
-                SmartCardError.InvalidResponse("Failed to parse GET DATA response as TLV"))
-        );
+        return TlvService.TlvParser.Parse(response.ToImmutableArray())
+            .Match(
+                tlvObject =>
+                    Result.Success<GetDataResponse, SmartCardError>(
+                        new GetDataResponse(dataObjectIdentifier, response, Maybe<TlvObject>.From(tlvObject))
+                    ),
+                error =>
+                    Result.Failure<GetDataResponse, SmartCardError>(
+                        SmartCardError.InvalidResponse("Failed to parse GET DATA response as TLV")
+                    )
+            );
     }
 
     /// <summary>
@@ -376,18 +369,18 @@ public class GetDataResponse
         }
 
         // CPLC data can be in raw format or TLV format
-        byte[] dataToparse = IsTlvFormat && TlvObject.HasValue ? TlvObject.Value.Value : Data;
+        byte[] dataToparse = IsTlvFormat && TlvObject.HasValue 
+            ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
+            : Data;
 
         if (dataToparse.Length < 42)
         {
             return Maybe<CplcData>.None;
         }
 
-        return CplcData.Parse(dataToparse)
-            .Match(
-                success => Maybe<CplcData>.From(success),
-                failure => Maybe<CplcData>.None
-            );
+        return CplcData
+            .Parse(dataToparse)
+            .Match(success => Maybe<CplcData>.From(success), failure => Maybe<CplcData>.None);
     }
 
     /// <summary>
@@ -401,19 +394,23 @@ public class GetDataResponse
             return Maybe<CardDataInfo>.None;
         }
 
-        byte[] dataToparse = IsTlvFormat && TlvObject.HasValue ? TlvObject.Value.Value : Data;
+        byte[] dataToparse = IsTlvFormat && TlvObject.HasValue 
+            ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
+            : Data;
 
-        return Maybe<byte[]>.From(dataToparse)
+        return Maybe<byte[]>
+            .From(dataToparse)
             .Where(data => data.Length > 0)
             .Match(
-                Some: validData => CardDataInfo.Parse(validData)
-                    .Match(
-                        success => Maybe<CardDataInfo>.From(success),
-                        failure => Maybe<CardDataInfo>.None
-                    ),
+                Some: validData =>
+                    CardDataInfo
+                        .Parse(validData)
+                        .Match(
+                            success => Maybe<CardDataInfo>.From(success),
+                            failure => Maybe<CardDataInfo>.None
+                        ),
                 None: () => Maybe<CardDataInfo>.None
             );
-
     }
 
     /// <summary>
@@ -427,15 +424,21 @@ public class GetDataResponse
             return Maybe<CardCapabilities>.None;
         }
 
-        byte[] dataToparse = IsTlvFormat && TlvObject.HasValue ? TlvObject.Value.Value : Data;
+        byte[] dataToparse = IsTlvFormat && TlvObject.HasValue 
+            ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
+            : Data;
 
-        return Maybe<byte[]>.From(dataToparse)
+        return Maybe<byte[]>
+            .From(dataToparse)
             .Where(data => data.Length > 0)
-            .Bind(validData => CardCapabilities.TryParse(Maybe<byte[]>.From(validData))
-                .Match(
-                    onSuccess: caps => Maybe<CardCapabilities>.From(caps),
-                    onFailure: error => Maybe<CardCapabilities>.None
-                ));
+            .Bind(validData =>
+                CardCapabilities
+                    .TryParse(Maybe<byte[]>.From(validData))
+                    .Match(
+                        onSuccess: caps => Maybe<CardCapabilities>.From(caps),
+                        onFailure: error => Maybe<CardCapabilities>.None
+                    )
+            );
     }
 
     /// <summary>
@@ -444,8 +447,11 @@ public class GetDataResponse
     /// <returns>The value formatted as a hex string.</returns>
     public string GetValueAsHexString()
     {
-        byte[] dataToUse = IsTlvFormat && TlvObject.HasValue ? TlvObject.Value.Value : Data;
-        return Maybe<byte[]>.From(dataToUse)
+        byte[] dataToUse = IsTlvFormat && TlvObject.HasValue 
+            ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
+            : Data;
+        return Maybe<byte[]>
+            .From(dataToUse)
             .Map(data => Convert.ToHexString(data))
             .GetValueOrDefault(string.Empty);
     }
@@ -456,12 +462,14 @@ public class GetDataResponse
     /// <returns>The numeric value or None if not applicable.</returns>
     public Maybe<uint> GetValueAsNumber()
     {
-        byte[] dataToUse = IsTlvFormat && TlvObject.HasValue ? TlvObject.Value.Value : Data;
+        byte[] dataToUse = IsTlvFormat && TlvObject.HasValue 
+            ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
+            : Data;
 
-        return Maybe<byte[]>.From(dataToUse)
-            .Where(data => data.Length > 0 && data.Length <= 4)
+        return Maybe<byte[]>
+            .From(dataToUse)
+            .Where(data => data.Length is > 0 and <= 4)
             .Map(ConvertToNumber);
-
     }
 
     /// <summary>
@@ -471,7 +479,7 @@ public class GetDataResponse
     /// <returns>The numeric value.</returns>
     private static uint ConvertToNumber(byte[] data)
     {
-        return data.Aggregate(0u, (acc, b) => (acc << 8) | b);
+        return data.Aggregate(0u, (acc, b) => acc << 8 | b);
     }
 
     /// <summary>
@@ -485,14 +493,20 @@ public class GetDataResponse
             return Maybe<KeyInformationTemplate>.None;
         }
 
-        byte[] dataToparse = IsTlvFormat && TlvObject.HasValue ? TlvObject.Value.Value : Data;
+        byte[] dataToparse = IsTlvFormat && TlvObject.HasValue 
+            ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
+            : Data;
 
-        return Maybe<byte[]>.From(dataToparse)
+        return Maybe<byte[]>
+            .From(dataToparse)
             .Where(data => data.Length > 0)
-            .Bind(validData => KeyInformationTemplate.Parse(validData)
-                .Match(
-                    success => Maybe<KeyInformationTemplate>.From(success),
-                    failure => Maybe<KeyInformationTemplate>.None
-                ));
+            .Bind(validData =>
+                KeyInformationTemplate
+                    .Parse(validData)
+                    .Match(
+                        success => Maybe<KeyInformationTemplate>.From(success),
+                        failure => Maybe<KeyInformationTemplate>.None
+                    )
+            );
     }
 }

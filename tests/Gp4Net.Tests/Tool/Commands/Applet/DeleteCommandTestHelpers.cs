@@ -29,17 +29,11 @@ internal static class DeleteCommandTestHelpers
     {
         public ILookup<string, string?> Parsed
         {
-            get
-            {
-                return new List<(string, string?)>().ToLookup(x => x.Item1, x => x.Item2);
-            }
+            get { return new List<(string, string?)>().ToLookup(x => x.Item1, x => x.Item2); }
         }
         public IReadOnlyList<string> Raw
         {
-            get
-            {
-                return new List<string>();
-            }
+            get { return new List<string>(); }
         }
     }
 }

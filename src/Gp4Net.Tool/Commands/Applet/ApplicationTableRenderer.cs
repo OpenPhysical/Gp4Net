@@ -16,7 +16,10 @@ public static class ApplicationTableRenderer
     /// </summary>
     /// <param name="rows">Sequence of semantic application rows</param>
     /// <param name="showExtended">Whether to include extended columns</param>
-    public static void RenderToTable(IEnumerable<ApplicationTableBuilder.ApplicationRow> rows, bool showExtended = false)
+    public static void RenderToTable(
+        IEnumerable<ApplicationTableBuilder.ApplicationRow> rows,
+        bool showExtended = false
+    )
     {
         Table table = CreateTable(showExtended);
 
@@ -54,7 +57,7 @@ public static class ApplicationTableRenderer
                         "warning" => "yellow",
                         "error" => "red",
                         "success" => "green",
-                        _ => "blue"
+                        _ => "blue",
                     };
                     AnsiConsole.MarkupLine($"[{color}]{message}[/]");
                     break;
@@ -63,7 +66,9 @@ public static class ApplicationTableRenderer
                     // For console output, display as a simple line
                     string version = dataRow.Version.GetValueOrDefault("");
                     string versionDisplay = !string.IsNullOrEmpty(version) ? $" v{version}" : "";
-                    AnsiConsole.MarkupLine($"{dataRow.Type} {dataRow.Aid}{versionDisplay} - {dataRow.State}");
+                    AnsiConsole.MarkupLine(
+                        $"{dataRow.Type} {dataRow.Aid}{versionDisplay} - {dataRow.State}"
+                    );
                     break;
             }
         }
@@ -95,11 +100,22 @@ public static class ApplicationTableRenderer
     /// <summary>
     /// Renders a single semantic row using pattern matching.
     /// </summary>
-    private static void RenderSemanticRow(Table table, ApplicationTableBuilder.ApplicationRow row, bool showExtended)
+    private static void RenderSemanticRow(
+        Table table,
+        ApplicationTableBuilder.ApplicationRow row,
+        bool showExtended
+    )
     {
         switch (row)
         {
-            case ApplicationTableBuilder.ApplicationDataRow(var type, var aid, var state, var privileges, var version, var associatedSd):
+            case ApplicationTableBuilder.ApplicationDataRow(
+                var type,
+                var aid,
+                var state,
+                var privileges,
+                var version,
+                var associatedSd
+            ):
                 List<string> columns = [type, aid, state, privileges];
 
                 if (showExtended)
@@ -115,7 +131,7 @@ public static class ApplicationTableRenderer
                 // Add empty row before section header for spacing
                 if (table.Rows.Count > 0)
                 {
-                    string[] emptyCols = Enumerable.Repeat("", table.Columns.Count).ToArray();
+                    string[] emptyCols = [.. Enumerable.Repeat("", table.Columns.Count)];
                     _ = table.AddRow(emptyCols);
                 }
 
@@ -144,7 +160,9 @@ public static class ApplicationTableRenderer
     /// </summary>
     public static void RenderPostTableRows(IEnumerable<ApplicationTableBuilder.ApplicationRow> rows)
     {
-        IEnumerable<ApplicationTableBuilder.ApplicationRow> postTableRows = rows.Where(r => r is ApplicationTableBuilder.SummaryRow or ApplicationTableBuilder.InfoRow);
+        IEnumerable<ApplicationTableBuilder.ApplicationRow> postTableRows = rows.Where(r =>
+            r is ApplicationTableBuilder.SummaryRow or ApplicationTableBuilder.InfoRow
+        );
 
         foreach (ApplicationTableBuilder.ApplicationRow row in postTableRows)
         {
@@ -161,7 +179,7 @@ public static class ApplicationTableRenderer
                         "warning" => "yellow",
                         "error" => "red",
                         "success" => "green",
-                        _ => "blue"
+                        _ => "blue",
                     };
                     AnsiConsole.MarkupLine($"[{color}]{message}[/]");
                     break;

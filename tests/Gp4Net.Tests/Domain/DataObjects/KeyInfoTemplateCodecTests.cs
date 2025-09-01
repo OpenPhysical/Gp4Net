@@ -4,10 +4,10 @@
 // -----------------------------------------------------------------------------
 
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.DataObjects;
 using NUnit.Framework;
-using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tests.Domain.DataObjects;
 
@@ -21,12 +21,11 @@ public class KeyInfoTemplateCodecTests
         {
             KeyVersionNumber = 0x01,
             KeyIdentifier = 0x00,
-            KeyTypesAndLengths =
-            {
-                new KeyTypeAndLength { Type = 0x80, Length = 0x10 }, // DES, 16 bytes
-                new KeyTypeAndLength { Type = 0x81, Length = 0x10 }, // DES-ECB, 16 bytes
-                new KeyTypeAndLength { Type = 0x82, Length = 0x10 }  // DES-MAC, 16 bytes
-            }
+            KeyTypesAndLengths = [
+                new KeyTypeAndLength(0x80, 0x10), // DES, 16 bytes
+                new KeyTypeAndLength(0x81, 0x10), // DES-ECB, 16 bytes
+                new KeyTypeAndLength(0x82, 0x10), // DES-MAC, 16 bytes
+            ],
         };
 
         Result<byte[], SmartCardError> encodedResult = KeyInfoTemplateCodec.Encode(keyInfo);
@@ -48,10 +47,7 @@ public class KeyInfoTemplateCodecTests
     [Test]
     public void Encode_MinimalKeyInfo_ProducesValidFormat()
     {
-        KeyInfoTemplate keyInfo = new KeyInfoTemplate
-        {
-            KeyVersionNumber = 0x01
-        };
+        KeyInfoTemplate keyInfo = new KeyInfoTemplate { KeyVersionNumber = 0x01 };
 
         Result<byte[], SmartCardError> encodedResult = KeyInfoTemplateCodec.Encode(keyInfo);
 
@@ -71,10 +67,20 @@ public class KeyInfoTemplateCodecTests
     {
         byte[] testData =
         [
-            0xE0, 0x0C, // Tag and length (fixed: 12 bytes, not 11)
-            0xC0, 0x01, 0x01, // Key version number = 1
-            0xC1, 0x01, 0x00, // Key identifier = 0
-            0xC2, 0x04, 0x80, 0x10, 0x81, 0x10 // Two key types: DES 16 bytes each
+            0xE0,
+            0x0C, // Tag and length (fixed: 12 bytes, not 11)
+            0xC0,
+            0x01,
+            0x01, // Key version number = 1
+            0xC1,
+            0x01,
+            0x00, // Key identifier = 0
+            0xC2,
+            0x04,
+            0x80,
+            0x10,
+            0x81,
+            0x10, // Two key types: DES 16 bytes each
         ];
 
         Result<KeyInfoTemplate, SmartCardError> result = KeyInfoTemplateCodec.Decode(testData);
@@ -107,7 +113,9 @@ public class KeyInfoTemplateCodecTests
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<SmartCardError>();
         _ = result.Error.Code.Should().Be("INVALID_DATA");
-        _ = result.Error.Message.Should().Contain("Invalid key information template format - expected tag 0xE0");
+        _ = result
+            .Error.Message.Should()
+            .Contain("Invalid key information template format - expected tag 0xE0");
     }
 
     [Test]
@@ -115,9 +123,15 @@ public class KeyInfoTemplateCodecTests
     {
         byte[] testData =
         [
-            0xE0, 0x81, 0x06, // Tag with extended length (6 bytes content)
-            0xC0, 0x01, 0x01, // Key version number = 1
-            0xC1, 0x01, 0x00  // Key identifier = 0
+            0xE0,
+            0x81,
+            0x06, // Tag with extended length (6 bytes content)
+            0xC0,
+            0x01,
+            0x01, // Key version number = 1
+            0xC1,
+            0x01,
+            0x00, // Key identifier = 0
         ];
 
         Result<KeyInfoTemplate, SmartCardError> result = KeyInfoTemplateCodec.Decode(testData);
@@ -142,7 +156,7 @@ public class KeyInfoTemplateCodecTests
                 new KeyTypeAndLength { Type = 0x80, Length = 0x18 }, // 3DES, 24 bytes
                 new KeyTypeAndLength { Type = 0x88, Length = 0x10 }, // AES, 16 bytes
                 new KeyTypeAndLength { Type = 0x88, Length = 0x20 }, // AES, 32 bytes
-            }
+            },
         };
 
         Result<byte[], SmartCardError> encodedResult = KeyInfoTemplateCodec.Encode(original);
@@ -160,7 +174,10 @@ public class KeyInfoTemplateCodecTests
         for (int i = 0; i < original.KeyTypesAndLengths.Count; i++)
         {
             _ = result.KeyTypesAndLengths[i].Type.Should().Be(original.KeyTypesAndLengths[i].Type);
-            _ = result.KeyTypesAndLengths[i].Length.Should().Be(original.KeyTypesAndLengths[i].Length);
+            _ = result
+                .KeyTypesAndLengths[i]
+                .Length.Should()
+                .Be(original.KeyTypesAndLengths[i].Length);
         }
     }
 
@@ -200,9 +217,14 @@ public class KeyInfoTemplateCodecTests
     {
         byte[] testData =
         [
-            0xE0, 0x06, // Tag and length
-            0xC0, 0x01, 0x01, // Key version number = 1
-            0xC2, 0x01, 0x80 // Key types with odd length (missing second byte)
+            0xE0,
+            0x06, // Tag and length
+            0xC0,
+            0x01,
+            0x01, // Key version number = 1
+            0xC2,
+            0x01,
+            0x80, // Key types with odd length (missing second byte)
         ];
 
         Result<KeyInfoTemplate, SmartCardError> result = KeyInfoTemplateCodec.Decode(testData);
@@ -221,8 +243,8 @@ public class KeyInfoTemplateCodecTests
         {
             KeyTypesAndLengths =
             {
-                new KeyTypeAndLength { Type = 0x88, Length = 0x20 } // AES, 32 bytes
-            }
+                new KeyTypeAndLength { Type = 0x88, Length = 0x20 }, // AES, 32 bytes
+            },
         };
 
         Result<byte[], SmartCardError> encodedResult = KeyInfoTemplateCodec.Encode(keyInfo);

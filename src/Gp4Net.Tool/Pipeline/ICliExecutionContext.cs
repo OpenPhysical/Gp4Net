@@ -24,6 +24,11 @@ public interface ICliExecutionContext
     ISmartCardService CardService { get; }
 
     /// <summary>
+    /// Gets the keyset resolver for resolving keysets by name or parameters.
+    /// </summary>
+    IKeysetResolver KeysetResolver { get; }
+
+    /// <summary>
     /// Gets the GlobalPlatform service for GP operations.
     /// Creates the service on demand with proper pipeline context.
     /// </summary>
@@ -33,17 +38,26 @@ public interface ICliExecutionContext
     /// Gets a pure function for establishing secure channels from user requests.
     /// Eliminates imperative keyset resolution patterns in commands.
     /// </summary>
-    Func<SecureChannelRequest, CancellationToken, Task<Result<SecureChannelExecutionContext, SmartCardError>>> EstablishSecureChannelAsync { get; }
+    Func<
+        SecureChannelRequest,
+        CancellationToken,
+        Task<Result<SecureChannelExecutionContext, SmartCardError>>
+    > EstablishSecureChannelAsync { get; }
 
     /// <summary>
     /// Ensures a card connection is established with the specified reader.
     /// </summary>
-    Task<Result<ICliExecutionContext, SmartCardError>> RequireCardConnection(Maybe<string> readerName = default);
+    Task<Result<ICliExecutionContext, SmartCardError>> RequireCardConnection(
+        Maybe<string> readerName = default
+    );
 
     /// <summary>
     /// Ensures a secure channel is established with the specified security level.
     /// </summary>
-    Task<Result<ICliExecutionContext, SmartCardError>> RequireSecureChannel(byte securityLevel = 1, Maybe<string> keyset = default);
+    Task<Result<ICliExecutionContext, SmartCardError>> RequireSecureChannel(
+        byte securityLevel = 1,
+        Maybe<string> keyset = default
+    );
 
     /// <summary>
     /// Executes the command logic with the current context.

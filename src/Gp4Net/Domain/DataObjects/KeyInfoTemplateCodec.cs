@@ -4,11 +4,13 @@
 // -----------------------------------------------------------------------------
 
 using System;
-using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
+using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Core.Tlv;
+using Gp4Net.Services;
+using static Gp4Net.Services.TlvService;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.DataObjects;
@@ -29,7 +31,8 @@ public static class KeyInfoTemplateCodec
     {
         if (keyInfo is null)
             return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidArgument("KeyInfo cannot be null"));
+                SmartCardError.InvalidArgument("KeyInfo cannot be null")
+            );
 
         using MemoryStream stream = new MemoryStream();
 
@@ -52,15 +55,11 @@ public static class KeyInfoTemplateCodec
         }
 
         // Key types and lengths (C2)
-        if (keyInfo.KeyTypesAndLengths.Count > 0)
+        if (keyInfo.KeyTypesAndLengths.Length > 0)
         {
-            byte[] keyData = new byte[keyInfo.KeyTypesAndLengths.Count * 2];
-            int index = 0;
-            foreach (KeyTypeAndLength keyType in keyInfo.KeyTypesAndLengths)
-            {
-                keyData[index++] = keyType.Type;
-                keyData[index++] = keyType.Length;
-            }
+            byte[] keyData = keyInfo.KeyTypesAndLengths
+                .SelectMany(keyType => new[] { keyType.Type, keyType.Length })
+                .ToArray();
             WriteTlv(contentStream, 0xC2, keyData);
         }
 
@@ -78,7 +77,8 @@ public static class KeyInfoTemplateCodec
                 break;
             default:
                 return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidData("Key information template too large for encoding"));
+                    SmartCardError.InvalidData("Key information template too large for encoding")
+                );
         }
 
         // Write content
@@ -96,80 +96,78 @@ public static class KeyInfoTemplateCodec
     {
         if (data is null)
             return Result.Failure<KeyInfoTemplate, SmartCardError>(
-                SmartCardError.InvalidArgument("Data cannot be null"));
+                SmartCardError.InvalidArgument("Data cannot be null")
+            );
 
-        // Parse the outer TLV structure
-        Maybe<TlvObject> outerTlvMaybe = TlvParser.ParseSingle(data);
-        if (!outerTlvMaybe.HasValue)
-        {
-            return SmartCardError.InvalidData("Invalid key information template format - no outer TLV found");
-        }
+        // Parse the outer TLV structure using functional composition
+        return TlvService.TlvParser.Parse(data.ToImmutableArray())
+            .Bind(outerTlv => outerTlv.Tag.ToNumber()
+                .Bind(tagNumber => tagNumber == 0xE0
+                    ? Result.Success<TlvObject, SmartCardError>(outerTlv)
+                    : Result.Failure<TlvObject, SmartCardError>(
+                        SmartCardError.InvalidData("Invalid key information template format - expected tag 0xE0")
+                    ))
+            )
+            .Bind(ProcessKeyInfoContent);
+    }
 
-        Result<uint, SmartCardError> tagResult = outerTlvMaybe.Value.GetTagNumber();
-        if (tagResult.IsFailure || tagResult.Value != 0xE0)
-        {
-            return SmartCardError.InvalidData("Invalid key information template format - expected tag 0xE0");
-        }
+    /// <summary>
+    /// Processes the key information content from a parsed TLV object.
+    /// </summary>
+    /// <param name="outerTlv">The outer TLV object containing key information.</param>
+    /// <returns>A Result containing the decoded key information template.</returns>
+    private static Result<KeyInfoTemplate, SmartCardError> ProcessKeyInfoContent(TlvObject outerTlv)
+    {
+        return TlvService.TlvParser.ParseMultiple(outerTlv.TlvData.Bytes)
+            .Map(parseResult => parseResult.Objects
+                .Aggregate(
+                    new KeyInfoTemplate(),
+                    (keyInfo, element) => ProcessKeyInfoElement(keyInfo, element)
+                )
+            );
+    }
 
-        TlvObject outerTlv = outerTlvMaybe.Value;
-
-        try
-        {
-            KeyInfoTemplate keyInfo = new KeyInfoTemplate();
-
-            // Parse all TLV elements within the key information data
-            IReadOnlyList<TlvObject> elements = TlvParser.ParseAll(outerTlv.Value);
-
-            foreach (TlvObject element in elements)
-            {
-                Result<uint, SmartCardError> tagNumberResult = element.GetTagNumber();
-                if (tagNumberResult.IsFailure) continue;
-
-                switch (tagNumberResult.Value)
+    /// <summary>
+    /// Processes a single TLV element and updates the key information template.
+    /// Pure function that returns a new KeyInfoTemplate with updates.
+    /// </summary>
+    /// <param name="keyInfo">The current key information template.</param>
+    /// <param name="element">The TLV element to process.</param>
+    /// <returns>Updated key information template.</returns>
+    private static KeyInfoTemplate ProcessKeyInfoElement(KeyInfoTemplate keyInfo, TlvObject element)
+    {
+        return element.Tag.ToNumber()
+            .Match(
+                tagNumber => tagNumber switch
                 {
-                    case 0xC0: // Key version number
-                        if (element.Length == 1)
-                        {
-                            keyInfo.KeyVersionNumber = element.Value[0];
-                        }
-                        break;
+                    0xC0 when element.Length.LengthValue == 1 => // Key version number
+                        keyInfo with { KeyVersionNumber = Maybe<byte>.From(element.TlvData.Bytes[0]) },
+                    
+                    0xC1 when element.Length.LengthValue == 1 => // Key identifier
+                        keyInfo with { KeyIdentifier = Maybe<byte>.From(element.TlvData.Bytes[0]) },
+                    
+                    0xC2 when element.TlvData.Bytes.Length >= 2 => // Key types and lengths
+                        ProcessKeyTypesAndLengths(keyInfo, element.TlvData.Bytes),
+                    
+                    _ => keyInfo // Ignore unrecognized or malformed elements
+                },
+                _ => keyInfo // Ignore elements with invalid tags
+            );
+    }
 
-                    case 0xC1: // Key identifier
-                        if (element.Length == 1)
-                        {
-                            keyInfo.KeyIdentifier = element.Value[0];
-                        }
-                        break;
-
-                    case 0xC2: // Key types and lengths
-                        if (element.Value is { Length: >= 2 })
-                        {
-                            for (int i = 0; i < element.Value.Length; i += 2)
-                            {
-                                if (i + 1 < element.Value.Length)
-                                {
-                                    keyInfo.KeyTypesAndLengths.Add(new KeyTypeAndLength
-                                    {
-                                        Type = element.Value[i],
-                                        Length = element.Value[i + 1]
-                                    });
-                                }
-                            }
-                        }
-                        break;
-
-                    default:
-                        // Unknown tags are ignored for forward compatibility
-                        break;
-                }
-            }
-
-            return keyInfo;
-        }
-        catch (Exception ex)
-        {
-            return SmartCardError.InvalidData($"Failed to parse key information template: {ex.Message}");
-        }
+    /// <summary>
+    /// Processes key types and lengths data using functional programming.
+    /// </summary>
+    /// <param name="keyInfo">The current key information template.</param>
+    /// <param name="data">The key types and lengths data.</param>
+    /// <returns>Updated key information template with key types and lengths.</returns>
+    private static KeyInfoTemplate ProcessKeyTypesAndLengths(KeyInfoTemplate keyInfo, ImmutableArray<byte> data)
+    {
+        var keyTypes = Enumerable.Range(0, data.Length / 2)
+            .Select(i => new KeyTypeAndLength(data[i * 2], data[i * 2 + 1]))
+            .ToImmutableArray();
+            
+        return keyInfo with { KeyTypesAndLengths = keyTypes };
     }
 
     private static void WriteTlv(Stream stream, byte tag, byte[] value)
@@ -187,7 +185,9 @@ public static class KeyInfoTemplateCodec
                 stream.WriteByte((byte)value.Length);
                 break;
             default:
-                throw new ArgumentException($"Value too long for simple TLV encoding: {value.Length} bytes");
+                throw new ArgumentException(
+                    $"Value too long for simple TLV encoding: {value.Length} bytes"
+                );
         }
 
         stream.Write(value, 0, value.Length);
@@ -196,39 +196,30 @@ public static class KeyInfoTemplateCodec
 
 /// <summary>
 /// Represents GlobalPlatform key information template.
+/// Immutable record following functional programming principles.
 /// </summary>
 [PublicAPI]
-public class KeyInfoTemplate
+public sealed record KeyInfoTemplate
 {
     /// <summary>
     /// Key version number.
     /// </summary>
-    public Maybe<byte> KeyVersionNumber { get; set; } = Maybe<byte>.None;
+    public Maybe<byte> KeyVersionNumber { get; init; } = Maybe<byte>.None;
 
     /// <summary>
     /// Key identifier.
     /// </summary>
-    public Maybe<byte> KeyIdentifier { get; set; } = Maybe<byte>.None;
+    public Maybe<byte> KeyIdentifier { get; init; } = Maybe<byte>.None;
 
     /// <summary>
     /// Key types and their lengths.
     /// </summary>
-    public List<KeyTypeAndLength> KeyTypesAndLengths { get; set; } = [];
+    public ImmutableArray<KeyTypeAndLength> KeyTypesAndLengths { get; init; } = ImmutableArray<KeyTypeAndLength>.Empty;
 }
 
 /// <summary>
 /// Represents a key type and its length.
+/// Immutable record following functional programming principles.
 /// </summary>
 [PublicAPI]
-public class KeyTypeAndLength
-{
-    /// <summary>
-    /// Key type identifier.
-    /// </summary>
-    public byte Type { get; set; }
-
-    /// <summary>
-    /// Key length in bytes.
-    /// </summary>
-    public byte Length { get; set; }
-}
+public sealed record KeyTypeAndLength(byte Type, byte Length);

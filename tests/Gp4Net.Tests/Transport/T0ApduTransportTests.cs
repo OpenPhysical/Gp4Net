@@ -2,9 +2,10 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
-using Gp4Net.Transport;
 using Gp4Net.CardEmulator.Services;
+using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Transport;
@@ -19,7 +20,7 @@ public class T0ApduTransportTests
 
     public T0ApduTransportTests()
     {
-        _logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<T0ApduTransport>.Instance;
+        _logger = NullLogger<T0ApduTransport>.Instance;
         VirtualCardService virtualCardService = new VirtualCardService();
         virtualCardService.SetupComprehensiveTestEnvironment();
         // Connect to the first virtual reader
@@ -96,40 +97,25 @@ public class T0ApduTransportTests
     {
         public byte Cla
         {
-            get
-            {
-                return 0x00;
-            }
+            get { return 0x00; }
         }
         public byte Ins
         {
-            get
-            {
-                return 0xA4;
-            }
+            get { return 0xA4; }
         }
         public byte P1
         {
-            get
-            {
-                return 0x04;
-            }
+            get { return 0x04; }
         }
         public byte P2
         {
-            get
-            {
-                return 0x00;
-            }
+            get { return 0x00; }
         }
         public byte[] Data { get; set; } = Convert.FromHexString("A000000151000000"); // GP ISD AID
         public Maybe<int> ExpectedResponseLength { get; set; } = Maybe<int>.None;
         public bool IsExtendedLength
         {
-            get
-            {
-                return false;
-            }
+            get { return false; }
         }
     }
 }
@@ -150,7 +136,10 @@ internal class TestCardChannel : ICardChannel
     public TransportProtocol Protocol => TransportProtocol.T0;
     public bool IsOpen => true;
 
-    public async Task<byte[]> TransmitAsync(byte[] command, CancellationToken cancellationToken = default)
+    public async Task<byte[]> TransmitAsync(
+        byte[] command,
+        CancellationToken cancellationToken = default
+    )
     {
         await Task.CompletedTask; // Satisfy async requirement
 

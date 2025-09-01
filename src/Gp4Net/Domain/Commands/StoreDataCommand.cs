@@ -89,10 +89,7 @@ public class StoreDataCommand : IApduCommand
     /// </summary>
     byte IApduCommand.Cla
     {
-        get
-        {
-            return Cla;
-        }
+        get { return Cla; }
     }
 
     /// <summary>
@@ -100,10 +97,7 @@ public class StoreDataCommand : IApduCommand
     /// </summary>
     byte IApduCommand.Ins
     {
-        get
-        {
-            return Ins;
-        }
+        get { return Ins; }
     }
 
     /// <summary>
@@ -111,10 +105,7 @@ public class StoreDataCommand : IApduCommand
     /// </summary>
     public byte P1
     {
-        get
-        {
-            return (byte)StructureFormat;
-        }
+        get { return (byte)StructureFormat; }
     }
 
     /// <summary>
@@ -122,10 +113,7 @@ public class StoreDataCommand : IApduCommand
     /// </summary>
     public byte P2
     {
-        get
-        {
-            return (byte)Block;
-        }
+        get { return (byte)Block; }
     }
 
     /// <summary>
@@ -133,10 +121,7 @@ public class StoreDataCommand : IApduCommand
     /// </summary>
     public byte[] Data
     {
-        get
-        {
-            return StoreData.Length > 0 ? StoreData : [];
-        }
+        get { return StoreData.Length > 0 ? StoreData : []; }
     }
 
     /// <summary>
@@ -144,10 +129,7 @@ public class StoreDataCommand : IApduCommand
     /// </summary>
     public Maybe<int> ExpectedResponseLength
     {
-        get
-        {
-            return Maybe<int>.None;
-        }
+        get { return Maybe<int>.None; }
     }
 
     /// <summary>
@@ -155,10 +137,7 @@ public class StoreDataCommand : IApduCommand
     /// </summary>
     public bool IsExtendedLength
     {
-        get
-        {
-            return false;
-        }
+        get { return false; }
     }
 
     /// <summary>
@@ -199,7 +178,8 @@ public class StoreDataCommand : IApduCommand
     public static Result<StoreDataCommand, SmartCardError> CreateWithFormat(
         DataStructureFormat structureFormat,
         BlockFormat block,
-        byte[] data)
+        byte[] data
+    )
     {
         if (data == null)
         {
@@ -209,13 +189,14 @@ public class StoreDataCommand : IApduCommand
         return new StoreDataCommand(structureFormat, block, data);
     }
 
-
     /// <summary>
     /// Creates a STORE DATA command for setting the default key version.
     /// </summary>
     /// <param name="keyVersion">The default key version number.</param>
     /// <returns>A Result containing either a new StoreDataCommand or an error.</returns>
-    public static Result<StoreDataCommand, SmartCardError> CreateDefaultKeyVersionCommand(byte keyVersion)
+    public static Result<StoreDataCommand, SmartCardError> CreateDefaultKeyVersionCommand(
+        byte keyVersion
+    )
     {
         // Simple TLV format: 7F0D + length + key version
         byte[] data = [0x7F, 0x0D, 0x01, keyVersion];

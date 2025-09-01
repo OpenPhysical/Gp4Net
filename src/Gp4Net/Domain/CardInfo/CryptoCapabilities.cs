@@ -132,11 +132,25 @@ public enum CryptoCapabilities
     /// Standard P71D321 cryptographic capabilities.
     /// Includes all algorithms supported by the SmartMX3 platform.
     /// </summary>
-    P71D321Standard = DES | TripleDES | AES128 | AES192 | AES256 |
-                      RSA2048 | RSA3072 | RSA4096 |
-                      ECC256 | ECC384 | ECC521 | ECC544 |
-                      SHA1 | SHA256 | SHA384 | SHA512 |
-                      HardwareRNG | DPACountermeasures
+    P71D321Standard =
+        DES
+        | TripleDES
+        | AES128
+        | AES192
+        | AES256
+        | RSA2048
+        | RSA3072
+        | RSA4096
+        | ECC256
+        | ECC384
+        | ECC521
+        | ECC544
+        | SHA1
+        | SHA256
+        | SHA384
+        | SHA512
+        | HardwareRNG
+        | DPACountermeasures,
 }
 
 /// <summary>
@@ -173,7 +187,7 @@ public enum CipherMode
     /// <summary>
     /// Cipher Feedback mode.
     /// </summary>
-    CFB = 0x10
+    CFB = 0x10,
 }
 
 /// <summary>
@@ -210,7 +224,7 @@ public enum MacAlgorithm
     /// <summary>
     /// Retail MAC (ISO/IEC 9797-1 Algorithm 3).
     /// </summary>
-    RetailMac = 0x10
+    RetailMac = 0x10,
 }
 
 /// <summary>
@@ -237,7 +251,7 @@ public enum RsaPadding
     /// <summary>
     /// PKCS#1 OAEP (Optimal Asymmetric Encryption Padding).
     /// </summary>
-    Oaep = 0x04
+    Oaep = 0x04,
 }
 
 /// <summary>
@@ -309,7 +323,7 @@ public enum CryptoKeyType : byte
     /// Extended key type for future use.
     /// GlobalPlatform identifier: 0xFF.
     /// </summary>
-    Extended = 0xFF
+    Extended = 0xFF,
 }
 
 /// <summary>
@@ -377,9 +391,15 @@ public enum SecurityFeatures
     /// Standard P71D321 security features.
     /// Includes all IntegralSecurity 2.0 features.
     /// </summary>
-    P71D321Standard = PhysicalUnclonableFunction | SecureKeyStorage |
-                      TamperDetection | EnvironmentalSensors |
-                      MemoryEncryption | SecureBoot | HardwareFirewall |
-                      SideChannelProtection | FaultInjectionProtection |
-                      GlitchProtection
+    P71D321Standard =
+        PhysicalUnclonableFunction
+        | SecureKeyStorage
+        | TamperDetection
+        | EnvironmentalSensors
+        | MemoryEncryption
+        | SecureBoot
+        | HardwareFirewall
+        | SideChannelProtection
+        | FaultInjectionProtection
+        | GlitchProtection,
 }

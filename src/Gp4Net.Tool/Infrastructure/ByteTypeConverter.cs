@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Globalization;
+using System.Linq;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Tool.Infrastructure;
@@ -15,9 +16,9 @@ public class ByteTypeConverter : TypeConverter
     public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
     {
         return sourceType == typeof(string)
-               || sourceType == typeof(int)
-               || sourceType == typeof(long)
-               || base.CanConvertFrom(context, sourceType);
+            || sourceType == typeof(int)
+            || sourceType == typeof(long)
+            || base.CanConvertFrom(context, sourceType);
     }
 
     /// <inheritdoc />
@@ -99,17 +100,7 @@ public class ByteTypeConverter : TypeConverter
         );
     }
 
-    private static bool IsHexString(string value)
-    {
-        foreach (char c in value)
-        {
-            if (!Uri.IsHexDigit(c))
-            {
-                return false;
-            }
-        }
-        return true;
-    }
+    private static bool IsHexString(string value) => value.All(Uri.IsHexDigit);
 
     /// <inheritdoc />
     public override bool CanConvertTo(ITypeDescriptorContext context, Type destinationType)

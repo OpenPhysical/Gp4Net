@@ -7,7 +7,6 @@ using Gp4Net.Domain;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Security;
 using StatusSubset = Gp4Net.Domain.Commands.GetStatusCommand.StatusSubset;
 
 namespace Gp4Net.Services;
@@ -28,7 +27,8 @@ public interface IGlobalPlatformService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The select response.</returns>
     Task<Result<SelectResponse, SmartCardError>> SelectIsdAsync(
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Establishes a secure channel with the card using a resolved keyset.
@@ -40,7 +40,8 @@ public interface IGlobalPlatformService
     Task<Result<SecureChannelState, SmartCardError>> EstablishSecureChannelAsync(
         KeySet keySet,
         SecurityLevel securityLevel = SecurityLevel.CMac,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Establishes a secure channel with the card using a named keyset specification.
@@ -54,7 +55,8 @@ public interface IGlobalPlatformService
         string keysetName,
         SecurityLevel securityLevel = SecurityLevel.CMac,
         byte keyVersion = 0x01,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Establishes a secure channel with the card using explicit keys.
@@ -72,7 +74,8 @@ public interface IGlobalPlatformService
         string dekKey,
         byte keyVersion,
         SecurityLevel securityLevel = SecurityLevel.CMac,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Gets the status of applications on the card.
@@ -82,7 +85,8 @@ public interface IGlobalPlatformService
     /// <returns>The list of application statuses.</returns>
     Task<Result<ImmutableList<ApplicationInfo>, SmartCardError>> GetStatusAsync(
         StatusSubset subset = StatusSubset.IssuerSecurityDomain,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Installs a CAP file on the card.
@@ -91,10 +95,11 @@ public interface IGlobalPlatformService
     /// <param name="options">Installation options.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The installation result.</returns>
-    Task<Result<InstallationResult, SmartCardError>> InstallCapFileAsync(
+    Task<Result<Results.InstallationResult, SmartCardError>> InstallCapFileAsync(
         byte[] capFileData,
         Maybe<InstallOptions> options = default,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Deletes an application from the card.
@@ -106,7 +111,8 @@ public interface IGlobalPlatformService
     Task<Result<bool, SmartCardError>> DeleteApplicationAsync(
         byte[] aid,
         bool deleteRelated = false,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Performs a PUT KEY operation to change card keys.
@@ -118,7 +124,8 @@ public interface IGlobalPlatformService
     Task<Result<bool, SmartCardError>> PutKeysAsync(
         KeySet keySet,
         byte keyVersion,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Gets the Card Production Life Cycle (CPLC) data from the card.
@@ -126,7 +133,8 @@ public interface IGlobalPlatformService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The CPLC data.</returns>
     Task<Result<CplcData, SmartCardError>> GetCplcAsync(
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Gets data from the card using GET DATA command.
@@ -136,7 +144,8 @@ public interface IGlobalPlatformService
     /// <returns>The data value.</returns>
     Task<Result<byte[], SmartCardError>> GetDataAsync(
         ushort tag,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Sets the lifecycle state of an application.
@@ -148,7 +157,8 @@ public interface IGlobalPlatformService
     Task<Result<bool, SmartCardError>> SetLifecycleStateAsync(
         byte[] aid,
         LifecycleState state,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 
     /// <summary>
     /// Gets comprehensive card information including CPLC and reader details.
@@ -156,7 +166,8 @@ public interface IGlobalPlatformService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Structured card information for display.</returns>
     Task<Result<CardInformation, SmartCardError>> GetCardInfoAsync(
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 }
 
 /// <summary>
@@ -165,7 +176,8 @@ public interface IGlobalPlatformService
 public record InstallOptions(
     bool InstallApplets = true,
     bool MakeSelectable = true,
-    Maybe<byte[]> InstallParameters = default);
+    Maybe<byte[]> InstallParameters = default
+);
 
 /// <summary>
 /// Comprehensive card information for display purposes.
@@ -176,4 +188,5 @@ public record CardInformation(
     Maybe<SelectResponse> IsdInfo,
     string ReaderName,
     Maybe<string> Atr = default,
-    Maybe<byte[]> HistoricalBytes = default);
+    Maybe<byte[]> HistoricalBytes = default
+);

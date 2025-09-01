@@ -1,6 +1,7 @@
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
+using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Core.Functional;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
@@ -24,7 +25,8 @@ public record SecureChannelContext(
     InitializeUpdateResponse InitializeUpdateResponse,
     SessionKeys SessionKeys,
     ScpVersion ScpVersion,
-    IKeySet KeySet)
+    IKeySet KeySet
+)
 {
     /// <summary>
     /// Creates a SecureChannelContext with functional validation.
@@ -40,7 +42,8 @@ public record SecureChannelContext(
         InitializeUpdateResponse initializeUpdateResponse,
         SessionKeys sessionKeys,
         ScpVersion scpVersion,
-        IKeySet keySet)
+        IKeySet keySet
+    )
     {
         return ValidateHostChallenge(hostChallenge)
             .Bind(_ => ValidateInitializeUpdateResponse(initializeUpdateResponse))
@@ -52,40 +55,54 @@ public record SecureChannelContext(
                 initializeUpdateResponse,
                 sessionKeys,
                 scpVersion,
-                keySet));
+                keySet
+            ));
     }
 
     private static UnitResult<SmartCardError> ValidateHostChallenge(byte[] hostChallenge)
     {
-        return Maybe<byte[]>.From(hostChallenge)
+        return Maybe<byte[]>
+            .From(hostChallenge)
             .Match(
-                challenge => challenge.Length == 8
-                    ? UnitResult.Success<SmartCardError>()
-                    : SmartCardError.InvalidArgument($"Host challenge must be 8 bytes, got {challenge.Length}"),
-                () => SmartCardError.InvalidArgument("Host challenge cannot be null"));
+                challenge =>
+                    challenge.Length == 8
+                        ? UnitResult.Success<SmartCardError>()
+                        : SmartCardError.InvalidArgument(
+                            $"Host challenge must be 8 bytes, got {challenge.Length}"
+                        ),
+                () => SmartCardError.InvalidArgument("Host challenge cannot be null")
+            );
     }
 
-    private static UnitResult<SmartCardError> ValidateInitializeUpdateResponse(InitializeUpdateResponse response)
+    private static UnitResult<SmartCardError> ValidateInitializeUpdateResponse(
+        InitializeUpdateResponse response
+    )
     {
-        return Maybe<InitializeUpdateResponse>.From(response)
+        return Maybe<InitializeUpdateResponse>
+            .From(response)
             .Match(
                 _ => UnitResult.Success<SmartCardError>(),
-                () => SmartCardError.InvalidArgument("Initialize update response cannot be null"));
+                () => SmartCardError.InvalidArgument("Initialize update response cannot be null")
+            );
     }
 
     private static UnitResult<SmartCardError> ValidateSessionKeys(SessionKeys sessionKeys)
     {
-        return Maybe<SessionKeys>.From(sessionKeys)
+        return Maybe<SessionKeys>
+            .From(sessionKeys)
             .Match(
                 _ => UnitResult.Success<SmartCardError>(),
-                () => SmartCardError.InvalidArgument("Session keys cannot be null"));
+                () => SmartCardError.InvalidArgument("Session keys cannot be null")
+            );
     }
 
     private static UnitResult<SmartCardError> ValidateKeySet(IKeySet keySet)
     {
-        return Maybe<IKeySet>.From(keySet)
+        return Maybe<IKeySet>
+            .From(keySet)
             .Match(
                 _ => UnitResult.Success<SmartCardError>(),
-                () => SmartCardError.InvalidArgument("Key set cannot be null"));
+                () => SmartCardError.InvalidArgument("Key set cannot be null")
+            );
     }
 }

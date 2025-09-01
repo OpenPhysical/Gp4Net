@@ -1,58 +1,99 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.CardEmulator.Core;
 
 namespace Gp4Net.CardEmulator.Trace;
 
 /// <summary>
-/// Represents a complete APDU trace from a card session.
+/// Represents a complete APDU trace from a card session using immutable functional patterns.
 /// </summary>
 public class ApduTrace
 {
-    private readonly List<ApduExchange> _exchanges = new List<ApduExchange>();
+    private readonly ImmutableList<ApduExchange> _exchanges;
 
     /// <summary>
     /// Gets the list of APDU exchanges in the trace.
     /// </summary>
-    public IReadOnlyList<ApduExchange> Exchanges
-    {
-        get
-        {
-            return _exchanges.AsReadOnly();
-        }
-    }
+    public IReadOnlyList<ApduExchange> Exchanges => _exchanges;
 
     /// <summary>
     /// Gets the ATR if captured in the trace.
     /// </summary>
-    public byte[]? Atr { get; set; }
+    public Maybe<byte[]> Atr { get; }
 
     /// <summary>
     /// Gets metadata about the trace.
     /// </summary>
-    public TraceMetadata Metadata { get; } = new TraceMetadata();
+    public TraceMetadata Metadata { get; }
 
     /// <summary>
-    /// Adds an APDU exchange to the trace.
+    /// Private constructor for immutable instances.
     /// </summary>
-    public void AddExchange(ApduExchange exchange)
+    private ApduTrace(
+        ImmutableList<ApduExchange> exchanges,
+        Maybe<byte[]> atr,
+        TraceMetadata metadata
+    )
     {
-        ArgumentNullException.ThrowIfNull(exchange);
+        _exchanges = exchanges;
+        Atr = atr;
+        Metadata = metadata;
+    }
 
-        _exchanges.Add(exchange);
+    /// <summary>
+    /// Creates an empty APDU trace.
+    /// </summary>
+    /// <returns>A new empty trace instance.</returns>
+    public static ApduTrace CreateEmpty() =>
+        new ApduTrace(
+            ImmutableList<ApduExchange>.Empty,
+            Maybe<byte[]>.None,
+            new TraceMetadata()
+        );
+
+    /// <summary>
+    /// Creates a new trace with an additional APDU exchange.
+    /// </summary>
+    /// <param name="exchange">The exchange to add.</param>
+    /// <returns>A new trace instance with the added exchange, or an error.</returns>
+    public Result<ApduTrace, SmartCardError> WithExchange(ApduExchange exchange)
+    {
+        return Maybe.From(exchange)
+            .ToResult(SmartCardError.InvalidArgument("Exchange cannot be null"))
+            .Map(validExchange => new ApduTrace(
+                ImmutableList.CreateRange(_exchanges.Append(validExchange)),
+                Atr,
+                Metadata
+            ));
+    }
+
+    /// <summary>
+    /// Creates a new trace with the specified ATR.
+    /// </summary>
+    /// <param name="atr">The ATR bytes.</param>
+    /// <returns>A new trace instance with the ATR set, or an error.</returns>
+    public Result<ApduTrace, SmartCardError> WithAtr(byte[] atr)
+    {
+        return Maybe.From(atr)
+            .ToResult(SmartCardError.InvalidArgument("ATR cannot be null"))
+            .Map(validAtr => new ApduTrace(
+                _exchanges,
+                Maybe<byte[]>.From(validAtr),
+                Metadata
+            ));
     }
 
     /// <summary>
     /// Finds exchanges matching a specific command pattern.
     /// </summary>
     public IEnumerable<ApduExchange> FindExchanges(
-        byte? cla = null,
-        byte? ins = null,
-        byte? p1 = null,
-        byte? p2 = null
+        Maybe<byte> cla = default,
+        Maybe<byte> ins = default,
+        Maybe<byte> p1 = default,
+        Maybe<byte> p2 = default
     )
     {
         return _exchanges.Where(ex =>
@@ -60,93 +101,11 @@ public class ApduTrace
             if (ex.Command.Length < 4)
                 return false;
 
-            return (!cla.HasValue || ex.Command[0] == cla.Value)
-                   && (!ins.HasValue || ex.Command[1] == ins.Value)
-                   && (!p1.HasValue || ex.Command[2] == p1.Value)
-                   && (!p2.HasValue || ex.Command[3] == p2.Value);
+            return cla.Match(claValue => ex.Command[0] == claValue, () => true)
+                && ins.Match(insValue => ex.Command[1] == insValue, () => true)
+                && p1.Match(p1Value => ex.Command[2] == p1Value, () => true)
+                && p2.Match(p2Value => ex.Command[3] == p2Value, () => true);
         });
-    }
-}
-
-/// <summary>
-/// Represents a single APDU command/response exchange.
-/// </summary>
-public class ApduExchange
-{
-    /// <summary>
-    /// Gets the APDU command bytes.
-    /// </summary>
-    public byte[] Command { get; }
-
-    /// <summary>
-    /// Gets or sets the APDU response.
-    /// </summary>
-    public ApduResponse? Response { get; set; }
-
-    /// <summary>
-    /// Gets the timestamp of the exchange.
-    /// </summary>
-    public DateTime Timestamp { get; }
-
-    /// <summary>
-    /// Gets or sets optional metadata for this exchange.
-    /// </summary>
-    public Dictionary<string, object> Metadata { get; } = new Dictionary<string, object>();
-
-    /// <summary>
-    /// Gets whether this exchange has a response.
-    /// </summary>
-    public bool HasResponse
-    {
-        get
-        {
-            return Response != null;
-        }
-    }
-
-    /// <summary>
-    /// Private constructor for ApduExchange class.
-    /// Use Create factory method instead.
-    /// </summary>
-    private ApduExchange(byte[] command, Maybe<ApduResponse> response)
-    {
-        Command = command;
-        Response = response.Match(r => r, () => null);
-        Timestamp = DateTime.UtcNow;
-    }
-    
-    /// <summary>
-    /// Creates a new ApduExchange instance with validation.
-    /// </summary>
-    public static Result<ApduExchange, SmartCardError> Create(byte[] command, Maybe<ApduResponse> response = default)
-    {
-        return Maybe<byte[]>.From(command)
-            .ToResult(SmartCardError.InvalidArgument("Command cannot be null"))
-            .Map(cmd => new ApduExchange(cmd, response));
-    }
-
-    /// <summary>
-    /// Gets a string representation of the command for debugging.
-    /// </summary>
-    public string GetCommandString()
-    {
-        return BitConverter.ToString(Command).Replace("-", " ");
-    }
-
-    /// <summary>
-    /// Gets a string representation of the response for debugging.
-    /// </summary>
-    public string GetResponseString()
-    {
-        if (Response == null)
-            return "No response";
-
-        string data =
-            Response.Data is { Length: > 0 }
-                ? BitConverter.ToString(Response.Data).Replace("-", " ") + " "
-                : "";
-
-        return $"{data}SW: {Response.StatusWord:X4}";
     }
 }
 

@@ -14,19 +14,20 @@ public sealed record KeyManagementConfiguration
     /// <summary>
     /// Default secure configuration with recommended settings.
     /// </summary>
-    public static KeyManagementConfiguration Default { get; } = new()
-    {
-        RequireKeyRotation = true,
-        KeyRotationIntervalDays = 90,
-        MaxKeyUsageCount = 10000,
-        RequireSecureStorage = true,
-        AllowKeyExport = false,
-        MinimumKeyLength = 16, // 128 bits
-        RequireKeyDerivation = true,
-        ClearKeysAfterUse = true,
-        KeyLifetimeMinutes = 30,
-        EnableKeyAuditing = true
-    };
+    public static KeyManagementConfiguration Default { get; } =
+        new()
+        {
+            RequireKeyRotation = true,
+            KeyRotationIntervalDays = 90,
+            MaxKeyUsageCount = 10000,
+            RequireSecureStorage = true,
+            AllowKeyExport = false,
+            MinimumKeyLength = 16, // 128 bits
+            RequireKeyDerivation = true,
+            ClearKeysAfterUse = true,
+            KeyLifetimeMinutes = 30,
+            EnableKeyAuditing = true,
+        };
 
     /// <summary>
     /// Gets whether key rotation is required.
@@ -91,7 +92,8 @@ public sealed record KeyManagementConfiguration
         if (key.Length < MinimumKeyLength)
         {
             return Result.Failure<bool, string>(
-                $"{keyType} key length ({key.Length} bytes) is below minimum ({MinimumKeyLength} bytes)");
+                $"{keyType} key length ({key.Length} bytes) is below minimum ({MinimumKeyLength} bytes)"
+            );
         }
 
         return Result.Success<bool, string>(true);
@@ -101,19 +103,20 @@ public sealed record KeyManagementConfiguration
     /// Creates a development configuration with relaxed security.
     /// Should only be used for testing and development.
     /// </summary>
-    public static KeyManagementConfiguration Development { get; } = new()
-    {
-        RequireKeyRotation = false,
-        KeyRotationIntervalDays = 365,
-        MaxKeyUsageCount = int.MaxValue,
-        RequireSecureStorage = false,
-        AllowKeyExport = true,
-        MinimumKeyLength = 8,
-        RequireKeyDerivation = false,
-        ClearKeysAfterUse = true,
-        KeyLifetimeMinutes = 60,
-        EnableKeyAuditing = false
-    };
+    public static KeyManagementConfiguration Development { get; } =
+        new()
+        {
+            RequireKeyRotation = false,
+            KeyRotationIntervalDays = 365,
+            MaxKeyUsageCount = int.MaxValue,
+            RequireSecureStorage = false,
+            AllowKeyExport = true,
+            MinimumKeyLength = 8,
+            RequireKeyDerivation = false,
+            ClearKeysAfterUse = true,
+            KeyLifetimeMinutes = 60,
+            EnableKeyAuditing = false,
+        };
 }
 
 /// <summary>
@@ -128,7 +131,8 @@ public sealed class KeyLifecycleManager
     private KeyLifecycleManager(
         KeyManagementConfiguration config,
         SecureKeyStore keyStore,
-        ImmutableDictionary<string, KeyMetadata> metadata)
+        ImmutableDictionary<string, KeyMetadata> metadata
+    )
     {
         _config = config;
         _keyStore = keyStore;
@@ -139,15 +143,18 @@ public sealed class KeyLifecycleManager
     /// Creates a new key lifecycle manager.
     /// </summary>
     public static Result<KeyLifecycleManager, SmartCardError> Create(
-        KeyManagementConfiguration config = null)
+        KeyManagementConfiguration config = null
+    )
     {
         KeyManagementConfiguration configuration = config ?? KeyManagementConfiguration.Default;
 
-        return SecureKeyStore.Create()
+        return SecureKeyStore
+            .Create()
             .Map(store => new KeyLifecycleManager(
                 configuration,
                 store,
-                ImmutableDictionary<string, KeyMetadata>.Empty));
+                ImmutableDictionary<string, KeyMetadata>.Empty
+            ));
     }
 
     /// <summary>
@@ -156,18 +163,21 @@ public sealed class KeyLifecycleManager
     public Result<KeyLifecycleManager, SmartCardError> RegisterKey(
         string keyId,
         byte[] keyData,
-        KeyPurpose purpose)
+        KeyPurpose purpose
+    )
     {
         // Validate key
         Result<bool, string> validationResult = _config.ValidateKey(keyData, purpose.ToString());
         if (validationResult.IsFailure)
         {
             return Result.Failure<KeyLifecycleManager, SmartCardError>(
-                SmartCardError.SecurityError(validationResult.Error));
+                SmartCardError.SecurityError(validationResult.Error)
+            );
         }
 
         // Add to secure store
-        return _keyStore.AddKey(keyId, keyData)
+        return _keyStore
+            .AddKey(keyId, keyData)
             .Map(newStore =>
             {
                 KeyMetadata metadata = new KeyMetadata(
@@ -175,9 +185,13 @@ public sealed class KeyLifecycleManager
                     purpose,
                     DateTime.UtcNow,
                     0,
-                    DateTime.UtcNow);
+                    DateTime.UtcNow
+                );
 
-                ImmutableDictionary<string, KeyMetadata> newMetadata = _metadata.Add(keyId, metadata);
+                ImmutableDictionary<string, KeyMetadata> newMetadata = _metadata.Add(
+                    keyId,
+                    metadata
+                );
                 return new KeyLifecycleManager(_config, newStore, newMetadata);
             });
     }
@@ -187,41 +201,53 @@ public sealed class KeyLifecycleManager
     /// </summary>
     public Result<(T Result, KeyLifecycleManager Manager), SmartCardError> UseKey<T>(
         string keyId,
-        Func<byte[], Result<T, SmartCardError>> operation)
+        Func<byte[], Result<T, SmartCardError>> operation
+    )
     {
         if (!_metadata.TryGetValue(keyId, out KeyMetadata metadata))
         {
             return Result.Failure<(T, KeyLifecycleManager), SmartCardError>(
-                SmartCardError.InvalidArgument($"Key '{keyId}' not found"));
+                SmartCardError.InvalidArgument($"Key '{keyId}' not found")
+            );
         }
 
         // Check if key needs rotation
         if (_config.RequireKeyRotation && IsRotationRequired(metadata))
         {
             return Result.Failure<(T, KeyLifecycleManager), SmartCardError>(
-                SmartCardError.SecurityError($"Key '{keyId}' requires rotation"));
+                SmartCardError.SecurityError($"Key '{keyId}' requires rotation")
+            );
         }
 
         // Check usage count
         if (metadata.UsageCount >= _config.MaxKeyUsageCount)
         {
             return Result.Failure<(T, KeyLifecycleManager), SmartCardError>(
-                SmartCardError.SecurityError($"Key '{keyId}' has exceeded maximum usage count"));
+                SmartCardError.SecurityError($"Key '{keyId}' has exceeded maximum usage count")
+            );
         }
 
         // Use the key
-        return _keyStore.UseKey(keyId, operation)
+        return _keyStore
+            .UseKey(keyId, operation)
             .Map(result =>
             {
                 // Update metadata
                 KeyMetadata updatedMetadata = metadata with
                 {
                     UsageCount = metadata.UsageCount + 1,
-                    LastUsedUtc = DateTime.UtcNow
+                    LastUsedUtc = DateTime.UtcNow,
                 };
 
-                ImmutableDictionary<string, KeyMetadata> newMetadata = _metadata.SetItem(keyId, updatedMetadata);
-                KeyLifecycleManager newManager = new KeyLifecycleManager(_config, _keyStore, newMetadata);
+                ImmutableDictionary<string, KeyMetadata> newMetadata = _metadata.SetItem(
+                    keyId,
+                    updatedMetadata
+                );
+                KeyLifecycleManager newManager = new KeyLifecycleManager(
+                    _config,
+                    _keyStore,
+                    newMetadata
+                );
 
                 return (result, newManager);
             });
@@ -262,13 +288,16 @@ public sealed class KeyLifecycleManager
     public Maybe<KeyAuditInfo> GetKeyAuditInfo(string keyId)
     {
         return _metadata.TryGetValue(keyId, out KeyMetadata metadata)
-            ? Maybe<KeyAuditInfo>.From(new KeyAuditInfo(
-                metadata.KeyId,
-                metadata.Purpose,
-                metadata.CreatedUtc,
-                metadata.LastUsedUtc,
-                metadata.UsageCount,
-                IsRotationRequired(metadata)))
+            ? Maybe<KeyAuditInfo>.From(
+                new KeyAuditInfo(
+                    metadata.KeyId,
+                    metadata.Purpose,
+                    metadata.CreatedUtc,
+                    metadata.LastUsedUtc,
+                    metadata.UsageCount,
+                    IsRotationRequired(metadata)
+                )
+            )
             : Maybe<KeyAuditInfo>.None;
     }
 
@@ -286,7 +315,8 @@ public sealed class KeyLifecycleManager
         KeyPurpose Purpose,
         DateTime CreatedUtc,
         int UsageCount,
-        DateTime LastUsedUtc);
+        DateTime LastUsedUtc
+    );
 }
 
 /// <summary>
@@ -322,7 +352,7 @@ public enum KeyPurpose
     /// <summary>
     /// Key for secure storage.
     /// </summary>
-    Storage
+    Storage,
 }
 
 /// <summary>
@@ -334,4 +364,5 @@ public sealed record KeyAuditInfo(
     DateTime CreatedUtc,
     DateTime LastUsedUtc,
     int UsageCount,
-    bool RequiresRotation);
+    bool RequiresRotation
+);

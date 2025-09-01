@@ -1,20 +1,22 @@
 using System;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
+using Org.BouncyCastle.Crypto.Digests;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Generators;
 using Org.BouncyCastle.Crypto.Modes;
 using Org.BouncyCastle.Crypto.Paddings;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Security;
-using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 
 namespace Gp4Net.Domain.Keys;
 
 /// <summary>
 /// Immutable, thread-safe secure key store that manages cryptographic keys
-/// using functional programming patterns. Keys are encrypted in memory
+///. Keys are encrypted in memory
 /// and can only be accessed through secure operations.
 /// </summary>
 public sealed class SecureKeyStore
@@ -29,7 +31,8 @@ public sealed class SecureKeyStore
     private SecureKeyStore(
         ImmutableDictionary<string, EncryptedKey> keys,
         byte[] masterKey,
-        byte[] salt)
+        byte[] salt
+    )
     {
         _keys = keys;
         _masterKey = masterKey;
@@ -41,21 +44,25 @@ public sealed class SecureKeyStore
     /// </summary>
     public static Result<SecureKeyStore, SmartCardError> Create()
     {
-        return Result.Try(() =>
-        {
-            // Generate cryptographically secure master key and salt
-            byte[] masterKey = new byte[32]; // 256-bit key
-            byte[] salt = new byte[16];      // 128-bit salt
+        return Result.Try(
+            () =>
+            {
+                // Generate cryptographically secure master key and salt
+                byte[] masterKey = new byte[32]; // 256-bit key
+                byte[] salt = new byte[16]; // 128-bit salt
 
-            SecureRandom random = new SecureRandom();
-            random.NextBytes(masterKey);
-            random.NextBytes(salt);
+                SecureRandom random = new SecureRandom();
+                random.NextBytes(masterKey);
+                random.NextBytes(salt);
 
-            return new SecureKeyStore(
-                ImmutableDictionary<string, EncryptedKey>.Empty,
-                masterKey,
-                salt);
-        }, ex => SmartCardError.SecurityError($"Failed to create secure key store: {ex.Message}"));
+                return new SecureKeyStore(
+                    ImmutableDictionary<string, EncryptedKey>.Empty,
+                    masterKey,
+                    salt
+                );
+            },
+            ex => SmartCardError.SecurityError($"Failed to create secure key store: {ex.Message}")
+        );
     }
 
     /// <summary>
@@ -66,32 +73,38 @@ public sealed class SecureKeyStore
         if (string.IsNullOrEmpty(keyId))
         {
             return Result.Failure<SecureKeyStore, SmartCardError>(
-                SmartCardError.InvalidArgument("Key ID cannot be null or empty"));
+                SmartCardError.InvalidArgument("Key ID cannot be null or empty")
+            );
         }
 
         if (keyData == null || keyData.Length == 0)
         {
             return Result.Failure<SecureKeyStore, SmartCardError>(
-                SmartCardError.InvalidArgument("Key data cannot be null or empty"));
+                SmartCardError.InvalidArgument("Key data cannot be null or empty")
+            );
         }
 
         if (_keys.ContainsKey(keyId))
         {
             return Result.Failure<SecureKeyStore, SmartCardError>(
-                SmartCardError.InvalidArgument($"Key with ID '{keyId}' already exists"));
+                SmartCardError.InvalidArgument($"Key with ID '{keyId}' already exists")
+            );
         }
 
-        return Result.Try(() =>
-        {
-            // Encrypt the key before storing
-            EncryptedKey encryptedKey = EncryptKey(keyId, keyData);
-            ImmutableDictionary<string, EncryptedKey> newKeys = _keys.Add(keyId, encryptedKey);
+        return Result.Try(
+            () =>
+            {
+                // Encrypt the key before storing
+                EncryptedKey encryptedKey = EncryptKey(keyId, keyData);
+                ImmutableDictionary<string, EncryptedKey> newKeys = _keys.Add(keyId, encryptedKey);
 
-            // Clear the original key data
-            Array.Clear(keyData, 0, keyData.Length);
+                // Clear the original key data
+                Array.Clear(keyData, 0, keyData.Length);
 
-            return new SecureKeyStore(newKeys, _masterKey, _salt);
-        }, ex => SmartCardError.SecurityError($"Failed to add key: {ex.Message}"));
+                return new SecureKeyStore(newKeys, _masterKey, _salt);
+            },
+            ex => SmartCardError.SecurityError($"Failed to add key: {ex.Message}")
+        );
     }
 
     /// <summary>
@@ -103,20 +116,25 @@ public sealed class SecureKeyStore
         if (string.IsNullOrEmpty(keyId))
         {
             return Result.Failure<SecureKey, SmartCardError>(
-                SmartCardError.InvalidArgument("Key ID cannot be null or empty"));
+                SmartCardError.InvalidArgument("Key ID cannot be null or empty")
+            );
         }
 
         if (!_keys.TryGetValue(keyId, out EncryptedKey encryptedKey))
         {
             return Result.Failure<SecureKey, SmartCardError>(
-                SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found"));
+                SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found")
+            );
         }
 
-        return Result.Try(() =>
-        {
-            byte[] decryptedKey = DecryptKey(keyId, encryptedKey);
-            return new SecureKey(keyId, decryptedKey);
-        }, ex => SmartCardError.SecurityError($"Failed to retrieve key: {ex.Message}"));
+        return Result.Try(
+            () =>
+            {
+                byte[] decryptedKey = DecryptKey(keyId, encryptedKey);
+                return new SecureKey(keyId, decryptedKey);
+            },
+            ex => SmartCardError.SecurityError($"Failed to retrieve key: {ex.Message}")
+        );
     }
 
     /// <summary>
@@ -127,18 +145,21 @@ public sealed class SecureKeyStore
         if (string.IsNullOrEmpty(keyId))
         {
             return Result.Failure<SecureKeyStore, SmartCardError>(
-                SmartCardError.InvalidArgument("Key ID cannot be null or empty"));
+                SmartCardError.InvalidArgument("Key ID cannot be null or empty")
+            );
         }
 
         if (!_keys.ContainsKey(keyId))
         {
             return Result.Failure<SecureKeyStore, SmartCardError>(
-                SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found"));
+                SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found")
+            );
         }
 
         ImmutableDictionary<string, EncryptedKey> newKeys = _keys.Remove(keyId);
         return Result.Success<SecureKeyStore, SmartCardError>(
-            new SecureKeyStore(newKeys, _masterKey, _salt));
+            new SecureKeyStore(newKeys, _masterKey, _salt)
+        );
     }
 
     /// <summary>
@@ -152,10 +173,12 @@ public sealed class SecureKeyStore
     /// <summary>
     /// Performs a secure operation with a key, ensuring the key is cleared after use.
     /// </summary>
-    public Result<T, SmartCardError> UseKey<T>(string keyId, Func<byte[], Result<T, SmartCardError>> operation)
+    public Result<T, SmartCardError> UseKey<T>(
+        string keyId,
+        Func<byte[], Result<T, SmartCardError>> operation
+    )
     {
-        return GetKey(keyId)
-            .Bind(secureKey => secureKey.Use(operation));
+        return GetKey(keyId).Bind(secureKey => secureKey.Use(operation));
     }
 
     /// <summary>
@@ -166,7 +189,8 @@ public sealed class SecureKeyStore
         string macKeyId,
         string dekKeyId,
         byte keyVersion,
-        bool isScp03 = false)
+        bool isScp03 = false
+    )
     {
         Result<SecureKey, SmartCardError> encKeyResult = GetKey(encKeyId);
         Result<SecureKey, SmartCardError> macKeyResult = GetKey(macKeyId);
@@ -197,25 +221,39 @@ public sealed class SecureKeyStore
                     {
                         if (isScp03)
                         {
-                            Result<Scp03KeySet, SmartCardError> keySetResult = Scp03KeySet.Create(encData, macData, dekData, keyVersion);
+                            Result<Scp03KeySet, SmartCardError> keySetResult = Scp03KeySet.Create(
+                                encData,
+                                macData,
+                                dekData,
+                                keyVersion
+                            );
                             if (keySetResult.IsFailure)
                             {
                                 return Result.Failure<IKeySet, SmartCardError>(
-                                    SmartCardError.SecurityError(keySetResult.Error.Message));
+                                    SmartCardError.SecurityError(keySetResult.Error.Message)
+                                );
                             }
                             return Result.Success<IKeySet, SmartCardError>(keySetResult.Value);
                         }
                         else
                         {
-                            Result<Scp02KeySet, SmartCardError> keySetResult = Scp02KeySet.Create(encData, macData, dekData, keyVersion);
+                            Result<Scp02KeySet, SmartCardError> keySetResult = Scp02KeySet.Create(
+                                encData,
+                                macData,
+                                dekData,
+                                keyVersion
+                            );
                             if (keySetResult.IsFailure)
                             {
                                 return Result.Failure<IKeySet, SmartCardError>(
-                                    SmartCardError.SecurityError(keySetResult.Error.Message));
+                                    SmartCardError.SecurityError(keySetResult.Error.Message)
+                                );
                             }
                             return Result.Success<IKeySet, SmartCardError>(keySetResult.Value);
                         }
-                    })));
+                    })
+                )
+            );
         }
     }
 
@@ -230,7 +268,9 @@ public sealed class SecureKeyStore
         random.NextBytes(iv);
 
         // Setup AES-CBC cipher
-        PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
+        PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(
+            new CbcBlockCipher(new AesEngine())
+        );
         KeyParameter keyParam = new KeyParameter(keySpecificKey);
         ParametersWithIV keyParamWithIv = new ParametersWithIV(keyParam, iv);
 
@@ -245,7 +285,7 @@ public sealed class SecureKeyStore
         // Resize array if needed
         if (processedBytes + finalBytes < encrypted.Length)
         {
-            encrypted = encrypted.Take(processedBytes + finalBytes).ToArray();
+            encrypted = [.. encrypted.Take(processedBytes + finalBytes)];
         }
 
         return new EncryptedKey(encrypted, iv);
@@ -256,7 +296,9 @@ public sealed class SecureKeyStore
         byte[] keySpecificKey = DeriveKeySpecificKey(keyId);
 
         // Setup AES-CBC cipher for decryption
-        PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
+        PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(
+            new CbcBlockCipher(new AesEngine())
+        );
         KeyParameter keyParam = new KeyParameter(keySpecificKey);
         ParametersWithIV keyParamWithIv = new ParametersWithIV(keyParam, encryptedKey.Iv);
 
@@ -265,13 +307,19 @@ public sealed class SecureKeyStore
         // Decrypt
         int outputSize = cipher.GetOutputSize(encryptedKey.Data.Length);
         byte[] decrypted = new byte[outputSize];
-        int processedBytes = cipher.ProcessBytes(encryptedKey.Data, 0, encryptedKey.Data.Length, decrypted, 0);
+        int processedBytes = cipher.ProcessBytes(
+            encryptedKey.Data,
+            0,
+            encryptedKey.Data.Length,
+            decrypted,
+            0
+        );
         int finalBytes = cipher.DoFinal(decrypted, processedBytes);
 
         // Resize array if needed
         if (processedBytes + finalBytes < decrypted.Length)
         {
-            decrypted = decrypted.Take(processedBytes + finalBytes).ToArray();
+            decrypted = [.. decrypted.Take(processedBytes + finalBytes)];
         }
 
         return decrypted;
@@ -280,16 +328,15 @@ public sealed class SecureKeyStore
     private byte[] DeriveKeySpecificKey(string keyId)
     {
         // Use PBKDF2 to derive a key-specific encryption key
-        byte[] keyIdBytes = System.Text.Encoding.UTF8.GetBytes(keyId);
-        byte[] combinedSalt = _salt.Concat(keyIdBytes).ToArray();
+        byte[] keyIdBytes = Encoding.UTF8.GetBytes(keyId);
+        byte[] combinedSalt = [.. _salt, .. keyIdBytes];
 
-        Pkcs5S2ParametersGenerator generator = new Pkcs5S2ParametersGenerator(new Org.BouncyCastle.Crypto.Digests.Sha256Digest());
+        Pkcs5S2ParametersGenerator generator = new Pkcs5S2ParametersGenerator(new Sha256Digest());
         generator.Init(_masterKey, combinedSalt, 10000);
 
         KeyParameter keyParam = (KeyParameter)generator.GenerateDerivedParameters("AES", 256); // 256 bits
         return keyParam.GetKey();
     }
-
 
     /// <summary>
     /// Encrypted key data with initialization vector.
@@ -321,10 +368,15 @@ public sealed class SecureKey : IDisposable
         if (_disposed)
         {
             return Result.Failure<T, SmartCardError>(
-                SmartCardError.InvalidArgument("Cannot use disposed key"));
+                SmartCardError.InvalidArgument("Cannot use disposed key")
+            );
         }
 
-        return Result.Try(() => operation(_keyData), ex => SmartCardError.UnexpectedError($"Key operation failed: {ex.Message}", ex))
+        return Result
+            .Try(
+                () => operation(_keyData),
+                ex => SmartCardError.UnexpectedError($"Key operation failed: {ex.Message}", ex)
+            )
             .Bind(result => result);
     }
 
@@ -336,7 +388,8 @@ public sealed class SecureKey : IDisposable
         if (_disposed)
         {
             return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidArgument("Cannot access disposed key"));
+                SmartCardError.InvalidArgument("Cannot access disposed key")
+            );
         }
 
         return Result.Success<byte[], SmartCardError>((byte[])_keyData.Clone());

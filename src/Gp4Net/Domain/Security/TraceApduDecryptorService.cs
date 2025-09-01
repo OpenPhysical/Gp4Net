@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
+using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -45,29 +45,47 @@ public sealed class TraceApduDecryptorService
         IEnumerable<TraceExchange> exchanges,
         SessionKeys sessionKeys,
         SecurityLevel securityLevel,
-        ScpVersion protocolVersion)
+        ScpVersion protocolVersion
+    )
     {
-        return Maybe<IEnumerable<TraceExchange>>.From(exchanges)
+        return Maybe<IEnumerable<TraceExchange>>
+            .From(exchanges)
             .ToResult(SmartCardError.InvalidArgument("Exchanges cannot be null"))
-            .Bind(_ => Maybe<SessionKeys>.From(sessionKeys)
-                .ToResult(SmartCardError.InvalidArgument("Session keys cannot be null")))
-            .Bind(_ => ValidateSessionKeysForSecurityLevel(sessionKeys, securityLevel).IsSuccess
-                ? Result.Success<SessionKeys, SmartCardError>(sessionKeys)
-                : Result.Failure<SessionKeys, SmartCardError>(SmartCardError.InvalidArgument("Session key validation failed")))
+            .Bind(_ =>
+                Maybe<SessionKeys>
+                    .From(sessionKeys)
+                    .ToResult(SmartCardError.InvalidArgument("Session keys cannot be null"))
+            )
+            .Bind(_ =>
+                ValidateSessionKeysForSecurityLevel(sessionKeys, securityLevel).IsSuccess
+                    ? Result.Success<SessionKeys, SmartCardError>(sessionKeys)
+                    : Result.Failure<SessionKeys, SmartCardError>(
+                        SmartCardError.InvalidArgument("Session key validation failed")
+                    )
+            )
             .Bind(_ => CreateInitialSessionState(sessionKeys, securityLevel, protocolVersion))
             .Bind(initialState =>
             {
-                _logger.LogDebug("Starting trace decryption for protocol SCP{Protocol:X2}, security level: {SecurityLevel}",
-                    (byte)protocolVersion, securityLevel);
+                _logger.LogDebug(
+                    "Starting trace decryption for protocol SCP{Protocol:X2}, security level: {SecurityLevel}",
+                    (byte)protocolVersion,
+                    securityLevel
+                );
 
                 return ProcessExchangesSequentially(exchanges, initialState)
                     .Map(decryptedExchanges => new DecryptedTrace(
                         decryptedExchanges,
                         sessionKeys,
                         securityLevel,
-                        (byte)protocolVersion));
+                        protocolVersion
+                    ));
             })
-            .Tap(trace => _logger.LogDebug("Successfully decrypted {ExchangeCount} exchanges", trace.Exchanges.Count));
+            .Tap(trace =>
+                _logger.LogDebug(
+                    "Successfully decrypted {ExchangeCount} exchanges",
+                    trace.Exchanges.Count
+                )
+            );
     }
 
     /// <summary>
@@ -78,81 +96,106 @@ public sealed class TraceApduDecryptorService
     /// <param name="direction">Whether this is a command or response APDU.</param>
     /// <param name="sessionState">The current session state.</param>
     /// <returns>Decrypted APDU and updated session state, or an error.</returns>
-    public Result<(DecryptedApdu decryptedApdu, SecureChannelState updatedState), SmartCardError> DecryptApdu(
-        byte[] apduBytes,
-        ApduDirection direction,
-        SecureChannelState sessionState)
+    public Result<
+        (DecryptedApdu decryptedApdu, SecureChannelState updatedState),
+        SmartCardError
+    > DecryptApdu(byte[] apduBytes, ApduDirection direction, SecureChannelState sessionState)
     {
-        return Maybe<byte[]>.From(apduBytes)
+        return Maybe<byte[]>
+            .From(apduBytes)
             .ToResult(SmartCardError.InvalidArgument("APDU bytes cannot be null"))
-            .Bind(bytes => Maybe<SecureChannelState>.From(sessionState)
-                .ToResult(SmartCardError.InvalidArgument("Session state cannot be null"))
-                .Map(_ => bytes))
-            .Bind(bytes => IsSecureMessaging(bytes, direction)
-                ? ProcessSecureApdu(bytes, direction, sessionState)
-                : ProcessPlainApdu(bytes, direction, sessionState));
+            .Bind(bytes =>
+                Maybe<SecureChannelState>
+                    .From(sessionState)
+                    .ToResult(SmartCardError.InvalidArgument("Session state cannot be null"))
+                    .Map(_ => bytes)
+            )
+            .Bind(bytes =>
+                IsSecureMessaging(bytes, direction)
+                    ? ProcessSecureApdu(bytes, direction, sessionState)
+                    : ProcessPlainApdu(bytes, direction, sessionState)
+            );
     }
 
-    private Result<(DecryptedExchange exchange, SecureChannelState updatedState), SmartCardError> DecryptExchange(
-        TraceExchange exchange,
-        SecureChannelState sessionState)
+    private Result<
+        (DecryptedExchange exchange, SecureChannelState updatedState),
+        SmartCardError
+    > DecryptExchange(TraceExchange exchange, SecureChannelState sessionState)
     {
         // Decrypt command first
         return DecryptApdu(exchange.Command, ApduDirection.Command, sessionState)
             .Bind(commandResult =>
             {
-                (DecryptedApdu decryptedCommand, SecureChannelState stateAfterCommand) = commandResult;
+                (DecryptedApdu decryptedCommand, SecureChannelState stateAfterCommand) =
+                    commandResult;
 
                 // Decrypt response using updated state
                 return DecryptApdu(exchange.Response, ApduDirection.Response, stateAfterCommand)
                     .Map(responseResult =>
                     {
-                        (DecryptedApdu decryptedResponse, SecureChannelState finalState) = responseResult;
+                        (DecryptedApdu decryptedResponse, SecureChannelState finalState) =
+                            responseResult;
                         DecryptedExchange decryptedExchange = new DecryptedExchange(
                             exchange.Id,
                             decryptedCommand,
                             decryptedResponse,
-                            finalState);
+                            finalState
+                        );
                         return (decryptedExchange, finalState);
                     });
             });
     }
 
-    private Result<(byte[] decryptedBytes, SecureChannelState newState, string metadata), SmartCardError> DecryptCommand(
-        byte[] commandBytes,
-        SecureChannelState sessionState)
+    private Result<
+        (byte[] decryptedBytes, SecureChannelState newState, string metadata),
+        SmartCardError
+    > DecryptCommand(byte[] commandBytes, SecureChannelState sessionState)
     {
         // Use CommandSecurityProcessor in reverse - we need to decrypt/verify instead of encrypt/MAC
         // For now, return original command with metadata about secure messaging
-        string metadata = $"Command secure messaging detected (SCP{sessionState.ProtocolVersion:X2}, Security: {sessionState.SecurityLevel})";
+        string metadata =
+            $"Command secure messaging detected (SCP{sessionState.ProtocolVersion:X2}, Security: {sessionState.SecurityLevel})";
 
         // Extract the original command structure by reversing the security processing
-        Result<(byte[] originalCommand, SecureChannelState newState), SmartCardError> reversalResult = ReverseCommandSecurity(commandBytes, sessionState);
+        Result<
+            (byte[] originalCommand, SecureChannelState newState),
+            SmartCardError
+        > reversalResult = ReverseCommandSecurity(commandBytes, sessionState);
         return reversalResult.Map(result => (result.originalCommand, result.newState, metadata));
     }
 
-    private Result<(byte[] decryptedBytes, SecureChannelState newState, string metadata), SmartCardError> DecryptResponse(
-        byte[] responseBytes,
-        SecureChannelState sessionState)
+    private Result<
+        (byte[] decryptedBytes, SecureChannelState newState, string metadata),
+        SmartCardError
+    > DecryptResponse(byte[] responseBytes, SecureChannelState sessionState)
     {
         // Functional response decryption using existing security operations
-        string metadata = $"Response decrypted (SCP{(byte)sessionState.ProtocolVersion:X2}, R-MAC: {sessionState.SecurityLevel.HasRMac()}, R-ENC: {sessionState.SecurityLevel.HasREncryption()})";
-        
+        string metadata =
+            $"Response decrypted (SCP{(byte)sessionState.ProtocolVersion:X2}, R-MAC: {sessionState.SecurityLevel.HasRMac()}, R-ENC: {sessionState.SecurityLevel.HasREncryption()})";
+
         return sessionState.SecurityLevel.HasRMac() || sessionState.SecurityLevel.HasREncryption()
             ? DecryptSecuredResponse(responseBytes, sessionState)
                 .Map(result => (result.decryptedBytes, result.newState, metadata))
-            : Result.Success<(byte[], SecureChannelState, string), SmartCardError>((responseBytes, sessionState, "Plain response"));
+            : Result.Success<(byte[], SecureChannelState, string), SmartCardError>(
+                (responseBytes, sessionState, "Plain response")
+            );
     }
 
-    private Result<(byte[] originalCommand, SecureChannelState newState), SmartCardError> ReverseCommandSecurity(
-        byte[] securedCommand,
-        SecureChannelState sessionState)
+    private Result<
+        (byte[] originalCommand, SecureChannelState newState),
+        SmartCardError
+    > ReverseCommandSecurity(byte[] securedCommand, SecureChannelState sessionState)
     {
-        return Maybe<byte[]>.From(securedCommand)
+        return Maybe<byte[]>
+            .From(securedCommand)
             .ToResult(SmartCardError.InvalidArgument("Secured command cannot be null"))
-            .Bind(command => command.Length >= 4 && (command[0] & 0x04) != 0
-                ? ProcessSecuredCommandInternal(command, sessionState)
-                : Result.Success<(byte[], SecureChannelState), SmartCardError>((command, sessionState)));
+            .Bind(command =>
+                command.Length >= 4 && (command[0] & 0x04) != 0
+                    ? ProcessSecuredCommandInternal(command, sessionState)
+                    : Result.Success<(byte[], SecureChannelState), SmartCardError>(
+                        (command, sessionState)
+                    )
+            );
     }
 
     /// <summary>
@@ -160,27 +203,42 @@ public sealed class TraceApduDecryptorService
     /// </summary>
     private Result<(byte[], SecureChannelState), SmartCardError> ProcessSecuredCommandInternal(
         byte[] securedCommand,
-        SecureChannelState sessionState)
+        SecureChannelState sessionState
+    )
     {
-        return ApduParser.ParseSecuredCommand(securedCommand)
+        return ApduParser
+            .ParseSecuredCommand(securedCommand)
             .Bind(parsedCommand =>
             {
                 byte originalCla = (byte)(parsedCommand.Cla & ~0x04);
-                
+
                 return VerifyCommandMacIfRequired(parsedCommand, sessionState).IsSuccess
                     ? DecryptCommandDataIfRequired(parsedCommand, sessionState)
                         .Bind(dataResult =>
                         {
                             (byte[] originalData, uint newEncryptionCounter) = dataResult;
                             byte[] originalCommand = ApduParser.BuildOriginalCommand(
-                                originalCla, parsedCommand.Ins, parsedCommand.P1, parsedCommand.P2, originalData, parsedCommand.Le);
-                            
+                                originalCla,
+                                parsedCommand.Ins,
+                                parsedCommand.P1,
+                                parsedCommand.P2,
+                                originalData,
+                                parsedCommand.Le
+                            );
+
                             return UpdateMacChainingIfRequired(sessionState, parsedCommand)
-                                .Bind(newMacChaining => UpdateSessionState(sessionState, newEncryptionCounter, newMacChaining))
+                                .Bind(newMacChaining =>
+                                    UpdateSessionState(
+                                        sessionState,
+                                        newEncryptionCounter,
+                                        newMacChaining
+                                    )
+                                )
                                 .Map(newState => (originalCommand, newState));
                         })
                     : Result.Failure<(byte[], SecureChannelState), SmartCardError>(
-                        SmartCardError.SecurityError("MAC verification failed"));
+                        SmartCardError.SecurityError("MAC verification failed")
+                    );
             });
     }
 
@@ -188,11 +246,14 @@ public sealed class TraceApduDecryptorService
     /// Verifies command MAC if required by security level and MAC is present.
     /// </summary>
     private UnitResult<SmartCardError> VerifyCommandMacIfRequired(
-        ParsedSecuredCommand parsedCommand, 
-        SecureChannelState sessionState)
+        ParsedSecuredCommand parsedCommand,
+        SecureChannelState sessionState
+    )
     {
-        return sessionState.SecurityLevel.HasCMac() && Maybe<byte[]>.From(parsedCommand.Mac).HasValue
-            ? VerifyCommandMac(parsedCommand, sessionState).Map(_ => UnitResult.Success<SmartCardError>())
+        return
+            sessionState.SecurityLevel.HasCMac() && Maybe<byte[]>.From(parsedCommand.Mac).HasValue
+            ? VerifyCommandMac(parsedCommand, sessionState)
+                .Map(_ => UnitResult.Success<SmartCardError>())
             : UnitResult.Success<SmartCardError>();
     }
 
@@ -200,13 +261,16 @@ public sealed class TraceApduDecryptorService
     /// Decrypts command data if required by security level and data is present.
     /// </summary>
     private Result<(byte[], uint), SmartCardError> DecryptCommandDataIfRequired(
-        ParsedSecuredCommand parsedCommand, 
-        SecureChannelState sessionState)
+        ParsedSecuredCommand parsedCommand,
+        SecureChannelState sessionState
+    )
     {
         return sessionState.SecurityLevel.HasCDecryption() && parsedCommand.Data.Length > 0
             ? DecryptCommandData(parsedCommand.Data, sessionState)
                 .Map(decryptedData => (decryptedData, UpdateEncryptionCounter(sessionState)))
-            : Result.Success<(byte[], uint), SmartCardError>((parsedCommand.Data, sessionState.EncryptionCounter));
+            : Result.Success<(byte[], uint), SmartCardError>(
+                (parsedCommand.Data, sessionState.EncryptionCounter)
+            );
     }
 
     /// <summary>
@@ -223,18 +287,27 @@ public sealed class TraceApduDecryptorService
     /// Updates MAC chaining if required by security level and MAC is present.
     /// </summary>
     private Result<ImmutableArray<byte>, SmartCardError> UpdateMacChainingIfRequired(
-        SecureChannelState sessionState, 
-        ParsedSecuredCommand parsedCommand)
+        SecureChannelState sessionState,
+        ParsedSecuredCommand parsedCommand
+    )
     {
         MacChainingState currentChaining = sessionState.MacChaining;
-        return sessionState.SecurityLevel.HasCMac() && Maybe<byte[]>.From(parsedCommand.Mac).HasValue
+        return
+            sessionState.SecurityLevel.HasCMac() && Maybe<byte[]>.From(parsedCommand.Mac).HasValue
             ? Result.Success<ImmutableArray<byte>, SmartCardError>(
-                UpdateMacChaining([..currentChaining.ToArray()], parsedCommand.Mac, sessionState.ProtocolVersion))
-            : Result.Success<ImmutableArray<byte>, SmartCardError>([..currentChaining.ToArray()]);
+                UpdateMacChaining(
+                    [.. currentChaining.ToArray()],
+                    parsedCommand.Mac,
+                    sessionState.ProtocolVersion
+                )
+            )
+            : Result.Success<ImmutableArray<byte>, SmartCardError>([.. currentChaining.ToArray()]);
     }
 
-
-    private Result<bool, SmartCardError> VerifyCommandMac(ParsedSecuredCommand parsedCommand, SecureChannelState sessionState)
+    private Result<bool, SmartCardError> VerifyCommandMac(
+        ParsedSecuredCommand parsedCommand,
+        SecureChannelState sessionState
+    )
     {
         if (parsedCommand.Mac == null)
         {
@@ -242,103 +315,135 @@ public sealed class TraceApduDecryptorService
         }
 
         // Reconstruct the command data that was used for MAC calculation
-        byte[] macInput = CryptographicOperations.BuildMacInput(parsedCommand, sessionState.ProtocolVersion);
+        byte[] macInput = CryptoService.Utils.BuildMacInput(
+            parsedCommand,
+            sessionState.ProtocolVersion
+        );
 
         // Calculate expected MAC using type-safe service
 
-        Result<byte[], SmartCardError> expectedMacResult = sessionState.ProtocolVersion == ScpVersion.Scp03
-            ? MacCalculations.CalculateScp03CommandMac(sessionState.SessionKeys.SMac, macInput)
-            : MacCalculations.CalculateScp02CommandMac(sessionState.SessionKeys.SMac, macInput);
+        Result<byte[], SmartCardError> expectedMacResult =
+            sessionState.ProtocolVersion == ScpVersion.Scp03
+                ? CryptoService.Mac.CalculateScp03CommandMac(sessionState.SessionKeys.SMac, macInput)
+                : CryptoService.Mac.CalculateScp02CommandMac(sessionState.SessionKeys.SMac, macInput);
 
         return expectedMacResult.Map(expectedMac =>
         {
             // Verify MAC matches using constant-time comparison
-            bool isValid = CryptographicOperations.CompareBytes(expectedMac, parsedCommand.Mac);
+            bool isValid = CryptoService.Utils.CompareBytes(expectedMac, parsedCommand.Mac);
             return isValid;
         });
     }
 
-    private Result<byte[], SmartCardError> DecryptCommandData(byte[] encryptedData, SecureChannelState sessionState)
+    private Result<byte[], SmartCardError> DecryptCommandData(
+        byte[] encryptedData,
+        SecureChannelState sessionState
+    )
     {
         if (sessionState.ProtocolVersion == ScpVersion.Scp03)
         {
             return DecryptScp03CommandData(encryptedData, sessionState);
         }
-        else
-        {
-            return DecryptScp02CommandData(encryptedData, sessionState);
-        }
+        return DecryptScp02CommandData(encryptedData, sessionState);
     }
 
-    private Result<byte[], SmartCardError> DecryptScp03CommandData(byte[] encryptedData, SecureChannelState sessionState)
+    private Result<byte[], SmartCardError> DecryptScp03CommandData(
+        byte[] encryptedData,
+        SecureChannelState sessionState
+    )
     {
-        return CryptographicOperations.GenerateCommandIcv(sessionState.SessionKeys.SEnc, sessionState.EncryptionCounter, ScpVersion.Scp03)
-            .Bind(icv => CryptographicOperations.DecryptAesCbc(sessionState.SessionKeys.SEnc, icv, encryptedData))
-            .Bind(decryptedData => CryptographicOperations.RemovePkcs7Padding(decryptedData));
+        return CryptoService.Keys
+            .GenerateCommandIcv(
+                sessionState.SessionKeys.SEnc,
+                sessionState.EncryptionCounter,
+                ScpVersion.Scp03
+            )
+            .Bind(icv =>
+                CryptoService.Cipher.DecryptAesCbc(
+                    sessionState.SessionKeys.SEnc,
+                    icv,
+                    encryptedData
+                )
+            )
+            .Bind(decryptedData => CryptoService.Utils.RemovePkcs7Padding(decryptedData));
     }
 
-    private Result<byte[], SmartCardError> DecryptScp02CommandData(byte[] encryptedData, SecureChannelState sessionState)
+    private Result<byte[], SmartCardError> DecryptScp02CommandData(
+        byte[] encryptedData,
+        SecureChannelState sessionState
+    )
     {
         byte[] zeroIv = new byte[8];
-        return CryptographicOperations.Decrypt3DesCbc(sessionState.SessionKeys.SEnc, zeroIv, encryptedData)
-            .Bind(decryptedData => CryptographicOperations.RemoveIso7816Padding(decryptedData));
+        return CryptoService.Cipher
+            .Decrypt3DesCbc(sessionState.SessionKeys.SEnc, zeroIv, encryptedData)
+            .Bind(decryptedData => CryptoService.Utils.RemoveIso7816Padding(decryptedData));
     }
 
-
-    private ImmutableArray<byte> UpdateMacChaining(ImmutableArray<byte> currentChaining, byte[] newMac, ScpVersion protocolVersion)
+    private ImmutableArray<byte> UpdateMacChaining(
+        ImmutableArray<byte> currentChaining,
+        byte[] newMac,
+        ScpVersion protocolVersion
+    )
     {
         return protocolVersion switch
         {
             ScpVersion.Scp03 => [.. newMac], // Full 16-byte CMAC for SCP03
             ScpVersion.Scp02 => UpdateScp02MacChaining(currentChaining, newMac),
-            _ => [.. currentChaining] // Fallback to current chaining for unknown versions
+            _ => [.. currentChaining], // Fallback to current chaining for unknown versions
         };
     }
 
     private Result<SecureChannelState, SmartCardError> UpdateSessionState(
         SecureChannelState currentState,
         uint newEncryptionCounter,
-        ImmutableArray<byte> newMacChaining)
+        ImmutableArray<byte> newMacChaining
+    )
     {
-        return MacChainingState.Create(newMacChaining.ToArray(), currentState.ProtocolVersion, 0x00)
+        return MacChainingState
+            .Create([.. newMacChaining], currentState.ProtocolVersion, 0x00)
             .Bind(macState => currentState.UpdateCounterAndMac(newEncryptionCounter, macState));
     }
 
     private Result<SecureChannelState, SmartCardError> CreateInitialSessionState(
         SessionKeys sessionKeys,
         SecurityLevel securityLevel,
-        ScpVersion protocolVersion)
+        ScpVersion protocolVersion
+    )
     {
         byte[] initialMacChaining = protocolVersion switch
         {
             ScpVersion.Scp03 => new byte[16], // 16-byte chaining for SCP03
-            ScpVersion.Scp02 => new byte[8],  // 8-byte chaining for SCP02
-            _ => new byte[8] // Default to SCP02 format
+            ScpVersion.Scp02 => new byte[8], // 8-byte chaining for SCP02
+            _ => new byte[8], // Default to SCP02 format
         };
 
-        return MacChainingState.Create(initialMacChaining, protocolVersion, 0x00)
-            .Bind(macState => SecureChannelState.Create(
-                sessionKeys,
-                securityLevel,
-                protocolVersion,
-                initialMacChaining,
-                0x00)
-                .Bind(state => state.UpdateCounterAndMac(0, macState)));
+        return MacChainingState
+            .Create(initialMacChaining, protocolVersion, 0x00)
+            .Bind(macState =>
+                SecureChannelState
+                    .Create(sessionKeys, securityLevel, protocolVersion, initialMacChaining, 0x00)
+                    .Bind(state => state.UpdateCounterAndMac(0, macState))
+            );
     }
 
     /// <summary>
     /// Validates session keys are appropriate for the given security level.
     /// </summary>
     private static UnitResult<SmartCardError> ValidateSessionKeysForSecurityLevel(
-        SessionKeys sessionKeys, 
-        SecurityLevel securityLevel)
+        SessionKeys sessionKeys,
+        SecurityLevel securityLevel
+    )
     {
-        return securityLevel == SecurityLevel.None
-            ? UnitResult.Success<SmartCardError>()
-            : sessionKeys.SEnc?.Length > 0 && sessionKeys.SMac?.Length > 0 && sessionKeys.SrMac?.Length > 0
+        return securityLevel == SecurityLevel.None ? UnitResult.Success<SmartCardError>()
+            : sessionKeys.SEnc?.Length > 0
+            && sessionKeys.SMac?.Length > 0
+            && sessionKeys.SrMac?.Length > 0
                 ? UnitResult.Success<SmartCardError>()
-                : UnitResult.Failure<SmartCardError>(SmartCardError.InvalidArgument(
-                    "Invalid session keys: encryption and MAC keys cannot be empty when security level is not None"));
+            : UnitResult.Failure(
+                SmartCardError.InvalidArgument(
+                    "Invalid session keys: encryption and MAC keys cannot be empty when security level is not None"
+                )
+            );
     }
 
     /// <summary>
@@ -346,37 +451,79 @@ public sealed class TraceApduDecryptorService
     /// </summary>
     private Result<IReadOnlyList<DecryptedExchange>, SmartCardError> ProcessExchangesSequentially(
         IEnumerable<TraceExchange> exchanges,
-        SecureChannelState initialState)
+        SecureChannelState initialState
+    )
     {
-        return exchanges.Aggregate(
-            Result.Success<(IReadOnlyList<DecryptedExchange>, SecureChannelState), SmartCardError>((new List<DecryptedExchange>(), initialState)),
-            (accumResult, exchange) => accumResult.Bind(accum =>
-            {
-                (IReadOnlyList<DecryptedExchange> decryptedExchanges, SecureChannelState currentState) = accum;
-                return DecryptExchange(exchange, currentState)
-                    .Match(
-                        success =>
-                        {
-                            (DecryptedExchange decryptedExchange, SecureChannelState updatedState) = success;
-                            List<DecryptedExchange> newList = [..decryptedExchanges, decryptedExchange];
-                            return Result.Success<(IReadOnlyList<DecryptedExchange>, SecureChannelState), SmartCardError>((newList, updatedState));
-                        },
-                        failure =>
-                        {
-                            _logger.LogWarning("Failed to decrypt exchange {ExchangeId}: {Error}",
-                                exchange.Id, failure.Message);
-                            
-                            // Graceful degradation - include failed exchange
-                            DecryptedExchange failedExchange = new DecryptedExchange(
-                                exchange.Id,
-                                new DecryptedApdu(exchange.Command, ApduDirection.Command, DecryptionStatus.Failed, failure.Message),
-                                new DecryptedApdu(exchange.Response, ApduDirection.Response, DecryptionStatus.Failed, failure.Message),
-                                currentState);
-                            
-                            List<DecryptedExchange> newList = [..decryptedExchanges, failedExchange];
-                            return Result.Success<(IReadOnlyList<DecryptedExchange>, SecureChannelState), SmartCardError>((newList, currentState));
-                        });
-            }))
+        return exchanges
+            .Aggregate(
+                Result.Success<
+                    (IReadOnlyList<DecryptedExchange>, SecureChannelState),
+                    SmartCardError
+                >((new List<DecryptedExchange>(), initialState)),
+                (accumResult, exchange) =>
+                    accumResult.Bind(accum =>
+                    {
+                        (
+                            IReadOnlyList<DecryptedExchange> decryptedExchanges,
+                            SecureChannelState currentState
+                        ) = accum;
+                        return DecryptExchange(exchange, currentState)
+                            .Match(
+                                success =>
+                                {
+                                    (
+                                        DecryptedExchange decryptedExchange,
+                                        SecureChannelState updatedState
+                                    ) = success;
+                                    List<DecryptedExchange> newList =
+                                    [
+                                        .. decryptedExchanges,
+                                        decryptedExchange,
+                                    ];
+                                    return Result.Success<
+                                        (IReadOnlyList<DecryptedExchange>, SecureChannelState),
+                                        SmartCardError
+                                    >((newList, updatedState));
+                                },
+                                failure =>
+                                {
+                                    _logger.LogWarning(
+                                        "Failed to decrypt exchange {ExchangeId}: {Error}",
+                                        exchange.Id,
+                                        failure.Message
+                                    );
+
+                                    // Graceful degradation - include failed exchange
+                                    DecryptedExchange failedExchange = new DecryptedExchange(
+                                        exchange.Id,
+                                        new DecryptedApdu(
+                                            exchange.Command,
+                                            ApduDirection.Command,
+                                            DecryptionStatus.Failed,
+                                            failure.Message
+                                        ),
+                                        new DecryptedApdu(
+                                            exchange.Response,
+                                            ApduDirection.Response,
+                                            DecryptionStatus.Failed,
+                                            failure.Message
+                                        ),
+                                        currentState
+                                    );
+
+                                    List<DecryptedExchange> newList =
+                                    [
+                                        .. decryptedExchanges,
+                                        failedExchange,
+                                    ];
+                                    return Result.Success<
+                                        (IReadOnlyList<DecryptedExchange>, SecureChannelState),
+                                        SmartCardError
+                                    >((newList, currentState));
+                                }
+                            );
+                    })
+            )
             .Map(result => result.Item1);
     }
 
@@ -386,10 +533,18 @@ public sealed class TraceApduDecryptorService
     private static Result<(DecryptedApdu, SecureChannelState), SmartCardError> ProcessPlainApdu(
         byte[] apduBytes,
         ApduDirection direction,
-        SecureChannelState sessionState)
+        SecureChannelState sessionState
+    )
     {
-        DecryptedApdu plainApdu = new DecryptedApdu(apduBytes, direction, DecryptionStatus.PlainText, "No secure messaging detected");
-        return Result.Success<(DecryptedApdu, SecureChannelState), SmartCardError>((plainApdu, sessionState));
+        DecryptedApdu plainApdu = new DecryptedApdu(
+            apduBytes,
+            direction,
+            DecryptionStatus.PlainText,
+            "No secure messaging detected"
+        );
+        return Result.Success<(DecryptedApdu, SecureChannelState), SmartCardError>(
+            (plainApdu, sessionState)
+        );
     }
 
     /// <summary>
@@ -398,44 +553,73 @@ public sealed class TraceApduDecryptorService
     private Result<(DecryptedApdu, SecureChannelState), SmartCardError> ProcessSecureApdu(
         byte[] apduBytes,
         ApduDirection direction,
-        SecureChannelState sessionState)
+        SecureChannelState sessionState
+    )
     {
-        Result<(byte[] decryptedBytes, SecureChannelState newState, string metadata), SmartCardError> decryptionResult = direction == ApduDirection.Command
-            ? DecryptCommand(apduBytes, sessionState)
-            : DecryptResponse(apduBytes, sessionState);
+        Result<
+            (byte[] decryptedBytes, SecureChannelState newState, string metadata),
+            SmartCardError
+        > decryptionResult =
+            direction == ApduDirection.Command
+                ? DecryptCommand(apduBytes, sessionState)
+                : DecryptResponse(apduBytes, sessionState);
 
         return decryptionResult.Match(
             success =>
             {
                 (byte[] decryptedBytes, SecureChannelState newState, string metadata) = success;
-                DecryptedApdu decryptedApdu = new DecryptedApdu(decryptedBytes, direction, DecryptionStatus.Decrypted, metadata);
-                return Result.Success<(DecryptedApdu, SecureChannelState), SmartCardError>((decryptedApdu, newState));
+                DecryptedApdu decryptedApdu = new DecryptedApdu(
+                    decryptedBytes,
+                    direction,
+                    DecryptionStatus.Decrypted,
+                    metadata
+                );
+                return Result.Success<(DecryptedApdu, SecureChannelState), SmartCardError>(
+                    (decryptedApdu, newState)
+                );
             },
             failure =>
             {
-                string protocolStr = sessionState.ProtocolVersion == ScpVersion.Scp03 ? "SCP03" : "SCP02";
-                string metadata = $"Secure messaging detected ({protocolStr}) but decryption failed: {failure.Message}";
-                DecryptedApdu failedApdu = new DecryptedApdu(apduBytes, direction, DecryptionStatus.Failed, metadata);
-                return Result.Success<(DecryptedApdu, SecureChannelState), SmartCardError>((failedApdu, sessionState));
-            });
+                string protocolStr =
+                    sessionState.ProtocolVersion == ScpVersion.Scp03 ? "SCP03" : "SCP02";
+                string metadata =
+                    $"Secure messaging detected ({protocolStr}) but decryption failed: {failure.Message}";
+                DecryptedApdu failedApdu = new DecryptedApdu(
+                    apduBytes,
+                    direction,
+                    DecryptionStatus.Failed,
+                    metadata
+                );
+                return Result.Success<(DecryptedApdu, SecureChannelState), SmartCardError>(
+                    (failedApdu, sessionState)
+                );
+            }
+        );
     }
 
     /// <summary>
     /// Decrypts a secured response using functional R-MAC verification and R-ENC decryption.
     /// </summary>
-    private static Result<(byte[] decryptedBytes, SecureChannelState newState), SmartCardError> DecryptSecuredResponse(
-        byte[] responseBytes,
-        SecureChannelState sessionState)
+    private static Result<
+        (byte[] decryptedBytes, SecureChannelState newState),
+        SmartCardError
+    > DecryptSecuredResponse(byte[] responseBytes, SecureChannelState sessionState)
     {
         // Implement actual R-MAC verification and R-ENC decryption using functional operations
         return sessionState.SecurityLevel.HasRMac()
-            ? VerifyResponseMac(responseBytes, sessionState)
-                .Bind(verifiedBytes => sessionState.SecurityLevel.HasREncryption()
-                    ? DecryptResponseData(verifiedBytes, sessionState)
-                    : Result.Success<(byte[], SecureChannelState), SmartCardError>((verifiedBytes, sessionState)))
+                ? VerifyResponseMac(responseBytes, sessionState)
+                    .Bind(verifiedBytes =>
+                        sessionState.SecurityLevel.HasREncryption()
+                            ? DecryptResponseData(verifiedBytes, sessionState)
+                            : Result.Success<(byte[], SecureChannelState), SmartCardError>(
+                                (verifiedBytes, sessionState)
+                            )
+                    )
             : sessionState.SecurityLevel.HasREncryption()
                 ? DecryptResponseData(responseBytes, sessionState)
-                : Result.Success<(byte[], SecureChannelState), SmartCardError>((responseBytes, sessionState));
+            : Result.Success<(byte[], SecureChannelState), SmartCardError>(
+                (responseBytes, sessionState)
+            );
     }
 
     /// <summary>
@@ -443,9 +627,10 @@ public sealed class TraceApduDecryptorService
     /// </summary>
     private static Result<byte[], SmartCardError> VerifyResponseMac(
         byte[] responseBytes,
-        SecureChannelState sessionState)
+        SecureChannelState sessionState
+    )
     {
-        // Implement R-MAC verification logic using MacCalculations
+        // Implement R-MAC verification logic using UnifiedCryptoService.Mac
         return Result.Success<byte[], SmartCardError>(responseBytes);
     }
 
@@ -454,49 +639,52 @@ public sealed class TraceApduDecryptorService
     /// </summary>
     private static Result<(byte[], SecureChannelState), SmartCardError> DecryptResponseData(
         byte[] responseBytes,
-        SecureChannelState sessionState)
+        SecureChannelState sessionState
+    )
     {
-        // Implement R-ENC decryption logic using CryptographicOperations
-        return Result.Success<(byte[], SecureChannelState), SmartCardError>((responseBytes, sessionState));
+        // Implement R-ENC decryption logic using UnifiedCryptoService.Cipher
+        return Result.Success<(byte[], SecureChannelState), SmartCardError>(
+            (responseBytes, sessionState)
+        );
     }
 
     /// <summary>
     /// Updates SCP02 MAC chaining by copying new MAC to first 8 bytes.
     /// </summary>
-    private static ImmutableArray<byte> UpdateScp02MacChaining(ImmutableArray<byte> currentChaining, byte[] newMac)
+    private static ImmutableArray<byte> UpdateScp02MacChaining(
+        ImmutableArray<byte> currentChaining,
+        byte[] newMac
+    )
     {
-        byte[] newChaining = currentChaining.ToArray();
+        byte[] newChaining = [.. currentChaining];
         int copyLength = Math.Min(8, newMac.Length);
         Array.Copy(newMac, 0, newChaining, 0, copyLength);
         return [.. newChaining];
     }
 
     /// <summary>
-    /// Detects secure messaging in APDU bytes using functional patterns.
+    /// Detects secure messaging in APDU bytes.
     /// </summary>
     private static bool IsSecureMessaging(byte[] apduBytes, ApduDirection direction)
     {
-        return apduBytes.Length >= 4 && direction switch
-        {
-            ApduDirection.Command => (apduBytes[0] & 0x04) != 0, // Check CLA byte for secure messaging indicator
-            ApduDirection.Response => apduBytes.Length > 2 && 
-                apduBytes.Take(apduBytes.Length - 2) // Exclude status word
-                    .Any(tag => tag is 0x87 or 0x8E or 0x99), // Check for secure messaging tags
-            _ => false
-        };
+        return apduBytes.Length >= 4
+            && direction switch
+            {
+                ApduDirection.Command => (apduBytes[0] & 0x04) != 0, // Check CLA byte for secure messaging indicator
+                ApduDirection.Response => apduBytes.Length > 2
+                    && apduBytes
+                        .Take(apduBytes.Length - 2) // Exclude status word
+                        .Any(tag => tag is 0x87 or 0x8E or 0x99), // Check for secure messaging tags
+                _ => false,
+            };
     }
-
-
 }
 
 /// <summary>
 /// Represents a trace exchange from a trace file.
 /// </summary>
 [PublicAPI]
-public record TraceExchange(
-    int Id,
-    byte[] Command,
-    byte[] Response);
+public record TraceExchange(int Id, byte[] Command, byte[] Response);
 
 /// <summary>
 /// Represents the result of decrypting a complete trace.
@@ -506,7 +694,8 @@ public record DecryptedTrace(
     IReadOnlyList<DecryptedExchange> Exchanges,
     SessionKeys SessionKeys,
     SecurityLevel SecurityLevel,
-    byte ProtocolVersion);
+    ScpVersion ProtocolVersion
+);
 
 /// <summary>
 /// Represents a decrypted exchange containing both command and response.
@@ -516,7 +705,8 @@ public record DecryptedExchange(
     int Id,
     DecryptedApdu Command,
     DecryptedApdu Response,
-    SecureChannelState SessionState);
+    SecureChannelState SessionState
+);
 
 /// <summary>
 /// Represents a decrypted APDU with metadata about the decryption process.
@@ -526,7 +716,8 @@ public record DecryptedApdu(
     byte[] OriginalBytes,
     ApduDirection Direction,
     DecryptionStatus Status,
-    string Metadata)
+    string Metadata
+)
 {
     /// <summary>
     /// Gets the decrypted APDU bytes. Returns original bytes if decryption failed or not needed.
@@ -549,11 +740,11 @@ public record DecryptedApdu(
         get
         {
             return Direction == ApduDirection.Response && OriginalBytes.Length >= 2
-                ? $"Response: {new StatusWord((ushort)((OriginalBytes[^2] << 8) | OriginalBytes[^1])).ToDescriptiveString()}"
+                ? $"Response: {new StatusWord((ushort)(OriginalBytes[^2] << 8 | OriginalBytes[^1])).ToDescriptiveString()}"
                 : $"{Direction} APDU ({OriginalBytes.Length} bytes)";
         }
     }
-};
+}
 
 /// <summary>
 /// Indicates whether an APDU is a command sent to the card or a response from the card.
@@ -569,7 +760,7 @@ public enum ApduDirection
     /// <summary>
     /// APDU response received from the card.
     /// </summary>
-    Response
+    Response,
 }
 
 /// <summary>
@@ -591,5 +782,5 @@ public enum DecryptionStatus
     /// <summary>
     /// APDU decryption failed due to an error.
     /// </summary>
-    Failed
+    Failed,
 }

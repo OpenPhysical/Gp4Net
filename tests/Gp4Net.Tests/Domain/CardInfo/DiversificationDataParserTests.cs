@@ -1,8 +1,8 @@
 using System;
+using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Domain.CardInfo;
 using NUnit.Framework;
-using AwesomeAssertions;
 
 namespace Gp4Net.Tests.Domain.CardInfo;
 
@@ -162,7 +162,7 @@ public class DiversificationDataParserTests
     {
         // Arrange - CF0A format with three SCP versions
         // 02 15 - SCP02 with i=15
-        // 03 10 - SCP03 with i=10  
+        // 03 10 - SCP03 with i=10
         // 10 70 - SCP10 with i=70
         byte[] data = Convert.FromHexString("CF0A0215031010700000000000");
 

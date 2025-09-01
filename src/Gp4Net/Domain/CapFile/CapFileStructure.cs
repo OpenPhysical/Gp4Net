@@ -14,6 +14,7 @@ namespace Gp4Net.Domain.CapFile;
 /// Based on Java Card Virtual Machine Specification and GlobalPlatform Card Specification.
 /// </summary>
 [PublicAPI]
+// @TODO CONSOLIDATE THIS WITH THE BASE LIBRARY TO AVOID DRY VIOLATIONS
 public class CapFileStructure
 {
     /// <summary>
@@ -161,7 +162,8 @@ public class CapFileStructure
     {
         if (capFileData is null)
             return Result.Failure<CapFileStructure, SmartCardError>(
-                SmartCardError.InvalidArgument("CAP file data cannot be null"));
+                SmartCardError.InvalidArgument("CAP file data cannot be null")
+            );
 
         // Only support ZIP/JAR format CAP files
         if (
@@ -177,11 +179,13 @@ public class CapFileStructure
 
         return Result.Failure<CapFileStructure, SmartCardError>(
             SmartCardError.Unsupported(
-                "Only ZIP/JAR format CAP files are supported. Raw binary CAP format is not supported."));
+                "Only ZIP/JAR format CAP files are supported. Raw binary CAP format is not supported."
+            )
+        );
     }
 
     /// <summary>
-    /// Attempts to parse a CAP file from byte array (ZIP/JAR format only) using functional error handling.
+    /// Attempts to parse a CAP file from byte array (ZIP/JAR format only).
     /// </summary>
     /// <param name="capFileData">The CAP file data.</param>
     /// <returns>A result containing the parsed CAP file structure or an error.</returns>
@@ -190,22 +194,32 @@ public class CapFileStructure
         if (capFileData == null)
         {
             return Result.Failure<CapFileStructure, SmartCardError>(
-                SmartCardError.InvalidData("CAP file data cannot be null"));
+                SmartCardError.InvalidData("CAP file data cannot be null")
+            );
         }
 
         // Only support ZIP/JAR format CAP files
         if (capFileData.Length < 4)
         {
             return Result.Failure<CapFileStructure, SmartCardError>(
-                SmartCardError.InvalidData("CAP file data is too short to be valid"));
+                SmartCardError.InvalidData("CAP file data is too short to be valid")
+            );
         }
 
-        if (!(capFileData[0] == 0x50 && capFileData[1] == 0x4B &&
-              capFileData[2] == 0x03 && capFileData[3] == 0x04))
+        if (
+            !(
+                capFileData[0] == 0x50
+                && capFileData[1] == 0x4B
+                && capFileData[2] == 0x03
+                && capFileData[3] == 0x04
+            )
+        )
         {
             return Result.Failure<CapFileStructure, SmartCardError>(
                 SmartCardError.InvalidData(
-                    "Only ZIP/JAR format CAP files are supported. Raw binary CAP format is not supported."));
+                    "Only ZIP/JAR format CAP files are supported. Raw binary CAP format is not supported."
+                )
+            );
         }
 
         try
@@ -216,12 +230,14 @@ public class CapFileStructure
         catch (InvalidDataException ex)
         {
             return Result.Failure<CapFileStructure, SmartCardError>(
-                SmartCardError.InvalidData($"CAP file parsing failed: {ex.Message}"));
+                SmartCardError.InvalidData($"CAP file parsing failed: {ex.Message}")
+            );
         }
         catch (Exception ex)
         {
             return Result.Failure<CapFileStructure, SmartCardError>(
-                SmartCardError.UnexpectedError("Unexpected error during CAP file parsing", ex));
+                SmartCardError.UnexpectedError("Unexpected error during CAP file parsing", ex)
+            );
         }
     }
 
@@ -300,27 +316,26 @@ public class CapFileStructure
                 {
                     // Extract package information from header component
                     case ComponentTags.Header:
-                        {
-                            HeaderComponent header = HeaderComponent.Parse(component.Data);
-                            packageAid = header.PackageAid;
-                            packageVersion = header.PackageVersion;
-                            capFileVersion = new CapVersion(
-                                header.CapFileMajorVersion,
-                                header.CapFileMinorVersion
-                            );
-                            headerFlags = header.Flags;
-                            break;
-                        }
+                    {
+                        HeaderComponent header = HeaderComponent.Parse(component.Data);
+                        packageAid = header.PackageAid;
+                        packageVersion = header.PackageVersion;
+                        capFileVersion = new CapVersion(
+                            header.CapFileMajorVersion,
+                            header.CapFileMinorVersion
+                        );
+                        headerFlags = header.Flags;
+                        break;
+                    }
 
                     // Extract applet information from applet component
                     case ComponentTags.Applet:
-                        {
-                            AppletComponent appletComponent = AppletComponent.Parse(component.Data);
-                            applets.AddRange(appletComponent.Applets);
-                            break;
-                        }
+                    {
+                        AppletComponent appletComponent = AppletComponent.Parse(component.Data);
+                        applets.AddRange(appletComponent.Applets);
+                        break;
+                    }
                 }
-
             }
         }
 
@@ -359,7 +374,7 @@ public class CapFileStructure
             ComponentTags.Export,
             ComponentTags.ConstantPool,
             ComponentTags.ReferenceLocation,
-            ComponentTags.Descriptor
+            ComponentTags.Descriptor,
         ];
 
         Dictionary<byte, CapComponent> componentDict = Components.ToDictionary(c => c.Tag, c => c);
@@ -421,7 +436,7 @@ public class CapFileStructure
                 Array.Copy(componentData, offset, blockData, 0, blockSize);
 
                 bool isLastBlock =
-                    (offset + blockSize >= componentData.Length)
+                    offset + blockSize >= componentData.Length
                     && component == GetLoadingComponents().Last();
 
                 blocks.Add(new LoadBlock(blockNumber++, blockData, isLastBlock));
@@ -476,17 +491,13 @@ public class CapComponent
     {
         if (stream.Position >= stream.Length)
         {
-            throw new InvalidDataException(
-                "Unexpected end of stream while reading component tag."
-            );
+            throw new InvalidDataException("Unexpected end of stream while reading component tag.");
         }
 
         int tagByte = stream.ReadByte();
         if (tagByte == -1)
         {
-            throw new InvalidDataException(
-                "Unexpected end of stream while reading component tag."
-            );
+            throw new InvalidDataException("Unexpected end of stream while reading component tag.");
         }
 
         byte tag = (byte)tagByte;
@@ -510,7 +521,7 @@ public class CapComponent
 
         byte sizeHigh = (byte)sizeHighByte;
         byte sizeLow = (byte)sizeLowByte;
-        ushort size = (ushort)((sizeHigh << 8) | sizeLow);
+        ushort size = (ushort)(sizeHigh << 8 | sizeLow);
 
         // Check if we have enough data left in the stream
         if (stream.Position + size > stream.Length)
@@ -775,7 +786,7 @@ internal class AppletComponent
             offset += aidLength;
 
             // Read install method offset
-            ushort installMethodOffset = (ushort)((data[offset] << 8) | data[offset + 1]);
+            ushort installMethodOffset = (ushort)(data[offset] << 8 | data[offset + 1]);
             offset += 2;
 
             applets.Add(new AppletInfo(aid, installMethodOffset));

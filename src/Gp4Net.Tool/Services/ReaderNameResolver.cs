@@ -28,35 +28,48 @@ public static class ReaderNameResolver
     public static async Task<Result<string, SmartCardError>> ResolveAsync(
         Maybe<string> readerInput,
         ISmartCardService cardService,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
+        // @TODO NO NULLS!
         ArgumentNullException.ThrowIfNull(cardService);
 
         // Get available readers first
-        Result<string[], SmartCardError> readersResult = await cardService.GetReadersAsync(cancellationToken);
+        Result<string[], SmartCardError> readersResult = await cardService.GetReadersAsync(
+            cancellationToken
+        );
         if (readersResult.IsFailure)
         {
-            return Result.Failure<string, SmartCardError>(SmartCardError.CommunicationError($"Failed to enumerate readers: {readersResult.Error.Message}"));
+            return Result.Failure<string, SmartCardError>(
+                SmartCardError.CommunicationError(
+                    $"Failed to enumerate readers: {readersResult.Error.Message}"
+                )
+            );
         }
 
-        ImmutableList<string> availableReaders = readersResult.Value.ToImmutableList();
-        
+        ImmutableList<string> availableReaders = [.. readersResult.Value];
+
         // Handle empty reader list
         if (availableReaders.IsEmpty)
         {
             return Result.Failure<string, SmartCardError>(
-                SmartCardError.CommunicationError("No card readers found on this system"));
+                SmartCardError.CommunicationError("No card readers found on this system")
+            );
         }
 
         return readerInput.Match(
             input => ResolveWithInput(input, availableReaders),
-            () => AutoDetectReader(availableReaders));
+            () => AutoDetectReader(availableReaders)
+        );
     }
 
     /// <summary>
     /// Resolves reader name when user provided specific input.
     /// </summary>
-    private static Result<string, SmartCardError> ResolveWithInput(string input, ImmutableList<string> availableReaders)
+    private static Result<string, SmartCardError> ResolveWithInput(
+        string input,
+        ImmutableList<string> availableReaders
+    )
     {
         // Handle auto-detection keywords
         if (IsAutoDetectionKeyword(input))
@@ -65,52 +78,50 @@ public static class ReaderNameResolver
         }
 
         // Try exact match first (case-sensitive)
-        ImmutableList<string> exactMatches = availableReaders
-            .Where(reader => string.Equals(reader, input, StringComparison.Ordinal))
-            .ToImmutableList();
-        
+        ImmutableList<string> exactMatches = [.. availableReaders.Where(reader => string.Equals(reader, input, StringComparison.Ordinal))];
+
         if (exactMatches.Count == 1)
         {
             return Result.Success<string, SmartCardError>(exactMatches.First());
         }
 
         // Try exact match case-insensitive
-        ImmutableList<string> exactMatchesInsensitive = availableReaders
-            .Where(reader => string.Equals(reader, input, StringComparison.OrdinalIgnoreCase))
-            .ToImmutableList();
-        
+        ImmutableList<string> exactMatchesInsensitive = [.. availableReaders.Where(reader => string.Equals(reader, input, StringComparison.OrdinalIgnoreCase))];
+
         if (exactMatchesInsensitive.Count == 1)
         {
             return Result.Success<string, SmartCardError>(exactMatchesInsensitive.First());
         }
 
         // Try partial matching (case-insensitive)
-        ImmutableList<string> partialMatches = availableReaders
-            .Where(reader => reader.Contains(input, StringComparison.OrdinalIgnoreCase))
-            .ToImmutableList();
+        ImmutableList<string> partialMatches = [.. availableReaders.Where(reader => reader.Contains(input, StringComparison.OrdinalIgnoreCase))];
 
         return partialMatches.Count switch
         {
             0 => CreateNoMatchError(input, availableReaders),
             1 => Result.Success<string, SmartCardError>(partialMatches.First()),
-            _ => CreateMultipleMatchError(input, partialMatches)
+            _ => CreateMultipleMatchError(input, partialMatches),
         };
     }
 
     /// <summary>
     /// Auto-detects the first available reader for connection.
     /// </summary>
-    private static Result<string, SmartCardError> AutoDetectReader(ImmutableList<string> availableReaders)
+    private static Result<string, SmartCardError> AutoDetectReader(
+        ImmutableList<string> availableReaders
+    )
     {
         // Filter out virtual readers for auto-detection (prefer physical readers)
-        ImmutableList<string> physicalReaders = availableReaders
-            .Where(reader => !IsVirtualReader(reader))
-            .ToImmutableList();
+        ImmutableList<string> physicalReaders = [.. availableReaders.Where(reader => !IsVirtualReader(reader))];
 
-        ImmutableList<string> selectedReaders = physicalReaders.IsEmpty ? availableReaders : physicalReaders;
-        
-        return selectedReaders.IsEmpty 
-            ? Result.Failure<string, SmartCardError>(SmartCardError.CommunicationError("No readers available for auto-detection"))
+        ImmutableList<string> selectedReaders = physicalReaders.IsEmpty
+            ? availableReaders
+            : physicalReaders;
+
+        return selectedReaders.IsEmpty
+            ? Result.Failure<string, SmartCardError>(
+                SmartCardError.CommunicationError("No readers available for auto-detection")
+            )
             : Result.Success<string, SmartCardError>(selectedReaders.First());
     }
 
@@ -133,31 +144,42 @@ public static class ReaderNameResolver
     /// </summary>
     private static bool IsVirtualReader(string readerName)
     {
+        // @TODO: Virtual readers should all start with "virtual:"
         string lowerName = readerName.ToLowerInvariant();
-        return lowerName.Contains("virtual") || 
-               lowerName.Contains("simulator") || 
-               lowerName.Contains("emulator");
+        return lowerName.Contains("virtual")
+            || lowerName.Contains("simulator")
+            || lowerName.Contains("emulator");
     }
 
     /// <summary>
     /// Creates error for when no readers match the input.
     /// </summary>
-    private static Result<string, SmartCardError> CreateNoMatchError(string input, ImmutableList<string> availableReaders)
+    private static Result<string, SmartCardError> CreateNoMatchError(
+        string input,
+        ImmutableList<string> availableReaders
+    )
     {
         string readerList = string.Join(", ", availableReaders.Select(r => $"'{r}'"));
         return Result.Failure<string, SmartCardError>(
             SmartCardError.InvalidArgument(
-                $"Reader '{input}' not found. Available readers: {readerList}"));
+                $"Reader '{input}' not found. Available readers: {readerList}"
+            )
+        );
     }
 
     /// <summary>
     /// Creates error for when multiple readers match the input.
     /// </summary>
-    private static Result<string, SmartCardError> CreateMultipleMatchError(string input, ImmutableList<string> matches)
+    private static Result<string, SmartCardError> CreateMultipleMatchError(
+        string input,
+        ImmutableList<string> matches
+    )
     {
         string matchList = string.Join(", ", matches.Select(m => $"'{m}'"));
         return Result.Failure<string, SmartCardError>(
             SmartCardError.InvalidArgument(
-                $"Multiple readers match '{input}': {matchList}. Please be more specific."));
+                $"Multiple readers match '{input}': {matchList}. Please be more specific."
+            )
+        );
     }
 }

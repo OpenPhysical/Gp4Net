@@ -69,10 +69,16 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
             throw new FileNotFoundException($"Input file not found: {settings.InputFile}");
         }
 
-        AnsiConsole.MarkupLine($"[green]Converting {settings.Format} trace:[/] {settings.InputFile}");
+        AnsiConsole.MarkupLine(
+            $"[green]Converting {settings.Format} trace:[/] {settings.InputFile}"
+        );
 
         TraceConverter converter = new TraceConverter();
-        TraceData traceData = await converter.ConvertAsync(settings.InputFile, settings.Format, settings.Verbose);
+        TraceData traceData = await converter.ConvertAsync(
+            settings.InputFile,
+            settings.Format,
+            settings.Verbose
+        );
 
         // Ensure output directory exists
         string outputDir = Path.GetDirectoryName(settings.OutputFile);
@@ -86,10 +92,13 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         };
 
-        await File.WriteAllTextAsync(settings.OutputFile, JsonSerializer.Serialize(traceData, options));
+        await File.WriteAllTextAsync(
+            settings.OutputFile,
+            JsonSerializer.Serialize(traceData, options)
+        );
 
         // Display summary
         AnsiConsole.MarkupLine($"[green]✓ Generated JSON trace:[/] {settings.OutputFile}");
@@ -116,7 +125,9 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
             AnsiConsole.MarkupLine("\n[bold]Detected Operations:[/]");
             foreach (KeyValuePair<string, Operation> op in traceData.Operations)
             {
-                AnsiConsole.MarkupLine($"  • [cyan]{op.Key}:[/] {op.Value.Description} (exchanges {op.Value.StartExchange}-{op.Value.EndExchange})");
+                AnsiConsole.MarkupLine(
+                    $"  • [cyan]{op.Key}:[/] {op.Value.Description} (exchanges {op.Value.StartExchange}-{op.Value.EndExchange})"
+                );
             }
         }
 
@@ -290,7 +301,7 @@ public class TraceConverter
         {
             "gp_pro" => await ParseGpProTraceAsync(inputFile, verbose),
             "gpshell" => await ParseGpShellTraceAsync(inputFile, verbose),
-            _ => throw new ArgumentException($"Unsupported format: {format}")
+            _ => throw new ArgumentException($"Unsupported format: {format}"),
         };
 
         if (verbose)
@@ -302,7 +313,9 @@ public class TraceConverter
         Dictionary<string, Operation> operations = _operationDetector.AnalyzeTrace(exchanges);
         if (verbose)
         {
-            AnsiConsole.MarkupLine($"[dim]Detected operations: {string.Join(", ", operations.Keys)}[/]");
+            AnsiConsole.MarkupLine(
+                $"[dim]Detected operations: {string.Join(", ", operations.Keys)}[/]"
+            );
         }
 
         // Analyze sessions
@@ -327,7 +340,7 @@ public class TraceConverter
             Metadata = metadata,
             Operations = operations,
             UsageExamples = usageExamples,
-            Exchanges = exchanges
+            Exchanges = exchanges,
         };
     }
 
@@ -346,7 +359,12 @@ public class TraceConverter
             string line = lines[lineNum].Trim();
 
             // Skip empty lines and comments
-            if (string.IsNullOrEmpty(line) || line.StartsWith('#') || line.StartsWith('[') || line.StartsWith("WARNING:"))
+            if (
+                string.IsNullOrEmpty(line)
+                || line.StartsWith('#')
+                || line.StartsWith('[')
+                || line.StartsWith("WARNING:")
+            )
             {
                 continue;
             }
@@ -367,7 +385,13 @@ public class TraceConverter
                 int responseTime = int.Parse(respMatch.Groups[1].Value);
                 string responseData = respMatch.Groups[2].Value.Trim().Replace(" ", "").ToUpper();
 
-                Exchange exchange = CreateExchange(exchanges.Count + 1, currentCommand, responseData, responseTime, currentLine);
+                Exchange exchange = CreateExchange(
+                    exchanges.Count + 1,
+                    currentCommand,
+                    responseData,
+                    responseTime,
+                    currentLine
+                );
                 exchanges.Add(exchange);
 
                 currentCommand = null;
@@ -407,7 +431,13 @@ public class TraceConverter
             {
                 string responseData = recvMatch.Groups[1].Value.Trim().Replace(" ", "").ToUpper();
 
-                Exchange exchange = CreateExchange(exchanges.Count + 1, currentCommand, responseData, 20, currentLine);
+                Exchange exchange = CreateExchange(
+                    exchanges.Count + 1,
+                    currentCommand,
+                    responseData,
+                    20,
+                    currentLine
+                );
                 exchanges.Add(exchange);
 
                 currentCommand = null;
@@ -418,7 +448,13 @@ public class TraceConverter
         return exchanges;
     }
 
-    private Exchange CreateExchange(int index, string command, string response, int responseTime, int sourceLine)
+    private Exchange CreateExchange(
+        int index,
+        string command,
+        string response,
+        int responseTime,
+        int sourceLine
+    )
     {
         string description = ApduAnalyzer.GetCommandDescription(command);
         bool secureMessaging = ApduAnalyzer.IsSecureMessaging(command);
@@ -436,11 +472,14 @@ public class TraceConverter
             Description = description,
             SourceLine = sourceLine,
             SecureMessaging = secureMessaging,
-            ScpData = scpData
+            ScpData = scpData,
         };
     }
 
-    private static void LinkOperationsToSessions(Dictionary<string, Operation> operations, List<SessionMetadata> sessions)
+    private static void LinkOperationsToSessions(
+        Dictionary<string, Operation> operations,
+        List<SessionMetadata> sessions
+    )
     {
         // Simple implementation: assign operations to sessions based on session operations list
         foreach (KeyValuePair<string, Operation> kvp in operations)
@@ -474,7 +513,7 @@ public class ApduAnalyzer
         { "82", "EXTERNAL AUTHENTICATE" },
         { "E6", "INSTALL" },
         { "E8", "LOAD" },
-        { "E4", "DELETE" }
+        { "E4", "DELETE" },
     };
 
     private static readonly Dictionary<string, string> GetDataTags = new()
@@ -486,7 +525,7 @@ public class ApduAnalyzer
         { "00C1", "SSC" },
         { "0066", "CARD DATA" },
         { "0067", "CARD CAPABILITIES" },
-        { "00E0", "KEY INFORMATION" }
+        { "00E0", "KEY INFORMATION" },
     };
 
     public static string GetCommandDescription(string commandHex)
@@ -504,32 +543,31 @@ public class ApduAnalyzer
             {
                 // Special handling for GET DATA
                 case "CA" when commandHex.Length >= 8:
+                {
+                    string tag = commandHex.Substring(4, 4);
+                    if (GetDataTags.TryGetValue(tag, out string tagDesc))
                     {
-                        string tag = commandHex.Substring(4, 4);
-                        if (GetDataTags.TryGetValue(tag, out string tagDesc))
-                        {
-                            return $"GET {tagDesc}";
-                        }
-
-                        return $"GET DATA (tag {tag})";
+                        return $"GET {tagDesc}";
                     }
+
+                    return $"GET DATA (tag {tag})";
+                }
 
                 // Special handling for INSTALL
                 case "E6" when commandHex.Length >= 6:
+                {
+                    string p1 = commandHex.Substring(4, 2);
+                    return p1 switch
                     {
-                        string p1 = commandHex.Substring(4, 2);
-                        return p1 switch
-                        {
-                            "02" => "INSTALL [for load]",
-                            "04" => "INSTALL [for install and make selectable]",
-                            "0C" => "INSTALL [for install]",
-                            _ => $"INSTALL (P1={p1})"
-                        };
-                    }
+                        "02" => "INSTALL [for load]",
+                        "04" => "INSTALL [for install and make selectable]",
+                        "0C" => "INSTALL [for install]",
+                        _ => $"INSTALL (P1={p1})",
+                    };
+                }
                 default:
                     return baseDesc;
             }
-
         }
 
         return $"UNKNOWN (INS={ins})";
@@ -597,61 +635,79 @@ public class OperationDetector
     private static readonly Dictionary<string, OperationPattern> OperationPatterns = new()
     {
         {
-            "select_isd", new OperationPattern
+            "select_isd",
+            new OperationPattern
             {
                 Indicators = ["SELECT"],
                 RequiredSequence = false,
-                CliTemplate = "gp4net card info"
+                CliTemplate = "gp4net card info",
             }
         },
         {
-            "get_data", new OperationPattern
+            "get_data",
+            new OperationPattern
             {
-                Indicators = ["GET DATA", "GET CPLC", "GET CARD DATA", "GET CARD CAPABILITIES", "GET IIN", "GET CIN", "GET KDD", "GET SSC", "GET KEY INFORMATION"],
+                Indicators =
+                [
+                    "GET DATA",
+                    "GET CPLC",
+                    "GET CARD DATA",
+                    "GET CARD CAPABILITIES",
+                    "GET IIN",
+                    "GET CIN",
+                    "GET KDD",
+                    "GET SSC",
+                    "GET KEY INFORMATION",
+                ],
                 RequiredSequence = false,
-                CliTemplate = "gp4net card info"
+                CliTemplate = "gp4net card info",
             }
         },
         {
-            "list", new OperationPattern
+            "list",
+            new OperationPattern
             {
                 Indicators = ["GET STATUS"],
                 RequiredSequence = false,
-                CliTemplate = "gp4net applet list"
+                CliTemplate = "gp4net applet list",
             }
         },
         {
-            "secure_channel_establish", new OperationPattern
+            "secure_channel_establish",
+            new OperationPattern
             {
                 Indicators = ["INITIALIZE UPDATE", "EXTERNAL AUTHENTICATE"],
                 RequiredSequence = true,
-                CliTemplate = "gp4net card test-sc -k gp_test_keys"
+                CliTemplate = "gp4net card test-sc -k gp_test_keys",
             }
         },
         {
-            "install_applet", new OperationPattern
+            "install_applet",
+            new OperationPattern
             {
                 Indicators = ["INSTALL [for load]"],
                 RequiredSequence = false,
-                CliTemplate = "gp4net applet install {package}.cap"
+                CliTemplate = "gp4net applet install {package}.cap",
             }
         },
         {
-            "load_blocks", new OperationPattern
+            "load_blocks",
+            new OperationPattern
             {
                 Indicators = ["LOAD"],
                 RequiredSequence = false,
-                CliTemplate = "gp4net applet load"
+                CliTemplate = "gp4net applet load",
             }
         },
         {
-            "uninstall", new OperationPattern
+            "uninstall",
+            new OperationPattern
             {
                 Indicators = ["DELETE"],
                 RequiredSequence = false,
-                CliTemplate = "gp4net applet delete {aid}"
+                CliTemplate = "gp4net applet delete {aid}",
             }
-        }
+        },
     };
 
     private readonly Dictionary<string, int> _operationCounter = new();
@@ -685,7 +741,7 @@ public class OperationDetector
                 // For LOAD operations, group consecutive ones immediately
                 if (detectedOp == "load_blocks" && _detectedOperations.Count > 0)
                 {
-                    DetectedOperation lastOp = _detectedOperations[_detectedOperations.Count - 1];
+                    DetectedOperation lastOp = _detectedOperations[^1];
                     if (lastOp.Type == "load_blocks" && lastOp.EndIndex == i - 1)
                     {
                         // Extend the existing LOAD operation
@@ -699,13 +755,15 @@ public class OperationDetector
                     }
                 }
 
-                _detectedOperations.Add(new DetectedOperation
-                {
-                    Type = detectedOp,
-                    StartIndex = i,
-                    EndIndex = i,
-                    Commands = [exchange.Description]
-                });
+                _detectedOperations.Add(
+                    new DetectedOperation
+                    {
+                        Type = detectedOp,
+                        StartIndex = i,
+                        EndIndex = i,
+                        Commands = [exchange.Description],
+                    }
+                );
             }
         }
     }
@@ -715,7 +773,10 @@ public class OperationDetector
         Dictionary<string, Operation> operations = new Dictionary<string, Operation>();
 
         // Handle operations that require specific sequences
-        MergeSequentialOperations("secure_channel_establish", ["INITIALIZE UPDATE", "EXTERNAL AUTHENTICATE"]);
+        MergeSequentialOperations(
+            "secure_channel_establish",
+            ["INITIALIZE UPDATE", "EXTERNAL AUTHENTICATE"]
+        );
 
         // Create operations from detected operations
         for (int i = 0; i < _detectedOperations.Count; i++)
@@ -724,8 +785,9 @@ public class OperationDetector
 
             // Check if this operation is part of an existing operation (by checking overlap)
             Operation existingOp = operations.Values.FirstOrDefault(op =>
-                op.StartExchange - 1 <= detectedOp.EndIndex &&
-                op.EndExchange - 1 >= detectedOp.StartIndex);
+                op.StartExchange - 1 <= detectedOp.EndIndex
+                && op.EndExchange - 1 >= detectedOp.StartIndex
+            );
 
             if (existingOp != null)
             {
@@ -740,8 +802,10 @@ public class OperationDetector
                 SessionId = "session_1",
                 StartExchange = detectedOp.StartIndex + 1,
                 EndExchange = detectedOp.EndIndex + 1,
-                Commands = detectedOp.Commands.Distinct().ToList(),
-                ExpectedCli = OperationPatterns.GetValueOrDefault(detectedOp.Type)?.CliTemplate ?? "gp4net unknown"
+                Commands = [.. detectedOp.Commands.Distinct()],
+                ExpectedCli =
+                    OperationPatterns.GetValueOrDefault(detectedOp.Type)?.CliTemplate
+                    ?? "gp4net unknown",
             };
         }
 
@@ -780,7 +844,7 @@ public class OperationDetector
                             Type = operationType,
                             StartIndex = _detectedOperations[sequenceStart].StartIndex,
                             EndIndex = _detectedOperations[sequenceEnd].EndIndex,
-                            Commands = foundCommands.Distinct().ToList()
+                            Commands = [.. foundCommands.Distinct()],
                         };
 
                         // Replace the original operations
@@ -803,7 +867,10 @@ public class OperationDetector
         }
     }
 
-    private void AssignExchangesToOperations(List<Exchange> exchanges, Dictionary<string, Operation> operations)
+    private void AssignExchangesToOperations(
+        List<Exchange> exchanges,
+        Dictionary<string, Operation> operations
+    )
     {
         foreach (Exchange exchange in exchanges)
         {
@@ -817,7 +884,11 @@ public class OperationDetector
             Operation operation = kvp.Value;
 
             int stepCounter = 1;
-            for (int i = operation.StartExchange - 1; i < operation.EndExchange && i < exchanges.Count; i++)
+            for (
+                int i = operation.StartExchange - 1;
+                i < operation.EndExchange && i < exchanges.Count;
+                i++
+            )
             {
                 exchanges[i].Operation = opName;
                 exchanges[i].StepInOperation = stepCounter++;
@@ -856,11 +927,8 @@ public class OperationDetector
             _operationCounter[operationType] = 1;
             return operationType;
         }
-        else
-        {
-            _operationCounter[operationType]++;
-            return $"{operationType}{_operationCounter[operationType]}";
-        }
+        _operationCounter[operationType]++;
+        return $"{operationType}{_operationCounter[operationType]}";
     }
 
     private static string GetOperationDescription(string operationType)
@@ -875,14 +943,14 @@ public class OperationDetector
             "install_applet" => "Install application package",
             "load_blocks" => "Load CAP file blocks",
             "uninstall" => "Remove application",
-            _ => "Unknown operation"
+            _ => "Unknown operation",
         };
     }
 
     private class OperationPattern
     {
         public string[] Indicators { get; set; } = [];
-        public bool RequiredSequence { get; set; } = false;
+        public bool RequiredSequence { get; set; }
         public string CliTemplate { get; set; } = string.Empty;
     }
 }
@@ -943,7 +1011,7 @@ public class SessionAnalyzer
                 Kdd = "0370000000000000000001", // Default, should be extracted
                 HostChallenge = scpData.HostChallenge ?? "",
                 CardChallenge = scpData.CardChallenge ?? "",
-                CardCryptogram = scpData.CardCryptogram ?? ""
+                CardCryptogram = scpData.CardCryptogram ?? "",
             };
         }
 
@@ -959,7 +1027,7 @@ public class SessionAnalyzer
             CardChallenge = scpData?.CardChallenge ?? "",
             SequenceCounter = "000001",
             DerivationData = derivationData,
-            Operations = []
+            Operations = [],
         };
     }
 
@@ -969,7 +1037,10 @@ public class SessionAnalyzer
         exchange.SessionId = session.SessionId;
 
         // Add operation to session if not already present
-        if (!string.IsNullOrEmpty(exchange.Operation) && !session.Operations.Contains(exchange.Operation))
+        if (
+            !string.IsNullOrEmpty(exchange.Operation)
+            && !session.Operations.Contains(exchange.Operation)
+        )
         {
             session.Operations.Add(exchange.Operation);
         }
@@ -990,10 +1061,10 @@ public class MetadataExtractor
                 File = sourceFile,
                 Type = formatType,
                 Generated = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-                ToolVersion = "gp4net-1.0"
+                ToolVersion = "gp4net-1.0",
             },
             Card = ExtractCardInfo(exchanges),
-            Sessions = [] // Will be populated by session analyzer
+            Sessions = [], // Will be populated by session analyzer
         };
     }
 
@@ -1008,7 +1079,7 @@ public class MetadataExtractor
             Atr = atr,
             IsdAid = isdAid,
             CardType = DetectCardType(cplcData),
-            Cplc = cplcData
+            Cplc = cplcData,
         };
     }
 
@@ -1046,7 +1117,7 @@ public class MetadataExtractor
                             IcFabricator = cplcHex.Substring(0, 4),
                             IcType = cplcHex.Substring(4, 4),
                             OsId = cplcHex.Substring(8, 4),
-                            IcSerial = cplcHex.Substring(24, 8)
+                            IcSerial = cplcHex.Substring(24, 8),
                         };
                     }
                 }
@@ -1077,35 +1148,43 @@ public class UsageExampleGenerator
         // Single operation examples
         foreach (KeyValuePair<string, Operation> kvp in operations)
         {
-            examples.Add(new UsageExample
-            {
-                Description = $"{kvp.Value.Description} only",
-                Command = $"{kvp.Value.ExpectedCli} -r 'lua:trace.lua?operations={kvp.Key}'"
-            });
+            examples.Add(
+                new UsageExample
+                {
+                    Description = $"{kvp.Value.Description} only",
+                    Command = $"{kvp.Value.ExpectedCli} -r 'lua:trace.lua?operations={kvp.Key}'",
+                }
+            );
         }
 
         // Workflow examples
-        List<string> opNames = operations.Keys.ToList();
+        List<string> opNames = [.. operations.Keys];
 
         // Install workflow
-        List<string> installOps = opNames.Where(op => op.Contains("install") || op.Contains("secure_channel") || op == "info").ToList();
+        List<string> installOps = [.. opNames.Where(op => op.Contains("install") || op.Contains("secure_channel") || op == "info")];
         if (installOps.Count > 1)
         {
-            examples.Add(new UsageExample
-            {
-                Description = "Install workflow",
-                Command = $"gp4net applet install app.cap -r 'lua:trace.lua?operations={string.Join(",", installOps)}'"
-            });
+            examples.Add(
+                new UsageExample
+                {
+                    Description = "Install workflow",
+                    Command =
+                        $"gp4net applet install app.cap -r 'lua:trace.lua?operations={string.Join(",", installOps)}'",
+                }
+            );
         }
 
         // Full workflow
         if (opNames.Count > 2)
         {
-            examples.Add(new UsageExample
-            {
-                Description = "Complete workflow",
-                Command = $"gp4net script eval 'full_workflow()' -r 'lua:trace.lua?operations={string.Join(",", opNames)}'"
-            });
+            examples.Add(
+                new UsageExample
+                {
+                    Description = "Complete workflow",
+                    Command =
+                        $"gp4net script eval 'full_workflow()' -r 'lua:trace.lua?operations={string.Join(",", opNames)}'",
+                }
+            );
         }
 
         return examples;

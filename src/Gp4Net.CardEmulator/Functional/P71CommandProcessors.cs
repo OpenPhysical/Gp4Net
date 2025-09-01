@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
-using Gp4Net.Constants;
 using Gp4Net.CardEmulator.Core;
+using Gp4Net.Core;
 using JetBrains.Annotations;
 
+using Gp4Net.Constants;
 namespace Gp4Net.CardEmulator.Functional;
 
 /// <summary>
@@ -22,7 +22,8 @@ public static class P71CommandProcessors
     public static Result<(ApduResponse, CardState), SmartCardError> ProcessIdentify(
         byte[] command,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return ParseIdentifyCommand(command)
             .Bind(_ => ValidateIdentifyAccess(state))
@@ -37,12 +38,13 @@ public static class P71CommandProcessors
     public static Result<(ApduResponse, CardState), SmartCardError> ProcessP71GetData(
         byte[] command,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return ParseGetDataCommand(command)
             .Bind(tag => ValidateP71DataAccess(tag, state))
             .Bind(tag => RetrieveP71DataObject(tag, config))
-            .Map(data => (new ApduResponse(data, StatusWords.Success), state));
+            .Map(data => (new ApduResponse(data, Gp4Net.Constants.Constants.StatusWords.Success.Normal), state));
     }
 
     /// <summary>
@@ -50,7 +52,8 @@ public static class P71CommandProcessors
     /// </summary>
     public static Result<(ApduResponse, CardState), SmartCardError> ProcessP71Cplc(
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return ValidateCplcAccess(state)
             .Map(_ => CreateP71CplcResponse(config))
@@ -65,9 +68,10 @@ public static class P71CommandProcessors
         if (command.Length < 7)
             return Result.Failure<IdentifyRequest, SmartCardError>(SmartCardError.WrongLength());
 
-        if (command[0] != 0x80 || command[1] != 0xCA || 
-            command[2] != 0x00 || command[3] != 0xFE)
-            return Result.Failure<IdentifyRequest, SmartCardError>(SmartCardError.InstructionNotSupported());
+        if (command[0] != 0x80 || command[1] != 0xCA || command[2] != 0x00 || command[3] != 0xFE)
+            return Result.Failure<IdentifyRequest, SmartCardError>(
+                SmartCardError.InstructionNotSupported()
+            );
 
         if (command[4] != 0x02)
             return Result.Failure<IdentifyRequest, SmartCardError>(SmartCardError.WrongLength());
@@ -95,7 +99,7 @@ public static class P71CommandProcessors
         data.AddRange([0x03, 0x20]);
         data.AddRange(Convert.FromHexString("4A335233353130323336333130343030DCE5C19CFE6D0DCF"));
 
-        // ROM ID (Tag 08) - from FIPS 140-2 document  
+        // ROM ID (Tag 08) - from FIPS 140-2 document
         data.AddRange([0x08, 0x08]);
         data.AddRange(Convert.FromHexString("2E5AD88409C9BADB"));
 
@@ -106,7 +110,7 @@ public static class P71CommandProcessors
         // FIPS Mode (Tag 05) - from FIPS 140-2 document
         data.AddRange([0x05, 0x01, 0x01]); // 01 = FIPS mode active
 
-        return new ApduResponse(data.ToArray(), StatusWords.Success);
+        return new ApduResponse(data.ToArray(), Gp4Net.Constants.Constants.StatusWords.Success.Normal);
     }
 
     private static Result<ushort, SmartCardError> ParseGetDataCommand(byte[] command)
@@ -117,7 +121,7 @@ public static class P71CommandProcessors
         if (command[0] != 0x80 || command[1] != 0xCA)
             return Result.Failure<ushort, SmartCardError>(SmartCardError.InstructionNotSupported());
 
-        ushort tag = (ushort)((command[2] << 8) | command[3]);
+        ushort tag = (ushort)(command[2] << 8 | command[3]);
         return Result.Success<ushort, SmartCardError>(tag);
     }
 
@@ -128,14 +132,15 @@ public static class P71CommandProcessors
         return tag switch
         {
             0x00E0 when !state.IsSecureChannelEstablished => // Key info requires auth
-                Result.Failure<ushort, SmartCardError>(SmartCardError.SecurityStatusNotSatisfied()),
-            _ => Result.Success<ushort, SmartCardError>(tag)
+            Result.Failure<ushort, SmartCardError>(SmartCardError.SecurityStatusNotSatisfied()),
+            _ => Result.Success<ushort, SmartCardError>(tag),
         };
     }
 
     private static Result<byte[], SmartCardError> RetrieveP71DataObject(
         ushort tag,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         // Try to get from configuration first
         if (config.DefaultDataObjects.TryGetValue(tag, out byte[]? data))
@@ -147,7 +152,7 @@ public static class P71CommandProcessors
             0x9F7F => CreateP71CplcData(), // Enhanced CPLC
             0x0067 => CreateP71Capabilities(), // Enhanced capabilities
             0x0066 => CreateP71CardData(), // Enhanced card data
-            _ => Result.Failure<byte[], SmartCardError>(SmartCardError.ReferencedDataNotFound())
+            _ => Result.Failure<byte[], SmartCardError>(SmartCardError.ReferencedDataNotFound()),
         };
     }
 
@@ -161,16 +166,17 @@ public static class P71CommandProcessors
     {
         // P71 CPLC data from public traces
         byte[] cplcData = Convert.FromHexString(
-            "4790D3214700000000002345558919204839000000000000000018649535383931390000000000000000");
-            
-        return new ApduResponse(cplcData, StatusWords.Success);
+            "4790D3214700000000002345558919204839000000000000000018649535383931390000000000000000"
+        );
+
+        return new ApduResponse(cplcData, Gp4Net.Constants.Constants.StatusWords.Success.Normal);
     }
 
     private static Result<byte[], SmartCardError> CreateP71CplcData()
     {
         // Enhanced P71 CPLC with proper structure
         List<byte> cplcData = [];
-            
+
         // IC Fabricator: 4790 (NXP)
         cplcData.AddRange([0x47, 0x90]);
         // IC Type: D321 (P71D321)
@@ -215,7 +221,8 @@ public static class P71CommandProcessors
     {
         // P71 capabilities from trace data
         byte[] capabilities = Convert.FromHexString(
-            "6728A00D800103810500102060708201078103E5BEC082031E030083010284010285017B86010C87017B");
+            "6728A00D800103810500102060708201078103E5BEC082031E030083010284010285017B86010C87017B"
+        );
         return Result.Success<byte[], SmartCardError>(capabilities);
     }
 
@@ -223,9 +230,10 @@ public static class P71CommandProcessors
     {
         // P71 card data from trace data showing GP and JavaCard support
         byte[] cardData = Convert.FromHexString(
-            "664D734B06072A864886FC6B01600B06092A864886FC6B020203630906072A864886FC6B03640B06092A864886FC6B040370650D060B2A864886FC6B0507020000660C060A2B060104012A026E0103");
+            "664D734B06072A864886FC6B01600B06092A864886FC6B020203630906072A864886FC6B03640B06092A864886FC6B040370650D060B2A864886FC6B0507020000660C060A2B060104012A026E0103"
+        );
         return Result.Success<byte[], SmartCardError>(cardData);
     }
 
-    private record IdentifyRequest();
+    private record IdentifyRequest;
 }

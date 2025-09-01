@@ -20,10 +20,7 @@ public class ClApduTransport : IApduTransport
     /// <inheritdoc />
     public TransportProtocol Protocol
     {
-        get
-        {
-            return TransportProtocol.Tcl;
-        }
+        get { return TransportProtocol.Tcl; }
     }
 
     /// <inheritdoc />
@@ -40,10 +37,7 @@ public class ClApduTransport : IApduTransport
     /// <inheritdoc />
     public int MaxResponseDataLength
     {
-        get
-        {
-            return 256;
-        }
+        get { return 256; }
     }
 
     /// <inheritdoc />
@@ -75,15 +69,10 @@ public class ClApduTransport : IApduTransport
         CancellationToken cancellationToken = default
     )
     {
-
         // Validate contactless-specific restrictions
         ValidateContactlessCommand(command);
 
-        _logger.LogDebug(
-            "T=CL Transmit for CLA={Cla:X2} INS={Ins:X2}",
-            command.Cla,
-            command.Ins
-        );
+        _logger.LogDebug("T=CL Transmit for CLA={Cla:X2} INS={Ins:X2}", command.Cla, command.Ins);
 
         // Delegate to T=1 implementation with contactless wrapper
         ContactlessCommandWrapper contactlessCommand = new ContactlessCommandWrapper(command);
@@ -126,38 +115,23 @@ public class ClApduTransport : IApduTransport
 
         public byte Cla
         {
-            get
-            {
-                return _inner.Cla;
-            }
+            get { return _inner.Cla; }
         }
         public byte Ins
         {
-            get
-            {
-                return _inner.Ins;
-            }
+            get { return _inner.Ins; }
         }
         public byte P1
         {
-            get
-            {
-                return _inner.P1;
-            }
+            get { return _inner.P1; }
         }
         public byte P2
         {
-            get
-            {
-                return _inner.P2;
-            }
+            get { return _inner.P2; }
         }
         public byte[] Data
         {
-            get
-            {
-                return _inner.Data;
-            }
+            get { return _inner.Data; }
         }
 
         public Maybe<int> ExpectedResponseLength
@@ -171,9 +145,11 @@ public class ClApduTransport : IApduTransport
                 if (_inner.ExpectedResponseLength.HasValue)
                 {
                     // Le=0 means maximum (256 for short length)
-                    return Maybe<int>.From(_inner.ExpectedResponseLength.Value == 0
-                        ? 256
-                        : _inner.ExpectedResponseLength.Value);
+                    return Maybe<int>.From(
+                        _inner.ExpectedResponseLength.Value == 0
+                            ? 256
+                            : _inner.ExpectedResponseLength.Value
+                    );
                 }
                 // Interface allows None - the APDU encoder will handle this per T=CL requirements
                 return _inner.ExpectedResponseLength;

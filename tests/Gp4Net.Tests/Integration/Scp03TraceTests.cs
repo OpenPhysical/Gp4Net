@@ -13,9 +13,8 @@ namespace Gp4Net.Tests.Integration;
 [Category("Integration")]
 public class Scp03TraceTests : TraceBasedTestBase
 {
-    public Scp03TraceTests() : base("configure_gpshell_log_fixed.json", TraceOperations.SecureChannelEstablish)
-    {
-    }
+    public Scp03TraceTests()
+        : base("configure_gpshell_log_fixed.json", TraceOperations.SecureChannelEstablish) { }
 
     [Test]
     public void Scp03_EstablishSecureChannel_MatchesTrace()
@@ -30,36 +29,42 @@ public class Scp03TraceTests : TraceBasedTestBase
 
         // Act - Send INITIALIZE UPDATE
         byte[] hostChallenge = Convert.FromHexString("1443E205269A2AB5");
-        Result<InitializeUpdateCommand, SmartCardError> initUpdateCmdResult = InitializeUpdateCommand.CreateWithOptions(
-            keyVersion: 0x00,
-            keyIdentifier: 0x00,
-            hostChallenge: hostChallenge,
-            useMaxResponseLength: true
-        );
+        Result<InitializeUpdateCommand, SmartCardError> initUpdateCmdResult =
+            InitializeUpdateCommand.CreateWithOptions(
+                keyVersion: 0x00,
+                keyIdentifier: 0x00,
+                hostChallenge: hostChallenge,
+                useMaxResponseLength: true
+            );
         Assert.That(initUpdateCmdResult.IsSuccess, Is.True);
         InitializeUpdateCommand? initUpdateCmd = initUpdateCmdResult.Value;
 
         var initUpdateResponse = CardService.SendCommand(initUpdateCmd);
         Assert.Multiple(() =>
         {
-
             // Assert - Response should match trace
             Assert.That(initUpdateResponse.StatusWord, Is.EqualTo(0x9000));
             Assert.That(initUpdateResponse.Data, Is.Not.Null);
         });
 
         // From trace: Response <-- 00002345558083204839010200013C2B9786B83B4A40328149BB6F3F9000
-        byte[] expectedResponseData = Convert.FromHexString("00002345558083204839010200013C2B9786B83B4A40328149BB6F3F");
+        byte[] expectedResponseData = Convert.FromHexString(
+            "00002345558083204839010200013C2B9786B83B4A40328149BB6F3F"
+        );
         Assert.That(initUpdateResponse.Data, Is.EqualTo(expectedResponseData));
 
         // Parse the response
-        Result<InitializeUpdateResponse, SmartCardError> parsedResponseResult = InitializeUpdateResponse.Parse(initUpdateResponse.Data);
-        Assert.That(parsedResponseResult.IsSuccess, Is.True, "Failed to parse INITIALIZE UPDATE response");
+        Result<InitializeUpdateResponse, SmartCardError> parsedResponseResult =
+            InitializeUpdateResponse.Parse(initUpdateResponse.Data);
+        Assert.That(
+            parsedResponseResult.IsSuccess,
+            Is.True,
+            "Failed to parse INITIALIZE UPDATE response"
+        );
         InitializeUpdateResponse? parsedResponse = parsedResponseResult.Value;
         Assert.That(parsedResponse, Is.Not.Null);
         Assert.Multiple(() =>
         {
-
             // Verify parsed values match trace expectations
             Assert.That(parsedResponse.KeyDiversificationData[0], Is.EqualTo(0x00));
             Assert.That(parsedResponse.KeyDiversificationData[1], Is.EqualTo(0x00));
@@ -71,7 +76,9 @@ public class Scp03TraceTests : TraceBasedTestBase
 
         // Act - Send EXTERNAL AUTHENTICATE
         // From trace: Command --> 848203001007B2E3773126A490BC24C2ADC1FF46C8
-        byte[] expectedExtAuthCmd = Convert.FromHexString("848203001007B2E3773126A490BC24C2ADC1FF46C8");
+        byte[] expectedExtAuthCmd = Convert.FromHexString(
+            "848203001007B2E3773126A490BC24C2ADC1FF46C8"
+        );
 
         // The wrapped command in the trace shows secure messaging is already applied
         // Let's verify our secure channel can produce the same wrapped command
@@ -80,7 +87,6 @@ public class Scp03TraceTests : TraceBasedTestBase
         var extAuthResponse = CardService.SendCommand(expectedExtAuthCmd);
         Assert.Multiple(() =>
         {
-
             // Assert
             Assert.That(extAuthResponse.StatusWord, Is.EqualTo(0x9000));
             Assert.That(extAuthResponse.Data, Is.Empty);
@@ -104,7 +110,9 @@ public class Scp03TraceTests : TraceBasedTestBase
         // From trace line 43: Command --> 80E602001C09A0000003080000100008A0000001510000000006EF04C60268F80000
         // From trace line 44: Wrapped command --> 84E60200285B35732868A3027E2881C0D9C5FC012D13B064F2E22BFCB4FA3D06E0DA9314854DBA37472AEC5FAF00
 
-        byte[] wrappedInstallCmd = Convert.FromHexString("84E60200285B35732868A3027E2881C0D9C5FC012D13B064F2E22BFCB4FA3D06E0DA9314854DBA37472AEC5FAF00");
+        byte[] wrappedInstallCmd = Convert.FromHexString(
+            "84E60200285B35732868A3027E2881C0D9C5FC012D13B064F2E22BFCB4FA3D06E0DA9314854DBA37472AEC5FAF00"
+        );
         var installResponse = CardService.SendCommand(wrappedInstallCmd);
 
         // Assert
@@ -113,7 +121,9 @@ public class Scp03TraceTests : TraceBasedTestBase
         // Act - Send first LOAD command
         // From trace line 48: Wrapped command --> 84E80000F8447D3EA162C35893A127A403AACD1D2CFA480A1CFBCD6F6A5A71A592F180876C7E83DE507ADC629BE0EA4E695C6875E05B02D2FB746942781DFA2899E7428235D6E18FA98D4F9DD42E17DE3CB369FBB59B7E5DAE2E4204FE162B21C0FEC471E5E9A361F2B8CA7B017E31F08D4756D4459DD38939AF99A9258470EBD3C8C4E528C7ED1E7DFD0F08CB7CB98DFAE62F50887ADA0C0160E21CC0B1DDE8D46BB891708EED2B95648D7325628AA7CE2714910CA189FC290E4CB897C0F23EC8EFC88CE02405AE0E86B869FADD56C91C91623EAE47C4C8503E6601EE1CF242E6C1D886605EB98C874C286D6808EA69C4020A378589DF027ACF2E85E2
 
-        byte[] wrappedLoadCmd = Convert.FromHexString("84E80000F8447D3EA162C35893A127A403AACD1D2CFA480A1CFBCD6F6A5A71A592F180876C7E83DE507ADC629BE0EA4E695C6875E05B02D2FB746942781DFA2899E7428235D6E18FA98D4F9DD42E17DE3CB369FBB59B7E5DAE2E4204FE162B21C0FEC471E5E9A361F2B8CA7B017E31F08D4756D4459DD38939AF99A9258470EBD3C8C4E528C7ED1E7DFD0F08CB7CB98DFAE62F50887ADA0C0160E21CC0B1DDE8D46BB891708EED2B95648D7325628AA7CE2714910CA189FC290E4CB897C0F23EC8EFC88CE02405AE0E86B869FADD56C91C91623EAE47C4C8503E6601EE1CF242E6C1D886605EB98C874C286D6808EA69C4020A378589DF027ACF2E85E2");
+        byte[] wrappedLoadCmd = Convert.FromHexString(
+            "84E80000F8447D3EA162C35893A127A403AACD1D2CFA480A1CFBCD6F6A5A71A592F180876C7E83DE507ADC629BE0EA4E695C6875E05B02D2FB746942781DFA2899E7428235D6E18FA98D4F9DD42E17DE3CB369FBB59B7E5DAE2E4204FE162B21C0FEC471E5E9A361F2B8CA7B017E31F08D4756D4459DD38939AF99A9258470EBD3C8C4E528C7ED1E7DFD0F08CB7CB98DFAE62F50887ADA0C0160E21CC0B1DDE8D46BB891708EED2B95648D7325628AA7CE2714910CA189FC290E4CB897C0F23EC8EFC88CE02405AE0E86B869FADD56C91C91623EAE47C4C8503E6601EE1CF242E6C1D886605EB98C874C286D6808EA69C4020A378589DF027ACF2E85E2"
+        );
         var loadResponse = CardService.SendCommand(wrappedLoadCmd);
 
         // Assert

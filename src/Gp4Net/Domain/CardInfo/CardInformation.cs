@@ -36,25 +36,31 @@ public record CardInformation(
     /// Creates an empty CardInformation with all fields set to None.
     /// Used as the starting point for functional composition.
     /// </summary>
-    public static CardInformation Empty => new(
-        Maybe<byte[]>.None,
-        Maybe<CplcData>.None,
-        Maybe<CardCapabilities>.None,
-        Maybe<KeyInformationTemplate>.None,
-        Maybe<CardDataInfo>.None,
-        Maybe<ScpInformation>.None,
-        Maybe<SecurityDomainStatus>.None,
-        Maybe<byte[]>.None,
-        Maybe<SelectResponse>.None,
-        Maybe<ChipInfo>.None
-    );
+    public static CardInformation Empty =>
+        new(
+            Maybe<byte[]>.None,
+            Maybe<CplcData>.None,
+            Maybe<CardCapabilities>.None,
+            Maybe<KeyInformationTemplate>.None,
+            Maybe<CardDataInfo>.None,
+            Maybe<ScpInformation>.None,
+            Maybe<SecurityDomainStatus>.None,
+            Maybe<byte[]>.None,
+            Maybe<SelectResponse>.None,
+            Maybe<ChipInfo>.None
+        );
 
     /// <summary>
     /// Indicates whether the card has any meaningful data populated.
     /// Used to validate that card information gathering was successful.
     /// </summary>
-    public bool HasAnyData => Atr.HasValue || Cplc.HasValue || Capabilities.HasValue ||
-                             KeyInfo.HasValue || CardData.HasValue || ScpInfo.HasValue;
+    public bool HasAnyData =>
+        Atr.HasValue
+        || Cplc.HasValue
+        || Capabilities.HasValue
+        || KeyInfo.HasValue
+        || CardData.HasValue
+        || ScpInfo.HasValue;
 
     /// <summary>
     /// Indicates whether secure channel capabilities are available.
@@ -62,8 +68,8 @@ public record CardInformation(
     /// Card Capabilities or Diversification Data.
     /// </summary>
     public bool HasSecureChannelCapabilities =>
-        Capabilities.Map(c => c.ScpOptions.Count > 0).GetValueOrDefault(false) ||
-        ScpInfo.Map(s => s.Protocols.Count > 0).GetValueOrDefault(false);
+        Capabilities.Map(c => c.ScpOptions.Count > 0).GetValueOrDefault(false)
+        || ScpInfo.Map(s => s.Protocols.Count > 0).GetValueOrDefault(false);
 
     /// <summary>
     /// Gets a summary of manufacturing information for display purposes.
@@ -80,13 +86,13 @@ public record CardInformation(
     /// Per GP Card Specification v2.3.1 Section E.2.1.1.
     /// </summary>
     public Maybe<string> GlobalPlatformVersion =>
-        CardData.Bind(cd => cd.GlobalPlatformVersionFromOid)
-        .Or(() => CardData.Bind(cd => cd.GlobalPlatformVersion.Map(v => v.ToString())));
+        CardData
+            .Bind(cd => cd.GlobalPlatformVersionFromOid)
+            .Or(() => CardData.Bind(cd => cd.GlobalPlatformVersion.Map(v => v.ToString())));
 
     /// <summary>
     /// Gets the Java Card version if available from Card Data OIDs.
     /// Per Java Card Specification, identified by specific OID patterns.
     /// </summary>
-    public Maybe<string> JavaCardVersion =>
-        ChipDetails.Bind(cd => cd.JavaCardVersion);
+    public Maybe<string> JavaCardVersion => ChipDetails.Bind(cd => cd.JavaCardVersion);
 }

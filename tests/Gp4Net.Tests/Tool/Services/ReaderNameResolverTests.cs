@@ -2,11 +2,10 @@ using System;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
-using Gp4Net.Services;
-using Gp4Net.Tool.Services;
-using Gp4Net.Tests.TestHelpers;
 using Gp4Net.CardEmulator.Services;
 using Gp4Net.Core;
+using Gp4Net.Services;
+using Gp4Net.Tool.Services;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Tool.Services;
@@ -43,13 +42,17 @@ public class ReaderNameResolverTests
         Maybe<string> autoInput = Maybe<string>.From("auto");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(autoInput, _cardService);
+        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+            autoInput,
+            _cardService
+        );
 
         // Assert
         _ = result.Should().BeSuccessful();
         result.Match(
             readerName => _ = readerName.Should().NotBeNullOrWhiteSpace(),
-            error => Assert.Fail($"Expected success but got error: {error.Message}"));
+            error => Assert.Fail($"Expected success but got error: {error.Message}")
+        );
     }
 
     [Test]
@@ -59,26 +62,31 @@ public class ReaderNameResolverTests
         Maybe<string> emptyInput = Maybe<string>.None;
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(emptyInput, _cardService);
+        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+            emptyInput,
+            _cardService
+        );
 
         // Assert
         _ = result.Should().BeSuccessful();
         result.Match(
             readerName => _ = readerName.Should().NotBeNullOrWhiteSpace(),
-            error => Assert.Fail($"Expected success but got error: {error.Message}"));
+            error => Assert.Fail($"Expected success but got error: {error.Message}")
+        );
     }
 
     [Test]
     public async Task ResolveAsync_WithExactMatch_ReturnsMatchingReader()
     {
         // Arrange
-        Result<string[], SmartCardError> availableReadersResult = await _cardService.GetReadersAsync();
+        Result<string[], SmartCardError> availableReadersResult =
+            await _cardService.GetReadersAsync();
         if (availableReadersResult.IsFailure)
         {
             Assert.Inconclusive($"Cannot run test: {availableReadersResult.Error.Message}");
             return;
         }
-        
+
         availableReadersResult.Match(
             readers =>
             {
@@ -86,64 +94,77 @@ public class ReaderNameResolverTests
                 Task<Maybe<string>>? input = Maybe<string>.From(exactReaderName);
 
                 // Act
-                _ = ReaderNameResolver.ResolveAsync(input, _cardService)
-                    .ContinueWith(task => task.Result.Match(
-                        readerName =>
-                        {
-                            _ = readerName.Should().Be(exactReaderName);
-                            return true;
-                        },
-                        error =>
-                        {
-                            Assert.Fail($"Expected success but got error: {error.Message}");
-                            return false;
-                        }));
+                _ = ReaderNameResolver
+                    .ResolveAsync(input, _cardService)
+                    .ContinueWith(task =>
+                        task.Result.Match(
+                            readerName =>
+                            {
+                                _ = readerName.Should().Be(exactReaderName);
+                                return true;
+                            },
+                            error =>
+                            {
+                                Assert.Fail($"Expected success but got error: {error.Message}");
+                                return false;
+                            }
+                        )
+                    );
                 return true;
             },
             error =>
             {
                 Assert.Inconclusive($"Cannot run test: {error.Message}");
                 return false;
-            });
+            }
+        );
     }
 
     [Test]
     public async Task ResolveAsync_WithExactMatchCaseInsensitive_ReturnsMatchingReader()
     {
         // Arrange
-        Result<string[], SmartCardError> availableReadersResult = await _cardService.GetReadersAsync();
+        Result<string[], SmartCardError> availableReadersResult =
+            await _cardService.GetReadersAsync();
         if (availableReadersResult.IsFailure)
         {
             Assert.Inconclusive($"Cannot run test: {availableReadersResult.Error.Message}");
             return;
         }
-            
+
         availableReadersResult.Match(
             readers =>
             {
                 var exactReaderName = readers.First();
-                Task<Maybe<string>>? lowerCaseInput = Maybe<string>.From(exactReaderName.ToLowerInvariant());
+                Task<Maybe<string>>? lowerCaseInput = Maybe<string>.From(
+                    exactReaderName.ToLowerInvariant()
+                );
 
                 // Act
-                _ = ReaderNameResolver.ResolveAsync(lowerCaseInput, _cardService)
-                    .ContinueWith(task => task.Result.Match(
-                        readerName =>
-                        {
-                            _ = readerName.Should().Be(exactReaderName);
-                            return true;
-                        },
-                        error =>
-                        {
-                            Assert.Fail($"Expected success but got error: {error.Message}");
-                            return false;
-                        }));
+                _ = ReaderNameResolver
+                    .ResolveAsync(lowerCaseInput, _cardService)
+                    .ContinueWith(task =>
+                        task.Result.Match(
+                            readerName =>
+                            {
+                                _ = readerName.Should().Be(exactReaderName);
+                                return true;
+                            },
+                            error =>
+                            {
+                                Assert.Fail($"Expected success but got error: {error.Message}");
+                                return false;
+                            }
+                        )
+                    );
                 return true;
             },
             error =>
             {
                 Assert.Inconclusive($"Cannot run test: {error.Message}");
                 return false;
-            });
+            }
+        );
     }
 
     [Test]
@@ -153,13 +174,17 @@ public class ReaderNameResolverTests
         Maybe<string> partialInput = Maybe<string>.From("Virtual");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(partialInput, _cardService);
+        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+            partialInput,
+            _cardService
+        );
 
         // Assert
         _ = result.Should().BeSuccessful();
         result.Match(
             readerName => _ = readerName.Should().Contain("Virtual"),
-            error => Assert.Fail($"Expected success but got error: {error.Message}"));
+            error => Assert.Fail($"Expected success but got error: {error.Message}")
+        );
     }
 
     [Test]
@@ -169,13 +194,17 @@ public class ReaderNameResolverTests
         Maybe<string> partialInput = Maybe<string>.From("virtual");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(partialInput, _cardService);
+        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+            partialInput,
+            _cardService
+        );
 
         // Assert
         _ = result.Should().BeSuccessful();
         result.Match(
             readerName => _ = readerName.Should().Contain("Virtual"),
-            error => Assert.Fail($"Expected success but got error: {error.Message}"));
+            error => Assert.Fail($"Expected success but got error: {error.Message}")
+        );
     }
 
     [Test]
@@ -185,7 +214,10 @@ public class ReaderNameResolverTests
         Maybe<string> nonExistentInput = Maybe<string>.From("NonExistentReader123");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(nonExistentInput, _cardService);
+        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+            nonExistentInput,
+            _cardService
+        );
 
         // Assert
         _ = result.Should().BeFailure();
@@ -195,7 +227,8 @@ public class ReaderNameResolverTests
             {
                 _ = error.Message.Should().Contain("not found");
                 _ = error.Message.Should().Contain("Available readers:");
-            });
+            }
+        );
     }
 
     [Test]
@@ -206,21 +239,26 @@ public class ReaderNameResolverTests
         Maybe<string> input = Maybe<string>.From("auto");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(input, failingCardService);
+        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+            input,
+            failingCardService
+        );
 
         // Assert
         _ = result.Should().BeFailure();
         result.Match(
             readerName => Assert.Fail($"Expected failure but got success: {readerName}"),
-            error => _ = error.Message.Should().Contain("Failed to enumerate readers"));
+            error => _ = error.Message.Should().Contain("Failed to enumerate readers")
+        );
     }
 
     [Test]
     public async Task ResolveAsync_WithNullCardService_ThrowsArgumentNullException()
     {
         // Arrange & Act & Assert
-        Func<Task<Result<string, SmartCardError>>> act = async () => await ReaderNameResolver.ResolveAsync(Maybe<string>.From("auto"), null);
-        _ = await act.Should().ThrowAsync<System.ArgumentNullException>();
+        Func<Task<Result<string, SmartCardError>>> act = async () =>
+            await ReaderNameResolver.ResolveAsync(Maybe<string>.From("auto"), null);
+        _ = await act.Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Test]
@@ -230,13 +268,17 @@ public class ReaderNameResolverTests
         Maybe<string> detectInput = Maybe<string>.From("detect");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(detectInput, _cardService);
+        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+            detectInput,
+            _cardService
+        );
 
         // Assert
         _ = result.Should().BeSuccessful();
         result.Match(
             readerName => _ = readerName.Should().NotBeNullOrWhiteSpace(),
-            error => Assert.Fail($"Expected success but got error: {error.Message}"));
+            error => Assert.Fail($"Expected success but got error: {error.Message}")
+        );
     }
 
     [Test]
@@ -246,13 +288,17 @@ public class ReaderNameResolverTests
         Maybe<string> firstInput = Maybe<string>.From("first");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(firstInput, _cardService);
+        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+            firstInput,
+            _cardService
+        );
 
         // Assert
         _ = result.Should().BeSuccessful();
         result.Match(
             readerName => _ = readerName.Should().NotBeNullOrWhiteSpace(),
-            error => Assert.Fail($"Expected success but got error: {error.Message}"));
+            error => Assert.Fail($"Expected success but got error: {error.Message}")
+        );
     }
 
     [Test]
@@ -260,18 +306,22 @@ public class ReaderNameResolverTests
     {
         // This test verifies that auto-detection prefers physical readers over virtual ones
         // In our test environment, we only have virtual readers, so this tests the fallback logic
-        
+
         // Arrange
         Maybe<string> autoInput = Maybe<string>.From("auto");
 
         // Act
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(autoInput, _cardService);
+        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
+            autoInput,
+            _cardService
+        );
 
         // Assert
         _ = result.Should().BeSuccessful();
         result.Match(
             readerName => _ = readerName.Should().NotBeNullOrWhiteSpace(),
-            error => Assert.Fail($"Expected success but got error: {error.Message}"));
+            error => Assert.Fail($"Expected success but got error: {error.Message}")
+        );
         // In test environment, will return virtual reader as fallback
     }
 }

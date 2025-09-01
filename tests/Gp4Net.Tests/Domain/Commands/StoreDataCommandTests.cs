@@ -1,4 +1,3 @@
-using System;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -51,14 +50,16 @@ public class StoreDataCommandTests
         byte[]? apdu = ApduBuilder.BuildApdu(command);
 
         // Assert
-        _ = apdu.Should().BeEquivalentTo(new byte[] { 0x80, 0xE2, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03 });
+        _ = apdu.Should()
+            .BeEquivalentTo(new byte[] { 0x80, 0xE2, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03 });
     }
 
     [Test]
     public void ToApdu_WithDgiFormat_ReturnsCorrectApdu()
     {
         // Arrange - Use CreateDefaultKeyVersionCommand which creates DGI format
-        Result<StoreDataCommand, SmartCardError> result = StoreDataCommand.CreateDefaultKeyVersionCommand(0x01);
+        Result<StoreDataCommand, SmartCardError> result =
+            StoreDataCommand.CreateDefaultKeyVersionCommand(0x01);
         _ = result.IsSuccess.Should().BeTrue();
         StoreDataCommand? command = result.Value;
 
@@ -74,7 +75,6 @@ public class StoreDataCommandTests
         _ = apdu[5..].Should().BeEquivalentTo(new byte[] { 0x7F, 0x0D, 0x01, 0x01 }); // Data
     }
 
-
     [Test]
     public void CreateDefaultKeyVersionCommand_CreatesCorrectCommand()
     {
@@ -82,7 +82,8 @@ public class StoreDataCommandTests
         byte keyVersion = 0x01;
 
         // Act
-        Result<StoreDataCommand, SmartCardError> result = StoreDataCommand.CreateDefaultKeyVersionCommand(keyVersion);
+        Result<StoreDataCommand, SmartCardError> result =
+            StoreDataCommand.CreateDefaultKeyVersionCommand(keyVersion);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -105,7 +106,7 @@ public class StoreDataCommandTests
         );
         _ = result.IsSuccess.Should().BeTrue();
         StoreDataCommand? command = result.Value;
-        IApduCommand? iapdu = (IApduCommand)command;
+        IApduCommand? iapdu = command;
 
         // Assert
         _ = iapdu.Cla.Should().Be(0x80);

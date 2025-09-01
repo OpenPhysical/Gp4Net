@@ -48,7 +48,7 @@ public enum OpidFormat
     /// <summary>
     /// Format 9: IIII-IIII-IIII-IIIII (18 digits total).
     /// </summary>
-    Format9 = 9
+    Format9 = 9,
 }
 
 /// <summary>
@@ -75,7 +75,7 @@ public static class OpidFormatExtensions
             OpidFormat.Format7 => @"^\d{4}-\d{4}-\d{4}-\d{4}$", // 17 digits: 4-4-4-4
             OpidFormat.Format8 => @"^\d{5}-\d{4}-\d{4}-\d{4}$", // 18 digits: 5-4-4-4
             OpidFormat.Format9 => @"^\d{4}-\d{4}-\d{4}-\d{5}$", // 18 digits: 4-4-4-5
-            _ => throw new ArgumentException($"Unknown OPID format: {format}")
+            _ => throw new ArgumentException($"Unknown OPID format: {format}"),
         };
     }
 
@@ -96,7 +96,7 @@ public static class OpidFormatExtensions
             OpidFormat.Format7 => 17,
             OpidFormat.Format8 => 18,
             OpidFormat.Format9 => 18,
-            _ => throw new ArgumentException($"Unknown OPID format: {format}")
+            _ => throw new ArgumentException($"Unknown OPID format: {format}"),
         };
     }
 
@@ -117,7 +117,7 @@ public static class OpidFormatExtensions
             OpidFormat.Format7 => "IIII-IIII-IIII-IIII",
             OpidFormat.Format8 => "IIIII-IIII-IIII-IIII",
             OpidFormat.Format9 => "IIII-IIII-IIII-IIIII",
-            _ => throw new ArgumentException($"Unknown OPID format: {format}")
+            _ => throw new ArgumentException($"Unknown OPID format: {format}"),
         };
     }
 

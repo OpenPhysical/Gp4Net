@@ -75,7 +75,10 @@ public record ScpProtocolInfo
             return FormatScpVersion(Version);
         }
 
-        string options = string.Join(" ", ImplementationOptions.OrderBy(opt => (byte)opt).Select(opt => $"i={(byte)opt:X2}"));
+        string options = string.Join(
+            " ",
+            ImplementationOptions.OrderBy(opt => (byte)opt).Select(opt => $"i={(byte)opt:X2}")
+        );
         return $"{FormatScpVersion(Version)} ({options})";
     }
 
@@ -120,7 +123,7 @@ public record ScpProtocolInfo
             ScpImplementation.Scp03I11 => "AES-128 (no R-MAC)",
             ScpImplementation.Scp03I60 => "Random card challenge",
             ScpImplementation.Scp03I70 => "Pseudo-random card challenge",
-            _ => $"Unknown implementation 0x{((byte)implementation):X2}"
+            _ => $"Unknown implementation 0x{(byte)implementation:X2}",
         };
     }
 

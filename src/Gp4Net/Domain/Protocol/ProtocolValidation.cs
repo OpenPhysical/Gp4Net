@@ -3,10 +3,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
+using System;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Core.Functional;
+using Gp4Net.Cryptography;
+using static Gp4Net.Cryptography.CryptoService;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Protocol;
@@ -27,7 +28,13 @@ public static class ProtocolValidation
     {
         return hostChallenge?.Length == 8
             ? Result.Success()
-            : Result.Failure(SmartCardError.InvalidData($"Host challenge must be 8 bytes, got {hostChallenge?.Length ?? 0}").Message);
+            : Result.Failure(
+                SmartCardError
+                    .InvalidData(
+                        $"Host challenge must be 8 bytes, got {hostChallenge?.Length ?? 0}"
+                    )
+                    .Message
+            );
     }
 
     /// <summary>
@@ -40,7 +47,13 @@ public static class ProtocolValidation
     {
         return cardChallenge?.Length >= expectedLength
             ? Result.Success()
-            : Result.Failure(SmartCardError.InvalidResponse($"Card challenge must be at least {expectedLength} bytes, got {cardChallenge?.Length ?? 0}").Message);
+            : Result.Failure(
+                SmartCardError
+                    .InvalidResponse(
+                        $"Card challenge must be at least {expectedLength} bytes, got {cardChallenge?.Length ?? 0}"
+                    )
+                    .Message
+            );
     }
 
     /// <summary>
@@ -53,7 +66,13 @@ public static class ProtocolValidation
     {
         return sequenceCounter?.Length >= expectedLength
             ? Result.Success()
-            : Result.Failure(SmartCardError.InvalidResponse($"Sequence counter must be at least {expectedLength} bytes, got {sequenceCounter?.Length ?? 0}").Message);
+            : Result.Failure(
+                SmartCardError
+                    .InvalidResponse(
+                        $"Sequence counter must be at least {expectedLength} bytes, got {sequenceCounter?.Length ?? 0}"
+                    )
+                    .Message
+            );
     }
 
     /// <summary>
@@ -62,7 +81,10 @@ public static class ProtocolValidation
     /// <param name="responseScpId">The SCP ID from the response.</param>
     /// <param name="expectedProtocol">The expected protocol version.</param>
     /// <returns>Success if valid, error if invalid.</returns>
-    public static Result ValidateProtocolVersion(Maybe<ScpVersion> responseScpId, ScpVersion expectedProtocol)
+    public static Result ValidateProtocolVersion(
+        Maybe<ScpVersion> responseScpId,
+        ScpVersion expectedProtocol
+    )
     {
         return responseScpId == expectedProtocol
             ? Result.Failure($"Expected {expectedProtocol:X2} but received {responseScpId:X2}")
@@ -75,10 +97,16 @@ public static class ProtocolValidation
     /// <param name="keySet">The key set to validate.</param>
     /// <param name="expectedType">The expected key set type.</param>
     /// <returns>Success if valid, error if invalid.</returns>
-    public static Result ValidateKeySetType<T>(object keySet, System.Type expectedType)
+    public static Result ValidateKeySetType<T>(object keySet, Type expectedType)
     {
         return keySet.GetType() == expectedType
             ? Result.Success()
-            : Result.Failure(SmartCardError.InvalidArgument($"Expected {expectedType.Name} but got {keySet.GetType().Name}").Message);
+            : Result.Failure(
+                SmartCardError
+                    .InvalidArgument(
+                        $"Expected {expectedType.Name} but got {keySet.GetType().Name}"
+                    )
+                    .Message
+            );
     }
 }

@@ -19,12 +19,15 @@ public static class ApduParser
     /// </summary>
     /// <param name="securedCommand">The secured command bytes to parse.</param>
     /// <returns>Parsed secured command with extracted components, or an error.</returns>
-    public static Result<ParsedSecuredCommand, SmartCardError> ParseSecuredCommand(byte[] securedCommand)
+    public static Result<ParsedSecuredCommand, SmartCardError> ParseSecuredCommand(
+        byte[] securedCommand
+    )
     {
         if (securedCommand.Length < 5)
         {
             return Result.Failure<ParsedSecuredCommand, SmartCardError>(
-                SmartCardError.InvalidData("Secured command too short"));
+                SmartCardError.InvalidData("Secured command too short")
+            );
         }
 
         byte cla = securedCommand[0];
@@ -36,7 +39,8 @@ public static class ApduParser
         if (securedCommand.Length < 5 + lc)
         {
             return Result.Failure<ParsedSecuredCommand, SmartCardError>(
-                SmartCardError.InvalidData("Secured command length inconsistent with Lc"));
+                SmartCardError.InvalidData("Secured command length inconsistent with Lc")
+            );
         }
 
         // Extract data field (contains original data + MAC)
@@ -70,9 +74,9 @@ public static class ApduParser
         }
 
         return Result.Success<ParsedSecuredCommand, SmartCardError>(
-            new ParsedSecuredCommand(cla, ins, p1, p2, originalData, mac, le));
+            new ParsedSecuredCommand(cla, ins, p1, p2, originalData, mac, le)
+        );
     }
-
 
     /// <summary>
     /// Builds an original (unprotected) command APDU from parsed components.
@@ -85,7 +89,14 @@ public static class ApduParser
     /// <param name="data">The command data.</param>
     /// <param name="le">The expected response length (optional).</param>
     /// <returns>The reconstructed original command bytes.</returns>
-    public static byte[] BuildOriginalCommand(byte cla, byte ins, byte p1, byte p2, byte[] data, byte? le)
+    public static byte[] BuildOriginalCommand(
+        byte cla,
+        byte ins,
+        byte p1,
+        byte p2,
+        byte[] data,
+        byte? le
+    )
     {
         List<byte> command = [cla, ins, p1, p2];
 
@@ -100,7 +111,7 @@ public static class ApduParser
             command.Add(le.Value);
         }
 
-        return command.ToArray();
+        return [.. command];
     }
 }
 
@@ -123,4 +134,5 @@ public readonly record struct ParsedSecuredCommand(
     byte P2,
     byte[] Data,
     byte[] Mac,
-    byte? Le);
+    byte? Le
+);

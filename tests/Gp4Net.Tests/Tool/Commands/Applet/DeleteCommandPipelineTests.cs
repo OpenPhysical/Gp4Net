@@ -1,17 +1,17 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
+using Gp4Net.CardEmulator.Services;
 using Gp4Net.Core;
 using Gp4Net.Services;
-using Gp4Net.Tests.TestHelpers;
 using Gp4Net.Tool.Commands.Applet;
 using Gp4Net.Tool.Pipeline;
-using Gp4Net.CardEmulator.Services;
-using NUnit.Framework;
-using CSharpFunctionalExtensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using NUnit.Framework;
 
 namespace Gp4Net.Tests.Tool.Commands.Applet;
 
@@ -63,16 +63,17 @@ public class DeleteCommandPipelineTests
         _globalPlatformService = new EmptyGlobalPlatformService();
 
         // Create real CLI context with virtual card
-        DisplayService displayService = new DisplayService(false);
+        DisplayService displayService = new DisplayService();
         KeysetResolver keysetResolver = new KeysetResolver();
-        NullLogger<CliContext> logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<CliContext>.Instance;
+        NullLogger<CliContext> logger = NullLogger<CliContext>.Instance;
 
         _testContext = new TestCliContext(
             displayService,
             _smartCardService,
             _globalPlatformService,
             keysetResolver,
-            logger);
+            logger
+        );
 
         _command = new DeleteCommand();
 
@@ -98,7 +99,7 @@ public class DeleteCommandPipelineTests
         DeleteCommand.Settings settings = new DeleteCommand.Settings
         {
             Aid = "A000000003000000",
-            Force = true
+            Force = true,
         };
 
         // No mock setup needed - using real virtual card implementation
@@ -118,7 +119,7 @@ public class DeleteCommandPipelineTests
         {
             Aid = "A000000003000000",
             DeleteRelated = false,
-            Force = true
+            Force = true,
         };
 
         // Act
@@ -135,7 +136,7 @@ public class DeleteCommandPipelineTests
         DeleteCommand.Settings settings = new DeleteCommand.Settings
         {
             Aid = "INVALID_HEX",
-            Force = true
+            Force = true,
         };
 
         // Act
@@ -152,7 +153,7 @@ public class DeleteCommandPipelineTests
         DeleteCommand.Settings settings = new DeleteCommand.Settings
         {
             CapFile = _testCapFilePath,
-            Force = true
+            Force = true,
         };
 
         // Act
@@ -170,7 +171,7 @@ public class DeleteCommandPipelineTests
         DeleteCommand.Settings settings = new DeleteCommand.Settings
         {
             CapFile = "nonexistent.cap",
-            Force = true
+            Force = true,
         };
 
         // Act
@@ -187,9 +188,8 @@ public class DeleteCommandPipelineTests
         DeleteCommand.Settings settings = new DeleteCommand.Settings
         {
             Interactive = true,
-            Force = true
+            Force = true,
         };
-
 
         // Act
         int result = await _command.ExecuteAsync(_testContext, settings);
@@ -206,7 +206,7 @@ public class DeleteCommandPipelineTests
         {
             Aid = "A000000003000000",
             DryRun = true,
-            Force = true
+            Force = true,
         };
 
         // Act
@@ -225,7 +225,7 @@ public class DeleteCommandPipelineTests
         {
             CapFile = _testCapFilePath,
             DryRun = true,
-            Force = true
+            Force = true,
         };
 
         // Act
@@ -242,7 +242,7 @@ public class DeleteCommandPipelineTests
         DeleteCommand.Settings settings = new DeleteCommand.Settings
         {
             Aid = "A000000003000000",
-            Force = true
+            Force = true,
         };
 
         SmartCardError? error = SmartCardError.FromStatusWord(0x6A82);
@@ -271,7 +271,8 @@ public class TestCliContext : ICliExecutionContext
         ISmartCardService smartCardService,
         IGlobalPlatformService globalPlatformService,
         IKeysetResolver keysetResolver,
-        ILogger logger)
+        ILogger logger
+    )
     {
         Display = display;
         CardService = smartCardService;
@@ -282,11 +283,34 @@ public class TestCliContext : ICliExecutionContext
 
     public IGlobalPlatformService GetGlobalPlatformService() => _globalPlatformService;
 
-    public Task<Result<ICliExecutionContext, SmartCardError>> RequireCardConnection(Maybe<string> readerName = default) =>
-        Task.FromResult(Result.Success<ICliExecutionContext, SmartCardError>(this));
+    public Func<
+        SecureChannelRequest,
+        CancellationToken,
+        Task<Result<SecureChannelExecutionContext, SmartCardError>>
+    > EstablishSecureChannelAsync =>
+        (request, cancellationToken) =>
+            Task.FromResult(
+                Result.Success<SecureChannelExecutionContext, SmartCardError>(
+                    new SecureChannelExecutionContext(
+                        _globalPlatformService,
+                        new SecureChannelState(
+                            Maybe<SessionKeys>.None,
+                            SecurityLevel.NoSecurity,
+                            0,
+                            new byte[8]
+                        )
+                    )
+                )
+            );
 
-    public Task<Result<ICliExecutionContext, SmartCardError>> RequireSecureChannel(byte securityLevel = 1, Maybe<string> keyset = default) =>
-        Task.FromResult(Result.Success<ICliExecutionContext, SmartCardError>(this));
+    public Task<Result<ICliExecutionContext, SmartCardError>> RequireCardConnection(
+        Maybe<string> readerName = default
+    ) => Task.FromResult(Result.Success<ICliExecutionContext, SmartCardError>(this));
+
+    public Task<Result<ICliExecutionContext, SmartCardError>> RequireSecureChannel(
+        byte securityLevel = 1,
+        Maybe<string> keyset = default
+    ) => Task.FromResult(Result.Success<ICliExecutionContext, SmartCardError>(this));
 
     public Task<int> ExecuteAsync(Func<ICliExecutionContext, Task<int>> commandLogic) =>
         commandLogic(this);

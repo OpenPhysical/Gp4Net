@@ -4,7 +4,9 @@
 // -----------------------------------------------------------------------------
 
 using System;
-using Org.BouncyCastle.Security;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
+using Gp4Net.Cryptography;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 
@@ -28,23 +30,17 @@ public class DefaultChallengeGenerator : IChallengeGenerator
     }
 
     /// <inheritdoc />
-    public byte[] GenerateChallenge(int length)
+    public Result<byte[], SmartCardError> GenerateChallenge(int length)
     {
-        if (length <= 0)
-        {
-            throw new ArgumentException("Challenge length must be positive.", nameof(length));
-        }
-
-        byte[] challenge = new byte[length];
-        SecureRandom rng = new SecureRandom();
-        rng.NextBytes(challenge);
-
-        _logger.LogDebug(
-            "Generated {Length}-byte challenge: {Challenge}",
-            length,
-            Convert.ToHexString(challenge)
-        );
-
-        return challenge;
+        return length <= 0
+            ? SmartCardError.InvalidArgument("Challenge length must be positive")
+            : CryptoService.Utils.GenerateRandomBytes(length)
+                .Tap(challenge =>
+                    _logger.LogDebug(
+                        "Generated {Length}-byte challenge: {Challenge}",
+                        length,
+                        Convert.ToHexString(challenge)
+                    )
+                );
     }
 }

@@ -26,7 +26,8 @@ public interface IKeysetResolver
         string hexEncKey,
         string hexMacKey,
         string hexDekKey,
-        byte keyVersion);
+        byte keyVersion
+    );
 
     /// <summary>
     /// Resolves a keyset from a key identifier for SCP02.
@@ -34,9 +35,7 @@ public interface IKeysetResolver
     /// <param name="keyId">The key identifier.</param>
     /// <param name="keyVersion">The key version.</param>
     /// <returns>The resolved SCP02 keyset or error.</returns>
-    Result<Scp02KeySet, SmartCardError> ResolveScp02KeySet(
-        string keyId,
-        byte keyVersion);
+    Result<Scp02KeySet, SmartCardError> ResolveScp02KeySet(string keyId, byte keyVersion);
 
     /// <summary>
     /// Resolves a keyset from a key identifier for SCP03.
@@ -44,9 +43,7 @@ public interface IKeysetResolver
     /// <param name="keyId">The key identifier.</param>
     /// <param name="keyVersion">The key version.</param>
     /// <returns>The resolved SCP03 keyset or error.</returns>
-    Result<Scp03KeySet, SmartCardError> ResolveScp03KeySet(
-        string keyId,
-        byte keyVersion);
+    Result<Scp03KeySet, SmartCardError> ResolveScp03KeySet(string keyId, byte keyVersion);
 
     /// <summary>
     /// Gets test keys for development and testing purposes.
@@ -54,9 +51,7 @@ public interface IKeysetResolver
     /// <param name="protocolVersion">The protocol version (0x02 or 0x03).</param>
     /// <param name="keyVersion">The key version.</param>
     /// <returns>The test keyset or error.</returns>
-    Result<IKeySet, SmartCardError> GetTestKeys(
-        byte protocolVersion,
-        byte keyVersion);
+    Result<IKeySet, SmartCardError> GetTestKeys(byte protocolVersion, byte keyVersion);
 
     /// <summary>
     /// Legacy ResolveKeyset method for backward compatibility.
@@ -76,5 +71,6 @@ public interface IKeysetResolver
         Maybe<byte[]> macKey,
         Maybe<byte[]> dekKey,
         byte keyVersion,
-        Maybe<InitializeUpdateResponse> cardResponse);
+        Maybe<InitializeUpdateResponse> cardResponse
+    );
 }

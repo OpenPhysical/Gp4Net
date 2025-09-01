@@ -2,12 +2,12 @@ using System;
 using System.Linq;
 using System.Text;
 using CSharpFunctionalExtensions;
+using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
-using Gp4Net.CardEmulator.Core;
+using JetBrains.Annotations;
 using Kdf108.Domain.Kdf;
 using Kdf108.Domain.Kdf.Modes;
-using JetBrains.Annotations;
 using Org.BouncyCastle.Crypto.Digests;
 
 namespace Gp4Net.CardEmulator.Persistence;
@@ -41,7 +41,10 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
         if (validationResult.IsFailure)
             return Result.Failure<byte[], SmartCardError>(validationResult.Error);
 
-        Result<KdfParameters, SmartCardError> kdfParamsResult = BuildKdfParameters(keySet, cardUuid);
+        Result<KdfParameters, SmartCardError> kdfParamsResult = BuildKdfParameters(
+            keySet,
+            cardUuid
+        );
         if (kdfParamsResult.IsFailure)
             return Result.Failure<byte[], SmartCardError>(kdfParamsResult.Error);
 
@@ -61,8 +64,7 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
     /// </summary>
     public Result<bool, SmartCardError> ValidateKeyFingerprint(IKeySet keySet, byte[] fingerprint)
     {
-        return ComputeKeyFingerprint(keySet)
-            .Map(computed => computed.SequenceEqual(fingerprint));
+        return ComputeKeyFingerprint(keySet).Map(computed => computed.SequenceEqual(fingerprint));
     }
 
     /// <summary>
@@ -86,13 +88,14 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
         Result<bool, SmartCardError> keySetValidation = ValidateKeySet(keySet);
         if (keySetValidation.IsFailure)
             return Result.Failure<bool, SmartCardError>(keySetValidation.Error);
-            
+
         return ValidateCardUuid(cardUuid);
     }
 
     private static Result<bool, SmartCardError> ValidateKeySet(IKeySet keySet)
     {
-        return Maybe<IKeySet>.From(keySet)
+        return Maybe<IKeySet>
+            .From(keySet)
             .ToResult(SmartCardError.InvalidArgument("Key set cannot be null"))
             .Map(_ => true);
     }
@@ -101,51 +104,62 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
     {
         return cardUuid.IsEmpty
             ? Result.Failure<bool, SmartCardError>(
-                SmartCardError.InvalidArgument("Card UUID cannot be empty"))
+                SmartCardError.InvalidArgument("Card UUID cannot be empty")
+            )
             : Result.Success<bool, SmartCardError>(true);
     }
 
-    private static Result<KdfParameters, SmartCardError> BuildKdfParameters(IKeySet keySet, CardUuid cardUuid)
+    private static Result<KdfParameters, SmartCardError> BuildKdfParameters(
+        IKeySet keySet,
+        CardUuid cardUuid
+    )
     {
         return CreateKdfParametersWithErrorHandling(keySet, cardUuid);
     }
 
-    private static Result<KdfParameters, SmartCardError> CreateKdfParametersWithErrorHandling(IKeySet keySet, CardUuid cardUuid)
+    private static Result<KdfParameters, SmartCardError> CreateKdfParametersWithErrorHandling(
+        IKeySet keySet,
+        CardUuid cardUuid
+    )
     {
-        return Result.Try(() =>
-        {
-            // K1 = ENC key (always present, use as KDF input key)
-            byte[] k1 = keySet.EncKey;
-            
-            // K2 = MAC key (always present, encode in context)
-            byte[] k2 = keySet.MacKey;
-            
-            // K3 = DEK key (may be present, handle gracefully)
-            // Use zero-filled array if absent, matching key length
-            byte[] k3 = Maybe<byte[]>.From(keySet.DekKey)
-                .Match(
-                    dek => dek,
-                    () => new byte[k1.Length] // Zero if absent
+        return Result.Try(
+            () =>
+            {
+                // K1 = ENC key (always present, use as KDF input key)
+                byte[] k1 = keySet.EncKey;
+
+                // K2 = MAC key (always present, encode in context)
+                byte[] k2 = keySet.MacKey;
+
+                // K3 = DEK key (may be present, handle gracefully)
+                // Use zero-filled array if absent, matching key length
+                byte[] k3 = Maybe<byte[]>
+                    .From(keySet.DekKey)
+                    .Match(
+                        dek => dek,
+                        () => new byte[k1.Length] // Zero if absent
+                    );
+
+                // Build unambiguous tuple encoding for context
+                byte[] label = Encoding.ASCII.GetBytes("gp4net-card-persistence/v1");
+                byte[] context = EncodeTuple(
+                    Encoding.ASCII.GetBytes("alg=HMAC-SHA-256"),
+                    Encoding.ASCII.GetBytes("outlen=256"),
+                    Encoding.ASCII.GetBytes("purpose=KEK"),
+                    Encoding.ASCII.GetBytes($"scp={GetScpVersionString(keySet)}"),
+                    cardUuid.ToByteArray(),
+                    k2, // MAC key as secret context
+                    k3 // DEK key as secret context (zero if absent)
                 );
-            
-            // Build unambiguous tuple encoding for context
-            byte[] label = Encoding.ASCII.GetBytes("gp4net-card-persistence/v1");
-            byte[] context = EncodeTuple(
-                Encoding.ASCII.GetBytes("alg=HMAC-SHA-256"),
-                Encoding.ASCII.GetBytes("outlen=256"),
-                Encoding.ASCII.GetBytes("purpose=KEK"),
-                Encoding.ASCII.GetBytes($"scp={GetScpVersionString(keySet)}"),
-                cardUuid.ToByteArray(),
-                k2,  // MAC key as secret context
-                k3   // DEK key as secret context (zero if absent)
-            );
 
-            // Build fixed input per SP 800-108r1: Label || 0x00 || Context
-            byte[] fixedInput = BuildFixedInput(label, context);
+                // Build fixed input per SP 800-108r1: Label || 0x00 || Context
+                byte[] fixedInput = BuildFixedInput(label, context);
 
-            KdfParameters parameters = new KdfParameters(k1, fixedInput, keySet);
-            return parameters;
-        }, ex => SmartCardError.CryptographicError($"Failed to build KDF parameters: {ex.Message}"));
+                KdfParameters parameters = new KdfParameters(k1, fixedInput, keySet);
+                return parameters;
+            },
+            ex => SmartCardError.CryptographicError($"Failed to build KDF parameters: {ex.Message}")
+        );
     }
 
     private Result<byte[], SmartCardError> ExecuteKeyDerivation(KdfParameters parameters)
@@ -155,37 +169,44 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
 
     private Result<byte[], SmartCardError> ExecuteKdf108WithErrorHandling(KdfParameters parameters)
     {
-        return Result.Try(() =>
-        {
-            KdfOptions options = KdfOptions.CreateBuilder()
-                .WithPrfType(PrfType.HmacSha256)
-                .WithCounterLengthBits(32)
-                .WithUseCounter(true)
-                .WithCounterLocation(CounterLocation.BeforeFixed)
-                .Build();
+        return Result.Try(
+            () =>
+            {
+                KdfOptions options = KdfOptions
+                    .CreateBuilder()
+                    .WithPrfType(PrfType.HmacSha256)
+                    .WithCounterLengthBits(32)
+                    .WithUseCounter(true)
+                    .WithCounterLocation(CounterLocation.BeforeFixed)
+                    .Build();
 
-            byte[] derivedKey = _kdf.DeriveWithFixedInput(
-                parameters.Kin,
-                parameters.FixedInput,
-                256, // Output length in bits (32 bytes)
-                options);
+                byte[] derivedKey = _kdf.DeriveWithFixedInput(
+                    parameters.Kin,
+                    parameters.FixedInput,
+                    256, // Output length in bits (32 bytes)
+                    options
+                );
 
-            return derivedKey;
-        }, ex => SmartCardError.CryptographicError($"KDF108 key derivation failed: {ex.Message}"));
+                return derivedKey;
+            },
+            ex => SmartCardError.CryptographicError($"KDF108 key derivation failed: {ex.Message}")
+        );
     }
 
-    private static string GetScpVersionString(IKeySet keySet) => keySet switch
-    {
-        Scp02KeySet scp02 => $"scp02-{(scp02.EncKey.SequenceEqual(scp02.MacKey) ? "single" : "triple")}",
-        Scp03KeySet scp03 => $"scp03-aes{scp03.EncKey.Length * 8}",
-        _ => $"unknown-{keySet.GetType().Name}"
-    };
+    private static string GetScpVersionString(IKeySet keySet) =>
+        keySet switch
+        {
+            Scp02KeySet scp02 =>
+                $"scp02-{(scp02.EncKey.SequenceEqual(scp02.MacKey) ? "single" : "triple")}",
+            Scp03KeySet scp03 => $"scp03-aes{scp03.EncKey.Length * 8}",
+            _ => $"unknown-{keySet.GetType().Name}",
+        };
 
     private static byte[] EncodeTuple(params byte[][] components)
     {
         // Functional tuple encoding: length-prefixed components using LINQ
         return components
-            .SelectMany(component => 
+            .SelectMany(component =>
             {
                 // Encode length as 4-byte big-endian integer
                 byte[] lengthBytes = BitConverter.GetBytes((uint)component.Length);
@@ -203,50 +224,50 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
         // Per SP 800-108r1: Label || 0x00 || Context
         byte[] fixedInput = new byte[label.Length + 1 + context.Length];
         int offset = 0;
-        
+
         Array.Copy(label, 0, fixedInput, offset, label.Length);
         offset += label.Length;
-        
+
         fixedInput[offset] = 0x00; // Separator
         offset++;
-        
+
         Array.Copy(context, 0, fixedInput, offset, context.Length);
-        
+
         return fixedInput;
     }
 
     private static Result<byte[], SmartCardError> BuildFingerprintData(IKeySet keySet)
     {
-        return Result.Try(() =>
-        {
-            byte[] dekKey = Maybe<byte[]>.From(keySet.DekKey)
-                .Match(
-                    dek => dek,
-                    () => []
-                );
+        return Result.Try(
+            () =>
+            {
+                byte[] dekKey = Maybe<byte[]>.From(keySet.DekKey).Match(dek => dek, () => []);
 
-            byte[] concatenated = keySet.EncKey
-                .Concat(keySet.MacKey)
-                .Concat(dekKey)
-                .ToArray();
-            
-            return concatenated;
-        }, ex => SmartCardError.CryptographicError($"Failed to build fingerprint data: {ex.Message}"));
+                byte[] concatenated = keySet.EncKey.Concat(keySet.MacKey).Concat(dekKey).ToArray();
+
+                return concatenated;
+            },
+            ex =>
+                SmartCardError.CryptographicError($"Failed to build fingerprint data: {ex.Message}")
+        );
     }
 
     private static Result<byte[], SmartCardError> ComputeSha256Hash(byte[] data)
     {
-        return Result.Try(() =>
-        {
-            // Use BouncyCastle SHA-256 digest
-            Sha256Digest sha256Digest = new Sha256Digest();
-            sha256Digest.BlockUpdate(data, 0, data.Length);
-            
-            byte[] fingerprint = new byte[sha256Digest.GetDigestSize()];
-            sha256Digest.DoFinal(fingerprint, 0);
-            
-            return fingerprint;
-        }, ex => SmartCardError.CryptographicError($"Failed to compute SHA-256 hash: {ex.Message}"));
+        return Result.Try(
+            () =>
+            {
+                // Use BouncyCastle SHA-256 digest
+                Sha256Digest sha256Digest = new Sha256Digest();
+                sha256Digest.BlockUpdate(data, 0, data.Length);
+
+                byte[] fingerprint = new byte[sha256Digest.GetDigestSize()];
+                sha256Digest.DoFinal(fingerprint, 0);
+
+                return fingerprint;
+            },
+            ex => SmartCardError.CryptographicError($"Failed to compute SHA-256 hash: {ex.Message}")
+        );
     }
 
     /// <summary>
