@@ -2,6 +2,7 @@ using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using JetBrains.Annotations;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.CardEmulator.Core;
 
@@ -166,7 +167,7 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsSelect
     {
-        get { return Ins == 0xA4; }
+        get { return Ins == GlobalPlatform.Ins.Select; }
     }
 
     /// <summary>
@@ -174,7 +175,7 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsInitializeUpdate
     {
-        get { return Cla == 0x80 && Ins == 0x50; }
+        get { return Cla == GlobalPlatform.Cla.GpStandard && Ins == GlobalPlatform.Ins.InitializeUpdate; }
     }
 
     /// <summary>
@@ -182,7 +183,7 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsExternalAuthenticate
     {
-        get { return Cla == 0x84 && Ins == 0x82; }
+        get { return Cla == GlobalPlatform.Cla.Secured && Ins == GlobalPlatform.Ins.ExternalAuthenticate; }
     }
 
     /// <summary>
@@ -190,7 +191,7 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsInstall
     {
-        get { return Cla is 0x80 or 0x84 && Ins == 0xE6; }
+        get { return Cla is GlobalPlatform.Cla.GpStandard or GlobalPlatform.Cla.Secured && Ins == GlobalPlatform.Ins.Install; }
     }
 
     /// <summary>
@@ -198,7 +199,7 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsLoad
     {
-        get { return Cla is 0x80 or 0x84 && Ins == 0xE8; }
+        get { return Cla is GlobalPlatform.Cla.GpStandard or GlobalPlatform.Cla.Secured && Ins == GlobalPlatform.Ins.Load; }
     }
 
     /// <summary>
@@ -206,7 +207,7 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsGetStatus
     {
-        get { return Cla is 0x80 or 0x84 && Ins == 0xF2; }
+        get { return Cla is GlobalPlatform.Cla.GpStandard or GlobalPlatform.Cla.Secured && Ins == GlobalPlatform.Ins.GetStatus; }
     }
 
     /// <summary>
@@ -214,7 +215,7 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsDelete
     {
-        get { return Cla is 0x80 or 0x84 && Ins == 0xE4; }
+        get { return Cla is GlobalPlatform.Cla.GpStandard or GlobalPlatform.Cla.Secured && Ins == GlobalPlatform.Ins.Delete; }
     }
 
     /// <summary>
@@ -222,7 +223,7 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsGetData
     {
-        get { return Ins == 0xCA; }
+        get { return Ins == GlobalPlatform.Ins.GetData; }
     }
 
     /// <summary>
@@ -230,7 +231,7 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsPutKey
     {
-        get { return Cla is 0x80 or 0x84 && Ins == 0xD8; }
+        get { return Cla is GlobalPlatform.Cla.GpStandard or GlobalPlatform.Cla.Secured && Ins == GlobalPlatform.Ins.PutKey; }
     }
 
     /// <summary>
@@ -238,7 +239,7 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsSetStatus
     {
-        get { return Cla is 0x80 or 0x84 && Ins == 0xF0; }
+        get { return Cla is GlobalPlatform.Cla.GpStandard or GlobalPlatform.Cla.Secured && Ins == GlobalPlatform.Ins.SetStatus; }
     }
 
     /// <summary>

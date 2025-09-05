@@ -138,39 +138,6 @@ public static class FunctionalCombinators
         return Result.Success<TAcc, E>(accumulator);
     }
 
-    /// <summary>
-    /// Retries an operation with exponential backoff.
-    /// </summary>
-    public static async Task<Result<T, E>> RetryWithBackoff<T, E>(
-        Func<Task<Result<T, E>>> operation,
-        int maxRetries = 3,
-        TimeSpan? initialDelay = null,
-        Func<Result<T, E>, bool> shouldRetry = null
-    )
-    {
-        TimeSpan delay = initialDelay ?? TimeSpan.FromMilliseconds(100);
-        shouldRetry ??= result => result.IsFailure;
-
-        Maybe<Result<T, E>> lastResult = Maybe<Result<T, E>>.None;
-
-        return await Enumerable
-            .Range(0, maxRetries + 1)
-            .Select(async attempt =>
-            {
-                if (attempt > 0)
-                    await Task.Delay(delay * Math.Pow(2, attempt - 1));
-
-                Result<T, E> result = await operation();
-                lastResult = Maybe<Result<T, E>>.From(result);
-                return (attempt, result);
-            })
-            .FirstOrDefaultAsync(async task =>
-            {
-                (int attempt, Result<T, E> result) = await task;
-                return result.IsSuccess || attempt == maxRetries || !shouldRetry(result);
-            })
-            .Map(t => t.result);
-    }
 
     /// <summary>
     /// Helper to get first matching result from async sequence.

@@ -5,6 +5,7 @@ using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using JetBrains.Annotations;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.CardEmulator.Applications;
 
@@ -35,7 +36,7 @@ public interface IApplication
     /// <summary>
     /// Application privileges per GP Card Specification Table 8-1.
     /// </summary>
-    ApplicationPrivileges Privileges { get; }
+    Privilege Privileges { get; }
     
     /// <summary>
     /// Associated Security Domain AID.
@@ -71,7 +72,7 @@ public interface IApplication
     /// </summary>
     /// <param name="instruction">INS byte from APDU</param>
     /// <returns>Required privileges, or None if instruction not supported</returns>
-    Maybe<ApplicationPrivileges> GetRequiredPrivileges(byte instruction);
+    Maybe<Privilege> GetRequiredPrivileges(byte instruction);
     
     /// <summary>
     /// Updates application lifecycle state.
@@ -88,5 +89,5 @@ public interface IApplication
     /// </summary>
     /// <param name="newPrivileges">Updated privileges</param>
     /// <returns>New application instance</returns>
-    IApplication WithPrivileges(ApplicationPrivileges newPrivileges);
+    IApplication WithPrivileges(Privilege newPrivileges);
 }

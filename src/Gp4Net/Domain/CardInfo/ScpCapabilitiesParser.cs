@@ -6,7 +6,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Services;
 using static Gp4Net.Services.TlvService;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Constants;
 
 namespace Gp4Net.Domain.CardInfo;
 

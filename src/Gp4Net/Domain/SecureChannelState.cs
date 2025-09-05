@@ -20,7 +20,8 @@ public record SecureChannelState(
     ScpVersion ProtocolVersion,
     MacChainingState MacChaining,
     uint EncryptionCounter,
-    ImmutableArray<byte> SessionId
+    ImmutableArray<byte> SessionId,
+    byte ImplementationParameter
 )
 {
     /// <summary>
@@ -161,6 +162,15 @@ public record SecureChannelState(
     }
 
     /// <summary>
+    /// Gets the SCP protocol version.
+    /// Alias for ProtocolVersion for compatibility.
+    /// </summary>
+    public ScpVersion Protocol
+    {
+        get { return ProtocolVersion; }
+    }
+
+    /// <summary>
     /// Creates a new secure channel state for the specified protocol and security level.
     /// </summary>
     /// <param name="sessionKeys">The derived session keys.</param>
@@ -240,7 +250,8 @@ public record SecureChannelState(
                 protocolVersion,
                 macChainingResult.Value,
                 0, // Start with counter = 0 per GP specification
-                [.. sessionId]
+                [.. sessionId],
+                implementationParameter
             )
         );
     }

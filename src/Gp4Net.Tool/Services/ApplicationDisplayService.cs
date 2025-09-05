@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using Gp4Net.Domain;
 using Spectre.Console;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.Tool.Services;
 
@@ -54,7 +55,7 @@ public class ApplicationDisplayService
     /// </summary>
     /// <param name="type">The application type.</param>
     /// <returns>The color name.</returns>
-    // @TODO Evaluate if this is needed or useful.
+
     public static string GetTypeColor(ApplicationType type)
     {
         return type switch

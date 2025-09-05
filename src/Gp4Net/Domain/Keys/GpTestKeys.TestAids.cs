@@ -7,7 +7,7 @@ public static partial class GpTestKeys
     /// <summary>
     /// Well-known test AIDs for development and testing.
     /// </summary>
-    // @TODO: THESE ARE AIDs, NOT "TEST AIDS".
+
     public static class TestAids
     {
         /// <summary>

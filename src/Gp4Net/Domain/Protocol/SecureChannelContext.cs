@@ -29,6 +29,11 @@ public record SecureChannelContext(
 )
 {
     /// <summary>
+    /// Gets the SCP protocol version.
+    /// Alias for ScpVersion for compatibility.
+    /// </summary>
+    public ScpVersion Protocol => ScpVersion;
+    /// <summary>
     /// Creates a SecureChannelContext with functional validation.
     /// </summary>
     /// <param name="hostChallenge">The host challenge (8 bytes).</param>

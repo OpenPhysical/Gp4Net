@@ -2,13 +2,18 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Gp4Net.Core.ServiceLifetime;
+using Gp4Net.Domain;
 using Gp4Net.Domain.Protocol;
+using Gp4Net.Pipeline;
 using Gp4Net.Services;
 using Gp4Net.Tool.Commands.Card;
 using Gp4Net.Tool.Commands.Packages;
+using WSCT.ISO7816;
 using Gp4Net.Tool.Commands.Trace;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
@@ -63,7 +68,7 @@ public class Program
             Result<bool> validationResult = ValidateServiceRegistrations(serviceProvider);
             if (validationResult.IsFailure)
             {
-                AnsiConsole.MarkupLine($"[red]Startup Error: {validationResult.Error}[/]");
+                AnsiConsole.WriteLine($"Startup Error: {validationResult.Error}");
                 return 1;
             }
 
@@ -108,8 +113,6 @@ public class Program
                             .WithDescription("Connect to a smart card");
                         _ = card.AddCommand<PipelineCommand<InfoCommand.Settings>>("info")
                             .WithDescription("Display detailed card information");
-                        _ = card.AddCommand<TestSecureChannelCommand>("test-sc")
-                            .WithDescription("Test secure channel establishment");
                         _ = card.AddCommand<PipelineCommand<KeysChangeCommand.Settings>>(
                                 "change-keys"
                             )
@@ -208,39 +211,42 @@ public class Program
         _ = services.AddSingleton<IApduTransportFactory, ApduTransportFactory>();
 
         // Register secure channel services
-        _ = services.AddSingleton<IChallengeGenerator, DefaultChallengeGenerator>();
-        _ = services.AddSingleton<ISecureChannelProtocolFactory, SecureChannelProtocolFactory>();
-        _ = services.AddSingleton<ISecureChannelManager, SecureChannelManager>();
+        // IChallengeGenerator removed - use CryptoService.Rng.GenerateBytes directly
+        // ISecureChannelProtocolFactory deleted - using ScpService directly
+        
+        // SecureChannelManager is now created per-connection since it requires ISmartCardService
+        // Removed singleton registration - will be created by commands that need it
 
         // Register keyset resolver (functional implementation)
-        _ = services.AddSingleton<IKeysetResolver, FunctionalKeysetResolverAdapter>();
+        _ = services.AddSingleton<IKeysetResolver, KeysetResolver>();
 
-        // Register functional smart card service
-        _ = services.AddSingleton<ISmartCardService, SmartCardService>();
+        // SmartCardService is now created per-connection via PcscSmartCardService.CreateAsync
+        // No singleton registration needed as it's created dynamically with specific readers
 
-        // Register domain service factory
-        _ = services.AddSingleton<IDomainServiceFactory, DomainServiceFactory>();
+        // DomainServiceFactory deleted - services are now static
+        // No factory registration needed
         _ = services.AddSingleton<PackageRegistry>();
 
-        // SmartCardService is now created by DomainServiceFactory with functional composition
-
-        // GlobalPlatformService is now created by DomainServiceFactory with functional composition
-        // No need to register it in DI since it's created per-connection
+        // SmartCardService is now created per-connection
+        // GlobalPlatformService is static - no DI registration needed
 
         // Register pipeline services
         _ = services.AddSingleton<IDisplayService>(provider => new DisplayService());
+        // CliExecutionContext is now created per-command without singleton SmartCardService
         _ = services.AddScoped<ICliExecutionContext>(provider =>
         {
             IDisplayService display = provider.GetRequiredService<IDisplayService>();
-            ISmartCardService smartCardService = provider.GetRequiredService<ISmartCardService>();
-            var domainServiceFactory = provider.GetRequiredService<IDomainServiceFactory>();
             IKeysetResolver keysetResolver = provider.GetRequiredService<IKeysetResolver>();
 
             ILogger<CliContext> logger = provider.GetService<ILogger<CliContext>>();
+            
+            // SmartCardService will be created per-connection by commands that need it
+            // Using a placeholder service here as CliContext requires one
+            var placeholderService = new DisconnectedSmartCardService();
+            
             return new CliContext(
                 display,
-                smartCardService,
-                domainServiceFactory,
+                placeholderService,
                 keysetResolver,
                 logger
             );
@@ -278,13 +284,12 @@ public class Program
     {
         Type[] criticalServices =
         [
-            // IGlobalPlatformService is created by DomainServiceFactory, not DI
-            typeof(ISmartCardService),
+            // GlobalPlatformService is static - no DI registration
+            // ISmartCardService is created per-connection, not from DI  
+            // ISecureChannelManager is deleted - using ScpService directly
             typeof(IKeysetResolver),
-            typeof(ISecureChannelManager),
             typeof(IApduTransportFactory),
-            typeof(ISecureChannelProtocolFactory),
-            typeof(IDomainServiceFactory),
+            // ISecureChannelProtocolFactory and IDomainServiceFactory are deleted
         ];
 
         var missingServices = criticalServices
@@ -316,5 +321,99 @@ public class Program
             .Try(() => provider.GetService(serviceType))
             .MapError(ex => $"{serviceType.Name} (Error: {ex})")
             .Bind(service => Maybe.From(service).ToResult($"{serviceType.Name}").Map(s => s));
+    }
+}
+
+/// <summary>
+/// Placeholder SmartCardService for DI contexts where no card connection exists.
+/// All operations return disconnected errors.
+/// </summary>
+internal class DisconnectedSmartCardService : ISmartCardService
+{
+    /// <inheritdoc/>
+    public IPipelineContext Context => ImmutablePipelineContext.Empty;
+
+    /// <inheritdoc/>
+    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(IApduCommand command, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<CommandResponse, SmartCardError>(
+            SmartCardError.CommunicationError("No card connection established. Use commands that connect to specific readers.")
+        ));
+    }
+
+    /// <inheritdoc/>
+    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(IApduCommand command, CommandOptions options, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<CommandResponse, SmartCardError>(
+            SmartCardError.CommunicationError("No card connection established. Use commands that connect to specific readers.")
+        ));
+    }
+
+    /// <inheritdoc/>
+    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(CommandAPDU command, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<CommandResponse, SmartCardError>(
+            SmartCardError.CommunicationError("No card connection established. Use commands that connect to specific readers.")
+        ));
+    }
+
+    /// <inheritdoc/>
+    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(CommandAPDU command, CommandOptions options, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<CommandResponse, SmartCardError>(
+            SmartCardError.CommunicationError("No card connection established. Use commands that connect to specific readers.")
+        ));
+    }
+
+    /// <inheritdoc/>
+    public Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context)
+    {
+        return Result.Success<ISmartCardService, SmartCardError>(this);
+    }
+
+    /// <inheritdoc/>
+    public Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value)
+    {
+        return Result.Success<ISmartCardService, SmartCardError>(this);
+    }
+
+    /// <inheritdoc/>
+    public Task<Result<bool, SmartCardError>> IsConnectedAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Success<bool, SmartCardError>(false));
+    }
+
+    /// <inheritdoc/>
+    public Task<Result<byte[], SmartCardError>> GetAtrAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<byte[], SmartCardError>(
+            SmartCardError.CommunicationError("No card connection established.")
+        ));
+    }
+
+    /// <inheritdoc/>
+    public Task<Result<string[], SmartCardError>> GetReadersAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Success<string[], SmartCardError>([]));
+    }
+
+    /// <inheritdoc/>
+    public Task<Result<bool, SmartCardError>> IsSecureChannelEstablishedAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Success<bool, SmartCardError>(false));
+    }
+
+    /// <inheritdoc/>
+    public Task<Result<CommandResponse, SmartCardError>> SendCommandAsync(byte[] command, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(Result.Failure<CommandResponse, SmartCardError>(
+            SmartCardError.CommunicationError("No card connection established. Use commands that connect to specific readers.")
+        ));
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        // Nothing to dispose in placeholder service
     }
 }

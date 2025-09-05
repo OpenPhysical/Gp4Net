@@ -5,6 +5,7 @@ using System.Text.Json;
 using CSharpFunctionalExtensions;
 using Gp4Net.Domain;
 using Gp4Net.Tool.Common;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.Tool.Commands.Applet;
 

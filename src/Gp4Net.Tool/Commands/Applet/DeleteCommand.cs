@@ -4,13 +4,17 @@ using System.Collections.Immutable;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Services;
+using Gp4Net.Services.GlobalPlatform;
 using Gp4Net.Tool.Infrastructure;
+using Gp4Net.Transport;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using log4net;
@@ -89,8 +93,6 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
     /// <para>All errors are logged and human-readable error messages are displayed to the user
     /// based on GlobalPlatform specification status words.</para>
     /// </remarks>
-    /// <exception cref="InvalidOperationException">Thrown when no deletion target is specified.</exception>
-    /// <exception cref="FileNotFoundException">Thrown when a specified CAP file does not exist.</exception>
     public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
     {
         try
@@ -200,8 +202,6 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
     /// <para>For CAP files, only the package AID is returned as deleting the package
     /// will cascade to delete all related applets when deleteRelated is true.</para>
     /// </remarks>
-    /// <exception cref="InvalidOperationException">Thrown when no deletion target is specified.</exception>
-    /// <exception cref="FileNotFoundException">Thrown when a CAP file is specified but does not exist.</exception>
     private async Task<List<(byte[] Aid, string Description, string Source)>> DetermineAidsToDelete(
         ICliExecutionContext context,
         Settings settings
@@ -227,9 +227,8 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
         }
         else
         {
-            throw new InvalidOperationException(
-                "No deletion target specified. Use --aid, --cap, or --interactive"
-            );
+            AnsiConsole.MarkupLine("[red]No deletion target specified. Use --aid, --cap, or --interactive[/]");
+            return [];
         }
 
         return aidsToDelete;
@@ -241,16 +240,16 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
     {
         if (!File.Exists(capFilePath))
         {
-            throw new FileNotFoundException($"CAP file not found: {capFilePath}");
+            AnsiConsole.MarkupLine($"[red]CAP file not found: {capFilePath}[/]");
+            return [];
         }
 
         byte[] capData = await File.ReadAllBytesAsync(capFilePath);
         CapFileValidationResult validationResult = CapFileLoadingWorkflow.ValidateCapFile(capData);
         if (!validationResult.IsValid)
         {
-            throw new InvalidOperationException(
-                $"Invalid CAP file: {validationResult.ErrorMessage}"
-            );
+            AnsiConsole.MarkupLine($"[red]Invalid CAP file: {validationResult.ErrorMessage}[/]");
+            return [];
         }
         if (!validationResult.CapFile.HasValue)
         {
@@ -283,13 +282,10 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
                     async secureCtx =>
                     {
                         Result<ImmutableList<ApplicationInfo>, SmartCardError> statusResult =
-                            await secureCtx
-                                .GetGlobalPlatformService()
-                                .GetStatusAsync(
-                                    GetStatusCommand
-                                        .StatusSubset
-                                        .ApplicationsAndSupplementaryDomains
-                                );
+                            await Applications.GetApplicationsAndSecurityDomainsAsync(
+                                (command, ct) => secureCtx.CardService.ExecuteCommandAsync(command, ct),
+                                CancellationToken.None
+                            );
 
                         ImmutableList<ApplicationInfo> applications;
                         if (statusResult.IsSuccess)
@@ -459,9 +455,12 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
                         Logger.Debug($"  Delete related: {settings.DeleteRelated}");
                     }
 
-                    Result<bool, SmartCardError> result = await context
-                        .GetGlobalPlatformService()
-                        .DeleteApplicationAsync(aid, settings.DeleteRelated);
+                    Result<bool, SmartCardError> result = await CardManagement.DeleteApplicationAsync(
+                        aid,
+                        settings.DeleteRelated,
+                        (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
+                        CancellationToken.None
+                    );
 
                     if (result.IsSuccess)
                     {
@@ -557,9 +556,10 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
     {
         try
         {
-            Result<SelectResponse, SmartCardError> selectResult = await context
-                .GetGlobalPlatformService()
-                .SelectIsdAsync();
+            Result<SelectResponse, SmartCardError> selectResult = await Discovery.DetectAndSelectIsdAsync(
+                (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
+                CancellationToken.None
+            );
             if (selectResult.IsSuccess)
             {
                 SelectResponse response = selectResult.Value;

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Constants;
 
 namespace Gp4Net.Domain.CardInfo;
 

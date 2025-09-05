@@ -5,6 +5,8 @@ using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Services;
+using Gp4Net.Services.Helpers;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 using static Gp4Net.Services.TlvService;
 using JetBrains.Annotations;
 
@@ -41,7 +43,7 @@ public class CardCapabilities
     /// <summary>
     /// Gets the supported Application privileges.
     /// </summary>
-    public Maybe<ApplicationPrivileges> AppPrivileges { get; private set; }
+    public Maybe<Privilege> AppPrivileges { get; private set; }
 
     /// <summary>
     /// Gets the supported algorithms.
@@ -134,9 +136,13 @@ public class CardCapabilities
                             );
                             break;
                         case 0x81: // Application privileges
-                            capabilities.AppPrivileges = Maybe<ApplicationPrivileges>.From(
-                                ParseApplicationPrivileges(element.TlvData.Bytes.ToArray())
-                            );
+                            capabilities.AppPrivileges = 
+                                PrivilegeHelpers.FromBytes(element.TlvData.Bytes.ToArray())
+                                    .Map(Maybe<Privilege>.From)
+                                    .Match(
+                                        success => success,
+                                        _ => Maybe<Privilege>.None
+                                    );
                             break;
                         case 0x82: // Supported algorithms
                             capabilities.Algorithms = Maybe<SupportedAlgorithms>.From(
@@ -297,15 +303,6 @@ public class CardCapabilities
         return new SecurityDomainPrivileges(data[0], data[1], data.Length > 2 ? data[2] : (byte)0);
     }
 
-    private static ApplicationPrivileges ParseApplicationPrivileges(byte[] data)
-    {
-        if (data.Length < 3)
-        {
-            return new ApplicationPrivileges(0, 0, 0);
-        }
-
-        return new ApplicationPrivileges(data[0], data[1], data.Length > 2 ? data[2] : (byte)0);
-    }
 
     private static SupportedAlgorithms ParseSupportedAlgorithms(byte[] data)
     {
@@ -642,75 +639,6 @@ public record SecurityDomainPrivileges(byte Byte1, byte Byte2, byte Byte3)
     }
 }
 
-/// <summary>
-/// Application privileges.
-/// </summary>
-public record ApplicationPrivileges(byte Byte1, byte Byte2, byte Byte3)
-{
-    // Note: Many privilege bits have same meaning as SecurityDomainPrivileges
-    public bool CardLock
-    {
-        get { return (Byte1 & 0x10) != 0; }
-    }
-    public bool CardTerminate
-    {
-        get { return (Byte1 & 0x08) != 0; }
-    }
-    public bool CardReset
-    {
-        get { return (Byte1 & 0x04) != 0; }
-    }
-    public bool CvmManagement
-    {
-        get { return (Byte1 & 0x02) != 0; }
-    }
-
-    public bool FinalApplication
-    {
-        get { return (Byte2 & 0x02) != 0; }
-    }
-    public bool GlobalService
-    {
-        get { return (Byte2 & 0x01) != 0; }
-    }
-
-    public override string ToString()
-    {
-        List<string> privs = [];
-
-        if (CardLock)
-        {
-            privs.Add("CardLock");
-        }
-
-        if (CardTerminate)
-        {
-            privs.Add("CardTerminate");
-        }
-
-        if (CardReset)
-        {
-            privs.Add("CardReset");
-        }
-
-        if (CvmManagement)
-        {
-            privs.Add("CVMManagement");
-        }
-
-        if (FinalApplication)
-        {
-            privs.Add("FinalApplication");
-        }
-
-        if (GlobalService)
-        {
-            privs.Add("GlobalService");
-        }
-
-        return string.Join(", ", privs);
-    }
-}
 
 /// <summary>
 /// Supported algorithms.

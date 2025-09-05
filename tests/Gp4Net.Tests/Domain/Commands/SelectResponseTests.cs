@@ -5,6 +5,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Tests.Domain.Commands.TestHelpers;
+using Gp4Net.Tests.Infrastructure;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.Commands;
@@ -471,10 +472,10 @@ public class FileControlInformationTests
         );
 
         _ = fci.ApplicationAid.Should().BeEquivalentTo(aid);
-        _ = fci.ApplicationLabel.Should().Be(label);
-        _ = fci.ApplicationPriorityIndicator.Should().Be(priority);
-        _ = fci.MaxCommandDataLength.Should().Be(maxCommand);
-        _ = fci.MaxResponseDataLength.Should().Be(maxResponse);
+        _ = fci.ApplicationLabel.Should().HaveValue(label);
+        _ = fci.ApplicationPriorityIndicator.Should().HaveValue(priority);
+        _ = fci.MaxCommandDataLength.Should().HaveValue(maxCommand);
+        _ = fci.MaxResponseDataLength.Should().HaveValue(maxResponse);
         _ = fci.IssuerIdentificationNumber.Should().BeEquivalentTo(issuerNumber);
         _ = fci.CardImageNumber.Should().BeEquivalentTo(cardImage);
         _ = fci.CardData.Should().BeEquivalentTo(cardData);

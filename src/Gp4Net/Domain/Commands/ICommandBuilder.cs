@@ -1,5 +1,5 @@
-using Gp4Net.Transport;
 using JetBrains.Annotations;
+using WSCT.ISO7816;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -9,10 +9,15 @@ namespace Gp4Net.Domain.Commands;
 /// <typeparam name="TCommand">The command type being built.</typeparam>
 [PublicAPI]
 public interface ICommandBuilder<out TCommand>
-    where TCommand : IApduCommand
 {
     /// <summary>
-    /// Builds the command.
+    /// Builds the command and returns a WSCT CommandAPDU.
+    /// </summary>
+    /// <returns>The constructed CommandAPDU.</returns>
+    CommandAPDU BuildCommand();
+    
+    /// <summary>
+    /// Builds the command instance (for backwards compatibility).
     /// </summary>
     /// <returns>The constructed command.</returns>
     TCommand Build();

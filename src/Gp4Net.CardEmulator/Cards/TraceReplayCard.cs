@@ -5,6 +5,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Trace;
 using Gp4Net.Core;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.CardEmulator.Cards;
 
@@ -12,7 +13,7 @@ namespace Gp4Net.CardEmulator.Cards;
 /// Functional virtual card that replays APDU responses from a trace.
 /// Simple, clean implementation focusing on core functionality.
 /// </summary>
-// @TODO THERE NEEDS TO BE A WAY TO USE THIS
+
 public sealed record TraceReplayCard : IFunctionalVirtualCard
 {
     private readonly ApduTrace _trace;
@@ -148,7 +149,7 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
         if (exactMatchResponse.IsSuccessful)
             return Result.Success<ApduResponse, SmartCardError>(exactMatchResponse);
 
-        // @TODO FAIL HARD.  If we can't replay, DON'T!
+
 
         // Try pattern match by instruction
         ApduResponse patternResponse = TryPatternMatch(command);
@@ -163,7 +164,7 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
     private ApduResponse TrySequentialReplay(byte[] command)
     {
         if (_nextExchangeIndex >= _trace.Exchanges.Count)
-            return ApduResponse.Error(0x6D00);
+            return ApduResponse.Error(StatusWords.InstructionErrors.InstructionNotSupported);
 
         ApduExchange nextExchange = _trace.Exchanges[_nextExchangeIndex];
 
@@ -189,7 +190,7 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
             .ToArray();
 
         if (matchingExchanges.Length == 0)
-            return ApduResponse.Error(0x6D00);
+            return ApduResponse.Error(StatusWords.InstructionErrors.InstructionNotSupported);
 
         return matchingExchanges[0].Response.Match(
             response => response,
@@ -211,7 +212,7 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
             .ToArray();
 
         if (matchingExchanges.Length == 0)
-            return ApduResponse.Error(0x6D00);
+            return ApduResponse.Error(StatusWords.InstructionErrors.InstructionNotSupported);
 
         return matchingExchanges[0].Response.Match(
             response => response,

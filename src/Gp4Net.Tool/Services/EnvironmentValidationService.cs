@@ -223,28 +223,11 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         try
         {
             // GET DATA for CPLC (Card Production Life Cycle) - tag 9F7F
-            Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(
-                GetDataCommand.DataObjects.CardProductionLifeCycle
-            );
-            if (commandResult.IsFailure)
-            {
-                return Result.Failure<byte[], SmartCardError>(commandResult.Error);
-            }
-
-            ApduResponse response = await transport.TransmitAsync(
-                commandResult.Value,
-                channel,
-                cancellationToken
-            );
-
-            if (response.IsSuccess && response.Data.Length > 0)
-            {
-                return Result.Success<byte[], SmartCardError>(response.Data);
-            }
-
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CardError("CPLC data not available")
-            );
+            return await GetDataCommand.Create(GetDataCommand.DataObjects.CardProductionLifeCycle)
+                .Bind(command => transport.TransmitAsync(command, channel, cancellationToken))
+                .Bind(response => response.IsSuccessful && response.Data.Length > 0
+                    ? Result.Success<byte[], SmartCardError>(response.Data)
+                    : Result.Failure<byte[], SmartCardError>(SmartCardError.CardError("CPLC data not available")));
         }
         catch (Exception ex)
         {
@@ -303,26 +286,11 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         try
         {
             // Try SELECT ISD (Issuer Security Domain)
-            Result<SelectCommand, SmartCardError> selectResult = SelectCommand.Create(
-                GpTestKeys.TestAids.IsdAid
-            );
-            if (selectResult.IsFailure)
-            {
-                return CardEnvironment.Test;
-            }
-
-            SelectCommand selectCmd = selectResult.Value;
-            ApduResponse response = await transport.TransmitAsync(
-                selectCmd,
-                channel,
-                cancellationToken
-            );
-
-            if (!response.IsSuccess)
-            {
-                // If basic commands fail, likely a test/development environment
-                return CardEnvironment.Test;
-            }
+            return await SelectCommand.Create(GpTestKeys.TestAids.IsdAid)
+                .Bind(command => transport.TransmitAsync(command, channel, cancellationToken))
+                .Match(
+                    response => response.IsSuccessful ? CardEnvironment.Unknown : CardEnvironment.Test,
+                    error => CardEnvironment.Test); // If basic commands fail, likely a test/development environment
 
             // For now, default to unknown if we can't determine from behavior
             return CardEnvironment.Unknown;

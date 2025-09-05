@@ -8,7 +8,7 @@ trim_trailing_whitespace = true
 [*.{cs,csx}]
 indent_style = space
 indent_size = 4
-end_of_line = crlf
+end_of_line = lf
 
 [*.{json,yml,yaml}]
 indent_style = space

@@ -1,10 +1,13 @@
 using System;
+using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Protocol;
+using Gp4Net.Tests.Infrastructure;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Integration;
@@ -177,20 +180,25 @@ public class KeyDiversificationIntegrationTests
             .Should()
             .BeSuccess("Factory should create valid response without diversification data");
 
-        // Act & Assert - Use functional composition
-        var result = cardResponseResult
-            .Bind(cardResponse =>
-                GpTestKeys.GetTestKeySet(cardResponse.ScpId, cardResponse.KeyVersion)
-            )
-            .Bind(keySet =>
-                GpTestKeys.GetTestKeySet(0x02, 0x00).Map(staticKeys => (keySet, staticKeys))
-            );
+        // Act & Assert - Use functional composition  
+        Result<(IKeySet keySet, IKeySet staticKeys), SmartCardError> result = cardResponseResult
+            .Bind((InitializeUpdateResponse cardResponse) => 
+            {
+                Result<CryptoService.ScpVersion, SmartCardError> scpResult = cardResponse.ScpId
+                    .ToResult("Missing SCP ID")
+                    .MapError(_ => SmartCardError.InvalidArgument("Missing SCP ID"));
+                Result<byte, SmartCardError> scpIdResult = scpResult.Map(scpVersion => (byte)scpVersion);
+                Result<IKeySet, SmartCardError> keySetResult = scpIdResult
+                    .Bind((byte scpId) => GpTestKeys.GetTestKeySet(scpId, cardResponse.KeyVersion));
+                return keySetResult.Bind((IKeySet keySet) => GpTestKeys.GetTestKeySet(0x02, 0x00)
+                    .Map((IKeySet staticKeys) => (keySet, staticKeys)));
+            });
 
         _ = result.IsSuccess.Should().BeTrue();
         result.Match(
-            success: tuple =>
+            tuple =>
             {
-                var (keySet, staticKeys) = tuple;
+                (IKeySet keySet, IKeySet staticKeys) = tuple;
                 keySet
                     .EncKey.Should()
                     .BeEquivalentTo(
@@ -204,7 +212,7 @@ public class KeyDiversificationIntegrationTests
                         "Without diversification data, should return static MAC key"
                     );
             },
-            failure: error => Assert.Fail($"Should not fail: {error}")
+            error => Assert.Fail($"Should not fail: {error}")
         );
     }
 
@@ -272,27 +280,24 @@ public class KeyDiversificationIntegrationTests
             0x00
         );
 
-        // Act
-        Result<IKeySet, SmartCardError> keySetResult = GpTestKeys.GetTestKeySet(
-            cardResponse.ScpId,
-            cardResponse.KeyVersion
-        );
-
-        // Assert - Compare with static keys using functional composition
-        Result<(IKeySet keySet, IKeySet staticKeys), SmartCardError> comparison = keySetResult.Bind(
-            keySet => GpTestKeys.GetTestKeySet(0x03).Map(staticKeys => (keySet, staticKeys))
-        );
+        // Act & Assert - Use functional composition
+        Result<(IKeySet keySet, IKeySet staticKeys), SmartCardError> comparison = cardResponse.ScpId
+            .ToResult("Missing SCP ID")
+            .MapError(_ => SmartCardError.InvalidArgument("Missing SCP ID"))
+            .Map(scpVersion => (byte)scpVersion)
+            .Bind((byte scpId) => GpTestKeys.GetTestKeySet(scpId, cardResponse.KeyVersion))
+            .Bind((IKeySet keySet) => GpTestKeys.GetTestKeySet(0x03, 0x00).Map(staticKeys => (keySet, staticKeys)));
 
         _ = comparison.IsSuccess.Should().BeTrue("SCP03 diversification should succeed");
         comparison.Match(
-            success: tuple =>
+            tuple =>
             {
-                var (keySet, staticKeys) = tuple;
+                (IKeySet keySet, IKeySet staticKeys) = tuple;
                 keySet
                     .EncKey.Should()
                     .BeEquivalentTo(staticKeys.EncKey, "SCP03 currently returns static keys");
             },
-            failure: error => Assert.Fail($"Should not fail: {error}")
+            error => Assert.Fail($"Should not fail: {error}")
         );
     }
 
@@ -333,26 +338,21 @@ public class KeyDiversificationIntegrationTests
             TestVectors.TestKeyVersion
         );
 
-        // Act - Diversify keys twice
-        Result<IKeySet, SmartCardError> keySet1Result = GpTestKeys.GetTestKeySet(
-            cardResponse.ScpId,
-            cardResponse.KeyVersion
-        );
-        Result<IKeySet, SmartCardError> keySet2Result = GpTestKeys.GetTestKeySet(
-            cardResponse.ScpId,
-            cardResponse.KeyVersion
-        );
-
-        // Assert - Compare key sets using functional composition
-        Result<(IKeySet keySet1, IKeySet keySet2), SmartCardError> comparison = keySet1Result.Bind(
-            keySet1 => keySet2Result.Map(keySet2 => (keySet1, keySet2))
-        );
+        // Act & Assert - Compare key sets using functional composition
+        Result<IKeySet, SmartCardError> keySetResult = cardResponse.ScpId
+            .ToResult("Missing SCP ID")
+            .MapError(_ => SmartCardError.InvalidArgument("Missing SCP ID"))
+            .Map(scpVersion => (byte)scpVersion)
+            .Bind((byte scpId) => GpTestKeys.GetTestKeySet(scpId, cardResponse.KeyVersion));
+            
+        Result<(IKeySet keySet1, IKeySet keySet2), SmartCardError> comparison = keySetResult
+            .Bind((IKeySet keySet1) => keySetResult.Map(keySet2 => (keySet1, keySet2)));
 
         _ = comparison.IsSuccess.Should().BeTrue("Both key derivations should succeed");
         comparison.Match(
-            success: tuple =>
+            tuple =>
             {
-                var (keySet1, keySet2) = tuple;
+                (IKeySet keySet1, IKeySet keySet2) = tuple;
                 keySet1
                     .EncKey.Should()
                     .BeEquivalentTo(
@@ -363,7 +363,7 @@ public class KeyDiversificationIntegrationTests
                     .MacKey.Should()
                     .BeEquivalentTo(keySet2.MacKey, "Same input should produce same MAC key");
             },
-            failure: error => Assert.Fail($"Should not fail: {error}")
+            error => Assert.Fail($"Should not fail: {error}")
         );
     }
 
@@ -394,17 +394,17 @@ public class KeyDiversificationIntegrationTests
             .Bind(diversifiedKeys =>
             {
                 Result<byte[], SmartCardError> sessionEncResult =
-                    Scp02Protocol.DeriveScp02SessionKey(
+                    CryptoService.KeyDerivation.DeriveScp02SessionKey(
                         diversifiedKeys.EncKey,
-                        Convert.FromHexString("0182"), // SCP02 S-ENC constant
-                        TestVectors.TestSequenceCounter_1
+                        TestVectors.TestSequenceCounter_1,
+                        0x02 // SCP02 S-ENC derivation constant
                     );
 
                 Result<byte[], SmartCardError> sessionMacResult =
-                    Scp02Protocol.DeriveScp02SessionKey(
+                    CryptoService.KeyDerivation.DeriveScp02SessionKey(
                         diversifiedKeys.MacKey,
-                        Convert.FromHexString("0101"), // SCP02 S-MAC constant
-                        TestVectors.TestSequenceCounter_1
+                        TestVectors.TestSequenceCounter_1,
+                        0x01 // SCP02 S-MAC derivation constant
                     );
 
                 return sessionEncResult.Bind(sessionEnc =>
@@ -495,16 +495,16 @@ public class KeyDiversificationIntegrationTests
             SmartCardError
         > sessionKeysResult = keySetResult.Bind(keySet =>
         {
-            Result<byte[], SmartCardError> sessionEncResult = Scp02Protocol.DeriveScp02SessionKey(
+            Result<byte[], SmartCardError> sessionEncResult = CryptoService.KeyDerivation.DeriveScp02SessionKey(
                 keySet.EncKey,
-                Convert.FromHexString("0182"), // SCP02 S-ENC constant
-                sequenceCounter
+                sequenceCounter,
+                0x02 // SCP02 S-ENC derivation constant
             );
 
-            Result<byte[], SmartCardError> sessionMacResult = Scp02Protocol.DeriveScp02SessionKey(
+            Result<byte[], SmartCardError> sessionMacResult = CryptoService.KeyDerivation.DeriveScp02SessionKey(
                 keySet.MacKey,
-                Convert.FromHexString("0101"), // SCP02 S-MAC constant
-                sequenceCounter
+                sequenceCounter,
+                0x01 // SCP02 S-MAC derivation constant
             );
 
             return sessionEncResult.Bind(sessionEnc =>

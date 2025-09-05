@@ -1,8 +1,10 @@
+
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
 using Gp4Net.Domain;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.CardEmulator.Functional;
 
@@ -10,7 +12,7 @@ namespace Gp4Net.CardEmulator.Functional;
 /// Functional privilege enforcement system according to GlobalPlatform Section 6.
 /// Validates operations based on application privileges and secure channel state.
 /// </summary>
-// @TODO USE THIS UNLESS IT's A DRY VIOLATION, and REFACTOR IF IT IS
+
 public static class PrivilegeEnforcement
 {
     /// <summary>
@@ -25,7 +27,7 @@ public static class PrivilegeEnforcement
     )
     {
         return GetRequiredPrivileges(command)
-            .Bind(requiredPrivileges => ValidateApplicationPrivileges(state, requiredPrivileges))
+            .Bind(requiredPrivileges => ValidatePrivilege(state, requiredPrivileges))
             .Bind(_ => ValidateSecurityLevel(state, command))
             .Bind(_ => ValidateLifecycleState(state, command));
     }
@@ -41,19 +43,19 @@ public static class PrivilegeEnforcement
         {
             // Card Manager commands require Card Manager privileges
             0x80E6 => CommandPrivilegeRequirements.Create(
-                ApplicationPrivileges.CardManager,
+                Privilege.AuthorizedManagement | Privilege.SecurityDomain,
                 SecurityLevel.CMac,
                 true
             ), // Requires secure channel
 
             0x80E4 => CommandPrivilegeRequirements.Create(
-                ApplicationPrivileges.CardManager | ApplicationPrivileges.DelegatedManagement,
+                Privilege.AuthorizedManagement | Privilege.DelegatedManagement | Privilege.SecurityDomain,
                 SecurityLevel.CMac,
                 true
             ),
 
             0x80E8 => CommandPrivilegeRequirements.Create(
-                ApplicationPrivileges.CardManager,
+                Privilege.AuthorizedManagement | Privilege.SecurityDomain,
                 SecurityLevel.CMac,
                 true
             ),
@@ -62,12 +64,12 @@ public static class PrivilegeEnforcement
             0x80F2 => command.P1 switch
             {
                 0x80 or 0x90 => CommandPrivilegeRequirements.Create(
-                    ApplicationPrivileges.SecurityDomain,
+                    Privilege.SecurityDomain,
                     SecurityLevel.CMac,
                     true
                 ),
                 _ => CommandPrivilegeRequirements.Create(
-                    ApplicationPrivileges.None,
+                    Privilege.None,
                     SecurityLevel.None,
                     false
                 ),
@@ -75,7 +77,7 @@ public static class PrivilegeEnforcement
 
             // Key management commands
             0x80D8 => CommandPrivilegeRequirements.Create(
-                ApplicationPrivileges.SecurityDomain,
+                Privilege.SecurityDomain,
                 SecurityLevel.CMac,
                 true
             ),
@@ -84,17 +86,17 @@ public static class PrivilegeEnforcement
             0x80F0 => command.P1 switch
             {
                 0x00 => CommandPrivilegeRequirements.Create(
-                    ApplicationPrivileges.CardLock,
+                    Privilege.CardLock,
                     SecurityLevel.CMac,
                     true
                 ),
                 0x01 => CommandPrivilegeRequirements.Create(
-                    ApplicationPrivileges.CardTerminate,
+                    Privilege.CardTerminate,
                     SecurityLevel.CMac,
                     true
                 ),
                 _ => CommandPrivilegeRequirements.Create(
-                    ApplicationPrivileges.CardReset,
+                    Privilege.CardReset,
                     SecurityLevel.CMac,
                     true
                 ),
@@ -102,20 +104,20 @@ public static class PrivilegeEnforcement
 
             // Basic commands (SELECT, etc.) - no special privileges
             0x00A4 => CommandPrivilegeRequirements.Create(
-                ApplicationPrivileges.None,
+                Privilege.None,
                 SecurityLevel.None,
                 false
             ),
 
             // Secure channel establishment
             0x8050 or 0x8482 => CommandPrivilegeRequirements.Create(
-                ApplicationPrivileges.None,
+                Privilege.None,
                 SecurityLevel.None,
                 false
             ),
 
             _ => CommandPrivilegeRequirements.Create(
-                ApplicationPrivileges.None,
+                Privilege.None,
                 SecurityLevel.None,
                 false
             ),
@@ -127,12 +129,12 @@ public static class PrivilegeEnforcement
     /// <summary>
     /// Validates that the current application has required privileges.
     /// </summary>
-    private static Result<bool, SmartCardError> ValidateApplicationPrivileges(
+    private static Result<bool, SmartCardError> ValidatePrivilege(
         CardState state,
         CommandPrivilegeRequirements requirements
     )
     {
-        if (requirements.RequiredPrivileges == ApplicationPrivileges.None)
+        if (requirements.RequiredPrivileges == Privilege.None)
         {
             return Result.Success<bool, SmartCardError>(true);
         }
@@ -148,7 +150,7 @@ public static class PrivilegeEnforcement
     /// </summary>
     private static Result<bool, SmartCardError> ValidateSpecificPrivileges(
         VirtualApplication app,
-        ApplicationPrivileges required
+        Privilege required
     )
     {
         if (app.Privileges.HasFlag(required))
@@ -158,8 +160,8 @@ public static class PrivilegeEnforcement
 
         // Check for delegated management privileges
         if (
-            required.HasFlag(ApplicationPrivileges.CardManager)
-            && app.Privileges.HasFlag(ApplicationPrivileges.DelegatedManagement)
+            required.HasFlag(Privilege.AuthorizedManagement | Privilege.SecurityDomain)
+            && app.Privileges.HasFlag(Privilege.DelegatedManagement)
         )
         {
             return Result.Success<bool, SmartCardError>(true);

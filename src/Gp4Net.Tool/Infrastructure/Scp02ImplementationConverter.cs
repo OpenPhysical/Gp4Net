@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Constants;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Tool.Infrastructure;

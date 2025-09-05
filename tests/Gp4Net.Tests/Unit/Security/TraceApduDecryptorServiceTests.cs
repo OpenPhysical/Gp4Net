@@ -342,10 +342,10 @@ public class TraceApduDecryptorServiceTests
         byte protocolVersion
     )
     {
-        byte[] macChaining = protocolVersion == (byte)ScpVersion.Scp03 ? new byte[16] : new byte[8];
+        byte[] macChaining = protocolVersion == (byte)CryptoService.ScpVersion.Scp03 ? new byte[16] : new byte[8];
 
         return SecureChannelState
-            .Create(sessionKeys, securityLevel, protocolVersion, macChaining, 0x00)
+            .Create(sessionKeys, securityLevel, (CryptoService.ScpVersion)protocolVersion, macChaining, 0x00)
             .Value;
     }
 }

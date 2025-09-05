@@ -3,6 +3,8 @@ using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
+using WSCT.Core;
+using WSCT.ISO7816;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Commands;
@@ -12,7 +14,7 @@ namespace Gp4Net.Domain.Commands;
 /// Supports INSTALL [for load] and INSTALL [for install] operations.
 /// </summary>
 [PublicAPI]
-public abstract record InstallCommand : IApduCommand
+public abstract record InstallCommand
 {
     /// <summary>
     /// The command class byte.
@@ -34,17 +36,11 @@ public abstract record InstallCommand : IApduCommand
     /// </summary>
     public ImmutableArray<byte> PackageAid { get; }
 
-    /// <inheritdoc/>
-    public byte Cla
-    {
-        get { return CommandCla; }
-    }
-
-    /// <inheritdoc/>
-    public byte Ins
-    {
-        get { return CommandIns; }
-    }
+    /// <summary>
+    /// Converts this command to a CommandAPDU.
+    /// </summary>
+    /// <returns>A result containing the CommandAPDU or an error.</returns>
+    public abstract Result<CommandAPDU, SmartCardError> ToCommandApdu();
 
     /// <inheritdoc/>
     public byte P1
@@ -268,6 +264,17 @@ public abstract record InstallCommand : IApduCommand
             }
 
             return [.. builder];
+        }
+
+        /// <summary>
+        /// Converts this command to a CommandAPDU.
+        /// </summary>
+        /// <returns>A result containing the CommandAPDU or an error.</returns>
+        public override Result<CommandAPDU, SmartCardError> ToCommandApdu()
+        {
+            return Result.Success<CommandAPDU, SmartCardError>(
+                new CommandAPDU(CommandCla, CommandIns, (byte)InstallType.ForLoad, 0x00, (uint)Data.Length, Data)
+            );
         }
 
         /// <summary>
@@ -515,6 +522,17 @@ public abstract record InstallCommand : IApduCommand
             }
 
             return [.. builder];
+        }
+
+        /// <summary>
+        /// Converts this command to a CommandAPDU.
+        /// </summary>
+        /// <returns>A result containing the CommandAPDU or an error.</returns>
+        public override Result<CommandAPDU, SmartCardError> ToCommandApdu()
+        {
+            return Result.Success<CommandAPDU, SmartCardError>(
+                new CommandAPDU(CommandCla, CommandIns, (byte)Type, 0x00, (uint)Data.Length, Data)
+            );
         }
 
         /// <summary>

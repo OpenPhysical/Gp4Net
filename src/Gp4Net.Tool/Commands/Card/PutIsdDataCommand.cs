@@ -13,6 +13,7 @@ using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.OpenPhysical;
 using Gp4Net.Pipeline;
+using Gp4Net.Transport;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console;
@@ -526,34 +527,8 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
     /// </summary>
     private static Result<byte[], SmartCardError> ConstructApduBytes(StoreDataCommand command)
     {
-        byte[] commandData = command.Data;
-        byte[] header = [StoreDataCommand.Cla, StoreDataCommand.Ins, command.P1, command.P2];
-
-        return commandData.Length switch
-        {
-            0 => Result.Success<byte[], SmartCardError>(header), // Case 1: No data
-            <= 255 => Result.Success<byte[], SmartCardError>(
-                [.. header, (byte)commandData.Length, .. commandData]
-            ), // Case 3 short: CLA INS P1 P2 Lc Data
-            _ when command.IsExtendedLength => Result.Success<byte[], SmartCardError>(
-                [
-                    .. header
-,
-                    .. new byte[]
-                    {
-                        0x00,
-                        (byte)(commandData.Length >> 8),
-                        (byte)(commandData.Length & 0xFF),
-                    }
-,
-                    .. commandData,
-                ]), // Case 3 extended: CLA INS P1 P2 00 LcH LcL Data
-            _ => Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidArgument(
-                    $"Data length {commandData.Length} exceeds short format limit but extended length not enabled"
-                )
-            ),
-        };
+        // Use centralized ApduBuilder to avoid DRY violation
+        return ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
     }
 
     private static (ushort tag, byte[] data) ParseRawDataObject(string key, string value)

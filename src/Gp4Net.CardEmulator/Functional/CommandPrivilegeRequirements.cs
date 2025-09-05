@@ -1,5 +1,7 @@
+
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.Domain;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.CardEmulator.Functional;
 
@@ -7,7 +9,7 @@ namespace Gp4Net.CardEmulator.Functional;
 /// Requirements for executing a command.
 /// </summary>
 public record CommandPrivilegeRequirements(
-    ApplicationPrivileges RequiredPrivileges,
+    Privilege RequiredPrivileges,
     SecurityLevel MinimumSecurityLevel,
     bool RequiresSecureChannel
 )
@@ -20,7 +22,7 @@ public record CommandPrivilegeRequirements(
     /// <param name="requiresSecureChannel">Indicates whether a secure channel is required.</param>
     /// <returns>A new instance of the CommandPrivilegeRequirements class.</returns>
     public static CommandPrivilegeRequirements Create(
-        ApplicationPrivileges privileges,
+        Privilege privileges,
         SecurityLevel securityLevel,
         bool requiresSecureChannel
     )

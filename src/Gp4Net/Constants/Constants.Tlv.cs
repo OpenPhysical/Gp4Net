@@ -46,26 +46,8 @@ public static partial class Constants
 
             /// <summary>End-of-contents octets for indefinite length (0x00 0x00).</summary>
             public static readonly byte[] EndOfContents = [0x00, 0x00];
-
-            /// <summary>Maximum reasonable TLV length field size in bytes (4 bytes).</summary>
-            public const int MaxReasonableLengthBytes = 4;
-
-            /// <summary>Maximum reasonable TLV tag size in bytes (5 bytes).</summary>
-            public const int MaxReasonableTagBytes = 5;
         }
 
-        /// <summary>
-        /// Security limits for TLV parsing to prevent attacks.
-        /// Protects against malicious TLV structures and resource exhaustion.
-        /// </summary>
-        public static class SecurityLimits
-        {
-            /// <summary>Maximum TLV value size to prevent memory exhaustion attacks (64KB).</summary>
-            public const int MaxTlvValueSize = 65536;
-
-            /// <summary>Maximum total nested TLV parsing depth to prevent stack overflow attacks (32).</summary>
-            public const int MaxTlvParsingDepth = 32;
-        }
 
         /// <summary>
         /// ISO 7816-4 standard TLV tags for file control information.

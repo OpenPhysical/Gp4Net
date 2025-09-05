@@ -31,8 +31,17 @@ public static class ReaderNameResolver
         CancellationToken cancellationToken = default
     )
     {
-        // @TODO NO NULLS!
-        ArgumentNullException.ThrowIfNull(cardService);
+        return await Maybe.From(cardService)
+            .ToResult(SmartCardError.InvalidArgument("Card service cannot be null"))
+            .Bind(async service => await ResolveReaderNameInternal(readerInput, service, cancellationToken));
+    }
+
+    private static async Task<Result<string, SmartCardError>> ResolveReaderNameInternal(
+        Maybe<string> readerInput,
+        ISmartCardService cardService,
+        CancellationToken cancellationToken
+    )
+    {
 
         // Get available readers first
         Result<string[], SmartCardError> readersResult = await cardService.GetReadersAsync(
@@ -71,6 +80,13 @@ public static class ReaderNameResolver
         ImmutableList<string> availableReaders
     )
     {
+        // Handle virtual reader format: virtual:profile.json
+        if (input.StartsWith("virtual:", StringComparison.OrdinalIgnoreCase))
+        {
+            // Return the virtual reader specification as-is for handling by the connection service
+            return Result.Success<string, SmartCardError>(input);
+        }
+
         // Handle auto-detection keywords
         if (IsAutoDetectionKeyword(input))
         {
@@ -144,7 +160,7 @@ public static class ReaderNameResolver
     /// </summary>
     private static bool IsVirtualReader(string readerName)
     {
-        // @TODO: Virtual readers should all start with "virtual:"
+
         string lowerName = readerName.ToLowerInvariant();
         return lowerName.Contains("virtual")
             || lowerName.Contains("simulator")

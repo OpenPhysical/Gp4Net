@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
 using Org.BouncyCastle.Crypto.Digests;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Generators;
@@ -44,25 +45,16 @@ public sealed class SecureKeyStore
     /// </summary>
     public static Result<SecureKeyStore, SmartCardError> Create()
     {
-        return Result.Try(
-            () =>
-            {
-                // Generate cryptographically secure master key and salt
-                byte[] masterKey = new byte[32]; // 256-bit key
-                byte[] salt = new byte[16]; // 128-bit salt
-
-                SecureRandom random = new SecureRandom();
-                random.NextBytes(masterKey);
-                random.NextBytes(salt);
-
-                return new SecureKeyStore(
-                    ImmutableDictionary<string, EncryptedKey>.Empty,
-                    masterKey,
-                    salt
-                );
-            },
-            ex => SmartCardError.SecurityError($"Failed to create secure key store: {ex.Message}")
-        );
+        // Generate cryptographically secure master key and salt using CryptoService.Rng
+        return CryptoService.Rng.GenerateBytes(32) // 256-bit key
+            .Bind(masterKey => 
+                CryptoService.Rng.GenerateBytes(16) // 128-bit salt
+                    .Map(salt => new SecureKeyStore(
+                        ImmutableDictionary<string, EncryptedKey>.Empty,
+                        masterKey,
+                        salt
+                    ))
+            );
     }
 
     /// <summary>

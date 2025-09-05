@@ -4,7 +4,7 @@ using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Constants;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Compliance;

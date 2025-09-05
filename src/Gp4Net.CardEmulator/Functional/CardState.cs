@@ -5,8 +5,10 @@ using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Constants;
 using JetBrains.Annotations;
+using static Gp4Net.CardEmulator.Functional.LoadProcessor;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.CardEmulator.Functional;
 
@@ -31,7 +33,8 @@ public partial record CardState(
     ImmutableDictionary<byte, IKeySet> InstalledKeys,
     byte DefaultKeyVersion,
     ImmutableDictionary<byte, byte[]> SequenceCounters,
-    ApplicationSelectionContext ApplicationContext
+    ApplicationSelectionContext ApplicationContext,
+    ImmutableDictionary<string, LoadContext> LoadContexts
 )
 {
     /// <summary>
@@ -48,7 +51,7 @@ public partial record CardState(
             .Map(uuid => new CardState(
                 Uuid: uuid,
                 IsSelected: true, // ISD is implicitly selected by default per GP Card Spec v2.3.1
-                ScpVersion: 0x02,
+                ScpVersion: Protocols.Scp02,
                 ScpImplementation: ScpImplementation.Scp02I15,
                 SecureChannel: Maybe<SecureChannelState>.None,
                 CurrentKeys: Maybe<IKeySet>.None,
@@ -60,7 +63,8 @@ public partial record CardState(
                 InstalledKeys: ImmutableDictionary<byte, IKeySet>.Empty,
                 DefaultKeyVersion: 0xFF,
                 SequenceCounters: ImmutableDictionary<byte, byte[]>.Empty,
-                ApplicationContext: ApplicationSelectionContext.WithIsd()
+                ApplicationContext: ApplicationSelectionContext.WithIsd(),
+                LoadContexts: ImmutableDictionary<string, LoadContext>.Empty
             ));
     }
 
@@ -71,7 +75,7 @@ public partial record CardState(
     /// <returns>Initial card state with the specified UUID.</returns>
     public static CardState CreateWithUuid(CardUuid uuid)
     {
-        // @TODO can't we just call the regular creation and use a "with"?
+        // 
         return new CardState(
             Uuid: uuid,
             IsSelected: true,
@@ -87,7 +91,8 @@ public partial record CardState(
             InstalledKeys: ImmutableDictionary<byte, IKeySet>.Empty,
             DefaultKeyVersion: 0xFF,
             SequenceCounters: ImmutableDictionary<byte, byte[]>.Empty,
-            ApplicationContext: ApplicationSelectionContext.WithIsd()
+            ApplicationContext: ApplicationSelectionContext.WithIsd(),
+            LoadContexts: ImmutableDictionary<string, LoadContext>.Empty
         );
     }
 
@@ -106,7 +111,7 @@ public partial record CardState(
     {
         get
         {
-            return SecureChannel.HasValue ? (byte)SecureChannel.Value.SecurityLevel : (byte)0x00;
+            return SecureChannel.HasValue ? (byte)SecureChannel.Value.SecurityLevel : SecurityLevels.None;
         }
     }
 
@@ -173,6 +178,18 @@ public partial record CardState(
             SecureChannel = Maybe<SecureChannelState>.From(newSecureChannelState),
         };
 
+    /// <summary>
+    /// Creates a new state with updated load contexts.
+    /// </summary>
+    public CardState WithLoadContexts(ImmutableDictionary<string, LoadContext> loadContexts) =>
+        this with { LoadContexts = loadContexts };
+        
+    /// <summary>
+    /// Creates a new state with a new load file AID stored temporarily.
+    /// </summary>
+    public CardState WithLoadFileAid(byte[] loadFileAid) =>
+        this with { DataObjects = DataObjects.SetItem(0x0066, loadFileAid) };
+    
     /// <summary>
     /// Creates a new state with session keys stored directly in secure channel state.
     /// This method updates the existing secure channel state to include the provided session keys.
@@ -288,7 +305,7 @@ public partial record CardState(
             return counter;
 
         // Return appropriate default counter based on SCP version
-        return ScpVersion == 0x02
+        return ScpVersion == Protocols.Scp02
             ? [0x00, 0x01] // 2-byte counter for SCP02
             : [0x00, 0x00, 0x01]; // 3-byte counter for SCP03
     }
@@ -311,7 +328,7 @@ public partial record CardState(
     {
         // Return appropriate reset counter based on SCP version
         byte[] resetCounter =
-            ScpVersion == 0x02
+            ScpVersion == Protocols.Scp02
                 ? [0x00, 0x01] // 2-byte counter for SCP02
                 : [0x00, 0x00, 0x01]; // 3-byte counter for SCP03
         return this with { SequenceCounters = SequenceCounters.SetItem(keyVersion, resetCounter) };
@@ -379,7 +396,7 @@ public partial record CardState(
         ImmutableArray<byte> aid,
         string name,
         ImmutableArray<byte> associatedSecurityDomainAid,
-        ApplicationPrivileges privileges = ApplicationPrivileges.None
+        Privilege privileges = Privilege.None
     )
     {
         return ApplicationContext
@@ -396,7 +413,7 @@ public partial record CardState(
     /// <summary>
     /// Checks if the current application has specific privileges.
     /// </summary>
-    public bool CurrentApplicationHasPrivileges(ApplicationPrivileges requiredPrivileges)
+    public bool CurrentApplicationHasPrivileges(Privilege requiredPrivileges)
     {
         return ApplicationContext.CurrentApplicationHasPrivileges(requiredPrivileges);
     }
@@ -449,7 +466,7 @@ public record InstalledApplication(
     byte[] Aid,
     byte[] ExecutableModuleAid,
     byte LifecycleState,
-    byte Privileges,
+    Privilege Privileges,
     ImmutableDictionary<string, byte[]> ApplicationData
 );
 

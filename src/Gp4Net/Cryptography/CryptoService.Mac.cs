@@ -1,7 +1,7 @@
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Constants;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Paddings;
@@ -28,7 +28,7 @@ public static partial class CryptoService
             byte[] sMacKey,
             byte[] data
         )
-        {// @TODO NO NULLS!
+        {
             return Validation.ValidateInputs(sMacKey, data)
                 .Bind(() => Validation.ValidateKeyLength(sMacKey, [16, 24], "SCP02 S-MAC key must be 16 or 24 bytes"))
                 .Bind(() =>
@@ -63,7 +63,7 @@ public static partial class CryptoService
             byte[] sMacKey,
             byte[] data
         )
-        {// @TODO NO NULLS!
+        {
             return Validation.ValidateInputs(sMacKey, data)
                 .Bind(() => Validation.ValidateKeyLength(sMacKey, [16, 24], "SCP02 S-MAC key must be 16 or 24 bytes"))
                 .Bind(() =>
@@ -98,7 +98,7 @@ public static partial class CryptoService
             byte[] sMacKey,
             byte[] data
         )
-        {// @TODO NO NULLS!
+        {
             return Validation.ValidateInputs(sMacKey, data)
                 .Bind(() => Validation.ValidateKeyLength(sMacKey, [16, 24, 32], "SCP03 S-MAC key must be 16, 24, or 32 bytes"))
                 .Bind(() =>
@@ -130,7 +130,7 @@ public static partial class CryptoService
             byte[] sMacKey,
             byte[] data
         )
-        {// @TODO NO NULLS!
+        {
             return Validation.ValidateInputs(sMacKey, data)
                 .Bind(() => Validation.ValidateKeyLength(sMacKey, [16, 24, 32], "SCP03 S-MAC key must be 16, 24, or 32 bytes"))
                 .Bind(() =>
@@ -159,7 +159,7 @@ public static partial class CryptoService
         /// <param name="data">The data to authenticate.</param>
         /// <returns>16-byte full MAC for chaining or error.</returns>
         public static Result<byte[], SmartCardError> CalculateScp03FullMac(byte[] sMacKey, byte[] data)
-        {// @TODO NO NULLS!
+        {
             return Validation.ValidateInputs(sMacKey, data)
                 .Bind(() => Validation.ValidateKeyLength(sMacKey, [16, 24, 32], "SCP03 S-MAC key must be 16, 24, or 32 bytes"))
                 .Bind(() =>

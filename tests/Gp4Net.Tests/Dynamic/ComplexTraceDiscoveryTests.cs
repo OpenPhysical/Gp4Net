@@ -116,7 +116,8 @@ public class ComplexTraceDiscoveryTests
     /// Dynamically discover and analyze all complex traces.
     /// </summary>
     [Test]
-    public void ComplexTraces_Should_Be_Discoverable_And_Valid() =>
+    public void ComplexTraces_Should_Be_Discoverable_And_Valid()
+    {
         ValidateTraceDirectory(
                 Path.Combine(TestContext.CurrentContext.TestDirectory, ComplexTracePath)
             )
@@ -126,6 +127,7 @@ public class ComplexTraceDiscoveryTests
                 success => Assert.Pass("Test completed successfully"),
                 failure => Assert.Inconclusive(failure)
             );
+    }
 
     /// <summary>
     /// Functional helper to load and parse trace file.
@@ -212,13 +214,15 @@ public class ComplexTraceDiscoveryTests
     public void ComplexTraces_Should_Handle_Configuration_Workflows(
         string traceFile,
         string description
-    ) =>
+    )
+    {
         LoadTraceFile(traceFile)
             .Bind(testData => ValidateConfigurationWorkflow(testData, description))
             .Match(
                 success => Assert.Pass("Test completed successfully"),
                 failure => Assert.Inconclusive(failure)
             );
+    }
 
     /// <summary>
     /// Functional helper to validate protocol change characteristics.

@@ -4,8 +4,8 @@ using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
 using JetBrains.Annotations;
+using static Gp4Net.Constants.Constants;
 
-using Gp4Net.Constants;
 namespace Gp4Net.CardEmulator.Functional;
 
 /// <summary>
@@ -68,7 +68,7 @@ public static class P71CommandProcessors
         if (command.Length < 7)
             return Result.Failure<IdentifyRequest, SmartCardError>(SmartCardError.WrongLength());
 
-        if (command[0] != 0x80 || command[1] != 0xCA || command[2] != 0x00 || command[3] != 0xFE)
+        if (command[0] != GlobalPlatform.Cla.GpStandard || command[1] != GlobalPlatform.Ins.GetData || command[2] != 0x00 || command[3] != 0xFE)
             return Result.Failure<IdentifyRequest, SmartCardError>(
                 SmartCardError.InstructionNotSupported()
             );
@@ -118,7 +118,7 @@ public static class P71CommandProcessors
         if (command.Length < 4)
             return Result.Failure<ushort, SmartCardError>(SmartCardError.WrongLength());
 
-        if (command[0] != 0x80 || command[1] != 0xCA)
+        if (command[0] != GlobalPlatform.Cla.GpStandard || command[1] != GlobalPlatform.Ins.GetData)
             return Result.Failure<ushort, SmartCardError>(SmartCardError.InstructionNotSupported());
 
         ushort tag = (ushort)(command[2] << 8 | command[3]);

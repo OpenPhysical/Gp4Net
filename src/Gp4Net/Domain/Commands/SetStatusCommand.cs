@@ -1,13 +1,16 @@
+using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
+using WSCT.Core;
+using WSCT.ISO7816;
 
 namespace Gp4Net.Domain.Commands;
 
 /// <summary>
 /// Represents a SET STATUS command for changing lifecycle states.
 /// </summary>
-public sealed class SetStatusCommand : BaseApduCommand
+public sealed class SetStatusCommand : IApduCommand
 {
     private readonly byte _p1;
     private readonly byte _p2;
@@ -20,23 +23,26 @@ public sealed class SetStatusCommand : BaseApduCommand
         _data = Maybe<byte[]>.From(data).GetValueOrDefault([]);
     }
 
-    /// <inheritdoc/>
-    public override byte Cla => 0x80;
-
-    /// <inheritdoc/>
-    public override byte Ins => 0xF0;
-
-    /// <inheritdoc/>
-    public override byte P1 => _p1;
-
-    /// <inheritdoc/>
-    public override byte P2 => _p2;
-
-    /// <inheritdoc/>
-    public override byte[] Data => _data;
-
-    /// <inheritdoc/>
-    public override Maybe<int> ExpectedResponseLength => Maybe<int>.None;
+    /// <summary>
+    /// Converts this command to a CommandAPDU.
+    /// </summary>
+    /// <returns>A result containing the CommandAPDU or an error.</returns>
+    public Result<CommandAPDU, SmartCardError> ToCommandApdu()
+    {
+        // Build APDU bytes using immutable construction
+        var headerBytes = new byte[] { 0x80, 0xF0, _p1, _p2 };
+        
+        var apduBytes = _data.Length > 0
+            ? headerBytes
+                .Concat([(byte)_data.Length]) // Lc
+                .Concat(_data)
+                .ToArray()
+            : headerBytes;
+        
+        return Result.Success<CommandAPDU, SmartCardError>(
+            new CommandAPDU(apduBytes)
+        );
+    }
 
     /// <summary>
     /// Creates a SET STATUS command.
@@ -120,5 +126,17 @@ public sealed class SetStatusCommand : BaseApduCommand
     public static Result<SetStatusCommand, SmartCardError> CreateForCardTerminate()
     {
         return Create([], 0xFF);
+    }
+
+    /// <inheritdoc />
+    public CommandAPDU ToApdu()
+    {
+        return ToCommandApdu().GetValueOrDefault(new CommandAPDU([]));
+    }
+
+    /// <inheritdoc />
+    public byte[] ToBytes()
+    {
+        return ToCommandApdu().Map(cmd => cmd.ToBytes()).GetValueOrDefault([]);
     }
 }

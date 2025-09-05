@@ -11,7 +11,6 @@ public static partial class Constants
 {
     /// <summary>
     /// Cryptographic constants for GlobalPlatform secure channel protocols.
-    /// Consolidates ALL crypto-related constants from CryptographicConstants.cs and DerivationConstants.cs
     /// Reference: GlobalPlatform Card Specification v2.3.1, SCP03 v1.1.1, and cryptographic standards
     /// </summary>
     [PublicAPI]
@@ -215,7 +214,7 @@ public static partial class Constants
                 /// <summary>
                 /// Label for SCP03 key derivation (11 zero bytes).
                 /// Used as prefix in SCP03 key derivation function.
-                /// Reference: GP SCP03 v1.1.1 Section 4.1.5: "A 12 byte 'label' consisting of 
+                /// Reference: GP SCP03 v1.1.1 Section 4.1.5: "A 12 byte 'label' consisting of
                 /// 11 bytes with value '00' followed by a one byte derivation constant"
                 /// </summary>
                 public static readonly byte[] Label =

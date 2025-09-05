@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
+using WSCT.Core;
+using WSCT.ISO7816;
 using static Gp4Net.Pipeline.CommandProcessing;
 
 namespace Gp4Net.Pipeline;
@@ -46,7 +48,7 @@ public static class FunctionComposition
                 {
                     // First processor wrapped the command, create WrappedApduCommand for subsequent processors
                     Result<WrappedApduCommand, SmartCardError> wrappedResult =
-                        WrappedApduCommand.Create(command, cmdResult.Data);
+                        Result.Success<WrappedApduCommand, SmartCardError>(WrappedApduCommand.Create(cmdResult.Data));
 
                     if (wrappedResult.IsFailure)
                     {
@@ -108,124 +110,6 @@ public static class FunctionComposition
                 : Identity(command, environment, cancellationToken);
     }
 
-    /// <summary>
-    /// Adds retry logic to a processor.
-    /// </summary>
-    public static CommandProcessor WithRetry(
-        this CommandProcessor processor,
-        int maxRetries = 3,
-        Func<CommandResult, bool> shouldRetry = null
-    )
-    {
-        shouldRetry ??= result => !result.IsSuccess && IsRetriableError(result.StatusWord);
-
-        return async (command, environment, cancellationToken) =>
-        {
-            return await ExecuteWithRetry(
-                processor,
-                command,
-                environment,
-                shouldRetry,
-                maxRetries,
-                0,
-                cancellationToken
-            );
-        };
-    }
-
-    /// <summary>
-    /// Functional recursive retry implementation that eliminates imperative loops.
-    /// Uses tail recursion pattern with accumulator for retry count.
-    /// </summary>
-    private static async Task<Result<CommandResult, SmartCardError>> ExecuteWithRetry(
-        CommandProcessor processor,
-        IApduCommand command,
-        CommandEnvironment environment,
-        Func<CommandResult, bool> shouldRetry,
-        int maxRetries,
-        int currentAttempt,
-        CancellationToken cancellationToken
-    )
-    {
-        var result = await processor(command, environment, cancellationToken);
-
-        return await result.Match(
-            onSuccess: async commandResult =>
-            {
-                if (!shouldRetry(commandResult) || currentAttempt >= maxRetries)
-                    return Result.Success<CommandResult, SmartCardError>(
-                        commandResult with
-                        {
-                            Metadata = commandResult.Metadata with { RetryCount = currentAttempt },
-                        }
-                    );
-
-                await Task.Delay(
-                    TimeSpan.FromMilliseconds(100 * (currentAttempt + 1)),
-                    cancellationToken
-                );
-                return await ExecuteWithRetry(
-                    processor,
-                    command,
-                    environment,
-                    shouldRetry,
-                    maxRetries,
-                    currentAttempt + 1,
-                    cancellationToken
-                );
-            },
-            onFailure: async error =>
-            {
-                if (currentAttempt >= maxRetries)
-                    return Result.Failure<CommandResult, SmartCardError>(error);
-
-                await Task.Delay(
-                    TimeSpan.FromMilliseconds(100 * (currentAttempt + 1)),
-                    cancellationToken
-                );
-                return await ExecuteWithRetry(
-                    processor,
-                    command,
-                    environment,
-                    shouldRetry,
-                    maxRetries,
-                    currentAttempt + 1,
-                    cancellationToken
-                );
-            }
-        );
-    }
-
-    /// <summary>
-    /// Adds timeout handling to a processor.
-    /// </summary>
-    public static CommandProcessor WithTimeout(
-        this CommandProcessor processor,
-        TimeSpan? timeout = null
-    )
-    {
-        return async (command, environment, cancellationToken) =>
-        {
-            TimeSpan effectiveTimeout =
-                timeout ?? environment.EffectiveOptions.Timeout ?? TimeSpan.FromSeconds(30);
-
-            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken
-            );
-            cts.CancelAfter(effectiveTimeout);
-
-            try
-            {
-                return await processor(command, environment, cts.Token);
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                return Result.Failure<CommandResult, SmartCardError>(
-                    SmartCardError.CommunicationError($"Command timed out after {effectiveTimeout}")
-                );
-            }
-        };
-    }
 
     /// <summary>
     /// The identity processor - returns the command result unchanged.
@@ -242,34 +126,22 @@ public static class FunctionComposition
     /// </summary>
     private static CommandMetadata MergeMetadata(CommandMetadata first, CommandMetadata second)
     {
-        if (first == null)
-            return second;
-        if (second == null)
-            return first;
-
-        return new CommandMetadata(
-            ExecutionTime: second.ExecutionTime ?? first.ExecutionTime,
-            TransmittedBytes: second.TransmittedBytes ?? first.TransmittedBytes,
-            ReceivedBytes: second.ReceivedBytes ?? first.ReceivedBytes,
-            SecureChannelWrapped: second.SecureChannelWrapped || first.SecureChannelWrapped,
-            SecureChannelUnwrapped: second.SecureChannelUnwrapped || first.SecureChannelUnwrapped,
-            ResponseLogged: second.ResponseLogged || first.ResponseLogged,
-            RetryCount: first.RetryCount + second.RetryCount
+        return Maybe<CommandMetadata>.From(first).Match(
+            Some: firstMeta => Maybe<CommandMetadata>.From(second).Match(
+                Some: secondMeta => new CommandMetadata(
+                    ExecutionTime: secondMeta.ExecutionTime.HasValue ? secondMeta.ExecutionTime : firstMeta.ExecutionTime,
+                    TransmittedBytes: secondMeta.TransmittedBytes.HasValue ? secondMeta.TransmittedBytes : firstMeta.TransmittedBytes,
+                    ReceivedBytes: secondMeta.ReceivedBytes.HasValue ? secondMeta.ReceivedBytes : firstMeta.ReceivedBytes,
+                    SecureChannelWrapped: secondMeta.SecureChannelWrapped || firstMeta.SecureChannelWrapped,
+                    SecureChannelUnwrapped: secondMeta.SecureChannelUnwrapped || firstMeta.SecureChannelUnwrapped,
+                    ResponseLogged: secondMeta.ResponseLogged || firstMeta.ResponseLogged
+                ),
+                None: () => firstMeta
+            ),
+            None: () => second
         );
     }
 
-    /// <summary>
-    /// Determines if an error is retriable based on status word.
-    /// </summary>
-    private static bool IsRetriableError(StatusWord statusWord)
-    {
-        // Communication errors and failures
-        return statusWord == 0x6F00
-            || // No precise diagnosis
-            statusWord == 0x6581
-            || // Memory failure
-            statusWord == 0x6A86; // Incorrect P1/P2
-    }
 
     /// <summary>
     /// Determines if the command result contains response data rather than command data.
@@ -286,7 +158,7 @@ public static class FunctionComposition
             .Match(
                 metadata =>
                     metadata.ExecutionTime.HasValue
-                    || Maybe<byte[]>.From(metadata.ReceivedBytes).HasValue
+                    || metadata.ReceivedBytes.HasValue
                     || cmdResult.StatusWord != Constants.Constants.StatusWords.Legacy.Success && cmdResult.Data.Length < 4,
                 () => false
             );

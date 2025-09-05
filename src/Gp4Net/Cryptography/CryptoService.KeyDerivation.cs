@@ -4,7 +4,9 @@ using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
 using Kdf108.Domain.Kdf;
 using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Digests;
 using Org.BouncyCastle.Crypto.Engines;
+using Org.BouncyCastle.Crypto.Generators;
 using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Parameters;
 
@@ -32,7 +34,7 @@ public static partial class CryptoService
             byte[] sequenceCounter,
             byte derivationConstant
         )
-        {// @TODO NO NULLS!
+        {
             return Validation.ValidateInputs(baseKey, sequenceCounter)
                 .Bind(() => Validation.ValidateKeyLength(baseKey, [16, 24], "SCP02 base key must be 16 or 24 bytes"))
                 .Bind(() => ValidateSequenceCounterLength(sequenceCounter, 2))
@@ -56,7 +58,7 @@ public static partial class CryptoService
             byte[] cardChallenge,
             byte derivationConstant
         )
-        {// @TODO NO NULLS!
+        {
             return Validation.ValidateInputs(baseKey, hostChallenge)
                 .Bind(() => Validation.ValidateKeyLength(baseKey, [16, 24, 32], "SCP03 base key must be 16, 24, or 32 bytes"))
                 .Bind(() => ValidateChallengeLength(hostChallenge, 8, "Host challenge"))

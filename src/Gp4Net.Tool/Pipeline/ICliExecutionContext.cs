@@ -28,11 +28,6 @@ public interface ICliExecutionContext
     /// </summary>
     IKeysetResolver KeysetResolver { get; }
 
-    /// <summary>
-    /// Gets the GlobalPlatform service for GP operations.
-    /// Creates the service on demand with proper pipeline context.
-    /// </summary>
-    IGlobalPlatformService GetGlobalPlatformService();
 
     /// <summary>
     /// Gets a pure function for establishing secure channels from user requests.

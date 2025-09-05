@@ -4,7 +4,8 @@ using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Constants;
+using Org.BouncyCastle.Security;
 
 namespace Gp4Net.Domain;
 
@@ -271,14 +272,32 @@ public static class SecureChannelLifecycleTransitions
                                 (byte)authState.Implementation
                             )
                             .Map(macChaining => new SecureChannelState(
-                                ProtocolVersion: initData.ProtocolVersion,
-                                SecurityLevel: authState.Level,
                                 SessionKeys: authState.Keys,
+                                SecurityLevel: authState.Level,
+                                ProtocolVersion: initData.ProtocolVersion,
                                 MacChaining: macChaining,
                                 EncryptionCounter: 0,
-                                SessionId: ImmutableArray<byte>.Empty
+                                SessionId: GenerateSecureSessionId(),
+                                ImplementationParameter: (byte)authState.Implementation
                             ))
                     )
             );
+    }
+
+    /// <summary>
+    /// Generates a cryptographically secure session identifier.
+    /// Per GlobalPlatform specification, session IDs are used to uniquely identify
+    /// secure channel sessions and prevent replay attacks.
+    /// </summary>
+    /// <returns>An 8-byte cryptographically secure session ID.</returns>
+    private static ImmutableArray<byte> GenerateSecureSessionId()
+    {
+        // Generate 8 bytes of cryptographically secure random data
+        // This follows the pattern used in SecureChannelState.Create()
+        byte[] sessionId = new byte[8];
+        SecureRandom secureRandom = new SecureRandom();
+        secureRandom.NextBytes(sessionId);
+        
+        return [.. sessionId];
     }
 }

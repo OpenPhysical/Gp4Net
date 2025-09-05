@@ -66,12 +66,6 @@ public static partial class TlvService
                 );
             }
 
-            if (tag.Bytes.Length > Tlv.Parsing.MaxReasonableTagBytes)
-            {
-                return UnitResult.Failure<SmartCardError>(
-                    SmartCardError.InvalidArgument($"Tag length {tag.Bytes.Length} exceeds maximum allowed")
-                );
-            }
 
             // Check for multi-byte tag structure
             if ((tag.Bytes[0] & Tlv.Parsing.MultiByteTagMask) == Tlv.Parsing.MultiByteTagMask)
@@ -136,14 +130,6 @@ public static partial class TlvService
                 );
             }
 
-            if (length.LengthValue > Tlv.SecurityLimits.MaxTlvValueSize)
-            {
-                return UnitResult.Failure<SmartCardError>(
-                    SmartCardError.SecurityError(
-                        $"Value length {length.LengthValue} exceeds security limit"
-                    )
-                );
-            }
 
             return UnitResult.Success<SmartCardError>();
         }
@@ -187,7 +173,7 @@ public static partial class TlvService
         {
             // GP allows special encoding where 0x80 means length 128
             // This is already handled in parser, just validate the value
-            if (length.LengthValue < 0 || length.LengthValue > Tlv.SecurityLimits.MaxTlvValueSize)
+            if (length.LengthValue < 0)
             {
                 return UnitResult.Failure<SmartCardError>(
                     SmartCardError.InvalidArgument($"Invalid GP length: {length.LengthValue}")

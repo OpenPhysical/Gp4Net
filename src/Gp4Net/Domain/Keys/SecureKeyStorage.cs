@@ -4,6 +4,8 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using Org.BouncyCastle.Utilities;
 
 namespace Gp4Net.Domain.Keys;
@@ -13,7 +15,7 @@ namespace Gp4Net.Domain.Keys;
 /// </summary>
 public sealed class SecureKeyStorage : IDisposable
 {
-    private byte[] _keyData;
+    private Maybe<byte[]> _keyData;
     private bool _isDisposed;
 
     /// <summary>
@@ -21,7 +23,7 @@ public sealed class SecureKeyStorage : IDisposable
     /// </summary>
     public int Length
     {
-        get { return _keyData?.Length ?? 0; }
+        get { return _keyData.Match(data => data.Length, () => 0); }
     }
 
     /// <summary>
@@ -30,42 +32,61 @@ public sealed class SecureKeyStorage : IDisposable
     /// <param name="key">The key data to store securely.</param>
     public SecureKeyStorage(byte[] key)
     {
-        _keyData = new byte[key.Length];
-        key.CopyTo(_keyData, 0);
+        var keyData = new byte[key.Length];
+        key.CopyTo(keyData, 0);
+        _keyData = Maybe<byte[]>.From(keyData);
     }
 
     /// <summary>
     /// Creates a copy of the key data. The caller is responsible for clearing this copy.
     /// </summary>
-    /// <returns>A copy of the key data.</returns>
-    public byte[] GetKeyCopy()
+    /// <returns>A copy of the key data or failure if not available.</returns>
+    public Result<byte[], SmartCardError> GetKeyCopy()
     {
-        ThrowIfDisposed();
-
-        if (_keyData == null)
+        if (_isDisposed)
         {
-            throw new InvalidOperationException("Key data is not available.");
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidArgument("SecureKeyStorage has been disposed")
+            );
         }
 
-        byte[] copy = new byte[_keyData.Length];
-        _keyData.CopyTo(copy, 0);
-        return copy;
+        return _keyData.Match(
+            keyData =>
+            {
+                byte[] copy = new byte[keyData.Length];
+                keyData.CopyTo(copy, 0);
+                return Result.Success<byte[], SmartCardError>(copy);
+            },
+            () => Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidArgument("Key data is not available")
+            )
+        );
     }
 
     /// <summary>
     /// Executes an action with the key data. The key data should not be stored or leaked from the action.
     /// </summary>
     /// <param name="action">The action to execute with the key data.</param>
-    public void UseKey(Action<byte[]> action)
+    /// <returns>Success or failure result.</returns>
+    public Result<bool, SmartCardError> UseKey(Action<byte[]> action)
     {
-        ThrowIfDisposed();
-
-        if (_keyData == null)
+        if (_isDisposed)
         {
-            throw new InvalidOperationException("Key data is not available.");
+            return Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureKeyStorage has been disposed")
+            );
         }
 
-        action(_keyData);
+        return _keyData.Match(
+            keyData =>
+            {
+                action(keyData);
+                return Result.Success<bool, SmartCardError>(true);
+            },
+            () => Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("Key data is not available")
+            )
+        );
     }
 
     /// <summary>
@@ -73,29 +94,38 @@ public sealed class SecureKeyStorage : IDisposable
     /// </summary>
     /// <typeparam name="T">The return type of the function.</typeparam>
     /// <param name="func">The function to execute with the key data.</param>
-    /// <returns>The result of the function.</returns>
-    public T UseKey<T>(Func<byte[], T> func)
+    /// <returns>The result of the function or failure.</returns>
+    public Result<T, SmartCardError> UseKey<T>(Func<byte[], T> func)
     {
-        ThrowIfDisposed();
-
-        if (_keyData == null)
+        if (_isDisposed)
         {
-            throw new InvalidOperationException("Key data is not available.");
+            return Result.Failure<T, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureKeyStorage has been disposed")
+            );
         }
 
-        return func(_keyData);
+        return _keyData.Match(
+            keyData => Result.Success<T, SmartCardError>(func(keyData)),
+            () => Result.Failure<T, SmartCardError>(
+                SmartCardError.InvalidArgument("Key data is not available")
+            )
+        );
     }
 
     /// <summary>
     /// Clears the key data from memory.
     /// </summary>
-    public void Clear()
+    public UnitResult<SmartCardError> Clear()
     {
-        if (_keyData != null)
-        {
-            Arrays.Fill(_keyData, 0);
-            _keyData = null;
-        }
+        return _keyData.Match(
+            Some: keyData =>
+            {
+                Arrays.Fill(keyData, 0);
+                _keyData = Maybe<byte[]>.None;
+                return UnitResult.Success<SmartCardError>();
+            },
+            None: () => UnitResult.Success<SmartCardError>()
+        );
     }
 
     /// <summary>
@@ -110,10 +140,6 @@ public sealed class SecureKeyStorage : IDisposable
         }
     }
 
-    private void ThrowIfDisposed()
-    {
-        ObjectDisposedException.ThrowIf(_isDisposed, nameof(SecureKeyStorage));
-    }
 }
 
 /// <summary>
@@ -124,7 +150,7 @@ public sealed class SecureSessionKeys : IDisposable
     private readonly SecureKeyStorage _sEnc;
     private readonly SecureKeyStorage _sMac;
     private readonly SecureKeyStorage _sRMac;
-    private readonly SecureKeyStorage _dek;
+    private readonly Maybe<SecureKeyStorage> _dek;
     private bool _isDisposed;
 
     /// <summary>
@@ -134,22 +160,28 @@ public sealed class SecureSessionKeys : IDisposable
     /// <param name="sMac">The session MAC key.</param>
     /// <param name="sRMac">The session R-MAC key.</param>
     /// <param name="dek">The data encryption key (optional).</param>
-    public SecureSessionKeys(byte[] sEnc, byte[] sMac, byte[] sRMac, byte[] dek = null)
+    public SecureSessionKeys(byte[] sEnc, byte[] sMac, byte[] sRMac, Maybe<byte[]> dek = default)
     {
         _sEnc = new SecureKeyStorage(sEnc);
         _sMac = new SecureKeyStorage(sMac);
         _sRMac = new SecureKeyStorage(sRMac);
-        _dek = dek != null ? new SecureKeyStorage(dek) : null;
+        _dek = dek.Map(d => new SecureKeyStorage(d));
     }
 
     /// <summary>
     /// Uses the session encryption key.
     /// </summary>
     /// <param name="action">The action to execute with the key.</param>
-    public void UseSEnc(Action<byte[]> action)
+    /// <returns>Success or failure result.</returns>
+    public Result<bool, SmartCardError> UseSEnc(Action<byte[]> action)
     {
-        ThrowIfDisposed();
-        _sEnc.UseKey(action);
+        if (_isDisposed)
+        {
+            return Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureSessionKeys has been disposed")
+            );
+        }
+        return _sEnc.UseKey(action);
     }
 
     /// <summary>
@@ -157,10 +189,15 @@ public sealed class SecureSessionKeys : IDisposable
     /// </summary>
     /// <typeparam name="T">The return type.</typeparam>
     /// <param name="func">The function to execute with the key.</param>
-    /// <returns>The result of the function.</returns>
-    public T UseSEnc<T>(Func<byte[], T> func)
+    /// <returns>The result of the function or failure.</returns>
+    public Result<T, SmartCardError> UseSEnc<T>(Func<byte[], T> func)
     {
-        ThrowIfDisposed();
+        if (_isDisposed)
+        {
+            return Result.Failure<T, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureSessionKeys has been disposed")
+            );
+        }
         return _sEnc.UseKey(func);
     }
 
@@ -168,10 +205,16 @@ public sealed class SecureSessionKeys : IDisposable
     /// Uses the session MAC key.
     /// </summary>
     /// <param name="action">The action to execute with the key.</param>
-    public void UseSMac(Action<byte[]> action)
+    /// <returns>Success or failure result.</returns>
+    public Result<bool, SmartCardError> UseSMac(Action<byte[]> action)
     {
-        ThrowIfDisposed();
-        _sMac.UseKey(action);
+        if (_isDisposed)
+        {
+            return Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureSessionKeys has been disposed")
+            );
+        }
+        return _sMac.UseKey(action);
     }
 
     /// <summary>
@@ -179,10 +222,15 @@ public sealed class SecureSessionKeys : IDisposable
     /// </summary>
     /// <typeparam name="T">The return type.</typeparam>
     /// <param name="func">The function to execute with the key.</param>
-    /// <returns>The result of the function.</returns>
-    public T UseSMac<T>(Func<byte[], T> func)
+    /// <returns>The result of the function or failure.</returns>
+    public Result<T, SmartCardError> UseSMac<T>(Func<byte[], T> func)
     {
-        ThrowIfDisposed();
+        if (_isDisposed)
+        {
+            return Result.Failure<T, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureSessionKeys has been disposed")
+            );
+        }
         return _sMac.UseKey(func);
     }
 
@@ -190,10 +238,16 @@ public sealed class SecureSessionKeys : IDisposable
     /// Uses the session R-MAC key.
     /// </summary>
     /// <param name="action">The action to execute with the key.</param>
-    public void UseSrMac(Action<byte[]> action)
+    /// <returns>Success or failure result.</returns>
+    public Result<bool, SmartCardError> UseSrMac(Action<byte[]> action)
     {
-        ThrowIfDisposed();
-        _sRMac.UseKey(action);
+        if (_isDisposed)
+        {
+            return Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureSessionKeys has been disposed")
+            );
+        }
+        return _sRMac.UseKey(action);
     }
 
     /// <summary>
@@ -201,43 +255,71 @@ public sealed class SecureSessionKeys : IDisposable
     /// </summary>
     /// <typeparam name="T">The return type.</typeparam>
     /// <param name="func">The function to execute with the key.</param>
-    /// <returns>The result of the function.</returns>
-    public T UseSrMac<T>(Func<byte[], T> func)
+    /// <returns>The result of the function or failure.</returns>
+    public Result<T, SmartCardError> UseSrMac<T>(Func<byte[], T> func)
     {
-        ThrowIfDisposed();
+        if (_isDisposed)
+        {
+            return Result.Failure<T, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureSessionKeys has been disposed")
+            );
+        }
         return _sRMac.UseKey(func);
     }
 
     /// <summary>
     /// Uses the data encryption key if available.
     /// </summary>
-    /// <param name="action">The action to execute with the key.</param>
-    public void UseDek(Action<byte[]> action)
+    /// <param name="action">The action to execute with the key (receives Maybe for optional DEK).</param>
+    /// <returns>Success or failure result.</returns>
+    public Result<bool, SmartCardError> UseDek(Action<Maybe<byte[]>> action)
     {
-        ThrowIfDisposed();
-        if (_dek != null)
+        if (_isDisposed)
         {
-            _dek.UseKey(key => action(key));
+            return Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureSessionKeys has been disposed")
+            );
         }
-        else
-        {
-            action(null);
-        }
+        
+        return _dek.Match(
+            dek => dek.UseKey(key => action(Maybe<byte[]>.From(key))),
+            () =>
+            {
+                action(Maybe<byte[]>.None);
+                return Result.Success<bool, SmartCardError>(true);
+            }
+        );
     }
 
     /// <summary>
     /// Creates a legacy SessionKeys object. The caller is responsible for clearing the keys.
     /// </summary>
-    /// <returns>A SessionKeys object with copies of the keys.</returns>
-    public SessionKeys ToSessionKeys()
+    /// <returns>A SessionKeys object with copies of the keys or failure.</returns>
+    public Result<SessionKeys, SmartCardError> ToSessionKeys()
     {
-        ThrowIfDisposed();
-        return new SessionKeys(
-            _sEnc.GetKeyCopy(),
-            _sMac.GetKeyCopy(),
-            _sRMac.GetKeyCopy(),
-            _dek?.GetKeyCopy()
-        );
+        if (_isDisposed)
+        {
+            return Result.Failure<SessionKeys, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureSessionKeys has been disposed")
+            );
+        }
+        
+        return _sEnc.GetKeyCopy()
+            .Bind(sEnc => _sMac.GetKeyCopy().Map(sMac => (sEnc, sMac)))
+            .Bind(keys => _sRMac.GetKeyCopy().Map(sRMac => (keys.sEnc, keys.sMac, sRMac)))
+            .Map(keys =>
+            {
+                byte[] dekKey = default;
+                _dek.Execute(d => 
+                    d.GetKeyCopy().Tap(key => dekKey = key)
+                );
+                return new SessionKeys(
+                    keys.sEnc,
+                    keys.sMac,
+                    keys.sRMac,
+                    dekKey
+                );
+            });
     }
 
     /// <summary>
@@ -247,16 +329,12 @@ public sealed class SecureSessionKeys : IDisposable
     {
         if (!_isDisposed)
         {
-            _sEnc?.Dispose();
-            _sMac?.Dispose();
-            _sRMac?.Dispose();
-            _dek?.Dispose();
+            _sEnc.Dispose();
+            _sMac.Dispose();
+            _sRMac.Dispose();
+            _dek.Execute(d => d.Dispose());
             _isDisposed = true;
         }
     }
 
-    private void ThrowIfDisposed()
-    {
-        ObjectDisposedException.ThrowIf(_isDisposed, nameof(SecureSessionKeys));
-    }
 }

@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Org.BouncyCastle.Security;
@@ -31,6 +34,39 @@ public interface IRngContext
     /// Returns Some(count) for pre-loaded entropy (deterministic mode).
     /// </summary>
     Maybe<int> RemainingEntropy { get; }
+}
+
+/// <summary>
+/// Advanced interface for preloaded RNG context with pure functional state management.
+/// Extends IRngContext with stateless operations that return both results and new state.
+/// Used for deterministic testing with immutable entropy tracking.
+/// </summary>
+public interface IPreloadedRngContext : IRngContext
+{
+    /// <summary>
+    /// Pure functional entropy extraction that returns both entropy and new context state.
+    /// Unlike GenerateBytes(), this method does not modify the current instance.
+    /// </summary>
+    /// <param name="length">Number of bytes to extract.</param>
+    /// <returns>Result containing entropy and new context instance with updated position.</returns>
+    Result<(byte[] entropy, IPreloadedRngContext newState), SmartCardError> GetBytesWithNewState(int length);
+
+    /// <summary>
+    /// Gets the total size of the entropy buffer.
+    /// </summary>
+    int TotalEntropy { get; }
+
+    /// <summary>
+    /// Creates a copy of this context reset to the beginning of the entropy buffer.
+    /// Useful for running the same test scenario multiple times.
+    /// </summary>
+    /// <returns>A new PreloadedRngContext with the same entropy but reset position.</returns>
+    IPreloadedRngContext Reset();
+
+    /// <summary>
+    /// Gets the current position in the entropy buffer.
+    /// </summary>
+    int Position { get; }
 }
 
 public static partial class CryptoService
@@ -136,6 +172,93 @@ public static partial class CryptoService
         public static IRngContext CreateSecureContext()
         {
             return new RngContextAdapter(new SecureRngMode());
+        }
+
+        /// <summary>
+        /// Creates a preloaded RNG context from known challenges extracted from a trace.
+        /// Useful for trace replay and deterministic testing scenarios.
+        /// </summary>
+        /// <param name="challenges">Sequential challenges from a card trace.</param>
+        /// <returns>A deterministic RNG context or error if challenges are invalid.</returns>
+        public static Result<IRngContext, SmartCardError> CreateFromTraceChallenges(IEnumerable<byte[]> challenges)
+        {
+            return Maybe.From(challenges)
+                .ToResult(SmartCardError.InvalidArgument("Challenges cannot be null"))
+                .Map(c => c.SelectMany(chunk => chunk).ToArray())
+                .Bind(CreateDeterministicContext);
+        }
+
+        /// <summary>
+        /// Creates a preloaded RNG context with repeating entropy pattern for unit tests.
+        /// </summary>
+        /// <param name="pattern">The entropy pattern to repeat.</param>
+        /// <param name="repetitions">Number of times to repeat the pattern.</param>
+        /// <returns>A deterministic RNG context or error if parameters are invalid.</returns>
+        public static Result<IRngContext, SmartCardError> CreateWithRepeatingPattern(
+            byte[] pattern,
+            int repetitions)
+        {
+            return Maybe.From(pattern)
+                .ToResult(SmartCardError.InvalidArgument("Pattern cannot be null"))
+                .Ensure(p => p.Length > 0, SmartCardError.InvalidArgument("Pattern cannot be empty"))
+                .Ensure(_ => repetitions > 0, SmartCardError.InvalidArgument($"Repetitions must be positive: {repetitions}"))
+                .Map(p => Enumerable.Range(0, repetitions).SelectMany(_ => p).ToArray())
+                .Bind(CreateDeterministicContext);
+        }
+
+        /// <summary>
+        /// Creates an advanced preloaded RNG context with pure functional state tracking.
+        /// Provides the same functionality as the legacy PreloadedRngService but integrated
+        /// with the unified CryptoService.Rng architecture.
+        /// </summary>
+        /// <param name="entropy">The complete entropy supply for all random operations.</param>
+        /// <returns>A preloaded RNG context or error if entropy is invalid.</returns>
+        public static Result<IPreloadedRngContext, SmartCardError> CreatePreloadedContext(byte[] entropy)
+        {
+            return PreloadedRngContext.Create(entropy);
+        }
+
+        /// <summary>
+        /// Creates an advanced preloaded RNG context from entropy chunks (e.g., from trace data).
+        /// </summary>
+        /// <param name="entropyChunks">Sequence of entropy chunks to concatenate.</param>
+        /// <returns>A preloaded RNG context or error if entropy is invalid.</returns>
+        public static Result<IPreloadedRngContext, SmartCardError> CreatePreloadedContext(IEnumerable<byte[]> entropyChunks)
+        {
+            return Maybe.From(entropyChunks)
+                .ToResult(SmartCardError.InvalidArgument("Entropy chunks cannot be null"))
+                .Map(chunks => chunks.SelectMany(chunk => chunk).ToArray())
+                .Bind(CreatePreloadedContext);
+        }
+
+        /// <summary>
+        /// Generates an 8-byte host challenge for secure channel establishment.
+        /// Per GP Card Specification, host challenge is always 8 bytes.
+        /// </summary>
+        /// <returns>8-byte host challenge or error.</returns>
+        public static Result<byte[], SmartCardError> GenerateHostChallenge()
+        {
+            return GenerateBytes(8);
+        }
+
+        /// <summary>
+        /// Generates a 16-byte sequence counter for SCP03.
+        /// Per GP SCP03 Specification, sequence counter is 16 bytes.
+        /// </summary>
+        /// <returns>16-byte sequence counter or error.</returns>
+        public static Result<byte[], SmartCardError> GenerateSequenceCounter()
+        {
+            return GenerateBytes(16);
+        }
+
+        /// <summary>
+        /// Generates an 8-byte card challenge for secure channel establishment.
+        /// Per GP Card Specification, card challenge is always 8 bytes.
+        /// </summary>
+        /// <returns>8-byte card challenge or error.</returns>
+        public static Result<byte[], SmartCardError> GenerateCardChallenge()
+        {
+            return GenerateBytes(8);
         }
 
         /// <summary>
@@ -254,6 +377,66 @@ public static partial class CryptoService
 
             public Maybe<int> RemainingEntropy =>
                 Maybe<int>.From(_entropy.Length - _position);
+        }
+
+        /// <summary>
+        /// Pure functional deterministic RNG context with immutable entropy state.
+        /// Used for testing to ensure reproducible cryptographic behavior.
+        /// Perfect for trace replay and unit testing scenarios.
+        /// All operations return new instances - no mutable state.
+        /// </summary>
+        private sealed record PreloadedRngContext(
+            ImmutableList<byte> EntropyBuffer,
+            int Position = 0
+        ) : IPreloadedRngContext
+        {
+            /// <summary>
+            /// Creates a new PreloadedRngContext with the specified entropy buffer.
+            /// </summary>
+            /// <param name="entropy">The complete entropy supply to use for all random operations.</param>
+            /// <returns>A result containing the RNG context or an error.</returns>
+            public static Result<IPreloadedRngContext, SmartCardError> Create(byte[] entropy) =>
+                Maybe.From(entropy)
+                    .ToResult(SmartCardError.InvalidArgument("Entropy cannot be null"))
+                    .Ensure(e => e.Length > 0, SmartCardError.InvalidArgument("Entropy buffer cannot be empty"))
+                    .Map(e => (IPreloadedRngContext)new PreloadedRngContext(e.ToImmutableList()));
+
+            /// <inheritdoc />
+            public Result<byte[], SmartCardError> GenerateBytes(int length) =>
+                GetBytesWithNewState(length).Map(result => result.entropy);
+
+            /// <inheritdoc />
+            public Result<(byte[] entropy, IPreloadedRngContext newState), SmartCardError> GetBytesWithNewState(int length)
+            {
+                if (length < 0)
+                    return SmartCardError.InvalidArgument($"Length cannot be negative: {length}");
+
+                if (length == 0)
+                    return (Array.Empty<byte>(), this);
+
+                if (Position + length > EntropyBuffer.Count)
+                    return SmartCardError.CryptographicError(
+                        $"Insufficient entropy: requested {length} bytes, but only {EntropyBuffer.Count - Position} bytes remaining"
+                    );
+
+                var entropy = EntropyBuffer.Skip(Position).Take(length).ToArray();
+                var newState = this with { Position = Position + length };
+                
+                return (entropy, newState);
+            }
+
+            /// <inheritdoc />
+            public bool HasEnoughEntropy(int requiredBytes) =>
+                requiredBytes >= 0 && Position + requiredBytes <= EntropyBuffer.Count;
+
+            /// <inheritdoc />
+            public Maybe<int> RemainingEntropy => Maybe<int>.From(EntropyBuffer.Count - Position);
+
+            /// <inheritdoc />
+            public int TotalEntropy => EntropyBuffer.Count;
+
+            /// <inheritdoc />
+            public IPreloadedRngContext Reset() => this with { Position = 0 };
         }
     }
 }

@@ -10,11 +10,9 @@ using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Services;
 using Gp4Net.Transport;
+using WSCT.Core;
+using WSCT.ISO7816;
 using Microsoft.Extensions.Logging;
-using Org.BouncyCastle.Crypto.Engines;
-using Org.BouncyCastle.Crypto.Macs;
-using Org.BouncyCastle.Crypto.Modes;
-using Org.BouncyCastle.Crypto.Parameters;
 using static Gp4Net.Pipeline.CommandProcessing;
 
 namespace Gp4Net.Pipeline;
@@ -37,8 +35,14 @@ public static class CommandProcessors
             );
 
         string commandName = command.GetType().Name;
-        byte[] commandBytes = GetCommandBytes(command);
+        
+        var commandBytesResult = GetCommandBytes(command);
+        if (commandBytesResult.IsFailure)
+        {
+            return Task.FromResult(Result.Failure<CommandResult, SmartCardError>(commandBytesResult.Error));
+        }
 
+        byte[] commandBytes = commandBytesResult.Value;
         environment.Logger.LogDebug(
             "Executing command {CommandName}: {CommandBytes}",
             commandName,
@@ -82,7 +86,8 @@ public static class CommandProcessors
         // Check if secure channel is available
         if (!environment.SecureChannel.HasValue)
         {
-            if (environment.EffectiveOptions.RequiresSecureChannel)
+            // Use the command-specific requiresSecureChannel flag, not the global option
+            if (requiresSecureChannel)
             {
                 return Task.FromResult(
                     Result.Failure<CommandResult, SmartCardError>(
@@ -104,35 +109,37 @@ public static class CommandProcessors
         environment.Logger.LogDebug("Applying command security using ScpService for protocol {Protocol:X2}", secureChannelState.ProtocolVersion);
 
         return Task.FromResult(
-            ScpService.Security.ApplyCommandSecurity(command, secureChannelState)
-                .Bind(wrapResult =>
-                {
-                    (byte[] wrappedBytes, SecureChannelState newState) = wrapResult;
-
-                    environment.Logger.LogDebug(
-                        "ScpService returned {ByteCount} wrapped bytes: {WrappedBytes}",
-                        wrappedBytes.Length,
-                        Convert.ToHexString(wrappedBytes)
-                    );
-
-                    return WrappedApduCommand
-                        .Create(command, wrappedBytes)
-                        .Map(wrappedCommand =>
+            Result.Success<byte[], SmartCardError>(command.ToBytes())
+                .Bind(commandBytes => 
+                    ScpService.Security.ApplyCommandSecurity(commandBytes, secureChannelState)
+                        .Bind(wrapResult =>
                         {
-                            // Update environment with new secure channel state and wrapped command
-                            CommandEnvironment newEnvironment = environment.WithSecureChannel(
-                                newState
+                            (byte[] wrappedBytes, SecureChannelState newState) = wrapResult;
+
+                            environment.Logger.LogDebug(
+                                "ScpService returned {ByteCount} wrapped bytes: {WrappedBytes}",
+                                wrappedBytes.Length,
+                                Convert.ToHexString(wrappedBytes)
                             );
 
-                            // Log the transformation
-                            if (environment.EffectiveOptions.EnableLogging)
-                            {
-                                environment.Logger.LogDebug(
-                                    "Applied secure channel wrapping: {OriginalLength} → {WrappedLength} bytes",
-                                    ApduBuilder.BuildApdu(command).Length,
-                                    wrappedBytes.Length
-                                );
-                            }
+                            return Result.Success<WrappedApduCommand, SmartCardError>(
+                                WrappedApduCommand.Create(wrappedBytes))
+                                .Map(wrappedCommand =>
+                                {
+                                    // Update environment with new secure channel state and wrapped command
+                                    CommandEnvironment newEnvironment = environment.WithSecureChannel(
+                                        newState
+                                    );
+
+                                    // Log the transformation
+                                    if (environment.EffectiveOptions.EnableLogging)
+                                    {
+                                        environment.Logger.LogDebug(
+                                            "Applied secure channel wrapping: {OriginalLength} → {WrappedLength} bytes",
+                                            commandBytes.Length,
+                                            wrappedBytes.Length
+                                        );
+                                    }
 
                             // Create metadata indicating secure channel wrapping was applied
                             CommandMetadata metadata = new CommandMetadata(
@@ -148,12 +155,12 @@ public static class CommandProcessors
                                 metadata
                             );
                         });
-                })
+                        }))
                 .MapError(error =>
                 {
                     environment.Logger.LogError(
                         "Secure channel wrapping failed: {Error}",
-                        error.Message
+                        error
                     );
                     return error;
                 })
@@ -193,7 +200,13 @@ public static class CommandProcessors
             }
             else
             {
-                commandBytes = GetCommandBytes(command);
+                var commandBytesResult = GetCommandBytes(command);
+                if (commandBytesResult.IsFailure)
+                {
+                    return Result.Failure<CommandResult, SmartCardError>(commandBytesResult.Error);
+                }
+                
+                commandBytes = commandBytesResult.Value;
                 Console.WriteLine(
                     $"🔍 ExecuteTransport: Using unwrapped command: {commandBytes.Length} bytes - {Convert.ToHexString(commandBytes)}"
                 );
@@ -209,11 +222,18 @@ public static class CommandProcessors
             }
 
             // Execute via transport
-            ApduResponse response = await environment.Transport.TransmitAsync(
+            var transmitResult = await environment.Transport.TransmitAsync(
                 commandToSend,
                 environment.Channel,
                 cancellationToken
             );
+
+            if (transmitResult.IsFailure)
+            {
+                return Result.Failure<CommandResult, SmartCardError>(transmitResult.Error);
+            }
+
+            ApduResponse response = transmitResult.Value;
 
             stopwatch.Stop();
 
@@ -524,7 +544,7 @@ public static class CommandProcessors
     }
 
     /// <summary>
-    /// Verifies SCP02 response MAC using Triple-DES CBC-MAC.
+    /// Verifies SCP02 response MAC using centralized SCP operations.
     /// </summary>
     private static Result<bool, SmartCardError> VerifyScp02ResponseMac(
         byte[] responseData,
@@ -533,28 +553,24 @@ public static class CommandProcessors
         SecureChannelState channelState
     )
     {
-        // Construct MAC data: response data + status word
-        byte[] macData = [.. responseData, .. statusWord];
+        // Construct complete response: response data + status word
+        byte[] fullResponse = [.. responseData, .. statusWord];
 
-        // Calculate expected MAC using SRMac key
-        // Implementation uses BouncyCastle Triple-DES CBC-MAC
-        DesEngine desEngine = new DesEngine();
-        CbcBlockCipherMac mac = new CbcBlockCipherMac(desEngine);
-
-        // Initialize with SRMac key from session keys
-        mac.Init(new KeyParameter(channelState.SessionKeys.SrMac));
-
-        mac.BlockUpdate(macData, 0, macData.Length);
-        byte[] calculatedMac = new byte[mac.GetMacSize()];
-        _ = mac.DoFinal(calculatedMac, 0);
-
-        // Compare MACs using constant-time comparison
-        bool isValid = calculatedMac.SequenceEqual(receivedMac);
-        return Result.Success<bool, SmartCardError>(isValid);
+        // Use centralized SCP02 response MAC calculation with proper chaining
+        return CryptoService.ScpOperations.Scp02.CalculateResponseMac(
+                fullResponse,
+                channelState.SessionKeys.SrMac,
+                channelState.MacChainingValue
+            )
+            .Map(calculatedMac =>
+            {
+                // Compare MACs using constant-time comparison
+                return CryptoService.Utils.CompareBytes(calculatedMac, receivedMac);
+            });
     }
 
     /// <summary>
-    /// Verifies SCP03 response MAC using AES-CMAC.
+    /// Verifies SCP03 response MAC using centralized SCP operations.
     /// </summary>
     private static Result<bool, SmartCardError> VerifyScp03ResponseMac(
         byte[] responseData,
@@ -563,27 +579,24 @@ public static class CommandProcessors
         SecureChannelState channelState
     )
     {
-        // Construct MAC data: response data + status word
-        byte[] macData = [.. responseData, .. statusWord];
+        // Construct complete response: response data + status word
+        byte[] fullResponse = [.. responseData, .. statusWord];
 
-        // Calculate expected MAC using SRMac key with AES-CMAC
-        AesEngine aesEngine = new AesEngine();
-        CMac cmac = new CMac(aesEngine);
-
-        // Initialize with SRMac key from session keys
-        cmac.Init(new KeyParameter(channelState.SessionKeys.SrMac));
-
-        cmac.BlockUpdate(macData, 0, macData.Length);
-        byte[] calculatedMac = new byte[cmac.GetMacSize()];
-        _ = cmac.DoFinal(calculatedMac, 0);
-
-        // Compare MACs using constant-time comparison
-        bool isValid = calculatedMac.SequenceEqual(receivedMac);
-        return Result.Success<bool, SmartCardError>(isValid);
+        // Use centralized SCP03 response MAC calculation with proper chaining
+        return CryptoService.ScpOperations.Scp03.CalculateResponseMac(
+                fullResponse,
+                channelState.SessionKeys.SrMac,
+                channelState.MacChainingValue
+            )
+            .Map(calculatedMac =>
+            {
+                // Compare MACs using constant-time comparison
+                return CryptoService.Utils.CompareBytes(calculatedMac, receivedMac);
+            });
     }
 
     /// <summary>
-    /// Decrypts SCP02 response data using Triple-DES CBC.
+    /// Decrypts SCP02 response data using centralized cipher operations.
     /// </summary>
     private static Result<byte[], SmartCardError> DecryptScp02ResponseData(
         byte[] encryptedData,
@@ -595,27 +608,12 @@ public static class CommandProcessors
             return Result.Success<byte[], SmartCardError>([]);
         }
 
-        DesEdeEngine desEngine = new DesEdeEngine();
-        CbcBlockCipher cipher = new CbcBlockCipher(desEngine);
-
-        // Initialize cipher for decryption with SEnc key
-        cipher.Init(false, new KeyParameter(channelState.SessionKeys.SEnc));
-
-        byte[] decryptedData = new byte[encryptedData.Length];
-        int processedBytes = 0;
-
-        // Process data in blocks
-        for (int i = 0; i < encryptedData.Length; i += cipher.GetBlockSize())
-        {
-            int blockSize = Math.Min(cipher.GetBlockSize(), encryptedData.Length - i);
-            processedBytes += cipher.ProcessBlock(encryptedData, i, decryptedData, processedBytes);
-        }
-
-        return Result.Success<byte[], SmartCardError>(decryptedData);
+        // Use centralized cipher operation with SCP02 parameters (zero IV for response decryption)
+        return CryptoService.Cipher.Decrypt3DesCbc(channelState.SessionKeys.SEnc, Constants.Constants.Scp.Common.ZeroIv8, encryptedData);
     }
 
     /// <summary>
-    /// Decrypts SCP03 response data using AES-CBC.
+    /// Decrypts SCP03 response data using centralized cipher operations.
     /// </summary>
     private static Result<byte[], SmartCardError> DecryptScp03ResponseData(
         byte[] encryptedData,
@@ -627,23 +625,8 @@ public static class CommandProcessors
             return Result.Success<byte[], SmartCardError>([]);
         }
 
-        AesEngine aesEngine = new AesEngine();
-        CbcBlockCipher cipher = new CbcBlockCipher(aesEngine);
-
-        // Initialize cipher for decryption with SEnc key
-        cipher.Init(false, new KeyParameter(channelState.SessionKeys.SEnc));
-
-        byte[] decryptedData = new byte[encryptedData.Length];
-        int processedBytes = 0;
-
-        // Process data in blocks
-        for (int i = 0; i < encryptedData.Length; i += cipher.GetBlockSize())
-        {
-            int blockSize = Math.Min(cipher.GetBlockSize(), encryptedData.Length - i);
-            processedBytes += cipher.ProcessBlock(encryptedData, i, decryptedData, processedBytes);
-        }
-
-        return Result.Success<byte[], SmartCardError>(decryptedData);
+        // Use centralized cipher operation with SCP03 parameters (zero IV for response decryption)
+        return CryptoService.Cipher.DecryptAesCbc(channelState.SessionKeys.SEnc, Constants.Constants.Scp.Common.ZeroIv16, encryptedData);
     }
 
     /// <summary>
@@ -694,61 +677,31 @@ public static class CommandProcessors
 
     /// <summary>
     /// Determines if a command requires secure channel wrapping.
+    /// Per GlobalPlatform Card Specification v2.3.1:
+    /// - SELECT (to ISD or applications) does not require secure channel for initial selection
+    /// - INITIALIZE UPDATE starts secure channel establishment (cannot be wrapped)
+    /// - EXTERNAL AUTHENTICATE completes secure channel establishment (cannot be wrapped)
     /// </summary>
     private static bool RequiresSecureChannel(IApduCommand command, CommandEnvironment environment)
     {
         // Commands that never require secure channel per GP specification:
-        // - SELECT: Used to establish application context
+        // - SELECT: Used to establish application context (both ISD and applications)
         // - INITIALIZE UPDATE: Starts secure channel establishment (runs before channel exists)
         // - EXTERNAL AUTHENTICATE: Completes secure channel establishment (validates but doesn't require existing channel)
         if (command is SelectCommand or InitializeUpdateCommand or ExternalAuthenticateCommand)
             return false;
 
-        // Check command options for all other commands
+        // For all other commands, check if secure channel is required
+        // This includes GET DATA, PUT KEY, DELETE, INSTALL, LOAD, etc.
         return environment.EffectiveOptions.RequiresSecureChannel;
     }
 
     /// <summary>
     /// Gets the byte representation of a command.
     /// </summary>
-    private static byte[] GetCommandBytes(IApduCommand command)
+    private static Result<byte[], SmartCardError> GetCommandBytes(IApduCommand command)
     {
-        List<byte> buffer = [command.Cla, command.Ins, command.P1, command.P2];
-
-        if (command.Data?.Length > 0)
-        {
-            if (command.Data.Length > 255)
-            {
-                buffer.Add(0x00);
-                buffer.Add((byte)(command.Data.Length >> 8));
-                buffer.Add((byte)(command.Data.Length & 0xFF));
-            }
-            else
-            {
-                buffer.Add((byte)command.Data.Length);
-            }
-            buffer.AddRange(command.Data);
-        }
-
-        if (command.ExpectedResponseLength.HasValue)
-        {
-            int le = command.ExpectedResponseLength.Value;
-            switch (le)
-            {
-                case 0:
-                    buffer.Add(0x00);
-                    break;
-                case <= 255:
-                    buffer.Add((byte)le);
-                    break;
-                default:
-                    buffer.Add((byte)(le >> 8));
-                    buffer.Add((byte)(le & 0xFF));
-                    break;
-            }
-        }
-
-        return [.. buffer];
+        return Result.Success<byte[], SmartCardError>(command.ToBytes());
     }
 
     /// <summary>

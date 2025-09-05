@@ -7,6 +7,7 @@ using Gp4Net.Core;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
+using Gp4Net.Tests.Infrastructure;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Integration;
@@ -106,7 +107,7 @@ public class CapLoadingIntegrationTests
         );
 
         // Convert to APDUs for secure channel wrapping
-        List<byte[]> plainApdus = [.. loadCommands.Select(cmd => ApduBuilder.BuildApdu(cmd))];
+        List<byte[]> plainApdus = [.. loadCommands.Select(cmd => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(cmd)).GetValueOrDefault([]))];
 
         // Verify APDU structure matches trace format
         byte[] firstApdu = plainApdus[0];
@@ -134,7 +135,7 @@ public class CapLoadingIntegrationTests
         // Assert - Verify load commands generated successfully
         Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
         IList<LoadCommand>? loadCommands = result.Value;
-        List<byte[]> plainApdus = [.. loadCommands.Select(cmd => ApduBuilder.BuildApdu(cmd))];
+        List<byte[]> plainApdus = [.. loadCommands.Select(cmd => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(cmd)).GetValueOrDefault([]))];
         Assert.That(plainApdus.Count > 0, "Should have generated LOAD APDUs");
 
         // Verify APDU structure using functional composition - NO imperative loops
@@ -182,7 +183,8 @@ public class CapLoadingIntegrationTests
 
         Assert.That(installForLoadResult.IsSuccess, Is.True, "CreateForLoad should succeed");
         InstallCommand.InstallForLoadCommand? installForLoadCmd = installForLoadResult.Value;
-        byte[]? installForLoadApdu = ApduBuilder.BuildApdu(installForLoadCmd);
+        Result<byte[], SmartCardError> installForLoadApduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(installForLoadCmd));
+        byte[] installForLoadApdu = installForLoadApduResult.GetValueOrDefault([]);
 
         // Generate LOAD commands
         Result<IList<LoadCommand>, SmartCardError> result = LoadCommand.CreateFromCapFile(
@@ -191,7 +193,8 @@ public class CapLoadingIntegrationTests
         );
         Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
         IList<LoadCommand>? loadCommands = result.Value;
-        byte[]? firstLoadApdu = ApduBuilder.BuildApdu(loadCommands[0]);
+        Result<byte[], SmartCardError> firstLoadApduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(loadCommands[0]));
+        byte[] firstLoadApdu = firstLoadApduResult.GetValueOrDefault([]);
 
         Assert.Multiple(() =>
         {

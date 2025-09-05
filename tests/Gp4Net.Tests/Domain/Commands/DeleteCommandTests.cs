@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using AwesomeAssertions;
+using Gp4Net.Tests.Infrastructure;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
@@ -30,13 +31,18 @@ public class DeleteCommandTests
         );
 
         // Assert
-        _ = result.IsSuccess.Should().BeTrue();
-        DeleteCommand? command = result.Value;
-        _ = command.Type.Should().Be(DeleteCommand.DeleteType.DeleteObjectOnly);
-        _ = command.Target.Should().Be(DeleteCommand.DeleteTarget.ByAid);
-        _ = command.Aids.Should().HaveCount(1);
-        _ = command.Aids[0].Should().BeEquivalentTo(aid);
-        _ = command.DeletionToken.HasNoValue.Should().BeTrue();
+        _ = result.Should().BeSuccess();
+        result.Match(
+            command =>
+            {
+                _ = command.Type.Should().Be(DeleteCommand.DeleteType.DeleteObjectOnly);
+                _ = command.Target.Should().Be(DeleteCommand.DeleteTarget.ByAid);
+                _ = command.Aids.Should().HaveCount(1);
+                _ = command.Aids[0].Should().BeEquivalentTo(aid);
+                _ = command.DeletionToken.Should().HaveNoValue();
+            },
+            error => Assert.Fail($"Expected success but got error: {error}")
+        );
     }
 
     [Test]

@@ -1,12 +1,16 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Services;
+using Gp4Net.Core;
+using Gp4Net.Tests.Infrastructure;
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
+using WSCT.ISO7816;
 
 namespace Gp4Net.Tests.Transport;
 
@@ -58,11 +62,10 @@ public class T0ApduTransportTests
         TestCommand command = new TestCommand(); // Uses default GP ISD AID
 
         // Act
-        ApduResponse? response = await _transport.TransmitAsync(command, _channel);
+        var result = await _transport.TransmitAsync(command, _channel);
 
         // Assert - Virtual card should handle GET RESPONSE chaining automatically
-        Assert.That(response, Is.Not.Null);
-        Assert.That(response.IsSuccess, Is.True);
+        result.Should().BeSuccess();
     }
 
     [Test]
@@ -72,11 +75,10 @@ public class T0ApduTransportTests
         TestCommand command = new TestCommand { ExpectedResponseLength = Maybe<int>.From(256) };
 
         // Act
-        ApduResponse? response = await _transport.TransmitAsync(command, _channel);
+        var result = await _transport.TransmitAsync(command, _channel);
 
         // Assert - Virtual card should handle wrong length retries automatically
-        Assert.That(response, Is.Not.Null);
-        Assert.That(response.IsSuccess, Is.True);
+        result.Should().BeSuccess();
     }
 
     [Test]
@@ -86,11 +88,10 @@ public class T0ApduTransportTests
         TestCommand command = new TestCommand { ExpectedResponseLength = Maybe<int>.None };
 
         // Act
-        ApduResponse? response = await _transport.TransmitAsync(command, _channel);
+        var result = await _transport.TransmitAsync(command, _channel);
 
         // Assert - Virtual card should handle commands without LE properly
-        Assert.That(response, Is.Not.Null);
-        Assert.That(response.IsSuccess, Is.True);
+        result.Should().BeSuccess();
     }
 
     private class TestCommand : IApduCommand
@@ -116,6 +117,28 @@ public class T0ApduTransportTests
         public bool IsExtendedLength
         {
             get { return false; }
+        }
+
+        /// <summary>
+        /// Converts this command to a WSCT CommandAPDU.
+        /// </summary>
+        /// <returns>The CommandAPDU representation of this command.</returns>
+        public CommandAPDU ToApdu()
+        {
+            return ExpectedResponseLength
+                .Match(
+                    expectedLength => new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data, (uint)expectedLength),
+                    () => new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data)
+                );
+        }
+
+        /// <summary>
+        /// Gets the raw APDU bytes for this command.
+        /// </summary>
+        /// <returns>The APDU bytes.</returns>
+        public byte[] ToBytes()
+        {
+            return ToApdu().BinaryCommand;
         }
     }
 }

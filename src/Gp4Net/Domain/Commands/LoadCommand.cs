@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Transport;
+using WSCT.Core;
+using WSCT.ISO7816;
 using JetBrains.Annotations;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -13,17 +17,8 @@ namespace Gp4Net.Domain.Commands;
 /// Used to transfer CAP file content in chunks after INSTALL [for load].
 /// </summary>
 [PublicAPI]
-public class LoadCommand : IApduCommand
+public class LoadCommand
 {
-    /// <summary>
-    /// The command class byte.
-    /// </summary>
-    public const byte Cla = 0x80;
-
-    /// <summary>
-    /// The command instruction byte.
-    /// </summary>
-    public const byte Ins = 0xE8;
 
     /// <summary>
     /// CAP file data TLV tag.
@@ -57,9 +52,14 @@ public class LoadCommand : IApduCommand
     public byte BlockNumber { get; }
 
     /// <summary>
+    /// Backing field for load data.
+    /// </summary>
+    private readonly byte[] _data;
+
+    /// <summary>
     /// Gets the data to load.
     /// </summary>
-    public byte[] Data { get; }
+    public byte[] Data { get { return GetCommandData(); } }
 
     /// <summary>
     /// Gets the total CAP file size (only included in first block).
@@ -83,19 +83,15 @@ public class LoadCommand : IApduCommand
     }
 
     /// <summary>
-    /// Gets the class byte.
+    /// Converts this command to a CommandAPDU.
     /// </summary>
-    byte IApduCommand.Cla
+    /// <returns>A result containing the CommandAPDU or an error.</returns>
+    public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
-        get { return Cla; }
-    }
-
-    /// <summary>
-    /// Gets the instruction byte.
-    /// </summary>
-    byte IApduCommand.Ins
-    {
-        get { return Ins; }
+        var data = GetCommandData();
+        return Result.Success<CommandAPDU, SmartCardError>(
+            new CommandAPDU(GlobalPlatform.Cla.GpStandard, GlobalPlatform.Ins.Load, (byte)Type, BlockNumber, (uint)data.Length, data, 0)
+        );
     }
 
     /// <summary>
@@ -114,20 +110,13 @@ public class LoadCommand : IApduCommand
         get { return BlockNumber; }
     }
 
-    /// <summary>
-    /// Gets the command data.
-    /// </summary>
-    byte[] IApduCommand.Data
-    {
-        get { return GetCommandData(); }
-    }
 
     /// <summary>
     /// Gets the expected response length.
     /// </summary>
     public Maybe<int> ExpectedResponseLength
     {
-        get { return Maybe<int>.None; }
+        get { return Maybe<int>.From(0); } // LE=0x00 means maximum response length
     }
 
     /// <summary>
@@ -198,7 +187,7 @@ public class LoadCommand : IApduCommand
     private LoadCommand(byte blockNumber, byte[] data, bool isFinalBlock, uint? totalCapSize = null)
     {
         BlockNumber = blockNumber;
-        Data = (byte[])data.Clone();
+        _data = (byte[])data.Clone();
         Type = isFinalBlock ? LoadType.Final : LoadType.Continuation;
         TotalCapSize = totalCapSize;
     }
@@ -244,7 +233,7 @@ public class LoadCommand : IApduCommand
     /// <returns>A Result containing the sequence of LOAD commands or an error.</returns>
     public static Result<IList<LoadCommand>, SmartCardError> CreateFromCapFile(
         byte[] capFileData,
-        int maxBlockSize = Gp4Net.Constants.Constants.GlobalPlatform.ApduLimits.DefaultLoadBlockSize
+        int maxBlockSize = GlobalPlatform.ApduLimits.DefaultLoadBlockSize
     )
     {
         if (capFileData == null)
@@ -335,7 +324,7 @@ public class LoadCommand : IApduCommand
     /// <returns>A Result containing the sequence of LOAD commands or an error.</returns>
     public static Result<IList<LoadCommand>, SmartCardError> CreateFromCapFile(
         CapFileStructure capFile,
-        int maxBlockSize = Gp4Net.Constants.Constants.GlobalPlatform.ApduLimits.DefaultLoadBlockSize
+        int maxBlockSize = GlobalPlatform.ApduLimits.DefaultLoadBlockSize
     )
     {
         if (capFile == null)
@@ -360,69 +349,6 @@ public class LoadCommand : IApduCommand
         }
     }
 
-    /// <summary>
-    /// Converts this command to an APDU byte array.
-    /// </summary>
-    /// <returns>The APDU command bytes.</returns>
-    public byte[] ToApdu()
-    {
-        List<byte> data = [];
-
-        if (IsFirstBlock)
-        {
-            // First block includes TLV header: C4 <total_length> <data>
-            data.Add(CapDataTag);
-
-            // Encode length (up to 3 bytes for length field)
-            uint totalSize = TotalCapSize!.Value;
-            switch (totalSize)
-            {
-                case <= 0x7F:
-                    data.Add((byte)totalSize);
-                    break;
-                case <= 0xFF:
-                    data.Add(0x81);
-                    data.Add((byte)totalSize);
-                    break;
-                case <= 0xFFFF:
-                    data.Add(0x82);
-                    data.Add((byte)(totalSize >> 8));
-                    data.Add((byte)(totalSize & 0xFF));
-                    break;
-                case <= 0xFFFFFF:
-                    data.Add(0x83);
-                    data.Add((byte)(totalSize >> 16));
-                    data.Add((byte)(totalSize >> 8 & 0xFF));
-                    data.Add((byte)(totalSize & 0xFF));
-                    break;
-                default:
-                    data.Add(0x84);
-                    data.Add((byte)(totalSize >> 24));
-                    data.Add((byte)(totalSize >> 16 & 0xFF));
-                    data.Add((byte)(totalSize >> 8 & 0xFF));
-                    data.Add((byte)(totalSize & 0xFF));
-                    break;
-            }
-        }
-
-        // Add the actual data
-        data.AddRange(Data);
-
-        // Build APDU
-        List<byte> apdu =
-        [
-            Cla,
-            Ins,
-            (byte)Type,
-            BlockNumber,
-            (byte)data.Count, // Lc
-        ];
-
-        apdu.AddRange(data);
-        apdu.Add(0x00); // Le
-
-        return [.. apdu];
-    }
 
     /// <summary>
     /// Returns a string representation of this command.

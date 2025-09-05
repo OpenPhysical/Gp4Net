@@ -3,6 +3,7 @@ using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
+using Gp4Net.Tests.Infrastructure;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.CardInfo;
@@ -61,11 +62,10 @@ public class KeyInformationTemplateTests
         );
 
         // Assert
-        _ = template.Should().NotBeNull();
-        KeyEntry? key = template.Value.Keys.First();
+        KeyEntry key = template.Value.Keys.First();
         _ = key.KeyId.Should().Be(16);
         _ = key.KeyVersion.Should().Be(2);
-        _ = key.PrimaryKeyType.Should().Be(KeyType.Aes);
+        _ = key.PrimaryKeyType.Should().HaveValue(KeyType.Aes);
         _ = key.KeyLength.Should().Be(128); // Default AES length
     }
 
@@ -95,7 +95,7 @@ public class KeyInformationTemplateTests
         _ = key.KeyTypes.Should().Contain(KeyType.Des);
         _ = key.KeyTypes.Should().Contain(KeyType.TripleDes2Key);
         _ = key.KeyTypes.Should().Contain(KeyType.TripleDes3Key);
-        _ = key.PrimaryKeyType.Should().Be(KeyType.Des); // First type
+        _ = key.PrimaryKeyType.Should().HaveValue(KeyType.Des); // First type
         _ = key.KeyLength.Should().Be(64); // DES length
     }
 
@@ -158,7 +158,7 @@ public class KeyInformationTemplateTests
         // All are AES keys
         foreach (KeyEntry? key in template.Value.Keys)
         {
-            _ = key.PrimaryKeyType.Should().Be(KeyType.Aes);
+            _ = key.PrimaryKeyType.Should().HaveValue(KeyType.Aes);
         }
     }
 

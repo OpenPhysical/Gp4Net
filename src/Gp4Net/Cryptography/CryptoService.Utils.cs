@@ -228,33 +228,15 @@ public static partial class CryptoService
 
         /// <summary>
         /// Generates random bytes using the configured RNG mode.
-        /// Delegates to UnifiedCryptoService.Rng for consistent random generation.
+        /// Delegates to CryptoService.Rng for consistent random generation.
         /// Supports both secure (production) and deterministic (testing) modes.
+        /// This method is deprecated - use CryptoService.Rng.GenerateBytes() directly.
         /// </summary>
         /// <param name="length">Number of bytes to generate.</param>
         /// <returns>Array of random bytes or error.</returns>
+        [Obsolete("Use CryptoService.Rng.GenerateBytes() directly")]
         public static Result<byte[], SmartCardError> GenerateRandomBytes(int length) =>
             Rng.GenerateBytes(length);
-
-        /// <summary>
-        /// Generates an 8-byte host challenge for secure channel establishment.
-        /// Per GP Card Specification, host challenge is always 8 bytes.
-        /// </summary>
-        /// <returns>8-byte host challenge or error.</returns>
-        public static Result<byte[], SmartCardError> GenerateHostChallenge()
-        {
-            return GenerateRandomBytes(8);
-        }
-
-        /// <summary>
-        /// Generates a 16-byte sequence counter for SCP03.
-        /// Per GP SCP03 Specification, sequence counter is 16 bytes.
-        /// </summary>
-        /// <returns>16-byte sequence counter or error.</returns>
-        public static Result<byte[], SmartCardError> GenerateSequenceCounter()
-        {
-            return GenerateRandomBytes(16);
-        }
 
         /// <summary>
         /// Applies GP padding to the AID per Section E.3.3.

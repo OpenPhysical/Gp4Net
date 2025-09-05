@@ -5,6 +5,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
 using NUnit.Framework;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.Tests.Domain.CardInfo;
 
@@ -97,12 +98,19 @@ public class CardCapabilitiesTests
             Maybe<byte[]>.From(data)
         );
         _ = result.IsSuccess.Should().BeTrue();
-        CardCapabilities? capabilities = result.Value;
+        if (result.IsSuccess)
+        {
+            CardCapabilities capabilities = result.Value;
 
-        // Assert
-        _ = capabilities.AppPrivileges.HasValue.Should().BeTrue();
-        _ = capabilities.AppPrivileges.Value.FinalApplication.Should().BeTrue();
-        _ = capabilities.AppPrivileges.Value.CardLock.Should().BeFalse();
+            // Assert
+            _ = capabilities.AppPrivileges.HasValue.Should().BeTrue();
+            capabilities.AppPrivileges.Map(appPrivileges =>
+            {
+                _ = appPrivileges.HasFlag(Privilege.FinalApplication).Should().BeTrue();
+                _ = appPrivileges.HasFlag(Privilege.CardLock).Should().BeFalse();
+                return appPrivileges;
+            });
+        }
     }
 
     [Test]

@@ -138,7 +138,7 @@ public class AeadEncryptionService : IDisposable
         CardUuid cardUuid
     )
     {
-        return CryptoService.Utils.GenerateRandomBytes(12) // 96-bit IV for GCM
+        return CryptoService.Rng.GenerateBytes(12) // 96-bit IV for GCM
             .Bind(iv => PerformUnifiedCryptoEncryption(key, plaintext, cardUuid, iv));
     }
 

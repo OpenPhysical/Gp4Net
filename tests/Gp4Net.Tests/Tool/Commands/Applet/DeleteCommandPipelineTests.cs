@@ -7,6 +7,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Services;
 using Gp4Net.Core;
 using Gp4Net.Services;
+using Gp4Net.Tests.Infrastructure;
 using Gp4Net.Tool.Commands.Applet;
 using Gp4Net.Tool.Pipeline;
 using Microsoft.Extensions.Logging;
@@ -46,7 +47,6 @@ namespace Gp4Net.Tests.Tool.Commands.Applet;
 public class DeleteCommandPipelineTests
 {
     private TestCliContext _testContext;
-    private IGlobalPlatformService _globalPlatformService;
     private ISmartCardService _smartCardService;
     private DeleteCommand _command;
     private string _testCapFilePath;
@@ -59,8 +59,7 @@ public class DeleteCommandPipelineTests
         virtualCardService.SetupComprehensiveTestEnvironment();
         _smartCardService = new TestCardService(virtualCardService);
 
-        // Skip domain service factory setup for DeleteCommand tests - use empty service
-        _globalPlatformService = new EmptyGlobalPlatformService();
+        // Skip domain service factory setup for DeleteCommand tests - use card service directly
 
         // Create real CLI context with virtual card
         DisplayService displayService = new DisplayService();
@@ -70,7 +69,6 @@ public class DeleteCommandPipelineTests
         _testContext = new TestCliContext(
             displayService,
             _smartCardService,
-            _globalPlatformService,
             keysetResolver,
             logger
         );
@@ -262,26 +260,22 @@ public class TestCliContext : ICliExecutionContext
 {
     public IDisplayService Display { get; }
     public ISmartCardService CardService { get; }
-    private readonly IGlobalPlatformService _globalPlatformService;
     public IKeysetResolver KeysetResolver { get; }
     public ILogger Logger { get; }
 
     public TestCliContext(
         IDisplayService display,
         ISmartCardService smartCardService,
-        IGlobalPlatformService globalPlatformService,
         IKeysetResolver keysetResolver,
         ILogger logger
     )
     {
         Display = display;
         CardService = smartCardService;
-        _globalPlatformService = globalPlatformService;
         KeysetResolver = keysetResolver;
         Logger = logger;
     }
 
-    public IGlobalPlatformService GetGlobalPlatformService() => _globalPlatformService;
 
     public Func<
         SecureChannelRequest,
@@ -292,7 +286,7 @@ public class TestCliContext : ICliExecutionContext
             Task.FromResult(
                 Result.Success<SecureChannelExecutionContext, SmartCardError>(
                     new SecureChannelExecutionContext(
-                        _globalPlatformService,
+                        CardService,
                         new SecureChannelState(
                             Maybe<SessionKeys>.None,
                             SecurityLevel.NoSecurity,

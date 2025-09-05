@@ -17,6 +17,8 @@
     <PackageReference Include="JetBrains.Annotations" Version="2024.3.0" />
     <PackageReference Include="Kdf108" Version="1.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="WSCT.Core" Version="6.7.0" />
+    <PackageReference Include="WSCT.Wrapper.Desktop" Version="1.5.0" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Data\known-packages.json" />

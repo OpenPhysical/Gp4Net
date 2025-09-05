@@ -239,7 +239,7 @@ public class SelectCommandTests
     [Test]
     public void CreateEmptySelect_IsObsolete_ButWorks()
     {
-        SelectCommand? command = GlobalPlatformService.Commands.CreateSelectIsdCommand().Value;
+        SelectCommand? command = Services.GlobalPlatform.Commands.CreateSelectIsdCommand().Value;
 
         _ = command.Aid.Should().BeEmpty();
         _ = command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
@@ -396,7 +396,7 @@ public class SelectCommandTests
 
         foreach (SelectCommand.FileControlInfo option in options)
         {
-            SelectCommand? command = GlobalPlatformService.Commands.CreateSelectIsdCommand(option).Value;
+            SelectCommand? command = Services.GlobalPlatform.Commands.CreateSelectIsdCommand(option).Value;
 
             _ = command
                 .ControlInfo.Should()

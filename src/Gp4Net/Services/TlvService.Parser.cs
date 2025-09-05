@@ -318,23 +318,16 @@ public static partial class TlvService
                 );
             }
 
-            // Security check: Prevent excessive length bytes
-            if (lengthBytes > Constants.Constants.Tlv.Parsing.MaxReasonableLengthBytes)
-            {
-                return Result.Failure<(int, int), SmartCardError>(
-                    SmartCardError.SecurityError("Excessive length bytes in TLV")
-                );
-            }
 
             // Use LINQ to aggregate the length bytes
             var lengthData = data.Skip(currentOffset).Take(lengthBytes).ToImmutableArray();
             var length = lengthData.Aggregate(0, (acc, b) => (acc << 8) | b);
 
             // Security check: Detect overflow
-            if (length < 0 || length > Constants.Constants.Tlv.SecurityLimits.MaxTlvValueSize)
+            if (length < 0)
             {
                 return Result.Failure<(int, int), SmartCardError>(
-                    SmartCardError.SecurityError($"TLV length {length} is invalid or exceeds maximum allowed")
+                    SmartCardError.SecurityError($"TLV length {length} is invalid")
                 );
             }
 

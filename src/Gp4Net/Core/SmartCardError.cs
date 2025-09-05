@@ -104,6 +104,14 @@ public record SmartCardError(
     }
 
     /// <summary>
+    /// Creates an error for operations that are not yet implemented.
+    /// </summary>
+    public static SmartCardError NotImplemented(string message)
+    {
+        return Simple("NOT_IMPLEMENTED", message);
+    }
+
+    /// <summary>
     /// Creates an error for invalid response data.
     /// </summary>
     public static SmartCardError InvalidResponse(string message)
@@ -283,6 +291,22 @@ public record SmartCardError(
     public static SmartCardError OperationCancelled(string message)
     {
         return Simple("OPERATION_CANCELLED", message);
+    }
+
+    /// <summary>
+    /// Creates an error for invalid length.
+    /// </summary>
+    public static SmartCardError InvalidLength(string message)
+    {
+        return Simple("INVALID_LENGTH", message);
+    }
+
+    /// <summary>
+    /// Creates an error for communication failures.
+    /// </summary>
+    public static SmartCardError CommunicationFailed(string message)
+    {
+        return Simple("COMMUNICATION_FAILED", message);
     }
 
     /// <summary>

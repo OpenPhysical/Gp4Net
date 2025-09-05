@@ -1,9 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Transport;
+using WSCT.Core;
+using WSCT.ISO7816;
 using JetBrains.Annotations;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -11,17 +15,8 @@ namespace Gp4Net.Domain.Commands;
 /// Represents the PUT KEY command for key establishment and replacement.
 /// </summary>
 [PublicAPI]
-public class PutKeyCommand : IApduCommand
+public class PutKeyCommand
 {
-    /// <summary>
-    /// The command class byte.
-    /// </summary>
-    public const byte Cla = 0x80;
-
-    /// <summary>
-    /// The command instruction byte.
-    /// </summary>
-    public const byte Ins = 0xD8;
 
     /// <summary>
     /// Key usage qualifier values for P1.
@@ -86,19 +81,17 @@ public class PutKeyCommand : IApduCommand
     public IReadOnlyList<KeyDataBlock> KeyDataBlocks { get; }
 
     /// <summary>
-    /// Gets the class byte.
+    /// Converts this command to a CommandAPDU.
     /// </summary>
-    byte IApduCommand.Cla
+    /// <returns>A result containing the CommandAPDU or an error.</returns>
+    public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
-        get { return Cla; }
-    }
-
-    /// <summary>
-    /// Gets the instruction byte.
-    /// </summary>
-    byte IApduCommand.Ins
-    {
-        get { return Ins; }
+        var expectedLength = KeyDataBlocks.Count * 3;
+        var data = Data;
+        
+        return Result.Success<CommandAPDU, SmartCardError>(
+            new CommandAPDU(GlobalPlatform.Cla.GpStandard, GlobalPlatform.Ins.PutKey, (byte)UsageQualifier, (byte)KekIdentifier, (uint)data.Length, data, (uint)expectedLength)
+        );
     }
 
     /// <summary>
@@ -206,32 +199,6 @@ public class PutKeyCommand : IApduCommand
         return "PUT KEY";
     }
 
-    /// <summary>
-    /// Converts this command to an APDU byte array.
-    /// </summary>
-    /// <returns>The APDU command bytes.</returns>
-    public byte[] ToApdu()
-    {
-        // Calculate total data length
-        int dataLength = 0;
-        foreach (KeyDataBlock block in KeyDataBlocks)
-        {
-            dataLength += block.ToBytes().Length;
-        }
-
-        List<byte> apdu = [Cla, Ins, (byte)UsageQualifier, (byte)KekIdentifier, (byte)dataLength];
-
-        // Add key data blocks
-        foreach (KeyDataBlock block in KeyDataBlocks)
-        {
-            apdu.AddRange(block.ToBytes());
-        }
-
-        // Add LE byte for key check values (3 bytes per key)
-        apdu.Add((byte)(KeyDataBlocks.Count * 3));
-
-        return [.. apdu];
-    }
 }
 
 /// <summary>

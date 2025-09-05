@@ -10,8 +10,9 @@ using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Constants;
 using Gp4Net.Transport;
+using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 //using CSharpFunctionalExtensions.AwesomeAssertions;
 //using static CSharpFunctionalExtensions.Result;
@@ -213,13 +214,16 @@ public class VirtualCardTests
 
         // Create DELETE command for a test application
         byte[] testAid = Convert.FromHexString("A00000030800001000");
-        DeleteCommand? deleteCommand = DeleteCommand
-            .CreateForApplication(testAid, deleteRelated: true)
-            .Value;
-        byte[]? deleteApdu = ApduBuilder.BuildApdu(deleteCommand);
+        var deleteResult = DeleteCommand
+            .CreateForApplication(testAid, deleteRelated: true);
 
         // Act
-        ApduResponse response = card.ProcessCommand(deleteApdu);
+        var response = deleteResult
+            .Map(deleteCommand => deleteCommand.ToBytes())
+            .Match(
+                apduBytes => card.ProcessCommand(apduBytes),
+                error => new ApduResponse([], 0x6F00) // Generic failure response
+            );
 
         // Assert
         _ = response.StatusWord.Should().Be(StatusWords.Success.Normal);
@@ -236,12 +240,16 @@ public class VirtualCardTests
 
         // GlobalPlatform Card Specification v2.3.1 Section 11.5.2.1 INSTALL [for load]
         byte[] packageAid = Convert.FromHexString("A000000308000010");
-        InstallCommand.InstallForLoadCommand? installForLoadCommand = InstallCommandBuilder
-            .CreateForLoad(packageAid: packageAid, securityDomainAid: card.Configuration.IsdAid)
-            .Value;
+        var installForLoadResult = InstallCommandBuilder
+            .CreateForLoad(packageAid: packageAid, securityDomainAid: card.Configuration.IsdAid);
 
         // Act
-        ApduResponse response = card.ProcessCommand(ApduBuilder.BuildApdu(installForLoadCommand));
+        var response = installForLoadResult
+            .Bind(installCommand => installCommand.ToCommandApdu())
+            .Match(
+                commandApdu => card.ProcessCommand(commandApdu.BinaryCommand),
+                error => new ApduResponse([], 0x6F00) // Generic failure response
+            );
 
         // Assert
         _ = response.StatusWord.Should().Be(StatusWords.Success.Normal);
@@ -279,19 +287,18 @@ public class VirtualCardTests
             implementationParameter: 0x00
         );
 
-        // Apply secure channel state to card (unit testing approach)
+        // Create new card instance with secure channel established (functional approach)
         if (secureChannelResult.IsSuccess)
         {
-            FieldInfo? cardStateField = typeof(VirtualCard).GetField(
-                "_state",
-                BindingFlags.NonPublic | BindingFlags.Instance
+            CardState currentState = card.CurrentState;
+            CardState newState = currentState.WithSecureChannel(secureChannelResult.Value);
+            
+            return new VirtualCard(
+                card.Configuration,
+                CryptoService.Rng.CreateSecureContext(),
+                newState,
+                new LoggingService(Maybe<ILogger>.None)
             );
-            if (cardStateField is not null)
-            {
-                CardState currentState = (CardState)cardStateField.GetValue(card)!;
-                CardState newState = currentState.WithSecureChannel(secureChannelResult.Value);
-                cardStateField.SetValue(card, newState);
-            }
         }
 
         return card;

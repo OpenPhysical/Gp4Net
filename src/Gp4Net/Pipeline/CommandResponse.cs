@@ -108,10 +108,6 @@ public static class ResponseMetadata
     /// </summary>
     public const string ExecutionTime = "ExecutionTime";
 
-    /// <summary>
-    /// The number of retries attempted.
-    /// </summary>
-    public const string RetryCount = "RetryCount";
 
     /// <summary>
     /// Whether the command was wrapped with secure channel.

@@ -1,8 +1,13 @@
 using System.Collections.Generic;
+using System.Linq;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Transport;
+using WSCT.Core;
+using WSCT.ISO7816;
 using JetBrains.Annotations;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -12,15 +17,6 @@ namespace Gp4Net.Domain.Commands;
 [PublicAPI]
 public class StoreDataCommand : IApduCommand
 {
-    /// <summary>
-    /// The command class byte.
-    /// </summary>
-    public const byte Cla = 0x80;
-
-    /// <summary>
-    /// The command instruction byte.
-    /// </summary>
-    public const byte Ins = 0xE2;
 
     /// <summary>
     /// Data structure format values for P1.
@@ -85,19 +81,24 @@ public class StoreDataCommand : IApduCommand
     public byte[] StoreData { get; }
 
     /// <summary>
-    /// Gets the class byte.
+    /// Converts this command to a CommandAPDU.
     /// </summary>
-    byte IApduCommand.Cla
+    /// <returns>A result containing the CommandAPDU or an error.</returns>
+    public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
-        get { return Cla; }
-    }
-
-    /// <summary>
-    /// Gets the instruction byte.
-    /// </summary>
-    byte IApduCommand.Ins
-    {
-        get { return Ins; }
+        // Build APDU bytes using immutable construction
+        var headerBytes = new byte[] { GlobalPlatform.Cla.GpStandard, GlobalPlatform.Ins.StoreData, (byte)StructureFormat, (byte)Block };
+        
+        var apduBytes = StoreData.Length > 0
+            ? headerBytes
+                .Concat([(byte)StoreData.Length]) // Lc
+                .Concat(StoreData)
+                .ToArray()
+            : headerBytes;
+        
+        return Result.Success<CommandAPDU, SmartCardError>(
+            new CommandAPDU(apduBytes)
+        );
     }
 
     /// <summary>
@@ -213,21 +214,16 @@ public class StoreDataCommand : IApduCommand
         return "STORE DATA";
     }
 
-    /// <summary>
-    /// Converts this command to an APDU byte array.
-    /// </summary>
-    /// <returns>The APDU command bytes.</returns>
-    public byte[] ToApdu()
+    /// <inheritdoc />
+    public CommandAPDU ToApdu()
     {
-        List<byte> apdu = [Cla, Ins, P1, P2];
+        return ToCommandApdu().GetValueOrDefault(new CommandAPDU([]));
+    }
 
-        if (StoreData.Length > 0)
-        {
-            apdu.Add((byte)StoreData.Length);
-            apdu.AddRange(StoreData);
-        }
-
-        return [.. apdu];
+    /// <inheritdoc />
+    public byte[] ToBytes()
+    {
+        return ToCommandApdu().Map(cmd => cmd.ToBytes()).GetValueOrDefault([]);
     }
 }
 

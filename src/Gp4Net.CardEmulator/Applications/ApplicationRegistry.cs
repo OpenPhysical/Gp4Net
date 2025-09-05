@@ -7,11 +7,12 @@ using Gp4Net.CardEmulator.Functional;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain;
-using Gp4Net.Services;
 using Gp4Net.Shared;
 using JetBrains.Annotations;
-using ApduIns = Gp4Net.Constants.Constants.Apdu.Instructions;
+using ApduIns = Gp4Net.Constants.Apdu.Instructions;
 using GpIns = Gp4Net.Constants.Constants.GlobalPlatform.Ins;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
+using static Gp4Net.Services.TlvService;
 
 namespace Gp4Net.CardEmulator.Applications;
 
@@ -331,18 +332,31 @@ public sealed record ApplicationRegistry
         //       60 [length]
         //         [application_specific_data]
         
-        var aid = application.Aid.ToArray();
-        var aidTlv = new byte[2 + aid.Length];
-        aidTlv[0] = 0x84;
-        aidTlv[1] = (byte)aid.Length;
-        Array.Copy(aid, 0, aidTlv, 2, aid.Length);
+        var aid = application.Aid;
         
-        // Build FCI with just AID
-        var fciContent = aidTlv;
-        var fciTemplate = new byte[2 + fciContent.Length];
-        fciTemplate[0] = 0x6F;
-        fciTemplate[1] = (byte)fciContent.Length;
-        Array.Copy(fciContent, 0, fciTemplate, 2, fciContent.Length);
+        // Build AID TLV using service
+        var aidTlvResult = TlvEncoder.EncodeSimple(0x84, aid);
+        
+        // Build FCI template with AID TLV using service
+        var fciTemplateResult = aidTlvResult.Bind(aidTlv =>
+            TlvEncoder.EncodeSimple(0x6F, aidTlv));
+            
+        var fciTemplate = fciTemplateResult.Match(
+            success => success.ToArray(),
+            error => // Fallback to manual construction on service error
+            {
+                var aidArray = aid.ToArray();
+                var aidTlvFallback = new byte[2 + aidArray.Length];
+                aidTlvFallback[0] = 0x84;
+                aidTlvFallback[1] = (byte)aidArray.Length;
+                Array.Copy(aidArray, 0, aidTlvFallback, 2, aidArray.Length);
+                
+                var fciTemplateFallback = new byte[2 + aidTlvFallback.Length];
+                fciTemplateFallback[0] = 0x6F;
+                fciTemplateFallback[1] = (byte)aidTlvFallback.Length;
+                Array.Copy(aidTlvFallback, 0, fciTemplateFallback, 2, aidTlvFallback.Length);
+                return fciTemplateFallback;
+            });
         
         return fciTemplate;
     }
@@ -432,7 +446,7 @@ public sealed record ApplicationRegistry
     {
         // ISD is the application with SecurityDomain privilege
         var isdApps = Applications.Values
-            .Where(app => (app.Privileges & ApplicationPrivileges.SecurityDomain) != 0)
+            .Where(app => (app.Privileges & Privilege.SecurityDomain) != 0)
             .ToImmutableList();
         
         return isdApps.Count > 0 

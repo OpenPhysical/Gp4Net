@@ -31,7 +31,6 @@ public static partial class CryptoService
             byte[] data
         )
         {
-            // @TODO NO NULLS!
             return Validation.ValidateInputs(key, iv, data)
                 .Bind(() => Validation.ValidateIvLength(iv, 16, "IV must be 16 bytes for AES"))
                 .Bind(() =>
@@ -76,7 +75,6 @@ public static partial class CryptoService
             byte[] encryptedData
         )
         {
-            // @TODO NO NULLS!
             return Validation.ValidateInputs(key, iv, encryptedData)
                 .Bind(() => Validation.ValidateIvLength(iv, 16, "IV must be 16 bytes for AES"))
                 .Bind(() =>
@@ -112,7 +110,7 @@ public static partial class CryptoService
         /// <param name="data">The data to encrypt (must be padded to block size).</param>
         /// <returns>The encrypted data.</returns>
         public static Result<byte[], SmartCardError> EncryptAesCbc(byte[] key, byte[] iv, byte[] data)
-        {// @TODO NO NULLS!
+        {
             return Validation.ValidateInputs(key, iv, data)
                 .Bind(() => Validation.ValidateIvLength(iv, 16, "IV must be 16 bytes for AES"))
                 .Bind(() => Validation.ValidateDataPadding(data, 16, "Data must be padded to 16-byte blocks"))
@@ -150,7 +148,7 @@ public static partial class CryptoService
             byte[] iv,
             byte[] encryptedData
         )
-        {// @TODO NO NULLS!
+        {
             return Validation.ValidateInputs(key, iv, encryptedData)
                 .Bind(() => Validation.ValidateIvLength(iv, 16, "IV must be 16 bytes for AES"))
                 .Bind(() => Validation.ValidateDataPadding(encryptedData, 16, "Encrypted data must be in 16-byte blocks"))
@@ -187,7 +185,7 @@ public static partial class CryptoService
             byte[] iv,
             byte[] data
         )
-        {// @TODO NO NULLS!
+        {
             return Validation.ValidateInputs(key, iv, data)
                 .Bind(() => Validation.ValidateIvLength(iv, 8, "IV must be 8 bytes for 3DES"))
                 .Bind(() => Utils.ExpandTripleDesKey(key))
@@ -232,7 +230,7 @@ public static partial class CryptoService
             byte[] iv,
             byte[] encryptedData
         )
-        {// @TODO NO NULLS!
+        {
             return Validation.ValidateInputs(key, iv, encryptedData)
                 .Bind(() => Validation.ValidateIvLength(iv, 8, "IV must be 8 bytes for 3DES"))
                 .Bind(() => Utils.ExpandTripleDesKey(key))
@@ -275,7 +273,7 @@ public static partial class CryptoService
         /// <param name="data">The data to encrypt (must be padded to block size).</param>
         /// <returns>The encrypted data.</returns>
         public static Result<byte[], SmartCardError> Encrypt3DesCbc(byte[] key, byte[] iv, byte[] data)
-        {// @TODO NO NULLS!
+        {
             return Validation.ValidateInputs(key, iv, data)
                 .Bind(() => Validation.ValidateIvLength(iv, 8, "IV must be 8 bytes for 3DES"))
                 .Bind(() => Validation.ValidateDataPadding(data, 8, "Data must be padded to 8-byte blocks"))
@@ -314,7 +312,7 @@ public static partial class CryptoService
             byte[] iv,
             byte[] encryptedData
         )
-        {// @TODO NO NULLS!
+        {
             return Validation.ValidateInputs(key, iv, encryptedData)
                 .Bind(() => Validation.ValidateIvLength(iv, 8, "IV must be 8 bytes for 3DES"))
                 .Bind(() => Validation.ValidateDataPadding(encryptedData, 8, "Encrypted data must be in 8-byte blocks"))

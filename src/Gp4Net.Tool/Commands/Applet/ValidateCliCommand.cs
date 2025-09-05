@@ -24,7 +24,6 @@ namespace Gp4Net.Tool.Commands.Applet;
 public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 {
     private readonly IDisplayService _displayService;
-    private readonly IDomainServiceFactory _domainServiceFactory;
     private readonly IKeysetResolver _keysetResolver;
     private readonly PackageRegistry _packageRegistry;
 
@@ -33,13 +32,11 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
     /// </summary>
     public ValidateCommand(
         IDisplayService displayService,
-        IDomainServiceFactory domainServiceFactory,
         IKeysetResolver keysetResolver,
         PackageRegistry packageRegistry
     )
     {
         _displayService = displayService;
-        _domainServiceFactory = domainServiceFactory;
         _keysetResolver = keysetResolver;
         _packageRegistry = packageRegistry;
     }
@@ -293,9 +290,9 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
         // Check for sensitive components
         bool hasExport = capFile.Components.Any(c =>
-            c.Tag == CapFileStructure.ComponentTags.Export
+            c.Tag == Constants.Constants.JavaCard.ComponentTags.Export
         );
-        bool hasDebug = capFile.Components.Any(c => c.Tag == CapFileStructure.ComponentTags.Debug);
+        bool hasDebug = capFile.Components.Any(c => c.Tag == Constants.Constants.JavaCard.ComponentTags.Debug);
 
         List<string> sensitiveComponents = [];
         if (hasExport)
@@ -344,7 +341,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
         // Static field analysis summary
         CapComponent staticFieldComponent = capFile.Components.FirstOrDefault(c =>
-            c.Tag == CapFileStructure.ComponentTags.StaticField
+            c.Tag == Constants.Constants.JavaCard.ComponentTags.StaticField
         );
         if (staticFieldComponent is { Size: > 0 })
         {
@@ -658,7 +655,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         {
             // Find the static field component
             CapComponent staticFieldComponent = capFile.Components.FirstOrDefault(c =>
-                c.Tag == CapFileStructure.ComponentTags.StaticField
+                c.Tag == Constants.Constants.JavaCard.ComponentTags.StaticField
             );
             if (staticFieldComponent == null)
             {

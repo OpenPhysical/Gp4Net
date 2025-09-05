@@ -7,7 +7,7 @@ namespace Gp4Net.CardEmulator.Functional;
 /// </summary>
 internal record SelectCommandData(
     ImmutableArray<byte> Aid,
-    SelectionControl SelectionControl,
+    byte SelectionControl,
     FileControlInformation Fci,
     bool FileOccurrence
 );

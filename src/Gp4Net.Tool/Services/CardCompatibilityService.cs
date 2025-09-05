@@ -264,28 +264,24 @@ public class CardCompatibilityService : ICardCompatibilityService
                 return Result.Failure<int?, SmartCardError>(commandResult.Error);
             }
 
-            ApduResponse response = await transport.TransmitAsync(
+            var responseResult = await transport.TransmitAsync(
                 commandResult.Value,
                 channel,
                 cancellationToken
             );
 
-            if (response.IsSuccess && response.Data.Length > 0)
-            {
-                // Parse counter if available (implementation depends on card type)
-                Result<GetDataResponse, SmartCardError> parseResult = GetDataResponse.Parse(
-                    GetDataCommand.DataObjects.ConfirmationCounter,
-                    response.Data
-                );
-                return parseResult.Map(parsedResponse =>
-                {
-                    Maybe<uint> counter = parsedResponse.GetValueAsNumber();
-                    return counter.HasValue ? (int?)counter.Value : null;
-                });
-            }
-
-            // Attempt count not available
-            return Result.Success<int?, SmartCardError>(null);
+            return responseResult.Bind(response =>
+                response.IsSuccessful && response.Data.Length > 0
+                    ? GetDataResponse.Parse(
+                        GetDataCommand.DataObjects.ConfirmationCounter,
+                        response.Data
+                    ).Map(parsedResponse =>
+                    {
+                        Maybe<uint> counter = parsedResponse.GetValueAsNumber();
+                        return counter.HasValue ? (int?)counter.Value : null;
+                    })
+                    : Result.Success<int?, SmartCardError>(null)
+            );
         }
         catch (Exception ex)
         {
@@ -310,19 +306,19 @@ public class CardCompatibilityService : ICardCompatibilityService
                 return Result.Failure<byte[], SmartCardError>(commandResult.Error);
             }
             GetDataCommand getDataCmd = commandResult.Value;
-            ApduResponse response = await transport.TransmitAsync(
+            var responseResult = await transport.TransmitAsync(
                 getDataCmd,
                 channel,
                 cancellationToken
             );
 
-            if (response.IsSuccess && response.Data.Length > 0)
-            {
-                return Result.Success<byte[], SmartCardError>(response.Data);
-            }
 
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.CardError("CPLC data not available")
+            return responseResult.Bind(response =>
+                response.IsSuccessful && response.Data.Length > 0
+                    ? Result.Success<byte[], SmartCardError>(response.Data)
+                    : Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.CardError("CPLC data not available")
+                    )
             );
         }
         catch (Exception ex)

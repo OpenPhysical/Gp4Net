@@ -8,6 +8,7 @@ using Gp4Net.Domain;
 using Gp4Net.Pipeline;
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
+using WSCT.ISO7816;
 using static Gp4Net.Pipeline.CommandProcessing;
 
 namespace Gp4Net.Services;
@@ -57,7 +58,7 @@ public class SmartCardService : ISmartCardService
 
     /// <inheritdoc/>
     public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
-        IApduCommand command,
+        CommandAPDU command,
         CancellationToken cancellationToken = default
     )
     {
@@ -66,7 +67,7 @@ public class SmartCardService : ISmartCardService
 
     /// <inheritdoc/>
     public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
-        IApduCommand command,
+        CommandAPDU command,
         CommandOptions options,
         CancellationToken cancellationToken = default
     )
@@ -83,7 +84,7 @@ public class SmartCardService : ISmartCardService
         {
             // Execute command through functional processor
             Result<CommandResult, SmartCardError> result = await _processor(
-                command,
+                new WrappedApduCommand(command),
                 environmentWithOptions,
                 cancellationToken
             );
@@ -96,13 +97,13 @@ public class SmartCardService : ISmartCardService
                 new Dictionary<string, object>
                 {
                     [ResponseMetadata.ExecutionTime] =
-                        cmdResult.Metadata?.ExecutionTime ?? TimeSpan.Zero,
+                        cmdResult.Metadata?.ExecutionTime.GetValueOrDefault(TimeSpan.Zero) ?? TimeSpan.Zero,
                     [ResponseMetadata.TransmittedBytes] =
-                        cmdResult.Metadata?.TransmittedBytes ?? [],
-                    [ResponseMetadata.ReceivedBytes] = cmdResult.Metadata?.ReceivedBytes ?? [],
+                        cmdResult.Metadata?.TransmittedBytes.GetValueOrDefault([]) ?? [],
+                    [ResponseMetadata.ReceivedBytes] = 
+                        cmdResult.Metadata?.ReceivedBytes.GetValueOrDefault([]) ?? [],
                     [ResponseMetadata.SecureChannelWrapped] =
                         cmdResult.Metadata?.SecureChannelWrapped ?? false,
-                    [ResponseMetadata.RetryCount] = cmdResult.Metadata?.RetryCount ?? 0,
                 }
             ));
         }
@@ -220,7 +221,7 @@ public class SmartCardService : ISmartCardService
         CancellationToken cancellationToken = default
     )
     {
-        Result<IApduCommand, SmartCardError> parseResult = ParseApduCommand(command);
+        Result<CommandAPDU, SmartCardError> parseResult = ParseApduCommand(command);
         if (parseResult.IsFailure)
         {
             return Result.Failure<CommandResponse, SmartCardError>(parseResult.Error);
@@ -229,38 +230,24 @@ public class SmartCardService : ISmartCardService
         return await ExecuteCommandAsync(parseResult.Value, cancellationToken);
     }
 
-    private static Result<IApduCommand, SmartCardError> ParseApduCommand(byte[] command)
+    private static Result<CommandAPDU, SmartCardError> ParseApduCommand(byte[] command)
     {
         return command.Length switch
         {
-            4 => Result.Success<IApduCommand, SmartCardError>(
-                new SimpleApduCommand(
-                    command[0],
-                    command[1],
-                    command[2],
-                    command[3],
-                    [],
-                    Maybe<int>.None
-                )
+            4 => Result.Success<CommandAPDU, SmartCardError>(
+                new CommandAPDU(command[0], command[1], command[2], command[3])
             ),
-            5 => Result.Success<IApduCommand, SmartCardError>(
-                new SimpleApduCommand(
-                    command[0],
-                    command[1],
-                    command[2],
-                    command[3],
-                    [],
-                    Maybe<int>.From(command[4] == 0 ? 256 : command[4])
-                )
+            5 => Result.Success<CommandAPDU, SmartCardError>(
+                new CommandAPDU(command[0], command[1], command[2], command[3], (uint)(command[4] == 0 ? 256 : command[4]))
             ),
             > 5 => ParseApduWithData(command),
-            _ => Result.Failure<IApduCommand, SmartCardError>(
+            _ => Result.Failure<CommandAPDU, SmartCardError>(
                 SmartCardError.InvalidArgument("Invalid APDU command length")
             ),
         };
     }
 
-    private static Result<IApduCommand, SmartCardError> ParseApduWithData(byte[] command)
+    private static Result<CommandAPDU, SmartCardError> ParseApduWithData(byte[] command)
     {
         byte cla = command[0];
         byte ins = command[1];
@@ -273,8 +260,8 @@ public class SmartCardService : ISmartCardService
             // Case 3: command with data, no response expected
             byte[] data = new byte[lc];
             Array.Copy(command, 5, data, 0, lc);
-            return Result.Success<IApduCommand, SmartCardError>(
-                new SimpleApduCommand(cla, ins, p1, p2, data, Maybe<int>.None)
+            return Result.Success<CommandAPDU, SmartCardError>(
+                new CommandAPDU(cla, ins, p1, p2, (uint)data.Length, data)
             );
         }
         if (command.Length == 5 + lc + 1)
@@ -284,12 +271,12 @@ public class SmartCardService : ISmartCardService
             Array.Copy(command, 5, data, 0, lc);
             byte le = command[5 + lc];
             int expectedLength = le == 0 ? 256 : le;
-            return Result.Success<IApduCommand, SmartCardError>(
-                new SimpleApduCommand(cla, ins, p1, p2, data, Maybe<int>.From(expectedLength))
+            return Result.Success<CommandAPDU, SmartCardError>(
+                new CommandAPDU(cla, ins, p1, p2, (uint)data.Length, data, (uint)expectedLength)
             );
         }
 
-        return Result.Failure<IApduCommand, SmartCardError>(
+        return Result.Failure<CommandAPDU, SmartCardError>(
             SmartCardError.InvalidArgument("Invalid APDU command format")
         );
     }
@@ -317,7 +304,7 @@ public static class SmartCardServiceExtensions
     /// </summary>
     public static async Task<Result<CommandResponse[], SmartCardError>> ExecuteCommandsAsync(
         this ISmartCardService service,
-        IApduCommand[] commands,
+        CommandAPDU[] commands,
         CancellationToken cancellationToken = default
     )
     {
@@ -358,7 +345,7 @@ public static class SmartCardServiceExtensions
     /// </summary>
     public static async Task<Result<T, SmartCardError>> ExecuteAndMapAsync<T>(
         this ISmartCardService service,
-        IApduCommand command,
+        CommandAPDU command,
         Func<CommandResponse, T> mapper,
         CancellationToken cancellationToken = default
     )
@@ -371,50 +358,3 @@ public static class SmartCardServiceExtensions
     }
 }
 
-/// <summary>
-/// Simple APDU command implementation for raw command execution.
-/// </summary>
-internal class SimpleApduCommand : IApduCommand
-{
-    /// <inheritdoc/>
-    public byte Cla { get; }
-
-    /// <inheritdoc/>
-    public byte Ins { get; }
-
-    /// <inheritdoc/>
-    public byte P1 { get; }
-
-    /// <inheritdoc/>
-    public byte P2 { get; }
-
-    /// <inheritdoc/>
-    public byte[] Data { get; }
-
-    /// <inheritdoc/>
-    public Maybe<int> ExpectedResponseLength { get; }
-
-    /// <inheritdoc/>
-    public bool IsExtendedLength =>
-        Data.Length > 255 || ExpectedResponseLength.GetValueOrDefault(0) > 256;
-
-    /// <summary>
-    /// Initializes a new instance of SimpleApduCommand.
-    /// </summary>
-    public SimpleApduCommand(
-        byte cla,
-        byte ins,
-        byte p1,
-        byte p2,
-        byte[] data,
-        Maybe<int> expectedResponseLength
-    )
-    {
-        Cla = cla;
-        Ins = ins;
-        P1 = p1;
-        P2 = p2;
-        Data = data ?? [];
-        ExpectedResponseLength = expectedResponseLength;
-    }
-}

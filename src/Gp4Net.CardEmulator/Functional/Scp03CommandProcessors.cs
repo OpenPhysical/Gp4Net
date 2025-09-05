@@ -10,7 +10,6 @@ using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Constants;
-using Gp4Net.Domain.Protocol;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 

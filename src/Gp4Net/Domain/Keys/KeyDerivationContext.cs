@@ -2,7 +2,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using static Gp4Net.Cryptography.CryptoService;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Constants;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Keys;

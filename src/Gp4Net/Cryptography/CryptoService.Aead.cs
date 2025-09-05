@@ -29,11 +29,11 @@ public static partial class CryptoService
         public static Result<byte[], SmartCardError> EncryptAesGcm(
             byte[] key,
             byte[] nonce,
-            byte[] plaintext,// @TODO NO NULLS!
+            byte[] plaintext,
             byte[] associatedData,
             int tagLength = 128
         )
-        {// @TODO NO NULLS!
+        {
             return ValidateAesGcmInputs(key, nonce, plaintext, tagLength)
                 .Bind(() =>
                     Result.Try(
@@ -80,7 +80,7 @@ public static partial class CryptoService
         public static Result<byte[], SmartCardError> DecryptAesGcm(
             byte[] key,
             byte[] nonce,
-            byte[] ciphertext,// @TODO NO NULLS!
+            byte[] ciphertext,
             byte[] associatedData,
             int tagLength = 128
         )

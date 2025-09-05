@@ -1,8 +1,13 @@
 using System;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Domain;
+using Gp4Net.Domain.CardInfo;
+using Gp4Net.Domain.Commands;
+using Gp4Net.Domain.Keys;
 using Gp4Net.Services;
 using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
@@ -18,7 +23,6 @@ namespace Gp4Net.Tool.Pipeline;
 public class CliContext : ICliExecutionContext
 {
     private readonly ILogger<CliContext> _logger;
-    private readonly IGlobalPlatformService _globalPlatformService;
     private readonly IKeysetResolver _keysetResolver;
 
     public IDisplayService Display { get; }
@@ -38,7 +42,6 @@ public class CliContext : ICliExecutionContext
     public CliContext(
         IDisplayService display,
         ISmartCardService cardService,
-        IDomainServiceFactory domainServiceFactory,
         IKeysetResolver keysetResolver,
         ILogger<CliContext> logger = null
     )
@@ -48,9 +51,6 @@ public class CliContext : ICliExecutionContext
         CardService = cardService;
         _keysetResolver = keysetResolver;
         _logger = logger;
-
-        // Create domain service once during construction using pure function
-        _globalPlatformService = domainServiceFactory.CreateGlobalPlatformService(CardService);
 
         // Create pure function for secure channel establishment
         EstablishSecureChannelAsync = (request, cancellationToken) =>
@@ -62,11 +62,6 @@ public class CliContext : ICliExecutionContext
             );
     }
 
-    /// <summary>
-    /// Gets the GlobalPlatform service instance.
-    /// Pure accessor - service created during construction.
-    /// </summary>
-    public IGlobalPlatformService GetGlobalPlatformService() => _globalPlatformService;
 
     /// <summary>
     /// Ensures a card connection is established using pure functional patterns.

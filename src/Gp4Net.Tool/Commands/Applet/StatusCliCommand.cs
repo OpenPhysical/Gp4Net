@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Services;
+using Gp4Net.Services.GlobalPlatform;
 using Gp4Net.Tool.Pipeline;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -35,15 +38,13 @@ public class StatusCommand : IPipelineCommand<StatusCommand.Settings>
         {
             ctx.Display.Info("Starting applet status retrieval...");
 
-            IGlobalPlatformService gpService = ctx.GetGlobalPlatformService();
-
             if (!settings.NoCardInfo)
             {
                 await DisplayCardInfoAsync(ctx);
             }
 
             Result<ImmutableList<ApplicationInfo>, SmartCardError> statusResult =
-                await RetrieveApplicationStatus(gpService);
+                await RetrieveApplicationStatus(ctx);
             return await statusResult.Match(
                 async applications => await ProcessApplications(ctx, applications, settings),
                 error =>
@@ -63,10 +64,11 @@ public class StatusCommand : IPipelineCommand<StatusCommand.Settings>
 
     private static async Task<
         Result<ImmutableList<ApplicationInfo>, SmartCardError>
-    > RetrieveApplicationStatus(IGlobalPlatformService globalPlatformService)
+    > RetrieveApplicationStatus(ICliExecutionContext context)
     {
-        return await globalPlatformService.GetStatusAsync(
-            StatusSubset.ApplicationsAndSupplementaryDomains
+        return await Applications.GetApplicationsAndSecurityDomainsAsync(
+            (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
+            CancellationToken.None
         );
     }
 

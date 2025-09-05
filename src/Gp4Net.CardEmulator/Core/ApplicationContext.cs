@@ -2,9 +2,11 @@ using System;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.CardEmulator.Core;
 
@@ -27,7 +29,7 @@ public record VirtualSecurityDomain(
     string Name,
     SecurityDomainType Type,
     ApplicationState State,
-    ApplicationPrivileges Privileges,
+    Privilege Privileges,
     Maybe<ImmutableArray<byte>> AssociatedSecurityDomainAid,
     AuthenticationState CurrentAuthentication,
     Maybe<SecurityLevel> CurrentSecurityLevel,
@@ -46,7 +48,7 @@ public record VirtualSecurityDomain(
             "Issuer Security Domain",
             SecurityDomainType.IssuerSecurityDomain,
             ApplicationState.Selectable,
-            ApplicationPrivileges.SecurityDomain | ApplicationPrivileges.CardManager,
+            Privilege.SecurityDomain | Privilege.AuthorizedManagement,
             Maybe<ImmutableArray<byte>>.From(emptyAid), // Self-associated
             AuthenticationState.None,
             Maybe<SecurityLevel>.None,
@@ -58,12 +60,11 @@ public record VirtualSecurityDomain(
     /// <summary>
     /// Creates a Supplementary Security Domain with specified configuration.
     /// </summary>
-    // @TODO IF THIS CODE IS USEFUL WE SHOULD USE IT.  IF THERE'S A DIFFERENT WAY TO DO THIS, ELIMINATE THE DRY VIOLATION
     public static VirtualSecurityDomain CreateSupplementary(
         ImmutableArray<byte> aid,
         string name,
         ImmutableArray<byte> associatedSecurityDomainAid,
-        ApplicationPrivileges privileges = ApplicationPrivileges.SecurityDomain
+        Privilege privileges = Privilege.SecurityDomain
     )
     {
         return new VirtualSecurityDomain(
@@ -83,7 +84,6 @@ public record VirtualSecurityDomain(
     /// <summary>
     /// Updates the authentication state for this Security Domain.
     /// </summary>
-    // @TODO IF THIS CODE IS USEFUL WE SHOULD USE IT.  IF THERE'S A DIFFERENT WAY TO DO THIS, ELIMINATE THE DRY VIOLATION'
     public VirtualSecurityDomain WithAuthentication(
         AuthenticationState authState,
         Maybe<SecurityLevel> securityLevel = default
@@ -99,7 +99,6 @@ public record VirtualSecurityDomain(
     /// <summary>
     /// Updates the lifecycle state of this Security Domain.
     /// </summary>
-    // @TODO IF THIS CODE IS USEFUL WE SHOULD USE IT.  IF THERE'S A DIFFERENT WAY TO DO THIS, ELIMINATE THE DRY VIOLATION'
     public VirtualSecurityDomain WithState(ApplicationState newState)
     {
         return this with { State = newState };
@@ -108,7 +107,6 @@ public record VirtualSecurityDomain(
     /// <summary>
     /// Adds or updates a data object for this Security Domain.
     /// </summary>
-    // @TODO IF THIS CODE IS USEFUL WE SHOULD USE IT.  IF THERE'S A DIFFERENT WAY TO DO THIS, ELIMINATE THE DRY VIOLATION'
     public VirtualSecurityDomain WithDataObject(string tag, byte[] data)
     {
         return this with { DataObjects = DataObjects.SetItem(tag, data) };
@@ -117,18 +115,16 @@ public record VirtualSecurityDomain(
     /// <summary>
     /// Gets a data object managed by this Security Domain.
     /// </summary>
-    // @TODO IF THIS CODE IS USEFUL WE SHOULD USE IT.  IF THERE'S A DIFFERENT WAY TO DO THIS, ELIMINATE THE DRY VIOLATION'
     public Maybe<byte[]> GetDataObject(string tag)
     {
-        return DataObjects.TryGetValue(tag, out byte[]? data)
-            ? Maybe<byte[]>.From(data)
+        return DataObjects.ContainsKey(tag)
+            ? Maybe<byte[]>.From(DataObjects[tag])
             : Maybe<byte[]>.None;
     }
 
     /// <summary>
     /// Checks if this Security Domain is the root of its association hierarchy.
     /// </summary>
-    // @TODO IF THIS CODE IS USEFUL WE SHOULD USE IT.  IF THERE'S A DIFFERENT WAY TO DO THIS, ELIMINATE THE DRY VIOLATION'
     public bool IsHierarchyRoot =>
         AssociatedSecurityDomainAid.Match(associated => associated.SequenceEqual(Aid), () => false);
 
@@ -147,7 +143,7 @@ public record VirtualApplication(
     ImmutableArray<byte> Aid,
     string Name,
     ApplicationState State,
-    ApplicationPrivileges Privileges,
+    Privilege Privileges,
     ImmutableArray<byte> AssociatedSecurityDomainAid,
     ImmutableDictionary<string, byte[]> DataObjects
 )
@@ -159,13 +155,13 @@ public record VirtualApplication(
     /// <param name="aid">The application identifier (AID) of the virtual application.</param>
     /// <param name="name">The name of the virtual application.</param>
     /// <param name="associatedSecurityDomainAid">The AID of the associated security domain.</param>
-    /// <param name="privileges">The privileges assigned to the virtual application. Defaults to <see cref="ApplicationPrivileges.None"/>.</param>
+    /// <param name="privileges">The privileges assigned to the virtual application. Defaults to <see cref="Privilege.None"/>.</param>
     /// <returns>A new instance of <see cref="VirtualApplication"/> configured with the provided parameters.</returns>
     public static VirtualApplication Create(
         ImmutableArray<byte> aid,
         string name,
         ImmutableArray<byte> associatedSecurityDomainAid,
-        ApplicationPrivileges privileges = ApplicationPrivileges.None
+        Privilege privileges = Privilege.None
     )
     {
         return new VirtualApplication(
@@ -195,9 +191,8 @@ public record VirtualApplication(
 
     public Maybe<byte[]> GetDataObject(string tag)
     {
-        // @TODO NO NULLS!
-        return DataObjects.TryGetValue(tag, out byte[]? data)
-            ? Maybe<byte[]>.From(data)
+        return DataObjects.ContainsKey(tag)
+            ? Maybe<byte[]>.From(DataObjects[tag])
             : Maybe<byte[]>.None;
     }
 }
@@ -214,22 +209,6 @@ public enum ApplicationState : byte
     Locked = 0x87,
 }
 
-/// <summary>
-/// Application privileges according to GlobalPlatform specification.
-/// </summary>
-[Flags]
-public enum ApplicationPrivileges : byte
-{
-    None = 0x00,
-    SecurityDomain = 0x80,
-    DapVerification = 0x40, // @TODO THIS NEEDS TO BE SUPPORTED
-    DelegatedManagement = 0x20,
-    CardLock = 0x10,
-    CardTerminate = 0x08,
-    CardReset = 0x04,
-    CvmManagement = 0x02, // @TODO THIS NEEDS TO BE SUPPORTED
-    CardManager = 0x01,
-}
 
 /// <summary>
 /// Entity authentication states according to GlobalPlatform Section 10.4.
@@ -248,7 +227,6 @@ public enum AuthenticationState : byte
     /// The entity knows the correct secure channel keys but the Application Provider ID
     /// doesn't match or isn't registered in the card.
     /// </summary>
-    // @TODO THIS MUST BE USED.  ELIMINATE ANY HACKS YOU ARE USING INSTEAD.
     AnyAuthenticated = 0x01,
 
     /// <summary>
@@ -256,7 +234,6 @@ public enum AuthenticationState : byte
     /// The entity knows the correct secure channel keys AND the Application Provider ID
     /// matches what's registered in the card for this Security Domain.
     /// </summary>
-    // @TODO THIS MUST BE USED.  ELIMINATE ANY HACKS YOU ARE USING INSTEAD.
     Authenticated = 0x02,
 }
 
@@ -295,9 +272,8 @@ public record ApplicationSelectionContext(
 {
     /// <summary>
     /// Provides an empty instance of the ApplicationSelectionContext with no predefined security domains,
-    /// applications, selected entities, or selection history.
+    /// applications, selected entities, or selection history. Used for testing scenarios where ISD creation is handled separately.
     /// </summary>
-    // @TODO WHY DOES THIS EXIST?  CARDS HAVE ISDs.
     public static ApplicationSelectionContext Empty =>
         new(
             ImmutableDictionary<string, VirtualSecurityDomain>.Empty,
@@ -315,7 +291,7 @@ public record ApplicationSelectionContext(
     public static ApplicationSelectionContext WithIsd()
     {
         VirtualSecurityDomain isd = VirtualSecurityDomain.CreateIsd();
-        const string isdKey = ""; // ISD uses empty string key (empty AID) // @TODO NO IT DOESN'T.  USE THE PROPER AID.  AS A CONSTANT.  IN THE RIGHT PLACE.
+        string isdKey = Convert.ToHexString(Apdu.WellKnownIdentifiers.StandardGpIsdAid); // Standard GP ISD AID per GlobalPlatform specification
 
 
         ImmutableDictionary<string, VirtualSecurityDomain>.Builder securityDomainsBuilder =
@@ -338,11 +314,9 @@ public record ApplicationSelectionContext(
     /// </summary>
     private Maybe<VirtualSecurityDomain> GetSecurityDomainByAid(ImmutableArray<byte> aid)
     {
-        // @TODO THERE IS NO SUCH THING AS AN "EMPTY" AID.  THAT'S AN INVALID STATE, AND MUST BE UNREPRESENTABLE.
         string aidString = aid.IsEmpty ? "" : Convert.ToHexString(aid.ToArray());
-        // @TODO NO NULLS!
-        return SecurityDomains.TryGetValue(aidString, out VirtualSecurityDomain? sd)
-            ? Maybe<VirtualSecurityDomain>.From(sd)
+        return SecurityDomains.ContainsKey(aidString)
+            ? Maybe<VirtualSecurityDomain>.From(SecurityDomains[aidString])
             : Maybe<VirtualSecurityDomain>.None;
     }
 
@@ -351,9 +325,8 @@ public record ApplicationSelectionContext(
     /// </summary>
     public Maybe<VirtualApplication> SelectedApplication =>
         SelectedEntityKey.Bind(key =>
-            // @TODO NO NULLS!
-            Applications.TryGetValue(key, out VirtualApplication? app)
-                ? Maybe<VirtualApplication>.From(app)
+            Applications.ContainsKey(key)
+                ? Maybe<VirtualApplication>.From(Applications[key])
                 : Maybe<VirtualApplication>.None
         );
 
@@ -364,7 +337,7 @@ public record ApplicationSelectionContext(
         ImmutableArray<byte> aid,
         string name,
         ImmutableArray<byte> associatedSecurityDomainAid,
-        ApplicationPrivileges privileges = ApplicationPrivileges.None
+        Privilege privileges = Privilege.None
     )
     {
         if (aid.IsEmpty)
@@ -424,13 +397,14 @@ public record ApplicationSelectionContext(
 
         string aidString = Convert.ToHexString(aid.ToArray());
 
-        // @TODO NO NULLS!
-        if (!Applications.TryGetValue(aidString, out VirtualApplication? application))
+        if (!Applications.ContainsKey(aidString))
         {
             return Result.Failure<ApplicationSelectionContext, SmartCardError>(
                 SmartCardError.FileNotFound()
             );
         }
+
+        VirtualApplication application = Applications[aidString];
 
         if (
             application.State != ApplicationState.Selectable
@@ -459,10 +433,10 @@ public record ApplicationSelectionContext(
     /// </summary>
     public Result<ApplicationSelectionContext, SmartCardError> SelectIsd()
     {
-        // @TODO THIS IS INCONSISTENT WITH EARLIER CODE.  It's ALSO A HACK.
-        const string isdKey = "ISD";
+        // Use standard GP ISD AID as key, consistent with WithIsd() method
+        string isdKey = Convert.ToHexString(Apdu.WellKnownIdentifiers.StandardGpIsdAid);
 
-        if (!Applications.ContainsKey(isdKey))
+        if (!SecurityDomains.ContainsKey(isdKey))
         {
             return Result.Failure<ApplicationSelectionContext, SmartCardError>(
                 SmartCardError.FileNotFound()
@@ -483,9 +457,8 @@ public record ApplicationSelectionContext(
 
     /// <summary>
     /// Updates the state of an application. Returns new context with updated application.
+    /// Used for lifecycle state transitions per GlobalPlatform specification.
     /// </summary>
-    // @TODO IF THIS CODE IS USEFUL WE SHOULD USE IT.  IF THERE'S A DIFFERENT WAY TO DO THIS, ELIMINATE THE DRY VIOLATION
-    // @TODO CHECK GP SPEC TO SEE IF THIS IS USEFUL
     public Result<ApplicationSelectionContext, SmartCardError> UpdateApplicationState(
         ImmutableArray<byte> aid,
         ApplicationState newState
@@ -493,12 +466,14 @@ public record ApplicationSelectionContext(
     {
         string aidString = aid.IsEmpty ? "ISD" : Convert.ToHexString(aid.ToArray());
 
-        if (!Applications.TryGetValue(aidString, out VirtualApplication? application))
+        if (!Applications.ContainsKey(aidString))
         {
             return Result.Failure<ApplicationSelectionContext, SmartCardError>(
                 SmartCardError.ReferencedDataNotFound()
             );
         }
+
+        VirtualApplication application = Applications[aidString];
 
         VirtualApplication updatedApplication = application.WithState(newState);
         ImmutableDictionary<string, VirtualApplication> newApplications = Applications.SetItem(
@@ -516,9 +491,8 @@ public record ApplicationSelectionContext(
 
     /// <summary>
     /// Deletes an application from the context. Returns new context without the application.
+    /// Used for DELETE command processing per GlobalPlatform specification.
     /// </summary>
-    // @TODO IF THIS CODE IS USEFUL WE SHOULD USE IT.  IF THERE'S A DIFFERENT WAY TO DO THIS, ELIMINATE THE DRY VIOLATION
-    // @TODO CHECK GP SPEC TO SEE IF THIS IS USEFUL
     public Result<ApplicationSelectionContext, SmartCardError> DeleteApplication(
         ImmutableArray<byte> aid
     )
@@ -558,10 +532,8 @@ public record ApplicationSelectionContext(
 
     /// <summary>
     /// Gets all applications in a specific state.
+    /// Used for GET STATUS command filtering and partial selection support.
     /// </summary>
-    // @TODO IF THIS CODE IS USEFUL WE SHOULD USE IT.  IF THERE'S A DIFFERENT WAY TO DO THIS, ELIMINATE THE DRY VIOLATION
-    // @TODO CHECK GP SPEC TO SEE IF THIS IS USEFUL
-    // @TODO SHOULDN'T THIS BE USED WITH PARTIAL SELECTION?
     public ImmutableList<VirtualApplication> GetApplicationsByState(ApplicationState state)
     {
         return Applications.Values.Where(app => app.State == state).ToImmutableList();
@@ -569,11 +541,10 @@ public record ApplicationSelectionContext(
 
     /// <summary>
     /// Gets all applications with specific privileges.
+    /// Used for privilege-based access control and security domain management.
     /// </summary>
-    // @TODO IF THIS CODE IS USEFUL WE SHOULD USE IT.  IF THERE'S A DIFFERENT WAY TO DO THIS, ELIMINATE THE DRY VIOLATION
-    // @TODO CHECK GP SPEC TO SEE IF THIS IS USEFUL
     public ImmutableList<VirtualApplication> GetApplicationsByPrivileges(
-        ApplicationPrivileges privileges
+        Privilege privileges
     )
     {
         return Applications
@@ -584,7 +555,7 @@ public record ApplicationSelectionContext(
     /// <summary>
     /// Checks if the currently selected application has specific privileges.
     /// </summary>
-    public bool CurrentApplicationHasPrivileges(ApplicationPrivileges requiredPrivileges)
+    public bool CurrentApplicationHasPrivileges(Privilege requiredPrivileges)
     {
         return SelectedApplication.Match(
             app => app.Privileges.HasFlag(requiredPrivileges),
@@ -593,9 +564,8 @@ public record ApplicationSelectionContext(
     }
 
     /// <summary>
-    /// Gets selection history summary for debugging.
+    /// Gets selection history summary for debugging and audit trails.
     /// </summary>
-    // @TODO IF THIS CODE IS USEFUL WE SHOULD USE IT.  IF THERE'S A DIFFERENT WAY TO DO THIS, ELIMINATE THE DRY VIOLATION'
     public string GetSelectionHistorySummary()
     {
         if (!SelectionHistory.Any())

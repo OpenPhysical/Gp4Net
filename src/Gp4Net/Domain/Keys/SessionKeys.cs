@@ -107,15 +107,20 @@ public class SessionKeys : IDisposable
     /// <summary>
     /// Clears all cryptographic keys from memory.
     /// </summary>
-    public void Clear()
+    public UnitResult<SmartCardError> Clear()
     {
         Arrays.Fill(SEnc, 0);
         Arrays.Fill(SMac, 0);
         Arrays.Fill(SrMac, 0);
-        if (Dek != null)
-        {
-            Arrays.Fill(Dek, 0);
-        }
+        
+        return Maybe<byte[]>.From(Dek).Match(
+            Some: dekKey =>
+            {
+                Arrays.Fill(dekKey, 0);
+                return UnitResult.Success<SmartCardError>();
+            },
+            None: () => UnitResult.Success<SmartCardError>()
+        );
     }
 
     /// <summary>

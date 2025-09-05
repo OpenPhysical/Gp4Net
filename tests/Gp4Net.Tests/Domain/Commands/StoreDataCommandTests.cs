@@ -42,16 +42,18 @@ public class StoreDataCommandTests
     {
         // Arrange
         byte[] data = [0x01, 0x02, 0x03];
-        Result<StoreDataCommand, SmartCardError> result = StoreDataCommand.Create(data);
-        _ = result.IsSuccess.Should().BeTrue();
-        StoreDataCommand? command = result.Value;
 
         // Act
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult = StoreDataCommand.Create(data)
+            .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)));
 
         // Assert
-        _ = apdu.Should()
-            .BeEquivalentTo(new byte[] { 0x80, 0xE2, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03 });
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        if (apduResult.IsSuccess)
+        {
+            byte[] apdu = apduResult.Value;
+            _ = apdu.Should().BeEquivalentTo(new byte[] { 0x80, 0xE2, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03 });
+        }
     }
 
     [Test]
@@ -61,18 +63,27 @@ public class StoreDataCommandTests
         Result<StoreDataCommand, SmartCardError> result =
             StoreDataCommand.CreateDefaultKeyVersionCommand(0x01);
         _ = result.IsSuccess.Should().BeTrue();
-        StoreDataCommand? command = result.Value;
+        
+        if (result.IsSuccess)
+        {
+            StoreDataCommand command = result.Value;
 
-        // Act
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
-
-        // Assert
-        _ = apdu[0].Should().Be(0x80); // CLA
-        _ = apdu[1].Should().Be(0xE2); // INS
-        _ = apdu[2].Should().Be(0x80); // P1 (DGI format)
-        _ = apdu[3].Should().Be(0x00); // P2 (First or only block)
-        _ = apdu[4].Should().Be(0x04); // LC
-        _ = apdu[5..].Should().BeEquivalentTo(new byte[] { 0x7F, 0x0D, 0x01, 0x01 }); // Data
+            // Act
+            Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
+            _ = apduResult.IsSuccess.Should().BeTrue();
+            if (apduResult.IsSuccess)
+            {
+                byte[] apdu = apduResult.Value;
+                
+                // Assert
+                _ = apdu[0].Should().Be(0x80); // CLA
+                _ = apdu[1].Should().Be(0xE2); // INS
+                _ = apdu[2].Should().Be(0x80); // P1 (DGI format)
+                _ = apdu[3].Should().Be(0x00); // P2 (First or only block)
+                _ = apdu[4].Should().Be(0x04); // LC
+                _ = apdu[5..].Should().BeEquivalentTo(new byte[] { 0x7F, 0x0D, 0x01, 0x01 }); // Data
+            }
+        }
     }
 
     [Test]
@@ -87,12 +98,15 @@ public class StoreDataCommandTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        StoreDataCommand? command = result.Value;
-        _ = command.StructureFormat.Should().Be(StoreDataCommand.DataStructureFormat.Dgi);
-        _ = command.Block.Should().Be(StoreDataCommand.BlockFormat.FirstOrOnly);
+        if (result.IsSuccess)
+        {
+            StoreDataCommand command = result.Value;
+            _ = command.StructureFormat.Should().Be(StoreDataCommand.DataStructureFormat.Dgi);
+            _ = command.Block.Should().Be(StoreDataCommand.BlockFormat.FirstOrOnly);
 
-        byte[]? data = command.StoreData;
-        _ = data.Should().BeEquivalentTo(new byte[] { 0x7F, 0x0D, 0x01, 0x01 });
+            byte[] data = command.StoreData;
+            _ = data.Should().BeEquivalentTo(new byte[] { 0x7F, 0x0D, 0x01, 0x01 });
+        }
     }
 
     [Test]
@@ -105,18 +119,20 @@ public class StoreDataCommandTests
             [0x01]
         );
         _ = result.IsSuccess.Should().BeTrue();
-        StoreDataCommand? command = result.Value;
-        IApduCommand? iapdu = command;
+        if (result.IsSuccess)
+        {
+            StoreDataCommand command = result.Value;
+            IApduCommand iapdu = command;
+            byte[] apduBytes = iapdu.ToBytes();
 
-        // Assert
-        _ = iapdu.Cla.Should().Be(0x80);
-        _ = iapdu.Ins.Should().Be(0xE2);
-        _ = iapdu.P1.Should().Be(0x60); // BER-TLV format
-        _ = iapdu.P2.Should().Be(0x01); // More blocks
-        _ = iapdu.Data.Should().NotBeNull();
-        _ = iapdu.Data.Should().BeEquivalentTo(new byte[] { 0x01 });
-        _ = iapdu.ExpectedResponseLength.HasNoValue.Should().BeTrue();
-        _ = iapdu.IsExtendedLength.Should().BeFalse();
+            // Assert - Verify APDU byte structure
+            _ = apduBytes[0].Should().Be(0x80); // CLA
+            _ = apduBytes[1].Should().Be(0xE2); // INS
+            _ = apduBytes[2].Should().Be(0x60); // P1 (BER-TLV format)
+            _ = apduBytes[3].Should().Be(0x01); // P2 (More blocks)
+            _ = apduBytes[4].Should().Be(0x01); // LC (data length)
+            _ = apduBytes[5].Should().Be(0x01); // Data
+        }
     }
 
     [Test]
@@ -125,13 +141,16 @@ public class StoreDataCommandTests
         // Arrange
         Result<StoreDataCommand, SmartCardError> result = StoreDataCommand.Create([0x01]);
         _ = result.IsSuccess.Should().BeTrue();
-        StoreDataCommand? command = result.Value;
+        if (result.IsSuccess)
+        {
+            StoreDataCommand command = result.Value;
 
-        // Act
-        string? str = command.ToString();
+            // Act
+            string str = command.ToString();
 
-        // Assert
-        _ = str.Should().BeEquivalentTo("STORE DATA");
+            // Assert
+            _ = str.Should().BeEquivalentTo("STORE DATA");
+        }
     }
 
     [Test]
@@ -141,7 +160,7 @@ public class StoreDataCommandTests
         byte[] responseData = [];
 
         // Act
-        StoreDataResponse? response = StoreDataResponse.Parse(responseData);
+        StoreDataResponse response = StoreDataResponse.Parse(responseData);
 
         // Assert
         _ = response.Success.Should().BeTrue();

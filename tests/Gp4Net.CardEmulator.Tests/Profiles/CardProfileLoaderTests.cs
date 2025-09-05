@@ -6,7 +6,7 @@ using Gp4Net.CardEmulator.Functional;
 using Gp4Net.CardEmulator.Profiles;
 using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Constants;
 using NUnit.Framework;
 
 namespace Gp4Net.CardEmulator.Tests.Profiles;

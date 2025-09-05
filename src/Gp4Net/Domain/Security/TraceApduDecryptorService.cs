@@ -7,6 +7,7 @@ using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Domain.Keys;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -212,33 +213,38 @@ public sealed class TraceApduDecryptorService
             {
                 byte originalCla = (byte)(parsedCommand.Cla & ~0x04);
 
-                return VerifyCommandMacIfRequired(parsedCommand, sessionState).IsSuccess
-                    ? DecryptCommandDataIfRequired(parsedCommand, sessionState)
+                var macVerifyResult = VerifyCommandMacIfRequired(parsedCommand, sessionState);
+                if (macVerifyResult.IsFailure)
+                {
+                    return Result.Failure<(byte[], SecureChannelState), SmartCardError>(macVerifyResult.Error);
+                }
+
+                return DecryptCommandDataIfRequired(parsedCommand, sessionState)
                         .Bind(dataResult =>
                         {
                             (byte[] originalData, uint newEncryptionCounter) = dataResult;
-                            byte[] originalCommand = ApduParser.BuildOriginalCommand(
+                            
+                            return ApduBuilder.CreateCommand(
                                 originalCla,
                                 parsedCommand.Ins,
                                 parsedCommand.P1,
                                 parsedCommand.P2,
-                                originalData,
-                                parsedCommand.Le
-                            );
-
-                            return UpdateMacChainingIfRequired(sessionState, parsedCommand)
-                                .Bind(newMacChaining =>
-                                    UpdateSessionState(
-                                        sessionState,
-                                        newEncryptionCounter,
-                                        newMacChaining
+                                Maybe<byte[]>.From(originalData),
+                                Maybe.From(parsedCommand.Le).Map(le => (int)le)
+                            )
+                            .Map(originalCommand => originalCommand.ToBytes())
+                            .Bind(originalBytes =>
+                                UpdateMacChainingIfRequired(sessionState, parsedCommand)
+                                    .Bind(newMacChaining =>
+                                        UpdateSessionState(
+                                            sessionState,
+                                            newEncryptionCounter,
+                                            newMacChaining
+                                        )
                                     )
-                                )
-                                .Map(newState => (originalCommand, newState));
-                        })
-                    : Result.Failure<(byte[], SecureChannelState), SmartCardError>(
-                        SmartCardError.SecurityError("MAC verification failed")
-                    );
+                                    .Map(newState => (originalBytes, newState))
+                            );
+                        });
             });
     }
 

@@ -159,14 +159,6 @@ public static partial class TlvService
                 );
             }
 
-            if (value > Constants.Constants.Tlv.SecurityLimits.MaxTlvValueSize)
-            {
-                return Result.Failure<TlvLength, SmartCardError>(
-                    SmartCardError.InvalidArgument(
-                        $"Length {value} exceeds maximum allowed {Constants.Constants.Tlv.SecurityLimits.MaxTlvValueSize}"
-                    )
-                );
-            }
 
             return Result.Success<TlvLength, SmartCardError>(new TlvLength(value));
         }

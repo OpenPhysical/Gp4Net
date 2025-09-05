@@ -4,11 +4,11 @@ using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
 using Kdf108.Domain.Kdf;
 using Kdf108.Domain.Kdf.Modes;
-using Org.BouncyCastle.Crypto.Digests;
 
 namespace Gp4Net.CardEmulator.Persistence;
 
@@ -254,20 +254,7 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
 
     private static Result<byte[], SmartCardError> ComputeSha256Hash(byte[] data)
     {
-        return Result.Try(
-            () =>
-            {
-                // Use BouncyCastle SHA-256 digest
-                Sha256Digest sha256Digest = new Sha256Digest();
-                sha256Digest.BlockUpdate(data, 0, data.Length);
-
-                byte[] fingerprint = new byte[sha256Digest.GetDigestSize()];
-                sha256Digest.DoFinal(fingerprint, 0);
-
-                return fingerprint;
-            },
-            ex => SmartCardError.CryptographicError($"Failed to compute SHA-256 hash: {ex.Message}")
-        );
+        return CryptoService.Hash.Sha256(data);
     }
 
     /// <summary>

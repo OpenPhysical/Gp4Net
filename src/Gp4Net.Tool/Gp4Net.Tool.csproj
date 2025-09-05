@@ -24,7 +24,7 @@
       Version="0.6.0"
     />
     <PackageReference Include="VYaml" Version="0.26.0" />
-    <PackageReference Include="WSCT.Wrapper.Desktop" Version="1.4.0" />
+    <PackageReference Include="WSCT.Wrapper.Desktop" Version="1.5.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Gp4Net/Gp4Net.csproj" />

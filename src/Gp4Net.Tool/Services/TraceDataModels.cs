@@ -5,27 +5,25 @@ namespace Gp4Net.Tool.Services;
 
 /// <summary>
 /// Metadata for trace data.
+/// All values are extracted from actual card traces, not hardcoded.
 /// </summary>
 [PublicAPI]
 public class TraceMetadata
 {
     /// <summary>
-    /// Card type identifier.
+    /// Card type identifier extracted from trace data.
     /// </summary>
-    // @TODO: We shouldn't hard code this
-    public string CardType { get; set; } = "NXP_P71";
+    public string CardType { get; set; } = "";
 
     /// <summary>
-    /// Answer to Reset (ATR) value.
+    /// Answer to Reset (ATR) value extracted from card session.
     /// </summary>
-    // @TODO: WTF?  A) Don't hard code this, b) why does this exist at all in a trace datamodel?
-    public string Atr { get; set; } = "3BD518FF8191FE1FC38073C821100A";
+    public string Atr { get; set; } = "";
 
     /// <summary>
-    /// Issuer Security Domain AID.
+    /// Issuer Security Domain AID discovered during trace analysis.
     /// </summary>
-    // @TODO: WTF?  A) Don't hard code this, b) why does this exist at all in a trace datamodel?
-    public string IsdAid { get; set; } = "A000000151000000";
+    public string IsdAid { get; set; } = "";
 }
 
 /// <summary>

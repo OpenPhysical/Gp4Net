@@ -3,7 +3,6 @@ using System.Collections.Immutable;
 using Gp4Net.Core;
 using JetBrains.Annotations;
 
-using Gp4Net.Constants;
 namespace Gp4Net.CardEmulator.Core;
 
 /// <summary>

@@ -187,12 +187,6 @@ public static partial class TlvService
                 _ => 4
             };
 
-            if (bytesNeeded > Constants.Constants.Tlv.Parsing.MaxReasonableLengthBytes)
-            {
-                return Result.Failure<ImmutableArray<byte>, SmartCardError>(
-                    SmartCardError.InvalidArgument($"Length {value} requires too many bytes to encode")
-                );
-            }
 
             // Build the length bytes
             var builder = ImmutableArray.CreateBuilder<byte>(bytesNeeded + 1);

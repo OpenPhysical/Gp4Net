@@ -5,11 +5,11 @@ using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Constants;
+using static Gp4Net.Constants.Constants;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Gp4Net.Cryptography;
-using Gp4Net.Constants;
 
 namespace Gp4Net.CardEmulator.Functional;
 
@@ -192,7 +192,7 @@ public static class Scp02CommandProcessors
             return SmartCardError.WrongLength();
         }
 
-        if (command[0] != 0x80 || command[1] != 0x50)
+        if (command[0] != GlobalPlatform.Cla.GpStandard || command[1] != GlobalPlatform.Ins.InitializeUpdate)
         {
             return SmartCardError.InstructionNotSupported();
         }
@@ -519,7 +519,7 @@ public static class Scp02CommandProcessors
         if (command.Length < 5)
             return SmartCardError.WrongLength();
 
-        if (command[0] != 0x84 && command[0] != 0x00 || command[1] != 0x82)
+        if (command[0] != GlobalPlatform.Cla.Secured && command[0] != GlobalPlatform.Cla.Standard || command[1] != GlobalPlatform.Ins.ExternalAuthenticate)
             return SmartCardError.InstructionNotSupported();
 
         byte securityLevel = command[2];
@@ -529,7 +529,7 @@ public static class Scp02CommandProcessors
         // For SCP02, EXTERNAL AUTHENTICATE command format depends on secure messaging:
         // - CLA=0x00 (no secure messaging): 5 bytes header + 8 bytes host cryptogram = 13 bytes total
         // - CLA=0x84 (secure messaging): 5 bytes header + 8 bytes host cryptogram + 8 bytes MAC = 21 bytes total
-        if (command[0] == 0x84) // Secure messaging with MAC
+        if (command[0] == GlobalPlatform.Cla.Secured) // Secure messaging with MAC
         {
             if (lc != 16 || command.Length != 21) // LC includes both host cryptogram (8) and MAC (8)
                 return SmartCardError.WrongLength();
@@ -678,7 +678,7 @@ public static class Scp02CommandProcessors
             );
 
         // Per GP Card Spec v2.3.1 Section E.3.2: Verify MAC on EXTERNAL AUTHENTICATE command if secure messaging (CLA=0x84)
-        return originalCommand.Length > 0 && originalCommand[0] == 0x84
+        return originalCommand.Length > 0 && originalCommand[0] == GlobalPlatform.Cla.Secured
             ? VerifyScp02CommandMac(request, state, rngContext)
             : Result.Success<ExternalAuthenticateRequest, SmartCardError>(request);
     }
@@ -722,7 +722,7 @@ public static class Scp02CommandProcessors
                 // Per GP Card Spec v2.3.1 Section E.3.2: Construct the command data that was MACed
                 // EXTERNAL AUTHENTICATE command format: CLA=84 INS=82 P1=SecurityLevel P2=00 LC=16 Data=HostCryptogram(8)
                 // Note: LC=16 because data contains host cryptogram (8) + MAC (8), but MAC calculation only covers header + cryptogram
-                byte[] commandHeader = [0x84, 0x82, request.SecurityLevel, 0x00, 0x10]; // LC=0x10 (16) for secure messaging
+                byte[] commandHeader = [GlobalPlatform.Cla.Secured, GlobalPlatform.Ins.ExternalAuthenticate, request.SecurityLevel, 0x00, 0x10]; // LC=0x10 (16) for secure messaging
                 byte[] macInput = commandHeader.Concat(request.HostCryptogram).ToArray();
 
                 // GP Card Spec v2.3.1 Section E.3.2 - SCP02 EXTERNAL AUTHENTICATE MAC Verification
@@ -949,7 +949,7 @@ public static class Scp02CommandProcessors
             state.ScpVersion
         );
 
-        if (cla == 0x80 && ins == 0x50 || cla is 0x84 or 0x00 && ins == 0x82)
+        if (cla == GlobalPlatform.Cla.GpStandard && ins == GlobalPlatform.Ins.InitializeUpdate || cla is GlobalPlatform.Cla.Secured or GlobalPlatform.Cla.Standard && ins == GlobalPlatform.Ins.ExternalAuthenticate)
         {
             // Check if card is configured for SCP02
             bool isScp02 = state.ScpVersion == 0x02;

@@ -3,6 +3,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
 using JetBrains.Annotations;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.CardEmulator.Services;
 
@@ -246,7 +247,7 @@ public class VirtualCommandResponse
         return new VirtualCommandResponse(
             false,
             [],
-            0x6F00, // Generic error status word
+            StatusWords.InstructionErrors.NoPreciseDiagnosis, // Generic error status word
             Maybe<SmartCardError>.From(error)
         );
     }
@@ -261,7 +262,7 @@ public class VirtualCommandResponse
         return new VirtualCommandResponse(
             true,
             data ?? [],
-            0x9000, // Success status word
+            StatusWords.Success.Normal, // Success status word
             Maybe<SmartCardError>.None
         );
     }

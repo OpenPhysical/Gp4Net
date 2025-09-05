@@ -9,6 +9,7 @@ using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.Tool.Commands.Applet;
 
@@ -88,21 +89,9 @@ public class LifecycleCommand : IPipelineCommand<LifecycleCommand.Settings>
         byte[] aid = Convert.FromHexString(settings.Aid);
         context.Display.Info("Executing lifecycle state change...");
 
-        IGlobalPlatformService gpService = context.GetGlobalPlatformService();
-        Result<bool, SmartCardError> result = await gpService.SetLifecycleStateAsync(
-            aid,
-            settings.State
-        );
-
-        return result.Match(
-            success =>
-            {
-                context.Display.Success(
-                    $"Lifecycle state changed successfully to {settings.State}"
-                );
-                return Result.Success<bool, SmartCardError>(true);
-            },
-            error => Result.Failure<bool, SmartCardError>(error)
+        context.Display.Error("Lifecycle management functionality not yet implemented with static services.");
+        return Result.Failure<bool, SmartCardError>(
+            SmartCardError.Unsupported("Lifecycle management functionality needs to be implemented using static GlobalPlatformService methods")
         );
     }
 

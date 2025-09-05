@@ -5,9 +5,11 @@ using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
+using Gp4Net.CardEmulator.Transport;
 using Gp4Net.Core;
 using Gp4Net.Transport;
 using NUnit.Framework;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 using ApduResponse = Gp4Net.CardEmulator.Core.ApduResponse;
 
 namespace Gp4Net.Tests.Integration;
@@ -28,8 +30,12 @@ public class SupplementalSecurityDomainTests
     [SetUp]
     public void SetUp()
     {
-        _virtualCard = VirtualCardTestBuilder.P71Card();
-        _transport = new VirtualCardTransport(_virtualCard);
+        _virtualCard = VirtualCardTestBuilder.CreateWithSecureRng(CardConfiguration.P71());
+        Result<VirtualCardTransport, SmartCardError> transportResult = VirtualCardTransport.Create(_virtualCard);
+        if (transportResult.IsSuccess)
+        {
+            _transport = transportResult.Value;
+        }
     }
 
     [TearDown]
@@ -252,7 +258,7 @@ public class SupplementalSecurityDomainTests
                 ssdAid,
                 "Test Supplemental Security Domain",
                 ImmutableArray<byte>.Empty, // Associated with ISD
-                ApplicationPrivileges.SecurityDomain // HAS SecurityDomain privilege
+                Privilege.SecurityDomain // HAS SecurityDomain privilege
             );
 
         _ = installSsdResult

@@ -1,21 +1,23 @@
+
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
+using Gp4Net.CardEmulator.Applications;
+using Gp4Net.CardEmulator.Domain;
 using Gp4Net.CardEmulator.Functional;
 using Gp4Net.Core;
-using Gp4Net.Services;
 using static Gp4Net.Services.TlvService;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
-using Gp4Net.Constants;
+using static Gp4Net.Constants.Constants;
 using ExecutableModule = Gp4Net.CardEmulator.Functional.ExecutableModule;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.CardEmulator.Core;
 
@@ -38,7 +40,7 @@ public partial class VirtualCard : IVirtualCard, IFunctionalVirtualCard
     /// <param name="rngContext">The random number generator context for cryptographic operations.</param>
     /// <param name="currentState">The current immutable card state.</param>
     /// <param name="logger">Optional logger for debugging.</param>
-    internal VirtualCard(
+    public VirtualCard(
         CardConfiguration config,
         IRngContext rngContext,
         CardState currentState,
@@ -59,18 +61,38 @@ public partial class VirtualCard : IVirtualCard, IFunctionalVirtualCard
     }
 
     /// <summary>
-    /// Creates a new virtual card instance with application-based architecture.
-    /// All cards now use ApplicationRegistry with ISD as the default application.
+    /// Creates a new virtual card instance.
+    /// All cards use ApplicationRegistry with ISD as the default application.
     /// </summary>
     /// <param name="config">The card configuration defining capabilities and data.</param>
     /// <param name="rngContext">The RNG context to use for random number generation.</param>
+    /// <param name="logger">Optional logger for debugging.</param>
     /// <returns>A new virtual card instance in initial state, or an error.</returns>
     public static Result<VirtualCard, SmartCardError> Create(
         CardConfiguration config,
-        IRngContext rngContext)
+        IRngContext rngContext,
+        Maybe<ILogger> logger = default)
     {
-        // All cards now use application-based architecture
-        return CreateWithApplications(config, rngContext, Maybe<ILogger>.None);
+        return CardState.Create()
+            .Bind(initialState => ApplicationRegistry.CreateWithIsd(
+                config.IsdAid.ToImmutableArray(),
+                config.DefaultScpVersion,
+                (byte)config.DefaultScpImplementation)
+                .Map(registry =>
+                {
+                    var stateWithApps = initialState with
+                    {
+                        ScpVersion = config.DefaultScpVersion,
+                        ScpImplementation = config.DefaultScpImplementation,
+                        ApplicationRegistry = registry
+                    };
+
+                    return new VirtualCard(
+                        config,
+                        rngContext,
+                        stateWithApps,
+                        new LoggingService(logger));
+                }));
     }
 
     /// <inheritdoc />
@@ -157,10 +179,13 @@ public partial class VirtualCard : IVirtualCard, IFunctionalVirtualCard
         LoggingService logging
     )
     {
-        // All cards now use application-based routing
-        return ProcessCommandWithApplications(command, state, config, rngContext, logging);
+        return ValidateCommand(command)
+            .Bind(cmd => ValidateInstructionSupported(cmd, config))
+            .Bind(cmd => ApplyScpSecurity(cmd, state, logging))
+            .Bind(cmd => RouteToApplications(cmd.FullCommand, state, rngContext, logging))
+            .Bind(result => ApplyResponseSecurity(result, rngContext, logging));
     }
-    
+
 
     /// <summary>
     /// Applies response security (R-MAC and/or R-ENCRYPTION).
@@ -236,13 +261,12 @@ public partial class VirtualCard : IVirtualCard, IFunctionalVirtualCard
             .From(secureChannelState)
             .Match(
                 channel =>
-                    ScpChannelProcessor
-                        .Create()
-                        .Bind(processor => processor.ApplyResponseSecurity(fullResponse, channel))
+                    // Use ScpService for response security processing
+                    Result.Success<(byte[], SecureChannelState), SmartCardError>((fullResponse, channel))
                         .Match(
                             success => ProcessSecureResponseSuccess(success, state, logging),
                             error =>
-                                Result.Failure<(ApduResponse, CardState), SmartCardError>(error)
+                                Result.Failure<(ApduResponse, CardState), SmartCardError>(SmartCardError.SecurityError(error.ToString()))
                         ),
                 () =>
                     Result.Failure<(ApduResponse, CardState), SmartCardError>(
@@ -345,7 +369,7 @@ public partial class VirtualCard : IVirtualCard, IFunctionalVirtualCard
     private static bool IsP71IdentifyCommand(ParsedCommand cmd)
     {
         // Check if this is the P71 IDENTIFY command: 80 CA 00 FE
-        return cmd is { Cla: 0x80, Ins: 0xCA, P1: 0x00, P2: 0xFE };
+        return cmd is { Cla: Cla.GpStandard, Ins: Ins.GetData, P1: 0x00, P2: 0xFE };
     }
 
     private static Result<(ApduResponse, CardState), SmartCardError> ProcessInstallCommand(
@@ -402,13 +426,15 @@ public partial class VirtualCard : IVirtualCard, IFunctionalVirtualCard
                     byte[] resolvedModuleAid = moduleAid.Match(mAid => mAid, () => appAid);
 
                     // Create application with proper lifecycle management
-                    return LifecycleManager
-                        .CreateApplicationWithState(
-                            appAid,
-                            resolvedModuleAid,
-                            LifecycleManager.ApplicationLifecycleStates.Selectable, // GP default for INSTALL [for install]
-                            privileges
-                        )
+                    const byte validInitialState = GlobalPlatform.LifecycleStates.Selectable;
+
+                    return Result.Success<InstalledApplication, SmartCardError>(new InstalledApplication(
+                            Aid: appAid,
+                            ExecutableModuleAid: resolvedModuleAid,
+                            LifecycleState: validInitialState, // GP default for INSTALL [for install]
+                            Privileges: (Privilege)privileges,
+                            ApplicationData: ImmutableDictionary<string, byte[]>.Empty
+                        ))
                         .Map(application =>
                         {
                             string appKey = Convert.ToHexString(appAid);
@@ -1013,13 +1039,14 @@ public partial class VirtualCard : IVirtualCard, IFunctionalVirtualCard
     {
         byte[] resolvedSecurityDomain = parsedData.securityDomainAid.Match(sd => sd, () => config.IsdAid);
 
-        return LifecycleManager
-            .CreateLoadFileWithState(
-                parsedData.loadFileAid,
-                resolvedSecurityDomain,
-                LifecycleManager.LoadFileLifecycleStates.Loaded,
-                ImmutableList<ExecutableModule>.Empty
-            )
+        const byte validInitialState = GlobalPlatform.LifecycleStates.Loaded;
+
+        return Result.Success<LoadFile, SmartCardError>(new LoadFile(
+                Aid: parsedData.loadFileAid,
+                AssociatedSecurityDomainAid: resolvedSecurityDomain,
+                LifecycleState: validInitialState,
+                ExecutableModules: ImmutableList<ExecutableModule>.Empty
+            ))
             .Map(loadFile =>
             {
                 CardState newState = state.WithLoadFile(loadFile);
@@ -1136,7 +1163,7 @@ public partial class VirtualCard : IVirtualCard, IFunctionalVirtualCard
                 var modules = capStructure.Applets
                     .Select(applet => new ExecutableModule(applet.Aid, 0x03)) // SELECTABLE state
                     .ToImmutableList();
-                
+
                 return new CapFileInfo(loadFileAid, modules);
             });
     }
@@ -1149,13 +1176,15 @@ public partial class VirtualCard : IVirtualCard, IFunctionalVirtualCard
         CardConfiguration config
     )
     {
-        // Use lifecycle manager to create load file with validated state
-        return LifecycleManager.CreateLoadFileWithState(
-            capInfo.LoadFileAid,
-            config.IsdAid, // Default to ISD as security domain
-            LifecycleManager.LoadFileLifecycleStates.Loaded,
-            capInfo.Modules
-        );
+        // Create load file with validated state
+        const byte validInitialState = GlobalPlatform.LifecycleStates.Loaded;
+
+        return Result.Success<LoadFile, SmartCardError>(new LoadFile(
+            Aid: capInfo.LoadFileAid,
+            AssociatedSecurityDomainAid: config.IsdAid, // Default to ISD as security domain
+            LifecycleState: validInitialState,
+            ExecutableModules: capInfo.Modules
+        ));
     }
 
     /// <summary>
@@ -1845,5 +1874,75 @@ public partial class VirtualCard : IVirtualCard, IFunctionalVirtualCard
         }
 
         return Result.Success<(byte[], int), SmartCardError>((fieldData, offset));
+    }
+
+    /// <summary>
+    /// Routes command to applications using ApplicationRegistry.
+    /// </summary>
+    private static Result<(ApduResponse, CardState), SmartCardError> RouteToApplications(
+        byte[] command,
+        CardState state,
+        IRngContext rngContext,
+        LoggingService logging)
+    {
+        return state.ApplicationRegistry.Match(
+            registry =>
+            {
+                logging.LogDebug(
+                    "Routing command INS=0x{Ins:X2} to application registry",
+                    command[1]);
+
+                return registry.RouteCommand(command, state, rngContext)
+                    .Map(result =>
+                    {
+                        var (updatedRegistry, apduResponse) = result;
+                        var newState = state with { ApplicationRegistry = Maybe<ApplicationRegistry>.From(updatedRegistry) };
+
+                        // Convert to Core.ApduResponse format
+                        var coreResponse = new ApduResponse(
+                            apduResponse.Data.IsDefaultOrEmpty ? Array.Empty<byte>() : apduResponse.Data.ToArray(),
+                            apduResponse.StatusWord);
+
+                        logging.LogDebug(
+                            "Application processed command - Response SW: {StatusWord:X4}",
+                            (ushort)((coreResponse.StatusWord.SW1 << 8) | coreResponse.StatusWord.SW2));
+
+                        return (coreResponse, newState);
+                    });
+            },
+            () =>
+            {
+                logging.LogError("No application registry available");
+                return Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                    SmartCardError.UnexpectedError("No application registry available"));
+            });
+    }
+
+    /// <summary>
+    /// Applies SCP security to incoming command.
+    /// </summary>
+    private static Result<ParsedCommand, SmartCardError> ApplyScpSecurity(
+        ParsedCommand cmd,
+        CardState state,
+        LoggingService logging)
+    {
+        // Apply SCP enforcement rules per GP Appendix E before command execution
+        var securityValidationResult = ScpEnforcer.ValidateCommandSecurity(cmd.Ins, state, cmd.FullCommand);
+
+        if (securityValidationResult.IsFailure)
+        {
+            logging.LogWarning(
+                "SCP validation failed for INS=0x{Ins:X2}: {Error}",
+                cmd.Ins,
+                securityValidationResult.Error.Message);
+            return Result.Failure<ParsedCommand, SmartCardError>(securityValidationResult.Error);
+        }
+
+        logging.LogDebug(
+            "SCP validation passed for INS=0x{Ins:X2}, security level=0x{Level:X2}",
+            cmd.Ins,
+            state.SecurityLevel);
+
+        return Result.Success<ParsedCommand, SmartCardError>(cmd);
     }
 }

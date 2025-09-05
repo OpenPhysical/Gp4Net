@@ -1,3 +1,4 @@
+
 using System;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -6,12 +7,12 @@ using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Constants;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using static Gp4Net.Cryptography.CryptoService;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
-using Gp4Net.Constants;
 namespace Gp4Net.CardEmulator.Functional;
 
 /// <summary>
@@ -125,7 +126,7 @@ public static class CommandProcessors
         logging.LogDebug("Command: {Command}", Convert.ToHexString(command));
         logging.LogDebug("State SCP Version: 0x{ScpVersion:X2}", state.ScpVersion);
 
-        // Delegate to protocol-specific processors  
+        // Delegate to protocol-specific processors
         ILogger logger = logging.Logger.Match(l => l, () => Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
         bool isScp02 = Scp02CommandProcessors.IsScp02Command(command, state, logger);
         bool isScp03 = Scp03CommandProcessors.IsScp03Command(command, state);
@@ -217,12 +218,12 @@ public static class CommandProcessors
         // Accept CLA '00'-'03' (ISO) and '40'-'4F' (GP)
         byte cla = command[0];
         byte ins = command[1];
-        
+
         if (ins != 0xA4)
         {
             return Result.Failure<byte[], SmartCardError>(SmartCardError.InstructionNotSupported());
         }
-        
+
         if (!IsValidSelectCla(cla))
         {
             return Result.Failure<byte[], SmartCardError>(SmartCardError.Unsupported("Class not supported"));
@@ -286,17 +287,17 @@ public static class CommandProcessors
         byte aidLength = (byte)aid.Length;
         byte[] fciData = new byte[6 + aidLength + 6];
         int offset = 0;
-        
+
         // FCI Template (tag 6F)
         fciData[offset++] = 0x6F;
         fciData[offset++] = (byte)(4 + aidLength + 6); // Length of FCI content
-        
+
         // DF Name (tag 84) - Contains the actual selected AID
         fciData[offset++] = 0x84;
         fciData[offset++] = aidLength;
         Array.Copy(aid, 0, fciData, offset, aidLength);
         offset += aidLength;
-        
+
         // FCI Proprietary Template (tag A5) - Contains application-specific data
         fciData[offset++] = 0xA5;
         fciData[offset++] = 0x04; // Length of proprietary template
@@ -304,7 +305,7 @@ public static class CommandProcessors
         fciData[offset++] = 0x65;
         fciData[offset++] = 0x01;
         fciData[offset++] = 0x00; // Maximum length of data field in command message
-        
+
         return new ApduResponse(fciData, Gp4Net.Constants.Constants.StatusWords.Success.Normal);
     }
 
@@ -456,11 +457,11 @@ public static class CommandProcessors
         }
 
         // Get the appropriate keys
-        Maybe<IKeySet> installedKeySet = state.InstalledKeys.ContainsKey(effectiveKeyVersion) 
-            ? Maybe<IKeySet>.From(state.InstalledKeys[effectiveKeyVersion]) 
+        Maybe<IKeySet> installedKeySet = state.InstalledKeys.ContainsKey(effectiveKeyVersion)
+            ? Maybe<IKeySet>.From(state.InstalledKeys[effectiveKeyVersion])
             : Maybe<IKeySet>.None;
-        Maybe<IKeySet> staticKeySet = config.StaticKeys.ContainsKey(effectiveKeyVersion) 
-            ? Maybe<IKeySet>.From(config.StaticKeys[effectiveKeyVersion]) 
+        Maybe<IKeySet> staticKeySet = config.StaticKeys.ContainsKey(effectiveKeyVersion)
+            ? Maybe<IKeySet>.From(config.StaticKeys[effectiveKeyVersion])
             : Maybe<IKeySet>.None;
 
         Maybe<IKeySet> fallbackKeySet = config.StaticKeys.Values.Any()
@@ -477,7 +478,7 @@ public static class CommandProcessors
                         _ => fallbackKeySet.ToResult(SmartCardError.ReferencedDataNotFound())
                     )
             );
-            
+
         if (keySetResult.IsFailure)
             return Result.Failure<InitializeUpdateData, SmartCardError>(keySetResult.Error);
 
@@ -921,7 +922,7 @@ public static class CommandProcessors
 
         byte p1 = command[2]; // Reference control parameter - Table 11-33
         byte p2 = command[3]; // Reference control parameter - Table 11-34
-        
+
         // Validate P1 parameter per Table 11-33
         StatusRequestType requestType = p1 switch
         {
@@ -934,7 +935,7 @@ public static class CommandProcessors
 
         // P2 contains format and criteria information per Table 11-34
         bool includeTaggedFormat = (p2 & 0x02) != 0;
-        
+
         return Result.Success<GetStatusRequest, SmartCardError>(
             new GetStatusRequest(requestType, p2, includeTaggedFormat));
     }
@@ -985,11 +986,11 @@ public static class CommandProcessors
         byte[] isdAid = config.IsdAid;
         byte lifecycleState = 0x07; // SELECTABLE per GP Card Specification Table 11-1
         byte privileges = 0x81; // Security Domain + Authorized Management + Personalized per Table 8-1
-        
+
         byte[] statusData = isdAid
             .Concat([lifecycleState, privileges])
             .ToArray();
-        
+
         return Result.Success<byte[], SmartCardError>(statusData);
     }
 
@@ -1001,9 +1002,9 @@ public static class CommandProcessors
         // Return applications in TLV format per GP Table 11-36
         byte[] responseData = state.Applications.Values
             .SelectMany(app => app.Aid
-                .Concat([(byte)app.LifecycleState, app.Privileges]))
+                .Concat([(byte)app.LifecycleState, (byte)app.Privileges]))
             .ToArray();
-        
+
         return Result.Success<byte[], SmartCardError>(responseData);
     }
 
@@ -1017,7 +1018,7 @@ public static class CommandProcessors
                 .Concat([(byte)loadFile.LifecycleState])
                 .Concat(loadFile.AssociatedSecurityDomainAid))
             .ToArray();
-        
+
         return Result.Success<byte[], SmartCardError>(responseData);
     }
 
@@ -1031,7 +1032,7 @@ public static class CommandProcessors
                 .SelectMany(module => module.Aid
                     .Concat([(byte)module.LifecycleState])))
             .ToArray();
-        
+
         return Result.Success<byte[], SmartCardError>(responseData);
     }
 
@@ -1043,11 +1044,11 @@ public static class CommandProcessors
         // ISO CLAs: 00-03
         if (cla >= 0x00 && cla <= 0x03)
             return true;
-            
+
         // GlobalPlatform CLAs: 40-4F
         if (cla >= 0x40 && cla <= 0x4F)
             return true;
-            
+
         return false;
     }
 

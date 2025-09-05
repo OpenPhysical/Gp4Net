@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.CardEmulator.Trace;
 
@@ -222,7 +223,7 @@ public class GpShellTraceParser
         if (responseBytes.Length < 2)
         {
             // Invalid response, assume error
-            return ApduResponse.Error(0x6F00);
+            return ApduResponse.Error(StatusWords.InstructionErrors.NoPreciseDiagnosis);
         }
 
         // Extract SW from last 2 bytes

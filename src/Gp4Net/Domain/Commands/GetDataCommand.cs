@@ -2,12 +2,15 @@ using System;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Services;
 using static Gp4Net.Services.TlvService;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
+using WSCT.ISO7816;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -17,15 +20,6 @@ namespace Gp4Net.Domain.Commands;
 [PublicAPI]
 public class GetDataCommand : IApduCommand
 {
-    /// <summary>
-    /// The command class byte.
-    /// </summary>
-    public const byte Cla = 0x80;
-
-    /// <summary>
-    /// The command instruction byte.
-    /// </summary>
-    public const byte Ins = 0xCA;
 
     /// <summary>
     /// Common data object identifiers.
@@ -209,50 +203,63 @@ public class GetDataCommand : IApduCommand
         );
     }
 
+
     /// <summary>
-    /// Converts this command to an APDU byte array.
+    /// Gets the class byte.
     /// </summary>
-    /// <returns>The APDU command bytes.</returns>
-    public byte[] ToApdu()
+    public byte Cla => GlobalPlatform.Cla.GpStandard;
+
+    /// <summary>
+    /// Gets the instruction byte.
+    /// </summary>
+    public byte Ins => GlobalPlatform.Ins.GetData;
+
+    /// <summary>
+    /// Gets the command data.
+    /// </summary>
+    public byte[] Data => [];
+
+    /// <summary>
+    /// Gets the expected response length.
+    /// </summary>
+    public Maybe<int> ExpectedResponseLength => Maybe<int>.From(256);
+
+    /// <summary>
+    /// Gets whether this command uses extended length.
+    /// </summary>
+    public bool IsExtendedLength => false;
+
+    /// <summary>
+    /// Creates a WSCT CommandAPDU from this GET DATA command.
+    /// </summary>
+    /// <returns>A Result containing the CommandAPDU.</returns>
+    public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
-        return
-        [
-            Cla,
-            Ins,
-            P1,
-            P2,
-            0x00, // Le (expecting response)
-        ];
+        return ExpectedResponseLength.Match(
+            Some: le => Result.Success<CommandAPDU, SmartCardError>(
+                new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data, (uint)le)),
+            None: () => Result.Success<CommandAPDU, SmartCardError>(
+                new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data))
+        );
     }
 
-    // IApduCommand implementation
-    byte IApduCommand.Cla
+    /// <inheritdoc/>
+    public CommandAPDU ToApdu()
     {
-        get { return Cla; }
+        return ExpectedResponseLength.Match(
+            Some: le => new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data, (uint)le),
+            None: () => new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data)
+        );
     }
-    byte IApduCommand.Ins
+
+    /// <inheritdoc/>
+    public byte[] ToBytes()
     {
-        get { return Ins; }
-    }
-    byte IApduCommand.P1
-    {
-        get { return P1; }
-    }
-    byte IApduCommand.P2
-    {
-        get { return P2; }
-    }
-    byte[] IApduCommand.Data
-    {
-        get { return []; }
-    }
-    Maybe<int> IApduCommand.ExpectedResponseLength
-    {
-        get { return Maybe<int>.From(256); }
-    }
-    bool IApduCommand.IsExtendedLength
-    {
-        get { return false; }
+        // Create APDU bytes: CLA INS P1 P2 [Lc Data] [Le]
+        return ExpectedResponseLength.Match(
+            Some: le => new byte[] { Cla, Ins, P1, P2, (byte)(le == 256 ? 0 : le) },
+            None: () => new byte[] { Cla, Ins, P1, P2 }
+        );
     }
 
     /// <summary>

@@ -5,6 +5,7 @@ using Gp4Net.Core;
 using Gp4Net.Pipeline;
 using Gp4Net.Services;
 using Gp4Net.Transport;
+using WSCT.ISO7816;
 
 namespace Gp4Net.Tests.Tool.Infrastructure;
 
@@ -29,7 +30,7 @@ public class EmptyCardService : ISmartCardService
     public IPipelineContext Context => _context;
 
     public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
-        IApduCommand command,
+        CommandAPDU command,
         CancellationToken cancellationToken = default
     )
     {
@@ -41,7 +42,7 @@ public class EmptyCardService : ISmartCardService
     }
 
     public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
-        IApduCommand command,
+        CommandAPDU command,
         CommandOptions options,
         CancellationToken cancellationToken = default
     )

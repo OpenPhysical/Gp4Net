@@ -4,8 +4,11 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.DataObjects;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Constants;
+using Gp4Net.Services;
+using Gp4Net.Services.GlobalPlatform;
 using JetBrains.Annotations;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.CardEmulator.Functional;
 
@@ -33,8 +36,8 @@ public record CardConfiguration(
     /// </summary>
     public static CardConfiguration P71() =>
         new(
-            Atr: Constants.Constants.Apdu.WellKnownIdentifiers.NxpP71Atr,
-            IsdAid: Constants.Constants.Apdu.WellKnownIdentifiers.StandardGpIsdAid,
+            Atr: Apdu.WellKnownIdentifiers.NxpP71Atr,
+            IsdAid: Apdu.WellKnownIdentifiers.StandardGpIsdAid,
             StaticKeys: CreateP71Keys(),
             DefaultDataObjects: CreateP71DataObjects(),
             SupportedInstructions: CreateP71SupportedInstructions(),
@@ -49,8 +52,8 @@ public record CardConfiguration(
     /// </summary>
     public static CardConfiguration Generic() =>
         new(
-            Atr: Constants.Constants.Apdu.WellKnownIdentifiers.GenericJavaCardAtr,
-            IsdAid: Constants.Constants.Apdu.WellKnownIdentifiers.StandardGpIsdAid,
+            Atr: Apdu.WellKnownIdentifiers.GenericJavaCardAtr,
+            IsdAid: Apdu.WellKnownIdentifiers.StandardGpIsdAid,
             StaticKeys: CreateScp02TestKeys(),
             DefaultDataObjects: CreateGenericDataObjects(),
             SupportedInstructions: CreateStandardGpInstructions(),
@@ -66,8 +69,8 @@ public record CardConfiguration(
     /// </summary>
     public static CardConfiguration Minimal() =>
         new(
-            Atr: Constants.Constants.Apdu.WellKnownIdentifiers.GenericJavaCardAtr,
-            IsdAid: Constants.Constants.Apdu.WellKnownIdentifiers.StandardGpIsdAid,
+            Atr: Apdu.WellKnownIdentifiers.GenericJavaCardAtr,
+            IsdAid: Apdu.WellKnownIdentifiers.StandardGpIsdAid,
             StaticKeys: CreateScp02TestKeys(),
             DefaultDataObjects: CreateGenericDataObjects(),
             SupportedInstructions: CreateMinimalInstructions(),
@@ -185,62 +188,39 @@ public record CardConfiguration(
 
     private static ImmutableDictionary<ushort, byte[]> CreateP71DataObjects()
     {
-        // Create card capabilities for P71 (SCP02 only)
-        CardCapabilities cardCapabilities = new CardCapabilities
-        {
-            CardRecognitionData = Convert.FromHexString("42"),
-            CardManagementTypeAndVersion = [0x02, 0x00],
-            CardIdentificationScheme = 0x00,
-            SecureChannelProtocols =
-            {
-                new SecureChannelProtocol
-                {
-                    Protocol = Constants.Constants.GlobalPlatform.Protocols.Scp02,
-                    Implementations =
-                    {
-                        new ScpImplementationSpecifier
-                        {
-                            Implementation = 0x15,
-                            KeyTypes = { 0x80, 0x10 },
-                        },
-                        new ScpImplementationSpecifier
-                        {
-                            Implementation = 0x04,
-                            KeyTypes = { 0x80, 0x10 },
-                        },
-                        new ScpImplementationSpecifier
-                        {
-                            Implementation = 0x1A,
-                            KeyTypes = { 0x80, 0x10 },
-                        },
-                    },
-                },
-            },
-        };
+        // Define P71 card capabilities (SCP02 only)
+        var supportedScp02 = ImmutableList.Create(
+            ScpImplementation.Scp02I15, // 0x15
+            ScpImplementation.Scp02I04, // 0x04
+            ScpImplementation.Scp02I1A  // 0x1A
+        );
+
+        var supportedScp03 = ImmutableList<ScpImplementation>.Empty;
+
+        var keyTypes = ImmutableList.Create(
+            new KeyTypeAndLength(0x80, 0x10), // DES
+            new KeyTypeAndLength(0x81, 0x10), // DES-ECB
+            new KeyTypeAndLength(0x82, 0x10)  // DES-MAC
+        );
 
         // Create key information template for P71
-        KeyInfoTemplate keyInfoTemplate = new KeyInfoTemplate
+        var keyInfoTemplate = new KeyInfoTemplate
         {
-            KeyVersionNumber = 0x01,
-            KeyIdentifier = 0x00,
-            KeyTypesAndLengths =
-            [
-                new KeyTypeAndLength(0x80, 0x10), // DES
-                new KeyTypeAndLength(0x81, 0x10), // DES-ECB
-                new KeyTypeAndLength(0x82, 0x10), // DES-MAC
-            ]
+            KeyVersionNumber = Maybe<byte>.From((byte)0x01),
+            KeyIdentifier = Maybe<byte>.From((byte)0x00),
+            KeyTypesAndLengths = keyTypes.ToImmutableArray()
         };
 
         // Create security domain info
-        SecurityDomainInfo securityDomainInfo = new SecurityDomainInfo
+        var securityDomainInfo = new SecurityDomainInfo
         {
-            Oid = Constants.Constants.GlobalPlatform.Aids.IsdDefault,
+            Oid = Aids.IsdDefault,
             ImageData = Convert.FromHexString("A000000151535343"),
             LifeCycleData = Convert.FromHexString("03"),
         };
 
-        return CardCapabilitiesCodec
-            .Encode(cardCapabilities)
+        return DataGeneration
+            .BuildCardCapabilities(supportedScp02, supportedScp03, keyTypes)
             .Bind(cardCap =>
                 KeyInfoTemplateCodec
                     .Encode(keyInfoTemplate)
@@ -412,86 +392,53 @@ public record CardConfiguration(
     // approach ensures consistent test behavior and eliminates JSON parsing dependencies.
     private static Result<ImmutableDictionary<ushort, byte[]>, SmartCardError> CreateDualProtocolDataObjects()
     {
-        // Create dual-protocol card capabilities (both SCP02 and SCP03)
-        CardCapabilities cardCapabilities = new CardCapabilities
-        {
-            CardRecognitionData = Convert.FromHexString("42"),
-            CardManagementTypeAndVersion = [0x02, 0x00],
-            CardIdentificationScheme = 0x00,
-            SecureChannelProtocols =
-            {
-                new SecureChannelProtocol
-                {
-                    Protocol = Constants.Constants.GlobalPlatform.Protocols.Scp02,
-                    Implementations =
-                    {
-                        new ScpImplementationSpecifier
-                        {
-                            Implementation = 0x15,
-                            KeyTypes = { 0x80, 0x10 },
-                        },
-                        new ScpImplementationSpecifier
-                        {
-                            Implementation = 0x04,
-                            KeyTypes = { 0x80, 0x10 },
-                        },
-                        new ScpImplementationSpecifier
-                        {
-                            Implementation = 0x55,
-                            KeyTypes = { 0x80, 0x10 },
-                        },
-                    },
-                },
-                new SecureChannelProtocol
-                {
-                    Protocol = Constants.Constants.GlobalPlatform.Protocols.Scp03,
-                    Implementations =
-                    {
-                        new ScpImplementationSpecifier
-                        {
-                            Implementation = 0x70,
-                            KeyTypes = { 0x80, 0x20 },
-                        },
-                    },
-                },
-            },
-        };
+        // Define dual-protocol card capabilities (both SCP02 and SCP03)
+        var supportedScp02 = ImmutableList.Create(
+            ScpImplementation.Scp02I15, // 0x15
+            ScpImplementation.Scp02I04, // 0x04
+            ScpImplementation.Scp02I55  // 0x55
+        );
+
+        var supportedScp03 = ImmutableList.Create(
+            ScpImplementation.Scp03I70  // 0x70
+        );
+
+        var keyTypes = ImmutableList.Create(
+            new KeyTypeAndLength(0x80, 0x10), // DES for SCP02
+            new KeyTypeAndLength(0x88, 0x10), // AES-128 for SCP03
+            new KeyTypeAndLength(0x88, 0x20)  // AES-256 for SCP03
+        );
 
         // Create key information template for dual protocol
-        KeyInfoTemplate keyInfoTemplate = new KeyInfoTemplate
+        var keyInfoTemplate = new KeyInfoTemplate
         {
-            KeyVersionNumber = 0x01,
-            KeyIdentifier = 0x00,
-            KeyTypesAndLengths =
-            [
-                new KeyTypeAndLength(0x80, 0x10), // DES for SCP02
-                new KeyTypeAndLength(0x88, 0x10), // AES-128 for SCP03
-                new KeyTypeAndLength(0x88, 0x20), // AES-256 for SCP03
-            ]
+            KeyVersionNumber = Maybe<byte>.From((byte)0x01),
+            KeyIdentifier = Maybe<byte>.From((byte)0x00),
+            KeyTypesAndLengths = keyTypes.ToImmutableArray()
         };
 
         // Create security domain info
-        SecurityDomainInfo securityDomainInfo = new SecurityDomainInfo
+        var securityDomainInfo = new SecurityDomainInfo
         {
-            Oid = Constants.Constants.GlobalPlatform.Aids.IsdDefault,
+            Oid = Aids.IsdDefault,
             ImageData = Convert.FromHexString("A000000151535343"),
             LifeCycleData = Convert.FromHexString("03"),
         };
 
-        // Use functional composition instead of imperative checks
-        return CardCapabilitiesCodec
-            .Encode(cardCapabilities)
+        // Use functional composition with service calls
+        return DataGeneration
+            .BuildCardCapabilities(supportedScp02, supportedScp03, keyTypes)
             .Bind(cardCapabilitiesBytes =>
                 KeyInfoTemplateCodec
                     .Encode(keyInfoTemplate)
                     .Bind(keyInfoBytes =>
                         SecurityDomainInfoCodec
                             .Encode(securityDomainInfo)
-                            .Map(securityDomainBytes => 
+                            .Map(securityDomainBytes =>
                                 ImmutableDictionary
                                     .Create<ushort, byte[]>()
-                                    .Add(0x0066, cardCapabilitiesBytes)      // Card capabilities using codec
-                                    .Add(0x00E0, keyInfoBytes)               // Key info template using codec  
+                                    .Add(0x0066, cardCapabilitiesBytes)      // Card capabilities using service
+                                    .Add(0x00E0, keyInfoBytes)               // Key info template using codec
                                     .Add(0x00C1, securityDomainBytes)       // Security domain data using codec
                             )
                     )
@@ -503,86 +450,53 @@ public record CardConfiguration(
     /// </summary>
     private static Result<ImmutableDictionary<ushort, byte[]>, SmartCardError> CreateScp03DataObjects()
     {
-        // Create SCP03-first card capabilities
-        CardCapabilities cardCapabilities = new CardCapabilities
-        {
-            CardRecognitionData = Convert.FromHexString("42"),
-            CardManagementTypeAndVersion = [0x02, 0x00],
-            CardIdentificationScheme = 0x00,
-            SecureChannelProtocols =
-            {
-                new SecureChannelProtocol
-                {
-                    Protocol = Constants.Constants.GlobalPlatform.Protocols.Scp03, // SCP03 first
-                    Implementations =
-                    {
-                        new ScpImplementationSpecifier
-                        {
-                            Implementation = 0x70,
-                            KeyTypes = { 0x80, 0x20 },
-                        },
-                        new ScpImplementationSpecifier
-                        {
-                            Implementation = 0x60,
-                            KeyTypes = { 0x80, 0x10 },
-                        },
-                        new ScpImplementationSpecifier
-                        {
-                            Implementation = 0x10,
-                            KeyTypes = { 0x80, 0x20 },
-                        },
-                    },
-                },
-                new SecureChannelProtocol
-                {
-                    Protocol = Constants.Constants.GlobalPlatform.Protocols.Scp02, // SCP02 fallback
-                    Implementations =
-                    {
-                        new ScpImplementationSpecifier
-                        {
-                            Implementation = 0x15,
-                            KeyTypes = { 0x80, 0x10 },
-                        },
-                    },
-                },
-            },
-        };
+        // Define SCP03-first card capabilities
+        var supportedScp03 = ImmutableList.Create(
+            ScpImplementation.Scp03I70, // 0x70
+            ScpImplementation.Scp03I60, // 0x60
+            ScpImplementation.Scp03I10  // 0x10
+        );
+
+        var supportedScp02 = ImmutableList.Create(
+            ScpImplementation.Scp02I15  // 0x15 fallback
+        );
+
+        var keyTypes = ImmutableList.Create(
+            new KeyTypeAndLength(0x88, 0x20), // AES-256 primary
+            new KeyTypeAndLength(0x88, 0x10), // AES-128 fallback
+            new KeyTypeAndLength(0x80, 0x10)  // DES for SCP02
+        );
 
         // Create key information template for SCP03
-        KeyInfoTemplate keyInfoTemplate = new KeyInfoTemplate
+        var keyInfoTemplate = new KeyInfoTemplate
         {
-            KeyVersionNumber = 0x11, // Different version for SCP03
-            KeyIdentifier = 0x01,
-            KeyTypesAndLengths =
-            [
-                new KeyTypeAndLength(0x88, 0x20), // AES-256 primary
-                new KeyTypeAndLength(0x88, 0x10), // AES-128 fallback
-                new KeyTypeAndLength(0x80, 0x10), // DES for SCP02
-            ]
+            KeyVersionNumber = Maybe<byte>.From((byte)0x11), // Different version for SCP03
+            KeyIdentifier = Maybe<byte>.From((byte)0x01),
+            KeyTypesAndLengths = keyTypes.ToImmutableArray()
         };
 
         // Create security domain info for SCP03
-        SecurityDomainInfo securityDomainInfo = new SecurityDomainInfo
+        var securityDomainInfo = new SecurityDomainInfo
         {
-            Oid = Constants.Constants.GlobalPlatform.Aids.IsdDefault,
+            Oid = Aids.IsdDefault,
             ImageData = Convert.FromHexString("A000000151535343"),
             LifeCycleData = Convert.FromHexString("03"),
         };
 
-        // Use functional composition instead of imperative checks
-        return CardCapabilitiesCodec
-            .Encode(cardCapabilities)
+        // Use functional composition with service calls
+        return DataGeneration
+            .BuildCardCapabilities(supportedScp02, supportedScp03, keyTypes)
             .Bind(cardCapabilitiesBytes =>
                 KeyInfoTemplateCodec
                     .Encode(keyInfoTemplate)
                     .Bind(keyInfoBytes =>
                         SecurityDomainInfoCodec
                             .Encode(securityDomainInfo)
-                            .Map(securityDomainBytes => 
+                            .Map(securityDomainBytes =>
                                 ImmutableDictionary
                                     .Create<ushort, byte[]>()
-                                    .Add(0x0066, cardCapabilitiesBytes)      // Card capabilities using codec
-                                    .Add(0x00E0, keyInfoBytes)               // Key info template using codec  
+                                    .Add(0x0066, cardCapabilitiesBytes)      // Card capabilities using service
+                                    .Add(0x00E0, keyInfoBytes)               // Key info template using codec
                                     .Add(0x00C1, securityDomainBytes)       // Security domain data using codec
                             )
                     )

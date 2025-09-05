@@ -77,9 +77,9 @@ public static class GetDataResponseExtensions
                 if (
                     data.Length >= 3
                     && capabilities.ScpOptions.Count == 0
-                    && capabilities.SdPrivileges == null
-                    && capabilities.AppPrivileges == null
-                    && capabilities.Algorithms == null
+                    && !capabilities.SdPrivileges.HasValue
+                    && !capabilities.AppPrivileges.HasValue
+                    && !capabilities.Algorithms.HasValue
                     && capabilities.CipherSuites.Count == 0
                 )
                 {

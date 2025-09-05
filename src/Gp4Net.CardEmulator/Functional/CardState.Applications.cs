@@ -1,6 +1,5 @@
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Applications;
-using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Functional;
 

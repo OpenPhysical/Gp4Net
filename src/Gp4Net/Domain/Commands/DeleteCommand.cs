@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
+using WSCT.ISO7816;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -15,15 +18,6 @@ namespace Gp4Net.Domain.Commands;
 [PublicAPI]
 public class DeleteCommand : IApduCommand
 {
-    /// <summary>
-    /// The command class byte.
-    /// </summary>
-    public const byte Cla = 0x80;
-
-    /// <summary>
-    /// The command instruction byte.
-    /// </summary>
-    public const byte Ins = 0xE4;
 
     /// <summary>
     /// Delete operation types for P1 parameter.
@@ -83,20 +77,34 @@ public class DeleteCommand : IApduCommand
     public Maybe<byte[]> DeleteTokenKey { get; }
 
     /// <summary>
+    /// Optional Security Domain identifier for token verification (tag '42').
+    /// </summary>
+    public Maybe<byte[]> SecurityDomainIdentifier { get; }
+
+    /// <summary>
+    /// Optional Security Domain image number (tag '45').
+    /// </summary>
+    public Maybe<byte[]> SecurityDomainImageNumber { get; }
+
+    /// <summary>
+    /// Optional Application Provider identifier (tag '5F20').
+    /// </summary>
+    public Maybe<byte[]> ApplicationProviderIdentifier { get; }
+
+    /// <summary>
+    /// Optional Token identifier/number (tag '93').
+    /// </summary>
+    public Maybe<byte[]> TokenIdentifier { get; }
+
+    /// <summary>
     /// Gets the class byte.
     /// </summary>
-    byte IApduCommand.Cla
-    {
-        get { return Cla; }
-    }
+    public byte Cla => GlobalPlatform.Cla.GpStandard;
 
     /// <summary>
     /// Gets the instruction byte.
     /// </summary>
-    byte IApduCommand.Ins
-    {
-        get { return Ins; }
-    }
+    public byte Ins => GlobalPlatform.Ins.Delete;
 
     /// <summary>
     /// Gets the parameter 1 byte.
@@ -139,6 +147,20 @@ public class DeleteCommand : IApduCommand
     }
 
     /// <summary>
+    /// Creates a WSCT CommandAPDU from this DELETE command.
+    /// </summary>
+    /// <returns>A Result containing either the CommandAPDU or an error.</returns>
+    public Result<CommandAPDU, SmartCardError> ToCommandApdu()
+    {
+        return GetDeleteData().Map(data =>
+            ExpectedResponseLength.Match(
+                Some: expectedLength => new CommandAPDU(Cla, Ins, P1, P2, (uint)data.Length, data, (uint)expectedLength),
+                None: () => new CommandAPDU(Cla, Ins, P1, P2, (uint)data.Length, data)
+            )
+        );
+    }
+
+    /// <summary>
     /// Gets the delete data for the IApduCommand interface.
     /// </summary>
     private Result<byte[], SmartCardError> GetDeleteData()
@@ -168,15 +190,21 @@ public class DeleteCommand : IApduCommand
                         "Delete token calculation requires exactly one AID."
                     );
                 }
+                
+                // Build Control Reference Template for Digital Signature if needed
+                Maybe<byte[]> controlReferenceTemplate = BuildControlReferenceTemplate();
+                
                 // Compute token using the DeleteTokenCalculator
-                Result<byte[], SmartCardError> tokenResult =
-                    CryptoService.Keys.ComputeDeleteToken(
-                        DeleteTokenKey.Value,
+                Result<byte[], SmartCardError> tokenResult = DeleteTokenKey.Match(
+                    Some: key => CryptoService.Keys.ComputeDeleteToken(
+                        key,
                         P1,
                         P2,
                         Aids[0],
-                        Maybe<byte[]>.None
-                    ); // No optional TLV for now
+                        controlReferenceTemplate
+                    ),
+                    None: () => SmartCardError.InvalidArgument("Delete token key is required")
+                );
 
                 if (tokenResult.IsFailure)
                 {
@@ -229,7 +257,11 @@ public class DeleteCommand : IApduCommand
         DeleteTarget target,
         IList<byte[]> aids,
         Maybe<byte[]> deletionToken = default,
-        Maybe<byte[]> deleteTokenKey = default
+        Maybe<byte[]> deleteTokenKey = default,
+        Maybe<byte[]> securityDomainIdentifier = default,
+        Maybe<byte[]> securityDomainImageNumber = default,
+        Maybe<byte[]> applicationProviderIdentifier = default,
+        Maybe<byte[]> tokenIdentifier = default
     )
     {
         Type = type;
@@ -237,6 +269,10 @@ public class DeleteCommand : IApduCommand
         Aids = new List<byte[]>(aids.Select(aid => (byte[])aid.Clone()));
         DeletionToken = deletionToken.Map(token => (byte[])token.Clone());
         DeleteTokenKey = deleteTokenKey.Map(key => (byte[])key.Clone());
+        SecurityDomainIdentifier = securityDomainIdentifier.Map(id => (byte[])id.Clone());
+        SecurityDomainImageNumber = securityDomainImageNumber.Map(num => (byte[])num.Clone());
+        ApplicationProviderIdentifier = applicationProviderIdentifier.Map(id => (byte[])id.Clone());
+        TokenIdentifier = tokenIdentifier.Map(id => (byte[])id.Clone());
     }
 
     /// <summary>
@@ -263,6 +299,49 @@ public class DeleteCommand : IApduCommand
             );
     }
 
+    /// <summary>
+    /// Creates a DELETE command for deleting a single application or load file with full token parameters.
+    /// </summary>
+    /// <param name="aid">The AID to delete.</param>
+    /// <param name="deleteRelated">Whether to delete related objects.</param>
+    /// <param name="deletionToken">The deletion token (optional).</param>
+    /// <param name="deleteTokenKey">The delete token key for automatic token calculation (optional).</param>
+    /// <param name="securityDomainIdentifier">Security Domain identifier for token verification (tag '42').</param>
+    /// <param name="securityDomainImageNumber">Security Domain image number (tag '45').</param>
+    /// <param name="applicationProviderIdentifier">Application Provider identifier (tag '5F20').</param>
+    /// <param name="tokenIdentifier">Token identifier/number (tag '93').</param>
+    /// <returns>A Result containing either a new DeleteCommand or an error.</returns>
+    public static Result<DeleteCommand, SmartCardError> CreateForApplicationWithTokenParams(
+        byte[] aid,
+        bool deleteRelated = false,
+        Maybe<byte[]> deletionToken = default,
+        Maybe<byte[]> deleteTokenKey = default,
+        Maybe<byte[]> securityDomainIdentifier = default,
+        Maybe<byte[]> securityDomainImageNumber = default,
+        Maybe<byte[]> applicationProviderIdentifier = default,
+        Maybe<byte[]> tokenIdentifier = default
+    )
+    {
+        return Maybe<byte[]>
+            .From(aid)
+            .Match(
+                Some: aidValue =>
+                    aidValue.Length == 0
+                        ? SmartCardError.InvalidArgument("AID cannot be empty.")
+                        : CreateApplicationDeleteCommandWithTokenParams(
+                            aidValue, 
+                            deleteRelated, 
+                            deletionToken, 
+                            deleteTokenKey, 
+                            securityDomainIdentifier, 
+                            securityDomainImageNumber, 
+                            applicationProviderIdentifier, 
+                            tokenIdentifier
+                        ),
+                None: () => SmartCardError.InvalidArgument("AID cannot be null.")
+            );
+    }
+
     private static Result<DeleteCommand, SmartCardError> CreateApplicationDeleteCommand(
         byte[] aid,
         bool deleteRelated,
@@ -274,6 +353,34 @@ public class DeleteCommand : IApduCommand
             : DeleteType.DeleteObjectOnly;
         DeleteTarget target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, [aid], deletionToken);
+    }
+
+    private static Result<DeleteCommand, SmartCardError> CreateApplicationDeleteCommandWithTokenParams(
+        byte[] aid,
+        bool deleteRelated,
+        Maybe<byte[]> deletionToken,
+        Maybe<byte[]> deleteTokenKey,
+        Maybe<byte[]> securityDomainIdentifier,
+        Maybe<byte[]> securityDomainImageNumber,
+        Maybe<byte[]> applicationProviderIdentifier,
+        Maybe<byte[]> tokenIdentifier
+    )
+    {
+        DeleteType type = deleteRelated
+            ? DeleteType.DeleteObjectAndRelated
+            : DeleteType.DeleteObjectOnly;
+        DeleteTarget target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
+        return new DeleteCommand(
+            type, 
+            target, 
+            [aid], 
+            deletionToken, 
+            deleteTokenKey, 
+            securityDomainIdentifier, 
+            securityDomainImageNumber, 
+            applicationProviderIdentifier, 
+            tokenIdentifier
+        );
     }
 
     /// <summary>
@@ -452,65 +559,54 @@ public class DeleteCommand : IApduCommand
         return "DELETE";
     }
 
+
     /// <summary>
-    /// Converts this command to an APDU byte array.
+    /// Builds the Control Reference Template for Digital Signature (tag 'B6') containing optional TLV parameters.
+    /// Per GP specification Table 11-23, this includes Security Domain identification, 
+    /// Application Provider identifier, and Token identifier/number.
     /// </summary>
-    /// <returns>The APDU command bytes.</returns>
-    public byte[] ToApdu()
+    /// <returns>The encoded Control Reference Template, or None if no parameters are specified.</returns>
+    private Maybe<byte[]> BuildControlReferenceTemplate()
     {
-        List<byte> data = [];
-
-        if (Target is DeleteTarget.ByAid or DeleteTarget.WithRelated)
+        // Build TLV components functionally
+        IEnumerable<byte[]> tlvComponents = new[]
         {
-            // For AID deletion, encode as:
-            // 4F <total_len> <AID1><AID2>... [<token_len> <token>]
-            // Based on the trace: 4F09A000000308000010000
-
-            // Calculate total length of all AIDs
-            int totalAidLength = Aids.Sum(aid => aid.Length);
-
-            data.Add(0x4F); // AID tag
-            data.Add((byte)totalAidLength);
-
-            // Add all AIDs concatenated
-            foreach (byte[] aid in Aids)
-            {
-                data.AddRange(aid);
-            }
+            // Security Domain identifier (tag '42')
+            SecurityDomainIdentifier.Map(id => new byte[] { 0x42, (byte)id.Length }.Concat(id).ToArray()),
+            // Security Domain image number (tag '45') 
+            SecurityDomainImageNumber.Map(num => new byte[] { 0x45, (byte)num.Length }.Concat(num).ToArray()),
+            // Application Provider identifier (tag '5F20')
+            ApplicationProviderIdentifier.Map(id => new byte[] { 0x5F, 0x20, (byte)id.Length }.Concat(id).ToArray()),
+            // Token identifier/number (tag '93')
+            TokenIdentifier.Map(id => new byte[] { 0x93, (byte)id.Length }.Concat(id).ToArray())
         }
-        else
+        .Where(maybeComponent => maybeComponent.HasValue)
+        .Select(component => component.Value);
+
+        // If we have components, build the complete template
+        if (tlvComponents.Any())
         {
-            // For key deletion, the AID contains key identifier and version
-            foreach (byte[] keyRef in Aids)
-            {
-                data.AddRange(keyRef);
-            }
+            byte[] templateData = tlvComponents.SelectMany(component => component).ToArray();
+            byte[] result = new byte[] { 0xB6, (byte)templateData.Length }.Concat(templateData).ToArray();
+            return Maybe<byte[]>.From(result);
         }
 
-        // Add deletion token if present
-        if (DeletionToken.HasValue && DeletionToken.Value.Length > 0)
-        {
-            // Based on trace analysis, deletion token is appended directly
-            // without length prefix: just the raw token bytes
-            data.AddRange(DeletionToken.Value);
-        }
+        return Maybe<byte[]>.None;
+    }
 
-        // Build APDU
-        List<byte> apdu =
-        [
-            Cla,
-            Ins,
-            (byte)Type,
-            (byte)Target,
-            (byte)data.Count, // Lc
-        ];
+    /// <inheritdoc />
+    public CommandAPDU ToApdu()
+    {
+        return ToCommandApdu().GetValueOrDefault(new CommandAPDU([]));
+    }
 
-        apdu.AddRange(data);
-
-        // DELETE commands do NOT use LE byte per GP Pro traces
-        // Trace: 84E40080134F09A0000003080000100020EEDD243F094FAD (no LE)
-
-        return [.. apdu];
+    /// <inheritdoc />
+    public byte[] ToBytes()
+    {
+        // Store the command data when building the APDU
+        return ToCommandApdu()
+            .Map(apdu => GetDeleteData().GetValueOrDefault([]))
+            .GetValueOrDefault([]);
     }
 }
 
@@ -554,7 +650,7 @@ public class DeleteResponse
     {
         Data = Maybe<byte[]>.From(data).Map(d => (byte[])d.Clone()).GetValueOrDefault([]);
         StatusWord = statusWord;
-        IsSuccessful = statusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.Success;
+        IsSuccessful = statusWord == StatusWords.Legacy.Success;
         DeletionReceipts = deletionReceipts
             .Map(receipts => (IReadOnlyList<DeletionReceipt>)new List<DeletionReceipt>(receipts))
             .GetValueOrDefault([]);
@@ -649,13 +745,13 @@ public class DeleteResponse
     {
         return StatusWord switch
         {
-            _ when StatusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.Success => "Deletion successful",
-            _ when StatusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.IncorrectData => "Incorrect data or AID not found",
-            _ when StatusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.FileNotFound => "Application not found",
-            _ when StatusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.ConditionsNotSatisfied =>
+            _ when StatusWord == StatusWords.Legacy.Success => "Deletion successful",
+            _ when StatusWord == StatusWords.Legacy.IncorrectData => "Incorrect data or AID not found",
+            _ when StatusWord == StatusWords.Legacy.FileNotFound => "Application not found",
+            _ when StatusWord == StatusWords.Legacy.ConditionsNotSatisfied =>
                 "Conditions not satisfied (dependencies exist)",
-            _ when StatusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.ReferencedDataNotFound => "Referenced data not found",
-            _ when StatusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.GenericFailure => "Generic failure during deletion",
+            _ when StatusWord == StatusWords.Legacy.ReferencedDataNotFound => "Referenced data not found",
+            _ when StatusWord == StatusWords.Legacy.GenericFailure => "Generic failure during deletion",
             _ => $"Unknown error: {StatusWord.Value:X}",
         };
     }

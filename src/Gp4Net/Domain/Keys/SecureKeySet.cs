@@ -5,6 +5,7 @@
 
 using System;
 using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 
 namespace Gp4Net.Domain.Keys;
 
@@ -52,10 +53,16 @@ public sealed class SecureKeySet : IDisposable
     /// Uses the encryption key.
     /// </summary>
     /// <param name="action">The action to execute with the key.</param>
-    public void UseEncKey(Action<byte[]> action)
+    /// <returns>Success or failure result.</returns>
+    public Result<bool, SmartCardError> UseEncKey(Action<byte[]> action)
     {
-        ThrowIfDisposed();
-        _encKey.UseKey(action);
+        if (_isDisposed)
+        {
+            return Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureKeySet has been disposed")
+            );
+        }
+        return _encKey.UseKey(action);
     }
 
     /// <summary>
@@ -63,10 +70,15 @@ public sealed class SecureKeySet : IDisposable
     /// </summary>
     /// <typeparam name="T">The return type.</typeparam>
     /// <param name="func">The function to execute with the key.</param>
-    /// <returns>The result of the function.</returns>
-    public T UseEncKey<T>(Func<byte[], T> func)
+    /// <returns>The result of the function or failure.</returns>
+    public Result<T, SmartCardError> UseEncKey<T>(Func<byte[], T> func)
     {
-        ThrowIfDisposed();
+        if (_isDisposed)
+        {
+            return Result.Failure<T, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureKeySet has been disposed")
+            );
+        }
         return _encKey.UseKey(func);
     }
 
@@ -74,10 +86,16 @@ public sealed class SecureKeySet : IDisposable
     /// Uses the MAC key.
     /// </summary>
     /// <param name="action">The action to execute with the key.</param>
-    public void UseMacKey(Action<byte[]> action)
+    /// <returns>Success or failure result.</returns>
+    public Result<bool, SmartCardError> UseMacKey(Action<byte[]> action)
     {
-        ThrowIfDisposed();
-        _macKey.UseKey(action);
+        if (_isDisposed)
+        {
+            return Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureKeySet has been disposed")
+            );
+        }
+        return _macKey.UseKey(action);
     }
 
     /// <summary>
@@ -85,10 +103,15 @@ public sealed class SecureKeySet : IDisposable
     /// </summary>
     /// <typeparam name="T">The return type.</typeparam>
     /// <param name="func">The function to execute with the key.</param>
-    /// <returns>The result of the function.</returns>
-    public T UseMacKey<T>(Func<byte[], T> func)
+    /// <returns>The result of the function or failure.</returns>
+    public Result<T, SmartCardError> UseMacKey<T>(Func<byte[], T> func)
     {
-        ThrowIfDisposed();
+        if (_isDisposed)
+        {
+            return Result.Failure<T, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureKeySet has been disposed")
+            );
+        }
         return _macKey.UseKey(func);
     }
 
@@ -96,10 +119,16 @@ public sealed class SecureKeySet : IDisposable
     /// Uses the data encryption key.
     /// </summary>
     /// <param name="action">The action to execute with the key.</param>
-    public void UseDekKey(Action<byte[]> action)
+    /// <returns>Success or failure result.</returns>
+    public Result<bool, SmartCardError> UseDekKey(Action<byte[]> action)
     {
-        ThrowIfDisposed();
-        _dekKey.UseKey(action);
+        if (_isDisposed)
+        {
+            return Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureKeySet has been disposed")
+            );
+        }
+        return _dekKey.UseKey(action);
     }
 
     /// <summary>
@@ -107,41 +136,54 @@ public sealed class SecureKeySet : IDisposable
     /// </summary>
     /// <typeparam name="T">The return type.</typeparam>
     /// <param name="func">The function to execute with the key.</param>
-    /// <returns>The result of the function.</returns>
-    public T UseDekKey<T>(Func<byte[], T> func)
+    /// <returns>The result of the function or failure.</returns>
+    public Result<T, SmartCardError> UseDekKey<T>(Func<byte[], T> func)
     {
-        ThrowIfDisposed();
+        if (_isDisposed)
+        {
+            return Result.Failure<T, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureKeySet has been disposed")
+            );
+        }
         return _dekKey.UseKey(func);
     }
 
     /// <summary>
     /// Creates a legacy KeySet object. The caller is responsible for clearing the keys.
     /// </summary>
-    /// <returns>A KeySet object with copies of the keys.</returns>
-    public Scp02KeySet ToScp02KeySet()
+    /// <returns>A KeySet object with copies of the keys or failure.</returns>
+    public Result<Scp02KeySet, SmartCardError> ToScp02KeySet()
     {
-        ThrowIfDisposed();
-        return Scp02KeySet
-            .Create(_encKey.GetKeyCopy(), _macKey.GetKeyCopy(), _dekKey.GetKeyCopy(), KeyVersion)
-            .Match(
-                onSuccess: keySet => keySet,
-                onFailure: error => throw new InvalidOperationException(error.Message)
+        if (_isDisposed)
+        {
+            return Result.Failure<Scp02KeySet, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureKeySet has been disposed")
             );
+        }
+        
+        return _encKey.GetKeyCopy()
+            .Bind(encKey => _macKey.GetKeyCopy().Map(macKey => (encKey, macKey)))
+            .Bind(keys => _dekKey.GetKeyCopy().Map(dekKey => (keys.encKey, keys.macKey, dekKey)))
+            .Bind(keys => Scp02KeySet.Create(keys.encKey, keys.macKey, keys.dekKey, KeyVersion));
     }
 
     /// <summary>
     /// Creates a legacy KeySet object. The caller is responsible for clearing the keys.
     /// </summary>
-    /// <returns>A KeySet object with copies of the keys.</returns>
-    public Scp03KeySet ToScp03KeySet()
+    /// <returns>A KeySet object with copies of the keys or failure.</returns>
+    public Result<Scp03KeySet, SmartCardError> ToScp03KeySet()
     {
-        ThrowIfDisposed();
-        return Scp03KeySet
-            .Create(_encKey.GetKeyCopy(), _macKey.GetKeyCopy(), _dekKey.GetKeyCopy(), KeyVersion)
-            .Match(
-                onSuccess: keySet => keySet,
-                onFailure: error => throw new InvalidOperationException(error.Message)
+        if (_isDisposed)
+        {
+            return Result.Failure<Scp03KeySet, SmartCardError>(
+                SmartCardError.InvalidArgument("SecureKeySet has been disposed")
             );
+        }
+        
+        return _encKey.GetKeyCopy()
+            .Bind(encKey => _macKey.GetKeyCopy().Map(macKey => (encKey, macKey)))
+            .Bind(keys => _dekKey.GetKeyCopy().Map(dekKey => (keys.encKey, keys.macKey, dekKey)))
+            .Bind(keys => Scp03KeySet.Create(keys.encKey, keys.macKey, keys.dekKey, KeyVersion));
     }
 
     /// <summary>
@@ -151,15 +193,11 @@ public sealed class SecureKeySet : IDisposable
     {
         if (!_isDisposed)
         {
-            _encKey?.Dispose();
-            _macKey?.Dispose();
-            _dekKey?.Dispose();
+            _encKey.Dispose();
+            _macKey.Dispose();
+            _dekKey.Dispose();
             _isDisposed = true;
         }
     }
 
-    private void ThrowIfDisposed()
-    {
-        ObjectDisposedException.ThrowIf(_isDisposed, this);
-    }
 }

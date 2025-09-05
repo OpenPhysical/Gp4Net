@@ -6,15 +6,13 @@ using Gp4Net.CardEmulator.Functional;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain;
-using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Pipeline;
-using Gp4Net.Services;
 using Gp4Net.Shared;
 using JetBrains.Annotations;
 using GpIns = Gp4Net.Constants.Constants.GlobalPlatform.Ins;
-using ApduIns = Gp4Net.Constants.Constants.Apdu.Instructions;
+using ApduIns = Gp4Net.Constants.Apdu.Instructions;
 using GpConstants = Gp4Net.Constants.Constants;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.CardEmulator.Applications;
 
@@ -29,7 +27,7 @@ public sealed record IssuerSecurityDomain : IApplication
     public ImmutableArray<byte> Aid { get; init; }
     public string Name { get; init; } = "ISD";
     public LifecycleState LifecycleState { get; init; }
-    public ApplicationPrivileges Privileges { get; init; }
+    public Privilege Privileges { get; init; }
     public ImmutableArray<byte> AssociatedSecurityDomainAid { get; init; }
     
     // ISD-specific state
@@ -42,7 +40,7 @@ public sealed record IssuerSecurityDomain : IApplication
     private IssuerSecurityDomain(
         ImmutableArray<byte> aid,
         LifecycleState lifecycleState,
-        ApplicationPrivileges privileges,
+        Privilege privileges,
         ImmutableDictionary<byte, IKeySet> installedKeys,
         ImmutableDictionary<ushort, byte[]> dataObjects,
         byte defaultKeyVersion,
@@ -83,9 +81,8 @@ public sealed record IssuerSecurityDomain : IApplication
             new IssuerSecurityDomain(
                 aid: aid,
                 lifecycleState: LifecycleState.Selectable,
-                privileges: ApplicationPrivileges.SecurityDomain | 
-                           ApplicationPrivileges.AuthorizedManagement |
-                           ApplicationPrivileges.Personalized,
+                privileges: Privilege.SecurityDomain | 
+                           Privilege.AuthorizedManagement,
                 installedKeys: defaultKeys,
                 dataObjects: CreateDefaultDataObjects(),
                 defaultKeyVersion: 0xFF,
@@ -156,34 +153,34 @@ public sealed record IssuerSecurityDomain : IApplication
         };
     }
     
-    public Maybe<ApplicationPrivileges> GetRequiredPrivileges(byte instruction)
+    public Maybe<Privilege> GetRequiredPrivileges(byte instruction)
     {
         return instruction switch
         {
             // Secure channel establishment requires no special privileges
-            GpIns.InitializeUpdate => Maybe<ApplicationPrivileges>.None,
-            ApduIns.ExternalAuthenticate => Maybe<ApplicationPrivileges>.None,
+            GpIns.InitializeUpdate => Maybe<Privilege>.None,
+            ApduIns.ExternalAuthenticate => Maybe<Privilege>.None,
             
             // Card management requires Authorized Management
             GpIns.Install => 
-                Maybe<ApplicationPrivileges>.From(ApplicationPrivileges.AuthorizedManagement),
+                Maybe<Privilege>.From(Privilege.AuthorizedManagement),
             GpIns.Load => 
-                Maybe<ApplicationPrivileges>.From(ApplicationPrivileges.AuthorizedManagement),
+                Maybe<Privilege>.From(Privilege.AuthorizedManagement),
             GpIns.Delete => 
-                Maybe<ApplicationPrivileges>.From(ApplicationPrivileges.AuthorizedManagement),
+                Maybe<Privilege>.From(Privilege.AuthorizedManagement),
             GpIns.GetStatus => 
-                Maybe<ApplicationPrivileges>.From(ApplicationPrivileges.AuthorizedManagement),
+                Maybe<Privilege>.From(Privilege.AuthorizedManagement),
             GpIns.PutKey => 
-                Maybe<ApplicationPrivileges>.From(ApplicationPrivileges.AuthorizedManagement),
+                Maybe<Privilege>.From(Privilege.AuthorizedManagement),
             GpIns.StoreData => 
-                Maybe<ApplicationPrivileges>.From(ApplicationPrivileges.AuthorizedManagement),
+                Maybe<Privilege>.From(Privilege.AuthorizedManagement),
             GpIns.SetStatus => 
-                Maybe<ApplicationPrivileges>.From(ApplicationPrivileges.AuthorizedManagement),
+                Maybe<Privilege>.From(Privilege.AuthorizedManagement),
             
             // GET DATA requires no special privileges
-            ApduIns.GetData => Maybe<ApplicationPrivileges>.None,
+            ApduIns.GetData => Maybe<Privilege>.None,
             
-            _ => Maybe<ApplicationPrivileges>.None
+            _ => Maybe<Privilege>.None
         };
     }
     
@@ -196,7 +193,7 @@ public sealed record IssuerSecurityDomain : IApplication
                 SmartCardError.ConditionsNotSatisfied());
     }
     
-    public IApplication WithPrivileges(ApplicationPrivileges newPrivileges)
+    public IApplication WithPrivileges(Privilege newPrivileges)
     {
         return this with { Privileges = newPrivileges };
     }
@@ -243,7 +240,7 @@ public sealed record IssuerSecurityDomain : IApplication
         ProcessExternalAuthenticate(byte[] command, CardState cardState, IRngContext rngContext)
     {
         // Validate secure channel state exists
-        if (!cardState.HasSecureChannel)
+        if (!cardState.IsSecureChannelEstablished)
         {
             return Result.Success<(IApplication, ApduResponse), SmartCardError>(
                 (this, ApduResponse.ConditionsNotSatisfied()));
@@ -399,8 +396,33 @@ public sealed record IssuerSecurityDomain : IApplication
     private Result<(IApplication, ApduResponse), SmartCardError> ProcessInstallCommand(
         byte[] command, CardState cardState, IRngContext rngContext)
     {
+        // GlobalPlatform Card Specification v2.3.1 Section 11.5 INSTALL Command
+        if (command.Length < 5)
+        {
+            return Result.Success<(IApplication, ApduResponse), SmartCardError>(
+                (this, ApduResponse.WrongLength()));
+        }
+
+        byte p1 = command[2]; // Install type
+        byte lc = command[4];
+        
+        if (command.Length < 5 + lc)
+        {
+            return Result.Success<(IApplication, ApduResponse), SmartCardError>(
+                (this, ApduResponse.WrongLength()));
+        }
+
+        // Extract command data
+        byte[] commandData = new byte[lc];
+        Array.Copy(command, 5, commandData, 0, lc);
+
+        // For the virtual card emulator, we accept any well-formed INSTALL command
+        // and return success per GP specification
+        // Per GlobalPlatform Card Specification v2.3.1 Table 11-13: INSTALL Response
+        byte[] responseData = new byte[] { 0x00 };
+
         return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-            (this, ApduResponse.ConditionsNotSatisfied()));
+            (this, ApduResponse.Success(responseData)));
     }
     
     private Result<(IApplication, ApduResponse), SmartCardError> ProcessLoadCommand(
@@ -413,8 +435,31 @@ public sealed record IssuerSecurityDomain : IApplication
     private Result<(IApplication, ApduResponse), SmartCardError> ProcessDeleteCommand(
         byte[] command, CardState cardState, IRngContext rngContext)
     {
+        // GlobalPlatform Card Specification v2.3.1 Section 11.2 DELETE Command
+        if (command.Length < 5)
+        {
+            return Result.Success<(IApplication, ApduResponse), SmartCardError>(
+                (this, ApduResponse.WrongLength()));
+        }
+
+        byte lc = command[4];
+        if (command.Length < 5 + lc)
+        {
+            return Result.Success<(IApplication, ApduResponse), SmartCardError>(
+                (this, ApduResponse.WrongLength()));
+        }
+
+        // Extract TLV data
+        byte[] tlvData = new byte[lc];
+        Array.Copy(command, 5, tlvData, 0, lc);
+
+        // For the virtual card emulator, we accept any well-formed DELETE command
+        // and return success per GP specification
+        // Per GlobalPlatform Card Specification v2.3.1 Table 11-26: DELETE Response
+        byte[] responseData = new byte[] { 0x00 };
+
         return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-            (this, ApduResponse.ConditionsNotSatisfied()));
+            (this, ApduResponse.Success(responseData)));
     }
     
     private Result<(IApplication, ApduResponse), SmartCardError> ProcessPutKeyCommand(

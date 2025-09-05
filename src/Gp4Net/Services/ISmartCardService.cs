@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Pipeline;
-using Gp4Net.Transport;
+using WSCT.ISO7816;
 
 namespace Gp4Net.Services;
 
@@ -20,7 +20,7 @@ public interface ISmartCardService : IDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the command execution.</returns>
     Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
-        IApduCommand command,
+        CommandAPDU command,
         CancellationToken cancellationToken = default
     );
 
@@ -32,7 +32,7 @@ public interface ISmartCardService : IDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the command execution.</returns>
     Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
-        IApduCommand command,
+        CommandAPDU command,
         CommandOptions options,
         CancellationToken cancellationToken = default
     );

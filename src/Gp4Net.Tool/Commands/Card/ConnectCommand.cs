@@ -1,9 +1,11 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Services;
+using Gp4Net.Services.GlobalPlatform;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console.Cli;
@@ -38,8 +40,10 @@ public class ConnectCommand : IPipelineCommand<ConnectCommand.Settings>
         context.Display.Success("Successfully connected to card");
 
         // Try to select ISD and get basic card information
-        IGlobalPlatformService gpService = context.GetGlobalPlatformService();
-        Result<SelectResponse, SmartCardError> selectResult = await gpService.SelectIsdAsync();
+        Result<SelectResponse, SmartCardError> selectResult = await Discovery.DetectAndSelectIsdAsync(
+            (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
+            CancellationToken.None
+        );
 
         if (selectResult.IsSuccess)
         {

@@ -1,5 +1,5 @@
 using System;
-using Gp4Net.Transport;
+using WSCT.ISO7816;
 
 namespace Gp4Net.Pipeline;
 
@@ -7,7 +7,7 @@ namespace Gp4Net.Pipeline;
 /// Represents a request to execute a command through the pipeline.
 /// </summary>
 public record CommandRequest(
-    IApduCommand Command,
+    CommandAPDU Command,
     IPipelineContext Context,
     CommandOptions Options = null
 )
@@ -15,7 +15,7 @@ public record CommandRequest(
     /// <summary>
     /// Creates a simple request with just a command.
     /// </summary>
-    public static CommandRequest Create(IApduCommand command)
+    public static CommandRequest Create(CommandAPDU command)
     {
         return new(command, ImmutablePipelineContext.Empty);
     }
@@ -23,7 +23,7 @@ public record CommandRequest(
     /// <summary>
     /// Creates a request with a command and context.
     /// </summary>
-    public static CommandRequest Create(IApduCommand command, IPipelineContext context)
+    public static CommandRequest Create(CommandAPDU command, IPipelineContext context)
     {
         return new(command, context);
     }
@@ -58,8 +58,6 @@ public record CommandRequest(
 /// Options for command execution.
 /// </summary>
 public record CommandOptions(
-    TimeSpan? Timeout = null,
-    int MaxRetries = 0,
     bool RequiresSecureChannel = true,
     bool CaptureMetrics = true,
     bool EnableLogging = true
@@ -74,9 +72,4 @@ public record CommandOptions(
     /// Options for commands that don't require secure channel.
     /// </summary>
     public static CommandOptions NoSecureChannel { get; } = new(RequiresSecureChannel: false);
-
-    /// <summary>
-    /// Options for commands with extended timeout.
-    /// </summary>
-    public static CommandOptions ExtendedTimeout { get; } = new(Timeout: TimeSpan.FromMinutes(5));
 }

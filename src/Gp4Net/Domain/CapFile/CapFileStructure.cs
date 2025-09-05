@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using JetBrains.Annotations;
 
@@ -14,74 +15,9 @@ namespace Gp4Net.Domain.CapFile;
 /// Based on Java Card Virtual Machine Specification and GlobalPlatform Card Specification.
 /// </summary>
 [PublicAPI]
-// @TODO CONSOLIDATE THIS WITH THE BASE LIBRARY TO AVOID DRY VIOLATIONS
+
 public class CapFileStructure
 {
-    /// <summary>
-    /// CAP file component tags as defined in Java Card specification.
-    /// </summary>
-    public static class ComponentTags
-    {
-        /// <summary>
-        /// Header component tag.
-        /// </summary>
-        public const byte Header = 0x01;
-
-        /// <summary>
-        /// Directory component tag.
-        /// </summary>
-        public const byte Directory = 0x02;
-
-        /// <summary>
-        /// Applet component tag.
-        /// </summary>
-        public const byte Applet = 0x03;
-
-        /// <summary>
-        /// Import component tag.
-        /// </summary>
-        public const byte Import = 0x04;
-
-        /// <summary>
-        /// Constant Pool component tag.
-        /// </summary>
-        public const byte ConstantPool = 0x05;
-
-        /// <summary>
-        /// Class component tag.
-        /// </summary>
-        public const byte Class = 0x06;
-
-        /// <summary>
-        /// Method component tag.
-        /// </summary>
-        public const byte Method = 0x07;
-
-        /// <summary>
-        /// Static Field component tag.
-        /// </summary>
-        public const byte StaticField = 0x08;
-
-        /// <summary>
-        /// Reference Location component tag.
-        /// </summary>
-        public const byte ReferenceLocation = 0x09;
-
-        /// <summary>
-        /// Export component tag.
-        /// </summary>
-        public const byte Export = 0x0A;
-
-        /// <summary>
-        /// Descriptor component tag.
-        /// </summary>
-        public const byte Descriptor = 0x0B;
-
-        /// <summary>
-        /// Debug component tag.
-        /// </summary>
-        public const byte Debug = 0x0C;
-    }
 
     /// <summary>
     /// Gets the package AID.
@@ -167,11 +103,11 @@ public class CapFileStructure
 
         // Only support ZIP/JAR format CAP files
         if (
-            capFileData.Length >= 4
-            && capFileData[0] == 0x50
-            && capFileData[1] == 0x4B
-            && capFileData[2] == 0x03
-            && capFileData[3] == 0x04
+            capFileData.Length >= Constants.Constants.FileFormats.Zip.MinimumHeaderSize
+            && capFileData[0] == Constants.Constants.FileFormats.Zip.LocalFileHeaderSignature.Byte1
+            && capFileData[1] == Constants.Constants.FileFormats.Zip.LocalFileHeaderSignature.Byte2
+            && capFileData[2] == Constants.Constants.FileFormats.Zip.LocalFileHeaderSignature.Byte3
+            && capFileData[3] == Constants.Constants.FileFormats.Zip.LocalFileHeaderSignature.Byte4
         )
         {
             return ParseZipFormat(capFileData);
@@ -199,7 +135,7 @@ public class CapFileStructure
         }
 
         // Only support ZIP/JAR format CAP files
-        if (capFileData.Length < 4)
+        if (capFileData.Length < Constants.Constants.FileFormats.Zip.MinimumHeaderSize)
         {
             return Result.Failure<CapFileStructure, SmartCardError>(
                 SmartCardError.InvalidData("CAP file data is too short to be valid")
@@ -208,10 +144,10 @@ public class CapFileStructure
 
         if (
             !(
-                capFileData[0] == 0x50
-                && capFileData[1] == 0x4B
-                && capFileData[2] == 0x03
-                && capFileData[3] == 0x04
+                capFileData[0] == Constants.Constants.FileFormats.Zip.LocalFileHeaderSignature.Byte1
+                && capFileData[1] == Constants.Constants.FileFormats.Zip.LocalFileHeaderSignature.Byte2
+                && capFileData[2] == Constants.Constants.FileFormats.Zip.LocalFileHeaderSignature.Byte3
+                && capFileData[3] == Constants.Constants.FileFormats.Zip.LocalFileHeaderSignature.Byte4
             )
         )
         {
@@ -262,18 +198,18 @@ public class CapFileStructure
         // Component name to tag mapping
         Dictionary<string, byte> componentMapping = new Dictionary<string, byte>
         {
-            ["Header.cap"] = ComponentTags.Header,
-            ["Directory.cap"] = ComponentTags.Directory,
-            ["Applet.cap"] = ComponentTags.Applet,
-            ["Import.cap"] = ComponentTags.Import,
-            ["ConstantPool.cap"] = ComponentTags.ConstantPool,
-            ["Class.cap"] = ComponentTags.Class,
-            ["Method.cap"] = ComponentTags.Method,
-            ["StaticField.cap"] = ComponentTags.StaticField,
-            ["RefLocation.cap"] = ComponentTags.ReferenceLocation,
-            ["Export.cap"] = ComponentTags.Export,
-            ["Descriptor.cap"] = ComponentTags.Descriptor,
-            ["Debug.cap"] = ComponentTags.Debug,
+            [Constants.Constants.JavaCard.ComponentFilenames.Header] = Constants.Constants.JavaCard.ComponentTags.Header,
+            [Constants.Constants.JavaCard.ComponentFilenames.Directory] = Constants.Constants.JavaCard.ComponentTags.Directory,
+            [Constants.Constants.JavaCard.ComponentFilenames.Applet] = Constants.Constants.JavaCard.ComponentTags.Applet,
+            [Constants.Constants.JavaCard.ComponentFilenames.Import] = Constants.Constants.JavaCard.ComponentTags.Import,
+            [Constants.Constants.JavaCard.ComponentFilenames.ConstantPool] = Constants.Constants.JavaCard.ComponentTags.ConstantPool,
+            [Constants.Constants.JavaCard.ComponentFilenames.Class] = Constants.Constants.JavaCard.ComponentTags.Class,
+            [Constants.Constants.JavaCard.ComponentFilenames.Method] = Constants.Constants.JavaCard.ComponentTags.Method,
+            [Constants.Constants.JavaCard.ComponentFilenames.StaticField] = Constants.Constants.JavaCard.ComponentTags.StaticField,
+            [Constants.Constants.JavaCard.ComponentFilenames.ReferenceLocation] = Constants.Constants.JavaCard.ComponentTags.ReferenceLocation,
+            [Constants.Constants.JavaCard.ComponentFilenames.Export] = Constants.Constants.JavaCard.ComponentTags.Export,
+            [Constants.Constants.JavaCard.ComponentFilenames.Descriptor] = Constants.Constants.JavaCard.ComponentTags.Descriptor,
+            [Constants.Constants.JavaCard.ComponentFilenames.Debug] = Constants.Constants.JavaCard.ComponentTags.Debug,
         };
 
         // Find and parse component files and manifest
@@ -282,7 +218,7 @@ public class CapFileStructure
             string fileName = Path.GetFileName(entry.FullName);
 
             // Parse manifest file
-            if (entry.FullName == "META-INF/MANIFEST.MF")
+            if (entry.FullName == Constants.Constants.FileFormats.Zip.ManifestPath)
             {
                 using Stream entryStream = entry.Open();
                 using StreamReader reader = new StreamReader(entryStream);
@@ -315,7 +251,7 @@ public class CapFileStructure
                 switch (component.Tag)
                 {
                     // Extract package information from header component
-                    case ComponentTags.Header:
+                    case Constants.Constants.JavaCard.ComponentTags.Header:
                     {
                         HeaderComponent header = HeaderComponent.Parse(component.Data);
                         packageAid = header.PackageAid;
@@ -329,7 +265,7 @@ public class CapFileStructure
                     }
 
                     // Extract applet information from applet component
-                    case ComponentTags.Applet:
+                    case Constants.Constants.JavaCard.ComponentTags.Applet:
                     {
                         AppletComponent appletComponent = AppletComponent.Parse(component.Data);
                         applets.AddRange(appletComponent.Applets);
@@ -364,17 +300,17 @@ public class CapFileStructure
         // Standard loading order for Java Card
         byte[] loadOrder =
         [
-            ComponentTags.Header,
-            ComponentTags.Directory,
-            ComponentTags.Import,
-            ComponentTags.Applet,
-            ComponentTags.Class,
-            ComponentTags.Method,
-            ComponentTags.StaticField,
-            ComponentTags.Export,
-            ComponentTags.ConstantPool,
-            ComponentTags.ReferenceLocation,
-            ComponentTags.Descriptor,
+            Constants.Constants.JavaCard.ComponentTags.Header,
+            Constants.Constants.JavaCard.ComponentTags.Directory,
+            Constants.Constants.JavaCard.ComponentTags.Import,
+            Constants.Constants.JavaCard.ComponentTags.Applet,
+            Constants.Constants.JavaCard.ComponentTags.Class,
+            Constants.Constants.JavaCard.ComponentTags.Method,
+            Constants.Constants.JavaCard.ComponentTags.StaticField,
+            Constants.Constants.JavaCard.ComponentTags.Export,
+            Constants.Constants.JavaCard.ComponentTags.ConstantPool,
+            Constants.Constants.JavaCard.ComponentTags.ReferenceLocation,
+            Constants.Constants.JavaCard.ComponentTags.Descriptor,
         ];
 
         Dictionary<byte, CapComponent> componentDict = Components.ToDictionary(c => c.Tag, c => c);
@@ -392,32 +328,31 @@ public class CapFileStructure
     /// Converts the CAP file structure back to binary format suitable for loading.
     /// </summary>
     /// <returns>The binary CAP file data.</returns>
-    public byte[] ToBinaryFormat()
-    {
-        List<byte> binaryData = [];
+    public byte[] ToBinaryFormat() =>
+        GetLoadingComponents()
+            .SelectMany(SerializeComponent)
+            .ToArray();
 
-        foreach (CapComponent component in GetLoadingComponents())
-        {
-            // Add component tag
-            binaryData.Add(component.Tag);
-
-            // Add component size (2 bytes, big-endian)
-            binaryData.Add((byte)(component.Size >> 8));
-            binaryData.Add((byte)(component.Size & 0xFF));
-
-            // Add component data
-            binaryData.AddRange(component.Data);
-        }
-
-        return [.. binaryData];
-    }
+    /// <summary>
+    /// Serializes a single CAP component into binary format.
+    /// </summary>
+    /// <param name="component">The component to serialize.</param>
+    /// <returns>The serialized bytes for the component.</returns>
+    private static IEnumerable<byte> SerializeComponent(CapComponent component) =>
+        new[] { component.Tag }
+            .Concat(new[]
+            {
+                (byte)(component.Size >> 8),
+                (byte)(component.Size & Constants.Constants.GlobalPlatform.CommonBytes.Max)
+            })
+            .Concat(component.Data);
 
     /// <summary>
     /// Splits the CAP file into blocks suitable for LOAD commands.
     /// </summary>
     /// <param name="maxBlockSize">Maximum size per block (default 255 bytes).</param>
     /// <returns>The list of load blocks.</returns>
-    public IList<LoadBlock> CreateLoadBlocks(int maxBlockSize = 255)
+    public IList<LoadBlock> CreateLoadBlocks(int maxBlockSize = Constants.Constants.GlobalPlatform.ApduLimits.MaxShortDataLength)
     {
         List<LoadBlock> blocks = [];
         byte blockNumber = 0;
@@ -673,7 +608,7 @@ internal class HeaderComponent
 
     public static HeaderComponent Parse(byte[] data)
     {
-        if (data.Length < 10) // Minimum header size
+        if (data.Length < Constants.Constants.JavaCard.CapHeader.MinimumSize) // Minimum header size
         {
             throw new InvalidDataException("Invalid header component data.");
         }
@@ -683,10 +618,10 @@ internal class HeaderComponent
         // Check for magic number (4 bytes: 0xDECAFFED)
         if (
             data.Length >= 4
-            && data[0] == 0xDE
-            && data[1] == 0xCA
-            && data[2] == 0xFF
-            && data[3] == 0xED
+            && data[0] == Constants.Constants.JavaCard.CapHeader.MagicNumber.Byte1
+            && data[1] == Constants.Constants.JavaCard.CapHeader.MagicNumber.Byte2
+            && data[2] == Constants.Constants.JavaCard.CapHeader.MagicNumber.Byte3
+            && data[3] == Constants.Constants.JavaCard.CapHeader.MagicNumber.Byte4
         )
         {
             offset = 4; // Skip magic number
@@ -719,8 +654,8 @@ internal class HeaderComponent
         offset += packageAidLength;
 
         // Package version may not be present in all formats
-        byte packageMajor = 1;
-        byte packageMinor = 0;
+        byte packageMajor = Constants.Constants.JavaCard.DefaultVersion.PackageMajor;
+        byte packageMinor = Constants.Constants.JavaCard.DefaultVersion.PackageMinor;
 
         if (offset + 1 < data.Length)
         {
@@ -880,8 +815,8 @@ public class ManifestInfo
             string trimmedLine = line.Trim();
             if (
                 string.IsNullOrEmpty(trimmedLine)
-                || trimmedLine.StartsWith("Manifest-Version")
-                || trimmedLine.StartsWith("Name:")
+                || trimmedLine.StartsWith(Constants.Constants.JavaCard.IgnoredManifestHeaders.ManifestVersion)
+                || trimmedLine.StartsWith(Constants.Constants.JavaCard.IgnoredManifestHeaders.Name)
             )
             {
                 continue;
@@ -916,32 +851,30 @@ public class ManifestInfo
             properties[currentKey] = currentValue;
         }
 
-        // Extract imported packages
-        List<ImportedPackage> importedPackages = [];
-        for (int i = 1; i <= 10; i++) // Check up to 10 imported packages
-        {
-            string aidKey = $"Java-Card-Imported-Package-{i}-AID";
-            string versionKey = $"Java-Card-Imported-Package-{i}-Version";
-
-            if (
-                properties.TryGetValue(aidKey, out string aidValue)
-                && properties.TryGetValue(versionKey, out string versionValue)
-            )
+        // Extract imported packages by searching through all properties for matching patterns
+        var importedPackages = properties.Keys
+            .Where(key => key.StartsWith(Constants.Constants.JavaCard.ManifestAttributes.ImportedPackageAidBase) 
+                         && key.EndsWith(Constants.Constants.JavaCard.ManifestAttributes.ImportedPackageAidSuffix))
+            .Select(aidKey => 
             {
-                importedPackages.Add(new ImportedPackage(aidValue, versionValue));
-            }
-        }
+                var prefix = aidKey.Substring(0, aidKey.Length - Constants.Constants.JavaCard.ManifestAttributes.ImportedPackageAidSuffix.Length);
+                var versionKey = prefix + Constants.Constants.JavaCard.ManifestAttributes.ImportedPackageVersionSuffix;
+                return new { AidKey = aidKey, VersionKey = versionKey };
+            })
+            .Where(keys => properties.ContainsKey(keys.VersionKey))
+            .Select(keys => new ImportedPackage(properties[keys.AidKey], properties[keys.VersionKey]))
+            .ToList();
 
         return new ManifestInfo(
-            capFileVersion: properties.GetValueOrDefault("Java-Card-CAP-File-Version"),
-            converterVersion: properties.GetValueOrDefault("Java-Card-Converter-Version"),
-            converterProvider: properties.GetValueOrDefault("Java-Card-Converter-Provider"),
-            creationTime: properties.GetValueOrDefault("Java-Card-CAP-Creation-Time"),
-            packageName: properties.GetValueOrDefault("Java-Card-Package-Name"),
+            capFileVersion: properties.GetValueOrDefault(Constants.Constants.JavaCard.ManifestAttributes.CapFileVersion),
+            converterVersion: properties.GetValueOrDefault(Constants.Constants.JavaCard.ManifestAttributes.ConverterVersion),
+            converterProvider: properties.GetValueOrDefault(Constants.Constants.JavaCard.ManifestAttributes.ConverterProvider),
+            creationTime: properties.GetValueOrDefault(Constants.Constants.JavaCard.ManifestAttributes.CreationTime),
+            packageName: properties.GetValueOrDefault(Constants.Constants.JavaCard.ManifestAttributes.PackageName),
             importedPackages: importedPackages,
             integerSupportRequired: properties.GetValueOrDefault(
-                "Java-Card-Integer-Support-Required"
-            ) == "TRUE"
+                Constants.Constants.JavaCard.ManifestAttributes.IntegerSupportRequired
+            ) == Constants.Constants.JavaCard.ManifestAttributes.TrueValue
         );
     }
 }

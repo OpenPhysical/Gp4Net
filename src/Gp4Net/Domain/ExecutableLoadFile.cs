@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.Domain;
 

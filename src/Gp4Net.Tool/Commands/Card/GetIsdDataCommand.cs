@@ -5,12 +5,17 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.OpenPhysical;
+using Gp4Net.Pipeline;
+using Gp4Net.Services;
+using Gp4Net.Services.GlobalPlatform;
 using Gp4Net.Tool.Pipeline;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -98,9 +103,13 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
     {
         try
         {
-            Result<byte[], SmartCardError> dataResult = await context
-                .GetGlobalPlatformService()
-                .GetDataAsync(tag);
+            Result<byte[], SmartCardError> dataResult = await Gp4Net.Services.GlobalPlatform.Commands.CreateGetDataCommand(tag)
+                .Bind(command => command.ToCommandApdu())
+                .Bind(async apdu =>
+                {
+                    Result<CommandResponse, SmartCardError> response = await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    return response.Bind(resp => Responses.ParseGetDataResponse(resp));
+                });
             if (dataResult.IsSuccess)
             {
                 DisplaySingleDataObject(
@@ -140,9 +149,13 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 return 1;
             }
 
-            Result<byte[], SmartCardError> dataResult = await context
-                .GetGlobalPlatformService()
-                .GetDataAsync(tag);
+            Result<byte[], SmartCardError> dataResult = await Gp4Net.Services.GlobalPlatform.Commands.CreateGetDataCommand(tag)
+                .Bind(command => command.ToCommandApdu())
+                .Bind(async apdu =>
+                {
+                    Result<CommandResponse, SmartCardError> response = await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    return response.Bind(resp => Responses.ParseGetDataResponse(resp));
+                });
             if (dataResult.IsSuccess)
             {
                 DisplaySingleDataObject(
@@ -170,15 +183,27 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
         try
         {
             // Get all three required components
-            Result<byte[], SmartCardError> iinResult = await context
-                .GetGlobalPlatformService()
-                .GetDataAsync(GetDataCommand.DataObjects.IssuerIdentificationNumber);
-            Result<byte[], SmartCardError> cinResult = await context
-                .GetGlobalPlatformService()
-                .GetDataAsync(GetDataCommand.DataObjects.CardImageNumber);
-            Result<byte[], SmartCardError> urlResult = await context
-                .GetGlobalPlatformService()
-                .GetDataAsync(GetDataCommand.DataObjects.SecurityDomainManagerUrl);
+            Result<byte[], SmartCardError> iinResult = await Gp4Net.Services.GlobalPlatform.Commands.CreateGetDataCommand(GetDataCommand.DataObjects.IssuerIdentificationNumber)
+                .Bind(command => command.ToCommandApdu())
+                .Bind(async apdu =>
+                {
+                    Result<CommandResponse, SmartCardError> response = await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    return response.Bind(Responses.ParseGetDataResponse);
+                });
+            Result<byte[], SmartCardError> cinResult = await Gp4Net.Services.GlobalPlatform.Commands.CreateGetDataCommand(GetDataCommand.DataObjects.CardImageNumber)
+                .Bind(command => command.ToCommandApdu())
+                .Bind(async apdu =>
+                {
+                    Result<CommandResponse, SmartCardError> response = await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    return response.Bind(Responses.ParseGetDataResponse);
+                });
+            Result<byte[], SmartCardError> urlResult = await Gp4Net.Services.GlobalPlatform.Commands.CreateGetDataCommand(GetDataCommand.DataObjects.SecurityDomainManagerUrl)
+                .Bind(command => command.ToCommandApdu())
+                .Bind(async apdu =>
+                {
+                    Result<CommandResponse, SmartCardError> response = await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    return response.Bind(Responses.ParseGetDataResponse);
+                });
 
             if (iinResult.IsFailure || cinResult.IsFailure || urlResult.IsFailure)
             {
@@ -189,13 +214,13 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
             }
 
             // All OPID components should be ASCII per specification
-            Result<string, SmartCardError> iinDecodeResult = iinResult.Bind(bytes => 
+            Result<string, SmartCardError> iinDecodeResult = iinResult.Bind(bytes =>
                 Result.Success<string, SmartCardError>(Encoding.ASCII.GetString(bytes))
             );
-            Result<string, SmartCardError> cinDecodeResult = cinResult.Bind(bytes => 
+            Result<string, SmartCardError> cinDecodeResult = cinResult.Bind(bytes =>
                 Result.Success<string, SmartCardError>(Encoding.ASCII.GetString(bytes))
             );
-            Result<string, SmartCardError> urlDecodeResult = urlResult.Bind(bytes => 
+            Result<string, SmartCardError> urlDecodeResult = urlResult.Bind(bytes =>
                 Result.Success<string, SmartCardError>(Encoding.ASCII.GetString(bytes))
             );
 
@@ -280,9 +305,13 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
         {
             try
             {
-                Result<byte[], SmartCardError> dataResult = await context
-                    .GetGlobalPlatformService()
-                    .GetDataAsync(tag);
+                Result<byte[], SmartCardError> dataResult = await Gp4Net.Services.GlobalPlatform.Commands.CreateGetDataCommand(tag)
+                    .Bind(command => command.ToCommandApdu())
+                    .Bind(async apdu =>
+                    {
+                        Result<CommandResponse, SmartCardError> response = await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                        return response.Bind(resp => Responses.ParseGetDataResponse(resp));
+                    });
                 if (dataResult.IsSuccess)
                 {
                     results[name] = FormatDataForDisplay(

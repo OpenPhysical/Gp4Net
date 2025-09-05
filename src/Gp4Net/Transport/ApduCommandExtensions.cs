@@ -1,5 +1,8 @@
-using System.Collections.Generic;
+using System.Collections.Immutable;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using JetBrains.Annotations;
+using WSCT.ISO7816;
 
 namespace Gp4Net.Transport;
 
@@ -10,81 +13,23 @@ namespace Gp4Net.Transport;
 public static class ApduCommandExtensions
 {
     /// <summary>
-    /// Converts an APDU command to a byte array.
+    /// Converts a CommandAPDU to a byte array with functional error handling.
     /// </summary>
     /// <param name="command">The command to convert.</param>
-    /// <returns>The APDU as a byte array.</returns>
-    public static byte[] ToApdu(this IApduCommand command)
+    /// <returns>A result containing the APDU as a byte array or an error.</returns>
+    public static Result<byte[], SmartCardError> ToApdu(this Maybe<CommandAPDU> command)
     {
-        List<byte> apdu = [command.Cla, command.Ins, command.P1, command.P2];
-
-        byte[] data = command.Data;
-        bool hasData = data is { Length: > 0 };
-        bool expectsResponse = command.ExpectedResponseLength.HasValue;
-
-        if (command.IsExtendedLength)
-        {
-            // Extended length encoding
-            if (hasData)
-            {
-                apdu.Add(0x00); // Extended length indicator
-                apdu.Add((byte)(data!.Length >> 8));
-                apdu.Add((byte)(data.Length & 0xFF));
-                apdu.AddRange(data);
-            }
-
-            if (expectsResponse)
-            {
-                if (!hasData)
-                {
-                    apdu.Add(0x00); // Extended length indicator
-                }
-
-                int le = command.ExpectedResponseLength!.Value;
-                if (le == 0)
-                {
-                    // Maximum length
-                    apdu.Add(0x00);
-                    apdu.Add(0x00);
-                }
-                else
-                {
-                    apdu.Add((byte)(le >> 8));
-                    apdu.Add((byte)(le & 0xFF));
-                }
-            }
-        }
-        else
-        {
-            // Short length encoding
-            if (hasData)
-            {
-                apdu.Add((byte)data!.Length);
-                apdu.AddRange(data);
-            }
-
-            if (expectsResponse)
-            {
-                int le = command.ExpectedResponseLength!.Value;
-                if (le == 0)
-                {
-                    // Maximum length (256 bytes)
-                    apdu.Add(0x00);
-                }
-                else
-                {
-                    apdu.Add((byte)le);
-                }
-            }
-        }
-
-        return [.. apdu];
+        return command.ToResult(SmartCardError.InvalidArgument("Command cannot be null"))
+            .Map(cmd => cmd.ToBytes());
     }
 
     /// <summary>
-    /// Converts an APDU command to a byte array (alias for ToApdu).
+    /// Converts a CommandAPDU to a byte array with functional error handling (convenience overload).
     /// </summary>
     /// <param name="command">The command to convert.</param>
-    /// <returns>The APDU as a byte array.</returns>
-    public static byte[] ToByteArray(this IApduCommand command) => command.ToApdu();
+    /// <returns>A result containing the APDU as a byte array or an error.</returns>
+    public static Result<byte[], SmartCardError> ToApdu(this CommandAPDU command)
+    {
+        return Maybe<CommandAPDU>.From(command).ToApdu();
+    }
 }

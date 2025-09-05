@@ -8,7 +8,10 @@ using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Services;
 using Gp4Net.Pipeline;
+using Gp4Net.Constants;
+using Gp4Net.Services.GlobalPlatform;
 using NUnit.Framework;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.Tests.Integration;
 
@@ -21,7 +24,7 @@ public class ApplicationStatusParsingTests
         byte[] data = Convert.FromHexString(hexData.Replace(" ", string.Empty));
         return new CommandResponse(
             data,
-            StatusWords.Success,
+            0x9000,
             new ImmutablePipelineContext(),
             new Dictionary<string, object>()
         );
@@ -36,7 +39,7 @@ public class ApplicationStatusParsingTests
 
         CommandResponse r = MakeResponse(resp);
         Result<ImmutableList<ApplicationInfo>, SmartCardError> parsed =
-            GlobalPlatformService.Responses.ParseGetStatusResponse(r);
+            Responses.ParseGetStatusResponse(r);
 
         _ = parsed.IsSuccess.Should().BeTrue();
         ImmutableList<ApplicationInfo>? list = parsed.Value;

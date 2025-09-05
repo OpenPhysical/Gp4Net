@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using WSCT.Core;
+using WSCT.ISO7816;
 using Gp4Net.Domain.Keys;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
@@ -47,8 +49,8 @@ public static class SecurityValidation
     /// <param name="sessionKeys">The session keys.</param>
     /// <param name="macChainingValue">The MAC chaining value.</param>
     /// <returns>Success with the command or failure with error.</returns>
-    public static Result<IApduCommand, SmartCardError> ValidateCommandInputs(
-        IApduCommand command,
+    public static Result<CommandAPDU, SmartCardError> ValidateCommandInputs(
+        CommandAPDU command,
         SessionKeys sessionKeys,
         ImmutableArray<byte> macChainingValue
     )
@@ -58,7 +60,7 @@ public static class SecurityValidation
             return SmartCardError.InvalidArgument("MAC chaining value cannot be empty");
         }
 
-        return Result.Success<IApduCommand, SmartCardError>(command);
+        return Result.Success<CommandAPDU, SmartCardError>(command);
     }
 
     /// <summary>

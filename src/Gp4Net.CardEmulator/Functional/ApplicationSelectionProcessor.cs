@@ -1,10 +1,15 @@
+
 using System;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
+using Gp4Net.Constants;
+using static Gp4Net.Constants.Constants;
 using Gp4Net.Core;
+using static Gp4Net.Constants.Constants.GlobalPlatform;
+using static Gp4Net.Services.TlvService;
 
 namespace Gp4Net.CardEmulator.Functional;
 
@@ -54,8 +59,10 @@ public static class ApplicationSelectionProcessor
         }
 
         // Validate P1 (selection control)
-        SelectionControl selectionControl = (SelectionControl)(p1 & 0x03);
-        if (!Enum.IsDefined(typeof(SelectionControl), selectionControl))
+        byte selectionControl = (byte)(p1 & 0x03);
+        if (selectionControl != Apdu.SelectP1.SelectByName && 
+            selectionControl != Apdu.SelectP1.SelectByFileId && 
+            selectionControl != Apdu.SelectP1.SelectEfUnderCurrentDf)
         {
             return Result.Failure<SelectCommandData, SmartCardError>(
                 SmartCardError.IncorrectData());
@@ -89,9 +96,9 @@ public static class ApplicationSelectionProcessor
     {
         return selectData.SelectionControl switch
         {
-            SelectionControl.SelectByName => ProcessSelectByName(state, selectData.Aid),
-            SelectionControl.SelectFirstOccurrence => ProcessSelectFirst(state, selectData.Aid),
-            SelectionControl.SelectNextOccurrence => ProcessSelectNext(state, selectData.Aid),
+            var ctrl when ctrl == Apdu.SelectP1.SelectByName => ProcessSelectByName(state, selectData.Aid),
+            var ctrl when ctrl == Apdu.SelectP1.SelectByFileId => ProcessSelectFirst(state, selectData.Aid),
+            var ctrl when ctrl == Apdu.SelectP1.SelectEfUnderCurrentDf => ProcessSelectNext(state, selectData.Aid),
             _ => Result.Failure<CardState, SmartCardError>(SmartCardError.IncorrectData())
         };
     }
@@ -250,11 +257,19 @@ public static class ApplicationSelectionProcessor
         //     9F70 (Life Cycle State) - 1 byte: 0x07 (INITIALIZED)
         
         byte[] proprietaryData = BuildProprietaryData();
-        byte[] aidTlv = BuildTlv(0x84, isdAid);
-        byte[] proprietaryTlv = BuildTlv(0xA5, proprietaryData);
+        var aidTlvResult = TlvEncoder.EncodeSimple(0x84, isdAid.ToImmutableArray());
+        var proprietaryTlvResult = TlvEncoder.EncodeSimple(0xA5, proprietaryData.ToImmutableArray());
         
-        byte[] fciContent = [..aidTlv, ..proprietaryTlv];
-        return BuildTlv(0x6F, fciContent);
+        return aidTlvResult.Bind(aidTlv =>
+            proprietaryTlvResult.Bind(proprietaryTlv =>
+            {
+                var fciContent = aidTlv.AddRange(proprietaryTlv);
+                return TlvEncoder.EncodeSimple(0x6F, fciContent);
+            }))
+            .Match(
+                success => success.ToArray(),
+                error => [0x6F, 0x00] // Return minimal FCI on error
+            );
     }
 
     /// <summary>
@@ -264,26 +279,15 @@ public static class ApplicationSelectionProcessor
     {
         // Life cycle state: SELECTABLE (INITIALIZED)
         byte[] lifecycleState = [Gp4Net.Constants.Constants.GlobalPlatform.LifecycleStates.Selectable];
-        byte[] lifecycleTlv = BuildTlv(0x9F, 0x70, lifecycleState);
+        var lifecycleTlvResult = TlvEncoder.EncodeSimple(0x9F70, lifecycleState.ToImmutableArray());
+        var lifecycleTlv = lifecycleTlvResult.Match(
+            success => success.ToArray(),
+            error => [0x9F, 0x70, 0x01, lifecycleState[0]] // Fallback to manual construction
+        );
         
         return lifecycleTlv;
     }
 
-    /// <summary>
-    /// Builds a TLV structure with single-byte tag.
-    /// </summary>
-    private static byte[] BuildTlv(byte tag, byte[] value)
-    {
-        return [tag, (byte)value.Length, ..value];
-    }
-
-    /// <summary>
-    /// Builds a TLV structure with two-byte tag.
-    /// </summary>
-    private static byte[] BuildTlv(byte tag1, byte tag2, byte[] value)
-    {
-        return [tag1, tag2, (byte)value.Length, ..value];
-    }
 
     /// <summary>
     /// Extension method to set IsSelected state functionally.

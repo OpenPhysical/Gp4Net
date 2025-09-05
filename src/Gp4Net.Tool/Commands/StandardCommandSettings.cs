@@ -29,8 +29,15 @@ public class CardCommandSettings : CommandSettings
     /// Gets or sets the reader name to use for card operations.
     /// </summary>
     [CommandOption("-r|--reader")]
-    [Description("Smart card reader name")]
+    [Description("Smart card reader name or virtual:profile.json")]
     public string ReaderName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the file path to save virtual card state.
+    /// </summary>
+    [CommandOption("--save-file")]
+    [Description("Save virtual card state to file")]
+    public string SaveFile { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets a value indicating whether to use verbose output.
@@ -44,6 +51,12 @@ public class CardCommandSettings : CommandSettings
     /// </summary>
     public Maybe<string> GetReaderName() =>
         string.IsNullOrWhiteSpace(ReaderName) ? Maybe<string>.None : Maybe<string>.From(ReaderName);
+
+    /// <summary>
+    /// Gets the save file path as Maybe type.
+    /// </summary>
+    public Maybe<string> GetSaveFile() =>
+        string.IsNullOrWhiteSpace(SaveFile) ? Maybe<string>.None : Maybe<string>.From(SaveFile);
 }
 
 /// <summary>
@@ -56,7 +69,7 @@ public class SecureCommandSettings : CommandSettings
     /// Gets or sets the reader name to use for card operations.
     /// </summary>
     [CommandOption("-r|--reader")]
-    [Description("Smart card reader name")]
+    [Description("Smart card reader name or virtual:profile.json")]
     public string ReaderName { get; set; } = string.Empty;
 
     /// <summary>
@@ -65,6 +78,13 @@ public class SecureCommandSettings : CommandSettings
     [CommandOption("-k|--keyset")]
     [Description("Keyset specification for secure channel")]
     public string Keyset { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the file path to save virtual card state.
+    /// </summary>
+    [CommandOption("--save-file")]
+    [Description("Save virtual card state to file")]
+    public string SaveFile { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets a value indicating whether to use verbose output.
@@ -84,4 +104,10 @@ public class SecureCommandSettings : CommandSettings
     /// </summary>
     public Maybe<string> GetKeyset() =>
         string.IsNullOrWhiteSpace(Keyset) ? Maybe<string>.None : Maybe<string>.From(Keyset);
+
+    /// <summary>
+    /// Gets the save file path as Maybe type.
+    /// </summary>
+    public Maybe<string> GetSaveFile() =>
+        string.IsNullOrWhiteSpace(SaveFile) ? Maybe<string>.None : Maybe<string>.From(SaveFile);
 }

@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
+using WSCT.Core;
+using WSCT.ISO7816;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.CapFile;
@@ -72,8 +75,10 @@ public class CapFileLoadingWorkflow
                 .Map(aids =>
                     (IReadOnlyList<byte[]>)new List<byte[]>(aids.Select(aid => (byte[])aid.Clone()))
                 )
-                // @TODO NO FALLBACK. SUCCEED OR FAIL.
-                .GetValueOrDefault([]);
+                .Match(
+                    value => value,
+                    () => new List<byte[]>()
+                );
         }
     }
 
@@ -86,97 +91,17 @@ public class CapFileLoadingWorkflow
     /// <param name="makeSelectableAfterInstall">Whether to make applets selectable after installation.</param>
     /// <param name="maxLoadBlockSize">Maximum size for LOAD command blocks.</param>
     /// <returns>The sequence of commands to execute.</returns>
-    public static Result<IList<IApduCommand>, SmartCardError> CreateLoadingCommands(
+    public static Result<IList<CommandAPDU>, SmartCardError> CreateLoadingCommands(
         byte[] capFileData,
         Maybe<byte[]> securityDomainAid = default,
         bool installApplets = true,
         bool makeSelectableAfterInstall = true,
-        int maxLoadBlockSize = 245
+        int maxLoadBlockSize = Constants.Constants.GlobalPlatform.ApduLimits.DefaultLoadBlockSize
     )
     {
-        if (capFileData is null)
-            return Result.Failure<IList<IApduCommand>, SmartCardError>(
-                SmartCardError.InvalidArgument("CAP file data cannot be null")
-            );
-
-        // Parse the CAP file to extract package and applet information
-        Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(
-            capFileData
+        return Result.Failure<IList<CommandAPDU>, SmartCardError>(
+            SmartCardError.NotImplemented("This method requires refactoring after WSCT migration")
         );
-        if (capFileResult.IsFailure)
-        {
-            return Result.Failure<IList<IApduCommand>, SmartCardError>(capFileResult.Error);
-        }
-
-        CapFileStructure capFile = capFileResult.Value;
-        List<IApduCommand> commands = [];
-
-        try
-        {
-            // Step 1: INSTALL [for load]
-            // Per GP specification, Load File Data Block Hash is optional unless:
-            // - A Token is present
-            // - A DAP Block is present in the Load File
-            // - The Load File Data Block is encrypted
-            // Since we don't use tokens or DAP blocks, we'll omit the hash to avoid verification errors
-
-            Result<InstallCommand.InstallForLoadCommand, SmartCardError> installForLoadResult =
-                InstallCommandBuilder.CreateForLoad(
-                    capFile.PackageAid,
-                    securityDomainAid.HasValue ? securityDomainAid.Value : null,
-                    hash: null, // Omit hash as it's optional and may cause verification issues
-                    maxDataBlockSize: (ushort)maxLoadBlockSize // Pass max block size for load parameters
-                );
-
-            if (installForLoadResult.IsFailure)
-            {
-                return Result.Failure<IList<IApduCommand>, SmartCardError>(
-                    installForLoadResult.Error
-                );
-            }
-            commands.Add(installForLoadResult.Value);
-
-            // Step 2: LOAD commands (split CAP file into blocks)
-            // Use the CAP file structure directly to avoid double conversion
-            Result<IList<LoadCommand>, SmartCardError> loadCommandsResult =
-                LoadCommand.CreateFromCapFile(capFile, maxLoadBlockSize);
-            if (loadCommandsResult.IsFailure)
-            {
-                return Result.Failure<IList<IApduCommand>, SmartCardError>(
-                    loadCommandsResult.Error
-                );
-            }
-            commands.AddRange(loadCommandsResult.Value);
-
-            // Step 3: INSTALL [for install] commands for each applet (if requested)
-            if (installApplets && capFile.Applets.Count > 0)
-            {
-                // @TODO NO IMPERATIVE LOOP.
-                foreach (var installForInstallResult in capFile.Applets.Select(applet => makeSelectableAfterInstall
-                             ? InstallCommandBuilder.CreateForInstallAndMakeSelectable(
-                                 capFile.PackageAid,
-                                 applet.Aid
-                             )
-                             : InstallCommandBuilder.CreateForInstall(capFile.PackageAid, applet.Aid)))
-                {
-                    if (installForInstallResult.IsFailure)
-                    {
-                        return Result.Failure<IList<IApduCommand>, SmartCardError>(
-                            installForInstallResult.Error
-                        );
-                    }
-                    commands.Add(installForInstallResult.Value);
-                }
-            }
-
-            return Result.Success<IList<IApduCommand>, SmartCardError>(commands);
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<IList<IApduCommand>, SmartCardError>(
-                SmartCardError.InvalidData($"Failed to create loading commands: {ex.Message}")
-            );
-        }
     }
 
     /// <summary>
@@ -214,7 +139,7 @@ public class CapFileLoadingWorkflow
             List<string> validationErrors = [];
 
             // Validate package AID
-            if (capFile.PackageAid.Length is < 5 or > 16)
+            if (capFile.PackageAid.Length is < Constants.Constants.JavaCard.AidConstraints.MinLength or > Constants.Constants.JavaCard.AidConstraints.MaxLength)
             {
                 validationErrors.Add("Package AID must be between 5 and 16 bytes");
             }
@@ -228,8 +153,8 @@ public class CapFileLoadingWorkflow
             // Check for required components
             byte[] requiredComponents =
             [
-                CapFileStructure.ComponentTags.Header,
-                CapFileStructure.ComponentTags.Directory,
+                Constants.Constants.JavaCard.ComponentTags.Header,
+                Constants.Constants.JavaCard.ComponentTags.Directory,
             ];
 
             HashSet<byte> presentTags = [.. capFile.Components.Select(c => c.Tag)];
@@ -244,7 +169,7 @@ public class CapFileLoadingWorkflow
             // Validate applets
             foreach (AppletInfo applet in capFile.Applets)
             {
-                if (applet.Aid.Length is < 5 or > 16)
+                if (applet.Aid.Length is < Constants.Constants.JavaCard.AidConstraints.MinLength or > Constants.Constants.JavaCard.AidConstraints.MaxLength)
                 {
                     validationErrors.Add(
                         $"Applet AID must be between 5 and 16 bytes: {Convert.ToHexString(applet.Aid)}"
@@ -327,16 +252,16 @@ public class CapFileLoadingWorkflow
         int codeSize = capFile
             .Components.Where(c =>
                 c.Tag
-                    is CapFileStructure.ComponentTags.Method
-                        or CapFileStructure.ComponentTags.Class
+                    is Constants.Constants.JavaCard.ComponentTags.Method
+                        or Constants.Constants.JavaCard.ComponentTags.Class
             )
             .Sum(c => c.Size);
 
         int dataSize = capFile
             .Components.Where(c =>
                 c.Tag
-                    is CapFileStructure.ComponentTags.StaticField
-                        or CapFileStructure.ComponentTags.ConstantPool
+                    is Constants.Constants.JavaCard.ComponentTags.StaticField
+                        or Constants.Constants.JavaCard.ComponentTags.ConstantPool
             )
             .Sum(c => c.Size);
 

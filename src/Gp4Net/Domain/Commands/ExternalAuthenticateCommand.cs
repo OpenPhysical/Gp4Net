@@ -5,10 +5,12 @@
 
 using System;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Core.Functional;
-using Gp4Net.Transport;
 using JetBrains.Annotations;
+using WSCT.ISO7816;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -16,17 +18,17 @@ namespace Gp4Net.Domain.Commands;
 /// Represents the EXTERNAL AUTHENTICATE command for secure channel authentication.
 /// </summary>
 [PublicAPI]
-public class ExternalAuthenticateCommand : BaseApduCommand
+public class ExternalAuthenticateCommand
 {
     /// <summary>
     /// The command class byte.
     /// </summary>
-    public const byte ClassByte = 0x84;
+    public const byte ClassByte = GlobalPlatform.Cla.Secured;
 
     /// <summary>
     /// The command instruction byte.
     /// </summary>
-    public const byte InstructionByte = 0x82;
+    public const byte InstructionByte = GlobalPlatform.Ins.ExternalAuthenticate;
 
     /// <summary>
     /// Gets the security level.
@@ -187,8 +189,10 @@ public class ExternalAuthenticateCommand : BaseApduCommand
         return new ExternalAuthenticateCommand(securityLevel, hostCryptogram, []);
     }
 
-    /// <inheritdoc />
-    public override byte Cla
+    /// <summary>
+    /// Gets the command class byte.
+    /// </summary>
+    public byte Cla
     {
         get
         {
@@ -198,26 +202,34 @@ public class ExternalAuthenticateCommand : BaseApduCommand
         }
     }
 
-    /// <inheritdoc />
-    public override byte Ins
+    /// <summary>
+    /// Gets the instruction byte.
+    /// </summary>
+    public byte Ins
     {
         get { return InstructionByte; }
     }
 
-    /// <inheritdoc />
-    public override byte P1
+    /// <summary>
+    /// Gets the parameter 1 byte.
+    /// </summary>
+    public byte P1
     {
         get { return (byte)SecurityLevel; }
     }
 
-    /// <inheritdoc />
-    public override byte P2
+    /// <summary>
+    /// Gets the parameter 2 byte.
+    /// </summary>
+    public byte P2
     {
         get { return 0x00; }
     }
 
-    /// <inheritdoc />
-    public override byte[] Data
+    /// <summary>
+    /// Gets the command data.
+    /// </summary>
+    public byte[] Data
     {
         get
         {
@@ -233,8 +245,10 @@ public class ExternalAuthenticateCommand : BaseApduCommand
         }
     }
 
-    /// <inheritdoc />
-    public override Maybe<int> ExpectedResponseLength
+    /// <summary>
+    /// Gets the expected response length.
+    /// </summary>
+    public Maybe<int> ExpectedResponseLength
     {
         get
         {
@@ -242,6 +256,20 @@ public class ExternalAuthenticateCommand : BaseApduCommand
 
             // No response data expected
         }
+    }
+
+    /// <summary>
+    /// Creates a WSCT CommandAPDU from this EXTERNAL AUTHENTICATE command.
+    /// </summary>
+    /// <returns>A Result containing the CommandAPDU.</returns>
+    public Result<CommandAPDU, SmartCardError> ToCommandApdu()
+    {
+        return ExpectedResponseLength.Match(
+            Some: le => Result.Success<CommandAPDU, SmartCardError>(
+                new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data, (uint)le)),
+            None: () => Result.Success<CommandAPDU, SmartCardError>(
+                new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data))
+        );
     }
 
     /// <summary>

@@ -6,12 +6,16 @@
 using System;
 using System.Diagnostics;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Core.Functional;
 using Gp4Net.Transport;
+using WSCT.Core;
+using WSCT.ISO7816;
 using JetBrains.Annotations;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -19,17 +23,17 @@ namespace Gp4Net.Domain.Commands;
 /// Represents the INITIALIZE UPDATE command for secure channel initiation.
 /// </summary>
 [PublicAPI]
-public class InitializeUpdateCommand : BaseApduCommand
+public class InitializeUpdateCommand
 {
     /// <summary>
     /// The command class byte.
     /// </summary>
-    public const byte ClassByte = 0x80;
+    public const byte ClassByte = GlobalPlatform.Cla.GpStandard;
 
     /// <summary>
     /// The command instruction byte.
     /// </summary>
-    public const byte InstructionByte = 0x50;
+    public const byte InstructionByte = GlobalPlatform.Ins.InitializeUpdate;
 
     /// <summary>
     /// Gets the key version number.
@@ -51,40 +55,17 @@ public class InitializeUpdateCommand : BaseApduCommand
     /// </summary>
     private readonly bool _useMaxResponseLength;
 
-    /// <inheritdoc />
-    public override byte Cla
+    /// <summary>
+    /// Converts this command to a CommandAPDU.
+    /// </summary>
+    /// <returns>A result containing the CommandAPDU or an error.</returns>
+    public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
-        get { return ClassByte; }
-    }
-
-    /// <inheritdoc />
-    public override byte Ins
-    {
-        get { return InstructionByte; }
-    }
-
-    /// <inheritdoc />
-    public override byte P1
-    {
-        get { return KeyVersion; }
-    }
-
-    /// <inheritdoc />
-    public override byte P2
-    {
-        get { return KeyIdentifier; }
-    }
-
-    /// <inheritdoc />
-    public override byte[] Data
-    {
-        get { return HostChallenge; }
-    }
-
-    /// <inheritdoc />
-    public override Maybe<int> ExpectedResponseLength
-    {
-        get { return Maybe<int>.From(_useMaxResponseLength ? 256 : 28); }
+        var expectedLength = _useMaxResponseLength ? 256 : 28;
+        
+        return Result.Success<CommandAPDU, SmartCardError>(
+            new CommandAPDU(ClassByte, InstructionByte, KeyVersion, KeyIdentifier, (uint)HostChallenge.Length, HostChallenge, (uint)expectedLength)
+        );
     }
 
     /// <summary>

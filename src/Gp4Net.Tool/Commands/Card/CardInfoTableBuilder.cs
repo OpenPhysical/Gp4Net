@@ -4,7 +4,7 @@ using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Domain.Commands;
-using Gp4Net.Domain.Protocol;
+using Gp4Net.Constants;
 
 namespace Gp4Net.Tool.Commands.Card;
 

@@ -98,25 +98,9 @@ public class KeysChangeCommand : IPipelineCommand<KeysChangeCommand.Settings>
         context.Display.Info($"New key version: {newKeyset.KeyVersion:X2}");
         context.Display.Info($"Protocol: {(newKeyset is Scp02KeySet ? "SCP02" : "SCP03")}");
 
-        IGlobalPlatformService gpService = context.GetGlobalPlatformService();
-        context.Display.Info("Changing keys...");
-
-        Result<bool, SmartCardError> putKeyResult = await gpService.PutKeysAsync(
-            (KeySet)newKeyset,
-            newKeyset.KeyVersion
-        );
-
-        return putKeyResult.Match(
-            success =>
-            {
-                context.Display.Success("Keys changed successfully");
-                return Result.Success<bool, SmartCardError>(true);
-            },
-            error =>
-            {
-                context.Display.Error($"Failed to change keys: {error.Message}");
-                return Result.Failure<bool, SmartCardError>(error);
-            }
+        context.Display.Error("Key change functionality not yet implemented with static services.");
+        return Result.Failure<bool, SmartCardError>(
+            SmartCardError.Unsupported("Key change functionality needs to be implemented using static GlobalPlatformService methods")
         );
     }
 

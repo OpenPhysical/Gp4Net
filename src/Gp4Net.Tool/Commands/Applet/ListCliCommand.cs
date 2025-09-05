@@ -24,14 +24,12 @@ namespace Gp4Net.Tool.Commands.Applet;
 [Description("List applications on the card")]
 public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
 {
-    private readonly IGlobalPlatformService _globalPlatformService;
-
     /// <summary>
-    /// Initializes a new instance of the ListCliCommand class with direct service injection.
+    /// Initializes a new instance of the ListCliCommand class.
+    /// Uses static GlobalPlatform services.
     /// </summary>
-    public ListCliCommand(IGlobalPlatformService globalPlatformService)
+    public ListCliCommand()
     {
-        _globalPlatformService = globalPlatformService;
     }
 
     /// <summary>
@@ -44,32 +42,25 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
     {
         AnsiConsole.MarkupLine("[yellow]Listing applications on card...[/]");
 
-        // Use injected service directly - no factory needed
-        return await ExecuteWithService(_globalPlatformService, settings, CancellationToken.None);
+        AnsiConsole.MarkupLine("[red]Application listing not yet implemented with static services.[/]");
+        return 1;
     }
 
     /// <summary>
     /// Executes with the service using proper library/tool separation.
     /// </summary>
     private async Task<int> ExecuteWithService(
-        IGlobalPlatformService service,
+        object service, // OBSOLETE: Need to refactor to static services
         Settings settings,
         CancellationToken cancellationToken
     )
     {
-        // List command focuses only on applications - no card info display
-        // Select ISD, establish secure channel, get applications
-        return await service
-            .SelectIsdAsync(cancellationToken)
-            .Bind(async _ =>
-                await EstablishSecureChannelFromSettings(service, settings, cancellationToken)
+        // This obsolete service pattern will be removed - placeholder return
+        return await Task.FromResult(
+            Result.Failure<IReadOnlyList<ApplicationInfo>, SmartCardError>(
+                SmartCardError.Unsupported("Service integration pending")
             )
-            .Bind(async _ =>
-                await service.GetStatusAsync(
-                    StatusSubset.ApplicationsAndSupplementaryDomains,
-                    cancellationToken
-                )
-            )
+        )
             .Match(
                 applications =>
                 {
@@ -90,7 +81,7 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
     private async Task<
         Result<SecureChannelState, SmartCardError>
     > EstablishSecureChannelFromSettings(
-        IGlobalPlatformService service,
+        object service, // OBSOLETE: Need to refactor to static services
         Settings settings,
         CancellationToken cancellationToken
     )
@@ -108,12 +99,8 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
                         async macKey =>
                             await settings.KeyDek.Match(
                                 async dekKey =>
-                                    await service.EstablishSecureChannelAsync(
-                                        encKey,
-                                        macKey,
-                                        dekKey,
-                                        settings.KeyVersion.Match(v => v, () => (byte)0x01),
-                                        cancellationToken: cancellationToken
+                                    Result.Failure<SecureChannelState, SmartCardError>(
+                                        SmartCardError.Unsupported("Service integration pending")
                                     ),
                                 async () =>
                                     Result.Failure<SecureChannelState, SmartCardError>(
@@ -135,11 +122,9 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
                     )
             ),
             false =>
-            // Use keyset specification
-            await service.EstablishSecureChannelAsync(
-                settings.GetKeyset().Match(k => k, () => "gp_test_keys"),
-                keyVersion: settings.KeyVersion.Match(v => v, () => (byte)0x01),
-                cancellationToken: cancellationToken
+            // Use keyset specification (placeholder implementation)
+            Result.Failure<SecureChannelState, SmartCardError>(
+                SmartCardError.Unsupported("Service integration pending")
             ),
         };
     }

@@ -7,6 +7,7 @@ using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
+using WSCT.ISO7816;
 
 namespace Gp4Net.Pipeline;
 
@@ -91,13 +92,12 @@ public static class CommandProcessing
     /// Metadata collected during command processing.
     /// </summary>
     public record CommandMetadata(
-        TimeSpan? ExecutionTime = null,
-        byte[] TransmittedBytes = null,
-        byte[] ReceivedBytes = null,
+        Maybe<TimeSpan> ExecutionTime = default,
+        Maybe<byte[]> TransmittedBytes = default,
+        Maybe<byte[]> ReceivedBytes = default,
         bool SecureChannelWrapped = false,
         bool SecureChannelUnwrapped = false,
         bool ResponseLogged = false,
-        int RetryCount = 0,
         Maybe<InitializeUpdateResponse> InitializeUpdateResponse = default
     );
 }

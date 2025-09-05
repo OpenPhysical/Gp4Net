@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -71,15 +72,10 @@ public class LoadCommand : IPipelineCommand<LoadCommand.Settings>
             await DisplayCardInfoAsync(context);
         }
 
-        IGlobalPlatformService gpService = context.GetGlobalPlatformService();
         context.Display.Info("Loading CAP file package...");
-        InstallOptions installOptions = new InstallOptions(
-            InstallApplets: false, // Load only - don't install applets
-            MakeSelectable: false
-        );
-        Result<Results.InstallationResult, SmartCardError> loadResult = await gpService.InstallCapFileAsync(
-            capData,
-            Maybe<InstallOptions>.From(installOptions)
+        context.Display.Error("CAP file loading not yet implemented with static services.");
+        Result<bool, SmartCardError> loadResult = Result.Failure<bool, SmartCardError>(
+            SmartCardError.Unsupported("CAP file loading functionality needs to be implemented using static GlobalPlatformService methods")
         );
 
         return loadResult.Match(

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.Security;
@@ -89,29 +90,18 @@ public static class ApduParser
     /// <param name="data">The command data.</param>
     /// <param name="le">The expected response length (optional).</param>
     /// <returns>The reconstructed original command bytes.</returns>
-    public static byte[] BuildOriginalCommand(
+    public static Result<byte[], SmartCardError> BuildOriginalCommand(
         byte cla,
         byte ins,
         byte p1,
         byte p2,
         byte[] data,
-        byte? le
+        Maybe<byte> le
     )
     {
-        List<byte> command = [cla, ins, p1, p2];
-
-        if (data.Length > 0)
-        {
-            command.Add((byte)data.Length);
-            command.AddRange(data);
-        }
-
-        if (le.HasValue)
-        {
-            command.Add(le.Value);
-        }
-
-        return [.. command];
+        Maybe<int> expectedLength = le.Map(value => (int)value);
+        return ApduBuilder.CreateCommand(cla, ins, p1, p2, Maybe<byte[]>.From(data), expectedLength)
+            .Map(cmd => cmd.ToBytes());
     }
 }
 

@@ -4,11 +4,15 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Services;
 using static Gp4Net.Services.TlvService;
 using Gp4Net.Transport;
+using WSCT.Core;
+using WSCT.ISO7816;
 using JetBrains.Annotations;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -16,17 +20,17 @@ namespace Gp4Net.Domain.Commands;
 /// Represents the SELECT command for selecting applications or security domains.
 /// </summary>
 [PublicAPI]
-public class SelectCommand : BaseApduCommand
+public class SelectCommand : IApduCommand
 {
     /// <summary>
     /// The command class byte.
     /// </summary>
-    public const byte ClassByte = 0x00;
+    public const byte ClassByte = Apdu.Classes.Standard;
 
     /// <summary>
     /// The command instruction byte.
     /// </summary>
-    public const byte InstructionByte = 0xA4;
+    public const byte InstructionByte = Apdu.Instructions.Select;
 
     /// <summary>
     /// Selection control values for P1.
@@ -36,7 +40,7 @@ public class SelectCommand : BaseApduCommand
         /// <summary>
         /// Select by name (AID).
         /// </summary>
-        SelectByName = 0x04,
+        SelectByName = Apdu.SelectP1.SelectByName,
     }
 
     /// <summary>
@@ -47,22 +51,22 @@ public class SelectCommand : BaseApduCommand
         /// <summary>
         /// Return FCI template.
         /// </summary>
-        ReturnFci = 0x00,
+        ReturnFci = Apdu.SelectP2.ReturnFci,
 
         /// <summary>
         /// Return FCP template.
         /// </summary>
-        ReturnFcp = 0x04,
+        ReturnFcp = Apdu.SelectP2.ReturnFcp,
 
         /// <summary>
         /// Return FMD template.
         /// </summary>
-        ReturnFmd = 0x08,
+        ReturnFmd = Apdu.SelectP2.ReturnFmd,
 
         /// <summary>
         /// No response data.
         /// </summary>
-        NoResponseData = 0x0C,
+        NoResponseData = Apdu.SelectP2.NoResponseData,
     }
 
     /// <summary>
@@ -202,45 +206,17 @@ public class SelectCommand : BaseApduCommand
         );
     }
 
-    /// <inheritdoc />
-    public override byte Cla
+    /// <summary>
+    /// Converts this command to a CommandAPDU.
+    /// </summary>
+    /// <returns>A result containing the CommandAPDU or an error.</returns>
+    public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
-        get { return ClassByte; }
-    }
-
-    /// <inheritdoc />
-    public override byte Ins
-    {
-        get { return InstructionByte; }
-    }
-
-    /// <inheritdoc />
-    public override byte P1
-    {
-        get { return (byte)Control; }
-    }
-
-    /// <inheritdoc />
-    public override byte P2
-    {
-        get { return (byte)ControlInfo; }
-    }
-
-    /// <inheritdoc />
-    public override byte[] Data
-    {
-        get { return Aid; }
-    }
-
-    /// <inheritdoc />
-    public override Maybe<int> ExpectedResponseLength
-    {
-        get
-        {
-            return ControlInfo == FileControlInfo.NoResponseData
-                ? Maybe<int>.None
-                : Maybe<int>.From(256);
-        }
+        return ControlInfo == FileControlInfo.NoResponseData
+            ? Result.Success<CommandAPDU, SmartCardError>(
+                new CommandAPDU(ClassByte, InstructionByte, (byte)Control, (byte)ControlInfo, (uint)Aid.Length, Aid))
+            : Result.Success<CommandAPDU, SmartCardError>(
+                new CommandAPDU(ClassByte, InstructionByte, (byte)Control, (byte)ControlInfo, (uint)Aid.Length, Aid, 256));
     }
 
     /// <summary>
@@ -250,6 +226,18 @@ public class SelectCommand : BaseApduCommand
     public override string ToString()
     {
         return "SELECT";
+    }
+
+    /// <inheritdoc />
+    public CommandAPDU ToApdu()
+    {
+        return ToCommandApdu().GetValueOrDefault(new CommandAPDU([]));
+    }
+
+    /// <inheritdoc />
+    public byte[] ToBytes()
+    {
+        return ToCommandApdu().Map(cmd => cmd.ToBytes()).GetValueOrDefault([]);
     }
 }
 
