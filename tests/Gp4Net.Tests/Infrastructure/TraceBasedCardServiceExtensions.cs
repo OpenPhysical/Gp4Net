@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using CSharpFunctionalExtensions;
 
@@ -19,7 +18,8 @@ public static class TraceBasedCardServiceExtensions
     /// <returns>Reader name formatted for trace-based testing.</returns>
     public static string CreateTraceReaderName(string tracePath, Maybe<string> operations)
     {
-        return Maybe<string>.From(tracePath)
+        return Maybe<string>
+            .From(tracePath)
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Match(
                 path =>
@@ -66,14 +66,17 @@ public static class TraceBasedCardServiceExtensions
     /// <returns>Result indicating if the trace file is valid.</returns>
     public static Result<string, string> ValidateTraceFile(string tracePath)
     {
-        return Maybe<string>.From(tracePath)
+        var pathResult = Maybe<string>
+            .From(tracePath)
             .Where(path => !string.IsNullOrWhiteSpace(path))
-            .ToResult("Trace path cannot be null or empty")
-            .Bind(path =>
-                File.Exists(path)
-                    ? Result.Success<string, string>(path)
-                    : Result.Failure<string, string>($"Trace file not found: {path}")
-            );
+            .ToResult("Trace path cannot be null or empty");
+
+        return pathResult.Match(
+            path => File.Exists(path)
+                ? Result.Success<string, string>(path)
+                : Result.Failure<string, string>($"Trace file not found: {path}"),
+            error => Result.Failure<string, string>(error)
+        );
     }
 
     /// <summary>
@@ -83,12 +86,10 @@ public static class TraceBasedCardServiceExtensions
     /// <returns>File extension or "unknown" if path is invalid.</returns>
     public static string GetTraceFileType(string tracePath)
     {
-        return Maybe<string>.From(tracePath)
+        return Maybe<string>
+            .From(tracePath)
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Map(path => Path.GetExtension(path).TrimStart('.').ToLowerInvariant())
-            .Match(
-                ext => string.IsNullOrWhiteSpace(ext) ? "unknown" : ext,
-                () => "unknown"
-            );
+            .Match(ext => string.IsNullOrWhiteSpace(ext) ? "unknown" : ext, () => "unknown");
     }
 }

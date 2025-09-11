@@ -1,19 +1,20 @@
 using System;
-using System.Reflection;
+using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
-using static Gp4Net.Constants.Constants;
-using Gp4Net.Cryptography;
-using static Gp4Net.Cryptography.CryptoService;
+using Gp4Net.CardEmulator.Services;
+using Gp4Net.Constants;
+using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Constants;
-using Gp4Net.Transport;
+using Gp4Net.CardEmulator.Tests.TestHelpers;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
+using static Gp4Net.Constants.Constants;
+using static Gp4Net.Cryptography.CryptoService;
 //using CSharpFunctionalExtensions.AwesomeAssertions;
 //using static CSharpFunctionalExtensions.Result;
 using ApduResponse = Gp4Net.CardEmulator.Core.ApduResponse;
@@ -31,7 +32,17 @@ public class VirtualCardTests
     public void P71Card_ShouldHaveCorrectAtr()
     {
         // Arrange
-        VirtualCard card = VirtualCardTestBuilder.CreateWithSecureRng(CardConfiguration.P71());
+        var configResult = CardConfiguration.P71();
+        CardConfiguration config = default!;
+        if (configResult.IsSuccess)
+        {
+            config = configResult.Value;
+        }
+        else
+        {
+            Assert.Fail($"Failed to load P71 configuration: {configResult.Error}");
+        }
+        var card = VirtualCardTestBuilder.CreateWithSecureRng(config);
 
         // Act
         byte[] atr = card.GetAtr();
@@ -44,14 +55,24 @@ public class VirtualCardTests
     public void ProcessSelect_WithValidCommand_ShouldSelectCard()
     {
         // Arrange
-        VirtualCard card = VirtualCardTestBuilder.CreateWithSecureRng(CardConfiguration.P71());
+        var configResult = CardConfiguration.P71();
+        CardConfiguration config = default!;
+        if (configResult.IsSuccess)
+        {
+            config = configResult.Value;
+        }
+        else
+        {
+            Assert.Fail($"Failed to load P71 configuration: {configResult.Error}");
+        }
+        var card = VirtualCardTestBuilder.CreateWithSecureRng(config);
         byte[] selectCommand = [0x00, 0xA4, 0x04, 0x00, 0x00]; // SELECT with no AID
 
         // Act
-        ApduResponse response = card.ProcessCommand(selectCommand);
+        var response = card.ExecuteCommand(selectCommand);
 
         // Assert
-        _ = response.StatusWord.Should().Be(StatusWords.Success.Normal);
+        _ = response.StatusWord.Should().Be(StatusWords.Success);
         _ = card.IsSelected.Should().BeTrue();
         _ = response.Data.Length.Should().BeGreaterThan(0); // Should return FCI
     }
@@ -60,26 +81,29 @@ public class VirtualCardTests
     public void ProcessSelect_WithUnsupportedInstruction_ShouldReturnError()
     {
         // Arrange
-        VirtualCard card = VirtualCardTestBuilder.CreateWithSecureRng(CardConfiguration.Minimal()); // Only supports SELECT and GET DATA
+        var configResult = CardConfiguration.P71();
+        CardConfiguration config = default!;
+        if (configResult.IsSuccess)
+        {
+            config = configResult.Value;
+        }
+        else
+        {
+            Assert.Fail($"Failed to load P71 configuration: {configResult.Error}");
+        }
+        var card = VirtualCardTestBuilder.CreateWithSecureRng(config);
+        // Use an invalid instruction that's not in GlobalPlatform spec
         byte[] unsupportedCommand =
         [
             0x80,
-            0x50,
+            0xFF,  // Invalid instruction - not in GP spec
             0x00,
             0x00,
-            0x08,
-            0x01,
-            0x02,
-            0x03,
-            0x04,
-            0x05,
-            0x06,
-            0x07,
-            0x08,
+            0x00,
         ];
 
         // Act
-        ApduResponse response = card.ProcessCommand(unsupportedCommand);
+        var response = card.ExecuteCommand(unsupportedCommand);
 
         // Assert
         _ = response.StatusWord.Should().Be(StatusWords.InstructionErrors.InstructionNotSupported);
@@ -89,25 +113,95 @@ public class VirtualCardTests
     public void ProcessIdentify_OnP71Card_ShouldReturnP71Data()
     {
         // Arrange
-        VirtualCard card = VirtualCardTestBuilder.CreateWithSecureRng(CardConfiguration.P71());
-        byte[] identifyCommand = [0x80, 0xCA, 0x00, 0xFE, 0x02, 0xDF, 0x28, 0x00];
+        var configResult = CardConfiguration.P71();
+        CardConfiguration config = default!;
+        if (configResult.IsSuccess)
+        {
+            config = configResult.Value;
+        }
+        else
+        {
+            Assert.Fail($"Failed to load P71 configuration: {configResult.Error}");
+        }
+        var card = VirtualCardTestBuilder.CreateWithSecureRng(config);
+
+        // Test both implicit and explicit select - ISD should be implicitly selected per GP spec
+        // but we can also explicitly select it
+        byte[] selectCommand = new byte[] { 0x00, Gp4Net.Constants.Apdu.Instructions.SELECT, 0x04, 0x00, (byte)config.IsdAid.Length }
+            .Concat(config.IsdAid)
+            .Concat(new byte[] { 0x00 })
+            .ToArray();
+        var selectResponse = card.ExecuteCommand(selectCommand);
+        TestContext.Out.WriteLine($"SELECT response: 0x{selectResponse.StatusWord:X4}");
+
+        // Build IDENTIFY command using constants - GET DATA for P71 IDENTIFY tag
+        // The P1P2 combination (0x00FE) specifies the data object to retrieve
+        byte[] identifyCommand =
+        [
+            0x80,  // GlobalPlatform CLA
+            Gp4Net.Constants.Apdu.Instructions.GET_DATA,
+            0x00,  // P1 - high byte of data object identifier
+            Constants.Constants.Tlv.VendorSpecific.NXP_P71_IDENTIFY,  // P2 - low byte (0xFE)
+            0x00   // Le - expect any length response
+        ];
+
+        // Debug: Check configuration
+        TestContext.Out.WriteLine($"Config DataObjects count: {config.DefaultDataObjects.Count}");
+        TestContext.Out.WriteLine($"Config has 0x00FE: {config.DefaultDataObjects.ContainsKey(0x00FE)}");
+        if (config.DefaultDataObjects.ContainsKey(0x00FE))
+        {
+            var identifyData = config.DefaultDataObjects[0x00FE];
+            TestContext.Out.WriteLine($"0x00FE data length in config: {identifyData.Length} bytes");
+        }
 
         // Act
-        ApduResponse response = card.ProcessCommand(identifyCommand);
+        var result = card.ProcessCommand(identifyCommand);
 
         // Assert
-        _ = response.StatusWord.Should().Be(StatusWords.Success.Normal);
-        _ = response.Data.Should().NotBeEmpty();
-        // Should contain DF28 tag and P71-specific identification data
-        _ = response.Data[0].Should().Be(0xDF);
-        _ = response.Data[1].Should().Be(0x28);
+        result.Match(
+            success =>
+            {
+                var response = success.Response;
+                TestContext.Out.WriteLine($"Response Status: 0x{response.StatusWord:X4}");
+                TestContext.Out.WriteLine($"Response Data Length: {response.Data.Length}");
+                if (response.Data.Length > 0)
+                {
+                    TestContext.Out.WriteLine($"Response Data: {Convert.ToHexString(response.Data)}");
+                }
+
+                _ = response.StatusWord.Should().Be(StatusWords.Success);
+                _ = response.Data.Should().NotBeEmpty();
+                // GET DATA returns complete TLV structure: FE (tag) + length + DF28 (inner tag) + data
+                _ = response.Data[0].Should().Be(0xFE);  // Outer tag (P71 IDENTIFY)
+                _ = response.Data[1].Should().Be(0x45);  // Length (69 bytes)
+                _ = response.Data[2].Should().Be(0xDF);  // Inner tag high byte
+                _ = response.Data[3].Should().Be(0x28);  // Inner tag low byte
+                return UnitResult.Success<SmartCardError>();
+            },
+            error =>
+            {
+                TestContext.Out.WriteLine($"Command failed: {error.Message}");
+                Assert.Fail($"ProcessCommand failed: {error.Message}");
+                return UnitResult.Failure<SmartCardError>(error);
+            }
+        );
     }
 
     [Test]
     public void ProcessInitializeUpdate_WithValidCommand_ShouldReturnCryptogram()
     {
         // Arrange
-        VirtualCard card = VirtualCardTestBuilder.CreateWithSecureRng(CardConfiguration.P71());
+        var configResult = CardConfiguration.P71();
+        CardConfiguration config = default!;
+        if (configResult.IsSuccess)
+        {
+            config = configResult.Value;
+        }
+        else
+        {
+            Assert.Fail($"Failed to load P71 configuration: {configResult.Error}");
+        }
+        var card = VirtualCardTestBuilder.CreateWithSecureRng(config);
         byte[] selectCommand = [0x00, 0xA4, 0x04, 0x00, 0x00];
         byte[] initUpdateCommand =
         [
@@ -128,11 +222,18 @@ public class VirtualCardTests
 
         // Act
         _ = card.ProcessCommand(selectCommand); // Select first
-        ApduResponse response = card.ProcessCommand(initUpdateCommand);
+        var result = card.ProcessCommand(initUpdateCommand);
 
         // Assert
-        _ = response.StatusWord.Should().Be(StatusWords.Success.Normal);
-        _ = response.Data.Length.Should().BeGreaterThanOrEqualTo(28); // Minimum INITIALIZE UPDATE response
+        result.Match(
+            success =>
+            {
+                var (response, _) = success;
+                _ = response.StatusWord.Should().Be(StatusWords.Success);
+                _ = response.Data.Length.Should().BeGreaterThanOrEqualTo(28); // Minimum INITIALIZE UPDATE response
+            },
+            error => Assert.Fail($"INITIALIZE UPDATE failed: {error}")
+        );
         // Response should contain key version, SCP info, card challenge, and cryptogram
     }
 
@@ -140,7 +241,19 @@ public class VirtualCardTests
     public void ProcessCommand_WithFailingCrypto_ShouldHandleErrors()
     {
         // Arrange
-        VirtualCard card = VirtualCardTestBuilder.CreateWithLimitedEntropy(CardConfiguration.P71(), 8).GetValueOrDefault(VirtualCardTestBuilder.CreateWithSecureRng(CardConfiguration.P71()));
+        var configResult = CardConfiguration.P71();
+        CardConfiguration config = default!;
+        if (configResult.IsSuccess)
+        {
+            config = configResult.Value;
+        }
+        else
+        {
+            Assert.Fail($"Failed to load P71 configuration: {configResult.Error}");
+        }
+        var card = VirtualCardTestBuilder
+            .CreateWithLimitedEntropy(config, 8)
+            .GetValueOrDefault(VirtualCardTestBuilder.CreateWithSecureRng(config));
         byte[] selectCommand = [0x00, 0xA4, 0x04, 0x00, 0x00];
         byte[] initUpdateCommand =
         [
@@ -160,32 +273,42 @@ public class VirtualCardTests
         ];
 
         // Act
-        ApduResponse selectResponse = card.ProcessCommand(selectCommand); // This should work (no crypto needed)
+        var selectResponse = card.ExecuteCommand(selectCommand); // This should work (no crypto needed)
         TestContext.Out.WriteLine(
             $"SELECT response: {Convert.ToHexString(selectResponse.Data)} {selectResponse.StatusWord:X4}"
         );
 
-        ApduResponse response = card.ProcessCommand(initUpdateCommand); // This should fail
+        var response = card.ExecuteCommand(initUpdateCommand); // This should fail
         TestContext.Out.WriteLine(
             $"INITIALIZE UPDATE response: {Convert.ToHexString(response.Data)} {response.StatusWord:X4}"
         );
         TestContext.Out.WriteLine($"Expected: NOT 0x9000, Actual: 0x{response.StatusWord:X4}");
 
         // Assert
-        _ = response.StatusWord.Should().NotBe(StatusWords.Success.Normal);
+        _ = response.StatusWord.Should().NotBe(StatusWords.Success);
     }
 
     [Test]
     public void CardState_ShouldBeImmutable()
     {
         // Arrange
-        VirtualCard card = VirtualCardTestBuilder.CreateWithSecureRng(CardConfiguration.P71());
-        CardState initialState = card.CurrentState;
+        var configResult = CardConfiguration.P71();
+        CardConfiguration config = default!;
+        if (configResult.IsSuccess)
+        {
+            config = configResult.Value;
+        }
+        else
+        {
+            Assert.Fail($"Failed to load P71 configuration: {configResult.Error}");
+        }
+        var card = VirtualCardTestBuilder.CreateWithSecureRng(config);
+        var initialState = card.CurrentState;
         byte[] selectCommand = [0x00, 0xA4, 0x04, 0x00, 0x00];
 
         // Act
         _ = card.ProcessCommand(selectCommand);
-        CardState newState = card.CurrentState;
+        var newState = card.CurrentState;
 
         // Assert
         // Per GP Card Spec v2.3.1 Section 6.4.1: ISD is implicitly selected initially
@@ -210,23 +333,26 @@ public class VirtualCardTests
     public void ProcessCommand_DeleteApplication_RemovesFromCardState()
     {
         // Arrange - Create card with established secure channel for DELETE command testing
-        VirtualCard card = CreateCardWithSecureChannel();
+        var card = CreateCardWithSecureChannel();
 
         // Create DELETE command for a test application
         byte[] testAid = Convert.FromHexString("A00000030800001000");
-        var deleteResult = DeleteCommand
-            .CreateForApplication(testAid, deleteRelated: true);
+        var deleteResult = DeleteCommand.CreateForApplication(testAid, deleteRelated: true);
 
         // Act
         var response = deleteResult
             .Map(deleteCommand => deleteCommand.ToBytes())
             .Match(
-                apduBytes => card.ProcessCommand(apduBytes),
+                apduBytes =>
+                {
+                    var result = card.ProcessCommand(apduBytes);
+                    return result.IsSuccess ? result.Value.Response : new ApduResponse([], 0x6F00);
+                },
                 error => new ApduResponse([], 0x6F00) // Generic failure response
             );
 
         // Assert
-        _ = response.StatusWord.Should().Be(StatusWords.Success.Normal);
+        _ = response.StatusWord.Should().Be(StatusWords.Success);
         // Per GlobalPlatform Card Specification v2.3.1 Table 11-26,
         // DELETE Response should contain one byte (00) indicating success
         _ = response.Data.Should().BeEquivalentTo(new byte[] { 0x00 });
@@ -236,23 +362,29 @@ public class VirtualCardTests
     public void ProcessCommand_InstallForLoad_PreparesForCapFileLoading()
     {
         // Arrange - Create card with established secure channel for INSTALL command testing
-        VirtualCard card = CreateCardWithSecureChannel();
+        var card = CreateCardWithSecureChannel();
 
         // GlobalPlatform Card Specification v2.3.1 Section 11.5.2.1 INSTALL [for load]
         byte[] packageAid = Convert.FromHexString("A000000308000010");
-        var installForLoadResult = InstallCommandBuilder
-            .CreateForLoad(packageAid: packageAid, securityDomainAid: card.Configuration.IsdAid);
+        var installForLoadResult = InstallCommandBuilder.CreateForLoad(
+            packageAid: packageAid,
+            securityDomainAid: card.Configuration.IsdAid
+        );
 
         // Act
         var response = installForLoadResult
             .Bind(installCommand => installCommand.ToCommandApdu())
             .Match(
-                commandApdu => card.ProcessCommand(commandApdu.BinaryCommand),
+                commandApdu =>
+                {
+                    var result = card.ProcessCommand(commandApdu.BinaryCommand);
+                    return result.IsSuccess ? result.Value.Response : new ApduResponse([], 0x6F00);
+                },
                 error => new ApduResponse([], 0x6F00) // Generic failure response
             );
 
         // Assert
-        _ = response.StatusWord.Should().Be(StatusWords.Success.Normal);
+        _ = response.StatusWord.Should().Be(StatusWords.Success);
         // Per GlobalPlatform Card Specification v2.3.1 Table 11-13,
         // INSTALL Response should contain application specific data or one byte (00)
         _ = response.Data.Should().BeEquivalentTo(new byte[] { 0x00 });
@@ -264,14 +396,24 @@ public class VirtualCardTests
     /// </summary>
     private VirtualCard CreateCardWithSecureChannel()
     {
-        VirtualCard card = VirtualCardTestBuilder.CreateWithSecureRng(CardConfiguration.P71());
+        var configResult = CardConfiguration.P71();
+        CardConfiguration config = default!;
+        if (configResult.IsSuccess)
+        {
+            config = configResult.Value;
+        }
+        else
+        {
+            Assert.Fail($"Failed to load P71 configuration: {configResult.Error}");
+        }
+        var card = VirtualCardTestBuilder.CreateWithSecureRng(config);
 
         // First SELECT the ISD to put the card in selected state
         byte[] selectCommand = [0x00, 0xA4, 0x04, 0x00, 0x00];
         _ = card.ProcessCommand(selectCommand);
 
         // Create test session keys for secure channel (deterministic for unit testing)
-        SessionKeys sessionKeys = new SessionKeys(
+        var sessionKeys = new SessionKeys(
             sEnc: new byte[16],
             sMac: new byte[16],
             sRMac: new byte[16],
@@ -290,14 +432,16 @@ public class VirtualCardTests
         // Create new card instance with secure channel established (functional approach)
         if (secureChannelResult.IsSuccess)
         {
-            CardState currentState = card.CurrentState;
-            CardState newState = currentState.WithSecureChannel(secureChannelResult.Value);
-            
+            var currentState = card.CurrentState;
+            var newState = currentState.WithSecureChannel(secureChannelResult.Value);
+
             return new VirtualCard(
                 card.Configuration,
-                CryptoService.Rng.CreateSecureContext(),
+                Rng.CreateSecureContext(),
                 newState,
-                new LoggingService(Maybe<ILogger>.None)
+                new LoggingService(Maybe<ILogger>.None),
+                new CapFileServiceAdapter(),
+                new CardStateService(Maybe<ILogger>.None)
             );
         }
 
@@ -308,21 +452,24 @@ public class VirtualCardTests
     public void ProcessCommandFunctionally_ShouldProcessSelectCommand()
     {
         // Arrange
-        CardConfiguration config = CardConfiguration.P71();
-        IRngContext rng = CryptoService.Rng.CreateSecureContext();
+        var configResult = CardConfiguration.P71();
+        CardConfiguration config = default!;
+        if (configResult.IsSuccess)
+        {
+            config = configResult.Value;
+        }
+        else
+        {
+            Assert.Fail($"Failed to load P71 configuration: {configResult.Error}");
+        }
+        var rng = Rng.CreateSecureContext();
         byte[] selectCommand = [0x00, 0xA4, 0x04, 0x00, 0x00];
         var initialState = CardState.Create();
 
         // Act
         var result = initialState.Bind(state =>
             VirtualCard
-                .ProcessCommandFunctionally(
-                    selectCommand,
-                    state,
-                    config,
-                    rng,
-                    LoggingService.None
-                )
+                .ProcessCommandFunctionally(selectCommand, state, config, rng, LoggingService.None)
                 .Map(x => x.Item1)
         ); // Extract just the response
 
@@ -334,11 +481,21 @@ public class VirtualCardTests
     public void Builder_ShouldCreateCustomConfigurations()
     {
         // Arrange & Act
-        VirtualCard card = VirtualCardTestBuilder.CreateWithSecureRng(
-            CardConfiguration.P71() with
+        var configResult = CardConfiguration.P71();
+        CardConfiguration config = default!;
+        if (configResult.IsSuccess)
+        {
+            config = configResult.Value;
+        }
+        else
+        {
+            Assert.Fail($"Failed to load P71 configuration: {configResult.Error}");
+        }
+        var card = VirtualCardTestBuilder.CreateWithSecureRng(
+            config with
             {
                 DefaultScpVersion = 0x03,
-                DefaultScpImplementation = ScpImplementation.Scp03I70
+                DefaultScpImplementation = ScpImplementation.Scp03I70,
             }
         );
 
@@ -352,7 +509,17 @@ public class VirtualCardTests
     public void Reset_ShouldRestoreInitialState()
     {
         // Arrange
-        VirtualCard card = VirtualCardTestBuilder.CreateWithSecureRng(CardConfiguration.P71());
+        var configResult = CardConfiguration.P71();
+        CardConfiguration config = default!;
+        if (configResult.IsSuccess)
+        {
+            config = configResult.Value;
+        }
+        else
+        {
+            Assert.Fail($"Failed to load P71 configuration: {configResult.Error}");
+        }
+        var card = VirtualCardTestBuilder.CreateWithSecureRng(config);
         byte[] selectCommand = [0x00, 0xA4, 0x04, 0x00, 0x00];
 
         // Act

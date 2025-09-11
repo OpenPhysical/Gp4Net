@@ -42,7 +42,7 @@ public record VirtualSecurityDomain(
     /// </summary>
     public static VirtualSecurityDomain CreateIsd()
     {
-        ImmutableArray<byte> emptyAid = ImmutableArray<byte>.Empty;
+        var emptyAid = ImmutableArray<byte>.Empty;
         return new VirtualSecurityDomain(
             emptyAid, // ISD has empty AID
             "Issuer Security Domain",
@@ -127,7 +127,6 @@ public record VirtualSecurityDomain(
     /// </summary>
     public bool IsHierarchyRoot =>
         AssociatedSecurityDomainAid.Match(associated => associated.SequenceEqual(Aid), () => false);
-
 }
 
 /// <summary>
@@ -209,7 +208,6 @@ public enum ApplicationState : byte
     Locked = 0x87,
 }
 
-
 /// <summary>
 /// Entity authentication states according to GlobalPlatform Section 10.4.
 /// Represents whether the off-card entity has been authenticated through secure channel establishment.
@@ -290,15 +288,14 @@ public record ApplicationSelectionContext(
     /// </returns>
     public static ApplicationSelectionContext WithIsd()
     {
-        VirtualSecurityDomain isd = VirtualSecurityDomain.CreateIsd();
+        var isd = VirtualSecurityDomain.CreateIsd();
         string isdKey = Convert.ToHexString(Apdu.WellKnownIdentifiers.StandardGpIsdAid); // Standard GP ISD AID per GlobalPlatform specification
 
-
-        ImmutableDictionary<string, VirtualSecurityDomain>.Builder securityDomainsBuilder =
+        var securityDomainsBuilder =
             ImmutableDictionary.CreateBuilder<string, VirtualSecurityDomain>();
         securityDomainsBuilder.Add(isdKey, isd);
 
-        ImmutableList<string>.Builder historyBuilder = ImmutableList.CreateBuilder<string>();
+        var historyBuilder = ImmutableList.CreateBuilder<string>();
         historyBuilder.Add(isdKey);
 
         return new ApplicationSelectionContext(
@@ -364,13 +361,13 @@ public record ApplicationSelectionContext(
             );
         }
 
-        VirtualApplication application = VirtualApplication.Create(
+        var application = VirtualApplication.Create(
             aid,
             name,
             associatedSecurityDomainAid,
             privileges
         );
-        ImmutableDictionary<string, VirtualApplication>.Builder applicationsBuilder =
+        var applicationsBuilder =
             Applications.ToBuilder();
         applicationsBuilder.Add(aidString, application);
 
@@ -404,7 +401,7 @@ public record ApplicationSelectionContext(
             );
         }
 
-        VirtualApplication application = Applications[aidString];
+        var application = Applications[aidString];
 
         if (
             application.State != ApplicationState.Selectable
@@ -416,7 +413,7 @@ public record ApplicationSelectionContext(
             );
         }
 
-        ImmutableList<string>.Builder historyBuilder = SelectionHistory.ToBuilder();
+        var historyBuilder = SelectionHistory.ToBuilder();
         historyBuilder.Add(aidString);
 
         return Result.Success<ApplicationSelectionContext, SmartCardError>(
@@ -443,7 +440,7 @@ public record ApplicationSelectionContext(
             );
         }
 
-        ImmutableList<string>.Builder historyBuilder = SelectionHistory.ToBuilder();
+        var historyBuilder = SelectionHistory.ToBuilder();
         historyBuilder.Add(isdKey);
 
         return Result.Success<ApplicationSelectionContext, SmartCardError>(
@@ -473,10 +470,10 @@ public record ApplicationSelectionContext(
             );
         }
 
-        VirtualApplication application = Applications[aidString];
+        var application = Applications[aidString];
 
-        VirtualApplication updatedApplication = application.WithState(newState);
-        ImmutableDictionary<string, VirtualApplication> newApplications = Applications.SetItem(
+        var updatedApplication = application.WithState(newState);
+        var newApplications = Applications.SetItem(
             aidString,
             updatedApplication
         );
@@ -513,10 +510,10 @@ public record ApplicationSelectionContext(
             );
         }
 
-        ImmutableDictionary<string, VirtualApplication> newApplications = Applications.Remove(
+        var newApplications = Applications.Remove(
             aidString
         );
-        Maybe<string> newSelectedKey = SelectedEntityKey.Match(
+        var newSelectedKey = SelectedEntityKey.Match(
             selected => selected == aidString ? Maybe<string>.None : SelectedEntityKey,
             () => Maybe<string>.None
         );
@@ -543,9 +540,7 @@ public record ApplicationSelectionContext(
     /// Gets all applications with specific privileges.
     /// Used for privilege-based access control and security domain management.
     /// </summary>
-    public ImmutableList<VirtualApplication> GetApplicationsByPrivileges(
-        Privilege privileges
-    )
+    public ImmutableList<VirtualApplication> GetApplicationsByPrivileges(Privilege privileges)
     {
         return Applications
             .Values.Where(app => app.Privileges.HasFlag(privileges))
@@ -573,7 +568,7 @@ public record ApplicationSelectionContext(
             return "No selections made";
         }
 
-        ImmutableList<string> historyItems = SelectionHistory
+        var historyItems = SelectionHistory
             .Select((key, index) => $"  {index + 1}. {key}")
             .ToImmutableList();
 

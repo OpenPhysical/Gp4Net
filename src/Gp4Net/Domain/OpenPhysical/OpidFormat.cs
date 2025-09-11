@@ -1,5 +1,6 @@
-using System;
 using System.Text.RegularExpressions;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.OpenPhysical;
@@ -61,21 +62,20 @@ public static class OpidFormatExtensions
     /// Gets the regex pattern for validating the OPID format.
     /// </summary>
     /// <param name="format">The OPID format.</param>
-    /// <returns>The regex pattern for the format.</returns>
-    /// <exception cref="ArgumentException">Thrown when the format is not supported.</exception>
-    public static string GetPattern(this OpidFormat format)
+    /// <returns>A Result containing the regex pattern for the format.</returns>
+    public static Result<string, SmartCardError> GetPattern(this OpidFormat format)
     {
         return format switch
         {
-            OpidFormat.Format2 => @"^\d{4}-\d{3}-\d{3}$", // 12 digits: 4-3-3
-            OpidFormat.Format3 => @"^\d{4}-\d{3}-\d{4}$", // 13 digits: 4-3-4
-            OpidFormat.Format4 => @"^\d{4}-\d{4}-\d{4}$", // 14 digits: 4-4-4
-            OpidFormat.Format5 => @"^\d{4}-\d{4}-\d{5}$", // 15 digits: 4-4-5
-            OpidFormat.Format6 => @"^\d{4}-\d{5}-\d{5}$", // 16 digits: 4-5-5
-            OpidFormat.Format7 => @"^\d{4}-\d{4}-\d{4}-\d{4}$", // 17 digits: 4-4-4-4
-            OpidFormat.Format8 => @"^\d{5}-\d{4}-\d{4}-\d{4}$", // 18 digits: 5-4-4-4
-            OpidFormat.Format9 => @"^\d{4}-\d{4}-\d{4}-\d{5}$", // 18 digits: 4-4-4-5
-            _ => throw new ArgumentException($"Unknown OPID format: {format}"),
+            OpidFormat.Format2 => Result.Success<string, SmartCardError>(@"^\d{4}-\d{3}-\d{3}$"), // 12 digits: 4-3-3
+            OpidFormat.Format3 => Result.Success<string, SmartCardError>(@"^\d{4}-\d{3}-\d{4}$"), // 13 digits: 4-3-4
+            OpidFormat.Format4 => Result.Success<string, SmartCardError>(@"^\d{4}-\d{4}-\d{4}$"), // 14 digits: 4-4-4
+            OpidFormat.Format5 => Result.Success<string, SmartCardError>(@"^\d{4}-\d{4}-\d{5}$"), // 15 digits: 4-4-5
+            OpidFormat.Format6 => Result.Success<string, SmartCardError>(@"^\d{4}-\d{5}-\d{5}$"), // 16 digits: 4-5-5
+            OpidFormat.Format7 => Result.Success<string, SmartCardError>(@"^\d{4}-\d{4}-\d{4}-\d{4}$"), // 17 digits: 4-4-4-4
+            OpidFormat.Format8 => Result.Success<string, SmartCardError>(@"^\d{5}-\d{4}-\d{4}-\d{4}$"), // 18 digits: 5-4-4-4
+            OpidFormat.Format9 => Result.Success<string, SmartCardError>(@"^\d{4}-\d{4}-\d{4}-\d{5}$"), // 18 digits: 4-4-4-5
+            _ => Result.Failure<string, SmartCardError>(SmartCardError.Unsupported($"Unknown OPID format: {format}")),
         };
     }
 
@@ -83,20 +83,20 @@ public static class OpidFormatExtensions
     /// Gets the expected total digit count for the format.
     /// </summary>
     /// <param name="format">The OPID format.</param>
-    /// <returns>The expected total number of digits.</returns>
-    public static int GetExpectedDigitCount(this OpidFormat format)
+    /// <returns>A Result containing the expected total number of digits.</returns>
+    public static Result<int, SmartCardError> GetExpectedDigitCount(this OpidFormat format)
     {
         return format switch
         {
-            OpidFormat.Format2 => 12,
-            OpidFormat.Format3 => 13,
-            OpidFormat.Format4 => 14,
-            OpidFormat.Format5 => 15,
-            OpidFormat.Format6 => 16,
-            OpidFormat.Format7 => 17,
-            OpidFormat.Format8 => 18,
-            OpidFormat.Format9 => 18,
-            _ => throw new ArgumentException($"Unknown OPID format: {format}"),
+            OpidFormat.Format2 => Result.Success<int, SmartCardError>(12),
+            OpidFormat.Format3 => Result.Success<int, SmartCardError>(13),
+            OpidFormat.Format4 => Result.Success<int, SmartCardError>(14),
+            OpidFormat.Format5 => Result.Success<int, SmartCardError>(15),
+            OpidFormat.Format6 => Result.Success<int, SmartCardError>(16),
+            OpidFormat.Format7 => Result.Success<int, SmartCardError>(17),
+            OpidFormat.Format8 => Result.Success<int, SmartCardError>(18),
+            OpidFormat.Format9 => Result.Success<int, SmartCardError>(18),
+            _ => Result.Failure<int, SmartCardError>(SmartCardError.Unsupported($"Unknown OPID format: {format}")),
         };
     }
 
@@ -104,20 +104,20 @@ public static class OpidFormatExtensions
     /// Gets a human-readable description of the format pattern.
     /// </summary>
     /// <param name="format">The OPID format.</param>
-    /// <returns>A description of the format pattern.</returns>
-    public static string GetDescription(this OpidFormat format)
+    /// <returns>A Result containing a description of the format pattern.</returns>
+    public static Result<string, SmartCardError> GetDescription(this OpidFormat format)
     {
         return format switch
         {
-            OpidFormat.Format2 => "IIII-III-III",
-            OpidFormat.Format3 => "IIII-III-IIII",
-            OpidFormat.Format4 => "IIII-IIII-IIII",
-            OpidFormat.Format5 => "IIII-IIII-IIIII",
-            OpidFormat.Format6 => "IIII-IIIII-IIIII",
-            OpidFormat.Format7 => "IIII-IIII-IIII-IIII",
-            OpidFormat.Format8 => "IIIII-IIII-IIII-IIII",
-            OpidFormat.Format9 => "IIII-IIII-IIII-IIIII",
-            _ => throw new ArgumentException($"Unknown OPID format: {format}"),
+            OpidFormat.Format2 => Result.Success<string, SmartCardError>("IIII-III-III"),
+            OpidFormat.Format3 => Result.Success<string, SmartCardError>("IIII-III-IIII"),
+            OpidFormat.Format4 => Result.Success<string, SmartCardError>("IIII-IIII-IIII"),
+            OpidFormat.Format5 => Result.Success<string, SmartCardError>("IIII-IIII-IIIII"),
+            OpidFormat.Format6 => Result.Success<string, SmartCardError>("IIII-IIIII-IIIII"),
+            OpidFormat.Format7 => Result.Success<string, SmartCardError>("IIII-IIII-IIII-IIII"),
+            OpidFormat.Format8 => Result.Success<string, SmartCardError>("IIIII-IIII-IIII-IIII"),
+            OpidFormat.Format9 => Result.Success<string, SmartCardError>("IIII-IIII-IIII-IIIII"),
+            _ => Result.Failure<string, SmartCardError>(SmartCardError.Unsupported($"Unknown OPID format: {format}")),
         };
     }
 
@@ -134,7 +134,11 @@ public static class OpidFormatExtensions
             return false;
         }
 
-        return Regex.IsMatch(opid, format.GetPattern());
+        return format.GetPattern()
+            .Match(
+                pattern => Regex.IsMatch(opid, pattern),
+                _ => false
+            );
     }
 
     /// <summary>

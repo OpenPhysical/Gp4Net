@@ -15,7 +15,7 @@ internal static class DeleteCommandTestHelpers
     public static CommandContext CreateTestContext()
     {
         // Create a minimal IRemainingArguments implementation
-        TestRemainingArguments remaining = new TestRemainingArguments();
+        var remaining = new TestRemainingArguments();
 
         // Create CommandContext with minimal required parameters
         List<string> args = [];

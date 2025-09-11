@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.OpenPhysical;
@@ -56,7 +57,7 @@ public static class OpidValidator
             );
         }
 
-        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out OpidFormat format))
+        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out var format))
         {
             return OpidValidationResult.Failure(
                 $"Format indicator '{formatIndicator}' is not supported. Valid formats are 2-9"
@@ -64,23 +65,29 @@ public static class OpidValidator
         }
 
         // Check total digit count
-        int expectedCount = format.GetExpectedDigitCount();
-        if (digitsOnly.Length != expectedCount)
-        {
-            return OpidValidationResult.Failure(
-                $"Format {formatIndicator} requires exactly {expectedCount} digits, but got {digitsOnly.Length}"
-            );
-        }
+        return format.GetExpectedDigitCount()
+            .Match(
+                expectedCount =>
+                {
+                    if (digitsOnly.Length != expectedCount)
+                    {
+                        return OpidValidationResult.Failure(
+                            $"Format {formatIndicator} requires exactly {expectedCount} digits, but got {digitsOnly.Length}"
+                        );
+                    }
 
-        // Validate dash pattern
-        if (!format.IsValidPattern(opid))
-        {
-            return OpidValidationResult.Failure(
-                $"OPID does not match the required pattern for format {formatIndicator}: {format.GetDescription()}"
-            );
-        }
+                    // Validate dash pattern
+                    if (!format.IsValidPattern(opid))
+                    {
+                        return OpidValidationResult.Failure(
+                            $"OPID does not match the required pattern for format {formatIndicator}: {format.GetDescription().Match(desc => desc, _ => "unknown")}"
+                        );
+                    }
 
-        return OpidValidationResult.Success();
+                    return OpidValidationResult.Success();
+                },
+                error => OpidValidationResult.Failure($"Invalid format: {error}")
+            );
     }
 
     /// <summary>
@@ -93,10 +100,10 @@ public static class OpidValidator
     public static OpidValidationResult ValidateCardData(string iin, string cin, string managerUrl)
     {
         // Check manager URL
-        if (managerUrl != OpenPhysicalId.OpenPhysicalManagerUrl)
+        if (managerUrl != OpenPhysicalId.OPEN_PHYSICAL_MANAGER_URL)
         {
             return OpidValidationResult.Failure(
-                $"Manager URL is '{managerUrl}', expected '{OpenPhysicalId.OpenPhysicalManagerUrl}'"
+                $"Manager URL is '{managerUrl}', expected '{OpenPhysicalId.OPEN_PHYSICAL_MANAGER_URL}'"
             );
         }
 
@@ -139,22 +146,28 @@ public static class OpidValidator
             return OpidValidationResult.Failure("Format indicator (5th digit) is not valid");
         }
 
-        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out OpidFormat format))
+        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out var format))
         {
             return OpidValidationResult.Failure(
                 $"Format indicator '{formatIndicator}' is not supported"
             );
         }
 
-        int expectedLength = format.GetExpectedDigitCount();
-        if (fullDigits.Length != expectedLength)
-        {
-            return OpidValidationResult.Failure(
-                $"Format {formatIndicator} requires {expectedLength} total digits, but IIN+CIN has {fullDigits.Length}"
-            );
-        }
+        return format.GetExpectedDigitCount()
+            .Match(
+                expectedLength =>
+                {
+                    if (fullDigits.Length != expectedLength)
+                    {
+                        return OpidValidationResult.Failure(
+                            $"Format {formatIndicator} requires {expectedLength} total digits, but IIN+CIN has {fullDigits.Length}"
+                        );
+                    }
 
-        return OpidValidationResult.Success();
+                    return OpidValidationResult.Success();
+                },
+                error => OpidValidationResult.Failure($"Invalid format: {error}")
+            );
     }
 
     /// <summary>
@@ -163,9 +176,9 @@ public static class OpidValidator
     /// <returns>A dictionary of format information.</returns>
     public static Dictionary<OpidFormat, string> GetSupportedFormats()
     {
-        Dictionary<OpidFormat, string> formats = new Dictionary<OpidFormat, string>();
+        var formats = new Dictionary<OpidFormat, string>();
 
-        foreach (OpidFormat format in Enum.GetValues<OpidFormat>())
+        foreach (var format in Enum.GetValues<OpidFormat>())
         {
             formats[format] =
                 $"{format.GetDescription()} ({format.GetExpectedDigitCount()} digits)";

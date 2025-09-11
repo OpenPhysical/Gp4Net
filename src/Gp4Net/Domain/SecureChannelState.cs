@@ -1,11 +1,10 @@
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Cryptography;
-using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
 using Org.BouncyCastle.Security;
+using static Gp4Net.Cryptography.CryptoService;
 
 namespace Gp4Net.Domain;
 
@@ -55,31 +54,6 @@ public record SecureChannelState(
             );
     }
 
-    /// <summary>
-    /// Creates a new secure channel state with an updated MAC chaining value.
-    /// Used after MAC calculations to maintain proper chaining for subsequent operations.
-    /// </summary>
-    public Result<SecureChannelState, SmartCardError> UpdateMacChainingValue(
-        byte[] newMacChainingValue
-    )
-    {
-        return Maybe<byte[]>
-            .From(newMacChainingValue)
-            .Match(
-                Some: macValue =>
-                    MacChainingState
-                        .Create(macValue, ProtocolVersion, 0x00)
-                        .Bind(newMacChaining =>
-                            Result.Success<SecureChannelState, SmartCardError>(
-                                this with
-                                {
-                                    MacChaining = newMacChaining,
-                                }
-                            )
-                        ),
-                None: () => SmartCardError.InvalidArgument("MAC chaining value cannot be null")
-            );
-    }
 
     /// <summary>
     /// Creates a new secure channel state with both updated MAC chaining state and incremented counter.
@@ -227,7 +201,7 @@ public record SecureChannelState(
         }
 
         // Create the MAC chaining state
-        Result<MacChainingState, SmartCardError> macChainingResult = MacChainingState.Create(
+        var macChainingResult = MacChainingState.Create(
             initialMacChainingValue,
             protocolVersion,
             implementationParameter
@@ -240,7 +214,7 @@ public record SecureChannelState(
 
         // Generate cryptographically secure session ID
         byte[] sessionId = new byte[8];
-        SecureRandom secureRandom = new SecureRandom();
+        var secureRandom = new SecureRandom();
         secureRandom.NextBytes(sessionId);
 
         return Result.Success<SecureChannelState, SmartCardError>(

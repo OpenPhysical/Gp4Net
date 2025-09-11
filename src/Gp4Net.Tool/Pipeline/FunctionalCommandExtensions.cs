@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using JetBrains.Annotations;
 using Spectre.Console.Cli;
 
@@ -39,7 +38,7 @@ public static class FunctionalCommandExtensions
         string readerName = null
     )
     {
-        Result<bool, SmartCardError> connectionResult =
+        var connectionResult =
             await context.CardService.IsConnectedAsync();
         return await connectionResult.Match(
             isConnected =>
@@ -94,7 +93,7 @@ public static class FunctionalCommandExtensions
         Func<ICliExecutionContext, Task<Result<TResult, string>>> operation
     )
     {
-        Result<ICliExecutionContext, string> contextResult = await contextTask;
+        var contextResult = await contextTask;
         return await contextResult.Bind(operation);
     }
 
@@ -106,7 +105,7 @@ public static class FunctionalCommandExtensions
         Func<ICliExecutionContext, Task<Result<ICliExecutionContext, string>>> operation
     )
     {
-        Result<ICliExecutionContext, string> contextResult = await contextTask;
+        var contextResult = await contextTask;
         return await contextResult.Bind(operation);
     }
 
@@ -118,7 +117,7 @@ public static class FunctionalCommandExtensions
         Func<ICliExecutionContext, TResult> mapper
     )
     {
-        Result<ICliExecutionContext, string> contextResult = await contextTask;
+        var contextResult = await contextTask;
         return contextResult.Map(mapper);
     }
 
@@ -131,9 +130,9 @@ public static class FunctionalCommandExtensions
         Func<ICliExecutionContext, Task<Result<bool, string>>> commandLogic
     )
     {
-        Result<ICliExecutionContext, string> connectionResult =
+        var connectionResult =
             await context.RequireCardConnectionFunctional();
-        Result<bool, string> commandResult = await connectionResult.Match(
+        var commandResult = await connectionResult.Match(
             async ctx => await commandLogic(ctx),
             error => Task.FromResult(Result.Failure<bool, string>(error))
         );

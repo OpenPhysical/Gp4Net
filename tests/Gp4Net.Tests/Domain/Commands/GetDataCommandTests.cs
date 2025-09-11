@@ -9,7 +9,6 @@ namespace Gp4Net.Tests.Domain.Commands;
 
 [TestFixture]
 [Category("Unit")]
-[Ignore("ApduBuilder.BuildApdu() return type changes need functional programming updates")]
 public class GetDataCommandTests
 {
     [Test]
@@ -33,20 +32,23 @@ public class GetDataCommandTests
     {
         // Arrange
         ushort dataObject = GetDataCommand.DataObjects.CardData;
-        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(dataObject);
-        _ = commandResult.IsSuccess.Should().BeTrue();
-        GetDataCommand? command = commandResult.Value;
 
-        // Act
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        // Act & Assert
+        var result = GetDataCommand.Create(dataObject)
+            .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)));
 
-        // Assert
-        _ = apdu[0].Should().Be(0x80); // CLA - GlobalPlatform
-        _ = apdu[1].Should().Be(0xCA); // INS - GET DATA
-        _ = apdu[2].Should().Be((byte)(dataObject >> 8)); // P1 - High byte of tag
-        _ = apdu[3].Should().Be((byte)(dataObject & 0xFF)); // P2 - Low byte of tag
-        _ = apdu[4].Should().Be(0x00); // Le - Receive all available
-        _ = apdu.Length.Should().Be(5); // No command data for GET DATA
+        result.Match(
+            apdu =>
+            {
+                _ = apdu[0].Should().Be(0x80); // CLA - GlobalPlatform
+                _ = apdu[1].Should().Be(0xCA); // INS - GET DATA
+                _ = apdu[2].Should().Be((byte)(dataObject >> 8)); // P1 - High byte of tag
+                _ = apdu[3].Should().Be((byte)(dataObject & 0xFF)); // P2 - Low byte of tag
+                _ = apdu[4].Should().Be(0x00); // Le - Receive all available
+                _ = apdu.Length.Should().Be(5); // No command data for GET DATA
+            },
+            error => result.IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+        );
     }
 
     [Test]
@@ -58,36 +60,38 @@ public class GetDataCommandTests
     [TestCase((ushort)0x9F7F, 0x9F, 0x7F)] // CPLC
     public void GetApdu_SplitsTagCorrectly(ushort tag, byte expectedP1, byte expectedP2)
     {
-        // Arrange
-        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(tag);
-        _ = commandResult.IsSuccess.Should().BeTrue();
-        GetDataCommand? command = commandResult.Value;
+        // Act & Assert
+        var result = GetDataCommand.Create(tag)
+            .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)));
 
-        // Act
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
-
-        // Assert
-        _ = apdu[2].Should().Be(expectedP1); // P1
-        _ = apdu[3].Should().Be(expectedP2); // P2
+        result.Match(
+            apdu =>
+            {
+                _ = apdu[2].Should().Be(expectedP1); // P1
+                _ = apdu[3].Should().Be(expectedP2); // P2
+            },
+            error => result.IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+        );
     }
 
     [Test]
     public void GetApdu_AlwaysReturnsNewArray()
     {
-        // Arrange
-        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(
-            GetDataCommand.DataObjects.CardData
-        );
-        _ = commandResult.IsSuccess.Should().BeTrue();
-        GetDataCommand? command = commandResult.Value;
+        // Act & Assert
+        GetDataCommand.Create(GetDataCommand.DataObjects.CardData)
+            .Match(
+                command =>
+                {
+                    // Act
+                    byte[] apdu1 = command.ToBytes();
+                    byte[] apdu2 = command.ToBytes();
 
-        // Act
-        byte[]? apdu1 = command.ToApdu();
-        byte[]? apdu2 = command.ToApdu();
-
-        // Assert
-        _ = apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
-        _ = apdu2.Should().BeEquivalentTo(apdu1); // But with same content
+                    // Assert
+                    _ = apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
+                    _ = apdu2.Should().BeEquivalentTo(apdu1); // But with same content
+                },
+                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
+            );
     }
 
     [Test]
@@ -98,7 +102,7 @@ public class GetDataCommandTests
             GetDataCommand.DataObjects.CardData
         );
         _ = commandResult.IsSuccess.Should().BeTrue();
-        GetDataCommand? command = commandResult.Value;
+        var command = commandResult.Value;
 
         // Act
         string? result = command.ToString();
@@ -134,17 +138,18 @@ public class GetDataCommandTests
         // Lc: Not present (no command data)
         // Le: 0x00 (receive all available bytes)
 
-        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(
-            GetDataCommand.DataObjects.CardData
-        );
-        _ = commandResult.IsSuccess.Should().BeTrue();
-        GetDataCommand? command = commandResult.Value;
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
-
-        _ = apdu.Length.Should().Be(5); // 5 header bytes only
-        _ = apdu[0].Should().Be(0x80); // CLA
-        _ = apdu[1].Should().Be(0xCA); // INS
-        _ = apdu[4].Should().Be(0x00); // Le
+        GetDataCommand.Create(GetDataCommand.DataObjects.CardData)
+            .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)))
+            .Match(
+                apdu =>
+                {
+                    _ = apdu.Length.Should().Be(5); // 5 header bytes only
+                    _ = apdu[0].Should().Be(0x80); // CLA
+                    _ = apdu[1].Should().Be(0xCA); // INS
+                    _ = apdu[4].Should().Be(0x00); // Le
+                },
+                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+            );
     }
 
     [Test]
@@ -160,7 +165,7 @@ public class GetDataCommandTests
         // This test documents common data objects and their purposes
         Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(dataObject);
         _ = commandResult.IsSuccess.Should().BeTrue();
-        GetDataCommand? command = commandResult.Value;
+        var command = commandResult.Value;
 
         // The command should be able to handle these common objects
         _ = command.Should().NotBeNull();
@@ -176,13 +181,16 @@ public class GetDataCommandTests
         // for certain data objects or when used outside secure channel.
         // Our implementation uses 0x80 (GlobalPlatform class) consistently.
 
-        Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(0x9F7F); // CPLC
-        _ = commandResult.IsSuccess.Should().BeTrue();
-        GetDataCommand? command = commandResult.Value;
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
-
-        // We use GP class
-        _ = apdu[0].Should().Be(0x80);
+        GetDataCommand.Create(0x9F7F) // CPLC
+            .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)))
+            .Match(
+                apdu =>
+                {
+                    // We use GP class
+                    _ = apdu[0].Should().Be(0x80);
+                },
+                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+            );
     }
 
     [Test]

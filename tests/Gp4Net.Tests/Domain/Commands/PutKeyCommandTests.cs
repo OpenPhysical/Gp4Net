@@ -5,6 +5,7 @@ using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Transport;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.Commands;
@@ -38,13 +39,13 @@ public class PutKeyCommandTests
     [Test]
     public void Create_WithSingleKeyDataBlock_ReturnsSuccessResult()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
 
         Result<PutKeyCommand, SmartCardError> result = PutKeyCommand.Create(0x01, keyDataBlocks);
 
         _ = result.IsSuccess.Should().BeTrue();
-        PutKeyCommand? command = result.Value;
+        var command = result.Value;
         _ = command.UsageQualifier.Should().Be(PutKeyCommand.KeyUsageQualifier.SingleKey);
         _ = command.KekIdentifier.Should().Be(PutKeyCommand.KeyEncryptionKeyIdentifier.None);
         _ = command.KeyDataBlocks.Should().HaveCount(1);
@@ -54,14 +55,14 @@ public class PutKeyCommandTests
     [Test]
     public void Create_WithMultipleKeyDataBlocks_ReturnsSuccessResult()
     {
-        KeyDataBlock? keyDataBlock1 = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
-        KeyDataBlock? keyDataBlock2 = KeyDataBlock.CreateAes128Key(ValidAes128Key).Value;
+        var keyDataBlock1 = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock2 = KeyDataBlock.CreateAes128Key(ValidAes128Key).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock1, keyDataBlock2];
 
         Result<PutKeyCommand, SmartCardError> result = PutKeyCommand.Create(0x01, keyDataBlocks);
 
         _ = result.IsSuccess.Should().BeTrue();
-        PutKeyCommand? command = result.Value;
+        var command = result.Value;
         _ = command.UsageQualifier.Should().Be(PutKeyCommand.KeyUsageQualifier.MultipleKeys);
         _ = command.KekIdentifier.Should().Be(PutKeyCommand.KeyEncryptionKeyIdentifier.None);
         _ = command.KeyDataBlocks.Should().HaveCount(2);
@@ -94,9 +95,9 @@ public class PutKeyCommandTests
     [Test]
     public void UsageQualifier_WithSingleKey_ReturnsSingleKey()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
         _ = command.UsageQualifier.Should().Be(PutKeyCommand.KeyUsageQualifier.SingleKey);
         _ = command.P1.Should().Be(0x81);
@@ -105,10 +106,10 @@ public class PutKeyCommandTests
     [Test]
     public void UsageQualifier_WithMultipleKeys_ReturnsMultipleKeys()
     {
-        KeyDataBlock? keyDataBlock1 = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
-        KeyDataBlock? keyDataBlock2 = KeyDataBlock.CreateAes128Key(ValidAes128Key).Value;
+        var keyDataBlock1 = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock2 = KeyDataBlock.CreateAes128Key(ValidAes128Key).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock1, keyDataBlock2];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
         _ = command.UsageQualifier.Should().Be(PutKeyCommand.KeyUsageQualifier.MultipleKeys);
         _ = command.P1.Should().Be(0x00);
@@ -125,9 +126,9 @@ public class PutKeyCommandTests
     [Test]
     public void KekIdentifier_DefaultsToNone()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
         _ = command.KekIdentifier.Should().Be(PutKeyCommand.KeyEncryptionKeyIdentifier.None);
         _ = command.P2.Should().Be(0x00);
@@ -148,7 +149,7 @@ public class PutKeyCommandTests
         Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateDesKey(ValidDesKey);
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyDataBlock? keyDataBlock = result.Value;
+        var keyDataBlock = result.Value;
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Des);
         _ = keyDataBlock.Length.Should().Be(8);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidDesKey);
@@ -164,7 +165,7 @@ public class PutKeyCommandTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyDataBlock? keyDataBlock = result.Value;
+        var keyDataBlock = result.Value;
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Des);
         _ = keyDataBlock.Length.Should().Be(8);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidDesKey);
@@ -225,7 +226,7 @@ public class PutKeyCommandTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyDataBlock? keyDataBlock = result.Value;
+        var keyDataBlock = result.Value;
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.TripleDes2Key);
         _ = keyDataBlock.Length.Should().Be(16);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidTripleDes2Key);
@@ -241,7 +242,7 @@ public class PutKeyCommandTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyDataBlock? keyDataBlock = result.Value;
+        var keyDataBlock = result.Value;
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.TripleDes2Key);
         _ = keyDataBlock.Length.Should().Be(16);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidTripleDes2Key);
@@ -284,7 +285,7 @@ public class PutKeyCommandTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyDataBlock? keyDataBlock = result.Value;
+        var keyDataBlock = result.Value;
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.TripleDes3Key);
         _ = keyDataBlock.Length.Should().Be(24);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidTripleDes3Key);
@@ -300,7 +301,7 @@ public class PutKeyCommandTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyDataBlock? keyDataBlock = result.Value;
+        var keyDataBlock = result.Value;
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.TripleDes3Key);
         _ = keyDataBlock.Length.Should().Be(24);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidTripleDes3Key);
@@ -341,7 +342,7 @@ public class PutKeyCommandTests
         Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateAes128Key(ValidAes128Key);
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyDataBlock? keyDataBlock = result.Value;
+        var keyDataBlock = result.Value;
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Aes128);
         _ = keyDataBlock.Length.Should().Be(16);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidAes128Key);
@@ -357,7 +358,7 @@ public class PutKeyCommandTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyDataBlock? keyDataBlock = result.Value;
+        var keyDataBlock = result.Value;
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Aes128);
         _ = keyDataBlock.Length.Should().Be(16);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidAes128Key);
@@ -398,7 +399,7 @@ public class PutKeyCommandTests
         Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateAes192Key(ValidAes192Key);
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyDataBlock? keyDataBlock = result.Value;
+        var keyDataBlock = result.Value;
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Aes192);
         _ = keyDataBlock.Length.Should().Be(24);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidAes192Key);
@@ -414,7 +415,7 @@ public class PutKeyCommandTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyDataBlock? keyDataBlock = result.Value;
+        var keyDataBlock = result.Value;
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Aes192);
         _ = keyDataBlock.Length.Should().Be(24);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidAes192Key);
@@ -455,7 +456,7 @@ public class PutKeyCommandTests
         Result<KeyDataBlock, SmartCardError> result = KeyDataBlock.CreateAes256Key(ValidAes256Key);
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyDataBlock? keyDataBlock = result.Value;
+        var keyDataBlock = result.Value;
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Aes256);
         _ = keyDataBlock.Length.Should().Be(32);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidAes256Key);
@@ -471,7 +472,7 @@ public class PutKeyCommandTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyDataBlock? keyDataBlock = result.Value;
+        var keyDataBlock = result.Value;
         _ = keyDataBlock.Type.Should().Be(KeyDataBlock.KeyType.Aes256);
         _ = keyDataBlock.Length.Should().Be(32);
         _ = keyDataBlock.Value.Should().BeEquivalentTo(ValidAes256Key);
@@ -554,7 +555,7 @@ public class PutKeyCommandTests
     [Test]
     public void ToBytes_WithoutKeyCheckValue_ReturnsCorrectBytes()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
 
         byte[]? bytes = keyDataBlock.ToBytes();
 
@@ -567,7 +568,7 @@ public class PutKeyCommandTests
     [Test]
     public void ToBytes_WithKeyCheckValue_ReturnsCorrectBytes()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock
+        var keyDataBlock = KeyDataBlock
             .CreateDesKey(ValidDesKey, ValidKeyCheckValue)
             .Value;
 
@@ -583,9 +584,9 @@ public class PutKeyCommandTests
     [Test]
     public void ToBytes_WithDifferentKeyTypes_ReturnsCorrectTypeBytes()
     {
-        KeyDataBlock? desKey = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
-        KeyDataBlock? aes128Key = KeyDataBlock.CreateAes128Key(ValidAes128Key).Value;
-        KeyDataBlock? aes256Key = KeyDataBlock.CreateAes256Key(ValidAes256Key).Value;
+        var desKey = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var aes128Key = KeyDataBlock.CreateAes128Key(ValidAes128Key).Value;
+        var aes256Key = KeyDataBlock.CreateAes256Key(ValidAes256Key).Value;
 
         _ = desKey.ToBytes()[0].Should().Be(0x80);
         _ = aes128Key.ToBytes()[0].Should().Be(0x88);
@@ -595,7 +596,7 @@ public class PutKeyCommandTests
     [Test]
     public void ToBytes_ReturnsImmutableArray()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
         byte[]? bytes1 = keyDataBlock.ToBytes();
         byte[]? bytes2 = keyDataBlock.ToBytes();
 
@@ -608,12 +609,12 @@ public class PutKeyCommandTests
     [Test]
     public void KeyDataBlock_Length_ReflectsActualKeySize()
     {
-        KeyDataBlock? desKey = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
-        KeyDataBlock? aes128Key = KeyDataBlock.CreateAes128Key(ValidAes128Key).Value;
-        KeyDataBlock? aes192Key = KeyDataBlock.CreateAes192Key(ValidAes192Key).Value;
-        KeyDataBlock? aes256Key = KeyDataBlock.CreateAes256Key(ValidAes256Key).Value;
-        KeyDataBlock? tripleDes2Key = KeyDataBlock.CreateTripleDes2Key(ValidTripleDes2Key).Value;
-        KeyDataBlock? tripleDes3Key = KeyDataBlock.CreateTripleDes3Key(ValidTripleDes3Key).Value;
+        var desKey = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var aes128Key = KeyDataBlock.CreateAes128Key(ValidAes128Key).Value;
+        var aes192Key = KeyDataBlock.CreateAes192Key(ValidAes192Key).Value;
+        var aes256Key = KeyDataBlock.CreateAes256Key(ValidAes256Key).Value;
+        var tripleDes2Key = KeyDataBlock.CreateTripleDes2Key(ValidTripleDes2Key).Value;
+        var tripleDes3Key = KeyDataBlock.CreateTripleDes3Key(ValidTripleDes3Key).Value;
 
         _ = desKey.Length.Should().Be(8);
         _ = aes128Key.Length.Should().Be(16);
@@ -627,7 +628,7 @@ public class PutKeyCommandTests
     public void KeyDataBlock_ValueProperty_ReturnsClonedData()
     {
         byte[] originalKey = (byte[])ValidDesKey.Clone();
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(originalKey).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(originalKey).Value;
 
         // Modify the original key
         originalKey[0] = 0xFF;
@@ -641,7 +642,7 @@ public class PutKeyCommandTests
     public void KeyDataBlock_KeyCheckValueProperty_ReturnsClonedData()
     {
         byte[] originalKcv = (byte[])ValidKeyCheckValue.Clone();
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey, originalKcv).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey, originalKcv).Value;
 
         // Modify the original KCV
         originalKcv[0] = 0xFF;
@@ -654,9 +655,9 @@ public class PutKeyCommandTests
     [Test]
     public void PutKeyCommand_KeyDataBlocks_ReturnsImmutableCollection()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
         // Should be a different collection instance
         _ = command.KeyDataBlocks.Should().NotBeSameAs(keyDataBlocks);
@@ -667,9 +668,9 @@ public class PutKeyCommandTests
     [Test]
     public void PutKeyCommand_Data_ReturnsNewArrayEachTime()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
         byte[]? data1 = command.Data;
         byte[]? data2 = command.Data;
@@ -684,12 +685,12 @@ public class PutKeyCommandTests
     [Test]
     public void PutKeyCommand_ToApdu_ReturnsNewArrayEachTime()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
-        byte[]? apdu1 = command.ToApdu();
-        byte[]? apdu2 = command.ToApdu();
+        byte[]? apdu1 = command.ToApdu().ToApdu().Value;
+        byte[]? apdu2 = command.ToApdu().ToApdu().Value;
 
         _ = apdu1.Should().NotBeSameAs(apdu2);
         _ = apdu1.Should().BeEquivalentTo(apdu2);
@@ -700,9 +701,9 @@ public class PutKeyCommandTests
     {
         // The SingleDesKey usage qualifier exists but isn't currently used
         // The implementation chooses SingleKey for single keys regardless of type
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
         // Currently uses SingleKey, not SingleDesKey
         _ = command.UsageQualifier.Should().Be(PutKeyCommand.KeyUsageQualifier.SingleKey);
@@ -716,7 +717,7 @@ public class PutKeyCommandTests
     public void KeyDataBlock_ValidateAllKeyTypesHaveCorrectEnumValues()
     {
         // Comprehensive validation of all key type enum values
-        Dictionary<KeyDataBlock.KeyType, byte> expectedKeyTypes = new Dictionary<
+        var expectedKeyTypes = new Dictionary<
             KeyDataBlock.KeyType,
             byte
         >
@@ -733,7 +734,7 @@ public class PutKeyCommandTests
             { KeyDataBlock.KeyType.EccPrivate, 0xB1 },
         };
 
-        foreach (KeyValuePair<KeyDataBlock.KeyType, byte> kvp in expectedKeyTypes)
+        foreach (var kvp in expectedKeyTypes)
         {
             _ = ((byte)kvp.Key)
                 .Should()
@@ -744,11 +745,11 @@ public class PutKeyCommandTests
     [Test]
     public void ToApdu_WithSingleKey_ReturnsCorrectApduStructure()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
-        byte[]? apdu = command.ToApdu();
+        byte[]? apdu = command.ToApdu().ToApdu().Value;
 
         _ = apdu[0].Should().Be(0x80); // CLA
         _ = apdu[1].Should().Be(0xD8); // INS
@@ -764,12 +765,12 @@ public class PutKeyCommandTests
     [Test]
     public void ToApdu_WithMultipleKeys_ReturnsCorrectApduStructure()
     {
-        KeyDataBlock? keyDataBlock1 = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
-        KeyDataBlock? keyDataBlock2 = KeyDataBlock.CreateAes128Key(ValidAes128Key).Value;
+        var keyDataBlock1 = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock2 = KeyDataBlock.CreateAes128Key(ValidAes128Key).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock1, keyDataBlock2];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
-        byte[]? apdu = command.ToApdu();
+        byte[]? apdu = command.ToApdu().ToApdu().Value;
 
         _ = apdu[0].Should().Be(0x80); // CLA
         _ = apdu[1].Should().Be(0xD8); // INS
@@ -793,13 +794,13 @@ public class PutKeyCommandTests
     [Test]
     public void ToApdu_WithKeyCheckValue_IncludesCheckValueInData()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock
+        var keyDataBlock = KeyDataBlock
             .CreateDesKey(ValidDesKey, ValidKeyCheckValue)
             .Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
-        byte[]? apdu = command.ToApdu();
+        byte[]? apdu = command.ToApdu().ToApdu().Value;
 
         _ = apdu[4].Should().Be(0x0D); // LC (13 bytes data including KCV)
         _ = apdu.Skip(7).Take(8).Should().BeEquivalentTo(ValidDesKey); // Key data
@@ -810,10 +811,10 @@ public class PutKeyCommandTests
     [Test]
     public void ExpectedResponseLength_ReturnsCorrectLength()
     {
-        KeyDataBlock? keyDataBlock1 = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
-        KeyDataBlock? keyDataBlock2 = KeyDataBlock.CreateAes128Key(ValidAes128Key).Value;
+        var keyDataBlock1 = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock2 = KeyDataBlock.CreateAes128Key(ValidAes128Key).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock1, keyDataBlock2];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
         _ = command.ExpectedResponseLength.Should().Be(6); // 3 bytes per key * 2 keys
     }
@@ -821,12 +822,12 @@ public class PutKeyCommandTests
     [Test]
     public void CommandProperties_HaveCorrectValues()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
-        _ = PutKeyCommand.Cla.Should().Be(0x80);
-        _ = PutKeyCommand.Ins.Should().Be(0xD8);
+        _ = command.Cla.Should().Be(0x80);
+        _ = command.Ins.Should().Be(0xD8);
         _ = command.IsExtendedLength.Should().BeFalse();
         _ = command.ToString().Should().Be("PUT KEY");
     }
@@ -844,9 +845,9 @@ public class PutKeyCommandTests
     [Test]
     public void Data_WithValidKeyDataBlocks_ReturnsCorrectData()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
         byte[]? data = command.Data;
 
@@ -865,7 +866,7 @@ public class PutKeyCommandTests
         Result<PutKeyResponse, SmartCardError> result = PutKeyResponse.Parse(responseData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        PutKeyResponse? response = result.Value;
+        var response = result.Value;
         _ = response.KeyCheckValues.Should().HaveCount(2);
         _ = response.KeyCheckValues[0].Should().BeEquivalentTo(Convert.FromHexString("123456"));
         _ = response.KeyCheckValues[1].Should().BeEquivalentTo(Convert.FromHexString("789ABC"));
@@ -879,7 +880,7 @@ public class PutKeyCommandTests
         Result<PutKeyResponse, SmartCardError> result = PutKeyResponse.Parse(responseData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        PutKeyResponse? response = result.Value;
+        var response = result.Value;
         _ = response.KeyCheckValues.Should().HaveCount(1);
         _ = response.KeyCheckValues[0].Should().BeEquivalentTo(Convert.FromHexString("123456"));
     }
@@ -892,7 +893,7 @@ public class PutKeyCommandTests
         Result<PutKeyResponse, SmartCardError> result = PutKeyResponse.Parse(responseData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        PutKeyResponse? response = result.Value;
+        var response = result.Value;
         _ = response.KeyCheckValues.Should().HaveCount(0);
     }
 
@@ -929,7 +930,7 @@ public class PutKeyCommandTests
     {
         byte[] originalKcv = Convert.FromHexString("123456");
         List<byte[]> keyCheckValues = [originalKcv];
-        PutKeyResponse response = new PutKeyResponse(keyCheckValues);
+        var response = new PutKeyResponse(keyCheckValues);
 
         // Modify original array
         originalKcv[0] = 0xFF;
@@ -941,7 +942,7 @@ public class PutKeyCommandTests
     [Test]
     public void PutKeyResponse_Constructor_WithNullKeyCheckValues_HandlesGracefully()
     {
-        PutKeyResponse response = new PutKeyResponse(null!);
+        var response = new PutKeyResponse(null!);
 
         _ = response.KeyCheckValues.Should().HaveCount(0);
     }
@@ -950,21 +951,21 @@ public class PutKeyCommandTests
     public void ToApdu_Structure_FollowsGlobalPlatformSpecification()
     {
         // Test that APDU structure follows GlobalPlatform specification exactly
-        KeyDataBlock? keyDataBlock = KeyDataBlock
+        var keyDataBlock = KeyDataBlock
             .CreateDesKey(ValidDesKey, ValidKeyCheckValue)
             .Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
-        byte[]? apdu = command.ToApdu();
+        byte[]? apdu = command.ToApdu().ToApdu().Value;
 
         // GlobalPlatform PUT KEY APDU structure:
         // CLA | INS | P1 | P2 | LC | Data | LE
         _ = apdu.Should().HaveCountGreaterThan(5); // At least header + LC + LE
 
         // Header
-        _ = apdu[0].Should().Be(PutKeyCommand.Cla); // CLA
-        _ = apdu[1].Should().Be(PutKeyCommand.Ins); // INS
+        _ = apdu[0].Should().Be(command.Cla); // CLA
+        _ = apdu[1].Should().Be(command.Ins); // INS
         _ = apdu[2].Should().Be((byte)command.UsageQualifier); // P1
         _ = apdu[3].Should().Be((byte)command.KekIdentifier); // P2
 
@@ -982,13 +983,13 @@ public class PutKeyCommandTests
     public void ToApdu_WithLargeKeyData_HandlesCorrectly()
     {
         // Test with the largest supported key (AES-256)
-        KeyDataBlock? keyDataBlock = KeyDataBlock
+        var keyDataBlock = KeyDataBlock
             .CreateAes256Key(ValidAes256Key, ValidKeyCheckValue)
             .Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
-        byte[]? apdu = command.ToApdu();
+        byte[]? apdu = command.ToApdu().ToApdu().Value;
 
         // Should handle large key data correctly
         int expectedDataLength = 1 + 1 + 32 + 3; // Type + Length + Key + KCV
@@ -1013,7 +1014,7 @@ public class PutKeyCommandTests
     public void KeyDataBlock_PreservesKeyDataImmutability()
     {
         byte[] originalKeyData = (byte[])ValidDesKey.Clone();
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(originalKeyData).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(originalKeyData).Value;
 
         // Modify original array
         originalKeyData[0] = 0xFF;
@@ -1026,7 +1027,7 @@ public class PutKeyCommandTests
     public void KeyDataBlock_PreservesKeyCheckValueImmutability()
     {
         byte[] originalKcv = (byte[])ValidKeyCheckValue.Clone();
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey, originalKcv).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey, originalKcv).Value;
 
         // Modify original array
         originalKcv[0] = 0xFF;
@@ -1038,7 +1039,7 @@ public class PutKeyCommandTests
     [Test]
     public void ToBytes_ReturnsNewArrayEachTime()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey).Value;
 
         byte[]? bytes1 = keyDataBlock.ToBytes();
         byte[]? bytes2 = keyDataBlock.ToBytes();
@@ -1050,7 +1051,7 @@ public class PutKeyCommandTests
     [Test]
     public void ToBytes_ImmutabilityGuarantees_ArePreserved()
     {
-        KeyDataBlock? keyDataBlock = KeyDataBlock
+        var keyDataBlock = KeyDataBlock
             .CreateDesKey(ValidDesKey, ValidKeyCheckValue)
             .Value;
         byte[]? bytes1 = keyDataBlock.ToBytes();
@@ -1072,7 +1073,7 @@ public class PutKeyCommandTests
     {
         List<KeyDataBlock> originalKeyDataBlocks = [KeyDataBlock.CreateDesKey(ValidDesKey).Value];
 
-        PutKeyCommand? command = PutKeyCommand.Create(0x01, originalKeyDataBlocks).Value;
+        var command = PutKeyCommand.Create(0x01, originalKeyDataBlocks).Value;
 
         // Clear the original list
         originalKeyDataBlocks.Clear();

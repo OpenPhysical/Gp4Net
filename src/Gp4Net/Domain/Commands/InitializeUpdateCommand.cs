@@ -4,18 +4,14 @@
 // -----------------------------------------------------------------------------
 
 using System;
-using System.Diagnostics;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Cryptography;
-using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Core.Functional;
 using Gp4Net.Transport;
-using WSCT.Core;
-using WSCT.ISO7816;
 using JetBrains.Annotations;
+using WSCT.ISO7816;
 using static Gp4Net.Constants.Constants;
+using static Gp4Net.Cryptography.CryptoService;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -23,17 +19,17 @@ namespace Gp4Net.Domain.Commands;
 /// Represents the INITIALIZE UPDATE command for secure channel initiation.
 /// </summary>
 [PublicAPI]
-public class InitializeUpdateCommand
+public class InitializeUpdateCommand : IApduCommand
 {
     /// <summary>
     /// The command class byte.
     /// </summary>
-    public const byte ClassByte = GlobalPlatform.Cla.GpStandard;
+    public const byte CLASS_BYTE = GlobalPlatform.Cla.GP_STANDARD;
 
     /// <summary>
     /// The command instruction byte.
     /// </summary>
-    public const byte InstructionByte = GlobalPlatform.Ins.InitializeUpdate;
+    public const byte INSTRUCTION_BYTE = GlobalPlatform.Ins.INITIALIZE_UPDATE;
 
     /// <summary>
     /// Gets the key version number.
@@ -55,6 +51,12 @@ public class InitializeUpdateCommand
     /// </summary>
     private readonly bool _useMaxResponseLength;
 
+    /// <inheritdoc />
+    public byte Cla => CLASS_BYTE;
+
+    /// <inheritdoc />
+    public byte Ins => INSTRUCTION_BYTE;
+
     /// <summary>
     /// Converts this command to a CommandAPDU.
     /// </summary>
@@ -62,9 +64,17 @@ public class InitializeUpdateCommand
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
         var expectedLength = _useMaxResponseLength ? 256 : 28;
-        
+
         return Result.Success<CommandAPDU, SmartCardError>(
-            new CommandAPDU(ClassByte, InstructionByte, KeyVersion, KeyIdentifier, (uint)HostChallenge.Length, HostChallenge, (uint)expectedLength)
+            new CommandAPDU(
+                CLASS_BYTE,
+                INSTRUCTION_BYTE,
+                KeyVersion,
+                KeyIdentifier,
+                (uint)HostChallenge.Length,
+                HostChallenge,
+                (uint)expectedLength
+            )
         );
     }
 
@@ -164,6 +174,18 @@ public class InitializeUpdateCommand
     {
         return "INITIALIZE UPDATE";
     }
+
+    /// <inheritdoc />
+    public CommandAPDU ToApdu()
+    {
+        return ToCommandApdu().GetValueOrDefault(new CommandAPDU([]));
+    }
+
+    /// <inheritdoc />
+    public byte[] ToBytes()
+    {
+        return ToCommandApdu().Map(cmd => cmd.ToBytes()).GetValueOrDefault([]);
+    }
 }
 
 /// <summary>
@@ -205,9 +227,14 @@ public class InitializeUpdateResponse
     }
 
     /// <summary>
-    /// Gets the secure channel protocol identifier.
+    /// Gets the secure channel protocol identifier as raw byte value.
     /// </summary>
-    public Maybe<ScpVersion> ScpId =>
+    public byte ScpId => KeyInformation.Length > 1 ? KeyInformation[1] : (byte)0x00;
+
+    /// <summary>
+    /// Gets the secure channel protocol version as typed enum.
+    /// </summary>
+    public Maybe<ScpVersion> ScpVersion =>
         KeyInformation.Length > 1
             ? KeyInformation[1]
                 .ToEnum<ScpVersion>() // Result<ScpVersion>
@@ -248,17 +275,17 @@ public class InitializeUpdateResponse
     )
     {
         // Validate all inputs functionally using UnitResult pattern
-        UnitResult<SmartCardError> scpValidation = ValidateScpId(scpId);
+        var scpValidation = ValidateScpId(scpId);
         if (scpValidation.IsFailure)
             return Result.Failure<InitializeUpdateResponse, SmartCardError>(scpValidation.Error);
 
-        UnitResult<SmartCardError> kddValidation = ValidateKeyDiversificationData(
+        var kddValidation = ValidateKeyDiversificationData(
             keyDiversificationData
         );
         if (kddValidation.IsFailure)
             return Result.Failure<InitializeUpdateResponse, SmartCardError>(kddValidation.Error);
 
-        UnitResult<SmartCardError> sequenceValidation = ValidateSequenceCounter(
+        var sequenceValidation = ValidateSequenceCounter(
             sequenceCounter,
             scpId
         );
@@ -267,7 +294,7 @@ public class InitializeUpdateResponse
                 sequenceValidation.Error
             );
 
-        UnitResult<SmartCardError> challengeValidation = ValidateCardChallenge(
+        var challengeValidation = ValidateCardChallenge(
             cardChallenge,
             scpId
         );
@@ -276,7 +303,7 @@ public class InitializeUpdateResponse
                 challengeValidation.Error
             );
 
-        UnitResult<SmartCardError> cryptogramValidation = ValidateCardCryptogram(cardCryptogram);
+        var cryptogramValidation = ValidateCardCryptogram(cardCryptogram);
         if (cryptogramValidation.IsFailure)
             return Result.Failure<InitializeUpdateResponse, SmartCardError>(
                 cryptogramValidation.Error
@@ -504,11 +531,6 @@ public class InitializeUpdateResponse
         byte[] response
     )
     {
-        // Debug logging
-        Debug.WriteLine($"[InitializeUpdateResponse.Parse] Response length: {response.Length}");
-        Debug.WriteLine(
-            $"[InitializeUpdateResponse.Parse] Response data: {Convert.ToHexString(response)}"
-        );
 
         // Per GP spec and trace analysis: SCP03 responses are 32 bytes, SCP02 are typically 28-30 bytes
         // Minimum 28 bytes per GP spec, but allow extra fields that some implementations include
@@ -529,14 +551,9 @@ public class InitializeUpdateResponse
 
         // Key version (1 byte)
         byte keyVersion = response[offset++];
-        Debug.WriteLine($"[InitializeUpdateResponse.Parse] Key version: {keyVersion:X2}");
 
         // SCP identifier (1 byte)
         byte scpVersion = response[offset++];
-        Debug.WriteLine($"[InitializeUpdateResponse.Parse] SCP ID byte: {scpVersion:X2}");
-        Debug.WriteLine(
-            $"[InitializeUpdateResponse.Parse] SCP version (masked): {scpVersion & 0x03:X2}"
-        );
 
         byte[] sequenceCounter = [];
         byte[] cardChallenge;
@@ -544,149 +561,113 @@ public class InitializeUpdateResponse
 
         // Strict SCP version parsing - fail secure, no fallbacks
         byte detectedScpVersion = (byte)(scpVersion & 0x03);
-        Debug.WriteLine(
-            $"[InitializeUpdateResponse.Parse] Detected SCP version: {detectedScpVersion:X2}"
-        );
 
         switch (detectedScpVersion)
         {
             case 0x02: // SCP02
-            {
-                Debug.WriteLine(
-                    $"[InitializeUpdateResponse.Parse] Parsing as SCP02 (response length: {response.Length})"
-                );
-
-                // SCP02 requires exactly 28 bytes minimum per GP spec Table E-8:
-                // Key diversification data (10) + Key info (2) + Sequence Counter (2) + Card challenge (6) + Card cryptogram (8) = 28
-                if (response.Length < 28)
                 {
-                    return Result.Failure<InitializeUpdateResponse, SmartCardError>(
-                        SmartCardError.InvalidData(
-                            $"SCP02 INITIALIZE UPDATE response too short: {response.Length} bytes, expected at least 28"
+
+                    // SCP02 requires exactly 28 bytes minimum per GP spec Table E-8:
+                    // Key diversification data (10) + Key info (2) + Sequence Counter (2) + Card challenge (6) + Card cryptogram (8) = 28
+                    if (response.Length < 28)
+                    {
+                        return Result.Failure<InitializeUpdateResponse, SmartCardError>(
+                            SmartCardError.InvalidData(
+                                $"SCP02 INITIALIZE UPDATE response too short: {response.Length} bytes, expected at least 28"
+                            )
+                        );
+                    }
+
+                    // Key information: KeyVersion + SCP ID + padding
+                    byte[] keyInformation = new byte[3];
+                    keyInformation[0] = keyVersion;
+                    keyInformation[1] = scpVersion;
+                    keyInformation[2] = 0x00; // Padding
+
+                    // Sequence counter (2 bytes - required for SCP02)
+                    sequenceCounter = new byte[2];
+                    Array.Copy(response, offset, sequenceCounter, 0, 2);
+                    offset += 2;
+
+                    // Card challenge (6 bytes - per SCP02 specification)
+                    cardChallenge = new byte[6];
+                    Array.Copy(response, offset, cardChallenge, 0, 6);
+                    offset += 6;
+
+                    // Card cryptogram (8 bytes)
+                    cardCryptogram = new byte[8];
+                    Array.Copy(response, offset, cardCryptogram, 0, 8);
+                    offset += 8;
+
+                    return Result.Success<InitializeUpdateResponse, SmartCardError>(
+                        new InitializeUpdateResponse(
+                            keyDiversificationData,
+                            keyInformation,
+                            cardChallenge,
+                            cardCryptogram,
+                            sequenceCounter
                         )
                     );
                 }
-
-                // Key information: KeyVersion + SCP ID + padding
-                byte[] keyInformation = new byte[3];
-                keyInformation[0] = keyVersion;
-                keyInformation[1] = scpVersion;
-                keyInformation[2] = 0x00; // Padding
-
-                // Sequence counter (2 bytes - required for SCP02)
-                sequenceCounter = new byte[2];
-                Array.Copy(response, offset, sequenceCounter, 0, 2);
-                Debug.WriteLine(
-                    $"[InitializeUpdateResponse.Parse] SCP02 Sequence counter: {Convert.ToHexString(sequenceCounter)}"
-                );
-                offset += 2;
-
-                // Card challenge (6 bytes - per SCP02 specification)
-                cardChallenge = new byte[6];
-                Array.Copy(response, offset, cardChallenge, 0, 6);
-                Debug.WriteLine(
-                    $"[InitializeUpdateResponse.Parse] SCP02 Card challenge (6 bytes): {Convert.ToHexString(cardChallenge)}"
-                );
-                offset += 6;
-
-                // Card cryptogram (8 bytes)
-                cardCryptogram = new byte[8];
-                Array.Copy(response, offset, cardCryptogram, 0, 8);
-                Debug.WriteLine(
-                    $"[InitializeUpdateResponse.Parse] SCP02 Card cryptogram: {Convert.ToHexString(cardCryptogram)}"
-                );
-                offset += 8;
-
-                return Result.Success<InitializeUpdateResponse, SmartCardError>(
-                    new InitializeUpdateResponse(
-                        keyDiversificationData,
-                        keyInformation,
-                        cardChallenge,
-                        cardCryptogram,
-                        sequenceCounter
-                    )
-                );
-            }
 
             case 0x03: // SCP03
-            {
-                Debug.WriteLine(
-                    $"[InitializeUpdateResponse.Parse] Parsing as SCP03 (response length: {response.Length})"
-                );
-
-                // SCP03 requires exactly 32 bytes minimum per GP spec:
-                // Key diversification data (10) + Key info (3) + Card challenge (8) + Card cryptogram (8) + Sequence counter (3) = 32
-                if (response.Length < 32)
                 {
-                    return Result.Failure<InitializeUpdateResponse, SmartCardError>(
-                        SmartCardError.InvalidData(
-                            $"SCP03 INITIALIZE UPDATE response too short: {response.Length} bytes, expected at least 32"
+
+                    // SCP03 requires exactly 32 bytes minimum per GP spec:
+                    // Key diversification data (10) + Key info (3) + Card challenge (8) + Card cryptogram (8) + Sequence counter (3) = 32
+                    if (response.Length < 32)
+                    {
+                        return Result.Failure<InitializeUpdateResponse, SmartCardError>(
+                            SmartCardError.InvalidData(
+                                $"SCP03 INITIALIZE UPDATE response too short: {response.Length} bytes, expected at least 32"
+                            )
+                        );
+                    }
+
+                    // For SCP03, the key information is 3 bytes:
+                    // - Byte 0: Key Version (already read at offset 10)
+                    // - Byte 1: SCP Version (already read at offset 11, should be 0x03)
+                    // - Byte 2: Implementation parameter 'i' (at offset 12)
+                    byte implementation = response[offset++];
+
+                    // Build the key information structure
+                    byte[] keyInformation = new byte[3];
+                    keyInformation[0] = keyVersion;
+                    keyInformation[1] = scpVersion; // Should be 0x03 for SCP03
+                    keyInformation[2] = implementation; // Implementation parameter (e.g., 0x70)
+
+                    // Card challenge (8 bytes - per SCP03 specification)
+                    cardChallenge = new byte[8];
+                    Array.Copy(response, offset, cardChallenge, 0, 8);
+                    offset += 8;
+
+                    // Card cryptogram (8 bytes)
+                    cardCryptogram = new byte[8];
+                    Array.Copy(response, offset, cardCryptogram, 0, 8);
+                    offset += 8;
+
+                    // Sequence counter (remaining bytes - should be 3 for pseudo-random challenge)
+                    int remainingBytes = response.Length - offset;
+                    if (remainingBytes > 0)
+                    {
+                        sequenceCounter = new byte[remainingBytes];
+                        Array.Copy(response, offset, sequenceCounter, 0, remainingBytes);
+                    }
+                    else
+                    {
+                        sequenceCounter = [];
+                    }
+
+                    return Result.Success<InitializeUpdateResponse, SmartCardError>(
+                        new InitializeUpdateResponse(
+                            keyDiversificationData,
+                            keyInformation,
+                            cardChallenge,
+                            cardCryptogram,
+                            sequenceCounter
                         )
                     );
                 }
-
-                // For SCP03, the key information is 3 bytes:
-                // - Byte 0: Key Version (already read at offset 10)
-                // - Byte 1: SCP Version (already read at offset 11, should be 0x03)
-                // - Byte 2: Implementation parameter 'i' (at offset 12)
-                byte implementation = response[offset++];
-                Debug.WriteLine(
-                    $"[InitializeUpdateResponse.Parse] SCP03 Implementation parameter: {implementation:X2}"
-                );
-
-                // Build the key information structure
-                byte[] keyInformation = new byte[3];
-                keyInformation[0] = keyVersion;
-                keyInformation[1] = scpVersion; // Should be 0x03 for SCP03
-                keyInformation[2] = implementation; // Implementation parameter (e.g., 0x70)
-                Debug.WriteLine(
-                    $"[InitializeUpdateResponse.Parse] SCP03 Key information: {Convert.ToHexString(keyInformation)}"
-                );
-
-                // Card challenge (8 bytes - per SCP03 specification)
-                cardChallenge = new byte[8];
-                Array.Copy(response, offset, cardChallenge, 0, 8);
-                Debug.WriteLine(
-                    $"[InitializeUpdateResponse.Parse] SCP03 Card challenge (8 bytes): {Convert.ToHexString(cardChallenge)}"
-                );
-                offset += 8;
-
-                // Card cryptogram (8 bytes)
-                cardCryptogram = new byte[8];
-                Array.Copy(response, offset, cardCryptogram, 0, 8);
-                Debug.WriteLine(
-                    $"[InitializeUpdateResponse.Parse] SCP03 Card cryptogram: {Convert.ToHexString(cardCryptogram)}"
-                );
-                offset += 8;
-
-                // Sequence counter (remaining bytes - should be 3 for pseudo-random challenge)
-                int remainingBytes = response.Length - offset;
-                Debug.WriteLine(
-                    $"[InitializeUpdateResponse.Parse] SCP03 Remaining bytes for sequence counter: {remainingBytes}"
-                );
-                if (remainingBytes > 0)
-                {
-                    sequenceCounter = new byte[remainingBytes];
-                    Array.Copy(response, offset, sequenceCounter, 0, remainingBytes);
-                    Debug.WriteLine(
-                        $"[InitializeUpdateResponse.Parse] SCP03 Sequence counter: {Convert.ToHexString(sequenceCounter)}"
-                    );
-                }
-                else
-                {
-                    sequenceCounter = [];
-                }
-
-                return Result.Success<InitializeUpdateResponse, SmartCardError>(
-                    new InitializeUpdateResponse(
-                        keyDiversificationData,
-                        keyInformation,
-                        cardChallenge,
-                        cardCryptogram,
-                        sequenceCounter
-                    )
-                );
-            }
 
             default:
                 return Result.Failure<InitializeUpdateResponse, SmartCardError>(

@@ -7,6 +7,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using CSharpFunctionalExtensions;
+using Gp4Net.Core;
+using Gp4Net.Domain.Trace;
+using Gp4Net.Tool.Commands.Common;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -46,6 +50,16 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
         [Description("Enable verbose output")]
         [DefaultValue(false)]
         public bool Verbose { get; set; }
+
+        [CommandOption("--validate")]
+        [Description("Validate cryptographic operations in the trace")]
+        [DefaultValue(false)]
+        public new bool Validate { get; set; }
+
+        [CommandOption("-k|--keyset <KEYSET>")]
+        [Description("Keyset for validation (gp_test, hex key, or ENC:MAC:DEK)")]
+        [DefaultValue("gp_test")]
+        public string Keyset { get; set; } = "gp_test";
     }
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
@@ -66,48 +80,63 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
     {
         if (!File.Exists(settings.InputFile))
         {
-            throw new FileNotFoundException($"Input file not found: {settings.InputFile}");
+            AnsiConsole.MarkupLine($"[red]Error: Input file not found: {settings.InputFile}[/]");
+            return;
         }
 
         AnsiConsole.MarkupLine(
             $"[green]Converting {settings.Format} trace:[/] {settings.InputFile}"
         );
 
-        TraceConverter converter = new TraceConverter();
-        TraceData traceData = await converter.ConvertAsync(
+        var converter = new TraceConverter();
+        var convertResult = await converter.ConvertAsync(
             settings.InputFile,
             settings.Format,
-            settings.Verbose
+            settings.Verbose,
+            settings.Validate,
+            settings.Keyset
         );
 
-        // Ensure output directory exists
-        string outputDir = Path.GetDirectoryName(settings.OutputFile);
-        if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
+        if (convertResult.IsFailure)
         {
-            _ = Directory.CreateDirectory(outputDir);
+            AnsiConsole.MarkupLine($"[red]Conversion failed: {convertResult.Error.Message}[/]");
+            return;
         }
 
-        // Write JSON with pretty formatting
-        JsonSerializerOptions options = new JsonSerializerOptions
+        // Safe value access after success check
+        if (convertResult.IsSuccess)
         {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        };
+            var traceData = convertResult.Value;
 
-        await File.WriteAllTextAsync(
-            settings.OutputFile,
-            JsonSerializer.Serialize(traceData, options)
-        );
+            // Ensure output directory exists
+            string outputDir = Path.GetDirectoryName(settings.OutputFile);
+            if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
+            {
+                _ = Directory.CreateDirectory(outputDir);
+            }
 
-        // Display summary
-        AnsiConsole.MarkupLine($"[green]✓ Generated JSON trace:[/] {settings.OutputFile}");
-        DisplaySummary(traceData);
+            // Write JSON with pretty formatting
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            };
+
+            await File.WriteAllTextAsync(
+                settings.OutputFile,
+                JsonSerializer.Serialize(traceData, options)
+            );
+
+            // Display summary
+            AnsiConsole.MarkupLine($"[green]✓ Generated JSON trace:[/] {settings.OutputFile}");
+            DisplaySummary(traceData);
+        }
     }
 
     private static void DisplaySummary(TraceData traceData)
     {
-        Table table = new Table();
+        var table = new Table();
         _ = table.AddColumn("Property");
         _ = table.AddColumn("Value");
 
@@ -123,7 +152,7 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
         if (traceData.Operations.Any())
         {
             AnsiConsole.MarkupLine("\n[bold]Detected Operations:[/]");
-            foreach (KeyValuePair<string, Operation> op in traceData.Operations)
+            foreach (var op in traceData.Operations)
             {
                 AnsiConsole.MarkupLine(
                     $"  • [cyan]{op.Key}:[/] {op.Value.Description} (exchanges {op.Value.StartExchange}-{op.Value.EndExchange})"
@@ -134,7 +163,7 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
         if (traceData.UsageExamples.Any())
         {
             AnsiConsole.MarkupLine("\n[bold]Usage Examples:[/]");
-            foreach (UsageExample example in traceData.UsageExamples)
+            foreach (var example in traceData.UsageExamples)
             {
                 AnsiConsole.MarkupLine($"  • [yellow]{example.Description}:[/]");
                 AnsiConsole.MarkupLine($"    [dim]{example.Command}[/]");
@@ -267,6 +296,7 @@ public class Exchange
     public int SourceLine { get; set; }
     public bool SecureMessaging { get; set; }
     public ScpData ScpData { get; set; }
+    public ValidationInfo Validation { get; set; }
 }
 
 /// <summary>
@@ -277,10 +307,30 @@ public class ScpData
     public string HostChallenge { get; set; }
     public string CardChallenge { get; set; }
     public string CardCryptogram { get; set; }
-    public int? KeyVersion { get; set; }
+    
+    [JsonIgnore]
+    public Maybe<int> KeyVersionMaybe { get; set; } = Maybe<int>.None;
+    
+    public int KeyVersion => KeyVersionMaybe.GetValueOrDefault(0);
+    
     public string ScpId { get; set; }
     public string HostCryptogram { get; set; }
-    public bool? SessionEstablished { get; set; }
+    
+    [JsonIgnore]
+    public Maybe<bool> SessionEstablishedMaybe { get; set; } = Maybe<bool>.None;
+    
+    public bool SessionEstablished => SessionEstablishedMaybe.GetValueOrDefault(false);
+}
+
+/// <summary>
+/// Validation information for an exchange.
+/// </summary>
+public class ValidationInfo
+{
+    public string Type { get; set; } = string.Empty;
+    public bool IsValid { get; set; }
+    public string Details { get; set; } = string.Empty;
+    public string Error { get; set; }
 }
 
 /// <summary>
@@ -294,15 +344,47 @@ public class TraceConverter
     private readonly MetadataExtractor _metadataExtractor = new();
     private readonly UsageExampleGenerator _usageGenerator = new();
 
-    public async Task<TraceData> ConvertAsync(string inputFile, string format, bool verbose = false)
+    public async Task<Result<TraceData, SmartCardError>> ConvertAsync(
+        string inputFile,
+        string format,
+        bool verbose = false,
+        bool validate = false,
+        string keysetSpec = "gp_test"
+    )
     {
         // Parse trace based on format
-        List<Exchange> exchanges = format.ToLower() switch
+        var parseResult = format.ToLower() switch
         {
-            "gp_pro" => await ParseGpProTraceAsync(inputFile, verbose),
-            "gpshell" => await ParseGpShellTraceAsync(inputFile, verbose),
-            _ => throw new ArgumentException($"Unsupported format: {format}"),
+            "gp_pro" => Result.Success<List<Exchange>, SmartCardError>(
+                await ParseGpProTraceAsync(inputFile, verbose)
+            ),
+            "gpshell" => Result.Success<List<Exchange>, SmartCardError>(
+                await ParseGpShellTraceAsync(inputFile, verbose)
+            ),
+            _ => Result.Failure<List<Exchange>, SmartCardError>(
+                SmartCardError.Unsupported($"Unsupported format: {format}")
+            ),
         };
+
+        if (parseResult.IsFailure)
+        {
+            return Result.Failure<TraceData, SmartCardError>(parseResult.Error);
+        }
+
+        var exchanges = parseResult.Value;
+
+        // Validate if requested
+        if (validate)
+        {
+            var validationResult = await ValidateTraceAsync(exchanges, keysetSpec, verbose);
+            if (validationResult.IsFailure)
+            {
+                if (verbose)
+                {
+                    AnsiConsole.MarkupLine($"[yellow]Warning: Validation failed: {validationResult.Error.Message}[/]");
+                }
+            }
+        }
 
         if (verbose)
         {
@@ -310,7 +392,7 @@ public class TraceConverter
         }
 
         // Detect operations
-        Dictionary<string, Operation> operations = _operationDetector.AnalyzeTrace(exchanges);
+        var operations = _operationDetector.AnalyzeTrace(exchanges);
         if (verbose)
         {
             AnsiConsole.MarkupLine(
@@ -319,7 +401,7 @@ public class TraceConverter
         }
 
         // Analyze sessions
-        List<SessionMetadata> sessions = _sessionAnalyzer.DetectSessions(exchanges);
+        var sessions = _sessionAnalyzer.DetectSessions(exchanges);
         if (verbose)
         {
             AnsiConsole.MarkupLine($"[dim]Detected {sessions.Count} session(s)[/]");
@@ -329,26 +411,28 @@ public class TraceConverter
         LinkOperationsToSessions(operations, sessions);
 
         // Extract metadata
-        TraceMetadata metadata = _metadataExtractor.ExtractAll(exchanges, inputFile, format);
+        var metadata = _metadataExtractor.ExtractAll(exchanges, inputFile, format);
         metadata.Sessions = sessions;
 
         // Generate usage examples
-        List<UsageExample> usageExamples = UsageExampleGenerator.GenerateExamples(operations);
+        var usageExamples = UsageExampleGenerator.GenerateExamples(operations);
 
-        return new TraceData
-        {
-            Metadata = metadata,
-            Operations = operations,
-            UsageExamples = usageExamples,
-            Exchanges = exchanges,
-        };
+        return Result.Success<TraceData, SmartCardError>(
+            new TraceData
+            {
+                Metadata = metadata,
+                Operations = operations,
+                UsageExamples = usageExamples,
+                Exchanges = exchanges,
+            }
+        );
     }
 
     private async Task<List<Exchange>> ParseGpProTraceAsync(string filename, bool verbose)
     {
         List<Exchange> exchanges = [];
-        Regex commandPattern = new Regex(@"^A>> T=\d+ \([\d+]+\) ([0-9A-F\s]+)$");
-        Regex responsePattern = new Regex(@"^A<< \([\d+]+\) \((\d+)ms\) ([0-9A-F\s]+)$");
+        var commandPattern = new Regex(@"^A>> T=\d+ \([\d+]+\) ([0-9A-F\s]+)$");
+        var responsePattern = new Regex(@"^A<< \([\d+]+\) \((\d+)ms\) ([0-9A-F\s]+)$");
 
         string currentCommand = null;
         int currentLine = 0;
@@ -370,7 +454,7 @@ public class TraceConverter
             }
 
             // Try to match command
-            Match cmdMatch = commandPattern.Match(line);
+            var cmdMatch = commandPattern.Match(line);
             if (cmdMatch.Success)
             {
                 currentCommand = cmdMatch.Groups[1].Value.Trim().Replace(" ", "").ToUpper();
@@ -379,13 +463,13 @@ public class TraceConverter
             }
 
             // Try to match response
-            Match respMatch = responsePattern.Match(line);
+            var respMatch = responsePattern.Match(line);
             if (respMatch.Success && currentCommand != null)
             {
                 int responseTime = int.Parse(respMatch.Groups[1].Value);
                 string responseData = respMatch.Groups[2].Value.Trim().Replace(" ", "").ToUpper();
 
-                Exchange exchange = CreateExchange(
+                var exchange = CreateExchange(
                     exchanges.Count + 1,
                     currentCommand,
                     responseData,
@@ -405,8 +489,8 @@ public class TraceConverter
     private async Task<List<Exchange>> ParseGpShellTraceAsync(string filename, bool verbose)
     {
         List<Exchange> exchanges = [];
-        Regex sendPattern = new Regex(@"Command --> ([0-9A-F\s]+)");
-        Regex recvPattern = new Regex(@"Response <-- ([0-9A-F\s]+)");
+        var sendPattern = new Regex(@"Command --> ([0-9A-F\s]+)");
+        var recvPattern = new Regex(@"Response <-- ([0-9A-F\s]+)");
 
         string currentCommand = null;
         int currentLine = 0;
@@ -417,7 +501,7 @@ public class TraceConverter
             string line = lines[lineNum].Trim();
 
             // Try to match command
-            Match sendMatch = sendPattern.Match(line);
+            var sendMatch = sendPattern.Match(line);
             if (sendMatch.Success)
             {
                 currentCommand = sendMatch.Groups[1].Value.Trim().Replace(" ", "").ToUpper();
@@ -426,12 +510,12 @@ public class TraceConverter
             }
 
             // Try to match response
-            Match recvMatch = recvPattern.Match(line);
+            var recvMatch = recvPattern.Match(line);
             if (recvMatch.Success && currentCommand != null)
             {
                 string responseData = recvMatch.Groups[1].Value.Trim().Replace(" ", "").ToUpper();
 
-                Exchange exchange = CreateExchange(
+                var exchange = CreateExchange(
                     exchanges.Count + 1,
                     currentCommand,
                     responseData,
@@ -458,7 +542,7 @@ public class TraceConverter
     {
         string description = ApduAnalyzer.GetCommandDescription(command);
         bool secureMessaging = ApduAnalyzer.IsSecureMessaging(command);
-        ScpData scpData = ApduAnalyzer.ExtractScpData(command, response, description);
+        var scpData = ApduAnalyzer.ExtractScpData(command, response, description);
 
         return new Exchange
         {
@@ -476,18 +560,131 @@ public class TraceConverter
         };
     }
 
+    private async Task<UnitResult<SmartCardError>> ValidateTraceAsync(
+        List<Exchange> exchanges,
+        string keysetSpec,
+        bool verbose
+    )
+    {
+        // Parse the keyset
+        var keysetResult = KeysetParser.ParseRawKeysetSpecification(keysetSpec);
+        if (keysetResult.IsFailure)
+        {
+            return UnitResult.Failure(keysetResult.Error);
+        }
+
+        // Convert RawKeyset to IKeySet (default to SCP02 which will be updated when we parse INITIALIZE UPDATE)
+        var keysetConversionResult = keysetResult.Value.ToScp02KeySet();
+        if (keysetConversionResult.IsFailure)
+        {
+            return UnitResult.Failure(keysetConversionResult.Error);
+        }
+
+        // Create initial validation state  
+        var initialState = TraceValidationState.Create(keysetConversionResult.Value);
+
+        // Validate all exchanges using functional composition
+        var finalStateResult = exchanges.Aggregate(
+            Result.Success<TraceValidationState, SmartCardError>(initialState),
+            (stateResult, exchange) => stateResult.Bind(state =>
+            {
+                // Convert hex strings to byte arrays for the library
+                var commandBytes = Result.Try(
+                    () => Convert.FromHexString(exchange.Command.Replace(" ", "")),
+                    ex => SmartCardError.InvalidArgument($"Invalid command hex at exchange {exchange.Index}: {ex.Message}")
+                );
+                
+                var responseBytes = Result.Try(
+                    () => Convert.FromHexString(exchange.Response.Replace(" ", "")),
+                    ex => SmartCardError.InvalidArgument($"Invalid response hex at exchange {exchange.Index}: {ex.Message}")
+                );
+                
+                return commandBytes.Bind(cmd =>
+                    responseBytes.Bind(resp =>
+                    {
+                        var validationResult = TraceValidation.ValidateExchange(
+                            state,
+                            cmd,
+                            resp,
+                            exchange.Index
+                        );
+                        
+                        return validationResult.Map(newState =>
+                {
+                    // Extract the latest validation result for this exchange
+                    var latestResult = newState.Results
+                        .Where(r => r.ExchangeIndex == exchange.Index)
+                        .LastOrDefault();
+
+                    Maybe<Gp4Net.Domain.Trace.ValidationResult>.From(latestResult).Match(
+                        Some: result =>
+                        {
+                            exchange.Validation = new ValidationInfo
+                            {
+                                Type = result.ValidationType,
+                                IsValid = result.IsValid,
+                                Details = result.Details,
+                                Error = result.Error.GetValueOrDefault()
+                            };
+
+                            if (verbose)
+                            {
+                                var status = result.IsValid ? "[green]✓[/]" : "[red]✗[/]";
+                                AnsiConsole.MarkupLine(
+                                    $"{status} Exchange {exchange.Index}: {result.ValidationType} - {result.Details}"
+                                );
+                            }
+                        },
+                        None: () => { }
+                    );
+
+                    return newState;
+                });
+                    })
+                );
+            })
+        );
+
+        // Report summary
+        finalStateResult.Match(
+            state =>
+            {
+                if (verbose && state.Results.Any())
+                {
+                    var validCount = state.Results.Count(r => r.IsValid);
+                    var totalCount = state.Results.Count;
+                    var color = validCount == totalCount ? "green" : validCount > 0 ? "yellow" : "red";
+                    AnsiConsole.MarkupLine(
+                        $"[{color}]Validation Summary: {validCount}/{totalCount} checks passed[/]"
+                    );
+                }
+            },
+            error =>
+            {
+                if (verbose)
+                {
+                    AnsiConsole.MarkupLine(
+                        $"[yellow]Warning: Validation failed: {error.Message}[/]"
+                    );
+                }
+            }
+        );
+
+        return await Task.FromResult(UnitResult.Success<SmartCardError>());
+    }
+
     private static void LinkOperationsToSessions(
         Dictionary<string, Operation> operations,
         List<SessionMetadata> sessions
     )
     {
         // Simple implementation: assign operations to sessions based on session operations list
-        foreach (KeyValuePair<string, Operation> kvp in operations)
+        foreach (var kvp in operations)
         {
-            Operation operation = kvp.Value;
+            var operation = kvp.Value;
             string operationName = kvp.Key;
 
-            foreach (SessionMetadata session in sessions)
+            foreach (var session in sessions)
             {
                 if (session.Operations.Contains(operationName))
                 {
@@ -586,7 +783,7 @@ public class ApduAnalyzer
 
     public static ScpData ExtractScpData(string commandHex, string responseHex, string description)
     {
-        ScpData scpData = new ScpData();
+        var scpData = new ScpData();
         bool hasData = false;
 
         if (description.Contains("INITIALIZE UPDATE"))
@@ -604,7 +801,7 @@ public class ApduAnalyzer
                 string responseData = responseHex.Substring(0, responseHex.Length - 4);
                 if (responseData.Length >= 64)
                 {
-                    scpData.KeyVersion = Convert.ToInt32(responseData.Substring(20, 2), 16);
+                    scpData.KeyVersionMaybe = Maybe<int>.From(Convert.ToInt32(responseData.Substring(20, 2), 16));
                     scpData.ScpId = responseData.Substring(22, 2);
                     scpData.CardChallenge = responseData.Substring(30, 16);
                     scpData.CardCryptogram = responseData.Substring(46, 16);
@@ -618,7 +815,7 @@ public class ApduAnalyzer
             if (commandHex.Length >= 44)
             {
                 scpData.HostCryptogram = commandHex.Substring(12, 32);
-                scpData.SessionEstablished = responseHex == "9000";
+                scpData.SessionEstablishedMaybe = Maybe<bool>.From(responseHex == "9000");
                 hasData = true;
             }
         }
@@ -719,7 +916,7 @@ public class OperationDetector
         DetectAllOperations(exchanges);
 
         // Second pass: merge and refine operations
-        Dictionary<string, Operation> mergedOperations = MergeOperations();
+        var mergedOperations = MergeOperations();
 
         // Third pass: assign exchanges to operations
         AssignExchangesToOperations(exchanges, mergedOperations);
@@ -733,7 +930,7 @@ public class OperationDetector
 
         for (int i = 0; i < exchanges.Count; i++)
         {
-            Exchange exchange = exchanges[i];
+            var exchange = exchanges[i];
             string detectedOp = DetectOperationType(exchange);
 
             if (detectedOp != "unknown")
@@ -741,7 +938,7 @@ public class OperationDetector
                 // For LOAD operations, group consecutive ones immediately
                 if (detectedOp == "load_blocks" && _detectedOperations.Count > 0)
                 {
-                    DetectedOperation lastOp = _detectedOperations[^1];
+                    var lastOp = _detectedOperations[^1];
                     if (lastOp.Type == "load_blocks" && lastOp.EndIndex == i - 1)
                     {
                         // Extend the existing LOAD operation
@@ -770,7 +967,7 @@ public class OperationDetector
 
     private Dictionary<string, Operation> MergeOperations()
     {
-        Dictionary<string, Operation> operations = new Dictionary<string, Operation>();
+        var operations = new Dictionary<string, Operation>();
 
         // Handle operations that require specific sequences
         MergeSequentialOperations(
@@ -781,10 +978,10 @@ public class OperationDetector
         // Create operations from detected operations
         for (int i = 0; i < _detectedOperations.Count; i++)
         {
-            DetectedOperation detectedOp = _detectedOperations[i];
+            var detectedOp = _detectedOperations[i];
 
             // Check if this operation is part of an existing operation (by checking overlap)
-            Operation existingOp = operations.Values.FirstOrDefault(op =>
+            var existingOp = operations.Values.FirstOrDefault(op =>
                 op.StartExchange - 1 <= detectedOp.EndIndex
                 && op.EndExchange - 1 >= detectedOp.StartIndex
             );
@@ -824,7 +1021,7 @@ public class OperationDetector
             // Look for the start of the sequence
             for (int j = i; j < _detectedOperations.Count && j < i + 10; j++) // Look ahead up to 10 exchanges
             {
-                DetectedOperation op = _detectedOperations[j];
+                var op = _detectedOperations[j];
                 if (requiredCommands.Any(cmd => op.Commands.Any(c => c.Contains(cmd))))
                 {
                     if (sequenceStart == -1)
@@ -839,7 +1036,7 @@ public class OperationDetector
                     if (requiredCommands.All(cmd => foundCommands.Any(c => c.Contains(cmd))))
                     {
                         // Merge into a single operation
-                        DetectedOperation mergedOp = new DetectedOperation
+                        var mergedOp = new DetectedOperation
                         {
                             Type = operationType,
                             StartIndex = _detectedOperations[sequenceStart].StartIndex,
@@ -860,10 +1057,8 @@ public class OperationDetector
                 }
             }
 
-            if (sequenceStart == -1)
-            {
-                i++;
-            }
+            // Always increment to avoid infinite loop
+            i++;
         }
     }
 
@@ -872,16 +1067,16 @@ public class OperationDetector
         Dictionary<string, Operation> operations
     )
     {
-        foreach (Exchange exchange in exchanges)
+        foreach (var exchange in exchanges)
         {
             exchange.Operation = "";
             exchange.StepInOperation = 0;
         }
 
-        foreach (KeyValuePair<string, Operation> kvp in operations)
+        foreach (var kvp in operations)
         {
             string opName = kvp.Key;
-            Operation operation = kvp.Value;
+            var operation = kvp.Value;
 
             int stepCounter = 1;
             for (
@@ -900,9 +1095,9 @@ public class OperationDetector
     {
         string description = exchange.Description;
 
-        foreach (KeyValuePair<string, OperationPattern> kvp in OperationPatterns)
+        foreach (var kvp in OperationPatterns)
         {
-            OperationPattern pattern = kvp.Value;
+            var pattern = kvp.Value;
             if (pattern.Indicators.Any(indicator => description.Contains(indicator)))
             {
                 return kvp.Key;
@@ -967,7 +1162,7 @@ public class SessionAnalyzer
         List<SessionMetadata> sessions = [];
         SessionMetadata currentSession = null;
 
-        foreach (Exchange exchange in exchanges)
+        foreach (var exchange in exchanges)
         {
             // Detect new session start
             if (exchange.Description.Contains("INITIALIZE UPDATE"))
@@ -1001,7 +1196,7 @@ public class SessionAnalyzer
         string sessionId = $"session_{_sessionCounter}";
         _sessionCounter++;
 
-        ScpData scpData = exchange.ScpData;
+        var scpData = exchange.ScpData;
         DerivationData derivationData = null;
 
         if (scpData != null)
@@ -1020,11 +1215,17 @@ public class SessionAnalyzer
             SessionId = sessionId,
             ScpVersion = 3,
             ScpImplementation = "i=70",
-            KeyVersion = scpData?.KeyVersion ?? 1,
+            KeyVersion = Maybe<ScpData>.From(scpData).Match(
+                Some: sd => sd.KeyVersionMaybe.Match(Some: v => v, None: () => 1),
+                None: () => 1),
             SecurityLevel = "C_MAC|R_MAC|C_ENC|R_ENC",
             KeyDiversification = "none",
-            HostChallenge = scpData?.HostChallenge ?? "",
-            CardChallenge = scpData?.CardChallenge ?? "",
+            HostChallenge = Maybe<ScpData>.From(scpData).Match(
+                Some: sd => sd.HostChallenge,
+                None: () => ""),
+            CardChallenge = Maybe<ScpData>.From(scpData).Match(
+                Some: sd => sd.CardChallenge,
+                None: () => ""),
             SequenceCounter = "000001",
             DerivationData = derivationData,
             Operations = [],
@@ -1072,7 +1273,7 @@ public class MetadataExtractor
     {
         string atr = "3BD518FF8191FE1FC38073C821100A"; // Default ATR
         string isdAid = FindIsdAid(exchanges);
-        CplcData cplcData = FindCplcData(exchanges);
+        var cplcData = FindCplcData(exchanges);
 
         return new CardInfo
         {
@@ -1085,7 +1286,7 @@ public class MetadataExtractor
 
     private static string FindIsdAid(List<Exchange> exchanges)
     {
-        foreach (Exchange exchange in exchanges)
+        foreach (var exchange in exchanges)
         {
             if (exchange.Description.Contains("SELECT") && exchange.Response.StartsWith("6F"))
             {
@@ -1101,7 +1302,7 @@ public class MetadataExtractor
 
     private static CplcData FindCplcData(List<Exchange> exchanges)
     {
-        foreach (Exchange exchange in exchanges)
+        foreach (var exchange in exchanges)
         {
             if (exchange.Description.Contains("GET CPLC") && exchange.Response.Length > 20)
             {
@@ -1146,7 +1347,7 @@ public class UsageExampleGenerator
         List<UsageExample> examples = [];
 
         // Single operation examples
-        foreach (KeyValuePair<string, Operation> kvp in operations)
+        foreach (var kvp in operations)
         {
             examples.Add(
                 new UsageExample
@@ -1161,7 +1362,12 @@ public class UsageExampleGenerator
         List<string> opNames = [.. operations.Keys];
 
         // Install workflow
-        List<string> installOps = [.. opNames.Where(op => op.Contains("install") || op.Contains("secure_channel") || op == "info")];
+        List<string> installOps =
+        [
+            .. opNames.Where(op =>
+                op.Contains("install") || op.Contains("secure_channel") || op == "info"
+            ),
+        ];
         if (installOps.Count > 1)
         {
             examples.Add(

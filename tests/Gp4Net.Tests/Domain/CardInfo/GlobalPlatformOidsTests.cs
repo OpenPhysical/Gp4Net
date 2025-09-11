@@ -118,7 +118,7 @@ public class GlobalPlatformOidsTests
         ];
 
         // Act
-        GlobalPlatformOids.CapabilitiesSummary? summary = GlobalPlatformOids.AnalyzeOids(oids);
+        var summary = GlobalPlatformOids.AnalyzeOids(oids);
 
         // Assert
         _ = summary.SupportedScpVersions.Should().Contain("SCP02");
@@ -134,7 +134,7 @@ public class GlobalPlatformOidsTests
     public void AnalyzeOids_ShouldHandleEmptyList()
     {
         // Act
-        GlobalPlatformOids.CapabilitiesSummary? summary = GlobalPlatformOids.AnalyzeOids(
+        var summary = GlobalPlatformOids.AnalyzeOids(
             new string[0]
         );
 
@@ -150,7 +150,7 @@ public class GlobalPlatformOidsTests
     {
         // Arrange
         string[] oids = ["1.2.840.114283.4.2", "1.2.840.114283.4.3.112", "1.2.840.114283.2.2.3"];
-        GlobalPlatformOids.CapabilitiesSummary? summary = GlobalPlatformOids.AnalyzeOids(oids);
+        var summary = GlobalPlatformOids.AnalyzeOids(oids);
 
         // Act
         string? result = summary.ToString();

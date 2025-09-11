@@ -1,12 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Transport;
-using WSCT.Core;
-using WSCT.ISO7816;
 using JetBrains.Annotations;
+using WSCT.ISO7816;
 using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Domain.Commands;
@@ -15,9 +13,8 @@ namespace Gp4Net.Domain.Commands;
 /// Represents the PUT KEY command for key establishment and replacement.
 /// </summary>
 [PublicAPI]
-public class PutKeyCommand
+public class PutKeyCommand : IApduCommand
 {
-
     /// <summary>
     /// Key usage qualifier values for P1.
     /// </summary>
@@ -88,9 +85,17 @@ public class PutKeyCommand
     {
         var expectedLength = KeyDataBlocks.Count * 3;
         var data = Data;
-        
+
         return Result.Success<CommandAPDU, SmartCardError>(
-            new CommandAPDU(GlobalPlatform.Cla.GpStandard, GlobalPlatform.Ins.PutKey, (byte)UsageQualifier, (byte)KekIdentifier, (uint)data.Length, data, (uint)expectedLength)
+            new CommandAPDU(
+                GlobalPlatform.Cla.GP_STANDARD,
+                GlobalPlatform.Ins.PUT_KEY,
+                (byte)UsageQualifier,
+                (byte)KekIdentifier,
+                (uint)data.Length,
+                data,
+                (uint)expectedLength
+            )
         );
     }
 
@@ -118,7 +123,7 @@ public class PutKeyCommand
         get
         {
             List<byte> data = [];
-            foreach (KeyDataBlock block in KeyDataBlocks)
+            foreach (var block in KeyDataBlocks)
             {
                 data.AddRange(block.ToBytes());
             }
@@ -181,11 +186,11 @@ public class PutKeyCommand
         }
 
         // Determine usage qualifier based on number of keys
-        KeyUsageQualifier usageQualifier =
+        var usageQualifier =
             keyDataBlocks.Count == 1 ? KeyUsageQualifier.SingleKey : KeyUsageQualifier.MultipleKeys;
 
         // For now, we always use plain text (no key encryption)
-        KeyEncryptionKeyIdentifier kekIdentifier = KeyEncryptionKeyIdentifier.None;
+        var kekIdentifier = KeyEncryptionKeyIdentifier.None;
 
         return new PutKeyCommand(usageQualifier, kekIdentifier, keyDataBlocks);
     }
@@ -199,6 +204,23 @@ public class PutKeyCommand
         return "PUT KEY";
     }
 
+    /// <inheritdoc />
+    public CommandAPDU ToApdu()
+    {
+        return ToCommandApdu().GetValueOrDefault(new CommandAPDU([]));
+    }
+
+    /// <inheritdoc />
+    public byte[] ToBytes()
+    {
+        return ToCommandApdu().Map(cmd => cmd.ToBytes()).GetValueOrDefault([]);
+    }
+
+    /// <inheritdoc />
+    public byte Cla => GlobalPlatform.Cla.GP_STANDARD;
+
+    /// <inheritdoc />
+    public byte Ins => GlobalPlatform.Ins.PUT_KEY;
 }
 
 /// <summary>

@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -7,6 +8,7 @@ using Gp4Net.Domain.Security;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Modes;
+using Org.BouncyCastle.Crypto.Paddings;
 using Org.BouncyCastle.Crypto.Parameters;
 
 namespace Gp4Net.Cryptography;
@@ -19,55 +21,63 @@ public static partial class CryptoService
     /// </summary>
     public static class Cryptogram
     {
-
         /// <summary>
         /// Calculates SCP02 Cryptogram using Full 3DES MAC (ISO 9797-1 Algorithm 1).
         /// Per GlobalPlatform Card Specification v2.3.1 Section B.1.2.1 and E.4.2.
         /// </summary>
         /// <param name="sEncKey">The S-ENC session key (16 or 24 bytes).</param>
-        /// <param name="data">The padded cryptogram data (must be multiple of 8 bytes).</param>
+        /// <param name="data">The unpadded cryptogram data (typically 16 bytes).</param>
         /// <returns>8-byte cryptogram or error.</returns>
         public static Result<byte[], SmartCardError> CalculateScp02Cryptogram(
             byte[] sEncKey,
             byte[] data
         )
         {
-            return Validation.ValidateInputs(sEncKey, data)
-                .Bind(() => Validation.ValidateKeyLength(sEncKey, [16, 24], "SCP02 S-ENC key must be 16 or 24 bytes"))
-                .Bind(() => Validation.ValidateDataPadding(data, 8, "Cryptogram data must be padded to 8-byte blocks"))
+            return Validation
+                .ValidateInputs(sEncKey, data)
+                .Bind(() =>
+                    Validation.ValidateKeyLength(
+                        sEncKey,
+                        [16, 24],
+                        "SCP02 S-ENC key must be 16 or 24 bytes"
+                    )
+                )
                 .Bind(() => Utils.ExpandTripleDesKey(sEncKey))
                 .Bind(expandedKey =>
                     Result.Try(
                         () =>
                         {
-                            byte[] zeroIv = new byte[8];
-                            DesEdeEngine engine = new DesEdeEngine();
-                            CbcBlockCipher blockCipher = new CbcBlockCipher(engine);
-                            blockCipher.Init(
-                                true,
-                                new ParametersWithIV(new KeyParameter(expandedKey), zeroIv)
+                            // Use PaddedBufferedBlockCipher with ISO7816-4 padding to match ScpVerification
+                            // This handles padding automatically - expects unpadded input data
+                            var cipher = new PaddedBufferedBlockCipher(
+                                new CbcBlockCipher(new DesEdeEngine()),
+                                new ISO7816d4Padding()
                             );
 
-                            int blockCount = data.Length / 8;
-                            byte[] mac = Enumerable
-                                .Range(0, blockCount)
-                                .Aggregate(
-                                    new byte[8],
-                                    (currentBlock, blockIndex) =>
-                                    {
-                                        byte[] result = new byte[8];
-                                        blockCipher.ProcessBlock(
-                                            data,
-                                            blockIndex * 8,
-                                            result,
-                                            0
-                                        );
-                                        return result;
-                                    }
-                                );
+                            // Initialize with zero IV (standard for SCP02)
+                            cipher.Init(
+                                true,
+                                new ParametersWithIV(
+                                    new DesEdeParameters(expandedKey),
+                                    new byte[8]
+                                )
+                            );
 
-                            return mac;
-                        }, static ex => SmartCardError.CryptographicError($"SCP02 Cryptogram calculation failed: {ex.Message}")
+                            // Process the unpadded data following ScpVerification pattern exactly
+                            // The ProcessBytes call stores the data but doesn't encrypt yet
+                            cipher.ProcessBytes(data);
+                            
+                            // DoFinal triggers the actual encryption with padding
+                            var encrypted = cipher.DoFinal();
+
+                            // SCP02 cryptogram uses bytes [8..16] of the encrypted result
+                            // This matches the proven implementation in ScpVerification tests
+                            return encrypted[8..16];
+                        },
+                        static ex =>
+                            SmartCardError.CryptographicError(
+                                $"SCP02 Cryptogram calculation failed: {ex.Message}"
+                            )
                     )
                 );
         }
@@ -84,13 +94,20 @@ public static partial class CryptoService
             byte[] data
         )
         {
-            return Validation.ValidateInputs(sEncKey, data)
-                .Bind(() => Validation.ValidateKeyLength(sEncKey, [16, 24, 32], "SCP03 S-ENC key must be 16, 24, or 32 bytes"))
+            return Validation
+                .ValidateInputs(sEncKey, data)
+                .Bind(() =>
+                    Validation.ValidateKeyLength(
+                        sEncKey,
+                        [16, 24, 32],
+                        "SCP03 S-ENC key must be 16, 24, or 32 bytes"
+                    )
+                )
                 .Bind(() =>
                     Result.Try(
                         () =>
                         {
-                            CMac cmac = new CMac(new AesEngine(), 128);
+                            var cmac = new CMac(new AesEngine(), 128);
                             cmac.Init(new KeyParameter(sEncKey));
                             cmac.BlockUpdate(data, 0, data.Length);
 
@@ -98,7 +115,11 @@ public static partial class CryptoService
                             cmac.DoFinal(fullMac, 0);
 
                             return fullMac;
-                        }, static ex => SmartCardError.CryptographicError($"SCP03 Cryptogram calculation failed: {ex.Message}")
+                        },
+                        static ex =>
+                            SmartCardError.CryptographicError(
+                                $"SCP03 Cryptogram calculation failed: {ex.Message}"
+                            )
                     )
                 );
         }
@@ -127,7 +148,8 @@ public static partial class CryptoService
                         seqCounterBytes,
                         response.CardChallenge
                     );
-                    return Utils.PadToLength(data, 24);
+                    // Return unpadded 16-byte data - PaddedBufferedBlockCipher will handle padding
+                    return Result.Success<byte[], SmartCardError>(data);
                 });
         }
 
@@ -155,7 +177,8 @@ public static partial class CryptoService
                         response.CardChallenge,
                         hostChallenge
                     );
-                    return Utils.PadToLength(data, 24);
+                    // Return unpadded 16-byte data - PaddedBufferedBlockCipher will handle padding
+                    return Result.Success<byte[], SmartCardError>(data);
                 });
         }
 
@@ -205,7 +228,9 @@ public static partial class CryptoService
                     challenge.Length == 8
                         ? Result.Success<byte[], SmartCardError>(challenge)
                         : Result.Failure<byte[], SmartCardError>(
-                            SmartCardError.InvalidArgument($"Host challenge must be 8 bytes, got {challenge.Length}")
+                            SmartCardError.InvalidArgument(
+                                $"Host challenge must be 8 bytes, got {challenge.Length}"
+                            )
                         )
                 );
         }
@@ -225,7 +250,9 @@ public static partial class CryptoService
                     challenge.Length == expectedLength
                         ? Result.Success<byte[], SmartCardError>(challenge)
                         : Result.Failure<byte[], SmartCardError>(
-                            SmartCardError.InvalidArgument($"Card challenge must be {expectedLength} bytes, got {challenge.Length}")
+                            SmartCardError.InvalidArgument(
+                                $"Card challenge must be {expectedLength} bytes, got {challenge.Length}"
+                            )
                         )
                 );
         }
@@ -244,7 +271,9 @@ public static partial class CryptoService
                     counter.Length >= 2
                         ? Result.Success<byte[], SmartCardError>(counter)
                         : Result.Failure<byte[], SmartCardError>(
-                            SmartCardError.InvalidResponse($"SequenceCounter must be at least 2 bytes, got {counter.Length}")
+                            SmartCardError.InvalidResponse(
+                                $"SequenceCounter must be at least 2 bytes, got {counter.Length}"
+                            )
                         )
                 );
         }
@@ -272,9 +301,12 @@ public static partial class CryptoService
             return scpVersion switch
             {
                 0x02 => context
-                    .ToResult(SmartCardError.InvalidArgument("SCP02 requires sequence counter in context"))
+                    .ToResult(
+                        SmartCardError.InvalidArgument("SCP02 requires sequence counter in context")
+                    )
                     .Bind(sequenceCounter =>
-                        Maybe<Scp02KeySet>.From(keys as Scp02KeySet)
+                        Maybe<Scp02KeySet>
+                            .From(keys as Scp02KeySet)
                             .ToResult(SmartCardError.InvalidArgument("SCP02 requires Scp02KeySet"))
                             .Bind(scp02Keys =>
                                 CryptogramParameters.ForScp02(
@@ -287,7 +319,8 @@ public static partial class CryptoService
                     )
                     .Bind(CalculateCardCryptogram),
 
-                0x03 => Maybe<Scp03KeySet>.From(keys as Scp03KeySet)
+                0x03 => Maybe<Scp03KeySet>
+                    .From(keys as Scp03KeySet)
                     .ToResult(SmartCardError.InvalidArgument("SCP03 requires Scp03KeySet"))
                     .Bind(scp03Keys =>
                         CryptogramParameters.ForScp03(hostChallenge, cardChallenge, scp03Keys)
@@ -296,7 +329,7 @@ public static partial class CryptoService
 
                 _ => Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidArgument($"Unsupported SCP version: 0x{scpVersion:X2}")
-                )
+                ),
             };
         }
 
@@ -323,9 +356,12 @@ public static partial class CryptoService
             return scpVersion switch
             {
                 0x02 => context
-                    .ToResult(SmartCardError.InvalidArgument("SCP02 requires sequence counter in context"))
+                    .ToResult(
+                        SmartCardError.InvalidArgument("SCP02 requires sequence counter in context")
+                    )
                     .Bind(sequenceCounter =>
-                        Maybe<Scp02KeySet>.From(keys as Scp02KeySet)
+                        Maybe<Scp02KeySet>
+                            .From(keys as Scp02KeySet)
                             .ToResult(SmartCardError.InvalidArgument("SCP02 requires Scp02KeySet"))
                             .Bind(scp02Keys =>
                                 CryptogramParameters.ForScp02(
@@ -338,7 +374,8 @@ public static partial class CryptoService
                     )
                     .Bind(CalculateHostCryptogram),
 
-                0x03 => Maybe<Scp03KeySet>.From(keys as Scp03KeySet)
+                0x03 => Maybe<Scp03KeySet>
+                    .From(keys as Scp03KeySet)
                     .ToResult(SmartCardError.InvalidArgument("SCP03 requires Scp03KeySet"))
                     .Bind(scp03Keys =>
                         CryptogramParameters.ForScp03(hostChallenge, cardChallenge, scp03Keys)
@@ -347,7 +384,7 @@ public static partial class CryptoService
 
                 _ => Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidArgument($"Unsupported SCP version: 0x{scpVersion:X2}")
-                )
+                ),
             };
         }
 
@@ -362,11 +399,15 @@ public static partial class CryptoService
         )
         {
             // Build card cryptogram data: Host Challenge || Sequence Counter || Card Challenge
-            byte[] data = [.. parameters.HostChallenge , .. parameters.SequenceCounter, .. parameters.CardChallenge];
+            byte[] data =
+            [
+                .. parameters.HostChallenge,
+                .. parameters.SequenceCounter,
+                .. parameters.CardChallenge,
+            ];
 
-            // Add ISO 7816-4 padding to 24 bytes
-            return Utils.PadToLength(data, 24)
-                .Bind(paddedData => CalculateScp02Cryptogram(parameters.Keys.SEnc, paddedData));
+            // Pass unpadded 16-byte data - PaddedBufferedBlockCipher will handle padding
+            return CalculateScp02Cryptogram(parameters.Keys.SEnc, data);
         }
 
         /// <summary>
@@ -380,51 +421,67 @@ public static partial class CryptoService
         )
         {
             // Build host cryptogram data: Sequence Counter || Card Challenge || Host Challenge
-            byte[] data = [.. parameters.SequenceCounter
-, .. parameters.CardChallenge, .. parameters.HostChallenge];
+            byte[] data =
+            [
+                .. parameters.SequenceCounter,
+                .. parameters.CardChallenge,
+                .. parameters.HostChallenge,
+            ];
 
-            // Add ISO 7816-4 padding to 24 bytes
-            return Utils.PadToLength(data, 24)
-                .Bind(paddedData => CalculateScp02Cryptogram(parameters.Keys.SEnc, paddedData));
+            // Pass unpadded 16-byte data - PaddedBufferedBlockCipher will handle padding
+            return CalculateScp02Cryptogram(parameters.Keys.SEnc, data);
         }
 
         /// <summary>
         /// Calculates SCP03 card cryptogram using typed parameters.
-        /// Per GP SCP03 v1.1.1 Section 6.2.2.2.
+        /// Per GlobalPlatform SCP03 v1.1.1 Section 6.2.2.2.
+        /// Uses NIST SP 800-108 KDF in counter mode with AES-CMAC as PRF.
         /// </summary>
         /// <param name="parameters">Validated SCP03 cryptogram parameters.</param>
-        /// <returns>8-byte card cryptogram (truncated from 16-byte MAC).</returns>
+        /// <returns>8-byte card cryptogram derived using KDF108.</returns>
         public static Result<byte[], SmartCardError> CalculateCardCryptogram(
             Scp03CryptogramParameters parameters
         )
         {
-            // Build card cryptogram data with derivation constant '00'
-            byte[] derivationConstant = new byte[11]; // 11 zero bytes for card cryptogram
-            byte[] data = [.. derivationConstant, .. parameters.HostChallenge, .. parameters.CardChallenge];
+            // Build context: Host Challenge || Card Challenge
+            byte[] context = Utils.ConcatenateArrays(
+                parameters.HostChallenge,
+                parameters.CardChallenge
+            );
 
-            // Calculate AES-CMAC and truncate to 8 bytes
-            return Mac.CalculateScp03FullMac(parameters.Keys.MacKey, data)
-                .Map(static fullMac => fullMac.Take(8).ToArray());
+            // Use KDF108 with card cryptogram derivation constant
+            return KeyDerivation.DeriveScp03Data(
+                parameters.Keys.MacKey,
+                Constants.Constants.Scp.Scp03.CryptogramDerivation.CardCryptogram,
+                context,
+                64 // 8 bytes = 64 bits
+            );
         }
 
         /// <summary>
         /// Calculates SCP03 host cryptogram using typed parameters.
-        /// Per GP SCP03 v1.1.1 Section 6.2.2.2.
+        /// Per GlobalPlatform SCP03 v1.1.1 Section 6.2.2.2.
+        /// Uses NIST SP 800-108 KDF in counter mode with AES-CMAC as PRF.
         /// </summary>
         /// <param name="parameters">Validated SCP03 cryptogram parameters.</param>
-        /// <returns>8-byte host cryptogram (truncated from 16-byte MAC).</returns>
+        /// <returns>8-byte host cryptogram derived using KDF108.</returns>
         public static Result<byte[], SmartCardError> CalculateHostCryptogram(
             Scp03CryptogramParameters parameters
         )
         {
-            // Build host cryptogram data with derivation constant '01'
-            byte[] derivationConstant = new byte[11];
-            derivationConstant[10] = 0x01; // Set last byte to 0x01 for host cryptogram
-            byte[] data = [.. derivationConstant, .. parameters.HostChallenge, .. parameters.CardChallenge];
+            // Build context: Host Challenge || Card Challenge (same as card cryptogram)
+            byte[] context = Utils.ConcatenateArrays(
+                parameters.HostChallenge,
+                parameters.CardChallenge
+            );
 
-            // Calculate AES-CMAC and truncate to 8 bytes
-            return Mac.CalculateScp03FullMac(parameters.Keys.MacKey, data)
-                .Map(static fullMac => fullMac.Take(8).ToArray());
+            // Use KDF108 with host cryptogram derivation constant
+            return KeyDerivation.DeriveScp03Data(
+                parameters.Keys.MacKey,
+                Constants.Constants.Scp.Scp03.CryptogramDerivation.HostCryptogram,
+                context,
+                64 // 8 bytes = 64 bits
+            );
         }
     }
 }

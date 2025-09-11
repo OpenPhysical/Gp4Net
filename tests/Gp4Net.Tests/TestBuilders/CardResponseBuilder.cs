@@ -23,9 +23,8 @@ public sealed class CardResponseBuilder
     /// <summary>
     /// Creates a new builder with default values.
     /// </summary>
-    public CardResponseBuilder() : this([], new StatusWord(0x9000))
-    {
-    }
+    public CardResponseBuilder()
+        : this([], new StatusWord(0x9000)) { }
 
     private CardResponseBuilder(byte[] data, StatusWord statusWord)
     {
@@ -50,10 +49,8 @@ public sealed class CardResponseBuilder
     /// <returns>A new builder with the data set, or the same builder if hex parsing fails.</returns>
     public CardResponseBuilder WithDataFromHex(string hexString)
     {
-        return ParseHexString(hexString).Match(
-            data => new CardResponseBuilder(data, _statusWord),
-            () => this
-        );
+        return ParseHexString(hexString)
+            .Match(data => new CardResponseBuilder(data, _statusWord), () => this);
     }
 
     /// <summary>
@@ -134,14 +131,19 @@ public sealed class CardResponseBuilder
             return Maybe<byte[]>.From([]);
 
         // Remove spaces and normalize
-        string cleanHex = hexString.Replace(" ", "").Replace("\t", "").Replace("\n", "").Replace("\r", "");
-        
+        string cleanHex = hexString
+            .Replace(" ", "")
+            .Replace("\t", "")
+            .Replace("\n", "")
+            .Replace("\r", "");
+
         // Must have even number of characters
         if (cleanHex.Length % 2 != 0)
             return Maybe<byte[]>.None;
 
         return Maybe<byte[]>.From(
-            Enumerable.Range(0, cleanHex.Length / 2)
+            Enumerable
+                .Range(0, cleanHex.Length / 2)
                 .Select(i => cleanHex.Substring(i * 2, 2))
                 .Select(hex => Convert.ToByte(hex, 16))
                 .ToArray()

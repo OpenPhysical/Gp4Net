@@ -11,11 +11,9 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.OpenPhysical;
-using Gp4Net.Pipeline;
-using Gp4Net.Services;
 using Gp4Net.Services.GlobalPlatform;
+using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
-using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -26,6 +24,7 @@ namespace Gp4Net.Tool.Commands.Card;
 /// Command to retrieve data from ISD using GET DATA operations.
 /// </summary>
 [PublicAPI]
+[CliCommand("get-data", "Retrieve data objects from the card (IIN, CIN, OPID, etc.)", "card")]
 [CommandHandler(Description = "Retrieve data objects from the card")]
 public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
 {
@@ -34,7 +33,7 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
     /// </summary>
     public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
     {
-        Result<ICliExecutionContext, SmartCardError> connectionResult = await context
+        var connectionResult = await context
             .WithVerbose(settings.Verbose)
             .RequireCardConnection(settings.GetReaderName());
 
@@ -103,11 +102,13 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
     {
         try
         {
-            Result<byte[], SmartCardError> dataResult = await Gp4Net.Services.GlobalPlatform.Commands.CreateGetDataCommand(tag)
+            var dataResult = await Gp4Net
+                .Services.GlobalPlatform.Commands.CreateGetDataCommand(tag)
                 .Bind(command => command.ToCommandApdu())
                 .Bind(async apdu =>
                 {
-                    Result<CommandResponse, SmartCardError> response = await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    var response =
+                        await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
                     return response.Bind(resp => Responses.ParseGetDataResponse(resp));
                 });
             if (dataResult.IsSuccess)
@@ -149,11 +150,13 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 return 1;
             }
 
-            Result<byte[], SmartCardError> dataResult = await Gp4Net.Services.GlobalPlatform.Commands.CreateGetDataCommand(tag)
+            var dataResult = await Gp4Net
+                .Services.GlobalPlatform.Commands.CreateGetDataCommand(tag)
                 .Bind(command => command.ToCommandApdu())
                 .Bind(async apdu =>
                 {
-                    Result<CommandResponse, SmartCardError> response = await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    var response =
+                        await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
                     return response.Bind(resp => Responses.ParseGetDataResponse(resp));
                 });
             if (dataResult.IsSuccess)
@@ -183,25 +186,37 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
         try
         {
             // Get all three required components
-            Result<byte[], SmartCardError> iinResult = await Gp4Net.Services.GlobalPlatform.Commands.CreateGetDataCommand(GetDataCommand.DataObjects.IssuerIdentificationNumber)
+            var iinResult = await Gp4Net
+                .Services.GlobalPlatform.Commands.CreateGetDataCommand(
+                    GetDataCommand.DataObjects.IssuerIdentificationNumber
+                )
                 .Bind(command => command.ToCommandApdu())
                 .Bind(async apdu =>
                 {
-                    Result<CommandResponse, SmartCardError> response = await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    var response =
+                        await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
                     return response.Bind(Responses.ParseGetDataResponse);
                 });
-            Result<byte[], SmartCardError> cinResult = await Gp4Net.Services.GlobalPlatform.Commands.CreateGetDataCommand(GetDataCommand.DataObjects.CardImageNumber)
+            var cinResult = await Gp4Net
+                .Services.GlobalPlatform.Commands.CreateGetDataCommand(
+                    GetDataCommand.DataObjects.CardImageNumber
+                )
                 .Bind(command => command.ToCommandApdu())
                 .Bind(async apdu =>
                 {
-                    Result<CommandResponse, SmartCardError> response = await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    var response =
+                        await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
                     return response.Bind(Responses.ParseGetDataResponse);
                 });
-            Result<byte[], SmartCardError> urlResult = await Gp4Net.Services.GlobalPlatform.Commands.CreateGetDataCommand(GetDataCommand.DataObjects.SecurityDomainManagerUrl)
+            var urlResult = await Gp4Net
+                .Services.GlobalPlatform.Commands.CreateGetDataCommand(
+                    GetDataCommand.DataObjects.SecurityDomainManagerUrl
+                )
                 .Bind(command => command.ToCommandApdu())
                 .Bind(async apdu =>
                 {
-                    Result<CommandResponse, SmartCardError> response = await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    var response =
+                        await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
                     return response.Bind(Responses.ParseGetDataResponse);
                 });
 
@@ -214,13 +229,13 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
             }
 
             // All OPID components should be ASCII per specification
-            Result<string, SmartCardError> iinDecodeResult = iinResult.Bind(bytes =>
+            var iinDecodeResult = iinResult.Bind(bytes =>
                 Result.Success<string, SmartCardError>(Encoding.ASCII.GetString(bytes))
             );
-            Result<string, SmartCardError> cinDecodeResult = cinResult.Bind(bytes =>
+            var cinDecodeResult = cinResult.Bind(bytes =>
                 Result.Success<string, SmartCardError>(Encoding.ASCII.GetString(bytes))
             );
-            Result<string, SmartCardError> urlDecodeResult = urlResult.Bind(bytes =>
+            var urlDecodeResult = urlResult.Bind(bytes =>
                 Result.Success<string, SmartCardError>(Encoding.ASCII.GetString(bytes))
             );
 
@@ -248,20 +263,20 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
 
             // Try to reconstruct OPID
             if (
-                OpenPhysicalId.TryFromCardData(iin, cin, managerUrl, out OpenPhysicalId opid)
+                OpenPhysicalId.TryFromCardData(iin, cin, managerUrl, out var opid)
                 && opid != null
             )
             {
                 DisplayOpidData(context, settings, opid, iin, cin, managerUrl);
                 return 0;
             }
-            OpidValidationResult validation = OpidValidator.ValidateCardData(iin, cin, managerUrl);
+            var validation = OpidValidator.ValidateCardData(iin, cin, managerUrl);
             context.Display.Error(
                 $"Card data does not represent a valid OPID: {validation.ErrorMessage}"
             );
 
             // Show the individual components for debugging
-            Table table = new Table().AddColumn("Component").AddColumn("Value").AddColumn("Status");
+            var table = new Table().AddColumn("Component").AddColumn("Value").AddColumn("Status");
             _ = table.AddRow(
                 "IIN",
                 iin,
@@ -271,7 +286,7 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
             _ = table.AddRow(
                 "Manager URL",
                 managerUrl,
-                managerUrl == OpenPhysicalId.OpenPhysicalManagerUrl ? "[green]✓[/]" : "[red]✗[/]"
+                managerUrl == OpenPhysicalId.OPEN_PHYSICAL_MANAGER_URL ? "[green]✓[/]" : "[red]✗[/]"
             );
 
             AnsiConsole.Write(table);
@@ -286,7 +301,7 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
 
     private static async Task<int> GetAllDataAsync(ICliExecutionContext context, Settings settings)
     {
-        Dictionary<string, string> results = new Dictionary<string, string>();
+        var results = new Dictionary<string, string>();
         List<string> errors = [];
 
         // Try to get all standard data objects
@@ -305,11 +320,16 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
         {
             try
             {
-                Result<byte[], SmartCardError> dataResult = await Gp4Net.Services.GlobalPlatform.Commands.CreateGetDataCommand(tag)
+                var dataResult = await Gp4Net
+                    .Services.GlobalPlatform.Commands.CreateGetDataCommand(tag)
                     .Bind(command => command.ToCommandApdu())
                     .Bind(async apdu =>
                     {
-                        Result<CommandResponse, SmartCardError> response = await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                        var response =
+                            await context.CardService.ExecuteCommandAsync(
+                                apdu,
+                                CancellationToken.None
+                            );
                         return response.Bind(resp => Responses.ParseGetDataResponse(resp));
                     });
                 if (dataResult.IsSuccess)
@@ -340,28 +360,46 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
         )
         {
             // Functional OPID reconstruction with proper error handling
-            Result<OpenPhysicalId, SmartCardError> opidResult = Result.Success<byte[], SmartCardError>(Convert.FromHexString(results["IIN"]))
+            var opidResult = Result
+                .Success<byte[], SmartCardError>(Convert.FromHexString(results["IIN"]))
                 .Map(bytes => Encoding.ASCII.GetString(bytes))
                 .Bind(iin =>
-                    Result.Success<byte[], SmartCardError>(Convert.FromHexString(results["CIN"]))
+                    Result
+                        .Success<byte[], SmartCardError>(Convert.FromHexString(results["CIN"]))
                         .Map(bytes => Encoding.ASCII.GetString(bytes))
                         .Bind(cin =>
-                            Result.Success<byte[], SmartCardError>(Convert.FromHexString(results["Manager URL"]))
+                            Result
+                                .Success<byte[], SmartCardError>(
+                                    Convert.FromHexString(results["Manager URL"])
+                                )
                                 .Map(bytes => Encoding.ASCII.GetString(bytes))
                                 .Bind(url =>
                                 {
-                                    if (OpenPhysicalId.TryFromCardData(iin, cin, url, out OpenPhysicalId opid))
+                                    if (
+                                        OpenPhysicalId.TryFromCardData(
+                                            iin,
+                                            cin,
+                                            url,
+                                            out var opid
+                                        )
+                                    )
                                     {
                                         return Result.Success<OpenPhysicalId, SmartCardError>(opid);
                                     }
                                     return Result.Failure<OpenPhysicalId, SmartCardError>(
-                                        SmartCardError.InvalidArgument("Failed to construct OPID from card data")
+                                        SmartCardError.InvalidArgument(
+                                            "Failed to construct OPID from card data"
+                                        )
                                     );
-                                })));
+                                })
+                        )
+                );
 
             opidResult.Match(
                 opid => results["OPID"] = opid.ToDisplayFormat(),
-                error => { /* OPID reconstruction failed, that's okay */ }
+                error =>
+                { /* OPID reconstruction failed, that's okay */
+                }
             );
         }
 
@@ -408,7 +446,7 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 );
                 break;
             default: // table
-                Table table = new Table().AddColumn("Property").AddColumn("Value");
+                var table = new Table().AddColumn("Property").AddColumn("Value");
                 _ = table.AddRow("Name", name);
                 _ = table.AddRow("Value (Hex)", $"[dim]{Convert.ToHexString(response.Data)}[/]");
                 _ = table.AddRow("Value (Text)", TryDecodeAsText(response.Data));
@@ -454,7 +492,7 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 );
                 break;
             default: // table
-                Table table = new Table().AddColumn("Property").AddColumn("Value");
+                var table = new Table().AddColumn("Property").AddColumn("Value");
                 _ = table.AddRow("OPID", $"[green]{opid.ToDisplayFormat()}[/]");
                 _ = table.AddRow("Format", $"{opid.Format} ({opid.Format.GetDescription()})");
                 _ = table.AddRow("IIN", iin);
@@ -484,8 +522,8 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 );
                 break;
             default: // table
-                Table table = new Table().AddColumn("Data Object").AddColumn("Value");
-                foreach (KeyValuePair<string, string> kvp in results)
+                var table = new Table().AddColumn("Data Object").AddColumn("Value");
+                foreach (var kvp in results)
                 {
                     _ = table.AddRow(kvp.Key, kvp.Value);
                 }

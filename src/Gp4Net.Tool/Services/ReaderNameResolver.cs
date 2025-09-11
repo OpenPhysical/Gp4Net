@@ -31,9 +31,12 @@ public static class ReaderNameResolver
         CancellationToken cancellationToken = default
     )
     {
-        return await Maybe.From(cardService)
+        return await Maybe
+            .From(cardService)
             .ToResult(SmartCardError.InvalidArgument("Card service cannot be null"))
-            .Bind(async service => await ResolveReaderNameInternal(readerInput, service, cancellationToken));
+            .Bind(async service =>
+                await ResolveReaderNameInternal(readerInput, service, cancellationToken)
+            );
     }
 
     private static async Task<Result<string, SmartCardError>> ResolveReaderNameInternal(
@@ -42,9 +45,8 @@ public static class ReaderNameResolver
         CancellationToken cancellationToken
     )
     {
-
         // Get available readers first
-        Result<string[], SmartCardError> readersResult = await cardService.GetReadersAsync(
+        var readersResult = await cardService.GetReadersAsync(
             cancellationToken
         );
         if (readersResult.IsFailure)
@@ -94,7 +96,12 @@ public static class ReaderNameResolver
         }
 
         // Try exact match first (case-sensitive)
-        ImmutableList<string> exactMatches = [.. availableReaders.Where(reader => string.Equals(reader, input, StringComparison.Ordinal))];
+        ImmutableList<string> exactMatches =
+        [
+            .. availableReaders.Where(reader =>
+                string.Equals(reader, input, StringComparison.Ordinal)
+            ),
+        ];
 
         if (exactMatches.Count == 1)
         {
@@ -102,7 +109,12 @@ public static class ReaderNameResolver
         }
 
         // Try exact match case-insensitive
-        ImmutableList<string> exactMatchesInsensitive = [.. availableReaders.Where(reader => string.Equals(reader, input, StringComparison.OrdinalIgnoreCase))];
+        ImmutableList<string> exactMatchesInsensitive =
+        [
+            .. availableReaders.Where(reader =>
+                string.Equals(reader, input, StringComparison.OrdinalIgnoreCase)
+            ),
+        ];
 
         if (exactMatchesInsensitive.Count == 1)
         {
@@ -110,7 +122,12 @@ public static class ReaderNameResolver
         }
 
         // Try partial matching (case-insensitive)
-        ImmutableList<string> partialMatches = [.. availableReaders.Where(reader => reader.Contains(input, StringComparison.OrdinalIgnoreCase))];
+        ImmutableList<string> partialMatches =
+        [
+            .. availableReaders.Where(reader =>
+                reader.Contains(input, StringComparison.OrdinalIgnoreCase)
+            ),
+        ];
 
         return partialMatches.Count switch
         {
@@ -128,9 +145,12 @@ public static class ReaderNameResolver
     )
     {
         // Filter out virtual readers for auto-detection (prefer physical readers)
-        ImmutableList<string> physicalReaders = [.. availableReaders.Where(reader => !IsVirtualReader(reader))];
+        ImmutableList<string> physicalReaders =
+        [
+            .. availableReaders.Where(reader => !IsVirtualReader(reader)),
+        ];
 
-        ImmutableList<string> selectedReaders = physicalReaders.IsEmpty
+        var selectedReaders = physicalReaders.IsEmpty
             ? availableReaders
             : physicalReaders;
 
@@ -160,7 +180,6 @@ public static class ReaderNameResolver
     /// </summary>
     private static bool IsVirtualReader(string readerName)
     {
-
         string lowerName = readerName.ToLowerInvariant();
         return lowerName.Contains("virtual")
             || lowerName.Contains("simulator")

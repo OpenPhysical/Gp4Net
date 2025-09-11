@@ -10,10 +10,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Domain;
 using Gp4Net.Core;
-using Gp4Net.Domain;
 using Gp4Net.Domain.CapFile;
-using System.Text;
-using Gp4Net.Cryptography;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Functional;
@@ -35,7 +32,8 @@ public static class LoadProcessor
     public static Result<(ApduResponse, CardState), SmartCardError> Process(
         ParsedCommand command,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return command.P1 switch
         {
@@ -43,7 +41,8 @@ public static class LoadProcessor
             0x01 => ProcessSubsequentLoad(command, state, config),
             0x80 => ProcessLastLoad(command, state, config),
             _ => Result.Failure<(ApduResponse, CardState), SmartCardError>(
-                SmartCardError.IncorrectP1P2($"Invalid P1 parameter: {command.P1:X2}"))
+                SmartCardError.IncorrectP1P2($"Invalid P1 parameter: {command.P1:X2}")
+            ),
         };
     }
 
@@ -53,7 +52,8 @@ public static class LoadProcessor
     private static Result<(ApduResponse, CardState), SmartCardError> ProcessFirstLoad(
         ParsedCommand command,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return GetOrCreateLoadContext(state, command.P2)
             .Bind(loadContext => ValidateFirstLoadData(command.Data))
@@ -67,7 +67,8 @@ public static class LoadProcessor
     private static Result<(ApduResponse, CardState), SmartCardError> ProcessSubsequentLoad(
         ParsedCommand command,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return GetLoadContext(state, command.P2)
             .Bind(loadContext => AccumulateLoadData(loadContext, command.Data))
@@ -81,7 +82,8 @@ public static class LoadProcessor
     private static Result<(ApduResponse, CardState), SmartCardError> ProcessLastLoad(
         ParsedCommand command,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return GetLoadContext(state, command.P2)
             .Bind(loadContext => AccumulateLoadData(loadContext, command.Data))
@@ -94,17 +96,21 @@ public static class LoadProcessor
     /// </summary>
     private static Result<LoadContext, SmartCardError> GetOrCreateLoadContext(
         CardState state,
-        byte blockNumber)
+        byte blockNumber
+    )
     {
         string contextKey = $"LOAD_{blockNumber:X2}";
-        
+
         return state.LoadContexts.ContainsKey(contextKey)
             ? Result.Success<LoadContext, SmartCardError>(state.LoadContexts[contextKey])
-            : Result.Success<LoadContext, SmartCardError>(new LoadContext(
-                blockNumber,
-                ImmutableList<byte[]>.Empty,
-                Maybe<ImmutableArray<byte>>.None,
-                0));
+            : Result.Success<LoadContext, SmartCardError>(
+                new LoadContext(
+                    blockNumber,
+                    ImmutableList<byte[]>.Empty,
+                    Maybe<ImmutableArray<byte>>.None,
+                    0
+                )
+            );
     }
 
     /// <summary>
@@ -112,13 +118,16 @@ public static class LoadProcessor
     /// </summary>
     private static Result<LoadContext, SmartCardError> GetLoadContext(
         CardState state,
-        byte blockNumber)
+        byte blockNumber
+    )
     {
         string contextKey = $"LOAD_{blockNumber:X2}";
-        
+
         return state.LoadContexts.ContainsKey(contextKey)
             ? Result.Success<LoadContext, SmartCardError>(state.LoadContexts[contextKey])
-            : Result.Failure<LoadContext, SmartCardError>(SmartCardError.ConditionsOfUseNotSatisfied());
+            : Result.Failure<LoadContext, SmartCardError>(
+                SmartCardError.ConditionsOfUseNotSatisfied()
+            );
     }
 
     /// <summary>
@@ -128,7 +137,9 @@ public static class LoadProcessor
     {
         return data.Length > 0
             ? Result.Success<byte[], SmartCardError>(data)
-            : Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidData("First LOAD command must contain data"));
+            : Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidData("First LOAD command must contain data")
+            );
     }
 
     /// <summary>
@@ -137,17 +148,19 @@ public static class LoadProcessor
     private static Result<CardState, SmartCardError> InitializeLoadContext(
         byte[] firstData,
         CardState state,
-        byte blockNumber)
+        byte blockNumber
+    )
     {
         var loadContext = new LoadContext(
             blockNumber,
             ImmutableList.Create<byte[]>(firstData),
             Maybe<ImmutableArray<byte>>.None,
-            firstData.Length);
+            firstData.Length
+        );
 
         string contextKey = $"LOAD_{blockNumber:X2}";
         var newContexts = state.LoadContexts.SetItem(contextKey, loadContext);
-        
+
         return Result.Success<CardState, SmartCardError>(state.WithLoadContexts(newContexts));
     }
 
@@ -156,16 +169,17 @@ public static class LoadProcessor
     /// </summary>
     private static Result<LoadContext, SmartCardError> AccumulateLoadData(
         LoadContext loadContext,
-        byte[] newData)
+        byte[] newData
+    )
     {
         var builder = loadContext.AccumulatedData.ToBuilder();
         builder.Add(newData);
         var updatedData = builder.ToImmutable();
-        
+
         var updatedContext = loadContext with
         {
             AccumulatedData = updatedData,
-            TotalSize = loadContext.TotalSize + newData.Length
+            TotalSize = loadContext.TotalSize + newData.Length,
         };
 
         return Result.Success<LoadContext, SmartCardError>(updatedContext);
@@ -177,11 +191,12 @@ public static class LoadProcessor
     private static Result<CardState, SmartCardError> UpdateLoadContext(
         CardState state,
         LoadContext loadContext,
-        byte blockNumber)
+        byte blockNumber
+    )
     {
         string contextKey = $"LOAD_{blockNumber:X2}";
         var newContexts = state.LoadContexts.SetItem(contextKey, loadContext);
-        
+
         return Result.Success<CardState, SmartCardError>(state.WithLoadContexts(newContexts));
     }
 
@@ -191,14 +206,19 @@ public static class LoadProcessor
     private static Result<CardState, SmartCardError> ProcessCompleteCapFile(
         LoadContext loadContext,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return CombineLoadData(loadContext)
-            .Bind(capFileData => ParseCapFileStructure(capFileData)
-                .Bind(capInfo => VerifyLfdbhHash(capFileData, state)
-                    .Bind(_ => VerifyDapSignature(capFileData, config))
-                    .Bind(_ => CreateLoadFileFromCapInfo(capInfo, state)))
-                .Bind(loadFile => InstallLoadFile(loadFile, state)))
+            .Bind(capFileData =>
+                ParseCapFileStructure(capFileData)
+                    .Bind(capInfo =>
+                        VerifyLfdbhHash(capFileData, state)
+                            .Bind(_ => VerifyDapSignature(capFileData, config))
+                            .Bind(_ => CreateLoadFileFromCapInfo(capInfo, state))
+                    )
+                    .Bind(loadFile => InstallLoadFile(loadFile, state))
+            )
             .Map(newState => ClearLoadContext(newState, loadContext.BlockNumber));
     }
 
@@ -209,15 +229,15 @@ public static class LoadProcessor
     {
         try
         {
-            var combinedData = loadContext.AccumulatedData
-                .SelectMany(chunk => chunk)
-                .ToArray();
-            
+            var combinedData = loadContext.AccumulatedData.SelectMany(chunk => chunk).ToArray();
+
             return Result.Success<byte[], SmartCardError>(combinedData);
         }
         catch (Exception ex)
         {
-            return Result.Failure<byte[], SmartCardError>(SmartCardError.UnexpectedError($"Failed to combine load data: {ex.Message}"));
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.UnexpectedError($"Failed to combine load data: {ex.Message}")
+            );
         }
     }
 
@@ -226,73 +246,57 @@ public static class LoadProcessor
     /// </summary>
     private static Result<CapFileInfo, SmartCardError> ParseCapFileStructure(byte[] capData)
     {
-        return CapFileStructure.Parse(capData)
+        return CapFileStructure
+            .Parse(capData)
             .Map(structure => new CapFileInfo(
                 structure.PackageAid,
                 structure.PackageVersion.ToString(),
-                structure.Applets.Select(a => a.Aid).ToArray()))
-            .MapError(error => SmartCardError.InvalidData($"Invalid CAP file structure: {error.Message}"));
+                structure.Applets.Select(a => a.Aid).ToArray()
+            ))
+            .MapError(error =>
+                SmartCardError.InvalidData($"Invalid CAP file structure: {error.Message}")
+            );
     }
 
     /// <summary>
     /// Verifies the Load File Data Block Hash (LFDBH) against the expected value.
+    /// Per GlobalPlatform Card Specification v2.3.1 Section 11.5.2.1.
     /// </summary>
-    private static Result<bool, SmartCardError> VerifyLfdbhHash(
-        byte[] capFileData,
-        CardState state)
+    private static Result<bool, SmartCardError> VerifyLfdbhHash(byte[] capFileData, CardState state)
     {
         return ExtractExpectedLfdbhFromState(state)
-            .Bind(expectedLfdbh => ComputeActualLfdbh(capFileData)
-                .Bind(actualLfdbh => VerifyHashMatch(expectedLfdbh, actualLfdbh)));
+            .Bind(expectedLfdbh =>
+                LoadFileDataBlockHash.ComputeFromCapFile(capFileData)
+                    .Bind(actualLfdbh => expectedLfdbh.VerifyMatch(actualLfdbh))
+            );
     }
 
     /// <summary>
     /// Extracts the expected LFDBH from the card state (from Install for Load response).
     /// </summary>
-    private static Result<byte[], SmartCardError> ExtractExpectedLfdbhFromState(CardState state)
+    private static Result<LoadFileDataBlockHash, SmartCardError> ExtractExpectedLfdbhFromState(
+        CardState state
+    )
     {
         // In a real implementation, this would extract the LFDBH from Install for Load response
         // For emulation, create a default expected hash
-        return CreateDefaultExpectedHash("LoadFile");
+        return state.DataObjects.TryGetValue(0xC001, out var hashValue)
+            ? LoadFileDataBlockHash.Create(hashValue)
+            : Result.Failure<LoadFileDataBlockHash, SmartCardError>(
+                SmartCardError.SecurityStatusNotSatisfied(
+                    "Expected LFDBH not found in card state - INSTALL [for load] required first"
+                )
+            );
     }
 
-    /// <summary>
-    /// Creates a default expected hash for emulation purposes.
-    /// </summary>
-    private static Result<byte[], SmartCardError> CreateDefaultExpectedHash(string stateData)
-    {
-        return CryptoService.Hash.Sha256(System.Text.Encoding.UTF8.GetBytes(stateData))
-            .Map(hash => hash[..20]); // Take first 20 bytes
-    }
-
-    /// <summary>
-    /// Computes the actual LFDBH from the CAP file data.
-    /// </summary>
-    private static Result<byte[], SmartCardError> ComputeActualLfdbh(byte[] capFileData)
-    {
-        return CryptoService.Hash.Sha256(capFileData)
-            .Map(hash => hash[..20]); // Take first 20 bytes
-    }
-
-    /// <summary>
-    /// Verifies that the computed hash matches the expected hash.
-    /// </summary>
-    private static Result<bool, SmartCardError> VerifyHashMatch(
-        byte[] expectedLfdbh,
-        byte[] actualLfdbh)
-    {
-        bool matches = expectedLfdbh.SequenceEqual(actualLfdbh);
-        return matches
-            ? Result.Success<bool, SmartCardError>(true)
-            : Result.Failure<bool, SmartCardError>(SmartCardError.SecurityStatusNotSatisfied("LFDBH verification failed"));
-    }
 
     /// <summary>
     /// Verifies the DAP (Data Authentication Pattern) signature if present.
     /// </summary>
     private static Result<bool, SmartCardError> VerifyDapSignature(
         byte[] capFileData,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return DapProcessor.VerifyDapSignature(capFileData, config);
     }
@@ -302,13 +306,17 @@ public static class LoadProcessor
     /// </summary>
     private static Result<LoadFile, SmartCardError> CreateLoadFileFromCapInfo(
         CapFileInfo capInfo,
-        CardState state)
+        CardState state
+    )
     {
-        return Result.Success<LoadFile, SmartCardError>(new LoadFile(
-            capInfo.PackageAid,
-            new byte[] { 0xA0, 0x00, 0x00, 0x01, 0x51 }, // Default ISD AID
-            0x01, // LOADED state
-            ImmutableList<ExecutableModule>.Empty));
+        return Result.Success<LoadFile, SmartCardError>(
+            new LoadFile(
+                capInfo.PackageAid,
+                new byte[] { 0xA0, 0x00, 0x00, 0x01, 0x51 }, // Default ISD AID
+                0x01, // LOADED state
+                ImmutableList<ExecutableModule>.Empty
+            )
+        );
     }
 
     /// <summary>
@@ -316,7 +324,8 @@ public static class LoadProcessor
     /// </summary>
     private static Result<CardState, SmartCardError> InstallLoadFile(
         LoadFile loadFile,
-        CardState state)
+        CardState state
+    )
     {
         return Result.Success<CardState, SmartCardError>(state.WithLoadFile(loadFile));
     }
@@ -338,13 +347,11 @@ public static class LoadProcessor
         byte BlockNumber,
         ImmutableList<byte[]> AccumulatedData,
         Maybe<ImmutableArray<byte>> ExpectedLfdbh,
-        int TotalSize);
+        int TotalSize
+    );
 
     /// <summary>
     /// CAP file information extracted from parsed structure.
     /// </summary>
-    private record CapFileInfo(
-        byte[] PackageAid,
-        string PackageName,
-        byte[][] AppletAids);
+    private record CapFileInfo(byte[] PackageAid, string PackageName, byte[][] AppletAids);
 }

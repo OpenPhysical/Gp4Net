@@ -9,13 +9,12 @@ using Gp4Net.CardEmulator.Functional;
 using Gp4Net.CardEmulator.Profiles;
 using Gp4Net.CardEmulator.Transport;
 using Gp4Net.Core;
-using Gp4Net.Pipeline;
-using static Gp4Net.Pipeline.CommandProcessing;
-using Gp4Net.Services;
-using Gp4Net.Transport;
 using Gp4Net.Domain;
+using Gp4Net.Pipeline;
+using Gp4Net.Services;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
+using static Gp4Net.Pipeline.CommandProcessing;
 
 namespace Gp4Net.Tool.Services;
 
@@ -50,13 +49,15 @@ public static class VirtualCardConnectionService
     private static Result<string, SmartCardError> ParseVirtualReaderSpec(string spec)
     {
         const string prefix = "virtual:";
-        
+
         return Maybe<string>
             .From(spec)
             .Where(s => s.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             .Map(s => s[prefix.Length..])
             .Where(path => !string.IsNullOrWhiteSpace(path))
-            .ToResult(SmartCardError.InvalidArgument($"Invalid virtual reader specification: {spec}"));
+            .ToResult(
+                SmartCardError.InvalidArgument($"Invalid virtual reader specification: {spec}")
+            );
     }
 
     /// <summary>
@@ -71,7 +72,7 @@ public static class VirtualCardConnectionService
         {
             return await LoadCardFromProfile(profilePath, cancellationToken);
         }
-        
+
         return Result.Failure<VirtualCard, SmartCardError>(
             SmartCardError.InvalidArgument($"Virtual card profile not found: {profilePath}")
         );
@@ -87,11 +88,11 @@ public static class VirtualCardConnectionService
     {
         // Use the existing CardProfileLoader which handles all the JSON parsing
         return Task.FromResult(
-            CardProfileLoader.LoadFromFile(profilePath)
+            CardProfileLoader
+                .LoadFromFile(profilePath)
                 .Map(config => VirtualCardTestBuilder.CreateWithSecureRng(config))
         );
     }
-
 
     /// <summary>
     /// Creates a SmartCardService with a virtual card backend.
@@ -101,19 +102,27 @@ public static class VirtualCardConnectionService
         ILogger<SmartCardService> logger
     )
     {
-        return VirtualCardChannel.Create(virtualCard)
-            .Bind(channel => VirtualCardTransport.Create(virtualCard)
-                .Map(transport => (channel, transport)))
+        return VirtualCardChannel
+            .Create(virtualCard)
+            .Bind(channel =>
+                VirtualCardTransport.Create(virtualCard).Map(transport => (channel, transport))
+            )
             .Map(tuple =>
             {
                 var (channel, transport) = tuple;
-                
+
                 var environment = new CommandEnvironment(
                     Channel: channel,
                     Transport: transport,
                     SecureChannel: Maybe<SecureChannelState>.None,
                     Logger: logger,
-                    Options: CommandOptions.Default
+                    Options: new CommandOptions(
+                        UseSecureChannel: false,
+                        CaptureMetrics: true,
+                        EnableLogging: true,     // Enable logging infrastructure
+                        VerboseLogging: false,   // CLI will override if --verbose
+                        DebugLogging: false      // CLI will override if --debug
+                    )
                 );
 
                 var processor = Gp4Net.Pipeline.CommandProcessors.CreatePipeline(
@@ -148,16 +157,12 @@ public static class VirtualCardConnectionService
     /// </summary>
     private static Result<string, SmartCardError> SerializeCardState(VirtualCard virtualCard)
     {
-        var cardState = new
-        {
-            CardType = "VirtualCard",
-            Timestamp = DateTime.UtcNow
-        };
+        var cardState = new { CardType = "VirtualCard", Timestamp = DateTime.UtcNow };
 
-        string json = JsonSerializer.Serialize(cardState, new JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
+        string json = JsonSerializer.Serialize(
+            cardState,
+            new JsonSerializerOptions { WriteIndented = true }
+        );
 
         return Result.Success<string, SmartCardError>(json);
     }

@@ -62,9 +62,11 @@ public class InitializeUpdateCommandTests
             keyId,
             hostChallenge
         );
-        InitializeUpdateCommand? command = result.Value;
+        var command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         _ = apdu[0].Should().Be(0x80); // CLA - GlobalPlatform
         _ = apdu[1].Should().Be(0x50); // INS - INITIALIZE UPDATE
@@ -88,8 +90,10 @@ public class InitializeUpdateCommandTests
                 0x00,
                 hostChallenge
             );
-            InitializeUpdateCommand? command = result.Value;
-            byte[]? apdu = ApduBuilder.BuildApdu(command);
+            var command = result.Value;
+            Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+            _ = apduResult.IsSuccess.Should().BeTrue();
+            byte[] apdu = apduResult.Value;
 
             _ = apdu[2].Should().Be(keyVersion); // P1
         }
@@ -108,8 +112,10 @@ public class InitializeUpdateCommandTests
                 keyId,
                 hostChallenge
             );
-            InitializeUpdateCommand? command = result.Value;
-            byte[]? apdu = ApduBuilder.BuildApdu(command);
+            var command = result.Value;
+            Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+            _ = apduResult.IsSuccess.Should().BeTrue();
+            byte[] apdu = apduResult.Value;
 
             _ = apdu[3].Should().Be(keyId); // P2
         }
@@ -125,9 +131,11 @@ public class InitializeUpdateCommandTests
             0x00,
             hostChallenge
         );
-        InitializeUpdateCommand? command = result.Value;
+        var command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         _ = apdu[3].Should().Be(0x00); // P2 must be 0x00 for SCP03
     }
@@ -140,10 +148,15 @@ public class InitializeUpdateCommandTests
             0x00,
             new byte[8]
         );
-        InitializeUpdateCommand? command = result.Value;
+        var command = result.Value;
 
-        byte[]? apdu1 = ApduBuilder.BuildApdu(command);
-        byte[]? apdu2 = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult1 = ApduBuilder.BuildApdu(command);
+        _ = apduResult1.IsSuccess.Should().BeTrue();
+        byte[] apdu1 = apduResult1.Value;
+
+        Result<byte[], SmartCardError> apduResult2 = ApduBuilder.BuildApdu(command);
+        _ = apduResult2.IsSuccess.Should().BeTrue();
+        byte[] apdu2 = apduResult2.Value;
 
         _ = apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
         _ = apdu2.Should().BeEquivalentTo(apdu1); // But with same content
@@ -158,7 +171,7 @@ public class InitializeUpdateCommandTests
             0x00,
             hostChallenge
         );
-        InitializeUpdateCommand? command = result.Value;
+        var command = result.Value;
 
         string? resultString = command.ToString();
 
@@ -183,8 +196,10 @@ public class InitializeUpdateCommandTests
             0x00,
             new byte[8]
         );
-        InitializeUpdateCommand? command = result.Value;
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        var command = result.Value;
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         _ = apdu.Length.Should().Be(14); // 5 header + 8 data + 1 Le
         _ = apdu[0].Should().Be(0x80); // CLA
@@ -201,12 +216,12 @@ public class InitializeUpdateCommandTests
             0x00,
             new byte[8]
         );
-        InitializeUpdateCommand? command = result.Value;
+        var command = result.Value;
 
-        _ = command.Cla.Should().Be(InitializeUpdateCommand.ClassByte);
-        _ = command.Ins.Should().Be(InitializeUpdateCommand.InstructionByte);
-        _ = InitializeUpdateCommand.ClassByte.Should().Be(0x80);
-        _ = InitializeUpdateCommand.InstructionByte.Should().Be(0x50);
+        _ = command.Cla.Should().Be(InitializeUpdateCommand.CLASS_BYTE);
+        _ = command.Ins.Should().Be(InitializeUpdateCommand.INSTRUCTION_BYTE);
+        _ = InitializeUpdateCommand.CLASS_BYTE.Should().Be(0x80);
+        _ = InitializeUpdateCommand.INSTRUCTION_BYTE.Should().Be(0x50);
     }
 
     [Test]
@@ -218,7 +233,7 @@ public class InitializeUpdateCommandTests
             0x00,
             originalChallenge
         );
-        InitializeUpdateCommand? command = result.Value;
+        var command = result.Value;
 
         _ = command.HostChallenge.Should().NotBeNull();
         _ = command.HostChallenge.Length.Should().Be(8);
@@ -233,7 +248,7 @@ public class InitializeUpdateCommandTests
             0x00,
             originalChallenge
         );
-        InitializeUpdateCommand? command = result.Value;
+        var command = result.Value;
 
         // Modify the original array
         originalChallenge[0] = 0xFF;

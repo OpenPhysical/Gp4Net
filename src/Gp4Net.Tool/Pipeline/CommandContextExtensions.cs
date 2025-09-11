@@ -28,7 +28,7 @@ public static class CommandContextExtensions
         if (context.Display is DisplayService displayService)
         {
             // Create a new display service with updated verbose setting
-            DisplayService newDisplayService = new DisplayService(verbose);
+            var newDisplayService = new DisplayService(verbose);
             // Note: This creates a new context but loses the domain service factory
             // In practice, commands should just use the existing context
             return context;

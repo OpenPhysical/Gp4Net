@@ -23,7 +23,7 @@ public class SelectCommandAutoDetectionTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        SelectCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Should().NotBeNull();
         _ = command.Aid.Should().BeEmpty();
         _ = command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
@@ -37,10 +37,12 @@ public class SelectCommandAutoDetectionTests
         Result<SelectCommand, SmartCardError> result =
             SelectCommand.CreateForIssuerSecurityDomain();
         _ = result.IsSuccess.Should().BeTrue();
-        SelectCommand? command = result.Value;
+        var command = result.Value;
 
         // Act
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         // Assert
         _ = apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 });
@@ -54,7 +56,7 @@ public class SelectCommandAutoDetectionTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        SelectCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Aid.Should().BeEmpty();
     }
 
@@ -69,7 +71,7 @@ public class SelectCommandAutoDetectionTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        SelectResponse? response = result.Value;
+        var response = result.Value;
         _ = response.Fci.HasValue.Should().BeTrue();
         _ = response.Fci.Match(
             fci =>
@@ -103,7 +105,7 @@ public class SelectCommandAutoDetectionTests
     public void SelectResponse_ParsesComplexFci()
     {
         // Arrange - More complex FCI with multiple fields
-        TlvBuilder tlvBuilder = new TlvBuilder();
+        var tlvBuilder = new TlvBuilder();
         tlvBuilder.Add(
             0x6F,
             builder =>
@@ -128,7 +130,7 @@ public class SelectCommandAutoDetectionTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        SelectResponse? response = result.Value;
+        var response = result.Value;
         _ = response.Fci.HasValue.Should().BeTrue();
         _ = response.Fci.Match(
             fci =>
@@ -193,7 +195,7 @@ public class SelectCommandAutoDetectionTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        SelectResponse? response = result.Value;
+        var response = result.Value;
         _ = response.Should().NotBeNull();
         _ = response.Fci.HasValue.Should().BeFalse();
         _ = response.RawData.Should().BeEmpty();
@@ -210,7 +212,7 @@ public class SelectCommandAutoDetectionTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        SelectResponse? response = result.Value;
+        var response = result.Value;
         _ = response.Should().NotBeNull();
         _ = response.Fci.HasValue.Should().BeFalse(); // Should not parse as FCI
         _ = response.RawData.Should().BeEquivalentTo(nonFciData);
@@ -225,7 +227,7 @@ public class SelectCommandAutoDetectionTests
         // Assert
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<InvalidDataError>();
-        InvalidDataError? error = result.Error as InvalidDataError;
+        var error = result.Error as InvalidDataError;
         _ = error.Should().NotBeNull();
         _ = error!.Field.Should().Be("AID");
         _ = error.Message.Should().Contain("cannot be null");
@@ -243,7 +245,7 @@ public class SelectCommandAutoDetectionTests
         // Assert
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<InvalidLengthError>();
-        InvalidLengthError? error = result.Error as InvalidLengthError;
+        var error = result.Error as InvalidLengthError;
         _ = error.Should().NotBeNull();
         _ = error!.Field.Should().Be("AID");
         _ = error.Expected.Should().Be(16);
@@ -261,7 +263,7 @@ public class SelectCommandAutoDetectionTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        SelectCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Aid.Should().BeEquivalentTo(aid);
         _ = command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
     }
@@ -280,7 +282,7 @@ public class SelectCommandAutoDetectionTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        SelectCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Aid.Should().BeEquivalentTo(aid);
         _ = ((byte)command.ControlInfo).Should().Be(0x02); // ReturnFci | Next
     }
@@ -294,7 +296,7 @@ public class SelectCommandAutoDetectionTests
         // Assert
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<InvalidDataError>();
-        InvalidDataError? error = result.Error as InvalidDataError;
+        var error = result.Error as InvalidDataError;
         _ = error.Should().NotBeNull();
         _ = error!.Field.Should().Be("Response");
         _ = error.Message.Should().Contain("cannot be null");
@@ -308,7 +310,7 @@ public class SelectCommandAutoDetectionTests
             Convert.FromHexString("A000000151000000")
         );
         _ = result.IsSuccess.Should().BeTrue();
-        SelectCommand? command = result.Value;
+        var command = result.Value;
 
         // Act
         string? str = command.ToString();
@@ -334,7 +336,7 @@ internal class TlvBuilder
 
     public void Add(int tag, Action<TlvBuilder> constructedContent)
     {
-        TlvBuilder subBuilder = new TlvBuilder();
+        var subBuilder = new TlvBuilder();
         constructedContent(subBuilder);
         byte[] value = subBuilder.Build();
         Add(tag, value);

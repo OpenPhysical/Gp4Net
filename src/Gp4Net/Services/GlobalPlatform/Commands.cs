@@ -43,9 +43,7 @@ public static class Commands
     /// <param name="aid">The application identifier to select.</param>
     public static Result<SelectCommand, SmartCardError> CreateSelectCommand(byte[] aid)
     {
-        return aid is not { Length: > 0 }
-            ? CreateSelectIsdCommand()
-            : SelectCommand.Create(aid);
+        return aid is not { Length: > 0 } ? CreateSelectIsdCommand() : SelectCommand.Create(aid);
     }
 
     /// <summary>
@@ -94,10 +92,16 @@ public static class Commands
     )
     {
         return mac.Match(
-            macValue => macValue.Length > 0
-                ? ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, macValue)
-                : ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram),
-            () => ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram));
+            macValue =>
+                macValue.Length > 0
+                    ? ExternalAuthenticateCommand.CreateWithMac(
+                        securityLevel,
+                        hostCryptogram,
+                        macValue
+                    )
+                    : ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram),
+            () => ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram)
+        );
     }
 
     /// <summary>
@@ -111,7 +115,11 @@ public static class Commands
         Maybe<byte[]> searchCriteria = default
     )
     {
-        return GetStatusCommand.Create(subset, GetStatusCommand.ResponseFormat.Tlv, searchCriteria.GetValueOrDefault([]));
+        return GetStatusCommand.Create(
+            subset,
+            GetStatusCommand.ResponseFormat.Tlv,
+            searchCriteria.GetValueOrDefault([])
+        );
     }
 
     /// <summary>

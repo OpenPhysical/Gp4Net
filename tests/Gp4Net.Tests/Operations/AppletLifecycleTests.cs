@@ -40,7 +40,7 @@ public class AppletLifecycleTests
         try
         {
             string jsonContent = File.ReadAllText(tracePath);
-            JsonDocument testData = JsonDocument.Parse(jsonContent);
+            var testData = JsonDocument.Parse(jsonContent);
             return Result.Success<JsonDocument, string>(testData);
         }
         catch (Exception ex)
@@ -61,7 +61,7 @@ public class AppletLifecycleTests
         JsonDocument testData,
         string traceFile
     ) =>
-        testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement)
+        testData.RootElement.TryGetProperty("exchanges", out var exchangesElement)
             ? Result.Success<JsonElement, string>(exchangesElement)
             : Result.Failure<JsonElement, string>($"No exchanges found in trace {traceFile}");
 
@@ -200,16 +200,23 @@ public class AppletLifecycleTests
     /// Test applet installation operations including CAP file loading and installation.
     /// </summary>
     [TestCase("gp_pro_install_scp03.json", "SCP03 applet installation")]
-    public void AppletLifecycle_Should_Install_Applets(string traceFile, string description) =>
-        LoadInstallationTraceFile(traceFile)
+    public void AppletLifecycle_Should_Install_Applets(string traceFile, string description)
+    {
+        var result = LoadInstallationTraceFile(traceFile)
             .Bind(testData => ValidateExchangesExist(testData, traceFile))
             .Bind(exchangesElement =>
                 ValidateAppletInstallation(exchangesElement, description, traceFile)
-            )
-            .Match(
-                success => Assert.Pass("Test completed successfully"),
-                failure => Assert.Inconclusive(failure)
             );
+
+        if (result.IsSuccess)
+        {
+            Assert.Pass("Test completed successfully");
+        }
+        else
+        {
+            Assert.Inconclusive(result.Error);
+        }
+    }
 
     /// <summary>
     /// Test applet uninstallation operations including DELETE commands.
@@ -230,11 +237,11 @@ public class AppletLifecycleTests
         }
 
         string jsonContent = File.ReadAllText(tracePath);
-        JsonDocument testData = JsonDocument.Parse(jsonContent);
+        var testData = JsonDocument.Parse(jsonContent);
 
         TestContext.Out.WriteLine($"Testing {description}");
 
-        if (!testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement))
+        if (!testData.RootElement.TryGetProperty("exchanges", out var exchangesElement))
         {
             Assert.Inconclusive($"No exchanges found in trace {traceFile}");
             return;
@@ -244,7 +251,7 @@ public class AppletLifecycleTests
         bool foundDelete = false;
         int deleteCommands = 0;
 
-        foreach (JsonElement exchange in exchangesElement.EnumerateArray())
+        foreach (var exchange in exchangesElement.EnumerateArray())
         {
             string command = exchange.GetProperty("command").GetString()!;
             string response = exchange.GetProperty("response").GetString()!;
@@ -313,11 +320,11 @@ public class AppletLifecycleTests
         }
 
         string jsonContent = File.ReadAllText(tracePath);
-        JsonDocument testData = JsonDocument.Parse(jsonContent);
+        var testData = JsonDocument.Parse(jsonContent);
 
         TestContext.Out.WriteLine($"Testing {description}");
 
-        if (!testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement))
+        if (!testData.RootElement.TryGetProperty("exchanges", out var exchangesElement))
         {
             Assert.Inconclusive($"No exchanges found in trace {traceFile}");
             return;
@@ -429,9 +436,9 @@ public class AppletLifecycleTests
         }
 
         string jsonContent = File.ReadAllText(tracePath);
-        JsonDocument testData = JsonDocument.Parse(jsonContent);
+        var testData = JsonDocument.Parse(jsonContent);
 
-        if (!testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement))
+        if (!testData.RootElement.TryGetProperty("exchanges", out var exchangesElement))
         {
             Assert.Inconclusive($"No exchanges found in trace {traceFile}");
             return;
@@ -497,20 +504,22 @@ public class AppletLifecycleTests
         // For uninstall traces, ensure DELETE commands are present and properly formed
         if (traceFile.Contains("uninstall"))
         {
-            List<JsonElement> deleteCommands = [.. exchanges
-                .Where(
+            List<JsonElement> deleteCommands =
+            [
+                .. exchanges.Where(
                     (ex, i) =>
                     {
                         string cmd = ex.GetProperty("command").GetString()!;
                         return cmd.StartsWith("80E4") || cmd.StartsWith("84E4");
                     }
-                )];
+                ),
+            ];
 
             _ = deleteCommands
                 .Count.Should()
                 .BeGreaterThan(0, "Uninstall should have DELETE commands");
 
-            foreach (JsonElement deleteCmd in deleteCommands)
+            foreach (var deleteCmd in deleteCommands)
             {
                 string response = deleteCmd.GetProperty("response").GetString()!;
                 // DELETE commands may return 9000 (success) or 6A88 (data not found) - both are valid
@@ -559,9 +568,9 @@ public class AppletLifecycleTests
         }
 
         string jsonContent = File.ReadAllText(tracePath);
-        JsonDocument testData = JsonDocument.Parse(jsonContent);
+        var testData = JsonDocument.Parse(jsonContent);
 
-        if (!testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement))
+        if (!testData.RootElement.TryGetProperty("exchanges", out var exchangesElement))
         {
             Assert.Inconclusive($"No exchanges found in trace {traceFile}");
             return;
@@ -570,7 +579,7 @@ public class AppletLifecycleTests
         int validCommands = 0;
         int totalCommands = 0;
 
-        foreach (JsonElement exchange in exchangesElement.EnumerateArray())
+        foreach (var exchange in exchangesElement.EnumerateArray())
         {
             string command = exchange.GetProperty("command").GetString()!;
             string response = exchange.GetProperty("response").GetString()!;

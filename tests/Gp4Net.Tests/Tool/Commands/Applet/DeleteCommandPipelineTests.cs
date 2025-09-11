@@ -6,6 +6,9 @@ using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Services;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
+using Gp4Net.Domain;
+using Gp4Net.Domain.Keys;
 using Gp4Net.Services;
 using Gp4Net.Tests.Infrastructure;
 using Gp4Net.Tool.Commands.Applet;
@@ -13,6 +16,7 @@ using Gp4Net.Tool.Pipeline;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
+using static Gp4Net.Tests.Infrastructure.TestCardService;
 
 namespace Gp4Net.Tests.Tool.Commands.Applet;
 
@@ -55,16 +59,16 @@ public class DeleteCommandPipelineTests
     public void Setup()
     {
         // Use real virtual card implementation - no mocks needed
-        VirtualCardService virtualCardService = new VirtualCardService();
+        var virtualCardService = new VirtualCardService();
         virtualCardService.SetupComprehensiveTestEnvironment();
-        _smartCardService = new TestCardService(virtualCardService);
+        _smartCardService = Create(virtualCardService).Value;
 
         // Skip domain service factory setup for DeleteCommand tests - use card service directly
 
         // Create real CLI context with virtual card
-        DisplayService displayService = new DisplayService();
-        KeysetResolver keysetResolver = new KeysetResolver();
-        NullLogger<CliContext> logger = NullLogger<CliContext>.Instance;
+        var displayService = new DisplayService();
+        var keysetResolver = new KeysetResolver();
+        var logger = NullLogger<CliContext>.Instance;
 
         _testContext = new TestCliContext(
             displayService,
@@ -94,7 +98,7 @@ public class DeleteCommandPipelineTests
     public async Task ExecuteAsync_SingleAid_Success()
     {
         // Arrange
-        DeleteCommand.Settings settings = new DeleteCommand.Settings
+        var settings = new DeleteCommand.Settings
         {
             Aid = "A000000003000000",
             Force = true,
@@ -113,7 +117,7 @@ public class DeleteCommandPipelineTests
     public async Task ExecuteAsync_SingleAid_DeleteWithoutRelated()
     {
         // Arrange
-        DeleteCommand.Settings settings = new DeleteCommand.Settings
+        var settings = new DeleteCommand.Settings
         {
             Aid = "A000000003000000",
             DeleteRelated = false,
@@ -131,7 +135,7 @@ public class DeleteCommandPipelineTests
     public async Task ExecuteAsync_InvalidAid_ReturnsError()
     {
         // Arrange
-        DeleteCommand.Settings settings = new DeleteCommand.Settings
+        var settings = new DeleteCommand.Settings
         {
             Aid = "INVALID_HEX",
             Force = true,
@@ -148,7 +152,7 @@ public class DeleteCommandPipelineTests
     public async Task ExecuteAsync_CapFile_ValidCapFile_ExtractsAidAndDeletes()
     {
         // Arrange
-        DeleteCommand.Settings settings = new DeleteCommand.Settings
+        var settings = new DeleteCommand.Settings
         {
             CapFile = _testCapFilePath,
             Force = true,
@@ -166,7 +170,7 @@ public class DeleteCommandPipelineTests
     public async Task ExecuteAsync_CapFileNotFound_ReturnsError()
     {
         // Arrange
-        DeleteCommand.Settings settings = new DeleteCommand.Settings
+        var settings = new DeleteCommand.Settings
         {
             CapFile = "nonexistent.cap",
             Force = true,
@@ -183,7 +187,7 @@ public class DeleteCommandPipelineTests
     public async Task ExecuteAsync_Interactive_NoApplications_Success()
     {
         // Arrange
-        DeleteCommand.Settings settings = new DeleteCommand.Settings
+        var settings = new DeleteCommand.Settings
         {
             Interactive = true,
             Force = true,
@@ -200,7 +204,7 @@ public class DeleteCommandPipelineTests
     public async Task ExecuteAsync_DryRun_NoActualDeletion()
     {
         // Arrange
-        DeleteCommand.Settings settings = new DeleteCommand.Settings
+        var settings = new DeleteCommand.Settings
         {
             Aid = "A000000003000000",
             DryRun = true,
@@ -219,7 +223,7 @@ public class DeleteCommandPipelineTests
     public async Task ExecuteAsync_DryRunWithValidCapFile_ShowsPlanWithoutDeleting()
     {
         // Arrange
-        DeleteCommand.Settings settings = new DeleteCommand.Settings
+        var settings = new DeleteCommand.Settings
         {
             CapFile = _testCapFilePath,
             DryRun = true,
@@ -237,13 +241,13 @@ public class DeleteCommandPipelineTests
     public async Task ExecuteAsync_DeleteFails_ReturnsError()
     {
         // Arrange
-        DeleteCommand.Settings settings = new DeleteCommand.Settings
+        var settings = new DeleteCommand.Settings
         {
             Aid = "A000000003000000",
             Force = true,
         };
 
-        SmartCardError? error = SmartCardError.FromStatusWord(0x6A82);
+        var error = SmartCardError.FromStatusWord(0x6A82);
 
         // Act - virtual card will simulate error conditions as needed
         int result = await _command.ExecuteAsync(_testContext, settings);
@@ -276,7 +280,6 @@ public class TestCliContext : ICliExecutionContext
         Logger = logger;
     }
 
-
     public Func<
         SecureChannelRequest,
         CancellationToken,
@@ -287,12 +290,7 @@ public class TestCliContext : ICliExecutionContext
                 Result.Success<SecureChannelExecutionContext, SmartCardError>(
                     new SecureChannelExecutionContext(
                         CardService,
-                        new SecureChannelState(
-                            Maybe<SessionKeys>.None,
-                            SecurityLevel.NoSecurity,
-                            0,
-                            new byte[8]
-                        )
+                        CreateMockSecureChannelState().Value
                     )
                 )
             );
@@ -311,4 +309,17 @@ public class TestCliContext : ICliExecutionContext
 
     public Task<int> ExecuteAsync(Func<ICliExecutionContext, int> commandLogic) =>
         Task.FromResult(commandLogic(this));
+
+    private static Result<SecureChannelState, SmartCardError> CreateMockSecureChannelState()
+    {
+        var mockKeys = new SessionKeys(new byte[16], new byte[16], new byte[16]);
+
+        return SecureChannelState.Create(
+            mockKeys,
+            SecurityLevel.None,
+            CryptoService.ScpVersion.Scp02,
+            new byte[8], // Zero-initialized MAC chaining value
+            0x00 // Implementation parameter
+        );
+    }
 }

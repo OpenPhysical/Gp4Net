@@ -1,5 +1,6 @@
 using System;
 using CSharpFunctionalExtensions;
+using Gp4Net.Core;
 
 namespace Gp4Net.Domain.CardInfo;
 
@@ -14,12 +15,12 @@ public static class CplcDateParser
     /// <summary>
     /// Invalid date value (all bits set).
     /// </summary>
-    public const ushort InvalidDateMax = 0xFFFF;
+    public const ushort INVALID_DATE_MAX = 0xFFFF;
 
     /// <summary>
     /// Invalid date value (all bits clear).
     /// </summary>
-    public const ushort InvalidDateMin = 0x0000;
+    public const ushort INVALID_DATE_MIN = 0x0000;
 
     /// <summary>
     /// Parses a CPLC date value to a DateTime.
@@ -48,13 +49,13 @@ public static class CplcDateParser
     /// <returns>Formatted date string or indication of invalid date.</returns>
     public static string FormatDate(ushort cplcDate)
     {
-        Maybe<DateTime> date = ParseDate(cplcDate);
+        var date = ParseDate(cplcDate);
         if (date.HasValue)
         {
             return date.Value.ToString("yyyy-MM-dd");
         }
 
-        if (cplcDate is InvalidDateMax or InvalidDateMin)
+        if (cplcDate is INVALID_DATE_MAX or INVALID_DATE_MIN)
         {
             return "(invalid date format)";
         }
@@ -69,31 +70,32 @@ public static class CplcDateParser
     /// <returns>True if the date is valid, false otherwise.</returns>
     public static bool IsValidDate(ushort cplcDate)
     {
-        return cplcDate != InvalidDateMin && cplcDate != InvalidDateMax;
+        return cplcDate != INVALID_DATE_MIN && cplcDate != INVALID_DATE_MAX;
     }
 
     /// <summary>
     /// Converts a DateTime to CPLC date format.
     /// </summary>
     /// <param name="date">The date to convert.</param>
-    /// <returns>The CPLC date value.</returns>
-    public static ushort ToCplcDate(DateTime date)
+    /// <returns>A Result containing the CPLC date value.</returns>
+    public static Result<ushort, SmartCardError> ToCplcDate(DateTime date)
     {
         if (date < BaseDate)
         {
-            throw new ArgumentException("Date cannot be before January 1, 2000", nameof(date));
+            return Result.Failure<ushort, SmartCardError>(
+                SmartCardError.InvalidArgument("Date cannot be before January 1, 2000")
+            );
         }
 
         int days = (date - BaseDate).Days;
         if (days > 0xFFFE) // Reserve 0xFFFF for invalid
         {
-            throw new ArgumentException(
-                "Date is too far in the future for CPLC format",
-                nameof(date)
+            return Result.Failure<ushort, SmartCardError>(
+                SmartCardError.InvalidArgument("Date is too far in the future for CPLC format")
             );
         }
 
-        return (ushort)days;
+        return Result.Success<ushort, SmartCardError>((ushort)days);
     }
 
     /// <summary>

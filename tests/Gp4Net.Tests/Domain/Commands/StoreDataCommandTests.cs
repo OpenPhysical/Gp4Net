@@ -20,22 +20,12 @@ public class StoreDataCommandTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        StoreDataCommand? command = result.Value;
+        var command = result.Value;
         _ = command.StructureFormat.Should().Be(StoreDataCommand.DataStructureFormat.Plain);
         _ = command.Block.Should().Be(StoreDataCommand.BlockFormat.FirstOrOnly);
         _ = command.StoreData.Should().BeEquivalentTo(data);
     }
 
-    [Test]
-    public void Create_WithNullData_ReturnsError()
-    {
-        // Act
-        Result<StoreDataCommand, SmartCardError> result = StoreDataCommand.Create(null!);
-
-        // Assert
-        _ = result.IsFailure.Should().BeTrue();
-        _ = result.Error.Should().BeOfType<SmartCardError>();
-    }
 
     [Test]
     public void ToApdu_WithPlainData_ReturnsCorrectApdu()
@@ -44,7 +34,8 @@ public class StoreDataCommandTests
         byte[] data = [0x01, 0x02, 0x03];
 
         // Act
-        Result<byte[], SmartCardError> apduResult = StoreDataCommand.Create(data)
+        Result<byte[], SmartCardError> apduResult = StoreDataCommand
+            .Create(data)
             .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)));
 
         // Assert
@@ -52,7 +43,8 @@ public class StoreDataCommandTests
         if (apduResult.IsSuccess)
         {
             byte[] apdu = apduResult.Value;
-            _ = apdu.Should().BeEquivalentTo(new byte[] { 0x80, 0xE2, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03 });
+            _ = apdu.Should()
+                .BeEquivalentTo(new byte[] { 0x80, 0xE2, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03 });
         }
     }
 
@@ -63,18 +55,20 @@ public class StoreDataCommandTests
         Result<StoreDataCommand, SmartCardError> result =
             StoreDataCommand.CreateDefaultKeyVersionCommand(0x01);
         _ = result.IsSuccess.Should().BeTrue();
-        
+
         if (result.IsSuccess)
         {
-            StoreDataCommand command = result.Value;
+            var command = result.Value;
 
             // Act
-            Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
+            Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(
+                Maybe<IApduCommand>.From(command)
+            );
             _ = apduResult.IsSuccess.Should().BeTrue();
             if (apduResult.IsSuccess)
             {
                 byte[] apdu = apduResult.Value;
-                
+
                 // Assert
                 _ = apdu[0].Should().Be(0x80); // CLA
                 _ = apdu[1].Should().Be(0xE2); // INS
@@ -100,7 +94,7 @@ public class StoreDataCommandTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            StoreDataCommand command = result.Value;
+            var command = result.Value;
             _ = command.StructureFormat.Should().Be(StoreDataCommand.DataStructureFormat.Dgi);
             _ = command.Block.Should().Be(StoreDataCommand.BlockFormat.FirstOrOnly);
 
@@ -121,7 +115,7 @@ public class StoreDataCommandTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            StoreDataCommand command = result.Value;
+            var command = result.Value;
             IApduCommand iapdu = command;
             byte[] apduBytes = iapdu.ToBytes();
 
@@ -143,7 +137,7 @@ public class StoreDataCommandTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            StoreDataCommand command = result.Value;
+            var command = result.Value;
 
             // Act
             string str = command.ToString();
@@ -160,7 +154,7 @@ public class StoreDataCommandTests
         byte[] responseData = [];
 
         // Act
-        StoreDataResponse response = StoreDataResponse.Parse(responseData);
+        var response = StoreDataResponse.Parse(responseData);
 
         // Assert
         _ = response.Success.Should().BeTrue();

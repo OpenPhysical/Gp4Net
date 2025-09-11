@@ -11,7 +11,6 @@ namespace Gp4Net.Tests.Domain.Commands;
 
 [TestFixture]
 [Category("Unit")]
-[Ignore("ApduBuilder functional programming updates needed")]
 public class GetStatusCommandTests
 {
     [Test]
@@ -102,7 +101,7 @@ public class GetStatusCommandTests
     [Test]
     public void Create_WithInvalidStatusSubset_ReturnsFailureResult()
     {
-        GetStatusCommand.StatusSubset invalidSubset = (GetStatusCommand.StatusSubset)0xFF;
+        var invalidSubset = (GetStatusCommand.StatusSubset)0xFF;
 
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(invalidSubset);
 
@@ -113,7 +112,7 @@ public class GetStatusCommandTests
     [Test]
     public void Create_WithInvalidResponseFormat_ReturnsFailureResult()
     {
-        GetStatusCommand.ResponseFormat invalidFormat = (GetStatusCommand.ResponseFormat)0xFF;
+        var invalidFormat = (GetStatusCommand.ResponseFormat)0xFF;
 
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
@@ -133,7 +132,7 @@ public class GetStatusCommandTests
             GetStatusCommand.ResponseFormat.None,
             originalAid
         );
-        GetStatusCommand? command = result.Value;
+        var command = result.Value;
 
         originalAid[0] = 0xFF;
 
@@ -146,9 +145,15 @@ public class GetStatusCommandTests
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains
         );
-        GetStatusCommand? command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        _ = result.IsSuccess.Should().BeTrue();
+        Assert.That(result.IsSuccess, Is.True);
+        var command = result.Value;
+
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        Assert.That(apduResult.IsSuccess, Is.True);
+        byte[] apdu = apduResult.Value;
 
         _ = apdu.Length.Should().Be(5); // CLA INS P1 P2 Le
         _ = apdu[0].Should().Be(0x80); // CLA
@@ -167,9 +172,15 @@ public class GetStatusCommandTests
             GetStatusCommand.ResponseFormat.None,
             aid
         );
-        GetStatusCommand? command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        _ = result.IsSuccess.Should().BeTrue();
+        Assert.That(result.IsSuccess, Is.True);
+        var command = result.Value;
+
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        Assert.That(apduResult.IsSuccess, Is.True);
+        byte[] apdu = apduResult.Value;
 
         _ = apdu.Length.Should().Be(5 + aid.Length + 1); // CLA INS P1 P2 Lc Data Le
         _ = apdu[0].Should().Be(0x80); // CLA
@@ -192,9 +203,15 @@ public class GetStatusCommandTests
     )
     {
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(subset);
-        GetStatusCommand? command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        _ = result.IsSuccess.Should().BeTrue();
+        Assert.That(result.IsSuccess, Is.True);
+        var command = result.Value;
+
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        Assert.That(apduResult.IsSuccess, Is.True);
+        byte[] apdu = apduResult.Value;
 
         _ = apdu[2].Should().Be(expectedP1);
     }
@@ -211,9 +228,15 @@ public class GetStatusCommandTests
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             format
         );
-        GetStatusCommand? command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        _ = result.IsSuccess.Should().BeTrue();
+        Assert.That(result.IsSuccess, Is.True);
+        var command = result.Value;
+
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        Assert.That(apduResult.IsSuccess, Is.True);
+        byte[] apdu = apduResult.Value;
 
         _ = apdu[3].Should().Be(expectedP2);
     }
@@ -224,13 +247,27 @@ public class GetStatusCommandTests
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains
         );
-        GetStatusCommand? command = result.Value;
 
-        byte[]? apdu1 = command.ToApdu();
-        byte[]? apdu2 = command.ToApdu();
+        result.Match(
+            command =>
+            {
+                Result<byte[], SmartCardError> apduResult1 = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
+                Result<byte[], SmartCardError> apduResult2 = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
 
-        _ = apdu1.Should().NotBeSameAs(apdu2);
-        _ = apdu2.Should().BeEquivalentTo(apdu1);
+                apduResult1.Match(
+                    apdu1 => apduResult2.Match(
+                        apdu2 =>
+                        {
+                            _ = apdu1.Should().NotBeSameAs(apdu2);
+                            _ = apdu2.Should().BeEquivalentTo(apdu1);
+                        },
+                        error2 => _ = apduResult2.IsSuccess.Should().BeTrue($"Second APDU build failed: {error2}")
+                    ),
+                    error1 => _ = apduResult1.IsSuccess.Should().BeTrue($"First APDU build failed: {error1}")
+                );
+            },
+            error => _ = result.IsSuccess.Should().BeTrue($"Command creation failed: {error}")
+        );
     }
 
     [Test]
@@ -240,7 +277,7 @@ public class GetStatusCommandTests
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             GetStatusCommand.ResponseFormat.Tlv
         );
-        GetStatusCommand? command = result.Value;
+        var command = result.Value;
         IApduCommand? iApduCommand = command;
 
         _ = iApduCommand.Cla.Should().Be(0x80);
@@ -261,7 +298,7 @@ public class GetStatusCommandTests
             GetStatusCommand.ResponseFormat.None,
             aid
         );
-        GetStatusCommand? command = result.Value;
+        var command = result.Value;
 
         _ = command.Data.Should().BeEquivalentTo(aid);
     }
@@ -291,7 +328,7 @@ public class GetStatusCommandTests
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Applications.Should().HaveCount(1);
 
-        ApplicationStatusEntry? app = result.Value.Applications[0];
+        var app = result.Value.Applications[0];
         _ = app.Aid.Should().BeEquivalentTo(Convert.FromHexString("A0000000031010"));
         _ = app.State.Should().Be(ApplicationStatusEntry.LifecycleState.Selectable);
         _ = app.Privileges.Should().BeEquivalentTo(new byte[] { 0x80, 0x00, 0x00 });
@@ -302,20 +339,20 @@ public class GetStatusCommandTests
     {
         byte[] aid1 = Convert.FromHexString("A0000000031010");
         byte[] aid2 = Convert.FromHexString("A000000003101001");
-        byte[] e3_1 = BuildAppEntry(aid1, 0x07, [0x80, 0x00, 0x00]);
-        byte[] e3_2 = BuildAppEntry(aid2, 0x0F, [0xC0, 0x40, 0x00]);
-        byte[] response = [.. e3_1, .. e3_2];
+        byte[] e31 = BuildAppEntry(aid1, 0x07, [0x80, 0x00, 0x00]);
+        byte[] e32 = BuildAppEntry(aid2, 0x0F, [0xC0, 0x40, 0x00]);
+        byte[] response = [.. e31, .. e32];
 
         Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(response);
 
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Applications.Should().HaveCount(2);
 
-        ApplicationStatusEntry? app1 = result.Value.Applications[0];
+        var app1 = result.Value.Applications[0];
         _ = app1.Aid.Should().BeEquivalentTo(Convert.FromHexString("A0000000031010"));
         _ = app1.State.Should().Be(ApplicationStatusEntry.LifecycleState.Selectable);
 
-        ApplicationStatusEntry? app2 = result.Value.Applications[1];
+        var app2 = result.Value.Applications[1];
         _ = app2.Aid.Should().BeEquivalentTo(Convert.FromHexString("A000000003101001"));
         _ = app2.State.Should().Be(ApplicationStatusEntry.LifecycleState.Personalized);
         _ = app2.Privileges.Should().BeEquivalentTo(new byte[] { 0xC0, 0x40, 0x00 });
@@ -447,7 +484,7 @@ public class GetStatusCommandTests
         byte[] originalAid = Convert.FromHexString("A0000000031010");
         byte[] originalPrivileges = [0x80, 0x40];
 
-        ApplicationStatusEntry entry = new ApplicationStatusEntry(
+        var entry = new ApplicationStatusEntry(
             originalAid,
             ApplicationStatusEntry.LifecycleState.Selectable,
             originalPrivileges
@@ -466,7 +503,7 @@ public class GetStatusCommandTests
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains
         );
-        GetStatusCommand? command = result.Value;
+        var command = result.Value;
 
         string? str = command.ToString();
 
@@ -476,8 +513,9 @@ public class GetStatusCommandTests
     [Test]
     public void Constants_HaveCorrectValues()
     {
-        _ = GetStatusCommand.Cla.Should().Be(0x80);
-        _ = GetStatusCommand.Ins.Should().Be(0xF2);
+        var command = GetStatusCommand.Create(GetStatusCommand.StatusSubset.IssuerSecurityDomain).Value;
+        _ = command.Cla.Should().Be(0x80);
+        _ = command.Ins.Should().Be(0xF2);
     }
 
     [Test]
@@ -492,7 +530,7 @@ public class GetStatusCommandTests
             ),
         ];
 
-        GetStatusResponse response = new GetStatusResponse(apps);
+        var response = new GetStatusResponse(apps);
 
         _ = response.Applications.Should().NotBeSameAs(apps);
         _ = response.Applications.Should().HaveCount(1);

@@ -1,6 +1,6 @@
 using AwesomeAssertions;
-using Gp4Net.Domain;
 using Gp4Net.Constants;
+using Gp4Net.Domain;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Compliance;
@@ -38,7 +38,7 @@ public class Scp02ProtocolRulesTests
     )
     {
         // Act - Parse P1 parameter per GP Table E-11
-        SecurityLevel parsedSecurityLevel = ParseExternalAuthenticateP1(p1Value);
+        var parsedSecurityLevel = ParseExternalAuthenticateP1(p1Value);
 
         // Assert
         _ = parsedSecurityLevel
@@ -138,7 +138,7 @@ public class Scp02ProtocolRulesTests
             .Should()
             .AllSatisfy(eventType =>
             {
-                SecurityLevel securityLevelAfterEvent = GetSecurityLevelAfterEvent(eventType);
+                var securityLevelAfterEvent = GetSecurityLevelAfterEvent(eventType);
                 _ = securityLevelAfterEvent
                     .Should()
                     .Be(
@@ -245,7 +245,7 @@ public class Scp02ProtocolRulesTests
     private static SecurityLevel ParseExternalAuthenticateP1(byte p1)
     {
         // GP Table E-11: EXTERNAL AUTHENTICATE P1 parameter bitmap
-        SecurityLevel level = SecurityLevel.None;
+        var level = SecurityLevel.None;
 
         // Bit mapping per GP specification
         if ((p1 & 0x01) != 0)

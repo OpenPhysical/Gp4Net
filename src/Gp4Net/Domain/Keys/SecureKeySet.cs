@@ -160,8 +160,9 @@ public sealed class SecureKeySet : IDisposable
                 SmartCardError.InvalidArgument("SecureKeySet has been disposed")
             );
         }
-        
-        return _encKey.GetKeyCopy()
+
+        return _encKey
+            .GetKeyCopy()
             .Bind(encKey => _macKey.GetKeyCopy().Map(macKey => (encKey, macKey)))
             .Bind(keys => _dekKey.GetKeyCopy().Map(dekKey => (keys.encKey, keys.macKey, dekKey)))
             .Bind(keys => Scp02KeySet.Create(keys.encKey, keys.macKey, keys.dekKey, KeyVersion));
@@ -179,8 +180,9 @@ public sealed class SecureKeySet : IDisposable
                 SmartCardError.InvalidArgument("SecureKeySet has been disposed")
             );
         }
-        
-        return _encKey.GetKeyCopy()
+
+        return _encKey
+            .GetKeyCopy()
             .Bind(encKey => _macKey.GetKeyCopy().Map(macKey => (encKey, macKey)))
             .Bind(keys => _dekKey.GetKeyCopy().Map(dekKey => (keys.encKey, keys.macKey, dekKey)))
             .Bind(keys => Scp03KeySet.Create(keys.encKey, keys.macKey, keys.dekKey, KeyVersion));
@@ -199,5 +201,4 @@ public sealed class SecureKeySet : IDisposable
             _isDisposed = true;
         }
     }
-
 }

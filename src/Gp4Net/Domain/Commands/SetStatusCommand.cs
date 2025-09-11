@@ -2,7 +2,6 @@ using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
-using WSCT.Core;
 using WSCT.ISO7816;
 
 namespace Gp4Net.Domain.Commands;
@@ -23,6 +22,12 @@ public sealed class SetStatusCommand : IApduCommand
         _data = Maybe<byte[]>.From(data).GetValueOrDefault([]);
     }
 
+    /// <inheritdoc />
+    public byte Cla => 0x80;
+
+    /// <inheritdoc />
+    public byte Ins => 0xF0;
+
     /// <summary>
     /// Converts this command to a CommandAPDU.
     /// </summary>
@@ -31,17 +36,16 @@ public sealed class SetStatusCommand : IApduCommand
     {
         // Build APDU bytes using immutable construction
         var headerBytes = new byte[] { 0x80, 0xF0, _p1, _p2 };
-        
-        var apduBytes = _data.Length > 0
-            ? headerBytes
-                .Concat([(byte)_data.Length]) // Lc
-                .Concat(_data)
-                .ToArray()
-            : headerBytes;
-        
-        return Result.Success<CommandAPDU, SmartCardError>(
-            new CommandAPDU(apduBytes)
-        );
+
+        var apduBytes =
+            _data.Length > 0
+                ? headerBytes
+                    .Concat([(byte)_data.Length]) // Lc
+                    .Concat(_data)
+                    .ToArray()
+                : headerBytes;
+
+        return Result.Success<CommandAPDU, SmartCardError>(new CommandAPDU(apduBytes));
     }
 
     /// <summary>

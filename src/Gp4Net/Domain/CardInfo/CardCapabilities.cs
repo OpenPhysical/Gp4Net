@@ -4,11 +4,10 @@ using System.Linq;
 using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Services;
 using Gp4Net.Services.Helpers;
+using JetBrains.Annotations;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
 using static Gp4Net.Services.TlvService;
-using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.CardInfo;
 
@@ -110,18 +109,23 @@ public class CardCapabilities
             .Bind(parseResult =>
             {
                 // Process all TLV objects functionally
-                return parseResult.Objects
-                    .Select(element => ProcessTlvObject(capabilities, element))
+                return parseResult
+                    .Objects.Select(element => ProcessTlvObject(capabilities, element))
                     .Aggregate(
                         seed: UnitResult.Success<SmartCardError>(),
-                        func: (acc, current) => acc.IsSuccess ? current : acc)
+                        func: (acc, current) => acc.IsSuccess ? current : acc
+                    )
                     .Map(() => capabilities);
             });
     }
 
-    private static UnitResult<SmartCardError> ProcessTlvObject(CardCapabilities capabilities, TlvObject element)
+    private static UnitResult<SmartCardError> ProcessTlvObject(
+        CardCapabilities capabilities,
+        TlvObject element
+    )
     {
-        return element.Tag.ToNumber()
+        return element
+            .Tag.ToNumber()
             .Match(
                 tagNumber =>
                 {
@@ -136,13 +140,10 @@ public class CardCapabilities
                             );
                             break;
                         case 0x81: // Application privileges
-                            capabilities.AppPrivileges = 
-                                PrivilegeHelpers.FromBytes(element.TlvData.Bytes.ToArray())
-                                    .Map(Maybe<Privilege>.From)
-                                    .Match(
-                                        success => success,
-                                        _ => Maybe<Privilege>.None
-                                    );
+                            capabilities.AppPrivileges = PrivilegeHelpers
+                                .FromBytes(element.TlvData.Bytes.ToArray())
+                                .Map(Maybe<Privilege>.From)
+                                .Match(success => success, _ => Maybe<Privilege>.None);
                             break;
                         case 0x82: // Supported algorithms
                             capabilities.Algorithms = Maybe<SupportedAlgorithms>.From(
@@ -150,43 +151,61 @@ public class CardCapabilities
                             );
                             break;
                         case 0x83: // LFDB hash algorithms
-                            capabilities.ParseCipherSuite(CipherUsage.LfdbHash, element.TlvData.Bytes.ToArray());
+                            capabilities.ParseCipherSuite(
+                                CipherUsage.LfdbHash,
+                                element.TlvData.Bytes.ToArray()
+                            );
                             break;
                         case 0x84: // Token verification ciphers
-                            capabilities.ParseCipherSuite(CipherUsage.TokenVerification, element.TlvData.Bytes.ToArray());
+                            capabilities.ParseCipherSuite(
+                                CipherUsage.TokenVerification,
+                                element.TlvData.Bytes.ToArray()
+                            );
                             break;
                         case 0x85: // Receipt generation ciphers
-                            capabilities.ParseCipherSuite(CipherUsage.ReceiptGeneration, element.TlvData.Bytes.ToArray());
+                            capabilities.ParseCipherSuite(
+                                CipherUsage.ReceiptGeneration,
+                                element.TlvData.Bytes.ToArray()
+                            );
                             break;
                         case 0x86: // DAP verification ciphers
-                            capabilities.ParseCipherSuite(CipherUsage.DapVerification, element.TlvData.Bytes.ToArray());
+                            capabilities.ParseCipherSuite(
+                                CipherUsage.DapVerification,
+                                element.TlvData.Bytes.ToArray()
+                            );
                             break;
                         case 0x87: // Mandated DAP verification ciphers
-                            capabilities.ParseCipherSuite(CipherUsage.MandatedDapVerification, element.TlvData.Bytes.ToArray());
+                            capabilities.ParseCipherSuite(
+                                CipherUsage.MandatedDapVerification,
+                                element.TlvData.Bytes.ToArray()
+                            );
                             break;
                     }
                     return UnitResult.Success<SmartCardError>();
                 },
-                error => UnitResult.Failure<SmartCardError>(error)
+                error => UnitResult.Failure(error)
             );
     }
 
     internal void ParseScpOptions(byte[] data)
     {
         // Parse according to Table H-6: SCP Information
-        TlvParser.ParseMultiple(data.ToImmutableArray())
+        TlvParser
+            .ParseMultiple(data.ToImmutableArray())
             .Match(
                 parseResult =>
                 {
-                    var elementsByTag = parseResult.Objects
-                        .Select(element => element.Tag.ToNumber().Map(tagNum => (element, tagNum)))
+                    var elementsByTag = parseResult
+                        .Objects.Select(element =>
+                            element.Tag.ToNumber().Map(tagNum => (element, tagNum))
+                        )
                         .Where(result => result.IsSuccess)
                         .Select(result => result.Value)
                         .ToLookup(tuple => tuple.tagNum, tuple => tuple.element);
 
-                    var scpType = elementsByTag[0x80].Any() 
-                        ? elementsByTag[0x80].First().TlvData.Bytes.Length > 0 
-                            ? elementsByTag[0x80].First().TlvData.Bytes[0] 
+                    var scpType = elementsByTag[0x80].Any()
+                        ? elementsByTag[0x80].First().TlvData.Bytes.Length > 0
+                            ? elementsByTag[0x80].First().TlvData.Bytes[0]
                             : (byte)0
                         : (byte)0;
 
@@ -204,51 +223,55 @@ public class CardCapabilities
                         {
                             if (scpType > 0)
                             {
-                    // Parse supported key lengths for SCP03
-                    if (scpType == 0x03)
-                    {
-                        _ = supportedKeys.Match(
-                            keys =>
-                            {
-                                if (keys.Length > 0)
+                                // Parse supported key lengths for SCP03
+                                if (scpType == 0x03)
                                 {
-                                    ImmutableList<int>.Builder keyLengthsBuilder =
-                                        ImmutableList.CreateBuilder<int>();
-                                    byte keyByte = keys[0];
-                                    if ((keyByte & 0x01) != 0)
-                                    {
-                                        keyLengthsBuilder.Add(128);
-                                    }
+                                    _ = supportedKeys.Match(
+                                        keys =>
+                                        {
+                                            if (keys.Length > 0)
+                                            {
+                                                var keyLengthsBuilder =
+                                                    ImmutableList.CreateBuilder<int>();
+                                                byte keyByte = keys[0];
+                                                if ((keyByte & 0x01) != 0)
+                                                {
+                                                    keyLengthsBuilder.Add(128);
+                                                }
 
-                                    if ((keyByte & 0x02) != 0)
-                                    {
-                                        keyLengthsBuilder.Add(192);
-                                    }
+                                                if ((keyByte & 0x02) != 0)
+                                                {
+                                                    keyLengthsBuilder.Add(192);
+                                                }
 
-                                    if ((keyByte & 0x04) != 0)
-                                    {
-                                        keyLengthsBuilder.Add(256);
-                                    }
+                                                if ((keyByte & 0x04) != 0)
+                                                {
+                                                    keyLengthsBuilder.Add(256);
+                                                }
 
-                                    SupportedKeyLengths = SupportedKeyLengths.SetItem(
-                                        scpType,
-                                        keyLengthsBuilder.ToImmutable()
+                                                SupportedKeyLengths = SupportedKeyLengths.SetItem(
+                                                    scpType,
+                                                    keyLengthsBuilder.ToImmutable()
+                                                );
+                                            }
+                                            return new object();
+                                        },
+                                        () => new object()
                                     );
                                 }
-                                return new object();
-                            },
-                            () => new object()
-                        );
-                    }
 
-                    // Each byte in supportedOptions represents one supported implementation parameter
-                    var newOptions = options
-                        .Select(option => new ScpOption(scpType, option, DetermineKeyLength(scpType, supportedKeys)))
-                        .ToImmutableList();
-                    ScpOptions = ScpOptions.AddRange(newOptions);
-                }
-                return new object();
-            },
+                                // Each byte in supportedOptions represents one supported implementation parameter
+                                var newOptions = options
+                                    .Select(option => new ScpOption(
+                                        scpType,
+                                        option,
+                                        DetermineKeyLength(scpType, supportedKeys)
+                                    ))
+                                    .ToImmutableList();
+                                ScpOptions = ScpOptions.AddRange(newOptions);
+                            }
+                            return new object();
+                        },
                         () => new object()
                     );
 
@@ -303,7 +326,6 @@ public class CardCapabilities
         return new SecurityDomainPrivileges(data[0], data[1], data.Length > 2 ? data[2] : (byte)0);
     }
 
-
     private static SupportedAlgorithms ParseSupportedAlgorithms(byte[] data)
     {
         if (data.Length < 2)
@@ -321,21 +343,24 @@ public class CardCapabilities
             return;
         }
 
-        ImmutableList<CipherSuite>.Builder suitesBuilder =
-            ImmutableList.CreateBuilder<CipherSuite>();
-
-        for (int i = 0; i < data.Length; i++)
-        {
-            CipherSuite suite = ParseCipherSuiteByte(data[i]);
-            if (suite != CipherSuite.Unknown)
+        var allSuites = data
+            .SelectMany<byte, CipherSuite>(dataByte =>
             {
-                suitesBuilder.Add(suite);
-            }
-        }
+                // Try individual cipher suite byte first
+                var individualSuite = ParseCipherSuiteByte(dataByte);
+                if (individualSuite != CipherSuite.Unknown)
+                {
+                    return ImmutableList.Create(individualSuite);
+                }
+                
+                // Handle multi-cipher bitmask values
+                return ParseCipherSuiteBitmask(dataByte);
+            })
+            .ToImmutableList();
 
-        if (suitesBuilder.Count > 0)
+        if (allSuites.Count > 0)
         {
-            CipherSuites = CipherSuites.SetItem(usage, suitesBuilder.ToImmutable());
+            CipherSuites = CipherSuites.SetItem(usage, allSuites);
         }
     }
 
@@ -364,16 +389,46 @@ public class CardCapabilities
     }
 
     /// <summary>
+    /// Parses cipher suite bitmask values used by some cards.
+    /// Based on observed card behavior where single bytes encode multiple cipher suites.
+    /// </summary>
+    private static ImmutableList<CipherSuite> ParseCipherSuiteBitmask(byte value)
+    {
+        // Handle known composite values observed in real cards
+        return value switch
+        {
+            0x7B => // Receipt Generation: DES_MAC + CMAC_AES128
+                ImmutableList.Create(
+                    CipherSuite.Des3Mac,
+                    CipherSuite.AesCmac128
+                ),
+                
+            0x0C => // DAP Verification: Multiple RSA and ECDSA algorithms
+                ImmutableList.Create(
+                    CipherSuite.Rsa1024Sha1,
+                    CipherSuite.RsaPssSha256,
+                    CipherSuite.AesCmac128,
+                    CipherSuite.AesCmac192,
+                    CipherSuite.AesCmac256,
+                    CipherSuite.EcdsaP256Sha256
+                ),
+                
+            // Add more composite values as discovered from other cards
+            _ => ImmutableList<CipherSuite>.Empty
+        };
+    }
+
+    /// <summary>
     /// Formats capabilities as a human-readable string.
     /// </summary>
     public override string ToString()
     {
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
         _ = sb.AppendLine("Card Capabilities:");
 
         // SCP options - group by SCP type
-        IEnumerable<IGrouping<byte, ScpOption>> scpGroups = ScpOptions.GroupBy(o => o.ScpId);
-        foreach (IGrouping<byte, ScpOption> group in scpGroups)
+        var scpGroups = ScpOptions.GroupBy(o => o.ScpId);
+        foreach (var group in scpGroups)
         {
             byte scpId = group.Key;
             string options = string.Join(" ", group.Select(o => $"i={o.Implementation:X2}"));
@@ -381,7 +436,7 @@ public class CardCapabilities
             // Get key lengths from the dedicated dictionary if available
             string keyLengthStr = "";
             if (
-                SupportedKeyLengths.TryGetValue(scpId, out ImmutableList<int> lengths)
+                SupportedKeyLengths.TryGetValue(scpId, out var lengths)
                 && lengths.Count > 0
             )
             {
@@ -397,10 +452,10 @@ public class CardCapabilities
             _ = sb.AppendLine($"Supported DOM privileges: {SdPrivileges.Value}");
         }
 
-        if (AppPrivileges.HasValue)
-        {
-            _ = sb.AppendLine($"Supported APP privileges: {AppPrivileges.Value}");
-        }
+        _ = AppPrivileges.Match(
+            privileges => sb.AppendLine($"Supported APP privileges: {Services.Helpers.PrivilegeHelpers.ToHumanReadableString(privileges)}"),
+            () => sb
+        );
 
         // Algorithms
         if (Algorithms.HasValue)
@@ -410,7 +465,7 @@ public class CardCapabilities
 
         // Cipher suites
         foreach (
-            KeyValuePair<CipherUsage, ImmutableList<CipherSuite>> kvp in CipherSuites.OrderBy(x =>
+            var kvp in CipherSuites.OrderBy(x =>
                 x.Key
             )
         )
@@ -638,7 +693,6 @@ public record SecurityDomainPrivileges(byte Byte1, byte Byte2, byte Byte3)
         return string.Join(", ", privs);
     }
 }
-
 
 /// <summary>
 /// Supported algorithms.

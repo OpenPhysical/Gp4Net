@@ -38,7 +38,7 @@ public class CardManagementOperationTests
         try
         {
             string jsonContent = File.ReadAllText(tracePath);
-            JsonDocument testData = JsonDocument.Parse(jsonContent);
+            var testData = JsonDocument.Parse(jsonContent);
             return Result.Success<JsonDocument, string>(testData);
         }
         catch (Exception ex)
@@ -59,7 +59,7 @@ public class CardManagementOperationTests
         JsonDocument testData,
         string traceFile
     ) =>
-        testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement)
+        testData.RootElement.TryGetProperty("exchanges", out var exchangesElement)
             ? Result.Success<JsonElement, string>(exchangesElement)
             : Result.Failure<JsonElement, string>($"No exchanges found in trace {traceFile}");
 
@@ -112,9 +112,12 @@ public class CardManagementOperationTests
             );
 
         // Validate SELECT responses and log findings
-        List<string> selectValidation = [.. selectCommands
-            .Where(pair => !pair.Response.EndsWith("9000"))
-            .Select(pair => pair.Command)];
+        List<string> selectValidation =
+        [
+            .. selectCommands
+                .Where(pair => !pair.Response.EndsWith("9000"))
+                .Select(pair => pair.Command),
+        ];
 
         if (selectValidation.Any())
             return UnitResult.Failure<string>("SELECT command should succeed");
@@ -165,16 +168,19 @@ public class CardManagementOperationTests
     public void CardManagement_Should_Retrieve_Card_Information(
         string traceFile,
         string description
-    ) =>
-        LoadTraceFile(traceFile)
+    )
+    {
+        var result = LoadTraceFile(traceFile)
             .Bind(testData => ValidateExchangesExist(testData, traceFile))
             .Bind(exchangesElement =>
                 ValidateCardInformationRetrieval(exchangesElement, description, traceFile)
-            )
-            .Match(
-                success => Assert.Pass("Test completed successfully"),
-                failure => Assert.Inconclusive(failure)
             );
+
+        result.Match(
+            () => { /* Test passed */ },
+            failure => Assert.Fail($"Test failed: {failure}")
+        );
+    }
 
     /// <summary>
     /// Functional helper to validate lock operations.
@@ -278,16 +284,19 @@ public class CardManagementOperationTests
     public void CardManagement_Should_Execute_Lock_Operations(
         string traceFile,
         string description
-    ) =>
-        LoadTraceFile(traceFile)
+    )
+    {
+        var result = LoadTraceFile(traceFile)
             .Bind(testData => ValidateExchangesExist(testData, traceFile))
             .Bind(exchangesElement =>
                 ValidateLockOperations(exchangesElement, description, traceFile)
-            )
-            .Match(
-                success => Assert.Pass("Test completed successfully"),
-                failure => Assert.Inconclusive(failure)
             );
+
+        result.Match(
+            () => { /* Test passed */ },
+            failure => Assert.Fail($"Test failed: {failure}")
+        );
+    }
 
     /// <summary>
     /// Functional helper to validate unlock operations.
@@ -375,16 +384,19 @@ public class CardManagementOperationTests
     public void CardManagement_Should_Execute_Unlock_Operations(
         string traceFile,
         string description
-    ) =>
-        LoadTraceFile(traceFile)
+    )
+    {
+        var result = LoadTraceFile(traceFile)
             .Bind(testData => ValidateExchangesExist(testData, traceFile))
             .Bind(exchangesElement =>
                 ValidateUnlockOperations(exchangesElement, description, traceFile)
-            )
-            .Match(
-                success => Assert.Pass("Test completed successfully"),
-                failure => Assert.Inconclusive(failure)
             );
+
+        result.Match(
+            () => { /* Test passed */ },
+            failure => Assert.Fail($"Test failed: {failure}")
+        );
+    }
 
     /// <summary>
     /// Functional helper to validate key management operations.
@@ -459,16 +471,19 @@ public class CardManagementOperationTests
     public void CardManagement_Should_Execute_Key_Management_Operations(
         string traceFile,
         string description
-    ) =>
-        LoadTraceFile(traceFile)
+    )
+    {
+        var result = LoadTraceFile(traceFile)
             .Bind(testData => ValidateExchangesExist(testData, traceFile))
             .Bind(exchangesElement =>
                 ValidateKeyManagementOperations(exchangesElement, description, traceFile)
-            )
-            .Match(
-                success => Assert.Pass("Test completed successfully"),
-                failure => Assert.Inconclusive(failure)
             );
+
+        result.Match(
+            () => { /* Test passed */ },
+            failure => Assert.Fail($"Test failed: {failure}")
+        );
+    }
 
     /// <summary>
     /// Functional helper to analyze authentication sequence.
@@ -574,14 +589,17 @@ public class CardManagementOperationTests
     [TestCase("gp_pro_lock.json")]
     [TestCase("gp_pro_factory_unlock.json")]
     [TestCase("gp_pro_factory_key_put_test_session1.json")]
-    public void CardManagement_Should_Follow_Authentication_Sequence(string traceFile) =>
-        LoadTraceFile(traceFile)
+    public void CardManagement_Should_Follow_Authentication_Sequence(string traceFile)
+    {
+        var result = LoadTraceFile(traceFile)
             .Bind(testData => ValidateExchangesExist(testData, traceFile))
             .Bind(exchangesElement =>
                 ValidateCompleteAuthenticationSequence(exchangesElement, traceFile)
-            )
-            .Match(
-                success => Assert.Pass("Test completed successfully"),
-                failure => Assert.Inconclusive(failure)
             );
+
+        result.Match(
+            () => { /* Test passed */ },
+            failure => Assert.Fail($"Test failed: {failure}")
+        );
+    }
 }

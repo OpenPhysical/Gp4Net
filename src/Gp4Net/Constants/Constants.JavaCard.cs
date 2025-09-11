@@ -30,26 +30,23 @@ public static partial class Constants
             public static class MagicNumber
             {
                 /// <summary>First byte of CAP file magic number (0xDE).</summary>
-                public const byte Byte1 = 0xDE;
-                
+                public const byte BYTE1 = 0xDE;
+
                 /// <summary>Second byte of CAP file magic number (0xCA).</summary>
-                public const byte Byte2 = 0xCA;
-                
+                public const byte BYTE2 = 0xCA;
+
                 /// <summary>Third byte of CAP file magic number (0xFF).</summary>
-                public const byte Byte3 = 0xFF;
-                
+                public const byte BYTE3 = 0xFF;
+
                 /// <summary>Fourth byte of CAP file magic number (0xED).</summary>
-                public const byte Byte4 = 0xED;
-                
-                /// <summary>Complete CAP file magic number as 32-bit value (0xDECAFFED).</summary>
-                public const uint Complete = 0xDECAFFED;
+                public const byte BYTE4 = 0xED;
             }
 
             /// <summary>
             /// Minimum header component size in bytes (10 bytes without magic number).
             /// Reference: Java Card Virtual Machine Specification, Section 6.3
             /// </summary>
-            public const int MinimumSize = 10;
+            public const int MINIMUM_SIZE = 10;
         }
 
         /// <summary>
@@ -59,40 +56,40 @@ public static partial class Constants
         public static class ComponentTags
         {
             /// <summary>Header component tag (0x01).</summary>
-            public const byte Header = 0x01;
+            public const byte HEADER = 0x01;
 
             /// <summary>Directory component tag (0x02).</summary>
-            public const byte Directory = 0x02;
+            public const byte DIRECTORY = 0x02;
 
             /// <summary>Applet component tag (0x03).</summary>
-            public const byte Applet = 0x03;
+            public const byte APPLET = 0x03;
 
             /// <summary>Import component tag (0x04).</summary>
-            public const byte Import = 0x04;
+            public const byte IMPORT = 0x04;
 
             /// <summary>Constant Pool component tag (0x05).</summary>
-            public const byte ConstantPool = 0x05;
+            public const byte CONSTANT_POOL = 0x05;
 
             /// <summary>Class component tag (0x06).</summary>
-            public const byte Class = 0x06;
+            public const byte CLASS = 0x06;
 
             /// <summary>Method component tag (0x07).</summary>
-            public const byte Method = 0x07;
+            public const byte METHOD = 0x07;
 
             /// <summary>Static Field component tag (0x08).</summary>
-            public const byte StaticField = 0x08;
+            public const byte STATIC_FIELD = 0x08;
 
             /// <summary>Reference Location component tag (0x09).</summary>
-            public const byte ReferenceLocation = 0x09;
+            public const byte REFERENCE_LOCATION = 0x09;
 
             /// <summary>Export component tag (0x0A).</summary>
-            public const byte Export = 0x0A;
+            public const byte EXPORT = 0x0A;
 
             /// <summary>Descriptor component tag (0x0B).</summary>
-            public const byte Descriptor = 0x0B;
+            public const byte DESCRIPTOR = 0x0B;
 
             /// <summary>Debug component tag (0x0C).</summary>
-            public const byte Debug = 0x0C;
+            public const byte DEBUG = 0x0C;
         }
 
         /// <summary>
@@ -102,40 +99,40 @@ public static partial class Constants
         public static class ComponentFilenames
         {
             /// <summary>Header component filename.</summary>
-            public const string Header = "Header.cap";
+            public const string HEADER = "Header.cap";
 
             /// <summary>Directory component filename.</summary>
-            public const string Directory = "Directory.cap";
+            public const string DIRECTORY = "Directory.cap";
 
             /// <summary>Applet component filename.</summary>
-            public const string Applet = "Applet.cap";
+            public const string APPLET = "Applet.cap";
 
             /// <summary>Import component filename.</summary>
-            public const string Import = "Import.cap";
+            public const string IMPORT = "Import.cap";
 
             /// <summary>Constant Pool component filename.</summary>
-            public const string ConstantPool = "ConstantPool.cap";
+            public const string CONSTANT_POOL = "ConstantPool.cap";
 
             /// <summary>Class component filename.</summary>
-            public const string Class = "Class.cap";
+            public const string CLASS = "Class.cap";
 
             /// <summary>Method component filename.</summary>
-            public const string Method = "Method.cap";
+            public const string METHOD = "Method.cap";
 
             /// <summary>Static Field component filename.</summary>
-            public const string StaticField = "StaticField.cap";
+            public const string STATIC_FIELD = "StaticField.cap";
 
             /// <summary>Reference Location component filename.</summary>
-            public const string ReferenceLocation = "RefLocation.cap";
+            public const string REFERENCE_LOCATION = "RefLocation.cap";
 
             /// <summary>Export component filename.</summary>
-            public const string Export = "Export.cap";
+            public const string EXPORT = "Export.cap";
 
             /// <summary>Descriptor component filename.</summary>
-            public const string Descriptor = "Descriptor.cap";
+            public const string DESCRIPTOR = "Descriptor.cap";
 
             /// <summary>Debug component filename.</summary>
-            public const string Debug = "Debug.cap";
+            public const string DEBUG = "Debug.cap";
         }
 
         /// <summary>
@@ -145,10 +142,10 @@ public static partial class Constants
         public static class AidConstraints
         {
             /// <summary>Minimum AID length in bytes (5 bytes).</summary>
-            public const int MinLength = 5;
+            public const int MIN_LENGTH = 5;
 
             /// <summary>Maximum AID length in bytes (16 bytes).</summary>
-            public const int MaxLength = 16;
+            public const int MAX_LENGTH = 16;
         }
 
         /// <summary>
@@ -158,10 +155,10 @@ public static partial class Constants
         public static class DefaultVersion
         {
             /// <summary>Default package major version (1).</summary>
-            public const byte PackageMajor = 1;
+            public const byte PACKAGE_MAJOR = 1;
 
             /// <summary>Default package minor version (0).</summary>
-            public const byte PackageMinor = 0;
+            public const byte PACKAGE_MINOR = 0;
         }
 
         /// <summary>
@@ -171,34 +168,34 @@ public static partial class Constants
         public static class ManifestAttributes
         {
             /// <summary>Java Card CAP file version attribute name.</summary>
-            public const string CapFileVersion = "Java-Card-CAP-File-Version";
+            public const string CAP_FILE_VERSION = "Java-Card-CAP-File-Version";
 
             /// <summary>Java Card converter version attribute name.</summary>
-            public const string ConverterVersion = "Java-Card-Converter-Version";
+            public const string CONVERTER_VERSION = "Java-Card-Converter-Version";
 
             /// <summary>Java Card converter provider attribute name.</summary>
-            public const string ConverterProvider = "Java-Card-Converter-Provider";
+            public const string CONVERTER_PROVIDER = "Java-Card-Converter-Provider";
 
             /// <summary>Java Card CAP creation time attribute name.</summary>
-            public const string CreationTime = "Java-Card-CAP-Creation-Time";
+            public const string CREATION_TIME = "Java-Card-CAP-Creation-Time";
 
             /// <summary>Java Card package name attribute name.</summary>
-            public const string PackageName = "Java-Card-Package-Name";
+            public const string PACKAGE_NAME = "Java-Card-Package-Name";
 
             /// <summary>Java Card integer support required attribute name.</summary>
-            public const string IntegerSupportRequired = "Java-Card-Integer-Support-Required";
+            public const string INTEGER_SUPPORT_REQUIRED = "Java-Card-Integer-Support-Required";
 
             /// <summary>Base attribute name for imported package AID (requires index suffix).</summary>
-            public const string ImportedPackageAidBase = "Java-Card-Imported-Package-";
+            public const string IMPORTED_PACKAGE_AID_BASE = "Java-Card-Imported-Package-";
 
             /// <summary>AID suffix for imported package attributes.</summary>
-            public const string ImportedPackageAidSuffix = "-AID";
+            public const string IMPORTED_PACKAGE_AID_SUFFIX = "-AID";
 
             /// <summary>Version suffix for imported package attributes.</summary>
-            public const string ImportedPackageVersionSuffix = "-Version";
+            public const string IMPORTED_PACKAGE_VERSION_SUFFIX = "-Version";
 
             /// <summary>Value indicating integer support is required.</summary>
-            public const string TrueValue = "TRUE";
+            public const string TRUE_VALUE = "TRUE";
         }
 
         /// <summary>
@@ -208,10 +205,10 @@ public static partial class Constants
         public static class IgnoredManifestHeaders
         {
             /// <summary>Manifest version header.</summary>
-            public const string ManifestVersion = "Manifest-Version";
+            public const string MANIFEST_VERSION = "Manifest-Version";
 
             /// <summary>Name section header.</summary>
-            public const string Name = "Name:";
+            public const string NAME = "Name:";
         }
     }
 }

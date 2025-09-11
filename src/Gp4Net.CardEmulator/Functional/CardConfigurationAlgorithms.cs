@@ -33,11 +33,7 @@ public static class CardConfigurationAlgorithms
     /// </summary>
     public static ImmutableList<string> CreateMinimalAlgorithms()
     {
-        return ImmutableList.Create(
-            "RSA-1024",
-            "AES-128",
-            "SHA-256"
-        );
+        return ImmutableList.Create("RSA-1024", "AES-128", "SHA-256");
     }
 
     /// <summary>
@@ -47,17 +43,17 @@ public static class CardConfigurationAlgorithms
     {
         return ImmutableList.Create(
             "RSA-1024",
-            "RSA-2048", 
+            "RSA-2048",
             "ECDSA-P256",
             "ECDSA-P384",
             "ECDSA-P521",
             "AES-128",
-            "AES-192", 
+            "AES-192",
             "AES-256",
             "3DES",
             "SHA-1",
             "SHA-256",
-            "SHA-384", 
+            "SHA-384",
             "SHA-512",
             "HMAC-SHA1",
             "HMAC-SHA256",
@@ -74,7 +70,7 @@ public static class CardConfigurationAlgorithms
         return ImmutableList.Create(
             "RSA-2048",
             "RSA-3072",
-            "ECDSA-P256", 
+            "ECDSA-P256",
             "ECDSA-P384",
             "ECDSA-P521",
             "AES-128",
@@ -82,7 +78,7 @@ public static class CardConfigurationAlgorithms
             "AES-256",
             "SHA-256",
             "SHA-384",
-            "SHA-512", 
+            "SHA-512",
             "HMAC-SHA256",
             "HMAC-SHA384",
             "HMAC-SHA512"

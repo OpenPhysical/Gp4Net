@@ -21,9 +21,9 @@ public static class ApplicationTableRenderer
         bool showExtended = false
     )
     {
-        Table table = CreateTable(showExtended);
+        var table = CreateTable(showExtended);
 
-        foreach (ApplicationTableBuilder.ApplicationRow row in rows)
+        foreach (var row in rows)
         {
             RenderSemanticRow(table, row, showExtended);
         }
@@ -37,7 +37,7 @@ public static class ApplicationTableRenderer
     /// <param name="rows">Sequence of semantic application rows</param>
     public static void RenderToConsole(IEnumerable<ApplicationTableBuilder.ApplicationRow> rows)
     {
-        foreach (ApplicationTableBuilder.ApplicationRow row in rows)
+        foreach (var row in rows)
         {
             switch (row)
             {
@@ -79,7 +79,7 @@ public static class ApplicationTableRenderer
     /// </summary>
     private static Table CreateTable(bool showExtended)
     {
-        Table table = new Table();
+        var table = new Table();
 
         // Basic columns
         _ = table.AddColumn("Type");
@@ -160,11 +160,11 @@ public static class ApplicationTableRenderer
     /// </summary>
     public static void RenderPostTableRows(IEnumerable<ApplicationTableBuilder.ApplicationRow> rows)
     {
-        IEnumerable<ApplicationTableBuilder.ApplicationRow> postTableRows = rows.Where(r =>
+        var postTableRows = rows.Where(r =>
             r is ApplicationTableBuilder.SummaryRow or ApplicationTableBuilder.InfoRow
         );
 
-        foreach (ApplicationTableBuilder.ApplicationRow row in postTableRows)
+        foreach (var row in postTableRows)
         {
             switch (row)
             {

@@ -44,15 +44,15 @@ public static class Applications
     )
     {
         // Retrieve ISD and applications
-        Task<Result<ImmutableList<ApplicationInfo>, SmartCardError>> isdTask =
+        var isdTask =
             GetIssuerSecurityDomainAsync(executeCommand, cancellationToken);
-        Task<Result<ImmutableList<ApplicationInfo>, SmartCardError>> appsTask =
+        var appsTask =
             GetApplicationsAndSecurityDomainsAsync(executeCommand, cancellationToken);
 
         // Retrieve load files
-        Task<Result<ImmutableList<ExecutableLoadFile>, SmartCardError>> loadFilesTask =
+        var loadFilesTask =
             GetExecutableLoadFilesAsync(executeCommand, cancellationToken);
-        Task<Result<ImmutableList<ExecutableLoadFile>, SmartCardError>> loadFilesWithModulesTask =
+        var loadFilesWithModulesTask =
             GetExecutableLoadFilesWithModulesAsync(executeCommand, cancellationToken);
 
         // Wait for all tasks
@@ -97,7 +97,7 @@ public static class Applications
         CancellationToken cancellationToken = default
     )
     {
-        Result<GetStatusCommand, SmartCardError> cmdResult = Commands.CreateGetStatusCommand(
+        var cmdResult = Commands.CreateGetStatusCommand(
             GetStatusCommand.StatusSubset.IssuerSecurityDomain,
             new byte[] { 0x4F, 0x00 }
         ); // Tag 4F, length 0
@@ -123,7 +123,7 @@ public static class Applications
         CancellationToken cancellationToken = default
     )
     {
-        Result<GetStatusCommand, SmartCardError> cmdResult = Commands.CreateGetStatusCommand(
+        var cmdResult = Commands.CreateGetStatusCommand(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             new byte[] { 0x4F, 0x00 }
         );
@@ -149,24 +149,25 @@ public static class Applications
         CancellationToken cancellationToken = default
     )
     {
-        Result<GetStatusCommand, SmartCardError> cmdResult = Commands.CreateGetStatusCommand(
+        var cmdResult = Commands.CreateGetStatusCommand(
             GetStatusCommand.StatusSubset.ExecutableLoadFiles,
             new byte[] { 0x4F, 0x00 }
         );
 
-        Result<ImmutableList<ApplicationInfo>, SmartCardError> parseResult = await cmdResult
+        var parseResult = await cmdResult
             .Bind(command => command.ToCommandApdu())
             .Bind(async commandApdu => await executeCommand(commandApdu, cancellationToken))
             .Bind(response => Responses.ParseGetStatusResponse(response));
 
         return parseResult.Map(apps =>
             apps.Select(app => new ExecutableLoadFile(
-                Aid: app.Aid,
-                LifecycleState: app.LifecycleState,
-                Version: Maybe<string>.None,
-                ExecutableModules: ImmutableList<ExecutableModule>.Empty,
-                AssociatedSecurityDomainAid: app.AssociatedSecurityDomain
-            )).ToImmutableList()
+                    Aid: app.Aid,
+                    LifecycleState: app.LifecycleState,
+                    Version: Maybe<string>.None,
+                    ExecutableModules: ImmutableList<ExecutableModule>.Empty,
+                    AssociatedSecurityDomainAid: app.AssociatedSecurityDomain
+                ))
+                .ToImmutableList()
         );
     }
 
@@ -185,25 +186,26 @@ public static class Applications
         CancellationToken cancellationToken = default
     )
     {
-        Result<GetStatusCommand, SmartCardError> cmdResult = Commands.CreateGetStatusCommand(
+        var cmdResult = Commands.CreateGetStatusCommand(
             GetStatusCommand.StatusSubset.ExecutableLoadFilesAndModules,
             new byte[] { 0x4F, 0x00 }
         );
 
         // Parse response and convert to ExecutableLoadFile objects with modules
-        Result<ImmutableList<ApplicationInfo>, SmartCardError> parseResult = await cmdResult
+        var parseResult = await cmdResult
             .Bind(command => command.ToCommandApdu())
             .Bind(async commandApdu => await executeCommand(commandApdu, cancellationToken))
             .Bind(response => Responses.ParseGetStatusResponse(response));
 
         return parseResult.Map(apps =>
             apps.Select(app => new ExecutableLoadFile(
-                Aid: app.Aid,
-                LifecycleState: app.LifecycleState,
-                Version: Maybe<string>.None,
-                ExecutableModules: ImmutableList<ExecutableModule>.Empty,
-                AssociatedSecurityDomainAid: app.AssociatedSecurityDomain
-            )).ToImmutableList()
+                    Aid: app.Aid,
+                    LifecycleState: app.LifecycleState,
+                    Version: Maybe<string>.None,
+                    ExecutableModules: ImmutableList<ExecutableModule>.Empty,
+                    AssociatedSecurityDomainAid: app.AssociatedSecurityDomain
+                ))
+                .ToImmutableList()
         );
     }
 
@@ -220,12 +222,11 @@ public static class Applications
     )
     {
         // Find the ISD from the list
-        Maybe<ApplicationInfo> issuerSecurityDomain = isd.Count > 0
-            ? Maybe<ApplicationInfo>.From(isd.First())
-            : Maybe<ApplicationInfo>.None;
+        var issuerSecurityDomain =
+            isd.Count > 0 ? Maybe<ApplicationInfo>.From(isd.First()) : Maybe<ApplicationInfo>.None;
 
         // Combine all load files (prefer ones with modules if available)
-        ImmutableDictionary<string, ExecutableLoadFile> loadFileDict = loadFilesWithModules
+        var loadFileDict = loadFilesWithModules
             .Concat(loadFiles)
             .GroupBy(lf => Convert.ToHexString(lf.Aid))
             .Select(g => g.First())

@@ -8,11 +8,10 @@ using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Services;
 using Gp4Net.Pipeline;
 using Gp4Net.Services.GlobalPlatform;
-using Gp4Net.Transport;
 using NUnit.Framework;
+using WSCT.ISO7816;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.Tests.Integration;
@@ -26,14 +25,14 @@ public class LoadFileParsingTests
         byte[] data = Convert.FromHexString(hexData.Replace(" ", string.Empty));
         return new CommandResponse(
             data,
-            StatusWords.Success,
+            StatusWords.SUCCESS,
             new ImmutablePipelineContext(),
             new Dictionary<string, object>()
         );
     }
 
     private static Func<
-        IApduCommand,
+        CommandAPDU,
         CancellationToken,
         Task<Result<CommandResponse, SmartCardError>>
     > ResponseExecutor(CommandResponse response)
@@ -52,21 +51,21 @@ public class LoadFileParsingTests
             + "E31B4F07A00000006202049F700101CE020100CC08A000000151000000"
             + "E31B4F07A00000006202029F700101CE020103CC08A000000151000000";
 
-        CommandResponse response = MakeResponse(respHex);
-        Func<IApduCommand, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> exec =
+        var response = MakeResponse(respHex);
+        var exec =
             ResponseExecutor(response);
 
         Result<ImmutableList<ExecutableLoadFile>, SmartCardError> result =
             await Applications.GetExecutableLoadFilesWithModulesAsync(exec);
 
         _ = result.IsSuccess.Should().BeTrue();
-        ImmutableList<ExecutableLoadFile>? elfs = result.Value;
+        var elfs = result.Value;
 
         // Expect at least 4 entries
         _ = elfs.Count.Should().BeGreaterThanOrEqualTo(4);
 
         // SSD creation package
-        ExecutableLoadFile? ssdPkg = elfs.FirstOrDefault(e =>
+        var ssdPkg = elfs.FirstOrDefault(e =>
             Convert.ToHexString(e.Aid) == "A0000001515350"
         );
         _ = ssdPkg.Should().NotBeNull();
@@ -95,19 +94,19 @@ public class LoadFileParsingTests
             + "E31B4F07A00000006202049F700101CE020100CC08A000000151000000"
             + "E31B4F07A00000006202029F700101CE020103CC08A000000151000000";
 
-        CommandResponse response = MakeResponse(respHex);
-        Func<IApduCommand, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> exec =
+        var response = MakeResponse(respHex);
+        var exec =
             ResponseExecutor(response);
 
         Result<ImmutableList<ExecutableLoadFile>, SmartCardError> result =
             await Applications.GetExecutableLoadFilesAsync(exec);
 
         _ = result.IsSuccess.Should().BeTrue();
-        ImmutableList<ExecutableLoadFile>? elfs = result.Value;
+        var elfs = result.Value;
         _ = elfs.Count.Should().BeGreaterThanOrEqualTo(4);
 
         // DocLite package
-        ExecutableLoadFile? docLite = elfs.FirstOrDefault(e =>
+        var docLite = elfs.FirstOrDefault(e =>
             Convert.ToHexString(e.Aid) == "A00000016443446F634C697465"
         );
         _ = docLite.Should().NotBeNull();

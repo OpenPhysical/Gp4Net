@@ -30,7 +30,8 @@ public class ApduResponse
     {
         get
         {
-            return StatusWord == Gp4Net.Constants.Constants.StatusWords.Success.Normal || IsSuccessWithContinuation;
+            return StatusWord == Constants.Constants.StatusWords.Success
+                || IsSuccessWithContinuation;
         }
     }
 
@@ -64,7 +65,7 @@ public class ApduResponse
     /// <returns>A successful APDU response.</returns>
     public static ApduResponse Success(byte[] data)
     {
-        return new ApduResponse(data, Gp4Net.Constants.Constants.StatusWords.Success.Normal);
+    return new ApduResponse(data, Constants.Constants.StatusWords.Success);
     }
 
     /// <summary>

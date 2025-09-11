@@ -1,10 +1,9 @@
 using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Cryptography;
-using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Domain.Commands;
 using JetBrains.Annotations;
+using static Gp4Net.Cryptography.CryptoService;
 
 namespace Gp4Net.Domain.Keys;
 
@@ -111,9 +110,9 @@ public static partial class GpTestKeys
     {
         return cardResponse.Match(
             response =>
-                response.ScpId.Match(
+                response.ScpVersion.Match(
                     scpVersion => GetTestKeySet(scpVersion, response.KeyVersion),
-                    () => GetTestKeySet(ScpVersion.Scp02) // Default to SCP02 v00 if ScpId is not available
+                    () => GetTestKeySet(ScpVersion.Scp02) // Default to SCP02 v00 if ScpVersion is not available
                 ),
             () => GetTestKeySet(ScpVersion.Scp02) // Default to SCP02 v00
         );
@@ -149,5 +148,19 @@ public static partial class GpTestKeys
         );
     }
 
-
+    /// <summary>
+    /// Creates a protocol-agnostic test key set that can be converted to SCP02 or SCP03
+    /// after protocol negotiation with the card.
+    /// </summary>
+    /// <param name="keyVersion">The key version (default: 0x00).</param>
+    /// <returns>The protocol-agnostic test key set.</returns>
+    public static Result<RawKeyset, SmartCardError> CreateRawTestKeyset(byte keyVersion = 0x00)
+    {
+        return RawKeyset.Create(
+            (byte[])GpTestKey.Clone(),
+            (byte[])GpTestKey.Clone(),
+            (byte[])GpTestKey.Clone(),
+            keyVersion
+        );
+    }
 }

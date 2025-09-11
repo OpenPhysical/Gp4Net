@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using CSharpFunctionalExtensions;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Domain.OpenPhysical;
@@ -13,7 +14,7 @@ public class OpenPhysicalId
     /// <summary>
     /// The fixed manager URL for all OpenPhysical cards.
     /// </summary>
-    public const string OpenPhysicalManagerUrl = "https://www.openphysical.org/";
+    public const string OPEN_PHYSICAL_MANAGER_URL = "https://www.openphysical.org/";
 
     /// <summary>
     /// Gets the Issuer Identification Number (first 4 digits).
@@ -35,7 +36,7 @@ public class OpenPhysicalId
     /// </summary>
     public static string ManagerUrl
     {
-        get { return OpenPhysicalManagerUrl; }
+        get { return OPEN_PHYSICAL_MANAGER_URL; }
     }
 
     /// <summary>
@@ -81,7 +82,7 @@ public class OpenPhysicalId
         }
 
         // Validate format indicator
-        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out OpidFormat format))
+        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out var format))
         {
             return false;
         }
@@ -89,7 +90,13 @@ public class OpenPhysicalId
         string cin = digitsOnly.Substring(5);
 
         // Validate that the total digit count matches the expected count for this format
-        if (digitsOnly.Length != format.GetExpectedDigitCount())
+        var expectedCountValid = format.GetExpectedDigitCount()
+            .Match(
+                expectedCount => digitsOnly.Length == expectedCount,
+                _ => false
+            );
+
+        if (!expectedCountValid)
         {
             return false;
         }
@@ -122,7 +129,7 @@ public class OpenPhysicalId
         result = null;
 
         // Validate manager URL
-        if (managerUrl != OpenPhysicalManagerUrl)
+        if (managerUrl != OPEN_PHYSICAL_MANAGER_URL)
         {
             return false;
         }
@@ -152,13 +159,19 @@ public class OpenPhysicalId
             return false;
         }
 
-        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out OpidFormat format))
+        if (!OpidFormatExtensions.TryParseFormat(formatIndicator, out var format))
         {
             return false;
         }
 
         // Validate that the total length matches the expected format
-        if (fullDigits.Length != format.GetExpectedDigitCount())
+        var expectedLengthValid = format.GetExpectedDigitCount()
+            .Match(
+                expectedLength => fullDigits.Length == expectedLength,
+                _ => false
+            );
+
+        if (!expectedLengthValid)
         {
             return false;
         }
@@ -180,6 +193,7 @@ public class OpenPhysicalId
         string fullDigits = Iin + (int)Format + Cin;
 
         // Apply the appropriate dash pattern based on format
+        // All OpidFormat enum values (2-9) are handled explicitly
         return Format switch
         {
             OpidFormat.Format2 =>
@@ -198,7 +212,7 @@ public class OpenPhysicalId
                 $"{fullDigits.Substring(0, 5)}-{fullDigits.Substring(5, 4)}-{fullDigits.Substring(9, 4)}-{fullDigits.Substring(13, 4)}",
             OpidFormat.Format9 =>
                 $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 4)}-{fullDigits.Substring(12, 5)}",
-            _ => throw new InvalidOperationException($"Unknown format: {Format}"),
+            _ => string.Empty // Invalid format - should never occur due to validation in constructor
         };
     }
 

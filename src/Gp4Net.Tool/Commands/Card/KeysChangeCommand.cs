@@ -5,7 +5,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Services;
+using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console.Cli;
@@ -16,6 +16,7 @@ namespace Gp4Net.Tool.Commands.Card;
 /// Command to change keys on a smart card.
 /// </summary>
 [PublicAPI]
+[CliCommand("change-keys", "Change cryptographic keys on the card (WARNING: This permanently modifies card keys)", "card")]
 [CommandHandler]
 public class KeysChangeCommand : IPipelineCommand<KeysChangeCommand.Settings>
 {
@@ -30,7 +31,7 @@ public class KeysChangeCommand : IPipelineCommand<KeysChangeCommand.Settings>
         return await context.ExecuteAsync(async ctx =>
         {
             // Validate required parameters functionally
-            Result<bool, SmartCardError> result = await ValidateSettings(settings)
+            var result = await ValidateSettings(settings)
                 .Bind(_ =>
                 {
                     ctx.Display.Info("Starting key change operation...");
@@ -89,7 +90,7 @@ public class KeysChangeCommand : IPipelineCommand<KeysChangeCommand.Settings>
         );
     }
 
-    private static async Task<Result<bool, SmartCardError>> ExecuteKeyChange(
+    private static Task<Result<bool, SmartCardError>> ExecuteKeyChange(
         ICliExecutionContext context,
         IKeySet newKeyset
     )
@@ -99,8 +100,12 @@ public class KeysChangeCommand : IPipelineCommand<KeysChangeCommand.Settings>
         context.Display.Info($"Protocol: {(newKeyset is Scp02KeySet ? "SCP02" : "SCP03")}");
 
         context.Display.Error("Key change functionality not yet implemented with static services.");
-        return Result.Failure<bool, SmartCardError>(
-            SmartCardError.Unsupported("Key change functionality needs to be implemented using static GlobalPlatformService methods")
+        return Task.FromResult(
+            Result.Failure<bool, SmartCardError>(
+                SmartCardError.Unsupported(
+                    "Key change functionality needs to be implemented using static GlobalPlatformService methods"
+                )
+            )
         );
     }
 

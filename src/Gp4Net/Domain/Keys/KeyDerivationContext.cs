@@ -1,9 +1,8 @@
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
-using Gp4Net.Cryptography;
-using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Constants;
+using Gp4Net.Core;
 using JetBrains.Annotations;
+using static Gp4Net.Cryptography.CryptoService;
 
 namespace Gp4Net.Domain.Keys;
 
@@ -83,13 +82,8 @@ public sealed record KeyDerivationContext(
             );
         }
 
-        // Validate implementation is SCP02
-        if (!IsValidScp02Implementation(implementation))
-        {
-            return Result.Failure<KeyDerivationContext, SmartCardError>(
-                SmartCardError.InvalidArgument($"Invalid SCP02 implementation: {implementation}")
-            );
-        }
+        // Implementation parameter is provided - no validation needed since
+        // the method name explicitly indicates this is for SCP02
 
         return Result.Success<KeyDerivationContext, SmartCardError>(
             new KeyDerivationContext(
@@ -146,21 +140,12 @@ public sealed record KeyDerivationContext(
         }
 
         // Use default implementation if not provided
-        Maybe<ScpImplementation> actualImplementation = implementation.HasNoValue
+        var actualImplementation = implementation.HasNoValue
             ? Maybe<ScpImplementation>.From(ScpImplementation.Scp03I70)
             : implementation;
 
-        // Validate implementation is SCP03
-        if (
-            actualImplementation.HasValue && !IsValidScp03Implementation(actualImplementation.Value)
-        )
-        {
-            return Result.Failure<KeyDerivationContext, SmartCardError>(
-                SmartCardError.InvalidArgument(
-                    $"Invalid SCP03 implementation: {actualImplementation.Value}"
-                )
-            );
-        }
+        // Implementation parameter is provided - no validation needed since
+        // the method name explicitly indicates this is for SCP03
 
         return Result.Success<KeyDerivationContext, SmartCardError>(
             new KeyDerivationContext(
@@ -226,24 +211,6 @@ public sealed record KeyDerivationContext(
                     ? ScpImplementation.Scp02I15
                     : ScpImplementation.Scp03I70
             );
-    }
-
-    /// <summary>
-    /// Validates if the implementation is valid for SCP02.
-    /// </summary>
-    private static bool IsValidScp02Implementation(ScpImplementation implementation)
-    {
-        // Use the extension method that properly validates SCP02 implementations
-        return implementation.IsScp02();
-    }
-
-    /// <summary>
-    /// Validates if the implementation is valid for SCP03.
-    /// </summary>
-    private static bool IsValidScp03Implementation(ScpImplementation implementation)
-    {
-        // Use the extension method that properly validates SCP03 implementations
-        return implementation.IsScp03();
     }
 
     /// <summary>

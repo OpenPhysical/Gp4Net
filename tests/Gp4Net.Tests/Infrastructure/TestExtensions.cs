@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using CSharpFunctionalExtensions;
 using NUnit.Framework;
 
@@ -18,10 +16,12 @@ public static class TestExtensions
     /// <typeparam name="T">The type to convert.</typeparam>
     /// <param name="value">The value to convert.</param>
     /// <returns>Maybe with the value, or None if null.</returns>
-    public static Maybe<T> ToMaybe<T>(this T value) where T : class
+    public static Maybe<T> ToMaybe<T>(this T value)
+        where T : class
     {
         return Maybe<T>.From(value);
     }
+
     /// <summary>
     /// Executes an action if the Maybe has a value, then returns the original Maybe.
     /// This method provides side-effect execution without breaking the functional chain.
@@ -87,7 +87,7 @@ public static class FunctionalAssertionExtensions
     /// <typeparam name="TError">The error type of the Result.</typeparam>
     /// <param name="result">The Result to assert on.</param>
     /// <returns>UnitResultAssertions for chaining.</returns>
-    public static UnitResultAssertions<TError> Should<TError>(this Result<TError> result)
+    public static UnitResultAssertions<TError> Should<TError>(this UnitResult<TError> result)
     {
         return new UnitResultAssertions<TError>(result);
     }
@@ -103,8 +103,6 @@ public static class FunctionalAssertionExtensions
         return new MaybeAssertions<T>(maybe);
     }
 }
-
-
 
 /// <summary>
 /// Functional assertions for Result types with success value.
@@ -141,7 +139,10 @@ public sealed class ResultAssertions<T, TError>
     {
         _result.Match(
             value => Assert.That(value, Is.EqualTo(expectedValue), because),
-            error => Assert.Fail($"Expected success with value {expectedValue}, but got failure: {error}. {because}")
+            error =>
+                Assert.Fail(
+                    $"Expected success with value {expectedValue}, but got failure: {error}. {because}"
+                )
         );
         return this;
     }
@@ -166,7 +167,10 @@ public sealed class ResultAssertions<T, TError>
     public ResultAssertions<T, TError> BeFailureWith(TError expectedError, string because = "")
     {
         _result.Match(
-            value => Assert.Fail($"Expected failure with error {expectedError}, but got success: {value}. {because}"),
+            value =>
+                Assert.Fail(
+                    $"Expected failure with error {expectedError}, but got success: {value}. {because}"
+                ),
             error => Assert.That(error, Is.EqualTo(expectedError), because)
         );
         return this;
@@ -179,9 +183,9 @@ public sealed class ResultAssertions<T, TError>
 /// <typeparam name="TError">The error type.</typeparam>
 public sealed class UnitResultAssertions<TError>
 {
-    private readonly Result<TError> _result;
+    private readonly UnitResult<TError> _result;
 
-    internal UnitResultAssertions(Result<TError> result)
+    internal UnitResultAssertions(UnitResult<TError> result)
     {
         _result = result;
     }
@@ -216,10 +220,19 @@ public sealed class UnitResultAssertions<TError>
     /// <returns>This instance for method chaining.</returns>
     public UnitResultAssertions<TError> BeFailureWith(TError expectedError, string because = "")
     {
-        _result.Match(
-            () => { Assert.Fail($"Expected failure with error {expectedError}, but got success. {because}"); },
-            error => { Assert.That(error, Is.EqualTo(expectedError), because); }
-        );
+        if (_result.IsSuccess)
+        {
+            Assert.Fail(
+                $"Expected failure with error {expectedError}, but got success. {because}"
+            );
+        }
+        else
+        {
+            // Use property access for the error instead of Match
+            Assert.That(_result.IsFailure, Is.True);
+            var error = _result.Error;
+            Assert.That(error.Equals(expectedError), Is.True, $"Expected {expectedError}, but got {error}. {because}");
+        }
         return this;
     }
 }
@@ -258,7 +271,10 @@ public sealed class MaybeAssertions<T>
     {
         _maybe.Match(
             value => Assert.That(value, Is.EqualTo(expectedValue), because),
-            () => Assert.Fail($"Expected Maybe to have value {expectedValue}, but it was None. {because}")
+            () =>
+                Assert.Fail(
+                    $"Expected Maybe to have value {expectedValue}, but it was None. {because}"
+                )
         );
         return this;
     }
@@ -283,7 +299,8 @@ public sealed class MaybeAssertions<T>
     {
         _maybe.Match(
             value => Assert.That(value, Is.Not.Null, because),
-            () => Assert.Fail($"Expected Maybe to have a non-null value, but it was None. {because}")
+            () =>
+                Assert.Fail($"Expected Maybe to have a non-null value, but it was None. {because}")
         );
         return this;
     }
@@ -308,7 +325,10 @@ public sealed class MaybeAssertions<T>
     {
         _maybe.Match(
             value => Assert.That(value, Is.EqualTo(expectedValue), because),
-            () => Assert.Fail($"Expected Maybe to contain {expectedValue}, but it was None. {because}")
+            () =>
+                Assert.Fail(
+                    $"Expected Maybe to contain {expectedValue}, but it was None. {because}"
+                )
         );
         return this;
     }
@@ -406,7 +426,7 @@ public sealed class MaybeValueAssertions<T>
     {
         return _maybe.Match(
             value => new PrimitiveAssertions<T>(value),
-            () => 
+            () =>
             {
                 Assert.Fail("Expected Maybe to have a value for assertion, but it was None");
                 return new PrimitiveAssertions<T>(default(T)!); // This will never be reached
@@ -462,4 +482,3 @@ public sealed class ObjectAssertions<T>
         return this;
     }
 }
-

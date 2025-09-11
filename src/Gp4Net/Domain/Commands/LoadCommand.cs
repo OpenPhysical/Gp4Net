@@ -1,14 +1,11 @@
 using System;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Transport;
-using WSCT.Core;
-using WSCT.ISO7816;
 using JetBrains.Annotations;
-using static Gp4Net.Constants.Constants;
+using WSCT.ISO7816;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -17,13 +14,12 @@ namespace Gp4Net.Domain.Commands;
 /// Used to transfer CAP file content in chunks after INSTALL [for load].
 /// </summary>
 [PublicAPI]
-public class LoadCommand
+public class LoadCommand : IApduCommand
 {
-
     /// <summary>
     /// CAP file data TLV tag.
     /// </summary>
-    public const byte CapDataTag = Gp4Net.Constants.Constants.Tlv.GlobalPlatformTags.CapDataTlvTag;
+    public const byte CAP_DATA_TAG = Constants.Constants.GlobalPlatform.Tags.CAP_DATA_TLV_TAG;
 
     /// <summary>
     /// P1 values for load operations.
@@ -59,7 +55,10 @@ public class LoadCommand
     /// <summary>
     /// Gets the data to load.
     /// </summary>
-    public byte[] Data { get { return GetCommandData(); } }
+    public byte[] Data
+    {
+        get { return GetCommandData(); }
+    }
 
     /// <summary>
     /// Gets the total CAP file size (only included in first block).
@@ -73,6 +72,12 @@ public class LoadCommand
     {
         get { return BlockNumber == 0; }
     }
+
+    /// <inheritdoc />
+    public byte Cla => Constants.Constants.GlobalPlatform.Cla.GP_STANDARD;
+
+    /// <inheritdoc />
+    public byte Ins => Constants.Constants.GlobalPlatform.Ins.LOAD;
 
     /// <summary>
     /// Gets a value indicating whether this is the final block.
@@ -90,7 +95,15 @@ public class LoadCommand
     {
         var data = GetCommandData();
         return Result.Success<CommandAPDU, SmartCardError>(
-            new CommandAPDU(GlobalPlatform.Cla.GpStandard, GlobalPlatform.Ins.Load, (byte)Type, BlockNumber, (uint)data.Length, data, 0)
+            new CommandAPDU(
+                Constants.Constants.GlobalPlatform.Cla.GP_STANDARD,
+                Constants.Constants.GlobalPlatform.Ins.LOAD,
+                (byte)Type,
+                BlockNumber,
+                (uint)data.Length,
+                data,
+                0
+            )
         );
     }
 
@@ -109,7 +122,6 @@ public class LoadCommand
     {
         get { return BlockNumber; }
     }
-
 
     /// <summary>
     /// Gets the expected response length.
@@ -137,7 +149,7 @@ public class LoadCommand
         if (IsFirstBlock)
         {
             // First block includes TLV header: C4 <total_length> <data>
-            data.Add(CapDataTag);
+            data.Add(CAP_DATA_TAG);
 
             // Encode length (up to 3 bytes for length field)
             uint totalSize = TotalCapSize!.Value;
@@ -172,7 +184,7 @@ public class LoadCommand
         }
 
         // Add the actual data
-        data.AddRange(Data);
+        data.AddRange(_data);
 
         return [.. data];
     }
@@ -221,7 +233,7 @@ public class LoadCommand
 
         uint? totalCapSize = blockNumber == 0 ? (uint)data.Length : null;
 
-        LoadCommand command = new LoadCommand(blockNumber, data, isLastBlock, totalCapSize);
+        var command = new LoadCommand(blockNumber, data, isLastBlock, totalCapSize);
         return Result.Success<LoadCommand, SmartCardError>(command);
     }
 
@@ -233,7 +245,7 @@ public class LoadCommand
     /// <returns>A Result containing the sequence of LOAD commands or an error.</returns>
     public static Result<IList<LoadCommand>, SmartCardError> CreateFromCapFile(
         byte[] capFileData,
-        int maxBlockSize = GlobalPlatform.ApduLimits.DefaultLoadBlockSize
+        int maxBlockSize = Constants.Constants.GlobalPlatform.ApduLimits.DEFAULT_LOAD_BLOCK_SIZE
     )
     {
         if (capFileData == null)
@@ -324,7 +336,7 @@ public class LoadCommand
     /// <returns>A Result containing the sequence of LOAD commands or an error.</returns>
     public static Result<IList<LoadCommand>, SmartCardError> CreateFromCapFile(
         CapFileStructure capFile,
-        int maxBlockSize = GlobalPlatform.ApduLimits.DefaultLoadBlockSize
+        int maxBlockSize = Constants.Constants.GlobalPlatform.ApduLimits.DEFAULT_LOAD_BLOCK_SIZE
     )
     {
         if (capFile == null)
@@ -334,21 +346,27 @@ public class LoadCommand
             );
         }
 
-        try
-        {
-            byte[] binaryData = capFile.ToBinaryFormat();
-            return CreateFromCapFile(binaryData, maxBlockSize);
-        }
-        catch (Exception ex)
-        {
-            return Result.Failure<IList<LoadCommand>, SmartCardError>(
-                SmartCardError.InvalidData(
-                    $"Failed to convert CAP file to binary format: {ex.Message}"
-                )
-            );
-        }
-    }
+        var binaryDataResult = Gp4Net.Core.Functional.ResultExtensions.Try(
+            () => capFile.ToBinaryFormat(),
+            ex => SmartCardError.InvalidData(
+                $"Failed to convert CAP file to binary format: {ex.Message}"
+            )
+        );
 
+        if (binaryDataResult.IsFailure)
+        {
+            return Result.Failure<IList<LoadCommand>, SmartCardError>(binaryDataResult.Error);
+        }
+
+        if (binaryDataResult.IsSuccess)
+        {
+            return CreateFromCapFile(binaryDataResult.Value, maxBlockSize);
+        }
+
+        return Result.Failure<IList<LoadCommand>, SmartCardError>(
+            SmartCardError.InvalidData("Unexpected state in binary data conversion")
+        );
+    }
 
     /// <summary>
     /// Returns a string representation of this command.
@@ -357,6 +375,18 @@ public class LoadCommand
     public override string ToString()
     {
         return "LOAD";
+    }
+
+    /// <inheritdoc />
+    public CommandAPDU ToApdu()
+    {
+        return ToCommandApdu().GetValueOrDefault(new CommandAPDU([]));
+    }
+
+    /// <inheritdoc />
+    public byte[] ToBytes()
+    {
+        return ToCommandApdu().Map(cmd => cmd.ToBytes()).GetValueOrDefault([]);
     }
 }
 
@@ -419,27 +449,27 @@ public static class CapFileLoader
         /// <summary>
         /// Incorrect data (e.g., wrong AID, TLV malformed).
         /// </summary>
-        public const ushort IncorrectData = 0x6A80;
+        public const ushort INCORRECT_DATA = 0x6A80;
 
         /// <summary>
         /// Memory error.
         /// </summary>
-        public const ushort MemoryError = 0x6A84;
+        public const ushort MEMORY_ERROR = 0x6A84;
 
         /// <summary>
         /// Conditions not satisfied (e.g., missing INSTALL [for load]).
         /// </summary>
-        public const ushort ConditionsNotSatisfied = 0x6985;
+        public const ushort CONDITIONS_NOT_SATISFIED = 0x6985;
 
         /// <summary>
         /// Generic failure (possibly applet exception during install).
         /// </summary>
-        public const ushort GenericFailure = 0x6F00;
+        public const ushort GENERIC_FAILURE = 0x6F00;
 
         /// <summary>
         /// Success.
         /// </summary>
-        public const ushort Success = 0x9000;
+        public const ushort SUCCESS = 0x9000;
     }
 
     /// <summary>
@@ -454,28 +484,25 @@ public static class CapFileLoader
             return false;
         }
 
-        try
+        // Try to parse the CAP file structure
+        var capFileResult = CapFileStructure.Parse(capFileData);
+        
+        if (capFileResult.IsFailure)
         {
-            // Try to parse the CAP file structure
-            Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(
-                capFileData
-            );
-            if (capFileResult.IsFailure)
-            {
-                return false;
-            }
+            return false;
+        }
 
-            CapFileStructure capFile = capFileResult.Value;
-
+        if (capFileResult.IsSuccess)
+        {
+            var capFile = capFileResult.Value;
+            
             // Basic validation checks
             return capFile.PackageAid.Length > 0
                 && capFile.Components.Count > 0
                 && capFile.TotalSize > 0;
         }
-        catch
-        {
-            return false;
-        }
+
+        return false;
     }
 
     /// <summary>
@@ -487,12 +514,12 @@ public static class CapFileLoader
     {
         return statusWord switch
         {
-            ErrorCodes.Success => "Success",
-            ErrorCodes.IncorrectData => "Incorrect data (wrong AID or malformed TLV)",
-            ErrorCodes.MemoryError => "Memory error",
-            ErrorCodes.ConditionsNotSatisfied =>
+            ErrorCodes.SUCCESS => "Success",
+            ErrorCodes.INCORRECT_DATA => "Incorrect data (wrong AID or malformed TLV)",
+            ErrorCodes.MEMORY_ERROR => "Memory error",
+            ErrorCodes.CONDITIONS_NOT_SATISFIED =>
                 "Conditions not satisfied (missing INSTALL [for load])",
-            ErrorCodes.GenericFailure => "Generic failure (possibly applet exception)",
+            ErrorCodes.GENERIC_FAILURE => "Generic failure (possibly applet exception)",
             _ => $"Unknown error: {statusWord:X4}",
         };
     }

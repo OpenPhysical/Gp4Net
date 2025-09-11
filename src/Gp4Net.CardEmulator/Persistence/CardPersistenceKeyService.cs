@@ -37,11 +37,11 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
     /// </summary>
     public Result<byte[], SmartCardError> DeriveStorageKey(IKeySet keySet, CardUuid cardUuid)
     {
-        Result<bool, SmartCardError> validationResult = ValidateInputs(keySet, cardUuid);
+        var validationResult = ValidateInputs(keySet, cardUuid);
         if (validationResult.IsFailure)
             return Result.Failure<byte[], SmartCardError>(validationResult.Error);
 
-        Result<KdfParameters, SmartCardError> kdfParamsResult = BuildKdfParameters(
+        var kdfParamsResult = BuildKdfParameters(
             keySet,
             cardUuid
         );
@@ -72,11 +72,11 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
     /// </summary>
     public Result<byte[], SmartCardError> ComputeKeyFingerprint(IKeySet keySet)
     {
-        Result<bool, SmartCardError> validationResult = ValidateKeySet(keySet);
+        var validationResult = ValidateKeySet(keySet);
         if (validationResult.IsFailure)
             return Result.Failure<byte[], SmartCardError>(validationResult.Error);
 
-        Result<byte[], SmartCardError> fingerprintDataResult = BuildFingerprintData(keySet);
+        var fingerprintDataResult = BuildFingerprintData(keySet);
         if (fingerprintDataResult.IsFailure)
             return Result.Failure<byte[], SmartCardError>(fingerprintDataResult.Error);
 
@@ -85,7 +85,7 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
 
     private static Result<bool, SmartCardError> ValidateInputs(IKeySet keySet, CardUuid cardUuid)
     {
-        Result<bool, SmartCardError> keySetValidation = ValidateKeySet(keySet);
+        var keySetValidation = ValidateKeySet(keySet);
         if (keySetValidation.IsFailure)
             return Result.Failure<bool, SmartCardError>(keySetValidation.Error);
 
@@ -155,7 +155,7 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
                 // Build fixed input per SP 800-108r1: Label || 0x00 || Context
                 byte[] fixedInput = BuildFixedInput(label, context);
 
-                KdfParameters parameters = new KdfParameters(k1, fixedInput, keySet);
+                var parameters = new KdfParameters(k1, fixedInput, keySet);
                 return parameters;
             },
             ex => SmartCardError.CryptographicError($"Failed to build KDF parameters: {ex.Message}")
@@ -172,7 +172,7 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
         return Result.Try(
             () =>
             {
-                KdfOptions options = KdfOptions
+                var options = KdfOptions
                     .CreateBuilder()
                     .WithPrfType(PrfType.HmacSha256)
                     .WithCounterLengthBits(32)

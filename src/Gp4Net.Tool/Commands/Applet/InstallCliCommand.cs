@@ -1,11 +1,8 @@
 using System.ComponentModel;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Domain;
-using Gp4Net.Services;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
@@ -58,7 +55,7 @@ public class InstallCliCommand : IPipelineCommand<InstallCliCommand.Settings>
             );
     }
 
-    private static async Task<Result<bool, SmartCardError>> PerformInstall(
+    private static Task<Result<bool, SmartCardError>> PerformInstall(
         ICliExecutionContext context,
         Settings settings
     )
@@ -66,8 +63,12 @@ public class InstallCliCommand : IPipelineCommand<InstallCliCommand.Settings>
         context.Display.Info($"Installing CAP file: {settings.CapFile}");
 
         context.Display.Error("CAP file installation not yet implemented with static services.");
-        return Result.Failure<bool, SmartCardError>(
-            SmartCardError.Unsupported("CAP file installation functionality needs to be implemented using static GlobalPlatformService methods")
+        return Task.FromResult(
+            Result.Failure<bool, SmartCardError>(
+                SmartCardError.Unsupported(
+                    "CAP file installation functionality needs to be implemented using static GlobalPlatformService methods"
+                )
+            )
         );
     }
 

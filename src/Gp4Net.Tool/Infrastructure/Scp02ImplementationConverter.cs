@@ -19,7 +19,7 @@ public class Scp02ImplementationConverter : TypeConverter
     /// Dictionary mapping user input strings to ScpImplementation enum values.
     /// Includes all hex values and specific aliases for common modes.
     /// </summary>
-    private static readonly Dictionary<string, ScpImplementation> _validValues = new()
+    private static readonly Dictionary<string, ScpImplementation> ValidValues = new()
     {
         // All SCP02 hex values (comprehensive support)
         { "00", ScpImplementation.Scp02I00 },
@@ -94,7 +94,7 @@ public class Scp02ImplementationConverter : TypeConverter
             string normalizedStr = str.Trim().ToUpperInvariant();
 
             // Try direct lookup in dictionary
-            if (_validValues.TryGetValue(normalizedStr, out ScpImplementation implementation))
+            if (ValidValues.TryGetValue(normalizedStr, out var implementation))
                 return implementation;
 
             // Try parsing as hex number (with or without 0x prefix)
@@ -167,7 +167,7 @@ public class Scp02ImplementationConverter : TypeConverter
     /// <returns>Dictionary of supported values</returns>
     public static IReadOnlyDictionary<string, ScpImplementation> GetSupportedValues()
     {
-        return _validValues;
+        return ValidValues;
     }
 
     /// <summary>

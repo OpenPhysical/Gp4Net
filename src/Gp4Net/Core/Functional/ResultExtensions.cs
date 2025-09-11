@@ -50,7 +50,7 @@ public static class ResultExtensions
         Func<T1, T2> selector
     )
     {
-        Result<T1, E> result = await resultTask;
+        var result = await resultTask;
         return result.Map(selector);
     }
 
@@ -62,7 +62,7 @@ public static class ResultExtensions
         Func<T1, Task<Result<T2, E>>> bind
     )
     {
-        Result<T1, E> result = await resultTask;
+        var result = await resultTask;
         return result.IsSuccess ? await bind(result.Value) : Result.Failure<T2, E>(result.Error);
     }
 
@@ -75,12 +75,12 @@ public static class ResultExtensions
         Func<T1, T2, T3> project
     )
     {
-        Result<T1, E> result = await resultTask;
+        var result = await resultTask;
         if (result.IsFailure)
             return Result.Failure<T3, E>(result.Error);
 
-        T1 t1 = result.Value;
-        Result<T2, E> result2 = await bind(t1);
+        var t1 = result.Value;
+        var result2 = await bind(t1);
         return result2.Map(t2 => project(t1, t2));
     }
 
@@ -95,7 +95,7 @@ public static class ResultExtensions
     {
         try
         {
-            T value = await operation();
+            var value = await operation();
             return Result.Success<T, E>(value);
         }
         catch (Exception ex)
@@ -111,7 +111,7 @@ public static class ResultExtensions
     {
         try
         {
-            T value = operation();
+            var value = operation();
             return Result.Success<T, E>(value);
         }
         catch (Exception ex)
@@ -228,7 +228,7 @@ public static class ResultExtensions
         Func<T, Task<UnitResult<E>>> bind
     )
     {
-        Result<T, E> result = await resultTask;
+        var result = await resultTask;
         return result.IsSuccess ? await bind(result.Value) : UnitResult.Failure(result.Error);
     }
 }

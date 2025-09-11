@@ -11,7 +11,6 @@ using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.DataObjects;
 using JetBrains.Annotations;
-using static Gp4Net.Constants.Constants;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
 using static Gp4Net.Services.TlvService;
 
@@ -38,26 +37,37 @@ public static class DataGeneration
     public static Result<byte[], SmartCardError> BuildCardCapabilities(
         ImmutableList<ScpImplementation> supportedScp02Implementations,
         ImmutableList<ScpImplementation> supportedScp03Implementations,
-        ImmutableList<KeyTypeAndLength> keyTypes)
+        ImmutableList<KeyTypeAndLength> keyTypes
+    )
     {
         // Build protocol TLVs functionally
-        var scp02TlvResult = supportedScp02Implementations.Count > 0
-            ? BuildScpProtocolTlv(Protocols.Scp02, supportedScp02Implementations, keyTypes).Map(Maybe<TlvObject>.From)
-            : Result.Success<Maybe<TlvObject>, SmartCardError>(Maybe<TlvObject>.None);
+        var scp02TlvResult =
+            supportedScp02Implementations.Count > 0
+                ? BuildScpProtocolTlv(Protocols.SCP02, supportedScp02Implementations, keyTypes)
+                    .Map(Maybe<TlvObject>.From)
+                : Result.Success<Maybe<TlvObject>, SmartCardError>(Maybe<TlvObject>.None);
 
-        var scp03TlvResult = supportedScp03Implementations.Count > 0
-            ? BuildScpProtocolTlv(Protocols.Scp03, supportedScp03Implementations, keyTypes).Map(Maybe<TlvObject>.From)
-            : Result.Success<Maybe<TlvObject>, SmartCardError>(Maybe<TlvObject>.None);
+        var scp03TlvResult =
+            supportedScp03Implementations.Count > 0
+                ? BuildScpProtocolTlv(Protocols.SCP03, supportedScp03Implementations, keyTypes)
+                    .Map(Maybe<TlvObject>.From)
+                : Result.Success<Maybe<TlvObject>, SmartCardError>(Maybe<TlvObject>.None);
 
         return scp02TlvResult
-            .Bind(scp02Maybe => scp03TlvResult
-                .Map((Maybe<TlvObject> scp03Maybe) => new[] { scp02Maybe, scp03Maybe }
-                    .Where(maybe => maybe.HasValue)
-                    .Select(maybe => maybe.Value)
-                    .ToImmutableArray()))
+            .Bind(scp02Maybe =>
+                scp03TlvResult.Map(
+                    (Maybe<TlvObject> scp03Maybe) =>
+                        new[] { scp02Maybe, scp03Maybe }
+                            .Where(maybe => maybe.HasValue)
+                            .Select(maybe => maybe.Value)
+                            .ToImmutableArray()
+                )
+            )
             .Bind(tlvObjects => TlvEncoder.EncodeMultiple(tlvObjects))
             .Map(encoded => encoded.ToArray())
-            .MapError(error => SmartCardError.InvalidData($"Failed to encode card capabilities: {error}"));
+            .MapError(error =>
+                SmartCardError.InvalidData($"Failed to encode card capabilities: {error}")
+            );
     }
 
     /// <summary>
@@ -71,13 +81,14 @@ public static class DataGeneration
     public static Result<byte[], SmartCardError> BuildKeyInformationTemplate(
         byte keyVersionNumber,
         byte keyIdentifier,
-        ImmutableList<KeyTypeAndLength> keyTypes)
+        ImmutableList<KeyTypeAndLength> keyTypes
+    )
     {
         var keyInfo = new KeyInfoTemplate
         {
             KeyVersionNumber = Maybe<byte>.From(keyVersionNumber),
             KeyIdentifier = Maybe<byte>.From(keyIdentifier),
-            KeyTypesAndLengths = keyTypes.ToImmutableArray()
+            KeyTypesAndLengths = keyTypes.ToImmutableArray(),
         };
 
         return KeyInfoTemplateCodec.Encode(keyInfo);
@@ -131,7 +142,8 @@ public static class DataGeneration
         ImmutableList<ScpImplementation> supportedScp03,
         ImmutableList<KeyTypeAndLength> keyTypes,
         byte keyVersionNumber = 0x01,
-        byte keyIdentifier = 0x00)
+        byte keyIdentifier = 0x00
+    )
     {
         return tag switch
         {
@@ -141,7 +153,7 @@ public static class DataGeneration
             0x9F7F => BuildCplcData(),
             _ => Result.Failure<byte[], SmartCardError>(
                 SmartCardError.InvalidArgument($"Unsupported data object tag: 0x{tag:X4}")
-            )
+            ),
         };
     }
 
@@ -153,7 +165,8 @@ public static class DataGeneration
     private static Result<TlvObject, SmartCardError> BuildScpProtocolTlv(
         byte protocol,
         ImmutableList<ScpImplementation> implementations,
-        ImmutableList<KeyTypeAndLength> keyTypes)
+        ImmutableList<KeyTypeAndLength> keyTypes
+    )
     {
         // Build TLV components functionally
         var protocolTlvResult = TlvObject.Create(
@@ -161,33 +174,54 @@ public static class DataGeneration
             new TlvValue(ImmutableArray.Create(protocol))
         );
 
-        var implementationsTlvResult = implementations.Count > 0
-            ? TlvObject.Create(
-                    TlvTag.FromByte(0x81),
-                    new TlvValue(implementations.Select(impl => (byte)impl).ToImmutableArray()))
-                .Map(Maybe<TlvObject>.From)
-            : Result.Success<Maybe<TlvObject>, SmartCardError>(Maybe<TlvObject>.None);
+        var implementationsTlvResult =
+            implementations.Count > 0
+                ? TlvObject
+                    .Create(
+                        TlvTag.FromByte(0x81),
+                        new TlvValue(implementations.Select(impl => (byte)impl).ToImmutableArray())
+                    )
+                    .Map(Maybe<TlvObject>.From)
+                : Result.Success<Maybe<TlvObject>, SmartCardError>(Maybe<TlvObject>.None);
 
-        var relevantKeyTypes = keyTypes.Where(kt => IsKeyTypeRelevantForProtocol(kt, protocol)).ToImmutableArray();
-        var keyTypesTlvResult = relevantKeyTypes.Length > 0
-            ? TlvObject.Create(
-                    TlvTag.FromByte(0x82),
-                    new TlvValue(relevantKeyTypes.SelectMany(kt => new byte[] { kt.Type, kt.Length }).ToImmutableArray()))
-                .Map(Maybe<TlvObject>.From)
-            : Result.Success<Maybe<TlvObject>, SmartCardError>(Maybe<TlvObject>.None);
+        var relevantKeyTypes = keyTypes
+            .Where(kt => IsKeyTypeRelevantForProtocol(kt, protocol))
+            .ToImmutableArray();
+        var keyTypesTlvResult =
+            relevantKeyTypes.Length > 0
+                ? TlvObject
+                    .Create(
+                        TlvTag.FromByte(0x82),
+                        new TlvValue(
+                            relevantKeyTypes
+                                .SelectMany(kt => new byte[] { kt.Type, kt.Length })
+                                .ToImmutableArray()
+                        )
+                    )
+                    .Map(Maybe<TlvObject>.From)
+                : Result.Success<Maybe<TlvObject>, SmartCardError>(Maybe<TlvObject>.None);
 
         // Combine all results functionally
         return protocolTlvResult
-            .Bind(protocolTlv => implementationsTlvResult
-                .Bind(implementationsMaybe => keyTypesTlvResult
-                    .Map((Maybe<TlvObject> keyTypesMaybe) =>
-                    {
-                        var tlvObjects = new[] { Maybe<TlvObject>.From(protocolTlv), implementationsMaybe, keyTypesMaybe }
-                            .Where(maybe => maybe.HasValue)
-                            .Select(maybe => maybe.Value)
-                            .ToImmutableArray();
-                        return tlvObjects;
-                    })))
+            .Bind(protocolTlv =>
+                implementationsTlvResult.Bind(implementationsMaybe =>
+                    keyTypesTlvResult.Map(
+                        (Maybe<TlvObject> keyTypesMaybe) =>
+                        {
+                            var tlvObjects = new[]
+                            {
+                                Maybe<TlvObject>.From(protocolTlv),
+                                implementationsMaybe,
+                                keyTypesMaybe,
+                            }
+                                .Where(maybe => maybe.HasValue)
+                                .Select(maybe => maybe.Value)
+                                .ToImmutableArray();
+                            return tlvObjects;
+                        }
+                    )
+                )
+            )
             .Bind(allTlvs => TlvEncoder.EncodeMultiple(allTlvs))
             .Bind(encoded => TlvObject.Create(TlvTag.FromByte(0xA0), new TlvValue(encoded)));
     }
@@ -199,9 +233,9 @@ public static class DataGeneration
     {
         return protocol switch
         {
-            Protocols.Scp02 => keyType.Type == 0x80 || keyType.Type == 0x81 || keyType.Type == 0x82, // DES keys
-            Protocols.Scp03 => keyType.Type == 0x88, // AES keys
-            _ => false
+            Protocols.SCP02 => keyType.Type == 0x80 || keyType.Type == 0x81 || keyType.Type == 0x82, // DES keys
+            Protocols.SCP03 => keyType.Type == 0x88, // AES keys
+            _ => false,
         };
     }
 

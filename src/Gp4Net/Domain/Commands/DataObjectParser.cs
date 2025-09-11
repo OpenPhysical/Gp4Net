@@ -27,7 +27,7 @@ public static class DataObjectParser
         }
 
         // Support both ':' and '=' as separators, 2-4 character tags, and allow any data
-        Match match = Regex.Match(dataObject, @"^([0-9A-Fa-f]{2,4})[:=](.*)$");
+        var match = Regex.Match(dataObject, @"^([0-9A-Fa-f]{2,4})[:=](.*)$");
         if (!match.Success)
         {
             return Result.Failure<(ushort tag, byte[] data), SmartCardError>(
@@ -70,24 +70,5 @@ public static class DataObjectParser
                     )
                     .Map(parsedData => (parsedTag, parsedData))
             );
-    }
-
-    /// <summary>
-    /// Validates that the parsed data object is well-formed.
-    /// </summary>
-    /// <param name="tag">The tag value.</param>
-    /// <param name="data">The data bytes.</param>
-    /// <returns>True if valid, false otherwise.</returns>
-    public static bool ValidateDataObject(ushort tag, byte[] data)
-    {
-        // Tag should be in valid range (0x0000 is invalid)
-        if (tag == 0x0000)
-        {
-            return false;
-        }
-
-        // Data should not be null (empty data is allowed for some tags)
-        // Additional validation could be added here based on specific tag requirements
-        return Maybe<byte[]>.From(data).HasValue;
     }
 }

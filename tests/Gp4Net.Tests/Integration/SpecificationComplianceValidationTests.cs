@@ -105,10 +105,10 @@ public class SpecificationComplianceValidationTests
             );
 
         _ = deleteCommandResult.IsSuccess.Should().BeTrue("DELETE command creation should succeed");
-        DeleteCommand? deleteCommand = deleteCommandResult.Value;
+        var deleteCommand = deleteCommandResult.Value;
 
         // Get APDU bytes
-        byte[]? apduBytes = deleteCommand.ToApdu();
+        byte[] apduBytes = deleteCommand.ToBytes();
 
         // Assert: Command should follow GP Table 11-23 format
         _ = apduBytes[0].Should().Be(0x80, "CLA should be 0x80 for plain command");
@@ -219,7 +219,7 @@ public class SpecificationComplianceValidationTests
             .BeTrue("E3 container format should parse successfully per GP Table 11-36");
         _ = result.Value.Applications.Should().HaveCount(1, "Should parse one application");
 
-        ApplicationStatusEntry? app = result.Value.Applications[0];
+        var app = result.Value.Applications[0];
         _ = app.Aid.Should().BeEquivalentTo(aid, "AID should be parsed correctly");
         _ = app
             .State.Should()

@@ -1,12 +1,9 @@
 using System;
 using System.IO;
 using AwesomeAssertions;
-using CSharpFunctionalExtensions;
-using Gp4Net.CardEmulator.Functional;
 using Gp4Net.CardEmulator.Profiles;
-using Gp4Net.Core;
-using Gp4Net.Domain.Keys;
 using Gp4Net.Constants;
+using Gp4Net.Domain.Keys;
 using NUnit.Framework;
 
 namespace Gp4Net.CardEmulator.Tests.Profiles;
@@ -71,13 +68,13 @@ public class CardProfileLoaderTests
     public void LoadFromJson_WithValidP71Profile_ReturnsConfiguration()
     {
         // Act
-        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(
+        var result = CardProfileLoader.LoadFromJson(
             SampleP71Profile
         );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        CardConfiguration? config = result.Value;
+        var config = result.Value;
 
         // Basic properties
         _ = config.CardType.Should().Be("Test P71D321 card");
@@ -92,7 +89,7 @@ public class CardProfileLoaderTests
 
         // Keys
         _ = config.StaticKeys.Should().ContainKey(1);
-        IKeySet keySet = config.StaticKeys[1];
+        var keySet = config.StaticKeys[1];
         _ = keySet.Should().BeOfType<Scp02KeySet>();
 
         // Data objects
@@ -145,13 +142,13 @@ public class CardProfileLoaderTests
         }";
 
         // Act
-        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(
+        var result = CardProfileLoader.LoadFromJson(
             scp03Profile
         );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        CardConfiguration? config = result.Value;
+        var config = result.Value;
         _ = config.DefaultScpVersion.Should().Be(0x03);
         _ = config.DefaultScpImplementation.Should().Be(ScpImplementation.Scp03I70);
         _ = config.StaticKeys[1].Should().BeOfType<Scp03KeySet>();
@@ -164,7 +161,7 @@ public class CardProfileLoaderTests
         string invalidJson = "{ invalid json }";
 
         // Act
-        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(
+        var result = CardProfileLoader.LoadFromJson(
             invalidJson
         );
 
@@ -186,7 +183,7 @@ public class CardProfileLoaderTests
         }";
 
         // Act
-        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(
+        var result = CardProfileLoader.LoadFromJson(
             incompleteJson
         );
 
@@ -208,7 +205,7 @@ public class CardProfileLoaderTests
         }";
 
         // Act
-        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(
+        var result = CardProfileLoader.LoadFromJson(
             badHexJson
         );
 
@@ -242,7 +239,7 @@ public class CardProfileLoaderTests
         }";
 
         // Act
-        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(
+        var result = CardProfileLoader.LoadFromJson(
             badKeyJson
         );
 
@@ -276,7 +273,7 @@ public class CardProfileLoaderTests
         }";
 
         // Act
-        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(
+        var result = CardProfileLoader.LoadFromJson(
             unknownKeyTypeJson
         );
 
@@ -295,13 +292,13 @@ public class CardProfileLoaderTests
             File.WriteAllText(tempFile, SampleP71Profile);
 
             // Act
-            Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromFile(
+            var result = CardProfileLoader.LoadFromFile(
                 tempFile
             );
 
             // Assert
             _ = result.IsSuccess.Should().BeTrue();
-            CardConfiguration? config = result.Value;
+            var config = result.Value;
             _ = config.CardType.Should().Be("Test P71D321 card");
         }
         finally
@@ -317,7 +314,7 @@ public class CardProfileLoaderTests
         string nonExistentFile = Path.Combine(Path.GetTempPath(), "non_existent_profile.json");
 
         // Act
-        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromFile(
+        var result = CardProfileLoader.LoadFromFile(
             nonExistentFile
         );
 
@@ -330,7 +327,7 @@ public class CardProfileLoaderTests
     public void LoadFromFile_WithNullPath_ReturnsFailure()
     {
         // Act
-        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromFile(null!);
+        var result = CardProfileLoader.LoadFromFile(null!);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -351,13 +348,13 @@ public class CardProfileLoaderTests
         }";
 
         // Act
-        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(
+        var result = CardProfileLoader.LoadFromJson(
             jsonWithSpaces
         );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        CardConfiguration? config = result.Value;
+        var config = result.Value;
         _ = config
             .Atr.Should()
             .BeEquivalentTo(Convert.FromHexString("3BD518FF8191FE1FC38073C821100A"));
@@ -368,17 +365,20 @@ public class CardProfileLoaderTests
     public void LoadFromJson_SupportedInstructions_ContainsStandardGpCommands()
     {
         // Act
-        Result<CardConfiguration, SmartCardError> result = CardProfileLoader.LoadFromJson(
+        var result = CardProfileLoader.LoadFromJson(
             SampleP71Profile
         );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        CardConfiguration? config = result.Value;
-        _ = config.SupportedInstructions.Should().Contain(0xA4); // SELECT
-        _ = config.SupportedInstructions.Should().Contain(0x50); // INITIALIZE UPDATE
-        _ = config.SupportedInstructions.Should().Contain(0x82); // EXTERNAL AUTHENTICATE
-        _ = config.SupportedInstructions.Should().Contain(0xCA); // GET DATA
-        _ = config.SupportedInstructions.Should().Contain(0xF2); // GET STATUS
+        if (result.IsSuccess)
+        {
+            var config = result.Value;
+            _ = config.SupportedInstructions.Select.Should().BeTrue(); // SELECT
+            _ = config.SupportedInstructions.InitializeUpdate.Should().BeTrue(); // INITIALIZE UPDATE
+            _ = config.SupportedInstructions.ExternalAuthenticate.Should().BeTrue(); // EXTERNAL AUTHENTICATE
+            _ = config.SupportedInstructions.GetData.Should().BeTrue(); // GET DATA
+            _ = config.SupportedInstructions.GetStatus.Should().BeTrue(); // GET STATUS
+        }
     }
 }

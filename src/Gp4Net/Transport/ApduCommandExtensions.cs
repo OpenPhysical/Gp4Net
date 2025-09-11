@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using JetBrains.Annotations;
@@ -19,7 +18,8 @@ public static class ApduCommandExtensions
     /// <returns>A result containing the APDU as a byte array or an error.</returns>
     public static Result<byte[], SmartCardError> ToApdu(this Maybe<CommandAPDU> command)
     {
-        return command.ToResult(SmartCardError.InvalidArgument("Command cannot be null"))
+        return command
+            .ToResult(SmartCardError.InvalidArgument("Command cannot be null"))
             .Map(cmd => cmd.ToBytes());
     }
 

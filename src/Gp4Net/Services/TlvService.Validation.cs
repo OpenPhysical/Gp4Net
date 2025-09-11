@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -24,8 +23,7 @@ public static partial class TlvService
         /// <returns>A Result indicating success or containing an error.</returns>
         public static UnitResult<SmartCardError> Validate(TlvObject tlv)
         {
-            return ValidateTag(tlv.Tag)
-                .Bind(_ => ValidateLength(tlv.Length, tlv.TlvData));
+            return ValidateTag(tlv.Tag).Bind(_ => ValidateLength(tlv.Length, tlv.TlvData));
         }
 
         /// <summary>
@@ -41,15 +39,11 @@ public static partial class TlvService
             }
 
             // Validate each object and check for failures
-            var validationResults = objects
-                .Select(obj => Validate(obj))
-                .ToImmutableArray();
+            var validationResults = objects.Select(obj => Validate(obj)).ToImmutableArray();
 
             // Check for any failures
             var failures = validationResults.Where(r => r.IsFailure).ToImmutableArray();
-            return failures.Length > 0
-                ? failures[0]
-                : UnitResult.Success<SmartCardError>();
+            return failures.Length > 0 ? failures[0] : UnitResult.Success<SmartCardError>();
         }
 
         /// <summary>
@@ -61,14 +55,13 @@ public static partial class TlvService
         {
             if (tag.Bytes.Length == 0)
             {
-                return UnitResult.Failure<SmartCardError>(
+                return UnitResult.Failure(
                     SmartCardError.InvalidArgument("Tag cannot be empty")
                 );
             }
 
-
             // Check for multi-byte tag structure
-            if ((tag.Bytes[0] & Tlv.Parsing.MultiByteTagMask) == Tlv.Parsing.MultiByteTagMask)
+            if ((tag.Bytes[0] & Tlv.Parsing.MULTI_BYTE_TAG_MASK) == Tlv.Parsing.MULTI_BYTE_TAG_MASK)
             {
                 return ValidateMultiByteTag(tag);
             }
@@ -83,7 +76,7 @@ public static partial class TlvService
         {
             if (tag.Bytes.Length < 2)
             {
-                return UnitResult.Failure<SmartCardError>(
+                return UnitResult.Failure(
                     SmartCardError.InvalidArgument("Multi-byte tag must have at least 2 bytes")
                 );
             }
@@ -91,21 +84,21 @@ public static partial class TlvService
             // Validate subsequent bytes
             var subsequentBytes = tag.Bytes.Skip(1).Take(tag.Bytes.Length - 2).ToImmutableArray();
             var invalidBytes = subsequentBytes
-                .Where(b => (b & Tlv.Parsing.SubsequentTagByteMask) == 0)
+                .Where(b => (b & Tlv.Parsing.SUBSEQUENT_TAG_BYTE_MASK) == 0)
                 .ToImmutableArray();
 
             if (invalidBytes.Length > 0)
             {
-                return UnitResult.Failure<SmartCardError>(
+                return UnitResult.Failure(
                     SmartCardError.InvalidArgument("Invalid multi-byte tag structure")
                 );
             }
 
             // Last byte should not have continuation bit
             var lastByte = tag.Bytes[tag.Bytes.Length - 1];
-            if ((lastByte & Tlv.Parsing.SubsequentTagByteMask) != 0)
+            if ((lastByte & Tlv.Parsing.SUBSEQUENT_TAG_BYTE_MASK) != 0)
             {
-                return UnitResult.Failure<SmartCardError>(
+                return UnitResult.Failure(
                     SmartCardError.InvalidArgument("Multi-byte tag not properly terminated")
                 );
             }
@@ -123,13 +116,12 @@ public static partial class TlvService
         {
             if (length.LengthValue != value.Bytes.Length)
             {
-                return UnitResult.Failure<SmartCardError>(
+                return UnitResult.Failure(
                     SmartCardError.InvalidArgument(
                         $"Length mismatch: declared {length.LengthValue}, actual {value.Bytes.Length}"
                     )
                 );
             }
-
 
             return UnitResult.Success<SmartCardError>();
         }
@@ -146,12 +138,15 @@ public static partial class TlvService
                 return Result.Success<bool, SmartCardError>(false);
             }
 
-            return Result.Try(() =>
-            {
-                // Try to parse as ASN.1 - BouncyCastle will throw if invalid
-                var _ = Asn1Object.FromByteArray(data.ToArray());
-                return true;
-            }, ex => SmartCardError.InvalidData($"ASN.1 validation failed: {ex.Message}"));
+            return Result.Try(
+                () =>
+                {
+                    // Try to parse as ASN.1 - BouncyCastle will throw if invalid
+                    var _ = Asn1Object.FromByteArray(data.ToArray());
+                    return true;
+                },
+                ex => SmartCardError.InvalidData($"ASN.1 validation failed: {ex.Message}")
+            );
         }
 
         /// <summary>
@@ -175,7 +170,7 @@ public static partial class TlvService
             // This is already handled in parser, just validate the value
             if (length.LengthValue < 0)
             {
-                return UnitResult.Failure<SmartCardError>(
+                return UnitResult.Failure(
                     SmartCardError.InvalidArgument($"Invalid GP length: {length.LengthValue}")
                 );
             }
@@ -196,7 +191,8 @@ public static partial class TlvService
             }
 
             // Try to parse the value as TLV
-            return TlvParser.ParseMultiple(tlv.TlvData.Bytes)
+            return TlvParser
+                .ParseMultiple(tlv.TlvData.Bytes)
                 .Map(result => result.Objects.Length > 0)
                 .MapError(_ => SmartCardError.InvalidData("Failed to parse nested TLV")) // Convert parse error to false
                 .Match(
@@ -215,15 +211,15 @@ public static partial class TlvService
         {
             if (tag.Bytes.Length == 0)
             {
-                return UnitResult.Failure<SmartCardError>(
+                return UnitResult.Failure(
                     SmartCardError.InvalidArgument("Cannot validate class of empty tag")
                 );
             }
 
-            var tagClass = (byte)(tag.Bytes[0] & Tlv.ContextSpecific.ClassMask);
+            var tagClass = (byte)(tag.Bytes[0] & Tlv.ContextSpecific.CLASS_MASK);
             if (tagClass != expectedClass)
             {
-                return UnitResult.Failure<SmartCardError>(
+                return UnitResult.Failure(
                     SmartCardError.InvalidArgument(
                         $"Tag class mismatch: expected {expectedClass:X2}, got {tagClass:X2}"
                     )

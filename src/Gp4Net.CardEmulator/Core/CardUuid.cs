@@ -24,7 +24,7 @@ public readonly record struct CardUuid(Guid Value)
             () =>
             {
                 // Guid.NewGuid() uses cryptographically secure random generation
-                Guid uuid = Guid.NewGuid();
+                var uuid = Guid.NewGuid();
                 return new CardUuid(uuid);
             },
             ex => SmartCardError.CryptographicError($"Failed to generate card UUID: {ex.Message}")

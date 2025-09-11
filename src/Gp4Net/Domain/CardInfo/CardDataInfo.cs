@@ -5,8 +5,8 @@ using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Services;
-using static Gp4Net.Services.TlvService;
 using Org.BouncyCastle.Asn1;
+using static Gp4Net.Services.TlvService;
 
 namespace Gp4Net.Domain.CardInfo;
 
@@ -23,6 +23,7 @@ namespace Gp4Net.Domain.CardInfo;
 /// <param name="CardChipDetails">Chip-specific details</param>
 /// <param name="Oids">Object identifiers found in card data</param>
 /// <param name="GlobalPlatformVersionFromOid">GP version string from OID parsing</param>
+/// <param name="CardRecognitionData">Parsed Card Recognition Data from tag 73</param>
 public record CardDataInfo(
     byte[] Data,
     IReadOnlyDictionary<ushort, byte[]> Tags,
@@ -31,7 +32,8 @@ public record CardDataInfo(
     Maybe<byte[]> CardConfigurationDetails,
     Maybe<byte[]> CardChipDetails,
     IReadOnlyList<string> Oids,
-    Maybe<string> GlobalPlatformVersionFromOid
+    Maybe<string> GlobalPlatformVersionFromOid,
+    Maybe<CardRecognitionData> CardRecognitionData
 )
 {
     /// <summary>
@@ -46,7 +48,8 @@ public record CardDataInfo(
             Maybe<byte[]>.None,
             Maybe<byte[]>.None,
             [],
-            Maybe<string>.None
+            Maybe<string>.None,
+            Maybe<CardRecognitionData>.None
         );
 
     /// <summary>
@@ -77,10 +80,11 @@ public record CardDataInfo(
         return Result.Try(
             () =>
             {
-                IReadOnlyDictionary<ushort, byte[]> tags = ParseTlvTags(data);
-                IReadOnlyList<string> oids = ExtractOids(data);
-                Maybe<string> gpVersionFromOid = ExtractGpVersionFromOids(oids);
-                Maybe<Version> gpVersion = ExtractGpVersionFromTags(tags);
+                var tags = ParseTlvTags(data);
+                var oids = ExtractOids(data);
+                var gpVersionFromOid = ExtractGpVersionFromOids(oids);
+                var gpVersion = ExtractGpVersionFromTags(tags);
+                var cardRecognitionData = ParseCardRecognitionData(tags);
 
                 return new CardDataInfo(
                     data,
@@ -96,7 +100,8 @@ public record CardDataInfo(
                         ? Maybe<byte[]>.From(chipDetails)
                         : Maybe<byte[]>.None,
                     oids,
-                    gpVersionFromOid
+                    gpVersionFromOid,
+                    cardRecognitionData
                 );
             },
             ex => SmartCardError.InvalidData($"Failed to parse card data: {ex.Message}")
@@ -109,16 +114,31 @@ public record CardDataInfo(
     /// </summary>
     private static IReadOnlyDictionary<ushort, byte[]> ParseTlvTags(byte[] data)
     {
-        return TlvParser.ParseMultiple(data.ToImmutableArray())
+        return TlvParser
+            .ParseMultiple(data.ToImmutableArray())
             .Match(
-                onSuccess: parseResult => parseResult.Objects
-                    .Select(element => element.Tag.ToNumber()
-                        .Match(
-                            onSuccess: tagNumber => new { HasTag = true, Tag = (ushort)tagNumber, Data = element.TlvData.Bytes.ToArray() },
-                            onFailure: _ => new { HasTag = false, Tag = (ushort)0, Data = Array.Empty<byte>() }
-                        ))
-                    .Where(x => x.HasTag)
-                    .ToDictionary(x => x.Tag, x => x.Data),
+                onSuccess: parseResult =>
+                    parseResult
+                        .Objects.Select(element =>
+                            element
+                                .Tag.ToNumber()
+                                .Match(
+                                    onSuccess: tagNumber => new
+                                    {
+                                        HasTag = true,
+                                        Tag = (ushort)tagNumber,
+                                        Data = element.TlvData.Bytes.ToArray(),
+                                    },
+                                    onFailure: _ => new
+                                    {
+                                        HasTag = false,
+                                        Tag = (ushort)0,
+                                        Data = Array.Empty<byte>(),
+                                    }
+                                )
+                        )
+                        .Where(x => x.HasTag)
+                        .ToDictionary(x => x.Tag, x => x.Data),
                 onFailure: _ => new Dictionary<ushort, byte[]>()
             );
     }
@@ -137,21 +157,27 @@ public record CardDataInfo(
     /// </summary>
     private static IEnumerable<string> ExtractOidsRecursive(byte[] data)
     {
-        return TlvParser.ParseMultiple(data.ToImmutableArray())
+        return TlvParser
+            .ParseMultiple(data.ToImmutableArray())
             .Match(
-                onSuccess: parseResult => parseResult.Objects.SelectMany(element => 
-                    element.Tag.ToNumber().Match(
-                        onSuccess: tagNumber => tagNumber == 0x06
-                            ? ParseOid(element.TlvData.Bytes.ToArray())
-                                .Match(
-                                    Some: oid => new[] { oid },
-                                    None: () => Enumerable.Empty<string>()
-                                )
-                            : element.TlvData.Bytes.Length >= 2
-                                ? ExtractOidsRecursive(element.TlvData.Bytes.ToArray())
-                                : Enumerable.Empty<string>(),
-                        onFailure: _ => Enumerable.Empty<string>()
-                    )),
+                onSuccess: parseResult =>
+                    parseResult.Objects.SelectMany(element =>
+                        element
+                            .Tag.ToNumber()
+                            .Match(
+                                onSuccess: tagNumber =>
+                                    tagNumber == 0x06
+                                        ? ParseOid(element.TlvData.Bytes.ToArray())
+                                            .Match(
+                                                Some: oid => new[] { oid },
+                                                None: () => Enumerable.Empty<string>()
+                                            )
+                                    : element.TlvData.Bytes.Length >= 2
+                                        ? ExtractOidsRecursive(element.TlvData.Bytes.ToArray())
+                                    : Enumerable.Empty<string>(),
+                                onFailure: _ => Enumerable.Empty<string>()
+                            )
+                    ),
                 onFailure: _ => Enumerable.Empty<string>()
             );
     }
@@ -161,7 +187,8 @@ public record CardDataInfo(
     /// </summary>
     private static Maybe<string> ParseOid(byte[] oidBytes)
     {
-        try
+        // Use Result.Try for functional exception handling
+        return Result.Try(() =>
         {
             // Create DER-encoded OID from content
             byte[] derBytes = new byte[oidBytes.Length + 2];
@@ -169,15 +196,15 @@ public record CardDataInfo(
             derBytes[1] = (byte)oidBytes.Length;
             Buffer.BlockCopy(oidBytes, 0, derBytes, 2, oidBytes.Length);
 
-            Asn1Object asn1Object = Asn1Object.FromByteArray(derBytes);
+            var asn1Object = Asn1Object.FromByteArray(derBytes);
             return asn1Object is DerObjectIdentifier oidObj
                 ? Maybe<string>.From(oidObj.Id)
                 : Maybe<string>.None;
-        }
-        catch
-        {
-            return Maybe<string>.None;
-        }
+        })
+        .Match(
+            success => success,
+            _ => Maybe<string>.None
+        );
     }
 
     /// <summary>
@@ -216,10 +243,9 @@ public record CardDataInfo(
         if (data.Length == 0)
             return Maybe<Version>.None;
 
-        try
-        {
-            // Parse as BCD (Binary Coded Decimal) format
-            return data.Length switch
+        // Try BCD parsing first, then fallback to raw binary
+        var bcdResult = Result.Try(() =>
+            data.Length switch
             {
                 >= 3 => Maybe<Version>.From(
                     new Version(BcdToByte(data[0]), BcdToByte(data[1]), BcdToByte(data[2]))
@@ -227,26 +253,30 @@ public record CardDataInfo(
                 2 => Maybe<Version>.From(new Version(BcdToByte(data[0]), BcdToByte(data[1]))),
                 1 => Maybe<Version>.From(new Version(BcdToByte(data[0]), 0)),
                 _ => Maybe<Version>.None,
-            };
-        }
-        catch
-        {
-            // Fallback to raw binary interpretation if BCD parsing fails
-            try
-            {
-                return data.Length switch
-                {
-                    >= 3 => Maybe<Version>.From(new Version(data[0], data[1], data[2])),
-                    2 => Maybe<Version>.From(new Version(data[0], data[1])),
-                    1 => Maybe<Version>.From(new Version(data[0], 0)),
-                    _ => Maybe<Version>.None,
-                };
             }
-            catch
+        );
+
+        return bcdResult.Match(
+            success => success,
+            _ =>
             {
-                return Maybe<Version>.None;
+                // Fallback to raw binary interpretation if BCD parsing fails
+                var binaryResult = Result.Try(() =>
+                    data.Length switch
+                    {
+                        >= 3 => Maybe<Version>.From(new Version(data[0], data[1], data[2])),
+                        2 => Maybe<Version>.From(new Version(data[0], data[1])),
+                        1 => Maybe<Version>.From(new Version(data[0], 0)),
+                        _ => Maybe<Version>.None,
+                    }
+                );
+                
+                return binaryResult.Match(
+                    success => success,
+                    _ => Maybe<Version>.None
+                );
             }
-        }
+        );
     }
 
     /// <summary>
@@ -256,6 +286,20 @@ public record CardDataInfo(
     private static int BcdToByte(byte bcd)
     {
         return (bcd >> 4) * 10 + (bcd & 0x0F);
+    }
+
+    /// <summary>
+    /// Parse Card Recognition Data from tag 73 using CardDataParser.
+    /// </summary>
+    private static Maybe<CardRecognitionData> ParseCardRecognitionData(IReadOnlyDictionary<ushort, byte[]> tags)
+    {
+        return tags.TryGetValue(0x73, out byte[] tag73Data)
+            ? CardDataParser.ParseCardRecognitionData(tag73Data)
+                .Match(
+                    success => Maybe<CardRecognitionData>.From(success),
+                    _ => Maybe<CardRecognitionData>.None
+                )
+            : Maybe<CardRecognitionData>.None;
     }
 
     /// <summary>
@@ -299,7 +343,7 @@ public record CardDataInfo(
                 // Add GP version info for version OIDs
                 if (oid.StartsWith("1.2.840.114283.2.") && oid != "1.2.840.114283.2")
                 {
-                    IEnumerable<string> versionParts = oid.Split('.').Skip(4);
+                    var versionParts = oid.Split('.').Skip(4);
                     result += $"-> GP Version: {string.Join(".", versionParts)}\n";
                 }
             }

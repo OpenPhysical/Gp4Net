@@ -112,15 +112,17 @@ public class SessionKeys : IDisposable
         Arrays.Fill(SEnc, 0);
         Arrays.Fill(SMac, 0);
         Arrays.Fill(SrMac, 0);
-        
-        return Maybe<byte[]>.From(Dek).Match(
-            Some: dekKey =>
-            {
-                Arrays.Fill(dekKey, 0);
-                return UnitResult.Success<SmartCardError>();
-            },
-            None: () => UnitResult.Success<SmartCardError>()
-        );
+
+        return Maybe<byte[]>
+            .From(Dek)
+            .Match(
+                Some: dekKey =>
+                {
+                    Arrays.Fill(dekKey, 0);
+                    return UnitResult.Success<SmartCardError>();
+                },
+                None: () => UnitResult.Success<SmartCardError>()
+            );
     }
 
     /// <summary>

@@ -1,4 +1,3 @@
-using System;
 using WSCT.ISO7816;
 
 namespace Gp4Net.Pipeline;
@@ -58,18 +57,9 @@ public record CommandRequest(
 /// Options for command execution.
 /// </summary>
 public record CommandOptions(
-    bool RequiresSecureChannel = true,
+    bool UseSecureChannel,
     bool CaptureMetrics = true,
-    bool EnableLogging = true
-)
-{
-    /// <summary>
-    /// Default options for most commands.
-    /// </summary>
-    public static CommandOptions Default { get; } = new();
-
-    /// <summary>
-    /// Options for commands that don't require secure channel.
-    /// </summary>
-    public static CommandOptions NoSecureChannel { get; } = new(RequiresSecureChannel: false);
-}
+    bool EnableLogging = true,
+    bool VerboseLogging = false,
+    bool DebugLogging = false
+);

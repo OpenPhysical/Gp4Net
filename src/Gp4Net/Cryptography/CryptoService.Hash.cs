@@ -27,19 +27,24 @@ public static partial class CryptoService
             return Maybe<byte[]>
                 .From(data)
                 .ToResult(SmartCardError.InvalidArgument("Data cannot be null"))
-                .Bind(input => Result.Try(
-                    () =>
-                    {
-                        var digest = new Sha256Digest();
-                        digest.BlockUpdate(input, 0, input.Length);
-                        
-                        var hash = new byte[digest.GetDigestSize()];
-                        digest.DoFinal(hash, 0);
-                        
-                        return hash;
-                    },
-                    ex => SmartCardError.CryptographicError($"SHA-256 hash computation failed: {ex.Message}")
-                ));
+                .Bind(input =>
+                    Result.Try(
+                        () =>
+                        {
+                            var digest = new Sha256Digest();
+                            digest.BlockUpdate(input, 0, input.Length);
+
+                            var hash = new byte[digest.GetDigestSize()];
+                            digest.DoFinal(hash, 0);
+
+                            return hash;
+                        },
+                        ex =>
+                            SmartCardError.CryptographicError(
+                                $"SHA-256 hash computation failed: {ex.Message}"
+                            )
+                    )
+                );
         }
 
         /// <summary>
@@ -52,19 +57,24 @@ public static partial class CryptoService
             return Maybe<byte[]>
                 .From(data)
                 .ToResult(SmartCardError.InvalidArgument("Data cannot be null"))
-                .Bind(input => Result.Try(
-                    () =>
-                    {
-                        var digest = new Sha1Digest();
-                        digest.BlockUpdate(input, 0, input.Length);
-                        
-                        var hash = new byte[digest.GetDigestSize()];
-                        digest.DoFinal(hash, 0);
-                        
-                        return hash;
-                    },
-                    ex => SmartCardError.CryptographicError($"SHA-1 hash computation failed: {ex.Message}")
-                ));
+                .Bind(input =>
+                    Result.Try(
+                        () =>
+                        {
+                            var digest = new Sha1Digest();
+                            digest.BlockUpdate(input, 0, input.Length);
+
+                            var hash = new byte[digest.GetDigestSize()];
+                            digest.DoFinal(hash, 0);
+
+                            return hash;
+                        },
+                        ex =>
+                            SmartCardError.CryptographicError(
+                                $"SHA-1 hash computation failed: {ex.Message}"
+                            )
+                    )
+                );
         }
 
         /// <summary>
@@ -78,19 +88,24 @@ public static partial class CryptoService
             return Maybe<byte[]>
                 .From(data)
                 .ToResult(SmartCardError.InvalidArgument("Data cannot be null"))
-                .Bind(input => Result.Try(
-                    () =>
-                    {
-                        var digest = new MD5Digest();
-                        digest.BlockUpdate(input, 0, input.Length);
-                        
-                        var hash = new byte[digest.GetDigestSize()];
-                        digest.DoFinal(hash, 0);
-                        
-                        return hash;
-                    },
-                    ex => SmartCardError.CryptographicError($"MD5 hash computation failed: {ex.Message}")
-                ));
+                .Bind(input =>
+                    Result.Try(
+                        () =>
+                        {
+                            var digest = new MD5Digest();
+                            digest.BlockUpdate(input, 0, input.Length);
+
+                            var hash = new byte[digest.GetDigestSize()];
+                            digest.DoFinal(hash, 0);
+
+                            return hash;
+                        },
+                        ex =>
+                            SmartCardError.CryptographicError(
+                                $"MD5 hash computation failed: {ex.Message}"
+                            )
+                    )
+                );
         }
     }
 }

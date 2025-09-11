@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
@@ -25,10 +24,7 @@ public class CardContentRetriever
     /// </summary>
     /// <param name="cardService">The smart card service for command execution.</param>
     /// <param name="logger">The logger for diagnostic output.</param>
-    public CardContentRetriever(
-        ISmartCardService cardService,
-        ILogger<CardContentRetriever> logger
-    )
+    public CardContentRetriever(ISmartCardService cardService, ILogger<CardContentRetriever> logger)
     {
         _cardService = cardService;
         _logger = logger;
@@ -47,7 +43,7 @@ public class CardContentRetriever
     )
     {
         // Select ISD
-        Result<SelectResponse, SmartCardError> selectResult =
+        var selectResult =
             await Discovery.DetectAndSelectIsdAsync(
                 async (cmd, ct) => await _cardService.ExecuteCommandAsync(cmd, ct),
                 cancellationToken
@@ -59,7 +55,7 @@ public class CardContentRetriever
         }
 
         // Establish secure channel
-        Result<bool, SmartCardError> secureChannelResult =
+        var secureChannelResult =
             await EstablishSecureChannelWithAutoDetection(keySet);
         if (secureChannelResult.IsFailure)
         {
@@ -88,8 +84,12 @@ public class CardContentRetriever
                 return await ConvertToKeySet(ks)
                     .Bind(async keySetForGp =>
                     {
-                        var secureChannelResult =
-                            await ScpService.Establishment.EstablishAsync(_cardService, keySetForGp, SecurityLevel.CMac, CancellationToken.None);
+                        var secureChannelResult = await ScpService.Establishment.EstablishAsync(
+                            _cardService,
+                            keySetForGp,
+                            SecurityLevel.CMac,
+                            CancellationToken.None
+                        );
 
                         if (secureChannelResult.IsSuccess)
                         {

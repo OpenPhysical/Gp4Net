@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Transport;
@@ -18,7 +17,6 @@ namespace Gp4Net.Domain.Commands;
 [PublicAPI]
 public class DeleteCommand : IApduCommand
 {
-
     /// <summary>
     /// Delete operation types for P1 parameter.
     /// </summary>
@@ -99,12 +97,12 @@ public class DeleteCommand : IApduCommand
     /// <summary>
     /// Gets the class byte.
     /// </summary>
-    public byte Cla => GlobalPlatform.Cla.GpStandard;
+    public byte Cla => GlobalPlatform.Cla.GP_STANDARD;
 
     /// <summary>
     /// Gets the instruction byte.
     /// </summary>
-    public byte Ins => GlobalPlatform.Ins.Delete;
+    public byte Ins => GlobalPlatform.Ins.DELETE;
 
     /// <summary>
     /// Gets the parameter 1 byte.
@@ -152,12 +150,21 @@ public class DeleteCommand : IApduCommand
     /// <returns>A Result containing either the CommandAPDU or an error.</returns>
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
-        return GetDeleteData().Map(data =>
-            ExpectedResponseLength.Match(
-                Some: expectedLength => new CommandAPDU(Cla, Ins, P1, P2, (uint)data.Length, data, (uint)expectedLength),
-                None: () => new CommandAPDU(Cla, Ins, P1, P2, (uint)data.Length, data)
-            )
-        );
+        return GetDeleteData()
+            .Map(data =>
+                ExpectedResponseLength.Match(
+                    Some: expectedLength => new CommandAPDU(
+                        Cla,
+                        Ins,
+                        P1,
+                        P2,
+                        (uint)data.Length,
+                        data,
+                        (uint)expectedLength
+                    ),
+                    None: () => new CommandAPDU(Cla, Ins, P1, P2, (uint)data.Length, data)
+                )
+            );
     }
 
     /// <summary>
@@ -178,7 +185,7 @@ public class DeleteCommand : IApduCommand
                 data.AddRange(aid);
             }
             // If DeletionTokenKey or DeletionToken is present, emit TLV (calculated as needed)
-            Maybe<byte[]> tokenToUse = DeletionToken;
+            var tokenToUse = DeletionToken;
 
             // If no token but we have a key, compute the token
             if (!tokenToUse.HasValue && DeleteTokenKey.HasValue)
@@ -190,19 +197,20 @@ public class DeleteCommand : IApduCommand
                         "Delete token calculation requires exactly one AID."
                     );
                 }
-                
+
                 // Build Control Reference Template for Digital Signature if needed
-                Maybe<byte[]> controlReferenceTemplate = BuildControlReferenceTemplate();
-                
+                var controlReferenceTemplate = BuildControlReferenceTemplate();
+
                 // Compute token using the DeleteTokenCalculator
-                Result<byte[], SmartCardError> tokenResult = DeleteTokenKey.Match(
-                    Some: key => CryptoService.Keys.ComputeDeleteToken(
-                        key,
-                        P1,
-                        P2,
-                        Aids[0],
-                        controlReferenceTemplate
-                    ),
+                var tokenResult = DeleteTokenKey.Match(
+                    Some: key =>
+                        CryptoService.Keys.ComputeDeleteToken(
+                            key,
+                            P1,
+                            P2,
+                            Aids[0],
+                            controlReferenceTemplate
+                        ),
                     None: () => SmartCardError.InvalidArgument("Delete token key is required")
                 );
 
@@ -329,13 +337,13 @@ public class DeleteCommand : IApduCommand
                     aidValue.Length == 0
                         ? SmartCardError.InvalidArgument("AID cannot be empty.")
                         : CreateApplicationDeleteCommandWithTokenParams(
-                            aidValue, 
-                            deleteRelated, 
-                            deletionToken, 
-                            deleteTokenKey, 
-                            securityDomainIdentifier, 
-                            securityDomainImageNumber, 
-                            applicationProviderIdentifier, 
+                            aidValue,
+                            deleteRelated,
+                            deletionToken,
+                            deleteTokenKey,
+                            securityDomainIdentifier,
+                            securityDomainImageNumber,
+                            applicationProviderIdentifier,
                             tokenIdentifier
                         ),
                 None: () => SmartCardError.InvalidArgument("AID cannot be null.")
@@ -348,14 +356,17 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken
     )
     {
-        DeleteType type = deleteRelated
+        var type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
             : DeleteType.DeleteObjectOnly;
-        DeleteTarget target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
+        var target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, [aid], deletionToken);
     }
 
-    private static Result<DeleteCommand, SmartCardError> CreateApplicationDeleteCommandWithTokenParams(
+    private static Result<
+        DeleteCommand,
+        SmartCardError
+    > CreateApplicationDeleteCommandWithTokenParams(
         byte[] aid,
         bool deleteRelated,
         Maybe<byte[]> deletionToken,
@@ -366,19 +377,19 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> tokenIdentifier
     )
     {
-        DeleteType type = deleteRelated
+        var type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
             : DeleteType.DeleteObjectOnly;
-        DeleteTarget target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
+        var target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(
-            type, 
-            target, 
-            [aid], 
-            deletionToken, 
-            deleteTokenKey, 
-            securityDomainIdentifier, 
-            securityDomainImageNumber, 
-            applicationProviderIdentifier, 
+            type,
+            target,
+            [aid],
+            deletionToken,
+            deleteTokenKey,
+            securityDomainIdentifier,
+            securityDomainImageNumber,
+            applicationProviderIdentifier,
             tokenIdentifier
         );
     }
@@ -413,10 +424,10 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken
     )
     {
-        DeleteType type = deleteRelated
+        var type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
             : DeleteType.DeleteObjectOnly;
-        DeleteTarget target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
+        var target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, [aid], deletionToken);
     }
 
@@ -457,10 +468,10 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken
     )
     {
-        DeleteType type = deleteRelated
+        var type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
             : DeleteType.DeleteObjectOnly;
-        DeleteTarget target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
+        var target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, [aid], deletionToken);
     }
 
@@ -498,33 +509,38 @@ public class DeleteCommand : IApduCommand
         }
 
         // Validate all AIDs - collect all validation results
-        List<Maybe<SmartCardError>> validationErrors = [.. aids.Select(aid =>
-                Maybe<byte[]>
-                    .From(aid)
-                    .Match(
-                        Some: aidValue =>
-                            aidValue.Length == 0
-                                ? Maybe<SmartCardError>.From(
-                                    SmartCardError.InvalidArgument("AIDs cannot be empty.")
+        List<Maybe<SmartCardError>> validationErrors =
+        [
+            .. aids.Select(aid =>
+                    Maybe<byte[]>
+                        .From(aid)
+                        .Match(
+                            Some: aidValue =>
+                                aidValue.Length == 0
+                                    ? Maybe<SmartCardError>.From(
+                                        SmartCardError.InvalidArgument("AIDs cannot be empty.")
+                                    )
+                                    : Maybe<SmartCardError>.None,
+                            None: () =>
+                                Maybe<SmartCardError>.From(
+                                    SmartCardError.InvalidArgument(
+                                        "AIDs cannot contain null values."
+                                    )
                                 )
-                                : Maybe<SmartCardError>.None,
-                        None: () =>
-                            Maybe<SmartCardError>.From(
-                                SmartCardError.InvalidArgument("AIDs cannot contain null values.")
-                            )
-                    )
-            )
-            .Where(error => error.HasValue)];
+                        )
+                )
+                .Where(error => error.HasValue),
+        ];
 
         if (validationErrors.Any())
         {
             return validationErrors.First().Value; // Return first validation error
         }
 
-        DeleteType type = deleteRelated
+        var type = deleteRelated
             ? DeleteType.DeleteObjectAndRelated
             : DeleteType.DeleteObjectOnly;
-        DeleteTarget target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
+        var target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, aids, deletionToken);
     }
 
@@ -559,35 +575,50 @@ public class DeleteCommand : IApduCommand
         return "DELETE";
     }
 
-
     /// <summary>
     /// Builds the Control Reference Template for Digital Signature (tag 'B6') containing optional TLV parameters.
-    /// Per GP specification Table 11-23, this includes Security Domain identification, 
+    /// Per GP specification Table 11-23, this includes Security Domain identification,
     /// Application Provider identifier, and Token identifier/number.
     /// </summary>
     /// <returns>The encoded Control Reference Template, or None if no parameters are specified.</returns>
     private Maybe<byte[]> BuildControlReferenceTemplate()
     {
         // Build TLV components functionally
-        IEnumerable<byte[]> tlvComponents = new[]
+        var tlvComponents = new[]
         {
             // Security Domain identifier (tag '42')
-            SecurityDomainIdentifier.Map(id => new byte[] { 0x42, (byte)id.Length }.Concat(id).ToArray()),
-            // Security Domain image number (tag '45') 
-            SecurityDomainImageNumber.Map(num => new byte[] { 0x45, (byte)num.Length }.Concat(num).ToArray()),
+            SecurityDomainIdentifier.Map(id =>
+                new byte[] { 0x42, (byte)id.Length }
+                    .Concat(id)
+                    .ToArray()
+            ),
+            // Security Domain image number (tag '45')
+            SecurityDomainImageNumber.Map(num =>
+                new byte[] { 0x45, (byte)num.Length }
+                    .Concat(num)
+                    .ToArray()
+            ),
             // Application Provider identifier (tag '5F20')
-            ApplicationProviderIdentifier.Map(id => new byte[] { 0x5F, 0x20, (byte)id.Length }.Concat(id).ToArray()),
+            ApplicationProviderIdentifier.Map(id =>
+                new byte[] { 0x5F, 0x20, (byte)id.Length }
+                    .Concat(id)
+                    .ToArray()
+            ),
             // Token identifier/number (tag '93')
-            TokenIdentifier.Map(id => new byte[] { 0x93, (byte)id.Length }.Concat(id).ToArray())
-        }
-        .Where(maybeComponent => maybeComponent.HasValue)
-        .Select(component => component.Value);
+            TokenIdentifier.Map(id =>
+                new byte[] { 0x93, (byte)id.Length }
+                    .Concat(id)
+                    .ToArray()
+            ),
+        }.Where(maybeComponent => maybeComponent.HasValue).Select(component => component.Value);
 
         // If we have components, build the complete template
         if (tlvComponents.Any())
         {
             byte[] templateData = tlvComponents.SelectMany(component => component).ToArray();
-            byte[] result = new byte[] { 0xB6, (byte)templateData.Length }.Concat(templateData).ToArray();
+            byte[] result = new byte[] { 0xB6, (byte)templateData.Length }
+                .Concat(templateData)
+                .ToArray();
             return Maybe<byte[]>.From(result);
         }
 
@@ -746,12 +777,15 @@ public class DeleteResponse
         return StatusWord switch
         {
             _ when StatusWord == StatusWords.Legacy.Success => "Deletion successful",
-            _ when StatusWord == StatusWords.Legacy.IncorrectData => "Incorrect data or AID not found",
+            _ when StatusWord == StatusWords.Legacy.IncorrectData =>
+                "Incorrect data or AID not found",
             _ when StatusWord == StatusWords.Legacy.FileNotFound => "Application not found",
             _ when StatusWord == StatusWords.Legacy.ConditionsNotSatisfied =>
                 "Conditions not satisfied (dependencies exist)",
-            _ when StatusWord == StatusWords.Legacy.ReferencedDataNotFound => "Referenced data not found",
-            _ when StatusWord == StatusWords.Legacy.GenericFailure => "Generic failure during deletion",
+            _ when StatusWord == StatusWords.Legacy.ReferencedDataNotFound =>
+                "Referenced data not found",
+            _ when StatusWord == StatusWords.Legacy.GenericFailure =>
+                "Generic failure during deletion",
             _ => $"Unknown error: {StatusWord.Value:X}",
         };
     }

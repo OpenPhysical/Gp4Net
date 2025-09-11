@@ -19,7 +19,7 @@ public enum IcFabricator : ushort
     /// <summary>
     /// STMicroelectronics.
     /// </summary>
-    STMicroelectronics = 0x0205,
+    StMicroelectronics = 0x0205,
 
     /// <summary>
     /// Samsung.
@@ -73,12 +73,12 @@ public enum IcType : ushort
     /// <summary>
     /// NXP SmartMX P5CD081 secure microcontroller.
     /// </summary>
-    P5CD081 = 0x5081,
+    P5Cd081 = 0x5081,
 
     /// <summary>
     /// NXP SmartMX P5CD041 secure microcontroller.
     /// </summary>
-    P5CD041 = 0x5041,
+    P5Cd041 = 0x5041,
 
     /// <summary>
     /// Unknown IC type.
@@ -100,37 +100,37 @@ public enum ChipPlatform
     /// NXP SmartMX3 platform with IntegralSecurity 2.0.
     /// Features: Common Criteria EAL6+, advanced crypto coprocessors.
     /// </summary>
-    SmartMX3,
+    SmartMx3,
 
     /// <summary>
     /// NXP SmartMX2 platform.
     /// </summary>
-    SmartMX2,
+    SmartMx2,
 
     /// <summary>
     /// NXP SmartMX platform (first generation).
     /// </summary>
-    SmartMX,
+    SmartMx,
 
     /// <summary>
     /// Infineon SLE66 platform.
     /// </summary>
-    SLE66,
+    Sle66,
 
     /// <summary>
     /// Infineon SLE78 platform.
     /// </summary>
-    SLE78,
+    Sle78,
 
     /// <summary>
     /// STMicroelectronics ST31 platform.
     /// </summary>
-    ST31,
+    St31,
 
     /// <summary>
     /// STMicroelectronics ST33 platform.
     /// </summary>
-    ST33,
+    St33,
 }
 
 /// <summary>
@@ -174,39 +174,39 @@ public enum SecurityCertification
     /// <summary>
     /// Common Criteria EAL4+ certification.
     /// </summary>
-    CommonCriteriaEAL4Plus,
+    CommonCriteriaEal4Plus,
 
     /// <summary>
     /// Common Criteria EAL5+ certification.
     /// </summary>
-    CommonCriteriaEAL5Plus,
+    CommonCriteriaEal5Plus,
 
     /// <summary>
     /// Common Criteria EAL6+ certification.
     /// Highest commercially available security level.
     /// </summary>
-    CommonCriteriaEAL6Plus,
+    CommonCriteriaEal6Plus,
 
     /// <summary>
     /// FIPS 140-2 Level 1 certification.
     /// </summary>
-    FIPS140_2_Level1,
+    Fips1402Level1,
 
     /// <summary>
     /// FIPS 140-2 Level 2 certification.
     /// </summary>
-    FIPS140_2_Level2,
+    Fips1402Level2,
 
     /// <summary>
     /// FIPS 140-2 Level 3 certification.
     /// Physical security requirements.
     /// </summary>
-    FIPS140_2_Level3,
+    Fips1402Level3,
 
     /// <summary>
     /// EMVCo security certification for payment cards.
     /// </summary>
-    EMVCo,
+    EmvCo,
 }
 
 /// <summary>
@@ -219,22 +219,22 @@ public enum OperatingSystemId : ushort
     /// JCOP 4 operating system.
     /// Java Card Open Platform version 4.
     /// </summary>
-    JCOP4 = 0x4700,
+    Jcop4 = 0x4700,
 
     /// <summary>
     /// JCOP 3 operating system.
     /// </summary>
-    JCOP3 = 0x4600,
+    Jcop3 = 0x4600,
 
     /// <summary>
     /// JCOP 2.4.2 operating system.
     /// </summary>
-    JCOP242 = 0x4242,
+    Jcop242 = 0x4242,
 
     /// <summary>
     /// JCOP 2.4.1 operating system.
     /// </summary>
-    JCOP241 = 0x4241,
+    Jcop241 = 0x4241,
 
     /// <summary>
     /// Unknown operating system.

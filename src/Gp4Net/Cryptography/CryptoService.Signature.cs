@@ -2,8 +2,6 @@ using System;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Org.BouncyCastle.Crypto;
-using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Security;
 
 namespace Gp4Net.Cryptography;
@@ -28,27 +26,26 @@ public static partial class CryptoService
         public static Result<bool, SmartCardError> VerifyRsaSha1(
             byte[] data,
             byte[] signature,
-            byte[] publicKey)
+            byte[] publicKey
+        )
         {
-            try
-            {
-                var signer = SignerUtilities.GetSigner("SHA1withRSA");
-                var keyParameter = PublicKeyFactory.CreateKey(publicKey);
-                
-                signer.Init(false, keyParameter);
-                signer.BlockUpdate(data, 0, data.Length);
-                
-                return Result.Success<bool, SmartCardError>(signer.VerifySignature(signature));
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure<bool, SmartCardError>(
-                    SmartCardError.CryptographicError($"RSA-SHA1 verification failed: {ex.Message}"));
-            }
+            return Gp4Net.Core.Functional.ResultExtensions.Try(
+                () =>
+                {
+                    var signer = SignerUtilities.GetSigner("SHA1withRSA");
+                    var keyParameter = PublicKeyFactory.CreateKey(publicKey);
+
+                    signer.Init(false, keyParameter);
+                    signer.BlockUpdate(data, 0, data.Length);
+
+                    return signer.VerifySignature(signature);
+                },
+                ex => SmartCardError.CryptographicError($"RSA-SHA1 verification failed: {ex.Message}")
+            );
         }
-        
+
         /// <summary>
-        /// Verifies an RSA-SHA256 signature according to GlobalPlatform DAP specifications.
+        /// Verifies an RSA-SHA256 signature.
         /// </summary>
         /// <param name="data">The data that was signed.</param>
         /// <param name="signature">The signature to verify.</param>
@@ -57,27 +54,26 @@ public static partial class CryptoService
         public static Result<bool, SmartCardError> VerifyRsaSha256(
             byte[] data,
             byte[] signature,
-            byte[] publicKey)
+            byte[] publicKey
+        )
         {
-            try
-            {
-                var signer = SignerUtilities.GetSigner("SHA256withRSA");
-                var keyParameter = PublicKeyFactory.CreateKey(publicKey);
-                
-                signer.Init(false, keyParameter);
-                signer.BlockUpdate(data, 0, data.Length);
-                
-                return Result.Success<bool, SmartCardError>(signer.VerifySignature(signature));
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure<bool, SmartCardError>(
-                    SmartCardError.CryptographicError($"RSA-SHA256 verification failed: {ex.Message}"));
-            }
+            return Gp4Net.Core.Functional.ResultExtensions.Try(
+                () =>
+                {
+                    var signer = SignerUtilities.GetSigner("SHA256withRSA");
+                    var keyParameter = PublicKeyFactory.CreateKey(publicKey);
+
+                    signer.Init(false, keyParameter);
+                    signer.BlockUpdate(data, 0, data.Length);
+
+                    return signer.VerifySignature(signature);
+                },
+                ex => SmartCardError.CryptographicError($"RSA-SHA256 verification failed: {ex.Message}")
+            );
         }
-        
+
         /// <summary>
-        /// Verifies an ECDSA-SHA256 signature according to GlobalPlatform DAP specifications.
+        /// Verifies an ECDSA-SHA256 signature.
         /// </summary>
         /// <param name="data">The data that was signed.</param>
         /// <param name="signature">The signature to verify.</param>
@@ -86,99 +82,120 @@ public static partial class CryptoService
         public static Result<bool, SmartCardError> VerifyEcdsaSha256(
             byte[] data,
             byte[] signature,
-            byte[] publicKey)
+            byte[] publicKey
+        )
         {
-            try
-            {
-                var signer = SignerUtilities.GetSigner("SHA256withECDSA");
-                var keyParameter = PublicKeyFactory.CreateKey(publicKey);
-                
-                signer.Init(false, keyParameter);
-                signer.BlockUpdate(data, 0, data.Length);
-                
-                return Result.Success<bool, SmartCardError>(signer.VerifySignature(signature));
-            }
-            catch (Exception ex)
-            {
-                return Result.Failure<bool, SmartCardError>(
-                    SmartCardError.CryptographicError($"ECDSA-SHA256 verification failed: {ex.Message}"));
-            }
+            return Gp4Net.Core.Functional.ResultExtensions.Try(
+                () =>
+                {
+                    var signer = SignerUtilities.GetSigner("SHA256withECDSA");
+                    var keyParameter = PublicKeyFactory.CreateKey(publicKey);
+
+                    signer.Init(false, keyParameter);
+                    signer.BlockUpdate(data, 0, data.Length);
+
+                    return signer.VerifySignature(signature);
+                },
+                ex => SmartCardError.CryptographicError($"ECDSA-SHA256 verification failed: {ex.Message}")
+            );
         }
-        
+
         /// <summary>
         /// Validates a certificate chain according to X.509 standards.
         /// </summary>
         /// <param name="certificateChain">The certificate chain to validate, starting from end-entity.</param>
         /// <returns>The public key from the validated end-entity certificate.</returns>
-        public static Result<byte[], SmartCardError> ValidateCertificateChain(byte[][] certificateChain)
+        public static Result<byte[], SmartCardError> ValidateCertificateChain(
+            byte[][] certificateChain
+        )
         {
             if (certificateChain.Length == 0)
             {
                 return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidData("Certificate chain is empty"));
+                    SmartCardError.InvalidData("Certificate chain is empty")
+                );
             }
-            
-            try
+
+            // Parse certificates
+            var parseResult = Gp4Net.Core.Functional.ResultExtensions.Try(
+                () =>
+                {
+                    var parser = new Org.BouncyCastle.X509.X509CertificateParser();
+                    return certificateChain
+                        .Select(certBytes => parser.ReadCertificate(certBytes))
+                        .ToArray();
+                },
+                ex => SmartCardError.CryptographicError($"Certificate parsing failed: {ex.Message}")
+            );
+
+            if (parseResult.IsFailure)
             {
-                var parser = new Org.BouncyCastle.X509.X509CertificateParser();
-                var certificates = certificateChain
-                    .Select(certBytes => parser.ReadCertificate(certBytes))
-                    .ToArray();
-                
-                // Validate the end-entity certificate dates
-                var endEntityCert = certificates[0];
-                try
+                return Result.Failure<byte[], SmartCardError>(parseResult.Error);
+            }
+
+            var certificates = parseResult.Value;
+
+            // Validate the end-entity certificate dates
+            var endEntityCert = certificates[0];
+            var dateValidation = Gp4Net.Core.Functional.ResultExtensions.Try(
+                () =>
                 {
                     endEntityCert.CheckValidity(DateTime.UtcNow);
-                }
-                catch
-                {
-                    return Result.Failure<byte[], SmartCardError>(
-                        SmartCardError.SecurityError("Certificate is not valid at current time"));
-                }
-                
-                // Validate certificate chain signatures using functional approach
-                var validationResults = certificates
-                    .Zip(certificates.Skip(1), (current, issuer) => new { Current = current, Issuer = issuer })
-                    .Select((pair, index) =>
-                    {
-                        try
-                        {
-                            pair.Current.Verify(pair.Issuer.GetPublicKey());
-                            return Result.Success<bool, SmartCardError>(true);
-                        }
-                        catch
-                        {
-                            return Result.Failure<bool, SmartCardError>(
-                                SmartCardError.SecurityError($"Certificate {index} signature verification failed"));
-                        }
-                    })
-                    .ToList();
-                
-                // Check all validations passed using functional aggregation
-                var allValid = validationResults
-                    .Aggregate(
-                        Result.Success<bool, SmartCardError>(true),
-                        (acc, result) => acc.IsFailure ? acc : result);
-                
-                if (allValid.IsFailure)
-                {
-                    return Result.Failure<byte[], SmartCardError>(allValid.Error);
-                }
-                
-                // Extract and return the public key from end-entity certificate
-                var publicKeyInfo = endEntityCert.GetPublicKey();
-                var encoded = Org.BouncyCastle.X509.SubjectPublicKeyInfoFactory
-                    .CreateSubjectPublicKeyInfo(publicKeyInfo)
-                    .GetEncoded();
-                
-                return Result.Success<byte[], SmartCardError>(encoded);
-            }
-            catch (Exception ex)
+                    return true;
+                },
+                _ => SmartCardError.SecurityError("Certificate is not valid at current time")
+            );
+
+            if (dateValidation.IsFailure)
             {
-                return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.CryptographicError($"Certificate chain validation failed: {ex.Message}"));
+                return Result.Failure<byte[], SmartCardError>(dateValidation.Error);
             }
+
+            // Validate certificate chain signatures
+            var validationResults = certificates
+                .Zip(
+                    certificates.Skip(1),
+                    (current, issuer) => new { Current = current, Issuer = issuer }
+                )
+                .Select(
+                    (pair, index) =>
+                        Gp4Net.Core.Functional.ResultExtensions.Try(
+                            () =>
+                            {
+                                pair.Current.Verify(pair.Issuer.GetPublicKey());
+                                return true;
+                            },
+                            _ => SmartCardError.SecurityError(
+                                $"Certificate {index} signature verification failed"
+                            )
+                        )
+                )
+                .ToList();
+
+            // Check all validations passed
+            var allValid = validationResults.Aggregate(
+                Result.Success<bool, SmartCardError>(true),
+                (acc, result) => acc.IsFailure ? acc : result
+            );
+
+            if (allValid.IsFailure)
+            {
+                return Result.Failure<byte[], SmartCardError>(allValid.Error);
+            }
+
+            // Extract and return the public key from end-entity certificate
+            return Gp4Net.Core.Functional.ResultExtensions.Try(
+                () =>
+                {
+                    var publicKeyInfo = endEntityCert.GetPublicKey();
+                    return Org
+                        .BouncyCastle.X509.SubjectPublicKeyInfoFactory.CreateSubjectPublicKeyInfo(
+                            publicKeyInfo
+                        )
+                        .GetEncoded();
+                },
+                ex => SmartCardError.CryptographicError($"Public key extraction failed: {ex.Message}")
+            );
         }
     }
 }

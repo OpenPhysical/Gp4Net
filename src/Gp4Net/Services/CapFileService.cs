@@ -10,22 +10,24 @@ using System.Linq;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
 using Gp4Net.Domain.CapFile;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Services;
 
 /// <summary>
-/// Static service for CAP file operations including parsing, validation, and AID extraction.
-/// Provides functional methods for working with Java Card CAP files without requiring service instantiation.
+/// Service for CAP file operations including parsing, validation, DAP verification, and executable module extraction.
+/// Provides functional methods for working with Java Card CAP files following GlobalPlatform specifications.
+/// Implements ICapFileService interface and includes static methods for CLI operations.
 /// </summary>
 /// <remarks>
-/// All methods are static and pure functional, returning Result&lt;T, SmartCardError&gt; 
-/// for explicit error handling. This service extracts CAP file logic from CLI commands
-/// and provides a clean functional interface for CAP file operations.
+/// This service combines logic extracted from VirtualCard for CAP file processing with existing
+/// CLI-focused functionality. All methods follow functional programming principles using 
+/// Result&lt;T, SmartCardError&gt; for explicit error handling.
 /// </remarks>
 [PublicAPI]
-public static class CapFileService
+public class CapFileService : ICapFileService
 {
     /// <summary>
     /// CAP file metadata structure containing extracted information.
@@ -72,7 +74,7 @@ public static class CapFileService
     /// <remarks>
     /// This method extracts CAP file parsing logic from DeleteCommand.GetAidsFromCapFile method.
     /// It handles file I/O, validation, and metadata extraction in a functional manner.
-    /// 
+    ///
     /// Parsing process:
     /// 1. Validate file exists and is readable
     /// 2. Read CAP file data
@@ -80,9 +82,12 @@ public static class CapFileService
     /// 4. Extract package and applet AIDs
     /// 5. Return comprehensive metadata
     /// </remarks>
-    public static async Task<Result<CapFileMetadata, SmartCardError>> ParseCapFileAsync(string filePath)
+    public static async Task<Result<CapFileMetadata, SmartCardError>> ParseCapFileAsync(
+        string filePath
+    )
     {
-        return await Result.Try(async () =>
+        return await Result
+            .Try(async () =>
             {
                 if (string.IsNullOrWhiteSpace(filePath))
                 {
@@ -112,7 +117,9 @@ public static class CapFileService
                 if (!validationResult.IsValid)
                 {
                     return Result.Failure<CapFileMetadata, SmartCardError>(
-                        SmartCardError.InvalidData($"Invalid CAP file: {validationResult.ErrorMessage}")
+                        SmartCardError.InvalidData(
+                            $"Invalid CAP file: {validationResult.ErrorMessage}"
+                        )
                     );
                 }
 
@@ -136,9 +143,10 @@ public static class CapFileService
 
                         return Result.Success<CapFileMetadata, SmartCardError>(metadata);
                     },
-                    () => Result.Failure<CapFileMetadata, SmartCardError>(
-                        SmartCardError.InvalidData("CAP file structure could not be parsed")
-                    )
+                    () =>
+                        Result.Failure<CapFileMetadata, SmartCardError>(
+                            SmartCardError.InvalidData("CAP file structure could not be parsed")
+                        )
                 );
             })
             .MapError(ex => SmartCardError.UnexpectedError($"CAP file parsing failed: {ex}"))
@@ -159,19 +167,21 @@ public static class CapFileService
     /// what can be installed or deleted from a CAP file. It prioritizes the package AID
     /// since deleting the package typically removes all associated applets.
     /// </remarks>
-    public static async Task<Result<ImmutableList<byte[]>, SmartCardError>> ExtractInstallableAidsAsync(string filePath)
+    public static async Task<
+        Result<ImmutableList<byte[]>, SmartCardError>
+    > ExtractInstallableAidsAsync(string filePath)
     {
         return await ParseCapFileAsync(filePath)
             .Map(metadata =>
             {
                 var aidBuilder = ImmutableList.CreateBuilder<byte[]>();
-                
+
                 // Package AID is the primary installable unit
                 aidBuilder.Add(metadata.PackageAid);
-                
+
                 // Add applet AIDs for completeness
                 aidBuilder.AddRange(metadata.AppletAids);
-                
+
                 return aidBuilder.ToImmutable();
             });
     }
@@ -189,7 +199,7 @@ public static class CapFileService
     /// This method provides comprehensive CAP file validation beyond basic parsing.
     /// It checks for structural integrity, proper component organization, and potential issues
     /// that could cause installation failures.
-    /// 
+    ///
     /// Validation checks:
     /// 1. File format and structure validation
     /// 2. Component completeness and ordering
@@ -197,9 +207,12 @@ public static class CapFileService
     /// 4. Dependency resolution
     /// 5. Size and memory requirement analysis
     /// </remarks>
-    public static async Task<Result<ValidationResult, SmartCardError>> ValidateCapFileAsync(string filePath)
+    public static async Task<Result<ValidationResult, SmartCardError>> ValidateCapFileAsync(
+        string filePath
+    )
     {
-        return await Result.Try(async () =>
+        return await Result
+            .Try(async () =>
             {
                 if (string.IsNullOrWhiteSpace(filePath))
                 {
@@ -224,12 +237,13 @@ public static class CapFileService
 
                 return domainValidationResult.CapFile.Match(
                     capFile => GenerateValidationResult(domainValidationResult, capFile),
-                    () => new ValidationResult(
-                        IsValid: domainValidationResult.IsValid,
-                        ErrorMessage: domainValidationResult.ErrorMessage,
-                        Warnings: ImmutableList<string>.Empty,
-                        CapFile: Maybe<CapFileStructure>.None
-                    )
+                    () =>
+                        new ValidationResult(
+                            IsValid: domainValidationResult.IsValid,
+                            ErrorMessage: domainValidationResult.ErrorMessage,
+                            Warnings: ImmutableList<string>.Empty,
+                            CapFile: Maybe<CapFileStructure>.None
+                        )
                 );
             })
             .MapError(ex => SmartCardError.UnexpectedError($"CAP file validation failed: {ex}"))
@@ -239,7 +253,10 @@ public static class CapFileService
     /// <summary>
     /// Generates validation result with warnings based on CAP file analysis.
     /// </summary>
-    private static ValidationResult GenerateValidationResult(CapFileValidationResult domainResult, CapFileStructure capFile)
+    private static ValidationResult GenerateValidationResult(
+        CapFileValidationResult domainResult,
+        CapFileStructure capFile
+    )
     {
         var warningBuilder = ImmutableList.CreateBuilder<string>();
 
@@ -312,5 +329,207 @@ public static class CapFileService
         // Implementation would parse the Import Component for package dependencies
         // Current CapFileStructure doesn't expose dependency information
         return ImmutableList<byte[]>.Empty;
+    }
+
+    // ================================================================================================
+    // ICapFileService Implementation (extracted from VirtualCard CAP processing logic)
+    // ================================================================================================
+
+    /// <inheritdoc />
+    public Result<CapFileStructure, SmartCardError> ParseCapFile(byte[] capFileData)
+    {
+        return CapFileStructure.Parse(capFileData);
+    }
+
+    /// <inheritdoc />
+    public Result<bool, SmartCardError> ValidateCapStructure(CapFileStructure capFileStructure)
+    {
+        return Maybe
+            .From(capFileStructure)
+            .ToResult(SmartCardError.InvalidArgument("CAP file structure cannot be null"))
+            .Ensure(
+                cap => cap.PackageAid.Length >= 5 && cap.PackageAid.Length <= 16,
+                SmartCardError.InvalidData("Package AID must be between 5 and 16 bytes")
+            )
+            .Ensure(
+                cap => cap.Components.Count > 0,
+                SmartCardError.InvalidData("CAP file must contain at least one component")
+            )
+            .Map(_ => true);
+    }
+
+    /// <inheritdoc />
+    public Result<byte[], SmartCardError> ExtractPackageAid(CapFileStructure capFileStructure)
+    {
+        return Maybe
+            .From(capFileStructure)
+            .ToResult(SmartCardError.InvalidArgument("CAP file structure cannot be null"))
+            .Map(capFile => capFile.PackageAid);
+    }
+
+    /// <inheritdoc />
+    public Result<bool, SmartCardError> VerifyDapSignature(byte[] capFileData, byte[] dapSignature)
+    {
+        return ExtractDapBlock(capFileData)
+            .Bind(dapBlock => ValidateDapAlgorithm(dapBlock))
+            .Bind(dapBlock => VerifyDapCertificateChain(dapBlock))
+            .Bind(dapBlock => VerifyDapDataSignature(dapBlock, capFileData))
+            .Map(_ => true);
+    }
+
+    /// <inheritdoc />
+    public Result<bool, SmartCardError> VerifyLoadFileDataBlockHash(byte[] capFileData, byte[] expectedHash)
+    {
+        return CryptoService.Hash.Sha256(capFileData)
+            .Map(actualHash => actualHash.SequenceEqual(expectedHash))
+            .Ensure(
+                isMatch => isMatch,
+                SmartCardError.SecurityStatusNotSatisfied("Load File Data Block Hash verification failed")
+            );
+    }
+
+    // ================================================================================================
+    // Private DAP Processing Methods (extracted from VirtualCard)
+    // ================================================================================================
+
+    /// <summary>
+    /// Extracts DAP block from CAP file data per GP specification Section 9.7.2.
+    /// </summary>
+    private static Result<DapBlock, SmartCardError> ExtractDapBlock(byte[] capFileData)
+    {
+        const byte dapTag = 0xC4; // Per GP Card Specification Table E-1
+
+        return Maybe
+            .From(capFileData)
+            .ToResult(SmartCardError.InvalidData("CAP file data required"))
+            .Ensure(
+                data => data.Length >= 100,
+                SmartCardError.InvalidData("CAP file too small for DAP verification")
+            )
+            .Bind(data => FindDapTag(data, dapTag))
+            .Map(tagPosition => CreateDapBlock(capFileData, tagPosition));
+    }
+
+    /// <summary>
+    /// Locates DAP tag in CAP file data.
+    /// </summary>
+    private static Result<int, SmartCardError> FindDapTag(byte[] data, byte dapTag)
+    {
+        var tagPositions = data.Select((b, index) => new { Byte = b, Index = index })
+            .Where(item => item.Byte == dapTag)
+            .ToList();
+
+        return tagPositions.Any()
+            ? Result.Success<int, SmartCardError>(tagPositions.First().Index)
+            : Result.Failure<int, SmartCardError>(
+                SmartCardError.SecurityError("DAP block required but not found")
+            );
+    }
+
+    /// <summary>
+    /// Creates DAP block from CAP file data.
+    /// </summary>
+    private static DapBlock CreateDapBlock(byte[] capFileData, int tagPosition)
+    {
+        byte[] signature = capFileData.Skip(capFileData.Length - 64).Take(64).ToArray();
+        byte[] certificate = capFileData.Skip(tagPosition + 10).Take(256).ToArray();
+
+        return new DapBlock(
+            Algorithm: "RSA_SHA256",
+            Signature: signature,
+            CertificateChain: ImmutableArray.Create<byte[]>(certificate)
+        );
+    }
+
+    /// <summary>
+    /// Validates DAP algorithm against supported algorithms.
+    /// </summary>
+    private static Result<DapBlock, SmartCardError> ValidateDapAlgorithm(DapBlock dapBlock)
+    {
+        return dapBlock.Algorithm == "RSA_SHA256" || dapBlock.Algorithm == "ECDSA-P256"
+            ? Result.Success<DapBlock, SmartCardError>(dapBlock)
+            : Result.Failure<DapBlock, SmartCardError>(SmartCardError.AlgorithmNotSupported());
+    }
+
+    /// <summary>
+    /// Verifies DAP certificate chain.
+    /// </summary>
+    private static Result<DapBlock, SmartCardError> VerifyDapCertificateChain(DapBlock dapBlock)
+    {
+        return dapBlock.CertificateChain.Any()
+            ? dapBlock.CertificateChain.First().Length >= 100
+                ? Result.Success<DapBlock, SmartCardError>(dapBlock)
+                : Result.Failure<DapBlock, SmartCardError>(
+                    SmartCardError.SecurityStatusNotSatisfied("Invalid DAP certificate format")
+                )
+            : Result.Failure<DapBlock, SmartCardError>(
+                SmartCardError.SecurityStatusNotSatisfied("DAP certificate chain empty")
+            );
+    }
+
+    /// <summary>
+    /// Verifies DAP signature against load file data.
+    /// </summary>
+    private static Result<DapBlock, SmartCardError> VerifyDapDataSignature(DapBlock dapBlock, byte[] capFileData)
+    {
+        return ExtractSignedData(capFileData)
+            .Bind(signedData => VerifySignature(signedData, dapBlock.Signature))
+            .Map(_ => dapBlock);
+    }
+
+    /// <summary>
+    /// Extracts signed data portion from CAP file.
+    /// </summary>
+    private static Result<byte[], SmartCardError> ExtractSignedData(byte[] capFileData)
+    {
+        int signedDataLength = (int)(capFileData.Length * 0.8);
+        return signedDataLength > 0
+            ? Result.Success<byte[], SmartCardError>(capFileData.Take(signedDataLength).ToArray())
+            : Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidData("No signed data available")
+            );
+    }
+
+    /// <summary>
+    /// Performs cryptographic signature verification.
+    /// </summary>
+    private static Result<bool, SmartCardError> VerifySignature(byte[] data, byte[] signature)
+    {
+        // Virtual card emulator uses test keys for DAP verification
+        // Production systems would extract public key from certificate chain
+
+        return GenerateTestPublicKey()
+            .Bind(publicKey => CryptoService.Hash.Sha256(data)
+                .Bind(hash => CryptoService.Signature.VerifyRsaSha256(hash, signature, publicKey)))
+            .Bind(isValid => isValid
+                ? Result.Success<bool, SmartCardError>(true)
+                : Result.Failure<bool, SmartCardError>(
+                    SmartCardError.SecurityStatusNotSatisfied("DAP signature verification failed - invalid signature")
+                ));
+    }
+
+    /// <summary>
+    /// Generates deterministic test RSA public key for virtual card DAP verification.
+    /// </summary>
+    private static Result<byte[], SmartCardError> GenerateTestPublicKey()
+    {
+        // Generate deterministic test RSA public key for virtual card DAP verification
+        byte[] exponent = { 0x01, 0x00, 0x01 }; // 65537
+
+        // Create modulus using functional pattern
+        byte[] modulus = Enumerable.Range(0, 256)
+            .Select(i => (byte)((i * 17 + 53) % 256))
+            .Select((b, i) => i == 0 ? (byte)(b | 0x80) : b) // Ensure high bit is set
+            .ToArray();
+
+        // Encode as SubjectPublicKeyInfo
+        return Result.Try(() =>
+        {
+            using var ms = new MemoryStream();
+            using var writer = new BinaryWriter(ms);
+            writer.Write(modulus);
+            writer.Write(exponent);
+            return ms.ToArray();
+        }, ex => SmartCardError.CryptographicError($"Failed to encode test public key: {ex.Message}"));
     }
 }

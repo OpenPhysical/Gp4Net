@@ -3,9 +3,8 @@ using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
-using WSCT.Core;
-using WSCT.ISO7816;
 using JetBrains.Annotations;
+using WSCT.ISO7816;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -14,17 +13,17 @@ namespace Gp4Net.Domain.Commands;
 /// Supports INSTALL [for load] and INSTALL [for install] operations.
 /// </summary>
 [PublicAPI]
-public abstract record InstallCommand
+public abstract record InstallCommand : IApduCommand
 {
     /// <summary>
     /// The command class byte.
     /// </summary>
-    public const byte CommandCla = 0x80;
+    public const byte COMMAND_CLA = 0x80;
 
     /// <summary>
     /// The command instruction byte.
     /// </summary>
-    public const byte CommandIns = 0xE6;
+    public const byte COMMAND_INS = 0xE6;
 
     /// <summary>
     /// Gets the install type.
@@ -35,6 +34,12 @@ public abstract record InstallCommand
     /// Gets the package AID.
     /// </summary>
     public ImmutableArray<byte> PackageAid { get; }
+
+    /// <inheritdoc />
+    public byte Cla => COMMAND_CLA;
+
+    /// <inheritdoc />
+    public byte Ins => COMMAND_INS;
 
     /// <summary>
     /// Converts this command to a CommandAPDU.
@@ -72,6 +77,18 @@ public abstract record InstallCommand
     public bool IsExtendedLength
     {
         get { return false; }
+    }
+
+    /// <inheritdoc />
+    public CommandAPDU ToApdu()
+    {
+        return ToCommandApdu().GetValueOrDefault(new CommandAPDU([]));
+    }
+
+    /// <inheritdoc />
+    public byte[] ToBytes()
+    {
+        return ToCommandApdu().Map(cmd => cmd.ToBytes()).GetValueOrDefault([]);
     }
 
     /// <summary>
@@ -174,7 +191,7 @@ public abstract record InstallCommand
             byte[] installToken = null
         )
         {
-            Result<ImmutableArray<byte>, SmartCardError> packageAidResult = ValidatePackageAid(
+            var packageAidResult = ValidatePackageAid(
                 packageAid
             );
             if (packageAidResult.IsFailure)
@@ -195,7 +212,7 @@ public abstract record InstallCommand
                 ]
                 : null;
 
-            InstallForLoadCommand command = new InstallForLoadCommand(
+            var command = new InstallForLoadCommand(
                 packageAidResult.Value,
                 securityDomainAid?.ToImmutableArray() ?? default,
                 hash?.ToImmutableArray() ?? default,
@@ -273,7 +290,14 @@ public abstract record InstallCommand
         public override Result<CommandAPDU, SmartCardError> ToCommandApdu()
         {
             return Result.Success<CommandAPDU, SmartCardError>(
-                new CommandAPDU(CommandCla, CommandIns, (byte)InstallType.ForLoad, 0x00, (uint)Data.Length, Data)
+                new CommandAPDU(
+                    COMMAND_CLA,
+                    COMMAND_INS,
+                    (byte)InstallType.ForLoad,
+                    0x00,
+                    (uint)Data.Length,
+                    Data
+                )
             );
         }
 
@@ -360,7 +384,7 @@ public abstract record InstallCommand
             byte[] installToken = null
         )
         {
-            Result<ImmutableArray<byte>, SmartCardError> packageAidResult = ValidatePackageAid(
+            var packageAidResult = ValidatePackageAid(
                 packageAid
             );
             if (packageAidResult.IsFailure)
@@ -391,7 +415,7 @@ public abstract record InstallCommand
                 );
             }
 
-            InstallForInstallCommand command = new InstallForInstallCommand(
+            var command = new InstallForInstallCommand(
                 InstallType.ForInstall,
                 packageAidResult.Value,
                 [.. applicationAid],
@@ -423,7 +447,7 @@ public abstract record InstallCommand
             byte[] installToken = null
         )
         {
-            Result<ImmutableArray<byte>, SmartCardError> packageAidResult = ValidatePackageAid(
+            var packageAidResult = ValidatePackageAid(
                 packageAid
             );
             if (packageAidResult.IsFailure)
@@ -454,7 +478,7 @@ public abstract record InstallCommand
                 );
             }
 
-            InstallForInstallCommand command = new InstallForInstallCommand(
+            var command = new InstallForInstallCommand(
                 InstallType.ForInstallAndMakeSelectable,
                 packageAidResult.Value,
                 [.. applicationAid],
@@ -531,7 +555,7 @@ public abstract record InstallCommand
         public override Result<CommandAPDU, SmartCardError> ToCommandApdu()
         {
             return Result.Success<CommandAPDU, SmartCardError>(
-                new CommandAPDU(CommandCla, CommandIns, (byte)Type, 0x00, (uint)Data.Length, Data)
+                new CommandAPDU(COMMAND_CLA, COMMAND_INS, (byte)Type, 0x00, (uint)Data.Length, Data)
             );
         }
 
@@ -676,7 +700,7 @@ public record InstallCommandResponse(ImmutableArray<byte> Data, StatusWord Statu
     /// </summary>
     public bool IsSuccess
     {
-        get { return StatusWord == Gp4Net.Constants.Constants.StatusWords.Legacy.Success; }
+        get { return StatusWord == Constants.Constants.StatusWords.Legacy.Success; }
     }
 
     /// <summary>
@@ -684,7 +708,10 @@ public record InstallCommandResponse(ImmutableArray<byte> Data, StatusWord Statu
     /// </summary>
     public static InstallCommandResponse Success(byte[] data = null)
     {
-        return new(data?.ToImmutableArray() ?? [], Gp4Net.Constants.Constants.StatusWords.Legacy.Success);
+        return new(
+            data?.ToImmutableArray() ?? [],
+            Constants.Constants.StatusWords.Legacy.Success
+        );
     }
 
     /// <summary>

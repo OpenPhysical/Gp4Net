@@ -5,9 +5,8 @@ using System.Linq;
 using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Services;
-using static Gp4Net.Services.TlvService;
 using JetBrains.Annotations;
+using static Gp4Net.Services.TlvService;
 
 namespace Gp4Net.Domain.CardInfo;
 
@@ -45,7 +44,7 @@ public class KeyInformationTemplate
             return SmartCardError.InvalidArgument("Key information data cannot be null or empty");
         }
 
-        KeyInformationTemplate template = new KeyInformationTemplate(data, []);
+        var template = new KeyInformationTemplate(data, []);
 
         // Check if data starts with E0 tag and extract the content
         byte[] contentToParse = data;
@@ -83,17 +82,19 @@ public class KeyInformationTemplate
         }
 
         // Parse the content for C0 tags
-        return TlvParser.ParseMultiple(contentToParse.ToImmutableArray())
-            .Map(parseResult => 
+        return TlvParser
+            .ParseMultiple(contentToParse.ToImmutableArray())
+            .Map(parseResult =>
             {
-                IReadOnlyList<KeyEntry> keys = parseResult.Objects
-                    .Where(element => element.Tag.ToNumber()
-                        .Match(
-                            onSuccess: tagNumber => tagNumber == 0xC0,
-                            onFailure: _ => false))
+                IReadOnlyList<KeyEntry> keys = parseResult
+                    .Objects.Where(element =>
+                        element
+                            .Tag.ToNumber()
+                            .Match(onSuccess: tagNumber => tagNumber == 0xC0, onFailure: _ => false)
+                    )
                     .Select(element => ParseKeyInformationData(element.TlvData.Bytes.ToArray()))
                     .ToImmutableList();
-                
+
                 return new KeyInformationTemplate(data, keys);
             });
     }
@@ -102,20 +103,24 @@ public class KeyInformationTemplate
     {
         if (data.Length < 3)
         {
-            return new KeyEntry { KeyId = 0, KeyVersion = 0, KeyTypes = [] };
+            return new KeyEntry
+            {
+                KeyId = 0,
+                KeyVersion = 0,
+                KeyTypes = [],
+            };
         }
 
-        IReadOnlyList<KeyType> keyTypes = data
-            .Skip(2)
+        IReadOnlyList<KeyType> keyTypes = data.Skip(2)
             .Select(ParseKeyType)
             .Where(keyType => keyType != KeyType.Unknown)
             .ToImmutableList();
 
-        return new KeyEntry 
-        { 
-            KeyId = data[0], 
+        return new KeyEntry
+        {
+            KeyId = data[0],
             KeyVersion = data[1],
-            KeyTypes = keyTypes
+            KeyTypes = keyTypes,
         };
     }
 
@@ -147,10 +152,10 @@ public class KeyInformationTemplate
     /// </summary>
     public override string ToString()
     {
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
         _ = sb.AppendLine("Key Information Template:");
 
-        foreach (KeyEntry key in Keys)
+        foreach (var key in Keys)
         {
             _ = sb.AppendLine(key.ToString());
         }
@@ -182,16 +187,13 @@ public record KeyEntry
     /// <summary>
     /// Gets the primary key type (first in the list).
     /// </summary>
-    public Maybe<KeyType> PrimaryKeyType => KeyTypes.Any() 
-        ? Maybe<KeyType>.From(KeyTypes.First())
-        : Maybe<KeyType>.None;
+    public Maybe<KeyType> PrimaryKeyType =>
+        KeyTypes.Any() ? Maybe<KeyType>.From(KeyTypes.First()) : Maybe<KeyType>.None;
 
     /// <summary>
     /// Gets the key length in bits based on the primary key type.
     /// </summary>
-    public int KeyLength => PrimaryKeyType
-        .Map(DetermineKeyLength)
-        .GetValueOrDefault(0);
+    public int KeyLength => PrimaryKeyType.Map(DetermineKeyLength).GetValueOrDefault(0);
 
     private static int DetermineKeyLength(KeyType keyType)
     {
@@ -216,7 +218,7 @@ public record KeyEntry
             .GetValueOrDefault("Unknown");
         string lengthStr = KeyLength > 0 ? $"length: {KeyLength / 8} ({keyTypeStr})" : keyTypeStr;
 
-        return $"Version: {KeyVersion} (0x{KeyVersion:X2}) ID: {KeyId} (0x{KeyId:X2}) type: {keyTypeStr, -12} {lengthStr}";
+        return $"Version: {KeyVersion} (0x{KeyVersion:X2}) ID: {KeyId} (0x{KeyId:X2}) type: {keyTypeStr,-12} {lengthStr}";
     }
 }
 

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using CSharpFunctionalExtensions;
+using Gp4Net.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console.Cli;
 
@@ -17,6 +18,25 @@ public class StandardCommandSettings : CommandSettings
     [CommandOption("-v|--verbose")]
     [Description("Enable verbose output")]
     public bool Verbose { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to enable debug output.
+    /// </summary>
+    [CommandOption("-d|--debug")]
+    [Description("Enable debug output")]
+    public bool Debug { get; set; }
+
+    /// <summary>
+    /// Creates CommandOptions from the settings.
+    /// </summary>
+    public CommandOptions GetCommandOptions() =>
+        new(
+            UseSecureChannel: false,
+            CaptureMetrics: true,
+            EnableLogging: true,
+            VerboseLogging: Verbose,
+            DebugLogging: Debug
+        );
 }
 
 /// <summary>
@@ -47,6 +67,13 @@ public class CardCommandSettings : CommandSettings
     public bool Verbose { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether to enable debug output.
+    /// </summary>
+    [CommandOption("-d|--debug")]
+    [Description("Enable debug output")]
+    public bool Debug { get; set; }
+
+    /// <summary>
     /// Gets the reader name as Maybe type.
     /// </summary>
     public Maybe<string> GetReaderName() =>
@@ -57,6 +84,18 @@ public class CardCommandSettings : CommandSettings
     /// </summary>
     public Maybe<string> GetSaveFile() =>
         string.IsNullOrWhiteSpace(SaveFile) ? Maybe<string>.None : Maybe<string>.From(SaveFile);
+
+    /// <summary>
+    /// Creates CommandOptions from the settings.
+    /// </summary>
+    public CommandOptions GetCommandOptions(bool useSecureChannel = false) =>
+        new(
+            UseSecureChannel: useSecureChannel,
+            CaptureMetrics: true,
+            EnableLogging: true,
+            VerboseLogging: Verbose,
+            DebugLogging: Debug
+        );
 }
 
 /// <summary>
@@ -94,6 +133,13 @@ public class SecureCommandSettings : CommandSettings
     public bool Verbose { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether to enable debug output.
+    /// </summary>
+    [CommandOption("-d|--debug")]
+    [Description("Enable debug output")]
+    public bool Debug { get; set; }
+
+    /// <summary>
     /// Gets the reader name as Maybe type.
     /// </summary>
     public Maybe<string> GetReaderName() =>
@@ -110,4 +156,16 @@ public class SecureCommandSettings : CommandSettings
     /// </summary>
     public Maybe<string> GetSaveFile() =>
         string.IsNullOrWhiteSpace(SaveFile) ? Maybe<string>.None : Maybe<string>.From(SaveFile);
+
+    /// <summary>
+    /// Creates CommandOptions from the settings.
+    /// </summary>
+    public CommandOptions GetCommandOptions(bool useSecureChannel = true) =>
+        new(
+            UseSecureChannel: useSecureChannel,
+            CaptureMetrics: true,
+            EnableLogging: true,
+            VerboseLogging: Verbose,
+            DebugLogging: Debug
+        );
 }

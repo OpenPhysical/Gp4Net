@@ -10,11 +10,9 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.CapFile;
-using Gp4Net.Domain.Commands;
 using Gp4Net.Services;
 using Gp4Net.Services.GlobalPlatform;
 using Gp4Net.Tool.Infrastructure;
-using Gp4Net.Transport;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using log4net;
@@ -98,10 +96,10 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
         try
         {
             // Configure context
-            ICliExecutionContext ctx = context.WithVerbose(settings.Verbose);
+            var ctx = context.WithVerbose(settings.Verbose);
 
             // Determine AIDs to delete
-            List<(byte[] Aid, string Description, string Source)> aidsToDelete =
+            var aidsToDelete =
                 await DetermineAidsToDelete(ctx, settings);
             if (aidsToDelete.Count == 0)
             {
@@ -127,12 +125,12 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
             }
 
             // Connect to card and establish secure channel
-            Result<ICliExecutionContext, SmartCardError> connectionResult =
+            var connectionResult =
                 await ctx.RequireCardConnection(settings.GetReaderName());
             return await connectionResult.Match(
                 async connectedCtx =>
                 {
-                    Result<ICliExecutionContext, SmartCardError> secureChannelResult =
+                    var secureChannelResult =
                         await connectedCtx.RequireSecureChannel();
                     return await secureChannelResult.Match(
                         async secureCtx =>
@@ -227,7 +225,9 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
         }
         else
         {
-            AnsiConsole.MarkupLine("[red]No deletion target specified. Use --aid, --cap, or --interactive[/]");
+            AnsiConsole.MarkupLine(
+                "[red]No deletion target specified. Use --aid, --cap, or --interactive[/]"
+            );
             return [];
         }
 
@@ -245,7 +245,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
         }
 
         byte[] capData = await File.ReadAllBytesAsync(capFilePath);
-        CapFileValidationResult validationResult = CapFileLoadingWorkflow.ValidateCapFile(capData);
+        var validationResult = CapFileLoadingWorkflow.ValidateCapFile(capData);
         if (!validationResult.IsValid)
         {
             AnsiConsole.MarkupLine($"[red]Invalid CAP file: {validationResult.ErrorMessage}[/]");
@@ -256,7 +256,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
             return [];
         }
 
-        CapFileStructure capFile = validationResult.CapFile.Value;
+        var capFile = validationResult.CapFile.Value;
 
         // For CAP files, we typically delete the package, not individual applets
         // The package deletion will cascade to delete all applets
@@ -271,19 +271,20 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
     > GetInteractiveAids(ICliExecutionContext context, Settings settings)
     {
         // Need to establish secure channel first for GET STATUS
-        Result<ICliExecutionContext, SmartCardError> connectionResult =
+        var connectionResult =
             await context.RequireCardConnection(settings.GetReaderName());
         return await connectionResult.Match(
             async connectedCtx =>
             {
-                Result<ICliExecutionContext, SmartCardError> secureChannelResult =
+                var secureChannelResult =
                     await connectedCtx.RequireSecureChannel();
                 return await secureChannelResult.Match(
                     async secureCtx =>
                     {
-                        Result<ImmutableList<ApplicationInfo>, SmartCardError> statusResult =
+                        var statusResult =
                             await Applications.GetApplicationsAndSecurityDomainsAsync(
-                                (command, ct) => secureCtx.CardService.ExecuteCommandAsync(command, ct),
+                                (command, ct) =>
+                                    secureCtx.CardService.ExecuteCommandAsync(command, ct),
                                 CancellationToken.None
                             );
 
@@ -309,7 +310,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
                         }
 
                         // Create multi-selection prompt
-                        MultiSelectionPrompt<ApplicationInfo> prompt =
+                        var prompt =
                             new MultiSelectionPrompt<ApplicationInfo>()
                                 .Title("Select applications to delete:")
                                 .PageSize(10)
@@ -325,7 +326,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
                                     $"{Convert.ToHexString(app.Aid)} ({app.Type}) - {app.LifecycleState}"
                                 );
 
-                        List<ApplicationInfo> selected = AnsiConsole.Prompt(prompt);
+                        var selected = AnsiConsole.Prompt(prompt);
 
                         return await Task.FromResult(
                             selected
@@ -365,7 +366,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
         Settings settings
     )
     {
-        Table table = new Table()
+        var table = new Table()
             .Title("Deletion Plan")
             .AddColumn("AID")
             .AddColumn("Description")
@@ -440,7 +441,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
             .Progress()
             .StartAsync(async ctx =>
             {
-                ProgressTask task = ctx.AddTask(
+                var task = ctx.AddTask(
                     "[green]Deleting objects[/]",
                     maxValue: aidsToDelete.Count
                 );
@@ -455,12 +456,13 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
                         Logger.Debug($"  Delete related: {settings.DeleteRelated}");
                     }
 
-                    Result<bool, SmartCardError> result = await CardManagement.DeleteApplicationAsync(
-                        aid,
-                        settings.DeleteRelated,
-                        (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
-                        CancellationToken.None
-                    );
+                    var result =
+                        await CardManagement.DeleteApplicationAsync(
+                            aid,
+                            settings.DeleteRelated,
+                            (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
+                            CancellationToken.None
+                        );
 
                     if (result.IsSuccess)
                     {
@@ -470,7 +472,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
                     else
                     {
                         failureCount++;
-                        string errorMessage = GetHumanReadableError(result.Error);
+                        string errorMessage = ErrorTranslationService.TranslateStatusWord(result.Error);
                         AnsiConsole.MarkupLine(
                             $"[red]✗ Failed to delete {description}: {errorMessage}[/]"
                         );
@@ -499,70 +501,19 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
         return failureCount > 0 ? 1 : 0;
     }
 
-    /// <summary>
-    /// Converts a SmartCardError to a human-readable error message based on GlobalPlatform specification status words.
-    /// </summary>
-    /// <param name="error">The smart card error containing the status word and message.</param>
-    /// <returns>
-    /// A descriptive error message suitable for display to users. If the status word is not recognized,
-    /// returns the original error message.
-    /// </returns>
-    /// <remarks>
-    /// <para>This method maps GlobalPlatform Card Specification v2.3.1 status words to user-friendly descriptions:</para>
-    /// <list type="table">
-    /// <listheader>
-    /// <term>Status Word</term>
-    /// <description>Meaning</description>
-    /// </listheader>
-    /// <item><term>0x6283</term><description>Application is locked (personalized state)</description></item>
-    /// <item><term>0x6581</term><description>Memory allocation problem</description></item>
-    /// <item><term>0x6982</term><description>Security status not satisfied</description></item>
-    /// <item><term>0x6985</term><description>Cannot delete - application has dependencies</description></item>
-    /// <item><term>0x6A80</term><description>Incorrect parameters in command data</description></item>
-    /// <item><term>0x6A82</term><description>Application or package not found</description></item>
-    /// <item><term>0x6A86</term><description>Incorrect P1/P2 parameters</description></item>
-    /// <item><term>0x6A88</term><description>Referenced data not found</description></item>
-    /// <item><term>0x6D00</term><description>Invalid instruction (DELETE not supported)</description></item>
-    /// <item><term>0x6E00</term><description>Invalid class</description></item>
-    /// <item><term>0x6F00</term><description>No precise diagnosis available</description></item>
-    /// </list>
-    /// </remarks>
-    private static string GetHumanReadableError(SmartCardError error)
-    {
-        // Map status words to human-readable messages based on GP spec
-        if (!error.StatusWord.HasValue)
-        {
-            return error.Message;
-        }
-
-        return error.StatusWord.Value switch
-        {
-            0x6283 => "Application is locked (personalized state)",
-            0x6581 => "Memory allocation problem",
-            0x6982 => "Security status not satisfied",
-            0x6985 => "Cannot delete - application has dependencies",
-            0x6A80 => "Incorrect parameters in command data",
-            0x6A82 => "Application or package not found",
-            0x6A86 => "Incorrect P1/P2 parameters",
-            0x6A88 => "Referenced data not found",
-            0x6D00 => "Invalid instruction (DELETE not supported)",
-            0x6E00 => "Invalid class",
-            0x6F00 => "No precise diagnosis available",
-            _ => error.Message,
-        };
-    }
 
     private static async Task DisplayCardInfo(ICliExecutionContext context)
     {
         try
         {
-            Result<SelectResponse, SmartCardError> selectResult = await Discovery.DetectAndSelectIsdAsync(
-                (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
-                CancellationToken.None
-            );
+            var selectResult =
+                await Discovery.DetectAndSelectIsdAsync(
+                    (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
+                    CancellationToken.None
+                );
             if (selectResult.IsSuccess)
             {
-                SelectResponse response = selectResult.Value;
+                var response = selectResult.Value;
                 byte[] aid = response.Fci.Map(fci => fci.ApplicationAid).GetValueOrDefault([]);
                 AnsiConsole.MarkupLine($"[dim]ISD AID: {Convert.ToHexString(aid)}[/]");
             }
@@ -711,11 +662,5 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
         [Description("Don't display card information")]
         public bool NoCardInfo { get; set; }
 
-        /// <summary>
-        /// Gets or sets debug mode.
-        /// </summary>
-        [CommandOption("-d|--debug")]
-        [Description("Enable debug output")]
-        public bool Debug { get; set; }
     }
 }

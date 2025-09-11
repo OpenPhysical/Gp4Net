@@ -7,10 +7,10 @@ using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
 using Gp4Net.CardEmulator.Transport;
 using Gp4Net.Core;
+using Gp4Net.Tests.TestHelpers;
 using Gp4Net.Transport;
 using NUnit.Framework;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
-using ApduResponse = Gp4Net.CardEmulator.Core.ApduResponse;
 
 namespace Gp4Net.Tests.Integration;
 
@@ -30,8 +30,19 @@ public class SupplementalSecurityDomainTests
     [SetUp]
     public void SetUp()
     {
-        _virtualCard = VirtualCardTestBuilder.CreateWithSecureRng(CardConfiguration.P71());
-        Result<VirtualCardTransport, SmartCardError> transportResult = VirtualCardTransport.Create(_virtualCard);
+        var configResult = CardConfiguration.P71();
+        configResult.IsSuccess.Should().BeTrue("P71 configuration should load successfully");
+        if (configResult.IsSuccess)
+        {
+            _virtualCard = VirtualCardTestBuilder.CreateWithSecureRng(configResult.Value);
+        }
+        else
+        {
+            Assert.Fail($"Failed to load P71 configuration: {configResult.Error}");
+        }
+        Result<VirtualCardTransport, SmartCardError> transportResult = VirtualCardTransport.Create(
+            _virtualCard
+        );
         if (transportResult.IsSuccess)
         {
             _transport = transportResult.Value;
@@ -73,13 +84,13 @@ public class SupplementalSecurityDomainTests
         ];
 
         // Act
-        ApduResponse response = _virtualCard.ProcessCommand(initUpdateCommand);
+        var response = _virtualCard.ExecuteCommand(initUpdateCommand);
 
         // Assert
         _ = response
             .StatusWord.Should()
             .Be(
-                StatusWords.Success,
+                StatusWords.SUCCESS,
                 "INITIALIZE UPDATE should succeed with implicitly selected ISD"
             );
         _ = response
@@ -103,8 +114,8 @@ public class SupplementalSecurityDomainTests
     {
         // Arrange - Explicitly select ISD first
         byte[] selectIsdCommand = [0x00, 0xA4, 0x04, 0x00, 0x00]; // SELECT with empty AID = select ISD
-        ApduResponse selectResponse = _virtualCard.ProcessCommand(selectIsdCommand);
-        _ = selectResponse.StatusWord.Should().Be(StatusWords.Success, "ISD SELECT should succeed");
+        var selectResponse = _virtualCard.ExecuteCommand(selectIsdCommand);
+        _ = selectResponse.StatusWord.Should().Be(StatusWords.SUCCESS, "ISD SELECT should succeed");
 
         byte[] hostChallenge = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
         byte[] initUpdateCommand =
@@ -125,13 +136,13 @@ public class SupplementalSecurityDomainTests
         ];
 
         // Act
-        ApduResponse response = _virtualCard.ProcessCommand(initUpdateCommand);
+        var response = _virtualCard.ExecuteCommand(initUpdateCommand);
 
         // Assert
         _ = response
             .StatusWord.Should()
             .Be(
-                StatusWords.Success,
+                StatusWords.SUCCESS,
                 "INITIALIZE UPDATE should succeed after explicit ISD selection"
             );
         _ = response
@@ -162,7 +173,7 @@ public class SupplementalSecurityDomainTests
         _ = installResult.IsSuccess.Should().BeTrue("Application installation should succeed");
 
         // Update card state with the new application context
-        CardState newState = _virtualCard.CurrentState.WithApplicationContext(
+        var newState = _virtualCard.CurrentState.WithApplicationContext(
             _virtualCard
                 .CurrentState.ApplicationContext.InstallApplication(
                     appAid,
@@ -189,7 +200,7 @@ public class SupplementalSecurityDomainTests
             0x00,
             0x01,
         ];
-        ApduResponse selectResponse = _virtualCard.ProcessCommand(selectAppCommand);
+        var selectResponse = _virtualCard.ExecuteCommand(selectAppCommand);
         // Note: This might fail if the application isn't properly selectable - that's OK for this test
 
         byte[] initUpdateCommand =
@@ -210,13 +221,13 @@ public class SupplementalSecurityDomainTests
         ];
 
         // Act
-        ApduResponse response = _virtualCard.ProcessCommand(initUpdateCommand);
+        var response = _virtualCard.ExecuteCommand(initUpdateCommand);
 
         // Assert
         // The response should either fail because:
         // 1. The application isn't selectable (which is fine), or
         // 2. The application is selected but doesn't have SecurityDomain privileges
-        if (selectResponse.StatusWord == StatusWords.Success)
+        if (selectResponse.StatusWord == StatusWords.SUCCESS)
         {
             // If selection succeeded, INITIALIZE UPDATE should fail due to insufficient privileges
             _ = response
@@ -232,7 +243,7 @@ public class SupplementalSecurityDomainTests
             _ = response
                 .StatusWord.Should()
                 .Be(
-                    StatusWords.Success,
+                    StatusWords.SUCCESS,
                     "INITIALIZE UPDATE should succeed when falling back to ISD after failed application selection"
                 );
         }
@@ -286,13 +297,13 @@ public class SupplementalSecurityDomainTests
         ];
 
         // Act - Try INITIALIZE UPDATE (will work with ISD since SSD selection isn't fully implemented yet)
-        ApduResponse response = _virtualCard.ProcessCommand(initUpdateCommand);
+        var response = _virtualCard.ExecuteCommand(initUpdateCommand);
 
         // Assert
         _ = response
             .StatusWord.Should()
             .Be(
-                StatusWords.Success,
+                StatusWords.SUCCESS,
                 "INITIALIZE UPDATE should succeed - either with ISD or properly configured SSD"
             );
 
@@ -337,13 +348,13 @@ public class SupplementalSecurityDomainTests
         ];
 
         // Act
-        ApduResponse response = _virtualCard.ProcessCommand(initUpdateCommand);
+        var response = _virtualCard.ExecuteCommand(initUpdateCommand);
 
         // Assert
         _ = response
             .StatusWord.Should()
             .Be(
-                StatusWords.Success,
+                StatusWords.SUCCESS,
                 "INITIALIZE UPDATE should succeed immediately after reset with implicit ISD selection"
             );
         _ = response

@@ -29,37 +29,37 @@ public static partial class Constants
         public static class Scp02
         {
             /// <summary>SCP02 protocol version identifier.</summary>
-            public const byte ProtocolVersion = 0x02;
+            public const byte PROTOCOL_VERSION = 0x02;
 
             /// <summary>3DES block size for SCP02 operations (8 bytes).</summary>
-            public const int BlockSize = 8;
+            public const int BLOCK_SIZE = 8;
 
             /// <summary>MAC size for SCP02 operations (8 bytes).</summary>
-            public const int MacSize = 8;
+            public const int MAC_SIZE = 8;
 
             /// <summary>MAC chaining value size for SCP02 (8 bytes).</summary>
-            public const int ChainingValueSize = 8;
+            public const int CHAINING_VALUE_SIZE = 8;
 
             /// <summary>Card challenge length in INITIALIZE UPDATE response (6 bytes).</summary>
-            public const int CardChallengeLength = 6;
+            public const int CARD_CHALLENGE_LENGTH = 6;
 
             /// <summary>Host challenge length for INITIALIZE UPDATE command (8 bytes).</summary>
-            public const int HostChallengeLength = 8;
+            public const int HOST_CHALLENGE_LENGTH = 8;
 
             /// <summary>Session key size for SCP02 (16 bytes for 3DES).</summary>
-            public const int SessionKeySize = 16;
+            public const int SESSION_KEY_SIZE = 16;
 
             /// <summary>Cryptogram size for card/host cryptograms (8 bytes).</summary>
-            public const int CryptogramSize = 8;
+            public const int CRYPTOGRAM_SIZE = 8;
 
             /// <summary>Sequence counter size for key derivation (2 bytes).</summary>
-            public const int SequenceCounterSize = 2;
+            public const int SEQUENCE_COUNTER_SIZE = 2;
 
             /// <summary>Key derivation data size for SCP02 (16 bytes).</summary>
-            public const int KeyDerivationDataSize = 16;
+            public const int KEY_DERIVATION_DATA_SIZE = 16;
 
             /// <summary>Cryptogram data size for SCP02 (24 bytes).</summary>
-            public const int CryptogramDataSize = 24;
+            public const int CRYPTOGRAM_DATA_SIZE = 24;
 
             /// <summary>
             /// SCP02 key derivation constants per GP Card Spec v2.3.1 Figure E-2.
@@ -75,7 +75,7 @@ public static partial class Constants
                 public static readonly byte[] SMac = [0x01, 0x01];
 
                 /// <summary>S-RMAC key derivation constant.</summary>
-                public static readonly byte[] SRMac = [0x01, 0x02];
+                public static readonly byte[] SrMac = [0x01, 0x02];
             }
 
             /// <summary>
@@ -98,7 +98,7 @@ public static partial class Constants
                 public const byte I05 = 0x05;
 
                 /// <summary>SCP02 i=0A - R-MAC only, challenge verification.</summary>
-                public const byte I0A = 0x0A;
+                public const byte I0_A = 0x0A;
 
                 /// <summary>SCP02 i=15 - R-MAC and R-ENC with different padding.</summary>
                 public const byte I15 = 0x15;
@@ -115,9 +115,31 @@ public static partial class Constants
                 /// <summary>All valid SCP02 implementation parameters.</summary>
                 public static readonly byte[] All =
                 [
-                    I00, I02, I04, I05, I0A, 0x14, I15, 0x1A, 0x24, 0x25,
-                    0x2A, 0x34, I35, 0x3A, 0x44, 0x45, 0x4A, 0x54, I55,
-                    0x64, 0x65, 0x6A, 0x74, I75, 0x7A
+                    I00,
+                    I02,
+                    I04,
+                    I05,
+                    I0_A,
+                    0x14,
+                    I15,
+                    0x1A,
+                    0x24,
+                    0x25,
+                    0x2A,
+                    0x34,
+                    I35,
+                    0x3A,
+                    0x44,
+                    0x45,
+                    0x4A,
+                    0x54,
+                    I55,
+                    0x64,
+                    0x65,
+                    0x6A,
+                    0x74,
+                    I75,
+                    0x7A,
                 ];
             }
         }
@@ -130,53 +152,64 @@ public static partial class Constants
         public static class Scp03
         {
             /// <summary>SCP03 protocol version identifier.</summary>
-            public const byte ProtocolVersion = 0x03;
+            public const byte PROTOCOL_VERSION = 0x03;
 
             /// <summary>AES block size for SCP03 operations (16 bytes).</summary>
-            public const int BlockSize = 16;
+            public const int BLOCK_SIZE = 16;
 
             /// <summary>MAC size for SCP03 operations (8 bytes, truncated from 16).</summary>
-            public const int MacSize = 8;
+            public const int MAC_SIZE = 8;
 
             /// <summary>Full MAC size before truncation (16 bytes).</summary>
-            public const int FullMacSize = 16;
+            public const int FULL_MAC_SIZE = 16;
 
             /// <summary>MAC chaining value size for SCP03 (16 bytes).</summary>
-            public const int ChainingValueSize = 16;
+            public const int CHAINING_VALUE_SIZE = 16;
 
             /// <summary>Card challenge length in INITIALIZE UPDATE response (8 bytes).</summary>
-            public const int CardChallengeLength = 8;
+            public const int CARD_CHALLENGE_LENGTH = 8;
 
             /// <summary>Host challenge length for INITIALIZE UPDATE command (8 bytes).</summary>
-            public const int HostChallengeLength = 8;
+            public const int HOST_CHALLENGE_LENGTH = 8;
 
             /// <summary>Session key size for SCP03 (16 bytes for AES-128).</summary>
-            public const int SessionKeySize = 16;
+            public const int SESSION_KEY_SIZE = 16;
 
             /// <summary>Cryptogram size for card/host cryptograms (8 bytes).</summary>
-            public const int CryptogramSize = 8;
+            public const int CRYPTOGRAM_SIZE = 8;
 
             /// <summary>KDF counter size for NIST SP 800-108 derivation (4 bytes).</summary>
-            public const int KdfCounterSize = 4;
+            public const int KDF_COUNTER_SIZE = 4;
 
             /// <summary>KDF label size for key derivation (variable).</summary>
-            public const int KdfLabelMaxSize = 32;
+            public const int KDF_LABEL_MAX_SIZE = 32;
 
             /// <summary>
-            /// SCP03 key derivation labels per GP Card Spec v2.3.1 Section E.5.2.
+            /// Key derivation label constants for SCP03.
             /// Used with NIST SP 800-108 KDF in Counter Mode with CMAC-AES PRF.
+            /// Per GlobalPlatform Card Specification v2.3 - SCP03 Amendment D v1.2.
+            /// Table 4-1: Data Derivation Constants.
             /// </summary>
             [PublicAPI]
-            public static class KeyDerivationLabels
+            public enum KeyDerivationLabel : byte
             {
-                /// <summary>S-ENC key derivation label.</summary>
-                public static readonly byte[] SEnc = [0x00, 0x00, 0x00, 0x04];
+                /// <summary>
+                /// S-ENC key derivation label.
+                /// Used for deriving the session encryption key.
+                /// </summary>
+                SEnc = 0x04,
 
-                /// <summary>S-MAC key derivation label.</summary>
-                public static readonly byte[] SMac = [0x00, 0x00, 0x00, 0x06];
+                /// <summary>
+                /// S-MAC key derivation label.
+                /// Used for deriving the session MAC key.
+                /// </summary>
+                SMac = 0x06,
 
-                /// <summary>S-RMAC key derivation label.</summary>
-                public static readonly byte[] SRMac = [0x00, 0x00, 0x00, 0x07];
+                /// <summary>
+                /// S-RMAC key derivation label.
+                /// Used for deriving the session response MAC key.
+                /// </summary>
+                SRMac = 0x07,
             }
 
             /// <summary>
@@ -216,19 +249,19 @@ public static partial class Constants
         public static class Common
         {
             /// <summary>INITIALIZE UPDATE command INS byte.</summary>
-            public const byte InitializeUpdateIns = 0x50;
+            public const byte INITIALIZE_UPDATE_INS = 0x50;
 
             /// <summary>EXTERNAL AUTHENTICATE command INS byte.</summary>
-            public const byte ExternalAuthenticateIns = 0x82;
+            public const byte EXTERNAL_AUTHENTICATE_INS = 0x82;
 
             /// <summary>Secure messaging CLA bit mask.</summary>
-            public const byte SecureMessagingClaBit = 0x04;
+            public const byte SECURE_MESSAGING_CLA_BIT = 0x04;
 
             /// <summary>Standard CLA byte for GP commands.</summary>
-            public const byte StandardCla = 0x80;
+            public const byte STANDARD_CLA = 0x80;
 
             /// <summary>Secure CLA byte for GP commands (with secure messaging bit).</summary>
-            public const byte SecureCla = StandardCla | SecureMessagingClaBit;
+            public const byte SECURE_CLA = STANDARD_CLA | SECURE_MESSAGING_CLA_BIT;
 
             /// <summary>Zero initialization vector size (8 bytes for 3DES, 16 bytes for AES).</summary>
             public static readonly byte[] ZeroIv8 = new byte[8];
@@ -244,55 +277,20 @@ public static partial class Constants
         }
 
         /// <summary>
-        /// Security level constants for secure channel operations.
-        /// Bitwise flags that can be combined to specify required security features.
-        /// </summary>
-        [PublicAPI]
-        public static class SecurityLevels
-        {
-            /// <summary>No security applied.</summary>
-            public const byte None = 0x00;
-
-            /// <summary>Command MAC (C-MAC) authentication.</summary>
-            public const byte CMac = 0x01;
-
-            /// <summary>Command encryption (C-ENC) confidentiality.</summary>
-            public const byte CEnc = 0x02;
-
-            /// <summary>Response MAC (R-MAC) authentication.</summary>
-            public const byte RMac = 0x10;
-
-            /// <summary>Response encryption (R-ENC) confidentiality.</summary>
-            public const byte REnc = 0x20;
-
-            /// <summary>Standard security: C-MAC only.</summary>
-            public const byte Standard = CMac;
-
-            /// <summary>Enhanced security: C-MAC and C-ENC.</summary>
-            public const byte Enhanced = CMac | CEnc;
-
-            /// <summary>Full security: C-MAC, C-ENC, R-MAC, R-ENC.</summary>
-            public const byte Full = CMac | CEnc | RMac | REnc;
-        }
-
-        /// <summary>
         /// Status words that affect secure channel processing.
         /// Only success and warning status words receive response security processing.
         /// </summary>
         [PublicAPI]
         public static class StatusWords
         {
-            /// <summary>Success status word.</summary>
-            public const ushort Success = 0x9000;
-
             /// <summary>Warning status word mask (62xx).</summary>
-            public const ushort WarningMask = 0xFF00;
+            public const ushort WARNING_MASK = 0xFF00;
 
             /// <summary>Warning status word value (6200).</summary>
-            public const ushort Warning62 = 0x6200;
+            public const ushort WARNING62 = 0x6200;
 
             /// <summary>Warning status word value (6300).</summary>
-            public const ushort Warning63 = 0x6300;
+            public const ushort WARNING63 = 0x6300;
 
             /// <summary>
             /// Checks if a status word should receive response security processing.
@@ -301,9 +299,9 @@ public static partial class Constants
             /// <param name="statusWord">The status word to check.</param>
             /// <returns>True if response security should be applied.</returns>
             public static bool ShouldApplyResponseSecurity(ushort statusWord) =>
-                statusWord == Success ||
-                (statusWord & WarningMask) == Warning62 ||
-                (statusWord & WarningMask) == Warning63;
+                statusWord == Constants.StatusWords.Success
+                || (statusWord & WARNING_MASK) == WARNING62
+                || (statusWord & WARNING_MASK) == WARNING63;
         }
     }
 }

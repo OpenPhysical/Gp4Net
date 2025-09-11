@@ -23,9 +23,11 @@ public static class VirtualCardTestBuilder
     /// <returns>A virtual card with deterministic behavior.</returns>
     public static Result<VirtualCard, SmartCardError> CreateWithEntropy(
         CardConfiguration config,
-        byte[] entropy)
+        byte[] entropy
+    )
     {
-        return CryptoService.Rng.CreateDeterministicContext(entropy)
+        return CryptoService
+            .Rng.CreateDeterministicContext(entropy)
             .Bind(rng => VirtualCard.Create(config, rng));
     }
 
@@ -36,7 +38,7 @@ public static class VirtualCardTestBuilder
     /// <returns>A virtual card with secure RNG.</returns>
     public static VirtualCard CreateWithSecureRng(CardConfiguration config)
     {
-        IRngContext rng = CryptoService.Rng.CreateSecureContext();
+        var rng = CryptoService.Rng.CreateSecureContext();
         return VirtualCard.Create(config, rng).Value;
     }
 
@@ -48,7 +50,8 @@ public static class VirtualCardTestBuilder
     /// <returns>A virtual card that will behave exactly like the traced card.</returns>
     public static Result<VirtualCard, SmartCardError> CreateWithTraceChallenges(
         CardConfiguration config,
-        IEnumerable<byte[]> traceChallenges)
+        IEnumerable<byte[]> traceChallenges
+    )
     {
         // Convert trace challenges to entropy array for deterministic mode
         byte[] entropy = traceChallenges.SelectMany(challenge => challenge).ToArray();
@@ -65,13 +68,15 @@ public static class VirtualCardTestBuilder
     public static Result<VirtualCard, SmartCardError> CreateWithRepeatingEntropy(
         CardConfiguration config,
         byte[] pattern,
-        int repetitions)
+        int repetitions
+    )
     {
         // Create repeating entropy by concatenating the pattern multiple times
-        byte[] repeatingEntropy = Enumerable.Range(0, repetitions)
+        byte[] repeatingEntropy = Enumerable
+            .Range(0, repetitions)
             .SelectMany(_ => pattern)
             .ToArray();
-        
+
         return CreateWithEntropy(config, repeatingEntropy);
     }
 
@@ -83,12 +88,11 @@ public static class VirtualCardTestBuilder
     /// <returns>A virtual card that may fail on operations requiring more entropy.</returns>
     public static Result<VirtualCard, SmartCardError> CreateWithLimitedEntropy(
         CardConfiguration config,
-        int entropyBytes)
+        int entropyBytes
+    )
     {
-        byte[] limitedEntropy = Enumerable.Range(0, entropyBytes)
-            .Select(i => (byte)i)
-            .ToArray();
-        
+        byte[] limitedEntropy = Enumerable.Range(0, entropyBytes).Select(i => (byte)i).ToArray();
+
         return CreateWithEntropy(config, limitedEntropy);
     }
 }

@@ -175,69 +175,6 @@ public class DataObjectParserTests
     }
 
     [Test]
-    [TestCase("9F70:040102", (ushort)0x9F70)]
-    [TestCase("DF21:1122", (ushort)0xDF21)]
-    [TestCase("C0:33", (ushort)0x00C0)]
-    [TestCase("5F2D:0011", (ushort)0x5F2D)]
-    public void ValidateDataObject_WithValidTag_ReturnsTrue(string dataObject, ushort expectedTag)
-    {
-        // Arrange
-        Result<(ushort tag, byte[] data), SmartCardError> result =
-            DataObjectParser.ParseRawDataObject(dataObject);
-        _ = result.IsSuccess.Should().BeTrue();
-        (ushort tag, byte[] data) = result.Value;
-
-        // Act
-        bool isValid = DataObjectParser.ValidateDataObject(tag, data);
-
-        // Assert
-        _ = isValid.Should().BeTrue();
-        _ = tag.Should().Be(expectedTag);
-    }
-
-    [Test]
-    public void ValidateDataObject_WithZeroTag_ReturnsFalse()
-    {
-        // Arrange
-        ushort tag = 0x0000;
-        byte[] data = [0x01, 0x02];
-
-        // Act
-        bool isValid = DataObjectParser.ValidateDataObject(tag, data);
-
-        // Assert
-        _ = isValid.Should().BeFalse();
-    }
-
-    [Test]
-    public void ValidateDataObject_WithNullData_ReturnsFalse()
-    {
-        // Arrange
-        ushort tag = 0x9F70;
-        byte[]? data = null;
-
-        // Act
-        bool isValid = DataObjectParser.ValidateDataObject(tag, data);
-
-        // Assert
-        _ = isValid.Should().BeFalse();
-    }
-
-    [Test]
-    public void ValidateDataObject_WithEmptyData_ReturnsTrue()
-    {
-        // Arrange
-        ushort tag = 0x9F70;
-        byte[] data = [];
-
-        // Act
-        bool isValid = DataObjectParser.ValidateDataObject(tag, data);
-
-        // Assert
-        _ = isValid.Should().BeTrue(); // Empty data is allowed for some tags
-    }
-
-    [Test]
     [TestCase("9f70:040102")]
     [TestCase("9F70:040102")]
     [TestCase("df21:AABBCC")]

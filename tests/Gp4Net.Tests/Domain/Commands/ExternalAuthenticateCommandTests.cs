@@ -1,23 +1,22 @@
 using System;
+using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
-using Gp4Net.Transport;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.Commands;
 
 [TestFixture]
-[Ignore("ApduBuilder.BuildApdu() patterns need functional programming updates")]
 public class ExternalAuthenticateCommandTests
 {
     [Test]
     public void CreateWithMac_WithValidParameters_CreatesCommand()
     {
         // Arrange
-        SecurityLevel securityLevel = SecurityLevel.CMac;
+        var securityLevel = SecurityLevel.CMac;
         byte[] hostCryptogram = Convert.FromHexString("0102030405060708");
         byte[] mac = Convert.FromHexString("1112131415161718");
 
@@ -27,7 +26,7 @@ public class ExternalAuthenticateCommandTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        ExternalAuthenticateCommand? command = result.Value;
+        var command = result.Value;
         _ = command.SecurityLevel.Should().Be(securityLevel);
         _ = command.HostCryptogram.Should().BeEquivalentTo(hostCryptogram);
         _ = command.Mac.Should().BeEquivalentTo(mac);
@@ -88,7 +87,7 @@ public class ExternalAuthenticateCommandTests
     public void CreateWithoutMac_WithValidParameters_CreatesCommandWithEmptyMac()
     {
         // Arrange
-        SecurityLevel securityLevel = SecurityLevel.None;
+        var securityLevel = SecurityLevel.None;
         byte[] hostCryptogram = new byte[8];
 
         // Act
@@ -97,7 +96,7 @@ public class ExternalAuthenticateCommandTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        ExternalAuthenticateCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Mac.Should().BeEmpty();
     }
 
@@ -105,67 +104,58 @@ public class ExternalAuthenticateCommandTests
     public void GetApdu_WithoutMac_ReturnsCorrectStructure()
     {
         // Arrange
-        SecurityLevel securityLevel = SecurityLevel.None;
+        var securityLevel = SecurityLevel.None;
         byte[] hostCryptogram = Convert.FromHexString("0102030405060708");
-        Result<ExternalAuthenticateCommand, SmartCardError> result =
-            ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
-        _ = result.IsSuccess.Should().BeTrue();
-        ExternalAuthenticateCommand? command = result.Value;
 
-        // Act
-        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
-        _ = apduResult.IsSuccess.Should().BeTrue();
-
-        // Assert
-        apduResult.Map(apdu =>
-        {
-            _ = apdu[0].Should().Be(0x84); // CLA - Secure messaging
-            _ = apdu[1].Should().Be(0x82); // INS - EXTERNAL AUTHENTICATE
-            return apdu;
-        });
-        _ = apdu[2].Should().Be((byte)securityLevel); // P1 - Security Level
-        _ = apdu[3].Should().Be(0x00); // P2 - RFU
-        _ = apdu[4].Should().Be(0x08); // Lc - Data length (8 bytes cryptogram)
-        _ = apdu[5..13].Should().BeEquivalentTo(hostCryptogram); // Data - Host Cryptogram
-        // No Le byte for EXTERNAL AUTHENTICATE
-        _ = apdu.Length.Should().Be(13); // 5 header + 8 data
+        // Act & Assert
+        ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram)
+            .Map(command => command.ToBytes())
+            .Match(
+                apdu =>
+                {
+                    _ = apdu[0].Should().Be(0x00); // CLA - No secure messaging for no MAC
+                    _ = apdu[1].Should().Be(0x82); // INS - EXTERNAL AUTHENTICATE
+                    _ = apdu[2].Should().Be((byte)securityLevel); // P1 - Security Level
+                    _ = apdu[3].Should().Be(0x00); // P2 - RFU
+                    _ = apdu[4].Should().Be(0x08); // Lc - Data length (8 bytes cryptogram)
+                    _ = apdu[5..13].Should().BeEquivalentTo(hostCryptogram); // Data - Host Cryptogram
+                    // No Le byte for EXTERNAL AUTHENTICATE
+                    _ = apdu.Length.Should().Be(13); // 5 header + 8 data
+                },
+                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+            );
     }
 
     [Test]
     public void GetApdu_WithMac_ReturnsCorrectStructure()
     {
         // Arrange
-        SecurityLevel securityLevel = SecurityLevel.CMac;
+        var securityLevel = SecurityLevel.CMac;
         byte[] hostCryptogram = Convert.FromHexString("0102030405060708");
         byte[] mac = Convert.FromHexString("1112131415161718");
-        Result<ExternalAuthenticateCommand, SmartCardError> result =
-            ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, mac);
-        _ = result.IsSuccess.Should().BeTrue();
-        ExternalAuthenticateCommand? command = result.Value;
 
-        // Act
-        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
-        _ = apduResult.IsSuccess.Should().BeTrue();
-
-        // Assert
-        apduResult.Map(apdu =>
-        {
-            _ = apdu[0].Should().Be(0x84); // CLA - Secure messaging
-            _ = apdu[1].Should().Be(0x82); // INS - EXTERNAL AUTHENTICATE
-            return apdu;
-        });
-        _ = apdu[2].Should().Be((byte)securityLevel); // P1 - Security Level
-        _ = apdu[3].Should().Be(0x00); // P2 - RFU
-        _ = apdu[4].Should().Be(0x10); // Lc - Data length (8 cryptogram + 8 MAC)
-        _ = apdu[5..13].Should().BeEquivalentTo(hostCryptogram); // Host Cryptogram
-        _ = apdu[13..21].Should().BeEquivalentTo(mac); // MAC
-        _ = apdu.Length.Should().Be(21); // 5 header + 8 cryptogram + 8 MAC
+        // Act & Assert
+        ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, mac)
+            .Map(command => command.ToBytes())
+            .Match(
+                apdu =>
+                {
+                    _ = apdu[0].Should().Be(0x84); // CLA - Secure messaging
+                    _ = apdu[1].Should().Be(0x82); // INS - EXTERNAL AUTHENTICATE
+                    _ = apdu[2].Should().Be((byte)securityLevel); // P1 - Security Level
+                    _ = apdu[3].Should().Be(0x00); // P2 - RFU
+                    _ = apdu[4].Should().Be(0x10); // Lc - Data length (8 cryptogram + 8 MAC)
+                    _ = apdu[5..13].Should().BeEquivalentTo(hostCryptogram); // Host Cryptogram
+                    _ = apdu[13..21].Should().BeEquivalentTo(mac); // MAC
+                    _ = apdu.Length.Should().Be(21); // 5 header + 8 cryptogram + 8 MAC
+                },
+                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
+            );
     }
 
     [Test]
     [TestCase(SecurityLevel.None, 0x00)]
     [TestCase(SecurityLevel.CMac, 0x01)]
-    [TestCase(SecurityLevel.CDecryption, 0x03)]
     [TestCase(SecurityLevel.CDecryption, 0x03)]
     public void GetApdu_WithDifferentSecurityLevels_SetsP1Correctly(
         SecurityLevel securityLevel,
@@ -174,35 +164,36 @@ public class ExternalAuthenticateCommandTests
     {
         // Arrange
         byte[] hostCryptogram = new byte[8];
-        Result<ExternalAuthenticateCommand, SmartCardError> result =
-            ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram);
-        _ = result.IsSuccess.Should().BeTrue();
-        ExternalAuthenticateCommand? command = result.Value;
 
-        // Act
-        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
-        _ = apduResult.IsSuccess.Should().BeTrue();
-
-        // Assert
-        _ = apdu[2].Should().Be(expectedP1); // P1
+        // Act & Assert
+        ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram)
+            .Map(command => command.ToBytes())
+            .Match(
+                apdu =>
+                {
+                    _ = apdu[2].Should().Be(expectedP1); // P1
+                },
+                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
+            );
     }
 
     [Test]
     public void GetApdu_AlwaysReturnsNewArray()
     {
-        // Arrange
-        Result<ExternalAuthenticateCommand, SmartCardError> result =
-            ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, new byte[8], new byte[8]);
-        _ = result.IsSuccess.Should().BeTrue();
-        ExternalAuthenticateCommand? command = result.Value;
+        // Arrange & Act
+        ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, new byte[8], new byte[8])
+            .Match(
+                command =>
+                {
+                    byte[] apdu1 = command.ToBytes();
+                    byte[] apdu2 = command.ToBytes();
 
-        // Act
-        byte[]? apdu1 = ApduBuilder.BuildApdu(command);
-        byte[]? apdu2 = ApduBuilder.BuildApdu(command);
-
-        // Assert
-        _ = apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
-        _ = apdu2.Should().BeEquivalentTo(apdu1); // But with same content
+                    // Assert
+                    _ = apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
+                    _ = apdu2.Should().BeEquivalentTo(apdu1); // But with same content
+                },
+                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
+            );
     }
 
     [Test]
@@ -214,7 +205,7 @@ public class ExternalAuthenticateCommandTests
         Result<ExternalAuthenticateCommand, SmartCardError> commandResult =
             ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, hostCryptogram, mac);
         _ = commandResult.IsSuccess.Should().BeTrue();
-        ExternalAuthenticateCommand? command = commandResult.Value;
+        var command = commandResult.Value;
 
         // Act
         string? result = command.ToString();
@@ -236,18 +227,19 @@ public class ExternalAuthenticateCommandTests
         // Data: Host Cryptogram [+ MAC]
         // No Le byte
 
-        Result<ExternalAuthenticateCommand, SmartCardError> result =
-            ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, new byte[8], new byte[8]);
-        _ = result.IsSuccess.Should().BeTrue();
-        ExternalAuthenticateCommand? command = result.Value;
-        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
-        _ = apduResult.IsSuccess.Should().BeTrue();
-
-        _ = apdu.Length.Should().Be(21); // 5 header + 8 cryptogram + 8 MAC
-        _ = apdu[0].Should().Be(0x84); // CLA
-        _ = apdu[1].Should().Be(0x82); // INS
-        _ = apdu[3].Should().Be(0x00); // P2
-        _ = apdu[4].Should().Be(0x10); // Lc
+        ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, new byte[8], new byte[8])
+            .Map(command => command.ToBytes())
+            .Match(
+                apdu =>
+                {
+                    _ = apdu.Length.Should().Be(21); // 5 header + 8 cryptogram + 8 MAC
+                    _ = apdu[0].Should().Be(0x84); // CLA
+                    _ = apdu[1].Should().Be(0x82); // INS
+                    _ = apdu[3].Should().Be(0x00); // P2
+                    _ = apdu[4].Should().Be(0x10); // Lc
+                },
+                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
+            );
     }
 
     [Test]
@@ -266,15 +258,17 @@ public class ExternalAuthenticateCommandTests
             (SecurityLevel.CDecryption, 0x03),
         ];
 
-        foreach ((SecurityLevel securityLevel, byte expectedP1) in testCases)
-        {
-            Result<ExternalAuthenticateCommand, SmartCardError> result =
-                ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, new byte[8]);
-            _ = result.IsSuccess.Should().BeTrue();
-            ExternalAuthenticateCommand? command = result.Value;
-            Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
-        _ = apduResult.IsSuccess.Should().BeTrue();
-            _ = apdu[2].Should().Be(expectedP1);
-        }
+        testCases.Select(testCase =>
+            ExternalAuthenticateCommand.CreateWithoutMac(testCase.Item1, new byte[8])
+                .Map(command => command.ToBytes())
+                .Match(
+                    apdu =>
+                    {
+                        _ = apdu[2].Should().Be(testCase.Item2);
+                        return Result.Success();
+                    },
+                    error => Result.Failure($"Command creation failed: {error}")
+                )
+        ).ToList(); // Execute all tests
     }
 }

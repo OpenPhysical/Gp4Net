@@ -2,9 +2,9 @@ using System.IO;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Functional;
 using Gp4Net.CardEmulator.Profiles;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
-using Gp4Net.Constants;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Core;
@@ -24,10 +24,7 @@ public class P71VirtualCard
     /// <summary>
     /// Initializes a new P71 virtual card with the specified configuration.
     /// </summary>
-    private P71VirtualCard(
-        string profileName,
-        VirtualCard baseCard
-    )
+    private P71VirtualCard(string profileName, VirtualCard baseCard)
     {
         ProfileName = profileName;
         _baseCard = baseCard;
@@ -53,7 +50,8 @@ public class P71VirtualCard
             .Bind(config =>
             {
                 string profileName = Path.GetFileNameWithoutExtension(jsonPath);
-                return CardState.Create()
+                return CardState
+                    .Create()
                     .Bind(_ => VirtualCard.Create(config, rngContext))
                     .Map(baseCard => new P71VirtualCard(profileName, baseCard));
             });
@@ -78,7 +76,8 @@ public class P71VirtualCard
             .LoadFromJson(json)
             .Bind(config =>
             {
-                return CardState.Create()
+                return CardState
+                    .Create()
                     .Bind(_ => VirtualCard.Create(config, rngContext))
                     .Map(baseCard => new P71VirtualCard(profileName, baseCard));
             });
@@ -95,9 +94,11 @@ public class P71VirtualCard
         LoggingService loggingService
     )
     {
-        CardConfiguration config = CardConfiguration.P71();
-        return CardState.Create()
-            .Bind(_ => VirtualCard.Create(config, rngContext))
+        return CardConfiguration
+            .P71()
+            .Bind(config => CardState
+                .Create()
+                .Bind(_ => VirtualCard.Create(config, rngContext)))
             .Map(baseCard => new P71VirtualCard("P71_SCP02_Default", baseCard));
     }
 
@@ -113,11 +114,12 @@ public class P71VirtualCard
     )
     {
         // Use dual protocol config but default to SCP03
-        CardConfiguration config = CardConfiguration
+        return CardConfiguration
             .DualProtocol()
-            .WithScpDefaults(0x03, ScpImplementation.Scp03I70);
-        return CardState.Create()
-            .Bind(_ => VirtualCard.Create(config, rngContext))
+            .Map(config => config.WithScpDefaults(0x03, ScpImplementation.Scp03I70))
+            .Bind(config => CardState
+                .Create()
+                .Bind(_ => VirtualCard.Create(config, rngContext)))
             .Map(baseCard => new P71VirtualCard("P71_SCP03_Default", baseCard));
     }
 }

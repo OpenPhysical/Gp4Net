@@ -1,4 +1,3 @@
-using Gp4Net.Core;
 using JetBrains.Annotations;
 
 namespace Gp4Net.Transport;

@@ -49,12 +49,15 @@ public static class ErrorTranslationService
     {
         /// <summary>Informational message, not an error</summary>
         Info,
+
         /// <summary>Warning that doesn't prevent operation</summary>
         Warning,
+
         /// <summary>Error that prevents operation but is recoverable</summary>
         Error,
+
         /// <summary>Critical error that may cause permanent damage</summary>
-        Critical
+        Critical,
     }
 
     /// <summary>
@@ -69,7 +72,7 @@ public static class ErrorTranslationService
     /// <remarks>
     /// This method extracts error translation logic from DeleteCommand.GetHumanReadableError method.
     /// It maps GlobalPlatform Card Specification v2.3.1 status words to user-friendly descriptions.
-    /// 
+    ///
     /// Status word mappings include:
     /// - 0x6283: Application is locked (personalized state)
     /// - 0x6581: Memory allocation problem
@@ -160,13 +163,13 @@ public static class ErrorTranslationService
             0x6F00 => "No precise diagnosis available",
 
             // Handle ranges
-            _ when (statusWord & 0xFF00) == 0x6100 => 
+            _ when (statusWord & 0xFF00) == 0x6100 =>
                 $"More data available ({statusWord & 0xFF} bytes)",
-            _ when (statusWord & 0xFF00) == 0x6C00 => 
+            _ when (statusWord & 0xFF00) == 0x6C00 =>
                 $"Wrong length ({statusWord & 0xFF} bytes expected)",
 
             // Default case
-            _ => $"Unknown status word: 0x{statusWord:X4}"
+            _ => $"Unknown status word: 0x{statusWord:X4}",
         };
     }
 
@@ -213,8 +216,11 @@ public static class ErrorTranslationService
     /// <summary>
     /// Analyzes status word context to provide causes and recommended actions.
     /// </summary>
-    private static (ErrorSeverity Severity, ImmutableList<string> Causes, ImmutableList<string> Actions) 
-        AnalyzeStatusWordContext(ushort statusWord)
+    private static (
+        ErrorSeverity Severity,
+        ImmutableList<string> Causes,
+        ImmutableList<string> Actions
+    ) AnalyzeStatusWordContext(ushort statusWord)
     {
         return statusWord switch
         {
@@ -276,14 +282,17 @@ public static class ErrorTranslationService
                 ErrorSeverity.Error,
                 ImmutableList.Create("Refer to GlobalPlatform specification for details"),
                 ImmutableList.Create("Check card documentation", "Verify command parameters")
-            )
+            ),
         };
     }
 
     /// <summary>
     /// Analyzes generic error context for non-status word errors.
     /// </summary>
-    private static (ImmutableList<string> Causes, ImmutableList<string> Actions) AnalyzeGenericErrorContext(string errorCode)
+    private static (
+        ImmutableList<string> Causes,
+        ImmutableList<string> Actions
+    ) AnalyzeGenericErrorContext(string errorCode)
     {
         return errorCode switch
         {
@@ -329,7 +338,7 @@ public static class ErrorTranslationService
             _ => (
                 ImmutableList.Create("Unexpected error condition"),
                 ImmutableList.Create("Check logs for detailed error information", "Retry operation")
-            )
+            ),
         };
     }
 
@@ -345,7 +354,7 @@ public static class ErrorTranslationService
             "INVALID_DATA" => ErrorSeverity.Error,
             "INVALID_ARGUMENT" => ErrorSeverity.Error,
             "UNSUPPORTED" => ErrorSeverity.Warning,
-            _ => ErrorSeverity.Error
+            _ => ErrorSeverity.Error,
         };
     }
 }

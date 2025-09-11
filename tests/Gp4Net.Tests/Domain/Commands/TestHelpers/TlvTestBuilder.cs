@@ -19,7 +19,7 @@ internal class TlvTestBuilder
 
     public void Add(int tag, Action<TlvTestBuilder> constructedContent)
     {
-        TlvTestBuilder subBuilder = new TlvTestBuilder();
+        var subBuilder = new TlvTestBuilder();
         constructedContent(subBuilder);
         byte[] value = subBuilder.Build();
         Add(tag, value);

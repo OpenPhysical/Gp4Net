@@ -39,8 +39,8 @@ public static partial class CryptoService
                     Result.Try(
                         () =>
                         {
-                            GcmBlockCipher gcmCipher = new GcmBlockCipher(new AesEngine());
-                            AeadParameters parameters = new AeadParameters(
+                            var gcmCipher = new GcmBlockCipher(new AesEngine());
+                            var parameters = new AeadParameters(
                                 new KeyParameter(key),
                                 tagLength,
                                 nonce,
@@ -50,7 +50,13 @@ public static partial class CryptoService
 
                             int outputLength = gcmCipher.GetOutputSize(plaintext.Length);
                             byte[] output = new byte[outputLength];
-                            int len = gcmCipher.ProcessBytes(plaintext, 0, plaintext.Length, output, 0);
+                            int len = gcmCipher.ProcessBytes(
+                                plaintext,
+                                0,
+                                plaintext.Length,
+                                output,
+                                0
+                            );
                             len += gcmCipher.DoFinal(output, len);
 
                             if (len < outputLength)
@@ -61,8 +67,10 @@ public static partial class CryptoService
                             }
 
                             return output;
-                        },
-                        ex => SmartCardError.CryptographicError($"AES-GCM encryption failed: {ex.Message}")
+                        }, static ex =>
+                            SmartCardError.CryptographicError(
+                                $"AES-GCM encryption failed: {ex.Message}"
+                            )
                     )
                 );
         }
@@ -91,8 +99,8 @@ public static partial class CryptoService
                     Result.Try(
                         () =>
                         {
-                            GcmBlockCipher gcmCipher = new GcmBlockCipher(new AesEngine());
-                            AeadParameters parameters = new AeadParameters(
+                            var gcmCipher = new GcmBlockCipher(new AesEngine());
+                            var parameters = new AeadParameters(
                                 new KeyParameter(key),
                                 tagLength,
                                 nonce,
@@ -102,14 +110,22 @@ public static partial class CryptoService
 
                             int outputLength = gcmCipher.GetOutputSize(ciphertext.Length);
                             byte[] output = new byte[outputLength];
-                            int len = gcmCipher.ProcessBytes(ciphertext, 0, ciphertext.Length, output, 0);
+                            int len = gcmCipher.ProcessBytes(
+                                ciphertext,
+                                0,
+                                ciphertext.Length,
+                                output,
+                                0
+                            );
                             len += gcmCipher.DoFinal(output, len);
 
                             byte[] result = new byte[len];
                             Array.Copy(output, 0, result, 0, len);
                             return result;
-                        },
-                        ex => SmartCardError.CryptographicError($"AES-GCM decryption failed: {ex.Message}")
+                        }, static ex =>
+                            SmartCardError.CryptographicError(
+                                $"AES-GCM decryption failed: {ex.Message}"
+                            )
                     )
                 );
         }
@@ -124,31 +140,49 @@ public static partial class CryptoService
             int tagLength
         )
         {
-            return Validation.ValidateInputs(key, data)
-                .Bind(() => Validation.ValidateKeyLength(key, [16, 24, 32], "AES key must be 16, 24, or 32 bytes"))
+            return Validation
+                .ValidateInputs(key, data)
+                .Bind(() =>
+                    Validation.ValidateKeyLength(
+                        key,
+                        [16, 24, 32],
+                        "AES key must be 16, 24, or 32 bytes"
+                    )
+                )
                 .Bind(() =>
                     nonce.Length > 0
                         ? UnitResult.Success<SmartCardError>()
-                        : UnitResult.Failure(SmartCardError.InvalidArgument("Nonce cannot be empty"))
+                        : UnitResult.Failure(
+                            SmartCardError.InvalidArgument("Nonce cannot be empty")
+                        )
                 )
                 .Bind(() =>
                     tagLength is 96 or 104 or 112 or 120 or 128
                         ? UnitResult.Success<SmartCardError>()
-                        : UnitResult.Failure(SmartCardError.InvalidArgument("Tag length must be 96, 104, 112, 120, or 128 bits"))
+                        : UnitResult.Failure(
+                            SmartCardError.InvalidArgument(
+                                "Tag length must be 96, 104, 112, 120, or 128 bits"
+                            )
+                        )
                 );
         }
 
         /// <summary>
         /// Validates that ciphertext is long enough to contain the authentication tag.
         /// </summary>
-        private static UnitResult<SmartCardError> ValidateCiphertextLength(byte[] ciphertext, int tagLength)
+        private static UnitResult<SmartCardError> ValidateCiphertextLength(
+            byte[] ciphertext,
+            int tagLength
+        )
         {
             int tagBytes = tagLength / 8;
             return ciphertext.Length >= tagBytes
                 ? UnitResult.Success<SmartCardError>()
-                : UnitResult.Failure(SmartCardError.InvalidArgument(
-                    $"Ciphertext too short: {ciphertext.Length} bytes, need at least {tagBytes} bytes for tag"
-                ));
+                : UnitResult.Failure(
+                    SmartCardError.InvalidArgument(
+                        $"Ciphertext too short: {ciphertext.Length} bytes, need at least {tagBytes} bytes for tag"
+                    )
+                );
         }
     }
 }

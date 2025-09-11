@@ -159,7 +159,6 @@ public static partial class TlvService
                 );
             }
 
-
             return Result.Success<TlvLength, SmartCardError>(new TlvLength(value));
         }
 
@@ -222,8 +221,7 @@ public static partial class TlvService
         /// <returns>A Result containing the TlvObject or an error.</returns>
         public static Result<TlvObject, SmartCardError> Create(TlvTag tag, TlvValue value)
         {
-            return TlvLength.FromValue(value)
-                .Map(length => new TlvObject(tag, value, length));
+            return TlvLength.FromValue(value).Map(length => new TlvObject(tag, value, length));
         }
 
         /// <summary>
@@ -237,7 +235,7 @@ public static partial class TlvService
             // Convert nullable byte arrays to ImmutableArrays with NO NULLS
             var tag = new TlvTag(tagBytes?.ToImmutableArray() ?? ImmutableArray<byte>.Empty);
             var value = new TlvValue(valueBytes?.ToImmutableArray() ?? ImmutableArray<byte>.Empty);
-            
+
             if (tag.Bytes.Length == 0)
             {
                 return Result.Failure<TlvObject, SmartCardError>(
@@ -272,27 +270,20 @@ public static partial class TlvService
         public int BytesConsumed { get; }
 
         /// <summary>
-        /// Whether the parsed data was ASN.1 format.
-        /// </summary>
-        public bool IsAsn1 { get; }
-
-        /// <summary>
         /// Creates a new ParseResult.
         /// </summary>
         /// <param name="objects">Parsed objects.</param>
         /// <param name="bytesConsumed">Bytes consumed.</param>
-        /// <param name="isAsn1">Whether data is ASN.1.</param>
-        public ParseResult(ImmutableArray<TlvObject> objects, int bytesConsumed, bool isAsn1)
+        public ParseResult(ImmutableArray<TlvObject> objects, int bytesConsumed)
         {
             Objects = objects.IsDefault ? ImmutableArray<TlvObject>.Empty : objects;
             BytesConsumed = bytesConsumed;
-            IsAsn1 = isAsn1;
         }
 
         /// <summary>
         /// Creates an empty ParseResult.
         /// </summary>
-        public static ParseResult Empty => new(ImmutableArray<TlvObject>.Empty, 0, false);
+        public static ParseResult Empty => new(ImmutableArray<TlvObject>.Empty, 0);
     }
 
     /// <summary>
@@ -321,7 +312,11 @@ public static partial class TlvService
         /// <param name="useLongForm">Use long form encoding.</param>
         /// <param name="padToBlockSize">Optional block size for padding.</param>
         /// <param name="maxLength">Optional maximum length.</param>
-        public EncodingOptions(bool useLongForm = false, Maybe<int> padToBlockSize = default, Maybe<int> maxLength = default)
+        public EncodingOptions(
+            bool useLongForm = false,
+            Maybe<int> padToBlockSize = default,
+            Maybe<int> maxLength = default
+        )
         {
             UseLongForm = useLongForm;
             PadToBlockSize = padToBlockSize;

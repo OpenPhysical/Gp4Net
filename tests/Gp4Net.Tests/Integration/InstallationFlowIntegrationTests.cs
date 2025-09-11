@@ -29,8 +29,8 @@ public class InstallationFlowIntegrationTests
     public static class OpenFips201InstallationTrace
     {
         // Card Information
-        public static readonly byte[] ATR = Convert.FromHexString("3BD518FF8191FE1FC38073C821100A");
-        public static readonly byte[] ISD_AID = Convert.FromHexString("A000000151000000");
+        public static readonly byte[] Atr = Convert.FromHexString("3BD518FF8191FE1FC38073C821100A");
+        public static readonly byte[] IsdAid = Convert.FromHexString("A000000151000000");
 
         // Static Keys (GP test keys used in trace)
         public static readonly byte[] StaticKeyEnc = Convert.FromHexString(
@@ -52,7 +52,7 @@ public class InstallationFlowIntegrationTests
         public static readonly byte[] ExpectedSMac = Convert.FromHexString(
             "AA133569FEC01F8D1BDA168939E90C2E"
         );
-        public static readonly byte[] ExpectedSRMac = Convert.FromHexString(
+        public static readonly byte[] ExpectedSrMac = Convert.FromHexString(
             "05B237DF134CD46B7B13DF0BF9EAE35D"
         );
 
@@ -70,13 +70,13 @@ public class InstallationFlowIntegrationTests
         public static readonly byte[] ExternalAuthenticateResponse = Convert.FromHexString("9000");
 
         // CAP File Information
-        public static readonly string PackageAID = "A00000030800001000";
-        public static readonly string AppletAID = "A000000308000010000100";
+        public static readonly string PackageAid = "A00000030800001000";
+        public static readonly string AppletAid = "A000000308000010000100";
         public static readonly string PackageName = "com.makina.security.openfips201";
         public static readonly string AppletName = "com.makina.security.openfips201.OpenFIPS201";
         public static readonly string Version = "1.10";
         public static readonly int CodeSize = 21780;
-        public static readonly string SHA256 =
+        public static readonly string Sha256 =
             "da7243300d1f08622a102bfefc40b3f6c86d010aa1fa45efd9e31a0b34b8f959";
 
         // Installation Commands
@@ -112,16 +112,18 @@ public class InstallationFlowIntegrationTests
             .BeTrue("INITIALIZE UPDATE command creation should succeed");
 
         // Test INITIALIZE UPDATE response parsing
-        byte[] responseData = [.. OpenFips201InstallationTrace
-            .InitializeUpdateResponse.Take(
+        byte[] responseData =
+        [
+            .. OpenFips201InstallationTrace.InitializeUpdateResponse.Take(
                 OpenFips201InstallationTrace.InitializeUpdateResponse.Length - 2
-            )]; // Remove SW1SW2
+            ),
+        ]; // Remove SW1SW2
         Result<InitializeUpdateResponse, SmartCardError> parsedResponseResult =
             InitializeUpdateResponse.Parse(responseData);
         _ = parsedResponseResult
             .IsSuccess.Should()
             .BeTrue("Failed to parse INITIALIZE UPDATE response");
-        InitializeUpdateResponse? parsedResponse = parsedResponseResult.Value;
+        var parsedResponse = parsedResponseResult.Value;
 
         _ = parsedResponse
             .CardChallenge.Should()
@@ -163,17 +165,17 @@ public class InstallationFlowIntegrationTests
             .CodeSize.Should()
             .Be(21780, "Code size should match trace");
         _ = OpenFips201InstallationTrace
-            .SHA256.Should()
+            .Sha256.Should()
             .Be(
                 "da7243300d1f08622a102bfefc40b3f6c86d010aa1fa45efd9e31a0b34b8f959",
                 "SHA-256 hash should match trace"
             );
 
         // Validate AID formats
-        byte[] packageAidBytes = Convert.FromHexString(OpenFips201InstallationTrace.PackageAID);
+        byte[] packageAidBytes = Convert.FromHexString(OpenFips201InstallationTrace.PackageAid);
         _ = packageAidBytes.Length.Should().BeInRange(5, 16, "Package AID should be valid length");
 
-        byte[] appletAidBytes = Convert.FromHexString(OpenFips201InstallationTrace.AppletAID);
+        byte[] appletAidBytes = Convert.FromHexString(OpenFips201InstallationTrace.AppletAid);
         _ = appletAidBytes.Length.Should().BeInRange(5, 16, "Applet AID should be valid length");
     }
 
@@ -196,7 +198,7 @@ public class InstallationFlowIntegrationTests
             .ExpectedSMac.Length.Should()
             .Be(16, "S-MAC key should be 16 bytes for AES-128");
         _ = OpenFips201InstallationTrace
-            .ExpectedSRMac.Length.Should()
+            .ExpectedSrMac.Length.Should()
             .Be(16, "S-RMAC key should be 16 bytes for AES-128");
 
         // All session keys should be different (proper key diversification)
@@ -209,13 +211,13 @@ public class InstallationFlowIntegrationTests
         _ = OpenFips201InstallationTrace
             .ExpectedSEnc.Should()
             .NotBeEquivalentTo(
-                OpenFips201InstallationTrace.ExpectedSRMac,
+                OpenFips201InstallationTrace.ExpectedSrMac,
                 "S-ENC and S-RMAC should be different"
             );
         _ = OpenFips201InstallationTrace
             .ExpectedSMac.Should()
             .NotBeEquivalentTo(
-                OpenFips201InstallationTrace.ExpectedSRMac,
+                OpenFips201InstallationTrace.ExpectedSrMac,
                 "S-MAC and S-RMAC should be different"
             );
     }

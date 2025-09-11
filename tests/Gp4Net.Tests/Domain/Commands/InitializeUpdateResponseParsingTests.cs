@@ -93,7 +93,7 @@ public class InitializeUpdateResponseParsingTests
             .IsSuccess.Should()
             .BeTrue("Minimum valid SCP02 response should parse successfully");
 
-        InitializeUpdateResponse? parsed = result.Value;
+        var parsed = result.Value;
         _ = parsed.KeyVersion.Should().Be(0x01);
         _ = parsed.ScpId.Should().Be(0x02);
         _ = parsed.ScpParameter.Should().Be(0x00); // Padding for SCP02
@@ -153,7 +153,7 @@ public class InitializeUpdateResponseParsingTests
         // Assert
         _ = result.IsSuccess.Should().BeTrue("Valid SCP03 response should parse successfully");
 
-        InitializeUpdateResponse? parsed = result.Value;
+        var parsed = result.Value;
         _ = parsed.KeyVersion.Should().Be(0x01);
         _ = parsed.ScpId.Should().Be(0x03);
         _ = parsed.ScpParameter.Should().Be(0x70);
@@ -187,7 +187,7 @@ public class InitializeUpdateResponseParsingTests
         // Assert
         _ = result.IsSuccess.Should().BeTrue("Real GP Pro CLR response should parse successfully");
 
-        InitializeUpdateResponse? parsed = result.Value;
+        var parsed = result.Value;
         _ = parsed
             .KeyDiversificationData.Should()
             .Equal(Convert.FromHexString("00002345558083204839"));
@@ -222,7 +222,7 @@ public class InitializeUpdateResponseParsingTests
         // Assert
         _ = result.IsSuccess.Should().BeTrue("Real GP Pro MAC response should parse successfully");
 
-        InitializeUpdateResponse? parsed = result.Value;
+        var parsed = result.Value;
         _ = parsed
             .KeyDiversificationData.Should()
             .Equal(Convert.FromHexString("00002345558083204839"));
@@ -273,7 +273,7 @@ public class InitializeUpdateResponseParsingTests
         // Assert
         _ = result.IsSuccess.Should().BeTrue("Parser should handle corrupted KDD gracefully");
 
-        InitializeUpdateResponse? parsed = result.Value;
+        var parsed = result.Value;
         _ = parsed
             .KeyDiversificationData.Should()
             .Equal(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF);
@@ -361,7 +361,7 @@ public class InitializeUpdateResponseParsingTests
         // Assert
         _ = result.IsSuccess.Should().BeTrue("Parser should handle extra trailing bytes");
 
-        InitializeUpdateResponse? parsed = result.Value;
+        var parsed = result.Value;
         _ = parsed.KeyVersion.Should().Be(0x01);
         _ = parsed.ScpId.Should().Be(0x02);
         _ = parsed.SequenceCounter.Should().Equal(0x00, 0x01);

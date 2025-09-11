@@ -8,6 +8,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Core.Functional;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 using WSCT.ISO7816;
 using static Gp4Net.Constants.Constants;
@@ -18,17 +19,17 @@ namespace Gp4Net.Domain.Commands;
 /// Represents the EXTERNAL AUTHENTICATE command for secure channel authentication.
 /// </summary>
 [PublicAPI]
-public class ExternalAuthenticateCommand
+public class ExternalAuthenticateCommand : IApduCommand
 {
     /// <summary>
     /// The command class byte.
     /// </summary>
-    public const byte ClassByte = GlobalPlatform.Cla.Secured;
+    public const byte CLASS_BYTE = GlobalPlatform.Cla.SECURED;
 
     /// <summary>
     /// The command instruction byte.
     /// </summary>
-    public const byte InstructionByte = GlobalPlatform.Ins.ExternalAuthenticate;
+    public const byte INSTRUCTION_BYTE = Apdu.Instructions.EXTERNAL_AUTHENTICATE;
 
     /// <summary>
     /// Gets the security level.
@@ -198,7 +199,7 @@ public class ExternalAuthenticateCommand
         {
             // CLA=0x84 only when MAC is applied (secure messaging)
             // CLA=0x00 when no MAC (no secure messaging)
-            return Mac.Length > 0 ? ClassByte : (byte)0x00;
+            return Mac.Length > 0 ? CLASS_BYTE : (byte)0x00;
         }
     }
 
@@ -207,7 +208,7 @@ public class ExternalAuthenticateCommand
     /// </summary>
     public byte Ins
     {
-        get { return InstructionByte; }
+        get { return INSTRUCTION_BYTE; }
     }
 
     /// <summary>
@@ -265,11 +266,36 @@ public class ExternalAuthenticateCommand
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
         return ExpectedResponseLength.Match(
-            Some: le => Result.Success<CommandAPDU, SmartCardError>(
-                new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data, (uint)le)),
-            None: () => Result.Success<CommandAPDU, SmartCardError>(
-                new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data))
+            Some: le =>
+                Result.Success<CommandAPDU, SmartCardError>(
+                    new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data, (uint)le)
+                ),
+            None: () =>
+                Result.Success<CommandAPDU, SmartCardError>(
+                    new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data)
+                )
         );
+    }
+
+    /// <summary>
+    /// Converts this command to a WSCT CommandAPDU.
+    /// </summary>
+    /// <returns>The CommandAPDU representation of this command.</returns>
+    public CommandAPDU ToApdu()
+    {
+        return ExpectedResponseLength.Match(
+            Some: le => new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data, (uint)le),
+            None: () => new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data)
+        );
+    }
+
+    /// <summary>
+    /// Gets the raw APDU bytes for this command.
+    /// </summary>
+    /// <returns>The APDU bytes.</returns>
+    public byte[] ToBytes()
+    {
+        return ToApdu().ToBytes();
     }
 
     /// <summary>

@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using JetBrains.Annotations;
 
@@ -315,8 +314,8 @@ public static class ScpImplementationExtensions
             impl.HasIcvEncryption() ? "ICV Encryption" : "",
             impl.HasRMacSupport() ? "R-MAC" : "",
             impl.UsesWellKnownChallenge() ? "Well-known Challenge" : "",
-            impl.HasMacOverAid() ? "MAC over AID" : ""
-        }.Where(f => !string.IsNullOrEmpty(f));
+            impl.HasMacOverAid() ? "MAC over AID" : "",
+        }.Where(static f => !string.IsNullOrEmpty(f));
 
         var allFeatures = baseFeatures.Concat(optionalFeatures);
         return $"i={(byte)impl:X2}: {string.Join(", ", allFeatures)}";
@@ -339,65 +338,6 @@ public static class ScpImplementationExtensions
             ScpImplementation.Scp02I14 => "BASE_KEY",
             _ => $"{(byte)impl:X2}",
         };
-    }
-
-    /// <summary>
-    /// Determines if this is an SCP02 implementation.
-    /// Only returns true for explicitly defined SCP02 implementations in the enum.
-    /// Per GP Card Specification v2.3.1 Table E-1, SCP02 implementations follow specific bitmap patterns.
-    /// </summary>
-    /// <param name="impl">The SCP implementation to check</param>
-    /// <returns>True if this is an SCP02 implementation, false otherwise</returns>
-    public static bool IsScp02(this ScpImplementation impl)
-    {
-        byte value = (byte)impl;
-
-        // Check if this value is defined as an SCP02 implementation in the enum
-        // Only accept explicitly defined SCP02 values, not just any value in range
-        return value switch
-        {
-            // Explicit SCP02 implementations from the enum
-            0x00 => true, // Scp02I00
-            0x02 => true, // Scp02I02
-            0x04 => true, // Scp02I04
-            0x05 => true, // Scp02I05
-            0x0A => true, // Scp02I0A
-            0x14 => true, // Scp02I14
-            0x15 => true, // Scp02I15
-            0x1A => true, // Scp02I1A
-            0x24 => true, // Scp02I24
-            0x25 => true, // Scp02I25
-            0x2A => true, // Scp02I2A
-            0x34 => true, // Scp02I34
-            0x35 => true, // Scp02I35
-            0x3A => true, // Scp02I3A
-            0x44 => true, // Scp02I44
-            0x45 => true, // Scp02I45
-            0x4A => true, // Scp02I4A
-            0x54 => true, // Scp02I54
-            0x55 => true, // Scp02I55
-            0x64 => true, // Scp02I64
-            0x65 => true, // Scp02I65
-            0x6A => true, // Scp02I6A
-            0x74 => true, // Scp02I74
-            0x75 => true, // Scp02I75
-            0x7A => true, // Scp02I7A
-
-            // All other values are not SCP02 (including SCP03 and undefined values)
-            _ => false,
-        };
-    }
-
-    /// <summary>
-    /// Determines if this is an SCP03 implementation.
-    /// </summary>
-    /// <param name="impl">The SCP implementation to check</param>
-    /// <returns>True if this is an SCP03 implementation, false otherwise</returns>
-    public static bool IsScp03(this ScpImplementation impl)
-    {
-        byte value = (byte)impl;
-        // SCP03: i=10, 11, 20, 30, 60, 70
-        return value is 0x10 or 0x11 or 0x20 or 0x30 or 0x60 or 0x70;
     }
 
     /// <summary>

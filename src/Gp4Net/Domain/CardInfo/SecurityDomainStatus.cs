@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using CSharpFunctionalExtensions;
@@ -84,7 +83,7 @@ public class SecurityDomainStatus
         byte stateByte = data[2];
 
         // Extract additional data if present
-        Maybe<byte[]> additionalData =
+        var additionalData =
             length > 1 ? Maybe<byte[]>.From(data[3..(2 + length)]) : Maybe<byte[]>.None;
 
         return Result.Success<SecurityDomainStatus, SmartCardError>(
@@ -137,11 +136,11 @@ public class SecurityDomainStatus
                     // Single byte counter
                     return Maybe<ushort>.From(data[0]);
                 case >= 2:
-                {
-                    // Two byte counter (big-endian)
-                    ushort counter = (ushort)(data[^2] << 8 | data[^1]);
-                    return Maybe<ushort>.From(counter);
-                }
+                    {
+                        // Two byte counter (big-endian)
+                        ushort counter = (ushort)(data[^2] << 8 | data[^1]);
+                        return Maybe<ushort>.From(counter);
+                    }
                 default:
                     return Maybe<ushort>.None;
             }
@@ -153,7 +152,7 @@ public class SecurityDomainStatus
     /// </summary>
     public override string ToString()
     {
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
         _ = sb.Append("Security Domain Status: ");
         _ = sb.Append($"State={GetIsdState()}");
 
@@ -178,7 +177,7 @@ public class SecurityDomainStatus
     /// </summary>
     public string GetShortDescription()
     {
-        IEnumerable<string> parts = new[]
+        var parts = new[]
         {
             GetIsdState().ToString(),
             IsPersonalized() ? "Personalized" : null,

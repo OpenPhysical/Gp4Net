@@ -64,11 +64,12 @@ public class ComplexTraceDiscoveryTests
 
         TestContext.Out.WriteLine($"Discovered {jsonFiles.Length} complex trace files:");
 
-        List<TraceMetadata> discoveredTraces = [.. jsonFiles
-            .Select(filePath =>
+        List<TraceMetadata> discoveredTraces =
+        [
+            .. jsonFiles.Select(filePath =>
             {
                 string fileName = Path.GetFileName(filePath);
-                TraceMetadata metadata = AnalyzeTrace(filePath, fileName);
+                var metadata = AnalyzeTrace(filePath, fileName);
 
                 TestContext.Out.WriteLine($"✓ {fileName}: {metadata.Description}");
                 TestContext.Out.WriteLine(
@@ -83,7 +84,8 @@ public class ComplexTraceDiscoveryTests
                 }
 
                 return metadata;
-            })];
+            }),
+        ];
 
         return Result.Success<List<TraceMetadata>, string>(discoveredTraces);
     }
@@ -100,9 +102,7 @@ public class ComplexTraceDiscoveryTests
             return UnitResult.Failure<string>("All traces should be automatically categorized");
 
         // Ensure variety in trace types
-        List<string> allCategories = [.. discoveredTraces
-            .SelectMany(t => t.Categories)
-            .Distinct()];
+        List<string> allCategories = [.. discoveredTraces.SelectMany(t => t.Categories).Distinct()];
         if (allCategories.Count <= 1)
             return UnitResult.Failure<string>("Complex traces should span multiple categories");
 
@@ -118,15 +118,16 @@ public class ComplexTraceDiscoveryTests
     [Test]
     public void ComplexTraces_Should_Be_Discoverable_And_Valid()
     {
-        ValidateTraceDirectory(
+        var result = ValidateTraceDirectory(
                 Path.Combine(TestContext.CurrentContext.TestDirectory, ComplexTracePath)
             )
             .Bind(DiscoverAndAnalyzeTraces)
-            .Bind(ValidateDiscoveredTraces)
-            .Match(
-                success => Assert.Pass("Test completed successfully"),
-                failure => Assert.Inconclusive(failure)
-            );
+            .Bind(ValidateDiscoveredTraces);
+
+        result.Match(
+            () => { /* Test passed */ },
+            failure => Assert.Fail($"Test failed: {failure}")
+        );
     }
 
     /// <summary>
@@ -148,7 +149,7 @@ public class ComplexTraceDiscoveryTests
         try
         {
             string jsonContent = File.ReadAllText(tracePath);
-            JsonDocument testData = JsonDocument.Parse(jsonContent);
+            var testData = JsonDocument.Parse(jsonContent);
             return Result.Success<JsonDocument, string>(testData);
         }
         catch (Exception ex)
@@ -172,7 +173,7 @@ public class ComplexTraceDiscoveryTests
     {
         TestContext.Out.WriteLine($"Testing {description}");
 
-        if (!testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement))
+        if (!testData.RootElement.TryGetProperty("exchanges", out var exchangesElement))
             return UnitResult.Failure<string>("Configuration trace should contain exchanges");
 
         List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
@@ -180,10 +181,13 @@ public class ComplexTraceDiscoveryTests
             return UnitResult.Failure<string>("Configuration should have command exchanges");
 
         // Analyze configuration patterns
-        HashSet<string> commandTypes = [.. exchanges
-            .Select(exchange => exchange.GetProperty("command").GetString()!)
-            .Where(command => command.Length >= 4)
-            .Select(command => command.Substring(0, 4))];
+        HashSet<string> commandTypes =
+        [
+            .. exchanges
+                .Select(exchange => exchange.GetProperty("command").GetString()!)
+                .Where(command => command.Length >= 4)
+                .Select(command => command.Substring(0, 4)),
+        ];
 
         bool hasInitialization = commandTypes.Contains("8050") || commandTypes.Contains("00A4");
         bool hasMultiplePhases = commandTypes.Count >= 3;
@@ -216,12 +220,13 @@ public class ComplexTraceDiscoveryTests
         string description
     )
     {
-        LoadTraceFile(traceFile)
-            .Bind(testData => ValidateConfigurationWorkflow(testData, description))
-            .Match(
-                success => Assert.Pass("Test completed successfully"),
-                failure => Assert.Inconclusive(failure)
-            );
+        var result = LoadTraceFile(traceFile)
+            .Bind(testData => ValidateConfigurationWorkflow(testData, description));
+
+        result.Match(
+            () => { /* Test passed */ },
+            failure => Assert.Fail($"Test failed: {failure}")
+        );
     }
 
     /// <summary>
@@ -239,7 +244,7 @@ public class ComplexTraceDiscoveryTests
     {
         TestContext.Out.WriteLine($"Testing {description}");
 
-        if (!testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement))
+        if (!testData.RootElement.TryGetProperty("exchanges", out var exchangesElement))
             return UnitResult.Failure<string>("Protocol change trace should contain exchanges");
 
         List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
@@ -248,14 +253,17 @@ public class ComplexTraceDiscoveryTests
         // Analyze protocol patterns
         bool hasInitializeUpdate = commands.Any(cmd => cmd.StartsWith("8050"));
         bool hasExternalAuth = commands.Any(cmd => cmd.StartsWith("8482"));
-        List<string> scp03Commands = [.. commands
-            .Where(cmd => cmd.Length >= 2)
-            .Where(cmd =>
-            {
-                byte cla = Convert.ToByte(cmd.Substring(0, 2), 16);
-                return (cla & 0x04) != 0 || (cla & 0x0C) != 0;
-            })
-            .Take(3)];
+        List<string> scp03Commands =
+        [
+            .. commands
+                .Where(cmd => cmd.Length >= 2)
+                .Where(cmd =>
+                {
+                    byte cla = Convert.ToByte(cmd.Substring(0, 2), 16);
+                    return (cla & 0x04) != 0 || (cla & 0x0C) != 0;
+                })
+                .Take(3),
+        ];
 
         if (!hasInitializeUpdate)
             return UnitResult.Failure<string>("Protocol change should include initialization");
@@ -311,13 +319,16 @@ public class ComplexTraceDiscoveryTests
     public void ComplexTraces_Should_Handle_Protocol_Changes(
         string traceFile,
         string description
-    ) =>
-        LoadTraceFile(traceFile)
-            .Bind(testData => ValidateProtocolChanges(testData, description, traceFile))
-            .Match(
-                success => Assert.Pass("Test completed successfully"),
-                failure => Assert.Inconclusive(failure)
-            );
+    )
+    {
+        var result = LoadTraceFile(traceFile)
+            .Bind(testData => ValidateProtocolChanges(testData, description, traceFile));
+
+        result.Match(
+            () => { /* Test passed */ },
+            failure => Assert.Fail($"Test failed: {failure}")
+        );
+    }
 
     /// <summary>
     /// Functional helper to validate listing operation characteristics.
@@ -332,7 +343,7 @@ public class ComplexTraceDiscoveryTests
     {
         TestContext.Out.WriteLine($"Testing {description}");
 
-        if (!testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement))
+        if (!testData.RootElement.TryGetProperty("exchanges", out var exchangesElement))
             return UnitResult.Failure<string>("Listing trace should contain exchanges");
 
         List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
@@ -395,13 +406,16 @@ public class ComplexTraceDiscoveryTests
     public void ComplexTraces_Should_Handle_Listing_Operations(
         string traceFile,
         string description
-    ) =>
-        LoadTraceFile(traceFile)
-            .Bind(testData => ValidateListingOperations(testData, description))
-            .Match(
-                success => Assert.Pass("Test completed successfully"),
-                failure => Assert.Inconclusive(failure)
-            );
+    )
+    {
+        var result = LoadTraceFile(traceFile)
+            .Bind(testData => ValidateListingOperations(testData, description));
+
+        result.Match(
+            () => { /* Test passed */ },
+            failure => Assert.Fail($"Test failed: {failure}")
+        );
+    }
 
     /// <summary>
     /// Functional helper to perform comprehensive analysis on all traces.
@@ -415,8 +429,9 @@ public class ComplexTraceDiscoveryTests
     {
         string[] jsonFiles = Directory.GetFiles(traceDirectory, "*.json");
 
-        List<(string fileName, bool isValid, string[] findings)> analysisResults = [.. jsonFiles
-            .Select(filePath =>
+        List<(string fileName, bool isValid, string[] findings)> analysisResults =
+        [
+            .. jsonFiles.Select(filePath =>
             {
                 string fileName = Path.GetFileName(filePath);
                 (bool isValid, string[] findings) = PerformComprehensiveAnalysis(filePath);
@@ -432,9 +447,13 @@ public class ComplexTraceDiscoveryTests
                 );
 
                 return (fileName, isValid, findings);
-            })];
+            }),
+        ];
 
-        List<(string fileName, bool isValid, string[] findings)> invalidTraces = [.. analysisResults.Where(result => !result.isValid)];
+        List<(string fileName, bool isValid, string[] findings)> invalidTraces =
+        [
+            .. analysisResults.Where(result => !result.isValid),
+        ];
         return invalidTraces.Any()
             ? Result.Failure<List<(string fileName, bool isValid, string[] findings)>, string>(
                 $"Comprehensive analysis should pass for {invalidTraces.First().fileName}"
@@ -471,23 +490,26 @@ public class ComplexTraceDiscoveryTests
     /// and test any complex trace without prior knowledge.
     /// </summary>
     [Test]
-    public void ComplexTraces_Should_Pass_Comprehensive_Analysis() =>
-        ValidateTraceDirectory(
+    public void ComplexTraces_Should_Pass_Comprehensive_Analysis()
+    {
+        var result = ValidateTraceDirectory(
                 Path.Combine(TestContext.CurrentContext.TestDirectory, ComplexTracePath)
             )
             .Bind(PerformComprehensiveAnalysisOnAllTraces)
-            .Bind(ValidateComprehensiveAnalysis)
-            .Match(
-                success => Assert.Pass("Test completed successfully"),
-                failure => Assert.Inconclusive(failure)
-            );
+            .Bind(ValidateComprehensiveAnalysis);
+
+        result.Match(
+            () => { /* Test passed */ },
+            failure => Assert.Fail($"Test failed: {failure}")
+        );
+    }
 
     /// <summary>
     /// Analyze a trace file and extract metadata for categorization.
     /// </summary>
     private static TraceMetadata AnalyzeTrace(string filePath, string fileName)
     {
-        TraceMetadata metadata = new TraceMetadata
+        var metadata = new TraceMetadata
         {
             FileName = fileName,
             Description = GenerateDescription(fileName),
@@ -496,16 +518,16 @@ public class ComplexTraceDiscoveryTests
         try
         {
             string jsonContent = File.ReadAllText(filePath);
-            JsonDocument testData = JsonDocument.Parse(jsonContent);
+            var testData = JsonDocument.Parse(jsonContent);
 
             // Analyze exchanges
-            if (testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement))
+            if (testData.RootElement.TryGetProperty("exchanges", out var exchangesElement))
             {
                 List<JsonElement> exchanges = [.. exchangesElement.EnumerateArray()];
                 metadata.ExchangeCount = exchanges.Count;
 
-                HashSet<string> commandTypes = new HashSet<string>();
-                foreach (JsonElement exchange in exchanges)
+                var commandTypes = new HashSet<string>();
+                foreach (var exchange in exchanges)
                 {
                     string command = exchange.GetProperty("command").GetString()!;
                     if (command.Length >= 4)
@@ -545,7 +567,10 @@ public class ComplexTraceDiscoveryTests
         string name = Path.GetFileNameWithoutExtension(fileName);
 
         // Convert underscores to spaces and title case
-        string[] words = [.. name.Split('_').Select(word => char.ToUpper(word[0]) + word.Substring(1).ToLower())];
+        string[] words =
+        [
+            .. name.Split('_').Select(word => char.ToUpper(word[0]) + word.Substring(1).ToLower()),
+        ];
 
         return string.Join(" ", words);
     }
@@ -597,16 +622,16 @@ public class ComplexTraceDiscoveryTests
     /// </summary>
     private static (bool isValid, string[] findings) PerformComprehensiveAnalysis(string filePath)
     {
-        List<string> findings = new List<string>();
+        var findings = new List<string>();
         bool isValid = true;
 
         try
         {
             string jsonContent = File.ReadAllText(filePath);
-            JsonDocument testData = JsonDocument.Parse(jsonContent);
+            var testData = JsonDocument.Parse(jsonContent);
 
             // Validate JSON structure
-            if (!testData.RootElement.TryGetProperty("exchanges", out JsonElement exchangesElement))
+            if (!testData.RootElement.TryGetProperty("exchanges", out var exchangesElement))
             {
                 findings.Add("❌ Missing exchanges property");
                 isValid = false;
@@ -618,7 +643,7 @@ public class ComplexTraceDiscoveryTests
 
                 // Validate exchange structure
                 int validExchanges = 0;
-                foreach (JsonElement exchange in exchangesElement.EnumerateArray())
+                foreach (var exchange in exchangesElement.EnumerateArray())
                 {
                     if (
                         exchange.TryGetProperty("command", out _)

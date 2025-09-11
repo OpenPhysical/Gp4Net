@@ -28,7 +28,6 @@ public interface ICliExecutionContext
     /// </summary>
     IKeysetResolver KeysetResolver { get; }
 
-
     /// <summary>
     /// Gets a pure function for establishing secure channels from user requests.
     /// Eliminates imperative keyset resolution patterns in commands.
@@ -37,7 +36,8 @@ public interface ICliExecutionContext
         SecureChannelRequest,
         CancellationToken,
         Task<Result<SecureChannelExecutionContext, SmartCardError>>
-    > EstablishSecureChannelAsync { get; }
+    > EstablishSecureChannelAsync
+    { get; }
 
     /// <summary>
     /// Ensures a card connection is established with the specified reader.

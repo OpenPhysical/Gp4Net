@@ -18,15 +18,18 @@ public static class CommandRegistrationService
     /// </summary>
     public static void RegisterCommandHandlers(this IServiceCollection services, Assembly assembly)
     {
-        List<Type> commandTypes = [.. assembly
-            .GetTypes()
-            .Where(type => type.GetCustomAttribute<CommandHandlerAttribute>() != null)
-            .Where(type => !type.IsAbstract && !type.IsInterface)];
+        List<Type> commandTypes =
+        [
+            .. assembly
+                .GetTypes()
+                .Where(type => type.GetCustomAttribute<CommandHandlerAttribute>() != null)
+                .Where(type => !type.IsAbstract && !type.IsInterface),
+        ];
 
-        foreach (Type commandType in commandTypes)
+        foreach (var commandType in commandTypes)
         {
             // Find the ICommand<TSettings> interface
-            Type commandInterface = commandType
+            var commandInterface = commandType
                 .GetInterfaces()
                 .FirstOrDefault(i =>
                     i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IPipelineCommand<>)
@@ -37,13 +40,13 @@ public static class CommandRegistrationService
                 continue;
             }
 
-            Type settingsType = commandInterface.GetGenericArguments()[0];
+            var settingsType = commandInterface.GetGenericArguments()[0];
 
             // Register the command implementation
             _ = services.AddTransient(commandInterface, commandType);
 
             // Create and register the pipeline command adapter
-            Type pipelineCommandType = typeof(PipelineCommand<>).MakeGenericType(settingsType);
+            var pipelineCommandType = typeof(PipelineCommand<>).MakeGenericType(settingsType);
             _ = services.AddTransient(pipelineCommandType);
         }
     }
@@ -53,16 +56,19 @@ public static class CommandRegistrationService
     /// </summary>
     public static IEnumerable<CommandHandlerInfo> GetCommandHandlers(Assembly assembly)
     {
-        List<Type> commandTypes = [.. assembly
-            .GetTypes()
-            .Where(type => type.GetCustomAttribute<CommandHandlerAttribute>() != null)
-            .Where(type => !type.IsAbstract && !type.IsInterface)];
+        List<Type> commandTypes =
+        [
+            .. assembly
+                .GetTypes()
+                .Where(type => type.GetCustomAttribute<CommandHandlerAttribute>() != null)
+                .Where(type => !type.IsAbstract && !type.IsInterface),
+        ];
 
-        foreach (Type commandType in commandTypes)
+        foreach (var commandType in commandTypes)
         {
-            CommandHandlerAttribute attribute =
+            var attribute =
                 commandType.GetCustomAttribute<CommandHandlerAttribute>()!;
-            Type commandInterface = commandType
+            var commandInterface = commandType
                 .GetInterfaces()
                 .FirstOrDefault(i =>
                     i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IPipelineCommand<>)
@@ -73,8 +79,8 @@ public static class CommandRegistrationService
                 continue;
             }
 
-            Type settingsType = commandInterface.GetGenericArguments()[0];
-            Type pipelineCommandType = typeof(PipelineCommand<>).MakeGenericType(settingsType);
+            var settingsType = commandInterface.GetGenericArguments()[0];
+            var pipelineCommandType = typeof(PipelineCommand<>).MakeGenericType(settingsType);
 
             // Derive command name from class name if not specified
             string commandName = attribute.CommandName ?? DeriveCommandName(commandType.Name);

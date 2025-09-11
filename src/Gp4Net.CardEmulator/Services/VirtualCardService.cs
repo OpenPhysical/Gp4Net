@@ -79,9 +79,7 @@ public class VirtualCardService : IDisposable
     /// </summary>
     private Result<bool, SmartCardError> FindAndConnectToReader(string readerName)
     {
-        Maybe<VirtualCardReader> reader = Maybe<VirtualCardReader>.From(
-            _readerManager.GetReader(readerName)
-        );
+        var reader = _readerManager.GetReader(readerName);
 
         return reader
             .ToResult(SmartCardError.CommunicationError($"Reader '{readerName}' not found"))
@@ -153,7 +151,7 @@ public class VirtualCardService : IDisposable
     /// </summary>
     public VirtualCardService MarkDisposed()
     {
-        VirtualCardService disconnectedService = Disconnect();
+        var disconnectedService = Disconnect();
         disconnectedService._readerManager.Clear();
         return new VirtualCardService(_readerManager, Maybe<VirtualCardReader>.None, true);
     }
@@ -164,7 +162,7 @@ public class VirtualCardService : IDisposable
     public void Dispose()
     {
         // Functional approach - create disposed instance
-        VirtualCardService disposedService = MarkDisposed();
+        var disposedService = MarkDisposed();
         // Note: In pure functional approach, we'd return the disposed service
         // but IDisposable interface requires void return
     }
@@ -225,7 +223,7 @@ public class VirtualCommandResponse
     public static VirtualCommandResponse FromApduResponse(ApduResponse apduResponse)
     {
         bool isSuccessful = apduResponse.IsSuccessful;
-        Maybe<SmartCardError> error = isSuccessful
+        var error = isSuccessful
             ? Maybe<SmartCardError>.None
             : Maybe<SmartCardError>.From(SmartCardError.FromStatusWord(apduResponse.StatusWord));
 
@@ -257,12 +255,12 @@ public class VirtualCommandResponse
     /// </summary>
     /// <param name="data">The response data.</param>
     /// <returns>A virtual command response indicating success.</returns>
-    public static VirtualCommandResponse Success(byte[]? data = null)
+    public static VirtualCommandResponse Success(byte[] data)
     {
         return new VirtualCommandResponse(
             true,
-            data ?? [],
-            StatusWords.Success.Normal, // Success status word
+            data,
+            StatusWords.Success, // Success status word
             Maybe<SmartCardError>.None
         );
     }

@@ -2,13 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
-using Gp4Net.Transport;
-using WSCT.Core;
-using WSCT.ISO7816;
 using JetBrains.Annotations;
+using WSCT.ISO7816;
 
 namespace Gp4Net.Domain.CapFile;
 
@@ -75,10 +72,7 @@ public class CapFileLoadingWorkflow
                 .Map(aids =>
                     (IReadOnlyList<byte[]>)new List<byte[]>(aids.Select(aid => (byte[])aid.Clone()))
                 )
-                .Match(
-                    value => value,
-                    () => new List<byte[]>()
-                );
+                .Match(value => value, () => new List<byte[]>());
         }
     }
 
@@ -96,7 +90,7 @@ public class CapFileLoadingWorkflow
         Maybe<byte[]> securityDomainAid = default,
         bool installApplets = true,
         bool makeSelectableAfterInstall = true,
-        int maxLoadBlockSize = Constants.Constants.GlobalPlatform.ApduLimits.DefaultLoadBlockSize
+        int maxLoadBlockSize = Constants.Constants.GlobalPlatform.ApduLimits.DEFAULT_LOAD_BLOCK_SIZE
     )
     {
         return Result.Failure<IList<CommandAPDU>, SmartCardError>(
@@ -121,25 +115,28 @@ public class CapFileLoadingWorkflow
             return new CapFileValidationResult(false, "CAP file data is empty");
         }
 
-        try
+        var capFileResult = CapFileStructure.Parse(capFileData);
+        
+        if (capFileResult.IsFailure)
         {
-            Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(
-                capFileData
+            return new CapFileValidationResult(
+                false,
+                Maybe<string>.From($"Failed to parse CAP file: {capFileResult.Error.Message}")
             );
-            if (capFileResult.IsFailure)
-            {
-                return new CapFileValidationResult(
-                    false,
-                    Maybe<string>.From($"Failed to parse CAP file: {capFileResult.Error.Message}")
-                );
-            }
+        }
 
-            CapFileStructure capFile = capFileResult.Value;
+        if (capFileResult.IsSuccess)
+        {
+            var capFile = capFileResult.Value;
 
             List<string> validationErrors = [];
 
             // Validate package AID
-            if (capFile.PackageAid.Length is < Constants.Constants.JavaCard.AidConstraints.MinLength or > Constants.Constants.JavaCard.AidConstraints.MaxLength)
+            if (
+                capFile.PackageAid.Length
+                is < Constants.Constants.JavaCard.AidConstraints.MIN_LENGTH
+                    or > Constants.Constants.JavaCard.AidConstraints.MAX_LENGTH
+            )
             {
                 validationErrors.Add("Package AID must be between 5 and 16 bytes");
             }
@@ -153,8 +150,8 @@ public class CapFileLoadingWorkflow
             // Check for required components
             byte[] requiredComponents =
             [
-                Constants.Constants.JavaCard.ComponentTags.Header,
-                Constants.Constants.JavaCard.ComponentTags.Directory,
+                Constants.Constants.JavaCard.ComponentTags.HEADER,
+                Constants.Constants.JavaCard.ComponentTags.DIRECTORY,
             ];
 
             HashSet<byte> presentTags = [.. capFile.Components.Select(c => c.Tag)];
@@ -167,9 +164,13 @@ public class CapFileLoadingWorkflow
             }
 
             // Validate applets
-            foreach (AppletInfo applet in capFile.Applets)
+            foreach (var applet in capFile.Applets)
             {
-                if (applet.Aid.Length is < Constants.Constants.JavaCard.AidConstraints.MinLength or > Constants.Constants.JavaCard.AidConstraints.MaxLength)
+                if (
+                    applet.Aid.Length
+                    is < Constants.Constants.JavaCard.AidConstraints.MIN_LENGTH
+                        or > Constants.Constants.JavaCard.AidConstraints.MAX_LENGTH
+                )
                 {
                     validationErrors.Add(
                         $"Applet AID must be between 5 and 16 bytes: {Convert.ToHexString(applet.Aid)}"
@@ -178,7 +179,7 @@ public class CapFileLoadingWorkflow
             }
 
             bool isValid = validationErrors.Count == 0;
-            Maybe<string> errorMessage = isValid
+            var errorMessage = isValid
                 ? Maybe<string>.None
                 : Maybe<string>.From(string.Join("; ", validationErrors));
 
@@ -188,13 +189,12 @@ public class CapFileLoadingWorkflow
                 Maybe<CapFileStructure>.From(capFile)
             );
         }
-        catch (Exception ex)
-        {
-            return new CapFileValidationResult(
-                false,
-                Maybe<string>.From($"Failed to parse CAP file: {ex.Message}")
-            );
-        }
+        
+        // If we get here without success, return failure
+        return new CapFileValidationResult(
+            false,
+            Maybe<string>.From("Failed to parse CAP file: unexpected state")
+        );
     }
 
     /// <summary>
@@ -237,7 +237,7 @@ public class CapFileLoadingWorkflow
     /// <returns>The estimated memory requirements in bytes.</returns>
     public static MemoryRequirements EstimateMemoryRequirements(byte[] capFileData)
     {
-        Result<CapFileStructure, SmartCardError> capFileResult = CapFileStructure.Parse(
+        var capFileResult = CapFileStructure.Parse(
             capFileData
         );
         if (capFileResult.IsFailure)
@@ -246,22 +246,22 @@ public class CapFileLoadingWorkflow
             return new MemoryRequirements(0, 0, capFileData.Length);
         }
 
-        CapFileStructure capFile = capFileResult.Value;
+        var capFile = capFileResult.Value;
 
         // Basic estimation - in practice this would be more sophisticated
         int codeSize = capFile
             .Components.Where(c =>
                 c.Tag
-                    is Constants.Constants.JavaCard.ComponentTags.Method
-                        or Constants.Constants.JavaCard.ComponentTags.Class
+                    is Constants.Constants.JavaCard.ComponentTags.METHOD
+                        or Constants.Constants.JavaCard.ComponentTags.CLASS
             )
             .Sum(c => c.Size);
 
         int dataSize = capFile
             .Components.Where(c =>
                 c.Tag
-                    is Constants.Constants.JavaCard.ComponentTags.StaticField
-                        or Constants.Constants.JavaCard.ComponentTags.ConstantPool
+                    is Constants.Constants.JavaCard.ComponentTags.STATIC_FIELD
+                        or Constants.Constants.JavaCard.ComponentTags.CONSTANT_POOL
             )
             .Sum(c => c.Size);
 

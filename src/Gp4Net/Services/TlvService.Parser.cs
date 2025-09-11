@@ -3,8 +3,6 @@ using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Core.Functional;
-using Org.BouncyCastle.Asn1;
 
 namespace Gp4Net.Services;
 
@@ -30,8 +28,7 @@ public static partial class TlvService
                 );
             }
 
-            return ParseAt(data, 0)
-                .Map(result => result.Object);
+            return ParseAt(data, 0).Map(result => result.Object);
         }
 
         /// <summary>
@@ -42,7 +39,8 @@ public static partial class TlvService
         /// <returns>A Result containing the parsed object and bytes consumed.</returns>
         private static Result<(TlvObject Object, int BytesConsumed), SmartCardError> ParseAt(
             ImmutableArray<byte> data,
-            int offset)
+            int offset
+        )
         {
             if (offset >= data.Length)
             {
@@ -52,10 +50,17 @@ public static partial class TlvService
             }
 
             return ParseTag(data, offset)
-                .Bind(tagResult => ParseLength(data, tagResult.EndOffset)
-                    .Bind(lengthResult => ExtractValue(data, lengthResult.EndOffset, lengthResult.Length)
-                        .Bind(valueResult => TlvObject.Create(tagResult.Tag, valueResult.Value)
-                            .Map(tlv => (tlv, valueResult.EndOffset - offset)))));
+                .Bind(tagResult =>
+                    ParseLength(data, tagResult.EndOffset)
+                        .Bind(lengthResult =>
+                            ExtractValue(data, lengthResult.EndOffset, lengthResult.Length)
+                                .Bind(valueResult =>
+                                    TlvObject
+                                        .Create(tagResult.Tag, valueResult.Value)
+                                        .Map(tlv => (tlv, valueResult.EndOffset - offset))
+                                )
+                        )
+                );
         }
 
         /// <summary>
@@ -69,9 +74,6 @@ public static partial class TlvService
             {
                 return Result.Success<ParseResult, SmartCardError>(ParseResult.Empty);
             }
-
-            // Check if this is ASN.1 data
-            var isAsn1 = IsAsn1(data);
 
             // Build list of parsed objects using a local builder
             var builder = ImmutableArray.CreateBuilder<TlvObject>();
@@ -98,15 +100,17 @@ public static partial class TlvService
                             // If we've parsed at least one object, that's success
                             return builder.Count > 0
                                 ? UnitResult.Success<SmartCardError>()
-                                : UnitResult.Failure<SmartCardError>(error);
+                                : UnitResult.Failure(error);
                         }
                     );
             };
 
             return parseNext(0)
                 .Match(
-                    () => Result.Success<ParseResult, SmartCardError>(
-                        new ParseResult(builder.ToImmutable(), offset, isAsn1)),
+                    () =>
+                        Result.Success<ParseResult, SmartCardError>(
+                            new ParseResult(builder.ToImmutable(), offset)
+                        ),
                     error => Result.Failure<ParseResult, SmartCardError>(error)
                 );
         }
@@ -117,19 +121,21 @@ public static partial class TlvService
         /// <param name="data">The data to search.</param>
         /// <param name="tag">The tag to find.</param>
         /// <returns>A Result containing Maybe of the found object or an error.</returns>
-        public static Result<Maybe<TlvObject>, SmartCardError> FindByTag(ImmutableArray<byte> data, uint tag)
+        public static Result<Maybe<TlvObject>, SmartCardError> FindByTag(
+            ImmutableArray<byte> data,
+            uint tag
+        )
         {
             return ParseMultiple(data)
                 .Map(result =>
                 {
-                    var found = result.Objects
-                        .Where(obj => obj.Tag.ToNumber()
-                            .Match(
-                                tagNum => tagNum == tag,
-                                _ => false))
+                    var found = result
+                        .Objects.Where(obj =>
+                            obj.Tag.ToNumber().Match(tagNum => tagNum == tag, _ => false)
+                        )
                         .ToImmutableArray();
-                    
-                    return found.Length > 0 
+
+                    return found.Length > 0
                         ? Maybe<TlvObject>.From(found[0])
                         : Maybe<TlvObject>.None;
                 });
@@ -141,92 +147,32 @@ public static partial class TlvService
         /// <param name="data">The data to search.</param>
         /// <param name="tag">The tag bytes to find.</param>
         /// <returns>A Result containing Maybe of the found object or an error.</returns>
-        public static Result<Maybe<TlvObject>, SmartCardError> FindByTag(ImmutableArray<byte> data, ImmutableArray<byte> tag)
+        public static Result<Maybe<TlvObject>, SmartCardError> FindByTag(
+            ImmutableArray<byte> data,
+            ImmutableArray<byte> tag
+        )
         {
             return ParseMultiple(data)
                 .Map(result =>
                 {
-                    var found = result.Objects
-                        .Where(obj => obj.Tag.Bytes.SequenceEqual(tag))
+                    var found = result
+                        .Objects.Where(obj => obj.Tag.Bytes.SequenceEqual(tag))
                         .ToImmutableArray();
-                    
+
                     return found.Length > 0
                         ? Maybe<TlvObject>.From(found[0])
                         : Maybe<TlvObject>.None;
                 });
         }
 
-        /// <summary>
-        /// Checks if the data is ASN.1 encoded.
-        /// </summary>
-        /// <param name="data">The data to check.</param>
-        /// <returns>True if the data appears to be ASN.1 encoded.</returns>
-        public static bool IsAsn1(ImmutableArray<byte> data)
-        {
-            if (data.IsDefault || data.Length == 0)
-            {
-                return false;
-            }
-
-            // Check for common ASN.1 universal tags
-            var firstByte = data[0];
-            return firstByte switch
-            {
-                Constants.Constants.Tlv.Asn1PrimitiveTags.Boolean => true,
-                Constants.Constants.Tlv.Asn1PrimitiveTags.Integer => true,
-                Constants.Constants.Tlv.Asn1PrimitiveTags.BitString => true,
-                Constants.Constants.Tlv.Asn1PrimitiveTags.OctetString => true,
-                Constants.Constants.Tlv.Asn1PrimitiveTags.Null => true,
-                Constants.Constants.Tlv.Asn1PrimitiveTags.ObjectIdentifier => true,
-                Constants.Constants.Tlv.Asn1PrimitiveTags.Sequence => true,
-                Constants.Constants.Tlv.Asn1PrimitiveTags.Set => true,
-                _ => (firstByte & Constants.Constants.Tlv.ContextSpecific.ClassMask) == Constants.Constants.Tlv.ContextSpecific.ClassMask
-            };
-        }
-
-        /// <summary>
-        /// Parses ASN.1 data using BouncyCastle.
-        /// </summary>
-        /// <param name="data">The ASN.1 data to parse.</param>
-        /// <returns>A Result containing the parsed TLV objects or an error.</returns>
-        public static Result<ParseResult, SmartCardError> ParseAsn1(ImmutableArray<byte> data)
-        {
-            if (data.IsDefault || data.Length == 0)
-            {
-                return Result.Success<ParseResult, SmartCardError>(ParseResult.Empty);
-            }
-
-            return Result.Try(() =>
-            {
-                var asn1Object = Asn1Object.FromByteArray(data.ToArray());
-                var tlvObjects = ConvertAsn1ToTlv(asn1Object);
-                return new ParseResult(tlvObjects, data.Length, true);
-            }, ex => SmartCardError.InvalidData($"ASN.1 parsing failed: {ex.Message}"));
-        }
-
-        /// <summary>
-        /// Converts an ASN.1 object to TLV objects.
-        /// </summary>
-        /// <param name="asn1Object">The ASN.1 object to convert.</param>
-        /// <returns>TLV objects.</returns>
-        private static ImmutableArray<TlvObject> ConvertAsn1ToTlv(Asn1Object asn1Object)
-        {
-            var encoded = asn1Object.GetEncoded();
-            
-            // Parse the encoded ASN.1 as regular TLV
-            return ParseMultiple(encoded.ToImmutableArray())
-                .Match(
-                    result => result.Objects,
-                    _ => ImmutableArray<TlvObject>.Empty
-                );
-        }
 
         /// <summary>
         /// Parses a tag from the data.
         /// </summary>
         private static Result<(TlvTag Tag, int EndOffset), SmartCardError> ParseTag(
             ImmutableArray<byte> data,
-            int offset)
+            int offset
+        )
         {
             if (offset >= data.Length)
             {
@@ -236,9 +182,12 @@ public static partial class TlvService
             }
 
             var firstByte = data[offset];
-            
+
             // Check if this is a multi-byte tag
-            if ((firstByte & Constants.Constants.Tlv.Parsing.MultiByteTagMask) != Constants.Constants.Tlv.Parsing.MultiByteTagMask)
+            if (
+                (firstByte & Constants.Constants.Tlv.Parsing.MULTI_BYTE_TAG_MASK)
+                != Constants.Constants.Tlv.Parsing.MULTI_BYTE_TAG_MASK
+            )
             {
                 // Single byte tag
                 return Result.Success<(TlvTag, int), SmartCardError>(
@@ -249,9 +198,9 @@ public static partial class TlvService
             // Multi-byte tag - collect all tag bytes
             var tagBuilder = ImmutableArray.CreateBuilder<byte>();
             tagBuilder.Add(firstByte);
-            
+
             var currentOffset = offset + 1;
-            
+
             // Collect tag bytes using functional iteration
             Func<int, Result<(TlvTag, int), SmartCardError>> collectBytes = null;
             collectBytes = pos =>
@@ -267,7 +216,7 @@ public static partial class TlvService
                 tagBuilder.Add(currentByte);
 
                 // Check if this is the last byte of the tag
-                if ((currentByte & Constants.Constants.Tlv.Parsing.SubsequentTagByteMask) == 0)
+                if ((currentByte & Constants.Constants.Tlv.Parsing.SUBSEQUENT_TAG_BYTE_MASK) == 0)
                 {
                     return Result.Success<(TlvTag, int), SmartCardError>(
                         (new TlvTag(tagBuilder.ToImmutable()), pos + 1)
@@ -285,7 +234,8 @@ public static partial class TlvService
         /// </summary>
         private static Result<(int Length, int EndOffset), SmartCardError> ParseLength(
             ImmutableArray<byte> data,
-            int offset)
+            int offset
+        )
         {
             if (offset >= data.Length)
             {
@@ -304,20 +254,19 @@ public static partial class TlvService
             }
 
             // Short form
-            if ((firstByte & Constants.Constants.Tlv.Parsing.LongFormLengthMask) == 0)
+            if ((firstByte & Constants.Constants.Tlv.Parsing.LONG_FORM_LENGTH_MASK) == 0)
             {
                 return Result.Success<(int, int), SmartCardError>((firstByte, currentOffset));
             }
 
             // Long form
-            var lengthBytes = firstByte & Constants.Constants.Tlv.Parsing.LengthBytesMask;
+            var lengthBytes = firstByte & Constants.Constants.Tlv.Parsing.LENGTH_BYTES_MASK;
             if (lengthBytes == 0 || currentOffset + lengthBytes > data.Length)
             {
                 return Result.Failure<(int, int), SmartCardError>(
                     SmartCardError.InvalidArgument("Invalid long form length encoding")
                 );
             }
-
 
             // Use LINQ to aggregate the length bytes
             var lengthData = data.Skip(currentOffset).Take(lengthBytes).ToImmutableArray();
@@ -331,7 +280,9 @@ public static partial class TlvService
                 );
             }
 
-            return Result.Success<(int, int), SmartCardError>((length, currentOffset + lengthBytes));
+            return Result.Success<(int, int), SmartCardError>(
+                (length, currentOffset + lengthBytes)
+            );
         }
 
         /// <summary>
@@ -340,7 +291,8 @@ public static partial class TlvService
         private static Result<(TlvValue Value, int EndOffset), SmartCardError> ExtractValue(
             ImmutableArray<byte> data,
             int offset,
-            int length)
+            int length
+        )
         {
             if (offset + length > data.Length)
             {

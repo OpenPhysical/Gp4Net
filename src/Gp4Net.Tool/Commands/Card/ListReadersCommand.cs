@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
+using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 
@@ -13,6 +13,7 @@ namespace Gp4Net.Tool.Commands.Card;
 /// Command to list available card readers.
 /// </summary>
 [PublicAPI]
+[CliCommand("list-readers", "List available card readers", "card")]
 [CommandHandler(Description = "List available card readers")]
 public class ListReadersCommand : IPipelineCommand<ListReadersCommand.Settings>
 {
@@ -27,12 +28,15 @@ public class ListReadersCommand : IPipelineCommand<ListReadersCommand.Settings>
                 .WithVerbose(settings.Verbose)
                 .ExecuteAsync(async ctx =>
                 {
-                    Result<string[], SmartCardError> readersResult =
+                    var readersResult =
                         await ctx.CardService.GetReadersAsync();
                     string[] readers = readersResult.Match(success => success, error => []);
 
                     // Build semantic rows using pure functional composition
-                    List<ReaderTableBuilder.ReaderRow> semanticRows = [.. ReaderTableBuilder.BuildReaderRows(readers, showSummary: true)];
+                    List<ReaderTableBuilder.ReaderRow> semanticRows =
+                    [
+                        .. ReaderTableBuilder.BuildReaderRows(readers, showSummary: true),
+                    ];
 
                     // Check if we have any readers to display
                     if (!semanticRows.OfType<ReaderTableBuilder.ReaderDataRow>().Any())

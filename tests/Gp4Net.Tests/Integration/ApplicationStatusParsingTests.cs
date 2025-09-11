@@ -6,9 +6,7 @@ using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Services;
 using Gp4Net.Pipeline;
-using Gp4Net.Constants;
 using Gp4Net.Services.GlobalPlatform;
 using NUnit.Framework;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
@@ -37,15 +35,15 @@ public class ApplicationStatusParsingTests
         const string resp =
             "E3264F08A0000001510000009F700101C5039EFE80C407A0000001515350CC08A000000151000000";
 
-        CommandResponse r = MakeResponse(resp);
+        var r = MakeResponse(resp);
         Result<ImmutableList<ApplicationInfo>, SmartCardError> parsed =
             Responses.ParseGetStatusResponse(r);
 
         _ = parsed.IsSuccess.Should().BeTrue();
-        ImmutableList<ApplicationInfo>? list = parsed.Value;
+        var list = parsed.Value;
 
         // Should include ISD AID with lifecycle (0x01) and privileges (C5: 03 9E FE)
-        ApplicationInfo? isd = list.FirstOrDefault(static x =>
+        var isd = list.FirstOrDefault(static x =>
             Convert.ToHexString(x.Aid) == "A000000151000000"
         );
         _ = isd.Should().NotBeNull();

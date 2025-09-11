@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Cryptography;
 using static Gp4Net.Cryptography.CryptoService;
 
 namespace Gp4Net.Core.Functional;
@@ -17,13 +16,13 @@ public static class EnumParsingExtensions
     public static Result<TEnum> ToEnum<TEnum>(this byte value, bool allowZeroForFlags = true)
         where TEnum : struct, Enum
     {
-        Type t = typeof(TEnum);
+        var t = typeof(TEnum);
 
         // Enforce underlying type = byte to avoid accidental mis-casts
         if (Enum.GetUnderlyingType(t) != typeof(byte))
             return Result.Failure<TEnum>($"{t.Name} must have underlying type byte");
 
-        TEnum candidate = (TEnum)(object)value;
+        var candidate = (TEnum)(object)value;
         bool isFlags = Attribute.IsDefined(t, typeof(FlagsAttribute));
 
         if (!isFlags)

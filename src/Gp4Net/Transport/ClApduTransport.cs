@@ -1,4 +1,3 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -72,18 +71,19 @@ public class ClApduTransport : IApduTransport
     )
     {
         // Convert to CommandAPDU for contactless validation
-        var validationResult = Maybe<IApduCommand>.From(command)
+        var validationResult = Maybe<IApduCommand>
+            .From(command)
             .ToResult(SmartCardError.InvalidArgument("Command cannot be null"))
             .Map(cmd => cmd.ToApdu())
             .Bind(ValidateContactlessCommand)
             .Tap(() => _logger.LogDebug("T=CL Transmit for command"))
             .Map(validCommand => new WrappedApduCommand(CreateContactlessCommand(validCommand)));
-            
+
         if (validationResult.IsFailure)
         {
             return Result.Failure<ApduResponse, SmartCardError>(validationResult.Error);
         }
-        
+
         return await _t1Transport.TransmitAsync(validationResult.Value, channel, cancellationToken);
     }
 
@@ -92,7 +92,7 @@ public class ClApduTransport : IApduTransport
         // Basic contactless validation - extended length APDUs are generally not supported
         // Without access to WSCT CommandAPDU internals, we'll do minimal validation
         // Specific validation can be added once the correct WSCT API usage is determined
-        
+
         return Result.Success<CommandAPDU, SmartCardError>(command);
     }
 

@@ -5,6 +5,7 @@ using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Transport;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.Commands;
@@ -24,7 +25,7 @@ public class LoadCommandTests
         Result<LoadCommand, SmartCardError> result = LoadCommand.Create(0, data);
 
         _ = result.IsSuccess.Should().BeTrue();
-        LoadCommand? command = result.Value;
+        var command = result.Value;
         _ = command.BlockNumber.Should().Be(0);
         _ = command.Data.Should().BeEquivalentTo(data);
         _ = command.Type.Should().Be(LoadCommand.LoadType.Continuation);
@@ -41,7 +42,7 @@ public class LoadCommandTests
         Result<LoadCommand, SmartCardError> result = LoadCommand.Create(1, data, true);
 
         _ = result.IsSuccess.Should().BeTrue();
-        LoadCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Type.Should().Be(LoadCommand.LoadType.Final);
         _ = command.IsFinalBlock.Should().BeTrue();
     }
@@ -76,7 +77,7 @@ public class LoadCommandTests
         Result<LoadCommand, SmartCardError> result = LoadCommand.Create(0, data);
 
         _ = result.IsSuccess.Should().BeTrue();
-        LoadCommand? command = result.Value;
+        var command = result.Value;
         _ = command.TotalCapSize.Should().Be(4);
     }
 
@@ -88,7 +89,7 @@ public class LoadCommandTests
         Result<LoadCommand, SmartCardError> result = LoadCommand.Create(1, data);
 
         _ = result.IsSuccess.Should().BeTrue();
-        LoadCommand? command = result.Value;
+        var command = result.Value;
         _ = command.TotalCapSize.Should().BeNull();
     }
 
@@ -103,7 +104,7 @@ public class LoadCommandTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        IList<LoadCommand>? commands = result.Value;
+        var commands = result.Value;
         _ = commands.Should().HaveCount(1);
         _ = commands[0].BlockNumber.Should().Be(0);
         _ = commands[0].IsFirstBlock.Should().BeTrue();
@@ -127,7 +128,7 @@ public class LoadCommandTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        IList<LoadCommand>? commands = result.Value;
+        var commands = result.Value;
         _ = commands.Count.Should().BeGreaterThan(1);
 
         // Check first block
@@ -137,7 +138,7 @@ public class LoadCommandTests
         _ = commands[0].TotalCapSize.Should().Be(500);
 
         // Check last block
-        LoadCommand lastCommand = commands[^1];
+        var lastCommand = commands[^1];
         _ = lastCommand.BlockNumber.Should().Be((byte)(commands.Count - 1));
         _ = lastCommand.IsFirstBlock.Should().BeFalse();
         _ = lastCommand.IsFinalBlock.Should().BeTrue();
@@ -165,8 +166,8 @@ public class LoadCommandTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        IList<LoadCommand>? commands = result.Value;
-        foreach (LoadCommand command in commands)
+        var commands = result.Value;
+        foreach (var command in commands)
         {
             _ = command.Data.Length.Should().BeLessThanOrEqualTo(maxBlockSize);
         }
@@ -187,7 +188,7 @@ public class LoadCommandTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        IList<LoadCommand>? commands = result.Value;
+        var commands = result.Value;
         byte[] reconstructed = [.. commands.SelectMany(c => c.Data)];
         _ = reconstructed.Should().BeEquivalentTo(capData);
     }
@@ -240,9 +241,9 @@ public class LoadCommandTests
     {
         byte[] data = Convert.FromHexString("DEADBEEF");
         Result<LoadCommand, SmartCardError> result = LoadCommand.Create(0, data);
-        LoadCommand? command = result.Value;
+        var command = result.Value;
 
-        byte[]? apdu = command.ToApdu();
+        byte[]? apdu = command.ToApdu().ToApdu().Value;
 
         _ = apdu[0].Should().Be(0x80); // CLA
         _ = apdu[1].Should().Be(0xE8); // INS
@@ -261,9 +262,9 @@ public class LoadCommandTests
     {
         byte[] data = Convert.FromHexString("DEADBEEF");
         Result<LoadCommand, SmartCardError> result = LoadCommand.Create(1, data);
-        LoadCommand? command = result.Value;
+        var command = result.Value;
 
-        byte[]? apdu = command.ToApdu();
+        byte[]? apdu = command.ToApdu().ToApdu().Value;
 
         _ = apdu[2].Should().Be(0x00); // P1 (continuation)
         _ = apdu[3].Should().Be(0x01); // P2 (block number)
@@ -278,9 +279,9 @@ public class LoadCommandTests
     {
         byte[] data = Convert.FromHexString("DEADBEEF");
         Result<LoadCommand, SmartCardError> result = LoadCommand.Create(2, data, true);
-        LoadCommand? command = result.Value;
+        var command = result.Value;
 
-        byte[]? apdu = command.ToApdu();
+        byte[]? apdu = command.ToApdu().ToApdu().Value;
 
         _ = apdu[2].Should().Be(0x80); // P1 (final)
         _ = apdu[3].Should().Be(0x02); // P2 (block number)
@@ -299,10 +300,10 @@ public class LoadCommandTests
             largeCapData,
             50
         );
-        IList<LoadCommand>? commands = result.Value;
-        LoadCommand firstCommand = commands[0]; // First block will have the TLV header
+        var commands = result.Value;
+        var firstCommand = commands[0]; // First block will have the TLV header
 
-        byte[]? apdu = firstCommand.ToApdu();
+        byte[]? apdu = firstCommand.ToApdu().ToApdu().Value;
 
         byte[] dataField = [.. apdu.Skip(5).Take(apdu[4])];
         _ = dataField[0].Should().Be(0xC4); // TLV tag
@@ -316,9 +317,9 @@ public class LoadCommandTests
     {
         byte[] data = Convert.FromHexString("DEADBEEF");
         Result<LoadCommand, SmartCardError> result = LoadCommand.Create(0, data);
-        LoadCommand? command = result.Value;
+        var command = result.Value;
 
-        byte[]? apdu = command.ToApdu();
+        byte[]? apdu = command.ToApdu().ToApdu().Value;
 
         _ = apdu[^1].Should().Be(0x00); // Le field
     }
@@ -331,7 +332,7 @@ public class LoadCommandTests
         const ushort statusWord = 0x9000;
 
         // Act
-        LoadResponse response = new LoadResponse(data, statusWord);
+        var response = new LoadResponse(data, statusWord);
 
         // Assert
         _ = response.Data.Should().BeEquivalentTo(data);
@@ -347,7 +348,7 @@ public class LoadCommandTests
         const ushort statusWord = 0x6A80;
 
         // Act
-        LoadResponse response = new LoadResponse(data, statusWord);
+        var response = new LoadResponse(data, statusWord);
 
         // Assert
         _ = response.IsSuccessful.Should().BeFalse();
@@ -362,7 +363,7 @@ public class LoadCommandTests
         const ushort statusWord = 0x9000;
 
         // Act
-        LoadResponse? response = LoadResponse.Parse(data, statusWord);
+        var response = LoadResponse.Parse(data, statusWord);
 
         // Assert
         _ = response.Data.Should().BeEquivalentTo(data);
@@ -374,7 +375,7 @@ public class LoadCommandTests
     public void LoadResponse_ParseNullData_HandlesGracefully()
     {
         // Act
-        LoadResponse? response = LoadResponse.Parse(null, 0x9000);
+        var response = LoadResponse.Parse(null, 0x9000);
 
         // Assert
         _ = response.Data.Should().NotBeNull();
@@ -386,7 +387,7 @@ public class LoadCommandTests
     {
         byte[] data = Convert.FromHexString("DEADBEEF");
         Result<LoadCommand, SmartCardError> result = LoadCommand.Create(0, data);
-        LoadCommand? command = result.Value;
+        var command = result.Value;
 
         string? str = command.ToString();
 
@@ -431,7 +432,7 @@ public class LoadCommandTests
     {
         // Act
         string? description = CapFileLoader.GetErrorDescription(
-            CapFileLoader.ErrorCodes.IncorrectData
+            CapFileLoader.ErrorCodes.INCORRECT_DATA
         );
 
         // Assert
@@ -454,7 +455,7 @@ public class LoadCommandTests
     public void GetErrorDescription_SuccessCode_ReturnsSuccess()
     {
         // Act
-        string? description = CapFileLoader.GetErrorDescription(CapFileLoader.ErrorCodes.Success);
+        string? description = CapFileLoader.GetErrorDescription(CapFileLoader.ErrorCodes.SUCCESS);
 
         // Assert
         _ = description.Should().Be("Success");

@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Immutable;
 using System.Linq;
@@ -6,7 +5,6 @@ using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.Constants;
-using static Gp4Net.Constants.Constants;
 using Gp4Net.Core;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
 using static Gp4Net.Services.TlvService;
@@ -27,7 +25,8 @@ public static class ApplicationSelectionProcessor
     /// <returns>Updated card state with application selected or error.</returns>
     public static Result<(CardState NewState, byte[] Response), SmartCardError> ProcessSelect(
         CardState state,
-        ImmutableArray<byte> command)
+        ImmutableArray<byte> command
+    )
     {
         return ParseSelectCommand(command)
             .Bind(selectData => ProcessApplicationSelection(state, selectData))
@@ -37,12 +36,13 @@ public static class ApplicationSelectionProcessor
     /// <summary>
     /// Parses SELECT command to extract AID and selection parameters.
     /// </summary>
-    private static Result<SelectCommandData, SmartCardError> ParseSelectCommand(ImmutableArray<byte> command)
+    private static Result<SelectCommandData, SmartCardError> ParseSelectCommand(
+        ImmutableArray<byte> command
+    )
     {
         if (command.Length < 5)
         {
-            return Result.Failure<SelectCommandData, SmartCardError>(
-                SmartCardError.WrongLength());
+            return Result.Failure<SelectCommandData, SmartCardError>(SmartCardError.WrongLength());
         }
 
         byte cla = command[0];
@@ -52,39 +52,45 @@ public static class ApplicationSelectionProcessor
         byte lc = command[4];
 
         // Validate CLA and INS
-        if (ins != Gp4Net.Constants.Constants.GlobalPlatform.Ins.Select)
+        if (ins != Apdu.Instructions.SELECT)
         {
             return Result.Failure<SelectCommandData, SmartCardError>(
-                SmartCardError.InstructionNotSupported());
+                SmartCardError.InstructionNotSupported()
+            );
         }
 
         // Validate P1 (selection control)
         byte selectionControl = (byte)(p1 & 0x03);
-        if (selectionControl != Apdu.SelectP1.SelectByName && 
-            selectionControl != Apdu.SelectP1.SelectByFileId && 
-            selectionControl != Apdu.SelectP1.SelectEfUnderCurrentDf)
+        if (
+            selectionControl != Apdu.SelectP1.SELECT_BY_NAME
+            && selectionControl != Apdu.SelectP1.SELECT_BY_FILE_ID
+            && selectionControl != Apdu.SelectP1.SELECT_EF_UNDER_CURRENT_DF
+        )
         {
             return Result.Failure<SelectCommandData, SmartCardError>(
-                SmartCardError.IncorrectData());
+                SmartCardError.IncorrectData()
+            );
         }
 
         // Extract AID data
         if (command.Length < 5 + lc)
         {
-            return Result.Failure<SelectCommandData, SmartCardError>(
-                SmartCardError.WrongLength());
+            return Result.Failure<SelectCommandData, SmartCardError>(SmartCardError.WrongLength());
         }
 
-        ImmutableArray<byte> aid = lc == 0
-            ? ImmutableArray<byte>.Empty
-            : [..command.Skip(5).Take(lc)];
+        var aid =
+            lc == 0 ? ImmutableArray<byte>.Empty : [.. command.Skip(5).Take(lc)];
 
-        return Result.Success<SelectCommandData, SmartCardError>(new SelectCommandData(
-            aid,
-            selectionControl,
-            (FileControlInformation)(p2 & Gp4Net.Constants.Constants.GlobalPlatform.CommonBytes.LowerNibbleMask),
-            (p1 & 0x04) != 0 // File occurrence bit
-        ));
+        return Result.Success<SelectCommandData, SmartCardError>(
+            new SelectCommandData(
+                aid,
+                selectionControl,
+                (FileControlInformation)(
+                    p2 & CommonBytes.LOWER_NIBBLE_MASK
+                ),
+                (p1 & 0x04) != 0 // File occurrence bit
+            )
+        );
     }
 
     /// <summary>
@@ -92,38 +98,56 @@ public static class ApplicationSelectionProcessor
     /// </summary>
     private static Result<CardState, SmartCardError> ProcessApplicationSelection(
         CardState state,
-        SelectCommandData selectData)
+        SelectCommandData selectData
+    )
     {
         return selectData.SelectionControl switch
         {
-            var ctrl when ctrl == Apdu.SelectP1.SelectByName => ProcessSelectByName(state, selectData.Aid),
-            var ctrl when ctrl == Apdu.SelectP1.SelectByFileId => ProcessSelectFirst(state, selectData.Aid),
-            var ctrl when ctrl == Apdu.SelectP1.SelectEfUnderCurrentDf => ProcessSelectNext(state, selectData.Aid),
-            _ => Result.Failure<CardState, SmartCardError>(SmartCardError.IncorrectData())
+            var ctrl when ctrl == Apdu.SelectP1.SELECT_BY_NAME => ProcessSelectByName(
+                state,
+                selectData.Aid
+            ),
+            var ctrl when ctrl == Apdu.SelectP1.SELECT_BY_FILE_ID => ProcessSelectFirst(
+                state,
+                selectData.Aid
+            ),
+            var ctrl when ctrl == Apdu.SelectP1.SELECT_EF_UNDER_CURRENT_DF => ProcessSelectNext(
+                state,
+                selectData.Aid
+            ),
+            _ => Result.Failure<CardState, SmartCardError>(SmartCardError.IncorrectData()),
         };
     }
 
     /// <summary>
     /// Processes SELECT by name (most common case).
     /// </summary>
-    private static Result<CardState, SmartCardError> ProcessSelectByName(CardState state, ImmutableArray<byte> aid)
+    private static Result<CardState, SmartCardError> ProcessSelectByName(
+        CardState state,
+        ImmutableArray<byte> aid
+    )
     {
         if (aid.IsEmpty)
         {
             // Empty AID selects ISD
-            return state.ApplicationContext.SelectIsd()
+            return state
+                .ApplicationContext.SelectIsd()
                 .Map(newContext => state.WithApplicationContext(newContext).WithSelected());
         }
 
         // Select specific application by AID
-        return state.ApplicationContext.SelectApplication(aid)
+        return state
+            .ApplicationContext.SelectApplication(aid)
             .Map(newContext => state.WithApplicationContext(newContext).WithSelected());
     }
 
     /// <summary>
     /// Processes SELECT first occurrence (for partial AID matching).
     /// </summary>
-    private static Result<CardState, SmartCardError> ProcessSelectFirst(CardState state, ImmutableArray<byte> aid)
+    private static Result<CardState, SmartCardError> ProcessSelectFirst(
+        CardState state,
+        ImmutableArray<byte> aid
+    )
     {
         if (aid.IsEmpty)
         {
@@ -132,8 +156,8 @@ public static class ApplicationSelectionProcessor
 
         // Find first application with AID starting with the given partial AID
         string aidString = Convert.ToHexString(aid.ToArray());
-        ImmutableList<VirtualApplication> candidates = state.ApplicationContext.Applications.Values
-            .Where(app => !app.Aid.IsEmpty)
+        var candidates = state
+            .ApplicationContext.Applications.Values.Where(app => !app.Aid.IsEmpty)
             .Where(app => Convert.ToHexString(app.Aid.ToArray()).StartsWith(aidString))
             .ToImmutableList();
 
@@ -142,15 +166,19 @@ public static class ApplicationSelectionProcessor
             return Result.Failure<CardState, SmartCardError>(SmartCardError.FileNotFound());
         }
 
-        VirtualApplication matchingApp = candidates.First();
-        return state.ApplicationContext.SelectApplication(matchingApp.Aid)
+        var matchingApp = candidates.First();
+        return state
+            .ApplicationContext.SelectApplication(matchingApp.Aid)
             .Map(newContext => state.WithApplicationContext(newContext).WithSelected());
     }
 
     /// <summary>
     /// Processes SELECT next occurrence using selection history tracking.
     /// </summary>
-    private static Result<CardState, SmartCardError> ProcessSelectNext(CardState state, ImmutableArray<byte> aid)
+    private static Result<CardState, SmartCardError> ProcessSelectNext(
+        CardState state,
+        ImmutableArray<byte> aid
+    )
     {
         if (aid.IsEmpty)
         {
@@ -158,8 +186,8 @@ public static class ApplicationSelectionProcessor
         }
 
         string aidString = Convert.ToHexString(aid.ToArray());
-        ImmutableList<VirtualApplication> candidates = state.ApplicationContext.Applications.Values
-            .Where(app => !app.Aid.IsEmpty)
+        var candidates = state
+            .ApplicationContext.Applications.Values.Where(app => !app.Aid.IsEmpty)
             .Where(app => Convert.ToHexString(app.Aid.ToArray()).StartsWith(aidString))
             .ToImmutableList();
 
@@ -169,25 +197,39 @@ public static class ApplicationSelectionProcessor
         }
 
         // Find next occurrence based on selection history
-        string? lastSelected = state.ApplicationContext.SelectionHistory.LastOrDefault();
-        if (lastSelected != null)
-        {
-            ImmutableList<string> candidateAids = candidates.Select(app => Convert.ToHexString(app.Aid.ToArray())).ToImmutableList();
-            int currentIndex = candidateAids.IndexOf(lastSelected);
-            if (currentIndex >= 0 && currentIndex + 1 < candidateAids.Count)
+        var lastSelected = Maybe<string>.From(state.ApplicationContext.SelectionHistory.LastOrDefault());
+        
+        return lastSelected.Match(
+            selected =>
             {
-                byte[] nextAid = Convert.FromHexString(candidateAids[currentIndex + 1]);
-                return state.ApplicationContext.SelectApplication([..nextAid])
+                var candidateAids = candidates
+                    .Select(app => Convert.ToHexString(app.Aid.ToArray()))
+                    .ToImmutableList();
+                int currentIndex = candidateAids.IndexOf(selected);
+                if (currentIndex >= 0 && currentIndex + 1 < candidateAids.Count)
+                {
+                    byte[] nextAid = Convert.FromHexString(candidateAids[currentIndex + 1]);
+                    return state
+                        .ApplicationContext.SelectApplication([.. nextAid])
+                        .Map(newContext => state.WithApplicationContext(newContext).WithSelected());
+                }
+                
+                // If at end of list, select first
+                var firstApp = candidates.First();
+                return state
+                    .ApplicationContext.SelectApplication(firstApp.Aid)
                     .Map(newContext => state.WithApplicationContext(newContext).WithSelected());
-            }
-        }
-
-        // If no history or at end, select first
-        // GlobalPlatform Card Specification v2.3.1 Section 11.1.1.1 - SELECT command processing
-        // When multiple applications match AID, select first registered application
-        VirtualApplication firstApp = candidates.First();
-        return state.ApplicationContext.SelectApplication(firstApp.Aid)
-            .Map(newContext => state.WithApplicationContext(newContext).WithSelected());
+            },
+            () =>
+            {
+                // If no history, select first
+                // GlobalPlatform Card Specification v2.3.1 Section 11.1.1.1 - SELECT command processing
+                // When multiple applications match AID, select first registered application
+                var firstApp = candidates.First();
+                return state
+                    .ApplicationContext.SelectApplication(firstApp.Aid)
+                    .Map(newContext => state.WithApplicationContext(newContext).WithSelected());
+            });
     }
 
     /// <summary>
@@ -207,12 +249,12 @@ public static class ApplicationSelectionProcessor
     private static byte[] GenerateApplicationSelectResponse(VirtualApplication app)
     {
         // Simple FCI (File Control Information) template
-        ImmutableArray<byte>.Builder fciBuilder = ImmutableArray.CreateBuilder<byte>();
+        var fciBuilder = ImmutableArray.CreateBuilder<byte>();
 
         // FCI Template tag (6F)
         fciBuilder.Add(0x6F);
 
-        ImmutableArray<byte>.Builder contentBuilder = ImmutableArray.CreateBuilder<byte>();
+        var contentBuilder = ImmutableArray.CreateBuilder<byte>();
 
         // Application AID (84)
         if (!app.Aid.IsEmpty)
@@ -234,7 +276,7 @@ public static class ApplicationSelectionProcessor
             }
         }
 
-        ImmutableArray<byte> content = contentBuilder.ToImmutable();
+        var content = contentBuilder.ToImmutable();
         fciBuilder.Add((byte)content.Length);
         fciBuilder.AddRange(content);
 
@@ -248,24 +290,29 @@ public static class ApplicationSelectionProcessor
     private static byte[] GenerateIsdSelectResponse()
     {
         // Standard GP ISD AID
-        byte[] isdAid = Gp4Net.Constants.Constants.GlobalPlatform.Aids.IsdDefault;
-        
+        byte[] isdAid = Aids.IsdDefault;
+
         // Build FCI according to GP spec:
         // 6F (FCI Template)
         //   84 (DF Name/AID) - 8 bytes
         //   A5 (Proprietary data) - contains ISD-specific info
         //     9F70 (Life Cycle State) - 1 byte: 0x07 (INITIALIZED)
-        
+
         byte[] proprietaryData = BuildProprietaryData();
         var aidTlvResult = TlvEncoder.EncodeSimple(0x84, isdAid.ToImmutableArray());
-        var proprietaryTlvResult = TlvEncoder.EncodeSimple(0xA5, proprietaryData.ToImmutableArray());
-        
-        return aidTlvResult.Bind(aidTlv =>
-            proprietaryTlvResult.Bind(proprietaryTlv =>
-            {
-                var fciContent = aidTlv.AddRange(proprietaryTlv);
-                return TlvEncoder.EncodeSimple(0x6F, fciContent);
-            }))
+        var proprietaryTlvResult = TlvEncoder.EncodeSimple(
+            0xA5,
+            proprietaryData.ToImmutableArray()
+        );
+
+        return aidTlvResult
+            .Bind(aidTlv =>
+                proprietaryTlvResult.Bind(proprietaryTlv =>
+                {
+                    var fciContent = aidTlv.AddRange(proprietaryTlv);
+                    return TlvEncoder.EncodeSimple(0x6F, fciContent);
+                })
+            )
             .Match(
                 success => success.ToArray(),
                 error => [0x6F, 0x00] // Return minimal FCI on error
@@ -278,16 +325,18 @@ public static class ApplicationSelectionProcessor
     private static byte[] BuildProprietaryData()
     {
         // Life cycle state: SELECTABLE (INITIALIZED)
-        byte[] lifecycleState = [Gp4Net.Constants.Constants.GlobalPlatform.LifecycleStates.Selectable];
+        byte[] lifecycleState =
+        [
+            LifecycleStates.SELECTABLE,
+        ];
         var lifecycleTlvResult = TlvEncoder.EncodeSimple(0x9F70, lifecycleState.ToImmutableArray());
         var lifecycleTlv = lifecycleTlvResult.Match(
             success => success.ToArray(),
             error => [0x9F, 0x70, 0x01, lifecycleState[0]] // Fallback to manual construction
         );
-        
+
         return lifecycleTlv;
     }
-
 
     /// <summary>
     /// Extension method to set IsSelected state functionally.

@@ -2,14 +2,16 @@ using System;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
+using Gp4Net.CardEmulator.Domain;
+using Gp4Net.Constants;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Constants;
-using static Gp4Net.Constants.Constants;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
-using Gp4Net.Cryptography;
+using static Gp4Net.CardEmulator.Domain.CommandRequests;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.CardEmulator.Functional;
 
@@ -43,7 +45,7 @@ public static class Scp02CommandProcessors
         );
 
         logging.LogDebug("About to parse INITIALIZE UPDATE command");
-        Result<(ApduResponse, CardState), SmartCardError> result = ParseInitializeUpdateCommand(
+        var result = ParseInitializeUpdateCommand(
                 command
             )
             .TapError(error => logging.LogError("Failed to parse command: {Error}", error.Message))
@@ -67,7 +69,9 @@ public static class Scp02CommandProcessors
             .TapError(error =>
                 logging.LogError("Precondition validation failed: {Error}", error.Message)
             )
-            .Bind(request => GenerateScp02CardChallenge(request, state, config, rngContext, logging))
+            .Bind(request =>
+                GenerateScp02CardChallenge(request, state, config, rngContext, logging)
+            )
             .Tap(data =>
                 logging.LogDebug(
                     "Card challenge generated - CardChallenge: {Challenge}, SequenceCounter: {Counter}",
@@ -155,14 +159,9 @@ public static class Scp02CommandProcessors
 
     // Helper methods and data structures
 
-    private record InitializeUpdateRequest(
-        byte KeyVersion,
-        byte KeyIdentifier,
-        byte[] HostChallenge
-    );
 
     private record Scp02ChallengeData(
-        InitializeUpdateRequest Request,
+        CommandRequests.InitializeUpdateRequest Request,
         byte[] CardChallenge,
         byte[] SequenceCounter
     );
@@ -177,11 +176,6 @@ public static class Scp02CommandProcessors
         IKeySet Keys
     );
 
-    private record ExternalAuthenticateRequest(
-        byte SecurityLevel,
-        byte[] HostCryptogram,
-        byte[] HostMac
-    );
 
     private static Result<InitializeUpdateRequest, SmartCardError> ParseInitializeUpdateCommand(
         byte[] command
@@ -192,7 +186,10 @@ public static class Scp02CommandProcessors
             return SmartCardError.WrongLength();
         }
 
-        if (command[0] != GlobalPlatform.Cla.GpStandard || command[1] != GlobalPlatform.Ins.InitializeUpdate)
+        if (
+            command[0] != GlobalPlatform.Cla.GP_STANDARD
+            || command[1] != GlobalPlatform.Ins.INITIALIZE_UPDATE
+        )
         {
             return SmartCardError.InstructionNotSupported();
         }
@@ -270,7 +267,7 @@ public static class Scp02CommandProcessors
 
         // SCP02 card challenge is 6 random bytes (sequence counter is separate)
         logger.LogDebug("Calling rngContext.GenerateBytes(6)");
-        Result<byte[], SmartCardError> challengeResult = rngContext.GenerateBytes(6);
+        var challengeResult = rngContext.GenerateBytes(6);
 
         return challengeResult.Match(
             cardChallenge =>
@@ -279,7 +276,7 @@ public static class Scp02CommandProcessors
                     "Generated card challenge: {Challenge}",
                     Convert.ToHexString(cardChallenge)
                 );
-                Scp02ChallengeData result = new Scp02ChallengeData(
+                var result = new Scp02ChallengeData(
                     request,
                     cardChallenge,
                     sequenceCounter
@@ -341,13 +338,13 @@ public static class Scp02CommandProcessors
                     keys.GetType().Name
                 );
                 return ProcessScp02InitializeUpdateWithKeys(
-                        (data.Request, data.SequenceCounter, data.CardChallenge),
-                        keys,
-                        effectiveKeyVersion,
-                        state,
-                        rngContext,
-                        logger
-                    );
+                    (data.Request, data.SequenceCounter, data.CardChallenge),
+                    keys,
+                    effectiveKeyVersion,
+                    state,
+                    rngContext,
+                    logger
+                );
             });
     }
 
@@ -393,14 +390,15 @@ public static class Scp02CommandProcessors
 
         // Calculate card cryptogram using unified crypto service
         // Per GP Card Spec v2.3.1 Section E.4.2
-        Result<byte[], SmartCardError> cryptogramResult = CryptoService.Cryptogram.CalculateCardCryptogram(
-            data.Request.HostChallenge,
-            data.CardChallenge,
-            keys,
-            0x02,
-            (byte)state.ScpImplementation,
-            Maybe<byte[]>.From(data.SequenceCounter)
-        );
+        var cryptogramResult =
+            CryptoService.Cryptogram.CalculateCardCryptogram(
+                data.Request.HostChallenge,
+                data.CardChallenge,
+                keys,
+                0x02,
+                (byte)state.ScpImplementation,
+                Maybe<byte[]>.From(data.SequenceCounter)
+            );
 
         return cryptogramResult.Match(
             cryptogram =>
@@ -410,7 +408,7 @@ public static class Scp02CommandProcessors
                     Convert.ToHexString(cryptogram)
                 );
 
-                Scp02CryptogramData result = new Scp02CryptogramData(
+                var result = new Scp02CryptogramData(
                     effectiveKeyVersion,
                     state.ScpImplementation,
                     data.Request.HostChallenge,
@@ -498,7 +496,7 @@ public static class Scp02CommandProcessors
             data.SequenceCounter,
             data.CardChallenge
         );
-        CardState newState = state
+        var newState = state
             .WithChallenges(data.HostChallenge, fullCardChallenge)
             .WithKeys(data.Keys)
             .WithIncrementedSequenceCounter(data.KeyVersion); // Increment for next use
@@ -508,7 +506,10 @@ public static class Scp02CommandProcessors
         );
         logger.LogDebug("=== CreateScp02InitializeUpdateResponse completed ===");
         logger.LogDebug("Returning SCP02 response with SW 9000");
-        return (new ApduResponse(response, Gp4Net.Constants.Constants.StatusWords.Success.Normal), newState);
+        return (
+            new ApduResponse(response, StatusWords.Success),
+            newState
+        );
     }
 
     private static Result<
@@ -519,7 +520,10 @@ public static class Scp02CommandProcessors
         if (command.Length < 5)
             return SmartCardError.WrongLength();
 
-        if (command[0] != GlobalPlatform.Cla.Secured && command[0] != GlobalPlatform.Cla.Standard || command[1] != GlobalPlatform.Ins.ExternalAuthenticate)
+        if (
+            command[0] != GlobalPlatform.Cla.SECURED && command[0] != GlobalPlatform.Cla.STANDARD
+            || command[1] != Gp4Net.Constants.Apdu.Instructions.EXTERNAL_AUTHENTICATE
+        )
             return SmartCardError.InstructionNotSupported();
 
         byte securityLevel = command[2];
@@ -529,7 +533,7 @@ public static class Scp02CommandProcessors
         // For SCP02, EXTERNAL AUTHENTICATE command format depends on secure messaging:
         // - CLA=0x00 (no secure messaging): 5 bytes header + 8 bytes host cryptogram = 13 bytes total
         // - CLA=0x84 (secure messaging): 5 bytes header + 8 bytes host cryptogram + 8 bytes MAC = 21 bytes total
-        if (command[0] == GlobalPlatform.Cla.Secured) // Secure messaging with MAC
+        if (command[0] == GlobalPlatform.Cla.SECURED) // Secure messaging with MAC
         {
             if (lc != 16 || command.Length != 21) // LC includes both host cryptogram (8) and MAC (8)
                 return SmartCardError.WrongLength();
@@ -644,8 +648,8 @@ public static class Scp02CommandProcessors
 
         // Calculate expected host cryptogram using unified crypto service
         // Per GP Card Spec v2.3.1 Section E.4.2 - host cryptogram has different order
-        return CryptoService.Cryptogram
-            .CalculateHostCryptogram(
+        return CryptoService
+            .Cryptogram.CalculateHostCryptogram(
                 hostChallenge,
                 cardChallengeRandom,
                 currentKeys,
@@ -678,7 +682,7 @@ public static class Scp02CommandProcessors
             );
 
         // Per GP Card Spec v2.3.1 Section E.3.2: Verify MAC on EXTERNAL AUTHENTICATE command if secure messaging (CLA=0x84)
-        return originalCommand.Length > 0 && originalCommand[0] == GlobalPlatform.Cla.Secured
+        return originalCommand.Length > 0 && originalCommand[0] == GlobalPlatform.Cla.SECURED
             ? VerifyScp02CommandMac(request, state, rngContext)
             : Result.Success<ExternalAuthenticateRequest, SmartCardError>(request);
     }
@@ -707,22 +711,30 @@ public static class Scp02CommandProcessors
                 // Per GP Card Spec v2.3.1 Section E.2.2: Derive session keys using the same parameters as INITIALIZE UPDATE
                 // Extract sequence counter from card challenge (first 2 bytes)
                 byte[] sequenceCounter = validatedData.cardChallenge.Take(2).ToArray();
-                
-                return KeyDerivationContext.CreateForScp02(
-                    validatedData.currentKeys,
-                    validatedData.hostChallenge,
-                    validatedData.cardChallenge,
-                    sequenceCounter,
-                    ScpImplementation.Scp02I15
-                )
-                .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context));
+
+                return KeyDerivationContext
+                    .CreateForScp02(
+                        validatedData.currentKeys,
+                        validatedData.hostChallenge,
+                        validatedData.cardChallenge,
+                        sequenceCounter,
+                        ScpImplementation.Scp02I15
+                    )
+                    .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context));
             })
             .Bind(sessionKeys =>
             {
                 // Per GP Card Spec v2.3.1 Section E.3.2: Construct the command data that was MACed
                 // EXTERNAL AUTHENTICATE command format: CLA=84 INS=82 P1=SecurityLevel P2=00 LC=16 Data=HostCryptogram(8)
                 // Note: LC=16 because data contains host cryptogram (8) + MAC (8), but MAC calculation only covers header + cryptogram
-                byte[] commandHeader = [GlobalPlatform.Cla.Secured, GlobalPlatform.Ins.ExternalAuthenticate, request.SecurityLevel, 0x00, 0x10]; // LC=0x10 (16) for secure messaging
+                byte[] commandHeader =
+                [
+                    GlobalPlatform.Cla.SECURED,
+                    Gp4Net.Constants.Apdu.Instructions.EXTERNAL_AUTHENTICATE,
+                    request.SecurityLevel,
+                    0x00,
+                    0x10,
+                ]; // LC=0x10 (16) for secure messaging
                 byte[] macInput = commandHeader.Concat(request.HostCryptogram).ToArray();
 
                 // GP Card Spec v2.3.1 Section E.3.2 - SCP02 EXTERNAL AUTHENTICATE MAC Verification
@@ -732,7 +744,10 @@ public static class Scp02CommandProcessors
                 // Host sent MAC: 8-byte MAC from command
 
                 // FIXED: SCP02 uses 3DES MAC, not AES-CMAC per GP Card Spec v2.3.1 Section E.4.3
-                return CryptoService.Mac.CalculateScp02CommandMac(sessionKeys.SMac, macInput)
+                // For EXTERNAL_AUTHENTICATE, ICV is zero (first command after INITIALIZE UPDATE)
+                byte[] icv = new byte[8]; // Zero ICV
+                return CryptoService
+                    .Mac.CalculateScp02CommandMac(sessionKeys.SMac, macInput, icv)
                     .Bind(expectedMac =>
                     {
                         // SCP02 3DES MAC is already 8 bytes, no truncation needed
@@ -773,15 +788,16 @@ public static class Scp02CommandProcessors
                 // The ICV encryption implementation option affects subsequent command MAC chaining, not EXTERNAL AUTHENTICATE itself
                 // Extract sequence counter from card challenge (first 2 bytes)
                 byte[] sequenceCounter = validatedData.cardChallenge.Take(2).ToArray();
-                
-                return KeyDerivationContext.CreateForScp02(
-                    validatedData.currentKeys,
-                    validatedData.hostChallenge,
-                    validatedData.cardChallenge,
-                    sequenceCounter,
-                    ScpImplementation.Scp02I15
-                )
-                .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context));
+
+                return KeyDerivationContext
+                    .CreateForScp02(
+                        validatedData.currentKeys,
+                        validatedData.hostChallenge,
+                        validatedData.cardChallenge,
+                        sequenceCounter,
+                        ScpImplementation.Scp02I15
+                    )
+                    .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context));
             });
     }
 
@@ -795,9 +811,9 @@ public static class Scp02CommandProcessors
         SmartCardError
     > ValidateScp02SessionKeyDerivationPreconditions(CardState state)
     {
-        Maybe<byte[]> hostChallenge = state.HostChallenge;
-        Maybe<byte[]> cardChallenge = state.CardChallenge;
-        Maybe<IKeySet> currentKeys = state.CurrentKeys;
+        var hostChallenge = state.HostChallenge;
+        var cardChallenge = state.CardChallenge;
+        var currentKeys = state.CurrentKeys;
 
         return hostChallenge
             .ToResult(SmartCardError.ConditionsNotSatisfied())
@@ -826,12 +842,13 @@ public static class Scp02CommandProcessors
     )
     {
         // Create functional secure channel state for SCP02
-        SecurityLevel securityLevel = (SecurityLevel)0x01; // Basic C-MAC
-        Result<SecureChannelState, SmartCardError> secureChannelStateResult =
+        var securityLevel = (SecurityLevel)0x01; // Basic C-MAC
+        var secureChannelStateResult =
             SecureChannelState.Create(
                 sessionKeys: sessionKeys,
                 securityLevel: securityLevel,
-                protocolVersion: (Gp4Net.Cryptography.CryptoService.ScpVersion)Gp4Net.Constants.Constants.GlobalPlatform.Protocols.Scp02,
+                protocolVersion: (CryptoService.ScpVersion)
+                    GlobalPlatform.Protocols.SCP02,
                 initialMacChainingValue: new byte[8], // Initialize with zeros for SCP02
                 implementationParameter: (byte)state.ScpImplementation
             );
@@ -841,14 +858,26 @@ public static class Scp02CommandProcessors
             {
                 // Update state with established secure channel and store session keys
                 // This enables end-to-end secure channel establishment working properly
-                CardState newState = state
+                var newState = state
                     .WithSecureChannel(secureChannelState)
                     .WithSessionKeys(sessionKeys); // Store session keys for pipeline integration
 
                 // SCP02 EXTERNAL AUTHENTICATE response is typically empty on success
-                return (new ApduResponse([], Gp4Net.Constants.Constants.StatusWords.Success.Normal), newState);
+                return (
+                    new ApduResponse([], StatusWords.Success),
+                    newState
+                );
             },
-            error => (new ApduResponse([], Gp4Net.Constants.Constants.StatusWords.CheckingErrors.AuthenticationMethodBlocked), state)
+            error =>
+                (
+                    new ApduResponse(
+                        [],
+                        StatusWords
+                            .CheckingErrors
+                            .AuthenticationMethodBlocked
+                    ),
+                    state
+                )
         );
     }
 
@@ -880,8 +909,8 @@ public static class Scp02CommandProcessors
         );
 
         // Check installed keys first using functional pattern
-        Maybe<IKeySet> installedKeySet = state.InstalledKeys.ContainsKey(keyVersion) 
-            ? Maybe<IKeySet>.From(state.InstalledKeys[keyVersion]) 
+        var installedKeySet = state.InstalledKeys.ContainsKey(keyVersion)
+            ? Maybe<IKeySet>.From(state.InstalledKeys[keyVersion])
             : Maybe<IKeySet>.None;
         if (installedKeySet.HasValue)
         {
@@ -890,8 +919,8 @@ public static class Scp02CommandProcessors
         }
 
         // Then check static keys
-        Maybe<IKeySet> staticKeySet = config.StaticKeys.ContainsKey(keyVersion) 
-            ? Maybe<IKeySet>.From(config.StaticKeys[keyVersion]) 
+        var staticKeySet = config.StaticKeys.ContainsKey(keyVersion)
+            ? Maybe<IKeySet>.From(config.StaticKeys[keyVersion])
             : Maybe<IKeySet>.None;
         if (staticKeySet.HasValue)
         {
@@ -906,7 +935,7 @@ public static class Scp02CommandProcessors
                 "Key version 0x{KeyVersion:X2} is default marker - using first available key",
                 keyVersion
             );
-            IKeySet firstAvailableKey = config.StaticKeys.Values.First();
+            var firstAvailableKey = config.StaticKeys.Values.First();
             logger.LogDebug("Using first available static key");
             return Result.Success<IKeySet, SmartCardError>(firstAvailableKey);
         }
@@ -949,7 +978,11 @@ public static class Scp02CommandProcessors
             state.ScpVersion
         );
 
-        if (cla == GlobalPlatform.Cla.GpStandard && ins == GlobalPlatform.Ins.InitializeUpdate || cla is GlobalPlatform.Cla.Secured or GlobalPlatform.Cla.Standard && ins == GlobalPlatform.Ins.ExternalAuthenticate)
+        if (
+            cla == GlobalPlatform.Cla.GP_STANDARD && ins == GlobalPlatform.Ins.INITIALIZE_UPDATE
+            || cla is GlobalPlatform.Cla.SECURED or GlobalPlatform.Cla.STANDARD
+                && ins == Gp4Net.Constants.Apdu.Instructions.EXTERNAL_AUTHENTICATE
+        )
         {
             // Check if card is configured for SCP02
             bool isScp02 = state.ScpVersion == 0x02;

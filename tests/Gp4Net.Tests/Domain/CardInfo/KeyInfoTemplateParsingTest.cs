@@ -35,7 +35,7 @@ public class KeyInfoTemplateParsingTest
             .BeTrue($"Parse failed: {(result.IsFailure ? result.Error.ToString() : "Unknown")}");
 
         // Verify 3 keys
-        KeyInformationTemplate? keyInfo = result.Value;
+        var keyInfo = result.Value;
         _ = keyInfo.Keys.Should().HaveCount(3);
 
         // Verify keys

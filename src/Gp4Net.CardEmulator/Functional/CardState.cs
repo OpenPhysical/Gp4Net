@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
+using Gp4Net.CardEmulator.Applications;
 using Gp4Net.CardEmulator.Core;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Constants;
 using JetBrains.Annotations;
 using static Gp4Net.CardEmulator.Functional.LoadProcessor;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
@@ -34,9 +35,15 @@ public partial record CardState(
     byte DefaultKeyVersion,
     ImmutableDictionary<byte, byte[]> SequenceCounters,
     ApplicationSelectionContext ApplicationContext,
-    ImmutableDictionary<string, LoadContext> LoadContexts
+    ImmutableDictionary<string, LoadContext> LoadContexts,
+    Maybe<ApplicationRegistry> ApplicationRegistry
 )
 {
+    /// <summary>
+    /// Gets the application registry for the card.
+    /// </summary>
+    public Maybe<ApplicationRegistry> ApplicationRegistry { get; init; } = ApplicationRegistry;
+
     /// <summary>
     /// Creates the initial state for a new card.
     /// Per GP Card Spec v2.3.1 Section 6.4.1: "The Issuer Security Domain is by default the implicitly selectable Application
@@ -51,7 +58,7 @@ public partial record CardState(
             .Map(uuid => new CardState(
                 Uuid: uuid,
                 IsSelected: true, // ISD is implicitly selected by default per GP Card Spec v2.3.1
-                ScpVersion: Protocols.Scp02,
+                ScpVersion: Protocols.SCP02,
                 ScpImplementation: ScpImplementation.Scp02I15,
                 SecureChannel: Maybe<SecureChannelState>.None,
                 CurrentKeys: Maybe<IKeySet>.None,
@@ -64,7 +71,8 @@ public partial record CardState(
                 DefaultKeyVersion: 0xFF,
                 SequenceCounters: ImmutableDictionary<byte, byte[]>.Empty,
                 ApplicationContext: ApplicationSelectionContext.WithIsd(),
-                LoadContexts: ImmutableDictionary<string, LoadContext>.Empty
+                LoadContexts: ImmutableDictionary<string, LoadContext>.Empty,
+                ApplicationRegistry: Maybe<ApplicationRegistry>.None
             ));
     }
 
@@ -75,7 +83,6 @@ public partial record CardState(
     /// <returns>Initial card state with the specified UUID.</returns>
     public static CardState CreateWithUuid(CardUuid uuid)
     {
-        // 
         return new CardState(
             Uuid: uuid,
             IsSelected: true,
@@ -92,7 +99,8 @@ public partial record CardState(
             DefaultKeyVersion: 0xFF,
             SequenceCounters: ImmutableDictionary<byte, byte[]>.Empty,
             ApplicationContext: ApplicationSelectionContext.WithIsd(),
-            LoadContexts: ImmutableDictionary<string, LoadContext>.Empty
+            LoadContexts: ImmutableDictionary<string, LoadContext>.Empty,
+            ApplicationRegistry: Maybe<ApplicationRegistry>.None
         );
     }
 
@@ -111,7 +119,9 @@ public partial record CardState(
     {
         get
         {
-            return SecureChannel.HasValue ? (byte)SecureChannel.Value.SecurityLevel : SecurityLevels.None;
+            return SecureChannel.HasValue
+                ? (byte)SecureChannel.Value.SecurityLevel
+                : (byte)Gp4Net.Domain.SecurityLevel.None;
         }
     }
 
@@ -182,14 +192,20 @@ public partial record CardState(
     /// Creates a new state with updated load contexts.
     /// </summary>
     public CardState WithLoadContexts(ImmutableDictionary<string, LoadContext> loadContexts) =>
-        this with { LoadContexts = loadContexts };
-        
+        this with
+        {
+            LoadContexts = loadContexts,
+        };
+
     /// <summary>
     /// Creates a new state with a new load file AID stored temporarily.
     /// </summary>
     public CardState WithLoadFileAid(byte[] loadFileAid) =>
-        this with { DataObjects = DataObjects.SetItem(0x0066, loadFileAid) };
-    
+        this with
+        {
+            DataObjects = DataObjects.SetItem(0x0066, loadFileAid),
+        };
+
     /// <summary>
     /// Creates a new state with session keys stored directly in secure channel state.
     /// This method updates the existing secure channel state to include the provided session keys.
@@ -200,7 +216,7 @@ public partial record CardState(
             secureChannelState =>
             {
                 // Update existing secure channel state with new session keys
-                SecureChannelState updatedState = secureChannelState with
+                var updatedState = secureChannelState with
                 {
                     SessionKeys = sessionKeys,
                 };
@@ -301,11 +317,11 @@ public partial record CardState(
     /// </summary>
     public byte[] GetSequenceCounter(byte keyVersion)
     {
-        if (SequenceCounters.TryGetValue(keyVersion, out byte[]? counter) && counter is not null)
+        if (SequenceCounters.TryGetValue(keyVersion, out byte[] counter) && counter is not null)
             return counter;
 
         // Return appropriate default counter based on SCP version
-        return ScpVersion == Protocols.Scp02
+        return ScpVersion == Protocols.SCP02
             ? [0x00, 0x01] // 2-byte counter for SCP02
             : [0x00, 0x00, 0x01]; // 3-byte counter for SCP03
     }
@@ -328,7 +344,7 @@ public partial record CardState(
     {
         // Return appropriate reset counter based on SCP version
         byte[] resetCounter =
-            ScpVersion == Protocols.Scp02
+            ScpVersion == Protocols.SCP02
                 ? [0x00, 0x01] // 2-byte counter for SCP02
                 : [0x00, 0x00, 0x01]; // 3-byte counter for SCP03
         return this with { SequenceCounters = SequenceCounters.SetItem(keyVersion, resetCounter) };
@@ -433,6 +449,7 @@ public partial record CardState(
             DefaultKeyVersion = DefaultKeyVersion,
             SequenceCounters = SequenceCounters, // Preserve sequence counters across resets
             ApplicationContext = ApplicationSelectionContext.WithIsd(), // Reset to ISD as implicitly selected
+            ApplicationRegistry = ApplicationRegistry, // Preserve application registry across resets
             IsSelected = true, // ISD is implicitly selected after reset per GP Card Spec v2.3.1
         };
 
@@ -448,7 +465,7 @@ public partial record CardState(
         {
             SecureChannel = SecureChannel.Map(sc =>
             {
-                Result<MacChainingState, SmartCardError> macChainingResult =
+                var macChainingResult =
                     MacChainingState.Create(macChaining, sc.ProtocolVersion, 0x00);
                 return macChainingResult.Match(
                     macChain => sc with { MacChaining = macChain },
@@ -457,6 +474,27 @@ public partial record CardState(
             }),
         };
     }
+
+    /// <summary>
+    /// Creates a new state with updated application registry.
+    /// </summary>
+    /// <param name="applicationRegistry">The updated application registry.</param>
+    /// <returns>New card state with updated application registry.</returns>
+    public CardState WithApplicationRegistry(ApplicationRegistry applicationRegistry) =>
+        this with
+        {
+            ApplicationRegistry = Maybe<ApplicationRegistry>.From(applicationRegistry),
+        };
+
+    /// <summary>
+    /// Creates a new state with application registry cleared.
+    /// </summary>
+    /// <returns>New card state with application registry cleared.</returns>
+    public CardState WithoutApplicationRegistry() =>
+        this with
+        {
+            ApplicationRegistry = Maybe<ApplicationRegistry>.None,
+        };
 }
 
 /// <summary>

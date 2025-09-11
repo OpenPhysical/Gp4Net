@@ -4,7 +4,6 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Pipeline;
 using Gp4Net.Services;
-using Gp4Net.Transport;
 using WSCT.ISO7816;
 
 namespace Gp4Net.Tests.Tool.Infrastructure;
@@ -43,6 +42,15 @@ public class EmptyCardService : ISmartCardService
 
     public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
         CommandAPDU command,
+        bool useSecureChannel,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return await ExecuteCommandAsync(command, cancellationToken);
+    }
+
+    public async Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
+        CommandAPDU command,
         CommandOptions options,
         CancellationToken cancellationToken = default
     )
@@ -60,7 +68,7 @@ public class EmptyCardService : ISmartCardService
 
     public Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value)
     {
-        IPipelineContext? newContext = _context.With(key, value);
+        var newContext = _context.With(key, value);
         return Result.Success<ISmartCardService, SmartCardError>(new EmptyCardService(newContext));
     }
 

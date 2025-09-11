@@ -3,7 +3,6 @@ using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Persistence;
-using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
 using NUnit.Framework;
 
@@ -28,7 +27,7 @@ public class CardPersistenceKeyServiceTests
     [Test]
     public void GenerateCardUuid_ReturnsSuccessResult()
     {
-        Result<CardUuid, SmartCardError> result = _service.GenerateCardUuid();
+        var result = _service.GenerateCardUuid();
 
         result.IsSuccess.Should().BeTrue();
         result.Match(
@@ -40,8 +39,8 @@ public class CardPersistenceKeyServiceTests
     [Test]
     public void GenerateCardUuid_ProducesUniqueUuids()
     {
-        Result<CardUuid, SmartCardError> result1 = _service.GenerateCardUuid();
-        Result<CardUuid, SmartCardError> result2 = _service.GenerateCardUuid();
+        var result1 = _service.GenerateCardUuid();
+        var result2 = _service.GenerateCardUuid();
 
         result1.IsSuccess.Should().BeTrue();
         result2.IsSuccess.Should().BeTrue();
@@ -79,8 +78,8 @@ public class CardPersistenceKeyServiceTests
             0x42,
             0x43,
         };
-        Scp02KeySet keySet = Scp02KeySet.Create(encKey, encKey, encKey).Value; // Single key scenario
-        Result<CardUuid, SmartCardError> uuidResult = CardUuid.Generate();
+        var keySet = Scp02KeySet.Create(encKey, encKey, encKey).Value; // Single key scenario
+        var uuidResult = CardUuid.Generate();
 
         uuidResult.IsSuccess.Should().BeTrue();
 
@@ -88,7 +87,7 @@ public class CardPersistenceKeyServiceTests
             uuid =>
             {
                 // Act
-                Result<byte[], SmartCardError> result = _service.DeriveStorageKey(keySet, uuid);
+                var result = _service.DeriveStorageKey(keySet, uuid);
 
                 // Assert
                 result.IsSuccess.Should().BeTrue();
@@ -166,8 +165,8 @@ public class CardPersistenceKeyServiceTests
             0x62,
             0x63,
         };
-        Scp02KeySet keySet = Scp02KeySet.Create(encKey, macKey, dekKey).Value;
-        Result<CardUuid, SmartCardError> uuidResult = CardUuid.Generate();
+        var keySet = Scp02KeySet.Create(encKey, macKey, dekKey).Value;
+        var uuidResult = CardUuid.Generate();
 
         uuidResult.IsSuccess.Should().BeTrue();
 
@@ -175,7 +174,7 @@ public class CardPersistenceKeyServiceTests
             uuid =>
             {
                 // Act
-                Result<byte[], SmartCardError> result = _service.DeriveStorageKey(keySet, uuid);
+                var result = _service.DeriveStorageKey(keySet, uuid);
 
                 // Assert
                 result.IsSuccess.Should().BeTrue();
@@ -234,8 +233,8 @@ public class CardPersistenceKeyServiceTests
             0x52,
             0x53,
         };
-        Scp02KeySet keySet = Scp02KeySet.Create(encKey, macKey, new byte[16]).Value; // No DEK
-        Result<CardUuid, SmartCardError> uuidResult = CardUuid.Generate();
+        var keySet = Scp02KeySet.Create(encKey, macKey, new byte[16]).Value; // No DEK
+        var uuidResult = CardUuid.Generate();
 
         uuidResult.IsSuccess.Should().BeTrue();
 
@@ -243,7 +242,7 @@ public class CardPersistenceKeyServiceTests
             uuid =>
             {
                 // Act
-                Result<byte[], SmartCardError> result = _service.DeriveStorageKey(keySet, uuid);
+                var result = _service.DeriveStorageKey(keySet, uuid);
 
                 // Assert
                 result.IsSuccess.Should().BeTrue();
@@ -321,8 +320,8 @@ public class CardPersistenceKeyServiceTests
             0x62,
             0x63,
         };
-        Scp03KeySet keySet = new Scp03KeySet(encKey, macKey, dekKey);
-        Result<CardUuid, SmartCardError> uuidResult = CardUuid.Generate();
+        var keySet = new Scp03KeySet(encKey, macKey, dekKey);
+        var uuidResult = CardUuid.Generate();
 
         uuidResult.IsSuccess.Should().BeTrue();
 
@@ -330,7 +329,7 @@ public class CardPersistenceKeyServiceTests
             uuid =>
             {
                 // Act
-                Result<byte[], SmartCardError> result = _service.DeriveStorageKey(keySet, uuid);
+                var result = _service.DeriveStorageKey(keySet, uuid);
 
                 // Assert
                 result.IsSuccess.Should().BeTrue();
@@ -355,8 +354,8 @@ public class CardPersistenceKeyServiceTests
         byte[] macKey = [.. Enumerable.Range(0, 32).Select(i => (byte)(0x50 + i % 16))];
         byte[] dekKey = [.. Enumerable.Range(0, 32).Select(i => (byte)(0x60 + i % 16))];
 
-        Scp03KeySet keySet = new Scp03KeySet(encKey, macKey, dekKey);
-        Result<CardUuid, SmartCardError> uuidResult = CardUuid.Generate();
+        var keySet = new Scp03KeySet(encKey, macKey, dekKey);
+        var uuidResult = CardUuid.Generate();
 
         uuidResult.IsSuccess.Should().BeTrue();
 
@@ -364,7 +363,7 @@ public class CardPersistenceKeyServiceTests
             uuid =>
             {
                 // Act
-                Result<byte[], SmartCardError> result = _service.DeriveStorageKey(keySet, uuid);
+                var result = _service.DeriveStorageKey(keySet, uuid);
 
                 // Assert
                 result.IsSuccess.Should().BeTrue();
@@ -423,8 +422,8 @@ public class CardPersistenceKeyServiceTests
             0x52,
             0x53,
         };
-        Scp03KeySet keySet = new Scp03KeySet(encKey, macKey, null!); // No DEK
-        Result<CardUuid, SmartCardError> uuidResult = CardUuid.Generate();
+        var keySet = new Scp03KeySet(encKey, macKey, null!); // No DEK
+        var uuidResult = CardUuid.Generate();
 
         uuidResult.IsSuccess.Should().BeTrue();
 
@@ -432,7 +431,7 @@ public class CardPersistenceKeyServiceTests
             uuid =>
             {
                 // Act
-                Result<byte[], SmartCardError> result = _service.DeriveStorageKey(keySet, uuid);
+                var result = _service.DeriveStorageKey(keySet, uuid);
 
                 // Assert
                 result.IsSuccess.Should().BeTrue();
@@ -472,8 +471,8 @@ public class CardPersistenceKeyServiceTests
             0x42,
             0x43,
         };
-        Scp02KeySet keySet = Scp02KeySet.Create(encKey, encKey, encKey).Value;
-        Result<CardUuid, SmartCardError> uuidResult = CardUuid.Generate();
+        var keySet = Scp02KeySet.Create(encKey, encKey, encKey).Value;
+        var uuidResult = CardUuid.Generate();
 
         uuidResult.IsSuccess.Should().BeTrue();
 
@@ -481,8 +480,8 @@ public class CardPersistenceKeyServiceTests
             uuid =>
             {
                 // Act - derive same key twice
-                Result<byte[], SmartCardError> result1 = _service.DeriveStorageKey(keySet, uuid);
-                Result<byte[], SmartCardError> result2 = _service.DeriveStorageKey(keySet, uuid);
+                var result1 = _service.DeriveStorageKey(keySet, uuid);
+                var result2 = _service.DeriveStorageKey(keySet, uuid);
 
                 // Assert
                 result1.IsSuccess.Should().BeTrue();
@@ -524,9 +523,9 @@ public class CardPersistenceKeyServiceTests
             0x42,
             0x43,
         };
-        Scp02KeySet keySet = Scp02KeySet.Create(encKey, encKey, encKey).Value;
-        Result<CardUuid, SmartCardError> uuid1Result = CardUuid.Generate();
-        Result<CardUuid, SmartCardError> uuid2Result = CardUuid.Generate();
+        var keySet = Scp02KeySet.Create(encKey, encKey, encKey).Value;
+        var uuid1Result = CardUuid.Generate();
+        var uuid2Result = CardUuid.Generate();
 
         uuid1Result.IsSuccess.Should().BeTrue();
         uuid2Result.IsSuccess.Should().BeTrue();
@@ -537,11 +536,11 @@ public class CardPersistenceKeyServiceTests
                     uuid2 =>
                     {
                         // Act
-                        Result<byte[], SmartCardError> result1 = _service.DeriveStorageKey(
+                        var result1 = _service.DeriveStorageKey(
                             keySet,
                             uuid1
                         );
-                        Result<byte[], SmartCardError> result2 = _service.DeriveStorageKey(
+                        var result2 = _service.DeriveStorageKey(
                             keySet,
                             uuid2
                         );
@@ -607,9 +606,9 @@ public class CardPersistenceKeyServiceTests
             0x52,
             0x53,
         };
-        Scp02KeySet keySet1 = Scp02KeySet.Create(encKey1, encKey1, encKey1).Value;
-        Scp02KeySet keySet2 = Scp02KeySet.Create(encKey2, encKey2, encKey2).Value;
-        Result<CardUuid, SmartCardError> uuidResult = CardUuid.Generate();
+        var keySet1 = Scp02KeySet.Create(encKey1, encKey1, encKey1).Value;
+        var keySet2 = Scp02KeySet.Create(encKey2, encKey2, encKey2).Value;
+        var uuidResult = CardUuid.Generate();
 
         uuidResult.IsSuccess.Should().BeTrue();
 
@@ -617,8 +616,8 @@ public class CardPersistenceKeyServiceTests
             uuid =>
             {
                 // Act
-                Result<byte[], SmartCardError> result1 = _service.DeriveStorageKey(keySet1, uuid);
-                Result<byte[], SmartCardError> result2 = _service.DeriveStorageKey(keySet2, uuid);
+                var result1 = _service.DeriveStorageKey(keySet1, uuid);
+                var result2 = _service.DeriveStorageKey(keySet2, uuid);
 
                 // Assert
                 result1.IsSuccess.Should().BeTrue();
@@ -698,10 +697,10 @@ public class CardPersistenceKeyServiceTests
             0x62,
             0x63,
         };
-        Scp02KeySet keySet = Scp02KeySet.Create(encKey, macKey, dekKey).Value;
+        var keySet = Scp02KeySet.Create(encKey, macKey, dekKey).Value;
 
         // Act
-        Result<byte[], SmartCardError> result = _service.ComputeKeyFingerprint(keySet);
+        var result = _service.ComputeKeyFingerprint(keySet);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -776,10 +775,10 @@ public class CardPersistenceKeyServiceTests
             0x62,
             0x63,
         };
-        Scp03KeySet keySet = new Scp03KeySet(encKey, macKey, dekKey);
+        var keySet = new Scp03KeySet(encKey, macKey, dekKey);
 
         // Act
-        Result<byte[], SmartCardError> result = _service.ComputeKeyFingerprint(keySet);
+        var result = _service.ComputeKeyFingerprint(keySet);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -816,11 +815,11 @@ public class CardPersistenceKeyServiceTests
             0x42,
             0x43,
         };
-        Scp02KeySet keySet = Scp02KeySet.Create(encKey, encKey, encKey).Value;
+        var keySet = Scp02KeySet.Create(encKey, encKey, encKey).Value;
 
         // Act
-        Result<byte[], SmartCardError> result1 = _service.ComputeKeyFingerprint(keySet);
-        Result<byte[], SmartCardError> result2 = _service.ComputeKeyFingerprint(keySet);
+        var result1 = _service.ComputeKeyFingerprint(keySet);
+        var result2 = _service.ComputeKeyFingerprint(keySet);
 
         // Assert
         result1.IsSuccess.Should().BeTrue();
@@ -859,8 +858,8 @@ public class CardPersistenceKeyServiceTests
             0x42,
             0x43,
         };
-        Scp02KeySet keySet = Scp02KeySet.Create(encKey, encKey, encKey).Value;
-        Result<byte[], SmartCardError> computeResult = _service.ComputeKeyFingerprint(keySet);
+        var keySet = Scp02KeySet.Create(encKey, encKey, encKey).Value;
+        var computeResult = _service.ComputeKeyFingerprint(keySet);
 
         computeResult.IsSuccess.Should().BeTrue();
 
@@ -868,7 +867,7 @@ public class CardPersistenceKeyServiceTests
             expectedFingerprint =>
             {
                 // Act
-                Result<bool, SmartCardError> result = _service.ValidateKeyFingerprint(
+                var result = _service.ValidateKeyFingerprint(
                     keySet,
                     expectedFingerprint
                 );
@@ -907,11 +906,11 @@ public class CardPersistenceKeyServiceTests
             0x42,
             0x43,
         };
-        Scp02KeySet keySet = Scp02KeySet.Create(encKey, encKey, encKey).Value;
+        var keySet = Scp02KeySet.Create(encKey, encKey, encKey).Value;
         byte[] wrongFingerprint = new byte[32]; // All zeros
 
         // Act
-        Result<bool, SmartCardError> result = _service.ValidateKeyFingerprint(
+        var result = _service.ValidateKeyFingerprint(
             keySet,
             wrongFingerprint
         );
@@ -928,7 +927,7 @@ public class CardPersistenceKeyServiceTests
     public void DeriveStorageKey_WithNullKeySet_ReturnsFailure()
     {
         // Arrange
-        Result<CardUuid, SmartCardError> uuidResult = CardUuid.Generate();
+        var uuidResult = CardUuid.Generate();
 
         uuidResult.IsSuccess.Should().BeTrue();
 
@@ -936,7 +935,7 @@ public class CardPersistenceKeyServiceTests
             uuid =>
             {
                 // Act
-                Result<byte[], SmartCardError> result = _service.DeriveStorageKey(null!, uuid);
+                var result = _service.DeriveStorageKey(null!, uuid);
 
                 // Assert
                 result.IsFailure.Should().BeTrue();
@@ -969,11 +968,11 @@ public class CardPersistenceKeyServiceTests
             0x42,
             0x43,
         };
-        Scp02KeySet keySet = Scp02KeySet.Create(encKey, encKey, encKey).Value;
-        CardUuid emptyUuid = CardUuid.Empty;
+        var keySet = Scp02KeySet.Create(encKey, encKey, encKey).Value;
+        var emptyUuid = CardUuid.Empty;
 
         // Act
-        Result<byte[], SmartCardError> result = _service.DeriveStorageKey(keySet, emptyUuid);
+        var result = _service.DeriveStorageKey(keySet, emptyUuid);
 
         // Assert
         result.IsFailure.Should().BeTrue();
@@ -984,7 +983,7 @@ public class CardPersistenceKeyServiceTests
     public void ComputeKeyFingerprint_WithNullKeySet_ReturnsFailure()
     {
         // Act
-        Result<byte[], SmartCardError> result = _service.ComputeKeyFingerprint(null!);
+        var result = _service.ComputeKeyFingerprint(null!);
 
         // Assert
         result.IsFailure.Should().BeTrue();

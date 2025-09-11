@@ -55,7 +55,6 @@ public class ApplicationDisplayService
     /// </summary>
     /// <param name="type">The application type.</param>
     /// <returns>The color name.</returns>
-
     public static string GetTypeColor(ApplicationType type)
     {
         return type switch
@@ -148,7 +147,7 @@ public class ApplicationDisplayService
     /// <returns>A configured table.</returns>
     public static Table CreateApplicationTable(bool extended = false)
     {
-        Table table = new Table();
+        var table = new Table();
 
         // Basic columns
         _ = table.AddColumn("Type");
@@ -205,9 +204,9 @@ public class ApplicationDisplayService
         bool extended = false
     )
     {
-        Table table = CreateApplicationTable(extended);
+        var table = CreateApplicationTable(extended);
 
-        foreach (ApplicationInfo app in applications)
+        foreach (var app in applications)
         {
             AddApplicationRow(table, app, extended);
         }
@@ -247,7 +246,7 @@ public class ApplicationDisplayService
     {
         Console.WriteLine("Type,AID,State,Privileges,Version,AssociatedSD");
 
-        foreach (ApplicationInfo app in applications)
+        foreach (var app in applications)
         {
             Console.WriteLine(
                 $"{app.Type},"
@@ -266,17 +265,17 @@ public class ApplicationDisplayService
     /// <param name="applications">The applications to display.</param>
     public static void DisplayDetailedInformation(IReadOnlyList<ApplicationInfo> applications)
     {
-        IEnumerable<IGrouping<ApplicationType, ApplicationInfo>> groups = applications.GroupBy(a =>
+        var groups = applications.GroupBy(a =>
             a.Type
         );
 
-        foreach (IGrouping<ApplicationType, ApplicationInfo> group in groups)
+        foreach (var group in groups)
         {
             AnsiConsole.MarkupLine($"[bold]{group.Key}s:[/]");
 
-            foreach (ApplicationInfo app in group)
+            foreach (var app in group)
             {
-                Panel panel = new Panel(
+                var panel = new Panel(
                     $"[dim]AID:[/] {Convert.ToHexString(app.Aid)}\n"
                         + $"[dim]State:[/] {app.LifecycleState}\n"
                         + $"[dim]Privileges:[/] {GetPrivilegesDisplaySimple(app.Privileges)}"

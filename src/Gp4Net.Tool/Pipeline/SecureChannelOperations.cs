@@ -1,4 +1,3 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -63,41 +62,45 @@ public static class SecureChannelOperations
                             )
                     )
             )
-            .Map(state => new SecureChannelExecutionContext(
-                cardService, 
-                state));
+            .Map(state => new SecureChannelExecutionContext(cardService, state));
     }
 
     /// <summary>
     /// Establishes secure channel with explicit keys.
+    /// Uses protocol-agnostic RawKeyset to allow proper SCP negotiation.
     /// </summary>
-    private static async Task<Result<SecureChannelState, SmartCardError>> EstablishWithExplicitKeysAsync(
+    private static async Task<
+        Result<SecureChannelState, SmartCardError>
+    > EstablishWithExplicitKeysAsync(
         ISmartCardService cardService,
         ExplicitKeys keys,
         byte keyVersion,
         CancellationToken cancellationToken
     )
     {
-        // Create a key set from explicit keys
-        var keySetResult = Scp03KeySet.Create(
+        // Create protocol-agnostic keyset for proper negotiation
+        var rawKeysetResult = RawKeyset.Create(
             keys.EncryptionKey,
             keys.MacKey,
             keys.DataEncryptionKey,
-            keyVersion);
-        
-        if (keySetResult.IsFailure)
+            keyVersion
+        );
+
+        if (rawKeysetResult.IsFailure)
         {
             return Result.Failure<SecureChannelState, SmartCardError>(
-                SmartCardError.InvalidArgument($"Invalid key set: {keySetResult.Error}"));
+                SmartCardError.InvalidArgument($"Invalid key set: {rawKeysetResult.Error}")
+            );
         }
-        
-        // Use ScpService to establish secure channel
+
+        // Let ScpService negotiate the protocol based on card response
         var sessionResult = await ScpService.Establishment.EstablishAsync(
             cardService,
-            keySetResult.Value,
+            rawKeysetResult.Value,
             SecurityLevel.CMac,
-            cancellationToken);
-        
+            cancellationToken
+        );
+
         return sessionResult.Map(session => session.State);
     }
 
@@ -112,11 +115,14 @@ public static class SecureChannelOperations
     )
     {
         return await ResolveKeysetByName(keysetName, keyVersion)
-            .Bind(keySet => ScpService.Establishment.EstablishAsync(
-                cardService,
-                keySet,
-                SecurityLevel.CMac,
-                cancellationToken))
+            .Bind(rawKeyset =>
+                ScpService.Establishment.EstablishAsync(
+                    cardService,
+                    rawKeyset,
+                    SecurityLevel.CMac,
+                    cancellationToken
+                )
+            )
             .Map(session => session.State);
     }
 
@@ -129,31 +135,25 @@ public static class SecureChannelOperations
         CancellationToken cancellationToken
     )
     {
-        return EstablishWithKeysetAsync(
-            cardService,
-            "gp_test_keys",
-            keyVersion,
-            cancellationToken);
+        return EstablishWithKeysetAsync(cardService, "gp_test_keys", keyVersion, cancellationToken);
     }
-    
+
     /// <summary>
-    /// Resolves a keyset name to a concrete keyset implementation.
-    /// Pure function that maps keyset names to key sets.
+    /// Resolves a keyset name to a protocol-agnostic keyset.
+    /// Pure function that maps keyset names to raw key sets.
+    /// The actual protocol will be negotiated during INITIALIZE UPDATE.
     /// </summary>
-    private static Result<IKeySet, SmartCardError> ResolveKeysetByName(string keysetName, byte keyVersion)
+    private static Result<RawKeyset, SmartCardError> ResolveKeysetByName(
+        string keysetName,
+        byte keyVersion
+    )
     {
         return keysetName switch
         {
-            "gp_test_keys" or "default" => 
-                Scp03KeySet.Create(
-                    GpTestKeys.GpTestKey,
-                    GpTestKeys.GpTestKey,
-                    GpTestKeys.GpTestKey,
-                    keyVersion)
-                .MapError(error => SmartCardError.InvalidArgument($"Invalid key set: {error}"))
-                .Map(keySet => (IKeySet)keySet),
-            _ => Result.Failure<IKeySet, SmartCardError>(
-                SmartCardError.InvalidArgument($"Unknown keyset: {keysetName}"))
+            "gp_test_keys" => GpTestKeys.CreateRawTestKeyset(keyVersion),
+            _ => Result.Failure<RawKeyset, SmartCardError>(
+                SmartCardError.InvalidArgument($"Unknown keyset: {keysetName}")
+            ),
         };
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using JetBrains.Annotations;
@@ -57,20 +58,38 @@ public static class WsctExtensions
         byte p1,
         byte p2,
         Maybe<byte[]> data = default,
-        Maybe<int> le = default)
+        Maybe<int> le = default
+    )
     {
         return ApduBuilder.CreateCommand(cla, ins, p1, p2, data, le);
     }
 
     /// <summary>
     /// Converts a CommandAPDU to its raw byte representation.
+    /// Uses WSCT's public BinaryCommand property.
     /// </summary>
     /// <param name="command">The CommandAPDU.</param>
     /// <returns>The raw APDU bytes.</returns>
     public static byte[] ToBytes(this CommandAPDU command)
     {
-        // WSCT CommandAPDU doesn't expose Binary property reliably
-        // Return empty array until proper WSCT API usage is determined
-        return [];
+        // Use WSCT's public BinaryCommand property - NO reflection needed!
+        return command.BinaryCommand;
+    }
+
+    /// <summary>
+    /// Converts a ResponseAPDU to its raw byte representation.
+    /// Combines Udr (user data response) and status word bytes.
+    /// </summary>
+    /// <param name="response">The ResponseAPDU.</param>
+    /// <returns>The raw response APDU bytes.</returns>
+    public static byte[] ToBytes(this ResponseAPDU response)
+    {
+        var udr = response.Udr ?? System.Array.Empty<byte>();
+        var result = new byte[udr.Length + 2];
+        if (udr.Length > 0)
+            System.Array.Copy(udr, 0, result, 0, udr.Length);
+        result[^2] = response.Sw1;
+        result[^1] = response.Sw2;
+        return result;
     }
 }

@@ -3,8 +3,6 @@ using System.ComponentModel;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Domain;
-using Gp4Net.Services;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console;
@@ -29,7 +27,7 @@ public class LifecycleCommand : IPipelineCommand<LifecycleCommand.Settings>
     {
         return await context.ExecuteAsync(async ctx =>
         {
-            Result<bool, SmartCardError> result = await ValidateSettings(settings)
+            var result = await ValidateSettings(settings)
                 .Bind(_ =>
                 {
                     ctx.Display.Info($"Setting lifecycle state for: {settings.Aid}");
@@ -81,7 +79,7 @@ public class LifecycleCommand : IPipelineCommand<LifecycleCommand.Settings>
             );
     }
 
-    private static async Task<Result<bool, SmartCardError>> PerformLifecycleChange(
+    private static Task<Result<bool, SmartCardError>> PerformLifecycleChange(
         ICliExecutionContext context,
         Settings settings
     )
@@ -89,9 +87,15 @@ public class LifecycleCommand : IPipelineCommand<LifecycleCommand.Settings>
         byte[] aid = Convert.FromHexString(settings.Aid);
         context.Display.Info("Executing lifecycle state change...");
 
-        context.Display.Error("Lifecycle management functionality not yet implemented with static services.");
-        return Result.Failure<bool, SmartCardError>(
-            SmartCardError.Unsupported("Lifecycle management functionality needs to be implemented using static GlobalPlatformService methods")
+        context.Display.Error(
+            "Lifecycle management functionality not yet implemented with static services."
+        );
+        return Task.FromResult(
+            Result.Failure<bool, SmartCardError>(
+                SmartCardError.Unsupported(
+                    "Lifecycle management functionality needs to be implemented using static GlobalPlatformService methods"
+                )
+            )
         );
     }
 

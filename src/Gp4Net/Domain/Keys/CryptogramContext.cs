@@ -1,6 +1,5 @@
-using Gp4Net.Cryptography;
-using static Gp4Net.Cryptography.CryptoService;
 using JetBrains.Annotations;
+using static Gp4Net.Cryptography.CryptoService;
 
 namespace Gp4Net.Domain.Keys;
 

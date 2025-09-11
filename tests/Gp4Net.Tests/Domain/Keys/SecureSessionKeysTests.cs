@@ -5,7 +5,9 @@
 
 using System;
 using AwesomeAssertions;
+using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Tests.Infrastructure;
 using Gp4Net.Domain.Keys;
 using NUnit.Framework;
 
@@ -44,7 +46,7 @@ public class SecureSessionKeysTests
     {
         // Act
         using (
-            SecureSessionKeys sessionKeys = new SecureSessionKeys(
+            var sessionKeys = new SecureSessionKeys(
                 _testSEnc,
                 _testSMac,
                 _testSrMac,
@@ -65,7 +67,7 @@ public class SecureSessionKeysTests
     {
         // Act
         using (
-            SecureSessionKeys sessionKeys = new SecureSessionKeys(
+            var sessionKeys = new SecureSessionKeys(
                 _testSEnc,
                 _testSMac,
                 _testSrMac,
@@ -86,7 +88,7 @@ public class SecureSessionKeysTests
     {
         // Arrange
         using (
-            SecureSessionKeys sessionKeys = new SecureSessionKeys(
+            var sessionKeys = new SecureSessionKeys(
                 _testSEnc,
                 _testSMac,
                 _testSrMac,
@@ -119,7 +121,7 @@ public class SecureSessionKeysTests
     {
         // Arrange
         using (
-            SecureSessionKeys sessionKeys = new SecureSessionKeys(
+            var sessionKeys = new SecureSessionKeys(
                 _testSEnc,
                 _testSMac,
                 _testSrMac,
@@ -131,7 +133,7 @@ public class SecureSessionKeysTests
             Result<int, SmartCardError> result = sessionKeys.UseSMac(key => key.Length);
 
             // Assert
-            _ = result.Should().BeSuccess();
+            result.Should().BeSuccess();
             if (result.IsSuccess)
             {
                 _ = result.Value.Should().Be(8);
@@ -147,7 +149,7 @@ public class SecureSessionKeysTests
     {
         // Arrange
         using (
-            SecureSessionKeys sessionKeys = new SecureSessionKeys(_testSEnc, _testSMac, _testSrMac)
+            var sessionKeys = new SecureSessionKeys(_testSEnc, _testSMac, _testSrMac)
         )
         {
             bool executed = false;
@@ -157,7 +159,7 @@ public class SecureSessionKeysTests
             sessionKeys.UseDek(key =>
             {
                 executed = true;
-                receivedKey = key;
+                receivedKey = key.GetValueOrDefault();
             });
 
             // Assert
@@ -174,7 +176,7 @@ public class SecureSessionKeysTests
     {
         // Arrange
         using (
-            SecureSessionKeys secureKeys = new SecureSessionKeys(
+            var secureKeys = new SecureSessionKeys(
                 _testSEnc,
                 _testSMac,
                 _testSrMac,
@@ -183,7 +185,13 @@ public class SecureSessionKeysTests
         )
         {
             // Act
-            SessionKeys? legacyKeys = secureKeys.ToSessionKeys();
+            Result<SessionKeys, SmartCardError> legacyKeysResult = secureKeys.ToSessionKeys();
+            legacyKeysResult.Should().BeSuccess();
+
+            if (legacyKeysResult.IsFailure)
+                return;
+
+            var legacyKeys = legacyKeysResult.Value;
 
             // Assert
             _ = legacyKeys.SEnc.Should().BeEquivalentTo(_testSEnc);
@@ -200,7 +208,7 @@ public class SecureSessionKeysTests
     public void AfterDispose_OperationsThrow()
     {
         // Arrange
-        SecureSessionKeys sessionKeys = new SecureSessionKeys(
+        var sessionKeys = new SecureSessionKeys(
             _testSEnc,
             _testSMac,
             _testSrMac,
@@ -237,7 +245,7 @@ public class SecureSessionKeysTests
         byte[] originalSrMac = [0x21, 0x22, 0x23, 0x24];
 
         using (
-            SecureSessionKeys sessionKeys = new SecureSessionKeys(
+            var sessionKeys = new SecureSessionKeys(
                 originalSEnc,
                 originalSMac,
                 originalSrMac,

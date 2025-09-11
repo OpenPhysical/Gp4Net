@@ -3,22 +3,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
-using System;
-using System.Linq;
-using AwesomeAssertions;
-using CSharpFunctionalExtensions;
-using Gp4Net.Core;
-using Gp4Net.Domain.DataObjects;
-using Gp4Net.Services;
-using Gp4Net.Services.GlobalPlatform;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.DataObjects;
 
 [TestFixture]
-[Ignore("CardCapabilitiesCodec has been refactored into GlobalPlatformService.DataGeneration - tests need to be updated")]
+[Ignore(
+    "CardCapabilitiesCodec has been refactored into GlobalPlatformService.DataGeneration - tests need to be updated"
+)]
 public class CardCapabilitiesCodecTests
 {
+    /* Legacy test data preserved for reference when rewriting tests
     private static readonly byte[] Scp02OnlyCapabilities = Convert.FromHexString(
         "664C"
             + // Tag 66, Length 4C (76 bytes)
@@ -102,7 +97,9 @@ public class CardCapabilitiesCodecTests
             + // Key types
             "8020" // AES keys, 32 bytes
     );
+    */
 
+    /* All tests commented out due to refactoring - class is marked [Ignore]
     [Test]
     public void Encode_Scp02OnlyCapabilities_ProducesExpectedFormat()
     {
@@ -437,4 +434,5 @@ public class CardCapabilitiesCodecTests
         _ = scp.Implementations.Should().Contain(i => i.Implementation == 0x04);
         _ = scp.Implementations.Should().Contain(i => i.Implementation == 0x1A);
     }
+    */
 }

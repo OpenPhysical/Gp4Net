@@ -50,13 +50,13 @@ public static class Discovery
     )
     {
         // First try SELECT with empty AID (standard method)
-        Result<SelectCommand, SmartCardError> selectIsdResult = Commands.CreateSelectIsdCommand();
+        var selectIsdResult = Commands.CreateSelectIsdCommand();
         if (selectIsdResult.IsFailure)
         {
             return Result.Failure<SelectResponse, SmartCardError>(selectIsdResult.Error);
         }
 
-        Result<CommandResponse, SmartCardError> response = await selectIsdResult
+        var response = await selectIsdResult
             .Bind(selectCommand => selectCommand.ToCommandApdu())
             .Bind(async commandApdu => await executeCommand(commandApdu, cancellationToken));
 
@@ -68,7 +68,7 @@ public static class Discovery
 
         if (response.IsSuccess)
         {
-            Result<SelectResponse, SmartCardError> parseResult = Responses.ParseSelectResponse(
+            var parseResult = Responses.ParseSelectResponse(
                 response.Value
             );
             if (parseResult.IsSuccess)
@@ -99,9 +99,7 @@ public static class Discovery
         CancellationToken cancellationToken = default
     )
     {
-        Result<SelectCommand, SmartCardError> selectResult = Commands.CreateSelectCommand(
-            aid
-        );
+        var selectResult = Commands.CreateSelectCommand(aid);
         return await selectResult
             .Bind(selectCommand => selectCommand.ToCommandApdu())
             .Bind(async commandApdu => await executeCommand(commandApdu, cancellationToken))
@@ -178,7 +176,7 @@ public static class Discovery
             );
         }
 
-        Result<SelectCommand, SmartCardError> selectResult = Commands.CreateSelectCommand(
+        var selectResult = Commands.CreateSelectCommand(
             aids[index]
         );
         if (selectResult.IsFailure)
@@ -223,12 +221,9 @@ public static class Discovery
             );
         }
 
-        IKeySet keySet = keySets[index];
-        Result<InitializeUpdateCommand, SmartCardError> cmdResult = Commands.CreateInitializeUpdateCommand(
-            keySet.KeyVersion,
-            keySet.KeyId,
-            hostChallenge
-        );
+        var keySet = keySets[index];
+        var cmdResult =
+            Commands.CreateInitializeUpdateCommand(keySet.KeyVersion, keySet.KeyId, hostChallenge);
 
         if (cmdResult.IsFailure)
         {
@@ -241,7 +236,7 @@ public static class Discovery
             );
         }
 
-        Result<CommandResponse, SmartCardError> response = await cmdResult
+        var response = await cmdResult
             .Bind(command => command.ToCommandApdu())
             .Bind(async commandApdu => await executeCommand(commandApdu, cancellationToken));
 
@@ -259,17 +254,13 @@ public static class Discovery
                 );
             }
 
-            Result<InitializeUpdateResponse, SmartCardError> parseResult = Responses.ParseInitializeUpdateResponse(responseValue);
+            var parseResult =
+                Responses.ParseInitializeUpdateResponse(responseValue);
 
-            if (parseResult.IsSuccess)
-            {
-                Maybe<CryptoService.ScpVersion> protocolVersion = parseResult.Value.ScpId;
-                return protocolVersion
-                    .ToResult(
-                        SmartCardError.InvalidArgument("Could not determine SCP protocol version")
-                    )
-                    .Map(version => (keySet, version));
-            }
+            return parseResult
+                .Bind(response => response.ScpVersion
+                    .ToResult(SmartCardError.InvalidArgument("Could not determine SCP protocol version"))
+                    .Map(version => (keySet, version)));
         }
 
         return await TryKeySetsRecursively(

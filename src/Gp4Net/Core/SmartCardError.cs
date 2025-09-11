@@ -188,7 +188,11 @@ public record SmartCardError(
     /// </summary>
     public static SmartCardError ConditionsOfUseNotSatisfied()
     {
-        return WithStatus("CONDITIONS_OF_USE_NOT_SATISFIED", "Conditions of use not satisfied", 0x6985);
+        return WithStatus(
+            "CONDITIONS_OF_USE_NOT_SATISFIED",
+            "Conditions of use not satisfied",
+            0x6985
+        );
     }
 
     /// <summary>
@@ -314,10 +318,10 @@ public record SmartCardError(
     /// </summary>
     public SmartCardError WithContext(string key, object value)
     {
-        IReadOnlyDictionary<string, object> currentContext = Context.GetValueOrDefault(
+        var currentContext = Context.GetValueOrDefault(
             new Dictionary<string, object>()
         );
-        Dictionary<string, object> newContext = new Dictionary<string, object>(currentContext)
+        var newContext = new Dictionary<string, object>(currentContext)
         {
             [key] = value,
         };
@@ -329,11 +333,11 @@ public record SmartCardError(
     /// </summary>
     public SmartCardError WithContext(IReadOnlyDictionary<string, object> additionalContext)
     {
-        IReadOnlyDictionary<string, object> currentContext = Context.GetValueOrDefault(
+        var currentContext = Context.GetValueOrDefault(
             new Dictionary<string, object>()
         );
-        Dictionary<string, object> newContext = new Dictionary<string, object>(currentContext);
-        foreach (KeyValuePair<string, object> kvp in additionalContext)
+        var newContext = new Dictionary<string, object>(currentContext);
+        foreach (var kvp in additionalContext)
         {
             newContext[kvp.Key] = kvp.Value;
         }
@@ -390,18 +394,18 @@ public record SmartCardError(
 /// </summary>
 public static class ErrorCodes
 {
-    public const string Success = "SUCCESS";
-    public const string CommunicationError = "COMMUNICATION_ERROR";
-    public const string SecurityError = "SECURITY_ERROR";
-    public const string InvalidData = "INVALID_DATA";
-    public const string Unsupported = "UNSUPPORTED";
-    public const string Timeout = "TIMEOUT";
-    public const string CardNotPresent = "CARD_NOT_PRESENT";
-    public const string ReaderNotFound = "READER_NOT_FOUND";
-    public const string SecureChannelNotEstablished = "SECURE_CHANNEL_NOT_ESTABLISHED";
-    public const string InvalidCapFile = "INVALID_CAP_FILE";
-    public const string InstallationFailed = "INSTALLATION_FAILED";
-    public const string DeletionFailed = "DELETION_FAILED";
+    public const string SUCCESS = "SUCCESS";
+    public const string COMMUNICATION_ERROR = "COMMUNICATION_ERROR";
+    public const string SECURITY_ERROR = "SECURITY_ERROR";
+    public const string INVALID_DATA = "INVALID_DATA";
+    public const string UNSUPPORTED = "UNSUPPORTED";
+    public const string TIMEOUT = "TIMEOUT";
+    public const string CARD_NOT_PRESENT = "CARD_NOT_PRESENT";
+    public const string READER_NOT_FOUND = "READER_NOT_FOUND";
+    public const string SECURE_CHANNEL_NOT_ESTABLISHED = "SECURE_CHANNEL_NOT_ESTABLISHED";
+    public const string INVALID_CAP_FILE = "INVALID_CAP_FILE";
+    public const string INSTALLATION_FAILED = "INSTALLATION_FAILED";
+    public const string DELETION_FAILED = "DELETION_FAILED";
 }
 
 /// <summary>

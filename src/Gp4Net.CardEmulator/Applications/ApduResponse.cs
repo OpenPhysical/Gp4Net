@@ -15,42 +15,45 @@ public sealed record ApduResponse
     /// Response data (may be empty).
     /// </summary>
     public ImmutableArray<byte> Data { get; }
-    
+
     /// <summary>
     /// Status word (SW1 and SW2).
     /// </summary>
     public StatusWord StatusWord { get; }
-    
+
     private ApduResponse(ImmutableArray<byte> data, StatusWord statusWord)
     {
         Data = data;
         StatusWord = statusWord;
     }
-    
+
     /// <summary>
     /// Creates a successful response with data.
     /// </summary>
     public static ApduResponse Success(ImmutableArray<byte> data)
     {
-        return new ApduResponse(data, Gp4Net.Constants.Constants.StatusWords.Legacy.Success);
+        return new ApduResponse(data, Constants.Constants.StatusWords.Legacy.Success);
     }
-    
+
     /// <summary>
     /// Creates a successful response with data.
     /// </summary>
     public static ApduResponse Success(byte[] data)
     {
-        return new ApduResponse([..data], Gp4Net.Constants.Constants.StatusWords.Legacy.Success);
+        return new ApduResponse([.. data], Constants.Constants.StatusWords.Legacy.Success);
     }
-    
+
     /// <summary>
     /// Creates a successful response with no data.
     /// </summary>
     public static ApduResponse Success()
     {
-        return new ApduResponse(ImmutableArray<byte>.Empty, Gp4Net.Constants.Constants.StatusWords.Legacy.Success);
+        return new ApduResponse(
+            ImmutableArray<byte>.Empty,
+            Constants.Constants.StatusWords.Legacy.Success
+        );
     }
-    
+
     /// <summary>
     /// Creates an error response with specified status word.
     /// </summary>
@@ -58,39 +61,39 @@ public sealed record ApduResponse
     {
         return new ApduResponse(ImmutableArray<byte>.Empty, statusWord);
     }
-    
+
     /// <summary>
     /// Creates an error response for wrong length.
     /// </summary>
     public static ApduResponse WrongLength()
     {
-        return Error(Gp4Net.Constants.Constants.StatusWords.Legacy.WrongLength);
+        return Error(Constants.Constants.StatusWords.Legacy.WrongLength);
     }
-    
+
     /// <summary>
     /// Creates an error response for instruction not supported.
     /// </summary>
     public static ApduResponse InstructionNotSupported()
     {
-        return Error(Gp4Net.Constants.Constants.StatusWords.Legacy.InstructionNotSupported);
+        return Error(Constants.Constants.StatusWords.Legacy.InstructionNotSupported);
     }
-    
+
     /// <summary>
     /// Creates an error response for conditions not satisfied.
     /// </summary>
     public static ApduResponse ConditionsNotSatisfied()
     {
-        return Error(Gp4Net.Constants.Constants.StatusWords.Legacy.ConditionsNotSatisfied);
+        return Error(Constants.Constants.StatusWords.Legacy.ConditionsNotSatisfied);
     }
-    
+
     /// <summary>
     /// Creates an error response for security status not satisfied.
     /// </summary>
     public static ApduResponse SecurityStatusNotSatisfied()
     {
-        return Error(Gp4Net.Constants.Constants.StatusWords.Legacy.SecurityStatusNotSatisfied);
+        return Error(Constants.Constants.StatusWords.Legacy.SecurityStatusNotSatisfied);
     }
-    
+
     /// <summary>
     /// Converts response to byte array (data + SW).
     /// </summary>
@@ -101,8 +104,8 @@ public sealed record ApduResponse
         {
             Data.CopyTo(result, 0);
         }
-        result[^2] = StatusWord.SW1;
-        result[^1] = StatusWord.SW2;
+        result[^2] = StatusWord.Sw1;
+        result[^1] = StatusWord.Sw2;
         return result;
     }
 }

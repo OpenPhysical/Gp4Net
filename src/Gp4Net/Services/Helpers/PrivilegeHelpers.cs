@@ -1,6 +1,5 @@
-using System;
+using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
 
@@ -24,9 +23,9 @@ public static class PrivilegeHelpers
         // Direct mapping: enum value matches wire format exactly
         return new[]
         {
-            (byte)(value & 0xFF),         // Byte 1 (LSB)
-            (byte)((value >> 8) & 0xFF),  // Byte 2
-            (byte)((value >> 16) & 0xFF)  // Byte 3 (MSB)
+            (byte)(value & 0xFF), // Byte 1 (LSB)
+            (byte)((value >> 8) & 0xFF), // Byte 2
+            (byte)((value >> 16) & 0xFF), // Byte 3 (MSB)
         };
     }
 
@@ -61,21 +60,27 @@ public static class PrivilegeHelpers
         if (bytes.Length == 0)
         {
             return Result.Failure<Privilege, SmartCardError>(
-                SmartCardError.InvalidArgument("Privilege bytes cannot be empty"));
+                SmartCardError.InvalidArgument("Privilege bytes cannot be empty")
+            );
         }
 
         return bytes.Length switch
         {
             1 => Result.Success<Privilege, SmartCardError>(
                 // Legacy 1-byte format: only byte 1, bytes 2-3 are 0x00
-                (Privilege)bytes[0]),
-            
+                (Privilege)bytes[0]
+            ),
+
             3 => Result.Success<Privilege, SmartCardError>(
                 // Full 3-byte format: direct mapping to enum
-                (Privilege)(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16))),
-            
+                (Privilege)(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16))
+            ),
+
             _ => Result.Failure<Privilege, SmartCardError>(
-                SmartCardError.InvalidArgument($"Invalid privilege byte length: {bytes.Length}. Expected 1 or 3 bytes."))
+                SmartCardError.InvalidArgument(
+                    $"Invalid privilege byte length: {bytes.Length}. Expected 1 or 3 bytes."
+                )
+            ),
         };
     }
 
@@ -93,8 +98,8 @@ public static class PrivilegeHelpers
     /// </summary>
     public static bool CanPerformDelegatedManagement(this Privilege privilege)
     {
-        return privilege.HasFlag(Privilege.SecurityDomain) &&
-               privilege.HasFlag(Privilege.DelegatedManagement);
+        return privilege.HasFlag(Privilege.SecurityDomain)
+            && privilege.HasFlag(Privilege.DelegatedManagement);
     }
 
     /// <summary>
@@ -103,8 +108,8 @@ public static class PrivilegeHelpers
     /// </summary>
     public static bool CanPerformAuthorizedManagement(this Privilege privilege)
     {
-        return privilege.HasFlag(Privilege.SecurityDomain) &&
-               privilege.HasFlag(Privilege.AuthorizedManagement);
+        return privilege.HasFlag(Privilege.SecurityDomain)
+            && privilege.HasFlag(Privilege.AuthorizedManagement);
     }
 
     /// <summary>
@@ -113,8 +118,8 @@ public static class PrivilegeHelpers
     /// </summary>
     public static bool CanVerifyDap(this Privilege privilege)
     {
-        return privilege.HasFlag(Privilege.SecurityDomain) &&
-               privilege.HasFlag(Privilege.DapVerification);
+        return privilege.HasFlag(Privilege.SecurityDomain)
+            && privilege.HasFlag(Privilege.DapVerification);
     }
 
     /// <summary>
@@ -123,44 +128,111 @@ public static class PrivilegeHelpers
     /// </summary>
     public static bool RequiresDapVerification(this Privilege privilege)
     {
-        return privilege.HasFlag(Privilege.SecurityDomain) &&
-               privilege.HasFlag(Privilege.DapVerification) &&
-               privilege.HasFlag(Privilege.MandatedDapVerification);
+        return privilege.HasFlag(Privilege.SecurityDomain)
+            && privilege.HasFlag(Privilege.DapVerification)
+            && privilege.HasFlag(Privilege.MandatedDapVerification);
+    }
+
+    /// <summary>
+    /// Formats privileges as a human-readable string showing all active flags.
+    /// </summary>
+    /// <param name="privilege">The privilege flags to format.</param>
+    /// <returns>Comma-separated list of active privilege names.</returns>
+    public static string ToHumanReadableString(this Privilege privilege)
+    {
+        if (privilege == Privilege.None)
+            return "None";
+
+        var privilegeMapping = new[]
+        {
+            (Privilege.SecurityDomain, "Security Domain"),
+            (Privilege.DapVerification, "DAP Verification"),
+            (Privilege.DelegatedManagement, "Delegated Management"),
+            (Privilege.CardLock, "Card Lock"),
+            (Privilege.CardTerminate, "Card Terminate"),
+            (Privilege.CardReset, "Card Reset"),
+            (Privilege.CvmManagement, "CVM Management"),
+            (Privilege.MandatedDapVerification, "Mandated DAP"),
+            (Privilege.TrustedPath, "Trusted Path"),
+            (Privilege.AuthorizedManagement, "Authorized Management"),
+            (Privilege.TokenVerification, "Token Verification"),
+            (Privilege.GlobalDelete, "Global Delete"),
+            (Privilege.GlobalLock, "Global Lock"),
+            (Privilege.GlobalRegistry, "Global Registry"),
+            (Privilege.FinalApplication, "Final Application"),
+            (Privilege.GlobalService, "Global Service"),
+            (Privilege.ReceiptGeneration, "Receipt Generation"),
+            (Privilege.CipheredLoadFileDataBlock, "Ciphered Load File"),
+            (Privilege.ContactlessActivation, "Contactless Activation"),
+            (Privilege.ContactlessSelfActivation, "Contactless Self-Activation")
+        };
+
+        var activePrivileges = privilegeMapping
+            .Where(mapping => privilege.HasFlag(mapping.Item1))
+            .Select(mapping => mapping.Item2);
+
+        return string.Join(", ", activePrivileges);
     }
 
     /// <summary>
     /// Validates that privilege combinations are valid per GP specification.
     /// </summary>
-    public static Result<Privilege, SmartCardError> ValidatePrivilegeCombination(this Privilege privilege)
+    public static Result<Privilege, SmartCardError> ValidatePrivilegeCombination(
+        this Privilege privilege
+    )
     {
         // DelegatedManagement requires SecurityDomain
-        if (privilege.HasFlag(Privilege.DelegatedManagement) && !privilege.HasFlag(Privilege.SecurityDomain))
+        if (
+            privilege.HasFlag(Privilege.DelegatedManagement)
+            && !privilege.HasFlag(Privilege.SecurityDomain)
+        )
         {
             return Result.Failure<Privilege, SmartCardError>(
-                SmartCardError.InvalidArgument("DelegatedManagement privilege requires SecurityDomain privilege"));
+                SmartCardError.InvalidArgument(
+                    "DelegatedManagement privilege requires SecurityDomain privilege"
+                )
+            );
         }
 
         // AuthorizedManagement requires SecurityDomain
-        if (privilege.HasFlag(Privilege.AuthorizedManagement) && !privilege.HasFlag(Privilege.SecurityDomain))
+        if (
+            privilege.HasFlag(Privilege.AuthorizedManagement)
+            && !privilege.HasFlag(Privilege.SecurityDomain)
+        )
         {
             return Result.Failure<Privilege, SmartCardError>(
-                SmartCardError.InvalidArgument("AuthorizedManagement privilege requires SecurityDomain privilege"));
+                SmartCardError.InvalidArgument(
+                    "AuthorizedManagement privilege requires SecurityDomain privilege"
+                )
+            );
         }
 
         // DapVerification requires SecurityDomain
-        if (privilege.HasFlag(Privilege.DapVerification) && !privilege.HasFlag(Privilege.SecurityDomain))
+        if (
+            privilege.HasFlag(Privilege.DapVerification)
+            && !privilege.HasFlag(Privilege.SecurityDomain)
+        )
         {
             return Result.Failure<Privilege, SmartCardError>(
-                SmartCardError.InvalidArgument("DapVerification privilege requires SecurityDomain privilege"));
+                SmartCardError.InvalidArgument(
+                    "DapVerification privilege requires SecurityDomain privilege"
+                )
+            );
         }
 
         // MandatedDapVerification requires both SecurityDomain and DapVerification
         if (privilege.HasFlag(Privilege.MandatedDapVerification))
         {
-            if (!privilege.HasFlag(Privilege.SecurityDomain) || !privilege.HasFlag(Privilege.DapVerification))
+            if (
+                !privilege.HasFlag(Privilege.SecurityDomain)
+                || !privilege.HasFlag(Privilege.DapVerification)
+            )
             {
                 return Result.Failure<Privilege, SmartCardError>(
-                    SmartCardError.InvalidArgument("MandatedDapVerification requires both SecurityDomain and DapVerification privileges"));
+                    SmartCardError.InvalidArgument(
+                        "MandatedDapVerification requires both SecurityDomain and DapVerification privileges"
+                    )
+                );
             }
         }
 

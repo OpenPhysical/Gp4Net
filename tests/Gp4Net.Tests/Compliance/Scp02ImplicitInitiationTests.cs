@@ -1,10 +1,9 @@
-using System.Collections.Generic;
 using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Constants;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Compliance;
@@ -69,7 +68,7 @@ public class Scp02ImplicitInitiationTests
         ];
 
         // Act - Calculate ICV per Section E.3.3
-        Result<byte[], SmartCardError> icvResult = CalculateIcvFromAidMac(selectedAid, cMacKey);
+        var icvResult = CalculateIcvFromAidMac(selectedAid, cMacKey);
 
         // Assert
         _ = icvResult
@@ -107,17 +106,17 @@ public class Scp02ImplicitInitiationTests
     public void Scp02_Should_Initiate_Secure_Channel_On_First_CMac_Command_For_Implicit_Mode()
     {
         // Arrange - Test implicit mode implementation
-        ScpImplementation implementation = ScpImplementation.Scp02I0A; // Implicit mode, MAC over AID
+        var implementation = ScpImplementation.Scp02I0A; // Implicit mode, MAC over AID
         _ = implementation
             .IsExplicitMode()
             .Should()
             .BeFalse("Test requires implicit mode implementation");
 
-        ImplicitSessionState sessionState = CreateImplicitSessionState();
-        TestCommand commandWithCMac = CreateCommandWithCMac();
+        var sessionState = CreateImplicitSessionState();
+        var commandWithCMac = CreateCommandWithCMac();
 
         // Act - Process first C-MAC command (should initiate secure channel)
-        Result<ImplicitSessionState, SmartCardError> result =
+        var result =
             ProcessImplicitSecureChannelInitiation(sessionState, commandWithCMac, implementation);
 
         // Assert
@@ -171,15 +170,15 @@ public class Scp02ImplicitInitiationTests
             },
         };
 
-        IEnumerable<Result> validationResults = testCases.Select(testCase =>
+        var validationResults = testCases.Select(testCase =>
         {
-            ImplicitSessionState sessionState = CreateImplicitSessionState();
-            TestCommand command = testCase.HasCMac
+            var sessionState = CreateImplicitSessionState();
+            var command = testCase.HasCMac
                 ? CreateCommandWithCMac()
                 : CreateCommandWithoutCMac();
 
             // Act
-            Result<ImplicitSessionState, SmartCardError> result =
+            var result =
                 ProcessImplicitSecureChannelInitiation(
                     sessionState,
                     command,
@@ -195,7 +194,7 @@ public class Scp02ImplicitInitiationTests
             );
         });
 
-        Result combinedResult = Result.Combine([.. validationResults]);
+        var combinedResult = Result.Combine([.. validationResults]);
         _ = combinedResult
             .IsSuccess.Should()
             .BeTrue("All protocol rules should be enforced correctly");
@@ -209,9 +208,12 @@ public class Scp02ImplicitInitiationTests
         byte[] paddedAid = ApplyGpPadding(aid);
 
         // Simulate MAC calculation over padded AID with zero ICV (simplified for testing)
-        byte[] mac = [.. Enumerable
-            .Range(0, 8)
-            .Select(i => (byte)(paddedAid[i % paddedAid.Length] ^ cMacKey[i]))];
+        byte[] mac =
+        [
+            .. Enumerable
+                .Range(0, 8)
+                .Select(i => (byte)(paddedAid[i % paddedAid.Length] ^ cMacKey[i])),
+        ];
 
         return Result.Success<byte[], SmartCardError>(mac);
     }
@@ -226,7 +228,7 @@ public class Scp02ImplicitInitiationTests
             return data;
         }
 
-        return [.. data, (byte)0x80, .. Enumerable.Repeat((byte)0x00, paddingNeeded - 1)];
+        return [.. data, 0x80, .. Enumerable.Repeat((byte)0x00, paddingNeeded - 1)];
     }
 
     private static ImplicitSessionState CreateImplicitSessionState()
@@ -269,7 +271,7 @@ public class Scp02ImplicitInitiationTests
         }
 
         // First C-MAC initiates secure channel per GP Section E.1.2.2
-        ImplicitSessionState newState = sessionState with
+        var newState = sessionState with
         {
             IsSecureChannelActive = true,
             SecurityLevel = SecurityLevel.CMac,

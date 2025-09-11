@@ -35,7 +35,7 @@ public class InstallCommandTests
             InstallCommand.InstallForLoadCommand.Create(_validPackageAid);
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForLoadCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Type.Should().Be(InstallType.ForLoad);
         _ = command.PackageAid.Should().BeEquivalentTo(_validPackageAid);
         _ = command.SecurityDomainAid.IsDefaultOrEmpty.Should().BeTrue();
@@ -57,7 +57,7 @@ public class InstallCommandTests
             );
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForLoadCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Type.Should().Be(InstallType.ForLoad);
         _ = command.PackageAid.Should().BeEquivalentTo(_validPackageAid);
         _ = command.SecurityDomainAid.Should().BeEquivalentTo(_validSecurityDomainAid);
@@ -76,7 +76,7 @@ public class InstallCommandTests
             InstallCommand.InstallForLoadCommand.Create(_validPackageAid, maxDataBlockSize: 1024);
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForLoadCommand? command = result.Value;
+        var command = result.Value;
         byte[] expectedLoadParams = [0xC9, 0x02, 0x04, 0x00]; // 1024 = 0x0400
         _ = command.LoadParameters.Should().BeEquivalentTo(expectedLoadParams);
     }
@@ -106,7 +106,7 @@ public class InstallCommandTests
     [Test]
     public void InstallForLoadCommand_Data_WithMinimalParameters_BuildsCorrectStructure()
     {
-        InstallCommand.InstallForLoadCommand? command = InstallCommand
+        var command = InstallCommand
             .InstallForLoadCommand.Create(_validPackageAid)
             .Value;
 
@@ -129,7 +129,7 @@ public class InstallCommandTests
     [Test]
     public void InstallForLoadCommand_Data_WithAllParameters_BuildsCorrectStructure()
     {
-        InstallCommand.InstallForLoadCommand? command = InstallCommand
+        var command = InstallCommand
             .InstallForLoadCommand.Create(
                 _validPackageAid,
                 maxDataBlockSize: 2048,
@@ -186,7 +186,7 @@ public class InstallCommandTests
     [Test]
     public void InstallForLoadCommand_ApduProperties_ReturnsCorrectValues()
     {
-        InstallCommand.InstallForLoadCommand? command = InstallCommand
+        var command = InstallCommand
             .InstallForLoadCommand.Create(_validPackageAid)
             .Value;
 
@@ -201,11 +201,13 @@ public class InstallCommandTests
     [Test]
     public void InstallForLoadCommand_ToApdu_GeneratesCorrectApdu()
     {
-        InstallCommand.InstallForLoadCommand? command = InstallCommand
+        var command = InstallCommand
             .InstallForLoadCommand.Create(_validPackageAid)
             .Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         _ = apdu[0].Should().Be(0x80); // CLA
         _ = apdu[1].Should().Be(0xE6); // INS
@@ -219,7 +221,7 @@ public class InstallCommandTests
     [Test]
     public void InstallForLoadCommand_ToString_ReturnsCorrectString()
     {
-        InstallCommand.InstallForLoadCommand? command = InstallCommand
+        var command = InstallCommand
             .InstallForLoadCommand.Create(_validPackageAid)
             .Value;
 
@@ -238,7 +240,7 @@ public class InstallCommandTests
             );
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForInstallCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Type.Should().Be(InstallType.ForInstall);
         _ = command.PackageAid.Should().BeEquivalentTo(_validPackageAid);
         _ = command.ModuleAid.Should().BeEquivalentTo(_validModuleAid);
@@ -262,7 +264,7 @@ public class InstallCommandTests
             );
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForInstallCommand? command = result.Value;
+        var command = result.Value;
         _ = command.InstallParameters.Should().BeEquivalentTo(_validInstallParameters);
         _ = command.InstallToken.Should().BeEquivalentTo(_validInstallToken);
     }
@@ -375,7 +377,7 @@ public class InstallCommandTests
             );
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForInstallCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Privileges.Should().BeEquivalentTo(new byte[] { 0x00 }); // Default privileges
     }
 
@@ -391,7 +393,7 @@ public class InstallCommandTests
             );
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForInstallCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Type.Should().Be(InstallType.ForInstallAndMakeSelectable);
         _ = command.P1.Should().Be(0x0C); // InstallType.ForInstallAndMakeSelectable
     }
@@ -399,7 +401,7 @@ public class InstallCommandTests
     [Test]
     public void InstallForInstallCommand_Data_WithMinimalParameters_BuildsCorrectStructure()
     {
-        InstallCommand.InstallForInstallCommand? command = InstallCommand
+        var command = InstallCommand
             .InstallForInstallCommand.Create(
                 _validPackageAid,
                 _validModuleAid,
@@ -453,7 +455,7 @@ public class InstallCommandTests
     [Test]
     public void InstallForInstallCommand_Data_WithAllParameters_BuildsCorrectStructure()
     {
-        InstallCommand.InstallForInstallCommand? command = InstallCommand
+        var command = InstallCommand
             .InstallForInstallCommand.Create(
                 _validPackageAid,
                 _validModuleAid,
@@ -519,7 +521,7 @@ public class InstallCommandTests
     [Test]
     public void InstallForInstallCommand_ApduProperties_ReturnsCorrectValues()
     {
-        InstallCommand.InstallForInstallCommand? command = InstallCommand
+        var command = InstallCommand
             .InstallForInstallCommand.Create(
                 _validPackageAid,
                 _validModuleAid,
@@ -539,7 +541,7 @@ public class InstallCommandTests
     [Test]
     public void InstallForInstallCommand_ToString_ReturnsCorrectString()
     {
-        InstallCommand.InstallForInstallCommand? command = InstallCommand
+        var command = InstallCommand
             .InstallForInstallCommand.Create(
                 _validPackageAid,
                 _validModuleAid,
@@ -573,7 +575,7 @@ public class InstallCommandTests
             );
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForLoadCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Type.Should().Be(InstallType.ForLoad);
         _ = command.PackageAid.Should().BeEquivalentTo(_validPackageAid);
         _ = command.SecurityDomainAid.Should().BeEquivalentTo(_validSecurityDomainAid);
@@ -595,7 +597,7 @@ public class InstallCommandTests
             );
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForInstallCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Type.Should().Be(InstallType.ForInstall);
         _ = command.PackageAid.Should().BeEquivalentTo(_validPackageAid);
         _ = command.AppletAid.Should().BeEquivalentTo(_validAppletAid);
@@ -617,7 +619,7 @@ public class InstallCommandTests
             );
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForInstallCommand? command = result.Value;
+        var command = result.Value;
         _ = command.ModuleAid.Should().BeEquivalentTo(_validPackageAid); // Should use package AID
         _ = command.Privileges.Should().BeEquivalentTo(new byte[] { 0x00 }); // Default privileges
     }
@@ -636,7 +638,7 @@ public class InstallCommandTests
             );
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForInstallCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Type.Should().Be(InstallType.ForInstallAndMakeSelectable);
         _ = command.P1.Should().Be(0x0C);
     }
@@ -653,7 +655,7 @@ public class InstallCommandTests
             );
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForInstallCommand? command = result.Value;
+        var command = result.Value;
         _ = command.ModuleAid.Should().BeEquivalentTo(_validPackageAid); // Should use package AID
         _ = command.Privileges.Should().BeEquivalentTo(new byte[] { 0x00 }); // Default privileges
     }
@@ -661,7 +663,7 @@ public class InstallCommandTests
     [Test]
     public void InstallCommandResponse_Success_WithoutData_CreatesSuccessResponse()
     {
-        InstallCommandResponse? response = InstallCommandResponse.Success();
+        var response = InstallCommandResponse.Success();
 
         _ = response.IsSuccess.Should().BeTrue();
         _ = response.StatusWord.Should().Be(0x9000);
@@ -672,7 +674,7 @@ public class InstallCommandTests
     public void InstallCommandResponse_Success_WithData_CreatesSuccessResponse()
     {
         byte[] responseData = [0x01, 0x02, 0x03];
-        InstallCommandResponse? response = InstallCommandResponse.Success(responseData);
+        var response = InstallCommandResponse.Success(responseData);
 
         _ = response.IsSuccess.Should().BeTrue();
         _ = response.StatusWord.Should().Be(0x9000);
@@ -683,7 +685,7 @@ public class InstallCommandTests
     public void InstallCommandResponse_Failure_WithStatusWord_CreatesFailureResponse()
     {
         ushort statusWord = 0x6A82;
-        InstallCommandResponse? response = InstallCommandResponse.Failure(statusWord);
+        var response = InstallCommandResponse.Failure(statusWord);
 
         _ = response.IsSuccess.Should().BeFalse();
         _ = response.StatusWord.Should().Be(statusWord);
@@ -695,7 +697,7 @@ public class InstallCommandTests
     {
         ushort statusWord = 0x6A82;
         byte[] responseData = [0x01, 0x02, 0x03];
-        InstallCommandResponse? response = InstallCommandResponse.Failure(statusWord, responseData);
+        var response = InstallCommandResponse.Failure(statusWord, responseData);
 
         _ = response.IsSuccess.Should().BeFalse();
         _ = response.StatusWord.Should().Be(statusWord);
@@ -707,7 +709,7 @@ public class InstallCommandTests
     {
         byte[] responseData = [0x01, 0x02, 0x03];
         ushort statusWord = 0x9000;
-        InstallCommandResponse? response = InstallCommandResponse.Parse(responseData, statusWord);
+        var response = InstallCommandResponse.Parse(responseData, statusWord);
 
         _ = response.StatusWord.Should().Be(statusWord);
         _ = response.Data.Should().BeEquivalentTo(responseData);
@@ -721,7 +723,7 @@ public class InstallCommandTests
             InstallCommand.InstallForLoadCommand.Create(_validPackageAid, maxDataBlockSize: 65535);
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForLoadCommand? command = result.Value;
+        var command = result.Value;
         byte[] expectedLoadParams = [0xC9, 0x02, 0xFF, 0xFF]; // 65535 = 0xFFFF
         _ = command.LoadParameters.Should().BeEquivalentTo(expectedLoadParams);
     }
@@ -733,7 +735,7 @@ public class InstallCommandTests
             InstallCommand.InstallForLoadCommand.Create(_validPackageAid, maxDataBlockSize: 1);
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForLoadCommand? command = result.Value;
+        var command = result.Value;
         byte[] expectedLoadParams = [0xC9, 0x02, 0x00, 0x01]; // 1 = 0x0001
         _ = command.LoadParameters.Should().BeEquivalentTo(expectedLoadParams);
     }
@@ -741,7 +743,7 @@ public class InstallCommandTests
     [Test]
     public void InstallCommand_IsImmutable_PropertiesCannotBeModified()
     {
-        InstallCommand.InstallForLoadCommand? command = InstallCommand
+        var command = InstallCommand
             .InstallForLoadCommand.Create(_validPackageAid)
             .Value;
         byte[] originalPackageAid = [.. command.PackageAid];
@@ -783,7 +785,7 @@ public class InstallCommandTests
             );
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForInstallCommand? command = result.Value;
+        var command = result.Value;
         _ = command.PackageAid.Should().BeEquivalentTo(longAid);
         _ = command.ModuleAid.Should().BeEquivalentTo(longAid);
         _ = command.AppletAid.Should().BeEquivalentTo(longAid);
@@ -808,7 +810,7 @@ public class InstallCommandTests
             );
 
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForInstallCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Privileges.Should().BeEquivalentTo(complexPrivileges);
     }
 
@@ -858,7 +860,7 @@ public class InstallCommandTests
 
         // Verify the command was not affected
         _ = result.IsSuccess.Should().BeTrue();
-        InstallCommand.InstallForInstallCommand? command = result.Value;
+        var command = result.Value;
         _ = command.PackageAid.Should().BeEquivalentTo(originalPackageAid);
         _ = command.ModuleAid.Should().BeEquivalentTo(originalModuleAid);
         _ = command.AppletAid.Should().BeEquivalentTo(originalAppletAid);

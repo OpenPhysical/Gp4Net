@@ -1,11 +1,10 @@
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Cryptography;
-using static Gp4Net.Cryptography.CryptoService;
 using Gp4Net.Core.Functional;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
+using static Gp4Net.Cryptography.CryptoService;
 
 namespace Gp4Net.Domain.Protocol;
 
@@ -33,6 +32,7 @@ public record SecureChannelContext(
     /// Alias for ScpVersion for compatibility.
     /// </summary>
     public ScpVersion Protocol => ScpVersion;
+
     /// <summary>
     /// Creates a SecureChannelContext with functional validation.
     /// </summary>

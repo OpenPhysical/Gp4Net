@@ -76,7 +76,7 @@ public sealed class KeysetResolver : IKeysetResolver
     /// </summary>
     public Result<IKeySet, SmartCardError> GetTestKeys(byte protocolVersion, byte keyVersion)
     {
-        CryptoService.ScpVersion scpVersion = protocolVersion switch
+        var scpVersion = protocolVersion switch
         {
             0x02 => CryptoService.ScpVersion.Scp02,
             0x03 => CryptoService.ScpVersion.Scp03,
@@ -100,7 +100,7 @@ public sealed class KeysetResolver : IKeysetResolver
     )
     {
         // Check if all explicit keys are provided
-        Maybe<(byte[] enc, byte[] mac, byte[] dek)> explicitKeysResult = encKey.Bind(enc =>
+        var explicitKeysResult = encKey.Bind(enc =>
             macKey.Bind(mac => dekKey.Map(dek => (enc, mac, dek)))
         );
 
@@ -120,7 +120,7 @@ public sealed class KeysetResolver : IKeysetResolver
                 // Use test keys based on card response if available
                 return cardResponse.Match(
                     response =>
-                        response.ScpId.Match(
+                        response.ScpVersion.Match(
                             scpVersion => GetTestKeys((byte)scpVersion, keyVersion),
                             () => GetTestKeys(0x02, keyVersion)
                         ),

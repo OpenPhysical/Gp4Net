@@ -2,10 +2,8 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
-using Gp4Net.Domain.Commands;
-using Gp4Net.Services;
 using Gp4Net.Services.GlobalPlatform;
+using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console.Cli;
@@ -16,6 +14,7 @@ namespace Gp4Net.Tool.Commands.Card;
 /// Command to connect to a smart card.
 /// </summary>
 [PublicAPI]
+[CliCommand("connect", "Connect to a smart card", "card")]
 [CommandHandler(Description = "Connect to a smart card")]
 public class ConnectCommand : IPipelineCommand<ConnectCommand.Settings>
 {
@@ -40,14 +39,15 @@ public class ConnectCommand : IPipelineCommand<ConnectCommand.Settings>
         context.Display.Success("Successfully connected to card");
 
         // Try to select ISD and get basic card information
-        Result<SelectResponse, SmartCardError> selectResult = await Discovery.DetectAndSelectIsdAsync(
-            (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
-            CancellationToken.None
-        );
+        var selectResult =
+            await Discovery.DetectAndSelectIsdAsync(
+                (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
+                CancellationToken.None
+            );
 
         if (selectResult.IsSuccess)
         {
-            SelectResponse response = selectResult.Value;
+            var response = selectResult.Value;
             context.Display.Success("✓ ISD successfully selected");
 
             // Display FCI information using functional pattern

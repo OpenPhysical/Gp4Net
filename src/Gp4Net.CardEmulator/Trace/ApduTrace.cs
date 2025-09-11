@@ -48,11 +48,7 @@ public class ApduTrace
     /// </summary>
     /// <returns>A new empty trace instance.</returns>
     public static ApduTrace CreateEmpty() =>
-        new ApduTrace(
-            ImmutableList<ApduExchange>.Empty,
-            Maybe<byte[]>.None,
-            new TraceMetadata()
-        );
+        new ApduTrace(ImmutableList<ApduExchange>.Empty, Maybe<byte[]>.None, new TraceMetadata());
 
     /// <summary>
     /// Creates a new trace with an additional APDU exchange.
@@ -61,10 +57,8 @@ public class ApduTrace
     /// <returns>A new trace instance with the added exchange, or an error.</returns>
     public Result<ApduTrace, SmartCardError> WithExchange(ApduExchange exchange)
     {
-        return Maybe.From(exchange)
-            .ToResult(SmartCardError.InvalidArgument("Exchange cannot be null"))
-            .Map(validExchange => new ApduTrace(
-                ImmutableList.CreateRange(_exchanges.Append(validExchange)),
+        return Result.Success<ApduTrace, SmartCardError>(new ApduTrace(
+                ImmutableList.CreateRange(_exchanges.Append(exchange)),
                 Atr,
                 Metadata
             ));
@@ -77,13 +71,7 @@ public class ApduTrace
     /// <returns>A new trace instance with the ATR set, or an error.</returns>
     public Result<ApduTrace, SmartCardError> WithAtr(byte[] atr)
     {
-        return Maybe.From(atr)
-            .ToResult(SmartCardError.InvalidArgument("ATR cannot be null"))
-            .Map(validAtr => new ApduTrace(
-                _exchanges,
-                Maybe<byte[]>.From(validAtr),
-                Metadata
-            ));
+        return Result.Success<ApduTrace, SmartCardError>(new ApduTrace(_exchanges, Maybe<byte[]>.From(atr), Metadata));
     }
 
     /// <summary>
@@ -130,7 +118,7 @@ public class TraceMetadata
     /// <summary>
     /// Gets or sets the reader name if known.
     /// </summary>
-    public string? ReaderName { get; set; }
+    public string ReaderName { get; set; }
 
     /// <summary>
     /// Gets additional properties.

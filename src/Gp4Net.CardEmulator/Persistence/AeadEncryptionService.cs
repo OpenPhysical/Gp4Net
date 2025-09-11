@@ -88,30 +88,25 @@ public class AeadEncryptionService : IDisposable
 
     private static Result<bool, SmartCardError> ValidateKey(byte[] key)
     {
-        return Maybe<byte[]>
-            .From(key)
-            .Where(k => k.Length == 32)
-            .ToResult(SmartCardError.InvalidArgument("Encryption key must be 32 bytes (AES-256)"))
-            .Map(_ => true);
+        return key.Length == 32
+            ? Result.Success<bool, SmartCardError>(true)
+            : Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("Encryption key must be 32 bytes (AES-256)"));
     }
 
     private static Result<bool, SmartCardError> ValidatePlaintext(byte[] plaintext)
     {
-        return Maybe<byte[]>
-            .From(plaintext)
-            .ToResult(SmartCardError.InvalidArgument("Plaintext cannot be null"))
-            .Map(_ => true);
+        return Result.Success<bool, SmartCardError>(true);
     }
 
     private static Result<bool, SmartCardError> ValidateEncryptedPayload(
         EncryptedPayload encryptedPayload
     )
     {
-        return Maybe<EncryptedPayload>
-            .From(encryptedPayload)
-            .Where(payload => payload.IsValid)
-            .ToResult(SmartCardError.InvalidArgument("Invalid encrypted payload structure"))
-            .Map(_ => true);
+        return encryptedPayload.IsValid
+            ? Result.Success<bool, SmartCardError>(true)
+            : Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("Invalid encrypted payload structure"));
     }
 
     private static Result<bool, SmartCardError> ValidateCardUuid(CardUuid cardUuid)
@@ -138,7 +133,8 @@ public class AeadEncryptionService : IDisposable
         CardUuid cardUuid
     )
     {
-        return CryptoService.Rng.GenerateBytes(12) // 96-bit IV for GCM
+        return CryptoService
+            .Rng.GenerateBytes(12) // 96-bit IV for GCM
             .Bind(iv => PerformUnifiedCryptoEncryption(key, plaintext, cardUuid, iv));
     }
 
@@ -150,8 +146,11 @@ public class AeadEncryptionService : IDisposable
     )
     {
         byte[] aad = cardUuid.ToByteArray();
-        return CryptoService.Aead.EncryptAesGcm(key, iv, plaintext, aad, 128)
-            .Bind(ciphertextWithTag => ExtractCiphertextAndTag(ciphertextWithTag, plaintext.Length, iv));
+        return CryptoService
+            .Aead.EncryptAesGcm(key, iv, plaintext, aad, 128)
+            .Bind(ciphertextWithTag =>
+                ExtractCiphertextAndTag(ciphertextWithTag, plaintext.Length, iv)
+            );
     }
 
     private static Result<EncryptedPayload, SmartCardError> ExtractCiphertextAndTag(
@@ -172,12 +171,15 @@ public class AeadEncryptionService : IDisposable
 
                 return new EncryptedPayload(
                     Algorithm: "aes-256-gcm",
-                    IV: iv,
+                    Iv: iv,
                     Ciphertext: ciphertext,
                     AuthTag: authTag
                 );
             },
-            ex => SmartCardError.CryptographicError($"Failed to extract ciphertext and tag: {ex.Message}")
+            ex =>
+                SmartCardError.CryptographicError(
+                    $"Failed to extract ciphertext and tag: {ex.Message}"
+                )
         );
     }
 
@@ -201,10 +203,10 @@ public class AeadEncryptionService : IDisposable
             {
                 byte[] aad = cardUuid.ToByteArray();
                 return CryptoService.Aead.DecryptAesGcm(
-                    key, 
-                    encryptedPayload.IV, 
-                    ciphertextWithTag, 
-                    aad, 
+                    key,
+                    encryptedPayload.Iv,
+                    ciphertextWithTag,
+                    aad,
                     128
                 );
             });
@@ -237,7 +239,10 @@ public class AeadEncryptionService : IDisposable
                 );
                 return ciphertextWithTag;
             },
-            ex => SmartCardError.CryptographicError($"Failed to combine ciphertext and tag: {ex.Message}")
+            ex =>
+                SmartCardError.CryptographicError(
+                    $"Failed to combine ciphertext and tag: {ex.Message}"
+                )
         );
     }
 

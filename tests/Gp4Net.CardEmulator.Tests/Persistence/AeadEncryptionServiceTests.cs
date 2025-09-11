@@ -4,7 +4,6 @@ using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Persistence;
-using Gp4Net.Core;
 using NUnit.Framework;
 
 namespace Gp4Net.CardEmulator.Tests.Persistence;
@@ -62,7 +61,7 @@ public class AeadEncryptionServiceTests
         _testPlaintext = Encoding.UTF8.GetBytes("Test CBOR card state data for encryption");
 
         // Generate valid UUID with explicit success check
-        Result<CardUuid, SmartCardError> uuidResult = CardUuid.Generate();
+        var uuidResult = CardUuid.Generate();
         if (uuidResult.IsSuccess)
         {
             _validUuid = uuidResult.Value;
@@ -83,7 +82,7 @@ public class AeadEncryptionServiceTests
     public void Encrypt_WithValidInputs_ReturnsSuccessResult()
     {
         // Act
-        Result<EncryptedPayload, SmartCardError> result = _service.Encrypt(
+        var result = _service.Encrypt(
             _validKey,
             _testPlaintext,
             _validUuid
@@ -95,7 +94,7 @@ public class AeadEncryptionServiceTests
             payload =>
             {
                 _ = payload.Algorithm.Should().Be("aes-256-gcm");
-                _ = payload.IV.Length.Should().Be(12);
+                _ = payload.Iv.Length.Should().Be(12);
                 _ = payload.AuthTag.Length.Should().Be(16);
                 _ = payload.Ciphertext.Length.Should().Be(_testPlaintext.Length);
                 _ = payload.IsValid.Should().BeTrue();
@@ -108,7 +107,7 @@ public class AeadEncryptionServiceTests
     public void Encrypt_ProducesValidEncryptedPayload()
     {
         // Act
-        Result<EncryptedPayload, SmartCardError> result = _service.Encrypt(
+        var result = _service.Encrypt(
             _validKey,
             _testPlaintext,
             _validUuid
@@ -122,9 +121,9 @@ public class AeadEncryptionServiceTests
                 // Verify payload structure
                 _ = payload
                     .TotalSize.Should()
-                    .Be(payload.IV.Length + payload.Ciphertext.Length + payload.AuthTag.Length);
+                    .Be(payload.Iv.Length + payload.Ciphertext.Length + payload.AuthTag.Length);
                 _ = payload.Ciphertext.Should().NotBeEquivalentTo(_testPlaintext); // Should be encrypted
-                _ = payload.IV.Should().NotBeEquivalentTo(new byte[12]); // Should not be all zeros
+                _ = payload.Iv.Should().NotBeEquivalentTo(new byte[12]); // Should not be all zeros
                 _ = payload.AuthTag.Should().NotBeEquivalentTo(new byte[16]); // Should not be all zeros
             },
             error => Assert.Fail($"Expected success but got error: {error}")
@@ -135,12 +134,12 @@ public class AeadEncryptionServiceTests
     public void Encrypt_MultipleTimes_ProducesDifferentCiphertexts()
     {
         // Act - encrypt same plaintext twice
-        Result<EncryptedPayload, SmartCardError> result1 = _service.Encrypt(
+        var result1 = _service.Encrypt(
             _validKey,
             _testPlaintext,
             _validUuid
         );
-        Result<EncryptedPayload, SmartCardError> result2 = _service.Encrypt(
+        var result2 = _service.Encrypt(
             _validKey,
             _testPlaintext,
             _validUuid
@@ -156,7 +155,7 @@ public class AeadEncryptionServiceTests
                     payload2 =>
                     {
                         // Different IVs should produce different ciphertexts
-                        _ = payload1.IV.Should().NotBeEquivalentTo(payload2.IV);
+                        _ = payload1.Iv.Should().NotBeEquivalentTo(payload2.Iv);
                         _ = payload1.Ciphertext.Should().NotBeEquivalentTo(payload2.Ciphertext);
                         _ = payload1.AuthTag.Should().NotBeEquivalentTo(payload2.AuthTag);
                     },
@@ -173,7 +172,7 @@ public class AeadEncryptionServiceTests
         byte[] emptyPlaintext = [];
 
         // Act
-        Result<EncryptedPayload, SmartCardError> result = _service.Encrypt(
+        var result = _service.Encrypt(
             _validKey,
             emptyPlaintext,
             _validUuid
@@ -195,7 +194,7 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithValidEncryptedPayload_ReturnsOriginalPlaintext()
     {
         // Arrange - first encrypt some data
-        Result<EncryptedPayload, SmartCardError> encryptResult = _service.Encrypt(
+        var encryptResult = _service.Encrypt(
             _validKey,
             _testPlaintext,
             _validUuid
@@ -206,7 +205,7 @@ public class AeadEncryptionServiceTests
             encryptedPayload =>
             {
                 // Act - decrypt the payload
-                Result<byte[], SmartCardError> decryptResult = _service.Decrypt(
+                var decryptResult = _service.Decrypt(
                     _validKey,
                     encryptedPayload,
                     _validUuid
@@ -227,7 +226,7 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithWrongKey_ReturnsFailure()
     {
         // Arrange - encrypt with one key
-        Result<EncryptedPayload, SmartCardError> encryptResult = _service.Encrypt(
+        var encryptResult = _service.Encrypt(
             _validKey,
             _testPlaintext,
             _validUuid
@@ -241,7 +240,7 @@ public class AeadEncryptionServiceTests
             encryptedPayload =>
             {
                 // Act - try to decrypt with wrong key
-                Result<byte[], SmartCardError> decryptResult = _service.Decrypt(
+                var decryptResult = _service.Decrypt(
                     wrongKey,
                     encryptedPayload,
                     _validUuid
@@ -259,7 +258,7 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithWrongUuid_ReturnsFailure()
     {
         // Arrange - encrypt with one UUID
-        Result<EncryptedPayload, SmartCardError> encryptResult = _service.Encrypt(
+        var encryptResult = _service.Encrypt(
             _validKey,
             _testPlaintext,
             _validUuid
@@ -267,7 +266,7 @@ public class AeadEncryptionServiceTests
         encryptResult.IsSuccess.Should().BeTrue();
 
         // Create different UUID
-        Result<CardUuid, SmartCardError> wrongUuidResult = CardUuid.Generate();
+        var wrongUuidResult = CardUuid.Generate();
         wrongUuidResult.IsSuccess.Should().BeTrue();
 
         encryptResult.Match(
@@ -276,7 +275,7 @@ public class AeadEncryptionServiceTests
                     wrongUuid =>
                     {
                         // Act - try to decrypt with wrong UUID
-                        Result<byte[], SmartCardError> decryptResult = _service.Decrypt(
+                        var decryptResult = _service.Decrypt(
                             _validKey,
                             encryptedPayload,
                             wrongUuid
@@ -296,7 +295,7 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithTamperedCiphertext_ReturnsFailure()
     {
         // Arrange - encrypt some data
-        Result<EncryptedPayload, SmartCardError> encryptResult = _service.Encrypt(
+        var encryptResult = _service.Encrypt(
             _validKey,
             _testPlaintext,
             _validUuid
@@ -310,13 +309,13 @@ public class AeadEncryptionServiceTests
                 byte[] tamperedCiphertext = [.. originalPayload.Ciphertext];
                 tamperedCiphertext[0] ^= 0xFF; // Flip all bits in first byte
 
-                EncryptedPayload tamperedPayload = originalPayload with
+                var tamperedPayload = originalPayload with
                 {
                     Ciphertext = tamperedCiphertext,
                 };
 
                 // Act - try to decrypt tampered data
-                Result<byte[], SmartCardError> decryptResult = _service.Decrypt(
+                var decryptResult = _service.Decrypt(
                     _validKey,
                     tamperedPayload,
                     _validUuid
@@ -334,7 +333,7 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithTamperedAuthTag_ReturnsFailure()
     {
         // Arrange - encrypt some data
-        Result<EncryptedPayload, SmartCardError> encryptResult = _service.Encrypt(
+        var encryptResult = _service.Encrypt(
             _validKey,
             _testPlaintext,
             _validUuid
@@ -348,13 +347,13 @@ public class AeadEncryptionServiceTests
                 byte[] tamperedAuthTag = [.. originalPayload.AuthTag];
                 tamperedAuthTag[0] ^= 0xFF; // Flip all bits in first byte
 
-                EncryptedPayload tamperedPayload = originalPayload with
+                var tamperedPayload = originalPayload with
                 {
                     AuthTag = tamperedAuthTag,
                 };
 
                 // Act - try to decrypt tampered data
-                Result<byte[], SmartCardError> decryptResult = _service.Decrypt(
+                var decryptResult = _service.Decrypt(
                     _validKey,
                     tamperedPayload,
                     _validUuid
@@ -372,7 +371,7 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithTamperedIV_ReturnsFailure()
     {
         // Arrange - encrypt some data
-        Result<EncryptedPayload, SmartCardError> encryptResult = _service.Encrypt(
+        var encryptResult = _service.Encrypt(
             _validKey,
             _testPlaintext,
             _validUuid
@@ -383,13 +382,13 @@ public class AeadEncryptionServiceTests
             originalPayload =>
             {
                 // Tamper with IV
-                byte[] tamperedIV = [.. originalPayload.IV];
-                tamperedIV[0] ^= 0xFF; // Flip all bits in first byte
+                byte[] tamperedIv = [.. originalPayload.Iv];
+                tamperedIv[0] ^= 0xFF; // Flip all bits in first byte
 
-                EncryptedPayload tamperedPayload = originalPayload with { IV = tamperedIV };
+                var tamperedPayload = originalPayload with { Iv = tamperedIv };
 
                 // Act - try to decrypt tampered data
-                Result<byte[], SmartCardError> decryptResult = _service.Decrypt(
+                var decryptResult = _service.Decrypt(
                     _validKey,
                     tamperedPayload,
                     _validUuid
@@ -412,7 +411,7 @@ public class AeadEncryptionServiceTests
         );
 
         // Act - encrypt then decrypt
-        Result<EncryptedPayload, SmartCardError> encryptResult = _service.Encrypt(
+        var encryptResult = _service.Encrypt(
             _validKey,
             originalData,
             _validUuid
@@ -422,7 +421,7 @@ public class AeadEncryptionServiceTests
         encryptResult.Match(
             encryptedPayload =>
             {
-                Result<byte[], SmartCardError> decryptResult = _service.Decrypt(
+                var decryptResult = _service.Decrypt(
                     _validKey,
                     encryptedPayload,
                     _validUuid
@@ -445,7 +444,7 @@ public class AeadEncryptionServiceTests
         byte[] largeData = [.. Enumerable.Range(0, 10000).Select(i => (byte)(i % 256))];
 
         // Act - encrypt then decrypt
-        Result<EncryptedPayload, SmartCardError> encryptResult = _service.Encrypt(
+        var encryptResult = _service.Encrypt(
             _validKey,
             largeData,
             _validUuid
@@ -455,7 +454,7 @@ public class AeadEncryptionServiceTests
         encryptResult.Match(
             encryptedPayload =>
             {
-                Result<byte[], SmartCardError> decryptResult = _service.Decrypt(
+                var decryptResult = _service.Decrypt(
                     _validKey,
                     encryptedPayload,
                     _validUuid
@@ -475,7 +474,7 @@ public class AeadEncryptionServiceTests
     public void Encrypt_WithNullKey_ReturnsFailure()
     {
         // Act
-        Result<EncryptedPayload, SmartCardError> result = _service.Encrypt(
+        var result = _service.Encrypt(
             null!,
             _testPlaintext,
             _validUuid
@@ -494,7 +493,7 @@ public class AeadEncryptionServiceTests
         byte[] wrongSizeKey = new byte[16]; // AES-128, not AES-256
 
         // Act
-        Result<EncryptedPayload, SmartCardError> result = _service.Encrypt(
+        var result = _service.Encrypt(
             wrongSizeKey,
             _testPlaintext,
             _validUuid
@@ -510,7 +509,7 @@ public class AeadEncryptionServiceTests
     public void Encrypt_WithNullPlaintext_ReturnsFailure()
     {
         // Act
-        Result<EncryptedPayload, SmartCardError> result = _service.Encrypt(
+        var result = _service.Encrypt(
             _validKey,
             null!,
             _validUuid
@@ -526,10 +525,10 @@ public class AeadEncryptionServiceTests
     public void Encrypt_WithEmptyUuid_ReturnsFailure()
     {
         // Arrange
-        CardUuid emptyUuid = CardUuid.Empty;
+        var emptyUuid = CardUuid.Empty;
 
         // Act
-        Result<EncryptedPayload, SmartCardError> result = _service.Encrypt(
+        var result = _service.Encrypt(
             _validKey,
             _testPlaintext,
             emptyUuid
@@ -545,15 +544,15 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithNullKey_ReturnsFailure()
     {
         // Arrange
-        EncryptedPayload validPayload = new EncryptedPayload(
+        var validPayload = new EncryptedPayload(
             Algorithm: "aes-256-gcm",
-            IV: new byte[12],
+            Iv: new byte[12],
             Ciphertext: new byte[10],
             AuthTag: new byte[16]
         );
 
         // Act
-        Result<byte[], SmartCardError> result = _service.Decrypt(null!, validPayload, _validUuid);
+        var result = _service.Decrypt(null!, validPayload, _validUuid);
 
         // Assert
         result.IsFailure.Should().BeTrue();
@@ -565,15 +564,15 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithInvalidPayload_ReturnsFailure()
     {
         // Arrange - create invalid payload
-        EncryptedPayload invalidPayload = new EncryptedPayload(
+        var invalidPayload = new EncryptedPayload(
             Algorithm: "invalid-algorithm",
-            IV: new byte[10], // Wrong IV size
+            Iv: new byte[10], // Wrong IV size
             Ciphertext: new byte[10],
             AuthTag: new byte[10] // Wrong auth tag size
         );
 
         // Act
-        Result<byte[], SmartCardError> result = _service.Decrypt(
+        var result = _service.Decrypt(
             _validKey,
             invalidPayload,
             _validUuid
@@ -589,7 +588,7 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithNullPayload_ReturnsFailure()
     {
         // Act
-        Result<byte[], SmartCardError> result = _service.Decrypt(_validKey, null!, _validUuid);
+        var result = _service.Decrypt(_validKey, null!, _validUuid);
 
         // Assert
         result.IsFailure.Should().BeTrue();
@@ -604,7 +603,7 @@ public class AeadEncryptionServiceTests
         _service.Dispose();
 
         // Act
-        Result<EncryptedPayload, SmartCardError> result = _service.Encrypt(
+        var result = _service.Encrypt(
             _validKey,
             _testPlaintext,
             _validUuid
@@ -620,16 +619,16 @@ public class AeadEncryptionServiceTests
     public void Decrypt_AfterDispose_ReturnsFailure()
     {
         // Arrange
-        EncryptedPayload validPayload = new EncryptedPayload(
+        var validPayload = new EncryptedPayload(
             Algorithm: "aes-256-gcm",
-            IV: new byte[12],
+            Iv: new byte[12],
             Ciphertext: new byte[10],
             AuthTag: new byte[16]
         );
         _service.Dispose();
 
         // Act
-        Result<byte[], SmartCardError> result = _service.Decrypt(
+        var result = _service.Decrypt(
             _validKey,
             validPayload,
             _validUuid
@@ -653,9 +652,9 @@ public class AeadEncryptionServiceTests
     public void EncryptedPayload_IsValid_ReturnsTrueForValidPayload()
     {
         // Arrange
-        EncryptedPayload validPayload = new EncryptedPayload(
+        var validPayload = new EncryptedPayload(
             Algorithm: "aes-256-gcm",
-            IV: new byte[12],
+            Iv: new byte[12],
             Ciphertext: new byte[10],
             AuthTag: new byte[16]
         );
@@ -668,9 +667,9 @@ public class AeadEncryptionServiceTests
     public void EncryptedPayload_IsValid_ReturnsFalseForInvalidAlgorithm()
     {
         // Arrange
-        EncryptedPayload invalidPayload = new EncryptedPayload(
+        var invalidPayload = new EncryptedPayload(
             Algorithm: "invalid",
-            IV: new byte[12],
+            Iv: new byte[12],
             Ciphertext: new byte[10],
             AuthTag: new byte[16]
         );
@@ -683,9 +682,9 @@ public class AeadEncryptionServiceTests
     public void EncryptedPayload_IsValid_ReturnsFalseForWrongIVSize()
     {
         // Arrange
-        EncryptedPayload invalidPayload = new EncryptedPayload(
+        var invalidPayload = new EncryptedPayload(
             Algorithm: "aes-256-gcm",
-            IV: new byte[16], // Should be 12
+            Iv: new byte[16], // Should be 12
             Ciphertext: new byte[10],
             AuthTag: new byte[16]
         );
@@ -698,9 +697,9 @@ public class AeadEncryptionServiceTests
     public void EncryptedPayload_IsValid_ReturnsFalseForWrongAuthTagSize()
     {
         // Arrange
-        EncryptedPayload invalidPayload = new EncryptedPayload(
+        var invalidPayload = new EncryptedPayload(
             Algorithm: "aes-256-gcm",
-            IV: new byte[12],
+            Iv: new byte[12],
             Ciphertext: new byte[10],
             AuthTag: new byte[8] // Should be 16
         );
@@ -713,9 +712,9 @@ public class AeadEncryptionServiceTests
     public void EncryptedPayload_IsValid_ReturnsFalseForEmptyCiphertext()
     {
         // Arrange
-        EncryptedPayload invalidPayload = new EncryptedPayload(
+        var invalidPayload = new EncryptedPayload(
             Algorithm: "aes-256-gcm",
-            IV: new byte[12],
+            Iv: new byte[12],
             Ciphertext: [], // Empty ciphertext
             AuthTag: new byte[16]
         );
@@ -728,9 +727,9 @@ public class AeadEncryptionServiceTests
     public void EncryptedPayload_TotalSize_CalculatesCorrectly()
     {
         // Arrange
-        EncryptedPayload payload = new EncryptedPayload(
+        var payload = new EncryptedPayload(
             Algorithm: "aes-256-gcm",
-            IV: new byte[12],
+            Iv: new byte[12],
             Ciphertext: new byte[100],
             AuthTag: new byte[16]
         );
@@ -743,8 +742,8 @@ public class AeadEncryptionServiceTests
     public void UuidBinding_DifferentUuids_ProduceDifferentCiphertexts()
     {
         // Arrange
-        Result<CardUuid, SmartCardError> uuid1Result = CardUuid.Generate();
-        Result<CardUuid, SmartCardError> uuid2Result = CardUuid.Generate();
+        var uuid1Result = CardUuid.Generate();
+        var uuid2Result = CardUuid.Generate();
         uuid1Result.IsSuccess.Should().BeTrue();
         uuid2Result.IsSuccess.Should().BeTrue();
 
@@ -754,12 +753,12 @@ public class AeadEncryptionServiceTests
                     uuid2 =>
                     {
                         // Act - encrypt same data with different UUIDs
-                        Result<EncryptedPayload, SmartCardError> result1 = _service.Encrypt(
+                        var result1 = _service.Encrypt(
                             _validKey,
                             _testPlaintext,
                             uuid1
                         );
-                        Result<EncryptedPayload, SmartCardError> result2 = _service.Encrypt(
+                        var result2 = _service.Encrypt(
                             _validKey,
                             _testPlaintext,
                             uuid2
@@ -795,8 +794,8 @@ public class AeadEncryptionServiceTests
     public void UuidBinding_CrossDecryption_ShouldFail()
     {
         // Arrange - create two different UUIDs
-        Result<CardUuid, SmartCardError> uuid1Result = CardUuid.Generate();
-        Result<CardUuid, SmartCardError> uuid2Result = CardUuid.Generate();
+        var uuid1Result = CardUuid.Generate();
+        var uuid2Result = CardUuid.Generate();
         uuid1Result.IsSuccess.Should().BeTrue();
         uuid2Result.IsSuccess.Should().BeTrue();
 
@@ -806,7 +805,7 @@ public class AeadEncryptionServiceTests
                     uuid2 =>
                     {
                         // Encrypt with uuid1
-                        Result<EncryptedPayload, SmartCardError> encryptResult = _service.Encrypt(
+                        var encryptResult = _service.Encrypt(
                             _validKey,
                             _testPlaintext,
                             uuid1
@@ -817,7 +816,7 @@ public class AeadEncryptionServiceTests
                             encryptedPayload =>
                             {
                                 // Try to decrypt with uuid2
-                                Result<byte[], SmartCardError> decryptResult = _service.Decrypt(
+                                var decryptResult = _service.Decrypt(
                                     _validKey,
                                     encryptedPayload,
                                     uuid2

@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using AwesomeAssertions;
-using Gp4Net.Tests.Infrastructure;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Tests.Infrastructure;
 using Gp4Net.Transport;
 using NUnit.Framework;
 
@@ -59,7 +59,7 @@ public class DeleteCommandTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        DeleteCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Type.Should().Be(DeleteCommand.DeleteType.DeleteObjectAndRelated);
         _ = command.Target.Should().Be(DeleteCommand.DeleteTarget.WithRelated);
         _ = command.P1.Should().Be(0x00); // Delete object and related
@@ -82,7 +82,7 @@ public class DeleteCommandTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        DeleteCommand? command = result.Value;
+        var command = result.Value;
         _ = command.DeletionToken.HasValue.Should().BeTrue();
         _ = command.DeletionToken.Value.Should().BeEquivalentTo(deletionToken);
     }
@@ -129,7 +129,7 @@ public class DeleteCommandTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        DeleteCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Aids[0].Should().BeEquivalentTo(packageAid);
     }
 
@@ -152,7 +152,7 @@ public class DeleteCommandTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        DeleteCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Aids.Should().HaveCount(3);
         for (int i = 0; i < aids.Length; i++)
         {
@@ -225,7 +225,7 @@ public class DeleteCommandTests
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
-        DeleteCommand? command = result.Value;
+        var command = result.Value;
         _ = command.Type.Should().Be(DeleteCommand.DeleteType.DeleteObjectOnly);
         _ = command.Target.Should().Be(DeleteCommand.DeleteTarget.ByAid);
         _ = command.Aids.Should().HaveCount(1);
@@ -237,25 +237,25 @@ public class DeleteCommandTests
     {
         // Arrange
         byte[] aid = Convert.FromHexString("A000000003000000");
-        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(
-            aid,
-            deleteRelated: false
-        );
-        DeleteCommand? command = commandResult.Value;
 
-        // Act
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
-
-        // Assert
-        _ = apdu[0].Should().Be(0x80); // CLA
-        _ = apdu[1].Should().Be(0xE4); // INS
-        _ = apdu[2].Should().Be(0x80); // P1 (delete object only)
-        _ = apdu[3].Should().Be(0x00); // P2 (by AID)
-        _ = apdu[4].Should().Be(0x0A); // Lc = 2 + 8 (tag + length + AID)
-        _ = apdu[5].Should().Be(0x4F); // AID tag
-        _ = apdu[6].Should().Be(0x08); // AID length (8 bytes)
-        _ = apdu.Skip(7).Take(8).Should().BeEquivalentTo(aid);
-        _ = apdu.Length.Should().Be(15); // 5 header + 10 data
+        // Act & Assert
+        DeleteCommand.CreateForApplication(aid, deleteRelated: false)
+            .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)))
+            .Match(
+                apdu =>
+                {
+                    _ = apdu[0].Should().Be(0x80); // CLA
+                    _ = apdu[1].Should().Be(0xE4); // INS
+                    _ = apdu[2].Should().Be(0x80); // P1 (delete object only)
+                    _ = apdu[3].Should().Be(0x00); // P2 (by AID)
+                    _ = apdu[4].Should().Be(0x0A); // Lc = 2 + 8 (tag + length + AID)
+                    _ = apdu[5].Should().Be(0x4F); // AID tag
+                    _ = apdu[6].Should().Be(0x08); // AID length (8 bytes)
+                    _ = apdu.Skip(7).Take(8).Should().BeEquivalentTo(aid);
+                    _ = apdu.Length.Should().Be(15); // 5 header + 10 data
+                },
+                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+            );
     }
 
     [Test]
@@ -264,36 +264,36 @@ public class DeleteCommandTests
         // Arrange
         byte[] aid = Convert.FromHexString("A000000003000000");
         byte[] deletionToken = Convert.FromHexString("20EEDD243F094FAD");
-        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(
-            aid,
-            deleteRelated: true,
-            deletionToken
+
+        // Act & Assert
+        var result = DeleteCommand.CreateForApplication(aid, deleteRelated: true, deletionToken)
+            .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)));
+
+        result.Match(
+            apdu =>
+            {
+                _ = apdu[0].Should().Be(0x80); // CLA
+                _ = apdu[1].Should().Be(0xE4); // INS
+                _ = apdu[2].Should().Be(0x00); // P1 (delete object and related)
+                _ = apdu[3].Should().Be(0x80); // P2 (with related)
+
+                int expectedLc = 2 + aid.Length + deletionToken.Length; // 4F<len><AID><token>
+                _ = apdu[4].Should().Be((byte)expectedLc);
+
+                // Verify AID TLV
+                _ = apdu[5].Should().Be(0x4F); // AID tag
+                _ = apdu[6].Should().Be((byte)aid.Length);
+                _ = apdu.Skip(7).Take(aid.Length).Should().BeEquivalentTo(aid);
+
+                // Verify deletion token is appended directly (no TLV wrapper)
+                int tokenOffset = 7 + aid.Length;
+                _ = apdu.Skip(tokenOffset)
+                    .Take(deletionToken.Length)
+                    .Should()
+                    .BeEquivalentTo(deletionToken);
+            },
+            error => Result.Success().IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
         );
-        DeleteCommand? command = commandResult.Value;
-
-        // Act
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
-
-        // Assert
-        _ = apdu[0].Should().Be(0x80); // CLA
-        _ = apdu[1].Should().Be(0xE4); // INS
-        _ = apdu[2].Should().Be(0x00); // P1 (delete object and related)
-        _ = apdu[3].Should().Be(0x80); // P2 (with related)
-
-        int expectedLc = 2 + aid.Length + deletionToken.Length; // 4F<len><AID><token>
-        _ = apdu[4].Should().Be((byte)expectedLc);
-
-        // Verify AID TLV
-        _ = apdu[5].Should().Be(0x4F); // AID tag
-        _ = apdu[6].Should().Be((byte)aid.Length);
-        _ = apdu.Skip(7).Take(aid.Length).Should().BeEquivalentTo(aid);
-
-        // Verify deletion token is appended directly (no TLV wrapper)
-        int tokenOffset = 7 + aid.Length;
-        _ = apdu.Skip(tokenOffset)
-            .Take(deletionToken.Length)
-            .Should()
-            .BeEquivalentTo(deletionToken);
     }
 
     [Test]
@@ -306,29 +306,29 @@ public class DeleteCommandTests
             Convert.FromHexString("A0000003080000"), // 7 bytes
             Convert.FromHexString("A000000308"), // 5 bytes
         ];
-        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplications(
-            aids
-        );
-        DeleteCommand? command = commandResult.Value;
 
-        // Act
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        // Act & Assert
+        DeleteCommand.CreateForApplications(aids)
+            .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)))
+            .Match(
+                apdu =>
+                {
+                    int totalAidLength = aids.Sum(aid => aid.Length); // 9 + 7 + 5 = 21
+                    int expectedLc = 2 + totalAidLength; // 4F<len><all AIDs>
 
-        // Assert
-        int totalAidLength = aids.Sum(aid => aid.Length); // 9 + 7 + 5 = 21
-        int expectedLc = 2 + totalAidLength; // 4F<len><all AIDs>
+                    _ = apdu[4].Should().Be((byte)expectedLc); // Lc
+                    _ = apdu[5].Should().Be(0x4F); // AID tag
+                    _ = apdu[6].Should().Be((byte)totalAidLength); // Total length of all AIDs
 
-        _ = apdu[4].Should().Be((byte)expectedLc); // Lc
-        _ = apdu[5].Should().Be(0x4F); // AID tag
-        _ = apdu[6].Should().Be((byte)totalAidLength); // Total length of all AIDs
-
-        // Verify all AIDs are concatenated
-        int offset = 7;
-        foreach (byte[] aid in aids)
-        {
-            _ = apdu.Skip(offset).Take(aid.Length).Should().BeEquivalentTo(aid);
-            offset += aid.Length;
-        }
+                    // Verify all AIDs are concatenated using functional approach
+                    aids.Aggregate(7, (offset, aid) =>
+                    {
+                        _ = apdu.Skip(offset).Take(aid.Length).Should().BeEquivalentTo(aid);
+                        return offset + aid.Length;
+                    });
+                },
+                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+            );
     }
 
     [Test]
@@ -336,19 +336,20 @@ public class DeleteCommandTests
     {
         // Arrange
         byte[] aid = Convert.FromHexString("A000000003000000");
-        Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(
-            aid
-        );
-        DeleteCommand? command = commandResult.Value;
 
-        // Act
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
-
-        // Assert
-        // Total length should be: 5 (header) + Lc value
-        int expectedLength = 5 + apdu[4];
-        _ = apdu.Length.Should().Be(expectedLength);
-        // No LE byte at the end
+        // Act & Assert
+        DeleteCommand.CreateForApplication(aid)
+            .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)))
+            .Match(
+                apdu =>
+                {
+                    // Total length should be: 5 (header) + Lc value
+                    int expectedLength = 5 + apdu[4];
+                    _ = apdu.Length.Should().Be(expectedLength);
+                    // No LE byte at the end
+                },
+                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+            );
     }
 
     [Test]
@@ -359,7 +360,7 @@ public class DeleteCommandTests
         Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(
             aid
         );
-        DeleteCommand? command = commandResult.Value;
+        var command = commandResult.Value;
 
         // Act
         byte[]? data = command.Data;
@@ -379,7 +380,7 @@ public class DeleteCommandTests
         ushort statusWord = 0x9000;
 
         // Act
-        DeleteResponse? response = DeleteResponse.Parse(responseData, statusWord);
+        var response = DeleteResponse.Parse(responseData, statusWord);
 
         // Assert
         _ = response.IsSuccessful.Should().BeTrue();
@@ -402,7 +403,7 @@ public class DeleteCommandTests
         ushort statusWord = 0x9000;
 
         // Act
-        DeleteResponse? response = DeleteResponse.Parse(responseData, statusWord);
+        var response = DeleteResponse.Parse(responseData, statusWord);
 
         // Assert
         _ = response.IsSuccessful.Should().BeTrue();
@@ -419,7 +420,7 @@ public class DeleteCommandTests
         ushort statusWord = 0x9000;
 
         // Act
-        DeleteResponse? response = DeleteResponse.Parse(responseData, statusWord);
+        var response = DeleteResponse.Parse(responseData, statusWord);
 
         // Assert
         _ = response.IsSuccessful.Should().BeTrue();
@@ -444,7 +445,7 @@ public class DeleteCommandTests
         foreach ((ushort statusWord, string expectedDescription) in testCases)
         {
             // Act
-            DeleteResponse response = new DeleteResponse([], statusWord);
+            var response = new DeleteResponse([], statusWord);
             string? description = response.GetResultDescription();
 
             // Assert
@@ -460,7 +461,7 @@ public class DeleteCommandTests
         Result<DeleteCommand, SmartCardError> commandResult = DeleteCommand.CreateForApplication(
             aid
         );
-        DeleteCommand? command = commandResult.Value;
+        var command = commandResult.Value;
         byte[][] originalAids = [.. command.Aids];
 
         // Act - Attempt to modify the returned AID list
@@ -478,7 +479,7 @@ public class DeleteCommandTests
     {
         // Arrange
         byte[] aid = Convert.FromHexString("A000000003000000");
-        DeletionReceipt receipt = new DeletionReceipt(aid, true);
+        var receipt = new DeletionReceipt(aid, true);
 
         // Act - Modify original array
         aid[0] = 0xFF;

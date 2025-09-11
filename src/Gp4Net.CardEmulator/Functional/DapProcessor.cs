@@ -28,7 +28,8 @@ public static class DapProcessor
     /// <returns>True if DAP verification passes or no DAP present, false otherwise.</returns>
     public static Result<bool, SmartCardError> VerifyDapSignature(
         byte[] capFileData,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return ExtractDapBlock(capFileData)
             .Match(
@@ -46,7 +47,8 @@ public static class DapProcessor
     {
         return FindDapTag(capFileData, 0xE2) // DAP block tag
             .Match(
-                onSuccess: tagPosition => Maybe<DapBlock>.From(CreateDapBlock(capFileData, tagPosition)),
+                onSuccess: tagPosition =>
+                    Maybe<DapBlock>.From(CreateDapBlock(capFileData, tagPosition)),
                 onFailure: _ => Maybe<DapBlock>.None
             );
     }
@@ -59,8 +61,7 @@ public static class DapProcessor
     /// <returns>Position of the tag if found, error otherwise.</returns>
     private static Result<int, SmartCardError> FindDapTag(byte[] data, byte dapTag)
     {
-        var tagPositions = data
-            .Select((value, index) => new { Value = value, Index = index })
+        var tagPositions = data.Select((value, index) => new { Value = value, Index = index })
             .Where(item => item.Value == dapTag)
             .Select(item => item.Index);
 
@@ -80,7 +81,7 @@ public static class DapProcessor
         // Simplified DAP block extraction for emulation
         int blockLength = Math.Min(256, capFileData.Length - tagPosition);
         var blockData = ImmutableArray.Create(capFileData, tagPosition, blockLength);
-        
+
         return new DapBlock(
             SecurityDomainAid: ImmutableArray<byte>.Empty,
             DapSignature: blockData[..Math.Min(64, blockData.Length)],
@@ -99,7 +100,8 @@ public static class DapProcessor
     private static Result<bool, SmartCardError> PerformDapVerification(
         DapBlock dapBlock,
         byte[] capFileData,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return ValidateDapAlgorithm(dapBlock)
             .Bind(validBlock => VerifyDapCertificateChain(validBlock, config))
@@ -119,8 +121,11 @@ public static class DapProcessor
             0x01 => Result.Success<DapBlock, SmartCardError>(dapBlock), // RSA-SHA1
             0x02 => Result.Success<DapBlock, SmartCardError>(dapBlock), // RSA-SHA256
             0x03 => Result.Success<DapBlock, SmartCardError>(dapBlock), // ECDSA-SHA256
-            _ => Result.Failure<DapBlock, SmartCardError>(SmartCardError.SecurityStatusNotSatisfied(
-                $"Unsupported DAP algorithm: {dapBlock.SignatureAlgorithm:X2}"))
+            _ => Result.Failure<DapBlock, SmartCardError>(
+                SmartCardError.SecurityStatusNotSatisfied(
+                    $"Unsupported DAP algorithm: {dapBlock.SignatureAlgorithm:X2}"
+                )
+            ),
         };
     }
 
@@ -132,17 +137,21 @@ public static class DapProcessor
     /// <returns>Verified DAP block or error.</returns>
     private static Result<DapBlock, SmartCardError> VerifyDapCertificateChain(
         DapBlock dapBlock,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         if (!dapBlock.CertificateChain.Any())
         {
             return Result.Failure<DapBlock, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied("No certificate chain provided"));
+                SmartCardError.SecurityStatusNotSatisfied("No certificate chain provided")
+            );
         }
-        
+
         // Validate the certificate chain and return the validated DAP block
-        return CryptoService.Signature.ValidateCertificateChain(
-            dapBlock.CertificateChain.Select(cert => cert.ToArray()).ToArray())
+        return CryptoService
+            .Signature.ValidateCertificateChain(
+                dapBlock.CertificateChain.Select(cert => cert.ToArray()).ToArray()
+            )
             .Map(_ => dapBlock);
     }
 
@@ -154,17 +163,25 @@ public static class DapProcessor
     /// <returns>Verified DAP block or error.</returns>
     private static Result<DapBlock, SmartCardError> VerifyDapDataSignature(
         DapBlock dapBlock,
-        byte[] capFileData)
+        byte[] capFileData
+    )
     {
         // First extract the public key from the validated certificate chain
-        return CryptoService.Signature.ValidateCertificateChain(
-            dapBlock.CertificateChain.Select(cert => cert.ToArray()).ToArray())
-            .Bind(publicKey => ExtractSignedData(capFileData)
-                .Bind(signedData => VerifySignature(
-                    signedData, 
-                    dapBlock.DapSignature.ToArray(), 
-                    publicKey, 
-                    dapBlock.SignatureAlgorithm)))
+        return CryptoService
+            .Signature.ValidateCertificateChain(
+                dapBlock.CertificateChain.Select(cert => cert.ToArray()).ToArray()
+            )
+            .Bind(publicKey =>
+                ExtractSignedData(capFileData)
+                    .Bind(signedData =>
+                        VerifySignature(
+                            signedData,
+                            dapBlock.DapSignature.ToArray(),
+                            publicKey,
+                            dapBlock.SignatureAlgorithm
+                        )
+                    )
+            )
             .Map(_ => dapBlock);
     }
 
@@ -187,20 +204,22 @@ public static class DapProcessor
     /// </summary>
     /// <param name="data">The data that was signed.</param>
     /// <param name="signature">The signature to verify.</param>
+    /// <param name="publicKey">The public key for verification.</param>
+    /// <param name="algorithm">The signature algorithm identifier.</param>
     /// <returns>True if signature is valid, false otherwise.</returns>
     private static Result<bool, SmartCardError> VerifySignature(
-        byte[] data, 
-        byte[] signature, 
+        byte[] data,
+        byte[] signature,
         byte[] publicKey,
-        byte algorithm)
+        byte algorithm
+    )
     {
         return algorithm switch
         {
             0x01 => CryptoService.Signature.VerifyRsaSha1(data, signature, publicKey),
             0x02 => CryptoService.Signature.VerifyRsaSha256(data, signature, publicKey),
             0x03 => CryptoService.Signature.VerifyEcdsaSha256(data, signature, publicKey),
-            _ => Result.Failure<bool, SmartCardError>(
-                SmartCardError.AlgorithmNotSupported())
+            _ => Result.Failure<bool, SmartCardError>(SmartCardError.AlgorithmNotSupported()),
         };
     }
 
@@ -215,5 +234,6 @@ public static class DapProcessor
         ImmutableArray<byte> SecurityDomainAid,
         ImmutableArray<byte> DapSignature,
         ImmutableArray<ImmutableArray<byte>> CertificateChain,
-        byte SignatureAlgorithm);
+        byte SignatureAlgorithm
+    );
 }

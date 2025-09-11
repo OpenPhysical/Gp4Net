@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -22,10 +21,12 @@ public static partial class TlvService
         public static Result<ImmutableArray<byte>, SmartCardError> Encode(TlvObject tlv)
         {
             return EncodeTag(tlv.Tag)
-                .Bind(tagBytes => EncodeLength(tlv.Length)
-                    .Map(lengthBytes => tagBytes
-                        .AddRange(lengthBytes)
-                        .AddRange(tlv.TlvData.Bytes)));
+                .Bind(tagBytes =>
+                    EncodeLength(tlv.Length)
+                        .Map(lengthBytes =>
+                            tagBytes.AddRange(lengthBytes).AddRange(tlv.TlvData.Bytes)
+                        )
+                );
         }
 
         /// <summary>
@@ -33,17 +34,19 @@ public static partial class TlvService
         /// </summary>
         /// <param name="objects">The TLV objects to encode.</param>
         /// <returns>A Result containing the encoded bytes or an error.</returns>
-        public static Result<ImmutableArray<byte>, SmartCardError> EncodeMultiple(ImmutableArray<TlvObject> objects)
+        public static Result<ImmutableArray<byte>, SmartCardError> EncodeMultiple(
+            ImmutableArray<TlvObject> objects
+        )
         {
             if (objects.IsDefault || objects.Length == 0)
             {
-                return Result.Success<ImmutableArray<byte>, SmartCardError>(ImmutableArray<byte>.Empty);
+                return Result.Success<ImmutableArray<byte>, SmartCardError>(
+                    ImmutableArray<byte>.Empty
+                );
             }
 
             // Use LINQ to encode all objects and aggregate results
-            var encodedResults = objects
-                .Select(obj => Encode(obj))
-                .ToImmutableArray();
+            var encodedResults = objects.Select(obj => Encode(obj)).ToImmutableArray();
 
             // Check if any encoding failed using pattern matching
             var failures = encodedResults.Where(r => r.IsFailure).ToImmutableArray();
@@ -54,9 +57,7 @@ public static partial class TlvService
 
             // Aggregate all successful results using Match
             var aggregated = encodedResults
-                .SelectMany(r => r.Match(
-                    bytes => bytes,
-                    _ => ImmutableArray<byte>.Empty))
+                .SelectMany(r => r.Match(bytes => bytes, _ => ImmutableArray<byte>.Empty))
                 .ToImmutableArray();
 
             return Result.Success<ImmutableArray<byte>, SmartCardError>(aggregated);
@@ -70,23 +71,25 @@ public static partial class TlvService
         /// <returns>A Result containing the encoded bytes or an error.</returns>
         public static Result<ImmutableArray<byte>, SmartCardError> EncodeWithOptions(
             TlvObject tlv,
-            EncodingOptions options)
+            EncodingOptions options
+        )
         {
-            return options.MaxLength
-                .Match(
-                    maxLength =>
+            return options.MaxLength.Match(
+                maxLength =>
+                {
+                    var valueLength = tlv.TlvData.Bytes.Length;
+                    if (valueLength > maxLength)
                     {
-                        var valueLength = tlv.TlvData.Bytes.Length;
-                        if (valueLength > maxLength)
-                        {
-                            return Result.Failure<ImmutableArray<byte>, SmartCardError>(
-                                SmartCardError.InvalidArgument($"Value length {valueLength} exceeds maximum {maxLength}")
-                            );
-                        }
-                        return EncodeWithOptionsInternal(tlv, options);
-                    },
-                    () => EncodeWithOptionsInternal(tlv, options)
-                );
+                        return Result.Failure<ImmutableArray<byte>, SmartCardError>(
+                            SmartCardError.InvalidArgument(
+                                $"Value length {valueLength} exceeds maximum {maxLength}"
+                            )
+                        );
+                    }
+                    return EncodeWithOptionsInternal(tlv, options);
+                },
+                () => EncodeWithOptionsInternal(tlv, options)
+            );
         }
 
         /// <summary>
@@ -94,22 +97,27 @@ public static partial class TlvService
         /// </summary>
         private static Result<ImmutableArray<byte>, SmartCardError> EncodeWithOptionsInternal(
             TlvObject tlv,
-            EncodingOptions options)
+            EncodingOptions options
+        )
         {
             return EncodeTag(tlv.Tag)
-                .Bind(tagBytes => EncodeLengthWithOptions(tlv.Length, options.UseLongForm)
-                    .Bind(lengthBytes =>
-                    {
-                        var baseEncoded = tagBytes
-                            .AddRange(lengthBytes)
-                            .AddRange(tlv.TlvData.Bytes);
+                .Bind(tagBytes =>
+                    EncodeLengthWithOptions(tlv.Length, options.UseLongForm)
+                        .Bind(lengthBytes =>
+                        {
+                            var baseEncoded = tagBytes
+                                .AddRange(lengthBytes)
+                                .AddRange(tlv.TlvData.Bytes);
 
-                        return options.PadToBlockSize
-                            .Match(
+                            return options.PadToBlockSize.Match(
                                 blockSize => ApplyPadding(baseEncoded, blockSize),
-                                () => Result.Success<ImmutableArray<byte>, SmartCardError>(baseEncoded)
+                                () =>
+                                    Result.Success<ImmutableArray<byte>, SmartCardError>(
+                                        baseEncoded
+                                    )
                             );
-                    }));
+                        })
+                );
         }
 
         /// <summary>
@@ -147,7 +155,8 @@ public static partial class TlvService
         /// <returns>A Result containing the encoded length bytes or an error.</returns>
         private static Result<ImmutableArray<byte>, SmartCardError> EncodeLengthWithOptions(
             TlvLength length,
-            bool useLongForm)
+            bool useLongForm
+        )
         {
             var lengthValue = length.LengthValue;
 
@@ -160,7 +169,7 @@ public static partial class TlvService
             }
 
             // Short form (if length <= 127 and not forcing long form)
-            if (lengthValue <= Constants.Constants.Tlv.Parsing.MaxShortFormLength && !useLongForm)
+            if (lengthValue <= Constants.Constants.Tlv.Parsing.MAX_SHORT_FORM_LENGTH && !useLongForm)
             {
                 return Result.Success<ImmutableArray<byte>, SmartCardError>(
                     ImmutableArray.Create((byte)lengthValue)
@@ -184,21 +193,21 @@ public static partial class TlvService
                 <= 0xFF => 1,
                 <= 0xFFFF => 2,
                 <= 0xFFFFFF => 3,
-                _ => 4
+                _ => 4,
             };
-
 
             // Build the length bytes
             var builder = ImmutableArray.CreateBuilder<byte>(bytesNeeded + 1);
-            
+
             // First byte: 0x80 | number of length bytes
-            builder.Add((byte)(Constants.Constants.Tlv.Parsing.LongFormLengthMask | bytesNeeded));
+            builder.Add((byte)(Constants.Constants.Tlv.Parsing.LONG_FORM_LENGTH_MASK | bytesNeeded));
 
             // Add length bytes in big-endian order
-            var lengthBytes = Enumerable.Range(0, bytesNeeded)
+            var lengthBytes = Enumerable
+                .Range(0, bytesNeeded)
                 .Select(i => (byte)(value >> ((bytesNeeded - 1 - i) * 8)))
                 .ToImmutableArray();
-            
+
             builder.AddRange(lengthBytes);
 
             return Result.Success<ImmutableArray<byte>, SmartCardError>(builder.ToImmutable());
@@ -212,7 +221,8 @@ public static partial class TlvService
         /// <returns>A Result containing the padded data or an error.</returns>
         private static Result<ImmutableArray<byte>, SmartCardError> ApplyPadding(
             ImmutableArray<byte> data,
-            int blockSize)
+            int blockSize
+        )
         {
             if (blockSize <= 0)
             {
@@ -229,10 +239,8 @@ public static partial class TlvService
 
             var paddingNeeded = blockSize - remainder;
             var padding = Enumerable.Repeat((byte)0x00, paddingNeeded).ToImmutableArray();
-            
-            return Result.Success<ImmutableArray<byte>, SmartCardError>(
-                data.AddRange(padding)
-            );
+
+            return Result.Success<ImmutableArray<byte>, SmartCardError>(data.AddRange(padding));
         }
 
         /// <summary>
@@ -241,21 +249,26 @@ public static partial class TlvService
         /// <param name="tagNumber">The tag number.</param>
         /// <param name="value">The value bytes.</param>
         /// <returns>A Result containing the encoded TLV or an error.</returns>
-        public static Result<ImmutableArray<byte>, SmartCardError> EncodeSimple(uint tagNumber, ImmutableArray<byte> value)
+        public static Result<ImmutableArray<byte>, SmartCardError> EncodeSimple(
+            uint tagNumber,
+            ImmutableArray<byte> value
+        )
         {
             var tag = tagNumber switch
             {
                 <= 0xFF => TlvTag.FromByte((byte)tagNumber),
                 <= 0xFFFF => TlvTag.FromUShort((ushort)tagNumber),
-                _ => new TlvTag(ImmutableArray.Create(
-                    (byte)(tagNumber >> 24),
-                    (byte)(tagNumber >> 16),
-                    (byte)(tagNumber >> 8),
-                    (byte)tagNumber))
+                _ => new TlvTag(
+                    ImmutableArray.Create(
+                        (byte)(tagNumber >> 24),
+                        (byte)(tagNumber >> 16),
+                        (byte)(tagNumber >> 8),
+                        (byte)tagNumber
+                    )
+                ),
             };
 
-            return TlvObject.Create(tag, new TlvValue(value))
-                .Bind(Encode);
+            return TlvObject.Create(tag, new TlvValue(value)).Bind(Encode);
         }
     }
 }

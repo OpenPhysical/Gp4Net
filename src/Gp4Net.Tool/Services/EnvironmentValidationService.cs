@@ -93,7 +93,7 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         try
         {
             // Detect card environment
-            Result<CardEnvironment, SmartCardError> cardEnvResult =
+            var cardEnvResult =
                 await DetectCardEnvironmentAsync(channel, transport, cancellationToken);
             if (cardEnvResult.IsFailure)
             {
@@ -102,7 +102,7 @@ public class EnvironmentValidationService : IEnvironmentValidationService
                 );
             }
 
-            CardEnvironment cardEnvironment = cardEnvResult.Value;
+            var cardEnvironment = cardEnvResult.Value;
             bool isTestKeySet = IsTestKeySet(keySet);
 
             // Analyze safety of the combination
@@ -111,7 +111,7 @@ public class EnvironmentValidationService : IEnvironmentValidationService
                 isTestKeySet
             );
 
-            EnvironmentValidationResult result = new EnvironmentValidationResult(
+            var result = new EnvironmentValidationResult(
                 isSafe,
                 cardEnvironment,
                 isTestKeySet,
@@ -175,14 +175,14 @@ public class EnvironmentValidationService : IEnvironmentValidationService
             }
 
             // Try to get CPLC data to identify card type
-            Result<byte[], SmartCardError> cplcResult = await GetCplcDataAsync(
+            var cplcResult = await GetCplcDataAsync(
                 channel,
                 transport,
                 cancellationToken
             );
             if (cplcResult.IsSuccess)
             {
-                CardEnvironment environment = AnalyzeCplcData(cplcResult.Value);
+                var environment = AnalyzeCplcData(cplcResult.Value);
                 if (environment != CardEnvironment.Unknown)
                 {
                     return Result.Success<CardEnvironment, SmartCardError>(environment);
@@ -190,7 +190,7 @@ public class EnvironmentValidationService : IEnvironmentValidationService
             }
 
             // Fallback: analyze card behavior patterns
-            CardEnvironment behaviorEnvironment = await AnalyzeCardBehaviorAsync(
+            var behaviorEnvironment = await AnalyzeCardBehaviorAsync(
                 channel,
                 transport,
                 cancellationToken
@@ -223,11 +223,16 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         try
         {
             // GET DATA for CPLC (Card Production Life Cycle) - tag 9F7F
-            return await GetDataCommand.Create(GetDataCommand.DataObjects.CardProductionLifeCycle)
+            return await GetDataCommand
+                .Create(GetDataCommand.DataObjects.CardProductionLifeCycle)
                 .Bind(command => transport.TransmitAsync(command, channel, cancellationToken))
-                .Bind(response => response.IsSuccessful && response.Data.Length > 0
-                    ? Result.Success<byte[], SmartCardError>(response.Data)
-                    : Result.Failure<byte[], SmartCardError>(SmartCardError.CardError("CPLC data not available")));
+                .Bind(response =>
+                    response.IsSuccessful && response.Data.Length > 0
+                        ? Result.Success<byte[], SmartCardError>(response.Data)
+                        : Result.Failure<byte[], SmartCardError>(
+                            SmartCardError.CardError("CPLC data not available")
+                        )
+                );
         }
         catch (Exception ex)
         {
@@ -286,14 +291,14 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         try
         {
             // Try SELECT ISD (Issuer Security Domain)
-            return await SelectCommand.Create(GpTestKeys.TestAids.IsdAid)
+            return await SelectCommand
+                .Create(GpTestKeys.TestAids.IsdAid)
                 .Bind(command => transport.TransmitAsync(command, channel, cancellationToken))
                 .Match(
-                    response => response.IsSuccessful ? CardEnvironment.Unknown : CardEnvironment.Test,
-                    error => CardEnvironment.Test); // If basic commands fail, likely a test/development environment
-
-            // For now, default to unknown if we can't determine from behavior
-            return CardEnvironment.Unknown;
+                    response =>
+                        response.IsSuccessful ? CardEnvironment.Unknown : CardEnvironment.Test,
+                    error => CardEnvironment.Test
+                ); // If basic commands fail, likely a test/development environment
         }
         catch
         {

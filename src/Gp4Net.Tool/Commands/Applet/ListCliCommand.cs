@@ -6,12 +6,10 @@ using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Services;
 using Gp4Net.Tool.Infrastructure;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
-using StatusSubset = Gp4Net.Domain.Commands.GetStatusCommand.StatusSubset;
 
 namespace Gp4Net.Tool.Commands.Applet;
 
@@ -28,9 +26,7 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
     /// Initializes a new instance of the ListCliCommand class.
     /// Uses static GlobalPlatform services.
     /// </summary>
-    public ListCliCommand()
-    {
-    }
+    public ListCliCommand() { }
 
     /// <summary>
     /// Executes the list command using library services for data and tool for display.
@@ -38,12 +34,14 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
     /// <param name="context">The command context.</param>
     /// <param name="settings">The command settings.</param>
     /// <returns>0 if successful, 1 if failed.</returns>
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
+    public override Task<int> ExecuteAsync(CommandContext context, Settings settings)
     {
         AnsiConsole.MarkupLine("[yellow]Listing applications on card...[/]");
 
-        AnsiConsole.MarkupLine("[red]Application listing not yet implemented with static services.[/]");
-        return 1;
+        AnsiConsole.MarkupLine(
+            "[red]Application listing not yet implemented with static services.[/]"
+        );
+        return Task.FromResult(1);
     }
 
     /// <summary>
@@ -57,10 +55,10 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
     {
         // This obsolete service pattern will be removed - placeholder return
         return await Task.FromResult(
-            Result.Failure<IReadOnlyList<ApplicationInfo>, SmartCardError>(
-                SmartCardError.Unsupported("Service integration pending")
+                Result.Failure<IReadOnlyList<ApplicationInfo>, SmartCardError>(
+                    SmartCardError.Unsupported("Service integration pending")
+                )
             )
-        )
             .Match(
                 applications =>
                 {
@@ -78,7 +76,7 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
     /// <summary>
     /// Establishes secure channel from settings with functional patterns.
     /// </summary>
-    private async Task<
+    private Task<
         Result<SecureChannelState, SmartCardError>
     > EstablishSecureChannelFromSettings(
         object service, // OBSOLETE: Need to refactor to static services
@@ -93,38 +91,42 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
         {
             true =>
             // All keys provided - extract them using pattern matching
-            await settings.KeyEnc.Match(
-                async encKey =>
-                    await settings.KeyMac.Match(
-                        async macKey =>
-                            await settings.KeyDek.Match(
-                                async dekKey =>
-                                    Result.Failure<SecureChannelState, SmartCardError>(
-                                        SmartCardError.Unsupported("Service integration pending")
-                                    ),
-                                async () =>
-                                    Result.Failure<SecureChannelState, SmartCardError>(
-                                        SmartCardError.InvalidData(
-                                            "DEK key is required when using explicit keys"
+            Task.FromResult(
+                settings.KeyEnc.Match(
+                    encKey =>
+                        settings.KeyMac.Match(
+                            macKey =>
+                                settings.KeyDek.Match(
+                                    dekKey =>
+                                        Result.Failure<SecureChannelState, SmartCardError>(
+                                            SmartCardError.Unsupported("Service integration pending")
+                                        ),
+                                    () =>
+                                        Result.Failure<SecureChannelState, SmartCardError>(
+                                            SmartCardError.InvalidData(
+                                                "DEK key is required when using explicit keys"
+                                            )
                                         )
+                                ),
+                            () =>
+                                Result.Failure<SecureChannelState, SmartCardError>(
+                                    SmartCardError.InvalidData(
+                                        "MAC key is required when using explicit keys"
                                     )
-                            ),
-                        async () =>
-                            Result.Failure<SecureChannelState, SmartCardError>(
-                                SmartCardError.InvalidData(
-                                    "MAC key is required when using explicit keys"
                                 )
-                            )
-                    ),
-                async () =>
-                    Result.Failure<SecureChannelState, SmartCardError>(
-                        SmartCardError.InvalidData("ENC key is required when using explicit keys")
-                    )
+                        ),
+                    () =>
+                        Result.Failure<SecureChannelState, SmartCardError>(
+                            SmartCardError.InvalidData("ENC key is required when using explicit keys")
+                        )
+                )
             ),
             false =>
             // Use keyset specification (placeholder implementation)
-            Result.Failure<SecureChannelState, SmartCardError>(
-                SmartCardError.Unsupported("Service integration pending")
+            Task.FromResult(
+                Result.Failure<SecureChannelState, SmartCardError>(
+                    SmartCardError.Unsupported("Service integration pending")
+                )
             ),
         };
     }

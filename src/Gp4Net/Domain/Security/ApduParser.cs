@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
@@ -99,8 +98,9 @@ public static class ApduParser
         Maybe<byte> le
     )
     {
-        Maybe<int> expectedLength = le.Map(value => (int)value);
-        return ApduBuilder.CreateCommand(cla, ins, p1, p2, Maybe<byte[]>.From(data), expectedLength)
+        var expectedLength = le.Map(value => (int)value);
+        return ApduBuilder
+            .CreateCommand(cla, ins, p1, p2, Maybe<byte[]>.From(data), expectedLength)
             .Map(cmd => cmd.ToBytes());
     }
 }

@@ -89,11 +89,18 @@ public class CardCompatibilityService : ICardCompatibilityService
         return Maybe
             .From(logger)
             .ToResult(SmartCardError.InvalidArgument("Logger cannot be null"))
-            .Bind(validLogger => 
+            .Bind(validLogger =>
                 Maybe
                     .From(environmentValidation)
-                    .ToResult(SmartCardError.InvalidArgument("Environment validation service cannot be null"))
-                    .Map(validEnvValidation => new CardCompatibilityService(validLogger, validEnvValidation))
+                    .ToResult(
+                        SmartCardError.InvalidArgument(
+                            "Environment validation service cannot be null"
+                        )
+                    )
+                    .Map(validEnvValidation => new CardCompatibilityService(
+                        validLogger,
+                        validEnvValidation
+                    ))
             );
     }
 
@@ -122,7 +129,7 @@ public class CardCompatibilityService : ICardCompatibilityService
         try
         {
             // Detect card type
-            Result<CardTypeInfo, SmartCardError> cardTypeResult = await DetectCardTypeAsync(
+            var cardTypeResult = await DetectCardTypeAsync(
                 channel,
                 transport,
                 cancellationToken
@@ -134,10 +141,10 @@ public class CardCompatibilityService : ICardCompatibilityService
                 );
             }
 
-            CardTypeInfo cardType = cardTypeResult.Value;
+            var cardType = cardTypeResult.Value;
 
             // Check environment validation
-            Result<EnvironmentValidationResult, SmartCardError> envResult =
+            var envResult =
                 await _environmentValidation.ValidateEnvironmentAsync(
                     keySet,
                     channel,
@@ -150,7 +157,7 @@ public class CardCompatibilityService : ICardCompatibilityService
                 return Result.Failure<CardCompatibilityResult, SmartCardError>(envResult.Error);
             }
 
-            EnvironmentValidationResult envValidation = envResult.Value;
+            var envValidation = envResult.Value;
 
             // Analyze compatibility based on operation type and card characteristics
             (
@@ -161,7 +168,7 @@ public class CardCompatibilityService : ICardCompatibilityService
                 string[] recommendations
             ) = AnalyzeCompatibility(operation, keySet, cardType, envValidation);
 
-            CardCompatibilityResult result = new CardCompatibilityResult(
+            var result = new CardCompatibilityResult(
                 isCompatible,
                 isSafe,
                 cardType,
@@ -203,20 +210,20 @@ public class CardCompatibilityService : ICardCompatibilityService
         {
             // First, try to identify by ATR if available
             string atrHash = GetChannelIdentifier(channel);
-            if (KnownCardTypes.TryGetValue(atrHash, out CardTypeInfo knownType))
+            if (KnownCardTypes.TryGetValue(atrHash, out var knownType))
             {
                 return Result.Success<CardTypeInfo, SmartCardError>(knownType);
             }
 
             // Try to get CPLC data for manufacturer identification
-            Result<byte[], SmartCardError> cplcResult = await GetCplcDataAsync(
+            var cplcResult = await GetCplcDataAsync(
                 channel,
                 transport,
                 cancellationToken
             );
             if (cplcResult.IsSuccess)
             {
-                CardTypeInfo cardType = AnalyzeCplcForCardType(cplcResult.Value);
+                var cardType = AnalyzeCplcForCardType(cplcResult.Value);
                 if (cardType != null)
                 {
                     return Result.Success<CardTypeInfo, SmartCardError>(cardType);
@@ -224,7 +231,7 @@ public class CardCompatibilityService : ICardCompatibilityService
             }
 
             // Fallback to generic unknown card
-            CardTypeInfo genericCard = new CardTypeInfo(
+            var genericCard = new CardTypeInfo(
                 "Unknown",
                 "Unknown",
                 null,
@@ -256,7 +263,7 @@ public class CardCompatibilityService : ICardCompatibilityService
         {
             // Try to get card status or security status
             // This is card-specific and may not be available on all cards
-            Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(
+            var commandResult = GetDataCommand.Create(
                 GetDataCommand.DataObjects.ConfirmationCounter
             );
             if (commandResult.IsFailure)
@@ -272,14 +279,13 @@ public class CardCompatibilityService : ICardCompatibilityService
 
             return responseResult.Bind(response =>
                 response.IsSuccessful && response.Data.Length > 0
-                    ? GetDataResponse.Parse(
-                        GetDataCommand.DataObjects.ConfirmationCounter,
-                        response.Data
-                    ).Map(parsedResponse =>
-                    {
-                        Maybe<uint> counter = parsedResponse.GetValueAsNumber();
-                        return counter.HasValue ? (int?)counter.Value : null;
-                    })
+                    ? GetDataResponse
+                        .Parse(GetDataCommand.DataObjects.ConfirmationCounter, response.Data)
+                        .Map(parsedResponse =>
+                        {
+                            var counter = parsedResponse.GetValueAsNumber();
+                            return counter.HasValue ? (int?)counter.Value : null;
+                        })
                     : Result.Success<int?, SmartCardError>(null)
             );
         }
@@ -298,20 +304,19 @@ public class CardCompatibilityService : ICardCompatibilityService
     {
         try
         {
-            Result<GetDataCommand, SmartCardError> commandResult = GetDataCommand.Create(
+            var commandResult = GetDataCommand.Create(
                 GetDataCommand.DataObjects.CardProductionLifeCycle
             );
             if (commandResult.IsFailure)
             {
                 return Result.Failure<byte[], SmartCardError>(commandResult.Error);
             }
-            GetDataCommand getDataCmd = commandResult.Value;
+            var getDataCmd = commandResult.Value;
             var responseResult = await transport.TransmitAsync(
                 getDataCmd,
                 channel,
                 cancellationToken
             );
-
 
             return responseResult.Bind(response =>
                 response.IsSuccessful && response.Data.Length > 0

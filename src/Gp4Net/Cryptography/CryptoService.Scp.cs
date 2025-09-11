@@ -4,14 +4,9 @@
 // -----------------------------------------------------------------------------
 
 using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Domain.Commands;
-using Gp4Net.Domain.Keys;
-using Gp4Net.Transport;
 using JetBrains.Annotations;
 using static Gp4Net.Constants.Constants;
 
@@ -49,23 +44,31 @@ public static partial class CryptoService
             public static Result<byte[], SmartCardError> DeriveScp02SessionKey(
                 byte[] baseKey,
                 byte[] derivationConstant,
-                byte[] sequenceCounter)
+                byte[] sequenceCounter
+            )
             {
-                if (baseKey.Length != Scp.Scp02.SessionKeySize)
+                if (baseKey.Length != Scp.Scp02.SESSION_KEY_SIZE)
                     return Result.Failure<byte[], SmartCardError>(
-                        new InvalidLengthError("baseKey", Scp.Scp02.SessionKeySize, baseKey.Length));
+                        new InvalidLengthError("baseKey", Scp.Scp02.SESSION_KEY_SIZE, baseKey.Length)
+                    );
 
                 if (derivationConstant.Length != 2)
                     return Result.Failure<byte[], SmartCardError>(
-                        new InvalidLengthError("derivationConstant", 2, derivationConstant.Length));
+                        new InvalidLengthError("derivationConstant", 2, derivationConstant.Length)
+                    );
 
-                if (sequenceCounter.Length != Scp.Scp02.SequenceCounterSize)
+                if (sequenceCounter.Length != Scp.Scp02.SEQUENCE_COUNTER_SIZE)
                     return Result.Failure<byte[], SmartCardError>(
-                        new InvalidLengthError("sequenceCounter", Scp.Scp02.SequenceCounterSize, sequenceCounter.Length));
+                        new InvalidLengthError(
+                            "sequenceCounter",
+                            Scp.Scp02.SEQUENCE_COUNTER_SIZE,
+                            sequenceCounter.Length
+                        )
+                    );
 
                 // Build derivation data per Figure E-2:
                 // Constant (2) || Sequence Counter (2) || Padding (12 zeros)
-                byte[] derivationData = new byte[Scp.Scp02.KeyDerivationDataSize];
+                byte[] derivationData = new byte[Scp.Scp02.KEY_DERIVATION_DATA_SIZE];
                 Array.Copy(derivationConstant, 0, derivationData, 0, 2);
                 Array.Copy(sequenceCounter, 0, derivationData, 2, 2);
                 // Remaining 12 bytes are already zeros
@@ -82,15 +85,20 @@ public static partial class CryptoService
             /// <param name="key">The S-ENC session key (16 bytes).</param>
             /// <param name="data">The cryptogram data (24 bytes, already includes padding).</param>
             /// <returns>The cryptogram value (8 bytes).</returns>
-            public static Result<byte[], SmartCardError> CalculateCryptogram(byte[] key, byte[] data)
+            public static Result<byte[], SmartCardError> CalculateCryptogram(
+                byte[] key,
+                byte[] data
+            )
             {
-                if (key.Length != Scp.Scp02.SessionKeySize)
+                if (key.Length != Scp.Scp02.SESSION_KEY_SIZE)
                     return Result.Failure<byte[], SmartCardError>(
-                        new InvalidLengthError("key", Scp.Scp02.SessionKeySize, key.Length));
+                        new InvalidLengthError("key", Scp.Scp02.SESSION_KEY_SIZE, key.Length)
+                    );
 
-                if (data.Length != Scp.Scp02.CryptogramDataSize)
+                if (data.Length != Scp.Scp02.CRYPTOGRAM_DATA_SIZE)
                     return Result.Failure<byte[], SmartCardError>(
-                        new InvalidLengthError("data", Scp.Scp02.CryptogramDataSize, data.Length));
+                        new InvalidLengthError("data", Scp.Scp02.CRYPTOGRAM_DATA_SIZE, data.Length)
+                    );
 
                 // Use existing cryptogram calculation from CryptoService
                 return Cryptogram.CalculateScp02Cryptogram(key, data);
@@ -106,16 +114,29 @@ public static partial class CryptoService
             /// <returns>The MAC value (8 bytes).</returns>
             public static Result<byte[], SmartCardError> CalculateMac(byte[] key, byte[] data)
             {
-                if (key.Length != Scp.Scp02.SessionKeySize)
+                // Legacy overload for backward compatibility - uses zero ICV
+                return CalculateMac(key, data, new byte[8]);
+            }
+            
+            public static Result<byte[], SmartCardError> CalculateMac(byte[] key, byte[] data, byte[] icv)
+            {
+                if (key.Length != Scp.Scp02.SESSION_KEY_SIZE)
                     return Result.Failure<byte[], SmartCardError>(
-                        new InvalidLengthError("key", Scp.Scp02.SessionKeySize, key.Length));
+                        new InvalidLengthError("key", Scp.Scp02.SESSION_KEY_SIZE, key.Length)
+                    );
 
                 if (data.Length == 0)
                     return Result.Failure<byte[], SmartCardError>(
-                        SmartCardError.InvalidArgument("Data cannot be empty"));
+                        SmartCardError.InvalidArgument("Data cannot be empty")
+                    );
 
-                // Use existing MAC calculation from CryptoService
-                return Mac.CalculateScp02CommandMac(key, data);
+                if (icv.Length != Scp.Scp02.CHAINING_VALUE_SIZE)
+                    return Result.Failure<byte[], SmartCardError>(
+                        new InvalidLengthError("icv", Scp.Scp02.CHAINING_VALUE_SIZE, icv.Length)
+                    );
+
+                // Use existing MAC calculation from CryptoService with ICV
+                return Mac.CalculateScp02CommandMac(key, data, icv);
             }
 
             /// <summary>
@@ -129,18 +150,21 @@ public static partial class CryptoService
             public static Result<byte[], SmartCardError> CalculateCommandMac(
                 byte[] command,
                 byte[] macKey,
-                byte[] chainingValue)
+                byte[] chainingValue
+            )
             {
-                if (chainingValue.Length != Scp.Scp02.ChainingValueSize)
+                if (chainingValue.Length != Scp.Scp02.CHAINING_VALUE_SIZE)
                     return Result.Failure<byte[], SmartCardError>(
-                        new InvalidLengthError("chainingValue", Scp.Scp02.ChainingValueSize, chainingValue.Length));
+                        new InvalidLengthError(
+                            "chainingValue",
+                            Scp.Scp02.CHAINING_VALUE_SIZE,
+                            chainingValue.Length
+                        )
+                    );
 
-                // SCP02 C-MAC: 3DES-MAC over (chaining_value || command) using ISO 9797-1 Algorithm 3
-                byte[] macInput = new byte[chainingValue.Length + command.Length];
-                Array.Copy(chainingValue, 0, macInput, 0, chainingValue.Length);
-                Array.Copy(command, 0, macInput, chainingValue.Length, command.Length);
-
-                return CalculateMac(macKey, macInput);
+                // SCP02 C-MAC: Pass command data and ICV separately to MAC function
+                // The MAC function will use ICV as initialization vector, not concatenate it
+                return CalculateMac(macKey, command, chainingValue);
             }
 
             /// <summary>
@@ -154,18 +178,21 @@ public static partial class CryptoService
             public static Result<byte[], SmartCardError> CalculateResponseMac(
                 byte[] response,
                 byte[] rMacKey,
-                byte[] chainingValue)
+                byte[] chainingValue
+            )
             {
-                if (chainingValue.Length != Scp.Scp02.ChainingValueSize)
+                if (chainingValue.Length != Scp.Scp02.CHAINING_VALUE_SIZE)
                     return Result.Failure<byte[], SmartCardError>(
-                        new InvalidLengthError("chainingValue", Scp.Scp02.ChainingValueSize, chainingValue.Length));
+                        new InvalidLengthError(
+                            "chainingValue",
+                            Scp.Scp02.CHAINING_VALUE_SIZE,
+                            chainingValue.Length
+                        )
+                    );
 
-                // SCP02 R-MAC: 3DES-MAC over (chaining_value || response) using ISO 9797-1 Algorithm 3
-                byte[] macInput = new byte[chainingValue.Length + response.Length];
-                Array.Copy(chainingValue, 0, macInput, 0, chainingValue.Length);
-                Array.Copy(response, 0, macInput, chainingValue.Length, response.Length);
-
-                return CalculateMac(rMacKey, macInput);
+                // SCP02 R-MAC: Pass response data and ICV separately to MAC function
+                // The MAC function will use ICV as initialization vector, not concatenate it
+                return Mac.CalculateScp02ResponseMac(rMacKey, response, chainingValue);
             }
 
             /// <summary>
@@ -177,7 +204,8 @@ public static partial class CryptoService
             /// <returns>The command with encrypted data portion.</returns>
             public static Result<byte[], SmartCardError> ApplyCommandEncryption(
                 byte[] command,
-                byte[] sEncKey)
+                byte[] sEncKey
+            )
             {
                 if (command.Length <= 5) // No data to encrypt
                     return Result.Success<byte[], SmartCardError>(command);
@@ -191,14 +219,17 @@ public static partial class CryptoService
                 Array.Copy(command, 5, dataToEncrypt, 0, lc);
 
                 // For SCP02 C-ENC, use zero IV with automatic padding
-                return Cipher.Encrypt3DesCbcWithPadding(sEncKey, Scp.Common.ZeroIv8, dataToEncrypt)
+                return Cipher
+                    .Encrypt3DesCbcWithPadding(sEncKey, Scp.Common.ZeroIv8, dataToEncrypt)
                     .Map(encryptedData =>
                     {
                         // Build new command with encrypted data
-                        byte[] newCommand = new byte[5 + encryptedData.Length + (command.Length > 5 + lc ? 1 : 0)];
+                        byte[] newCommand = new byte[
+                            5 + encryptedData.Length + (command.Length > 5 + lc ? 1 : 0)
+                        ];
                         Array.Copy(command, 0, newCommand, 0, 4); // CLA INS P1 P2
-                        newCommand[0] |= Scp.Common.SecureMessagingClaBit; // Set secure messaging bit
-                        newCommand[4] = (byte)(encryptedData.Length + Scp.Scp02.MacSize); // New Lc includes MAC
+                        newCommand[0] |= Scp.Common.SECURE_MESSAGING_CLA_BIT; // Set secure messaging bit
+                        newCommand[4] = (byte)(encryptedData.Length + Scp.Scp02.MAC_SIZE); // New Lc includes MAC
                         Array.Copy(encryptedData, 0, newCommand, 5, encryptedData.Length);
 
                         // Copy Le if present
@@ -218,7 +249,8 @@ public static partial class CryptoService
             /// <returns>The response with encrypted data portion.</returns>
             public static Result<byte[], SmartCardError> ApplyResponseEncryption(
                 byte[] response,
-                byte[] sEncKey)
+                byte[] sEncKey
+            )
             {
                 int statusOffset = response.Length - 2;
                 if (statusOffset <= 0) // No data to encrypt
@@ -228,13 +260,83 @@ public static partial class CryptoService
                 Array.Copy(response, 0, responseData, 0, statusOffset);
 
                 // For SCP02 R-ENC, use zero IV with automatic padding
-                return Cipher.Encrypt3DesCbcWithPadding(sEncKey, Scp.Common.ZeroIv8, responseData)
+                return Cipher
+                    .Encrypt3DesCbcWithPadding(sEncKey, Scp.Common.ZeroIv8, responseData)
                     .Map(encryptedData =>
                     {
                         // Combine encrypted data with original status word
                         byte[] result = new byte[encryptedData.Length + 2];
                         Array.Copy(encryptedData, 0, result, 0, encryptedData.Length);
                         Array.Copy(response, statusOffset, result, encryptedData.Length, 2);
+                        return result;
+                    });
+            }
+
+            /// <summary>
+            /// Removes SCP02 command encryption (decrypts the data portion).
+            /// Inverse operation of ApplyCommandEncryption.
+            /// </summary>
+            /// <param name="command">The encrypted command APDU.</param>
+            /// <param name="sEncKey">The S-ENC session key.</param>
+            /// <returns>The command with decrypted data portion.</returns>
+            public static Result<byte[], SmartCardError> RemoveCommandEncryption(
+                byte[] command,
+                byte[] sEncKey
+            )
+            {
+                if (command.Length <= 5) // No data to decrypt
+                    return Result.Success<byte[], SmartCardError>(command);
+
+                byte lc = command[4];
+                if (lc == 0 || command.Length < 5 + lc)
+                    return Result.Success<byte[], SmartCardError>(command);
+
+                // Extract data portion
+                byte[] encryptedData = new byte[lc];
+                Array.Copy(command, 5, encryptedData, 0, lc);
+
+                // Decrypt using zero IV with automatic padding removal
+                return Cipher
+                    .Decrypt3DesCbcWithPadding(sEncKey, Scp.Common.ZeroIv8, encryptedData)
+                    .Map(decryptedData =>
+                    {
+                        // Reconstruct command with decrypted data
+                        byte[] result = new byte[5 + decryptedData.Length];
+                        Array.Copy(command, 0, result, 0, 4); // CLA, INS, P1, P2
+                        result[4] = (byte)decryptedData.Length; // Update Lc
+                        Array.Copy(decryptedData, 0, result, 5, decryptedData.Length);
+                        return result;
+                    });
+            }
+
+            /// <summary>
+            /// Removes SCP02 response encryption (decrypts the data portion).
+            /// Inverse operation of ApplyResponseEncryption.
+            /// </summary>
+            /// <param name="response">The encrypted response APDU.</param>
+            /// <param name="sEncKey">The S-ENC session key.</param>
+            /// <returns>The response with decrypted data portion.</returns>
+            public static Result<byte[], SmartCardError> RemoveResponseEncryption(
+                byte[] response,
+                byte[] sEncKey
+            )
+            {
+                int statusOffset = response.Length - 2;
+                if (statusOffset <= 0) // No data to decrypt
+                    return Result.Success<byte[], SmartCardError>(response);
+
+                byte[] encryptedData = new byte[statusOffset];
+                Array.Copy(response, 0, encryptedData, 0, statusOffset);
+
+                // Decrypt using zero IV with automatic padding removal
+                return Cipher
+                    .Decrypt3DesCbcWithPadding(sEncKey, Scp.Common.ZeroIv8, encryptedData)
+                    .Map(decryptedData =>
+                    {
+                        // Combine decrypted data with original status word
+                        byte[] result = new byte[decryptedData.Length + 2];
+                        Array.Copy(decryptedData, 0, result, 0, decryptedData.Length);
+                        Array.Copy(response, statusOffset, result, decryptedData.Length, 2);
                         return result;
                     });
             }
@@ -258,11 +360,17 @@ public static partial class CryptoService
             public static Result<byte[], SmartCardError> CalculateCommandMac(
                 byte[] command,
                 byte[] macKey,
-                byte[] chainingValue)
+                byte[] chainingValue
+            )
             {
-                if (chainingValue.Length != Scp.Scp03.ChainingValueSize)
+                if (chainingValue.Length != Scp.Scp03.CHAINING_VALUE_SIZE)
                     return Result.Failure<byte[], SmartCardError>(
-                        new InvalidLengthError("chainingValue", Scp.Scp03.ChainingValueSize, chainingValue.Length));
+                        new InvalidLengthError(
+                            "chainingValue",
+                            Scp.Scp03.CHAINING_VALUE_SIZE,
+                            chainingValue.Length
+                        )
+                    );
 
                 // SCP03 C-MAC: AES-CMAC over (chaining_value || command)
                 byte[] macInput = new byte[chainingValue.Length + command.Length];
@@ -270,7 +378,7 @@ public static partial class CryptoService
                 Array.Copy(command, 0, macInput, chainingValue.Length, command.Length);
 
                 return Mac.CalculateScp03CommandMac(macKey, macInput)
-                    .Map(fullMac => fullMac.Take(Scp.Scp03.MacSize).ToArray()); // Truncate to 8 bytes
+                    .Map(fullMac => fullMac.Take(Scp.Scp03.MAC_SIZE).ToArray()); // Truncate to 8 bytes
             }
 
             /// <summary>
@@ -284,11 +392,17 @@ public static partial class CryptoService
             public static Result<byte[], SmartCardError> CalculateResponseMac(
                 byte[] response,
                 byte[] rMacKey,
-                byte[] chainingValue)
+                byte[] chainingValue
+            )
             {
-                if (chainingValue.Length != Scp.Scp03.ChainingValueSize)
+                if (chainingValue.Length != Scp.Scp03.CHAINING_VALUE_SIZE)
                     return Result.Failure<byte[], SmartCardError>(
-                        new InvalidLengthError("chainingValue", Scp.Scp03.ChainingValueSize, chainingValue.Length));
+                        new InvalidLengthError(
+                            "chainingValue",
+                            Scp.Scp03.CHAINING_VALUE_SIZE,
+                            chainingValue.Length
+                        )
+                    );
 
                 // SCP03 R-MAC: AES-CMAC over (chaining_value || response)
                 byte[] macInput = new byte[chainingValue.Length + response.Length];
@@ -296,7 +410,7 @@ public static partial class CryptoService
                 Array.Copy(response, 0, macInput, chainingValue.Length, response.Length);
 
                 return Mac.CalculateScp03ResponseMac(rMacKey, macInput)
-                    .Map(fullMac => fullMac.Take(Scp.Scp03.MacSize).ToArray()); // Truncate to 8 bytes
+                    .Map(fullMac => fullMac.Take(Scp.Scp03.MAC_SIZE).ToArray()); // Truncate to 8 bytes
             }
 
             /// <summary>
@@ -310,7 +424,8 @@ public static partial class CryptoService
             public static Result<byte[], SmartCardError> ApplyCommandEncryption(
                 byte[] command,
                 byte[] sEncKey,
-                uint encryptionCounter)
+                uint encryptionCounter
+            )
             {
                 if (command.Length <= 5) // No data to encrypt
                     return Result.Success<byte[], SmartCardError>(command);
@@ -326,14 +441,17 @@ public static partial class CryptoService
                 // For SCP03 C-ENC, use counter-based IV
                 byte[] iv = BuildScp03Iv(encryptionCounter);
 
-                return Cipher.EncryptAesCbcWithPadding(sEncKey, iv, dataToEncrypt)
+                return Cipher
+                    .EncryptAesCbcWithPadding(sEncKey, iv, dataToEncrypt)
                     .Map(encryptedData =>
                     {
                         // Build new command with encrypted data
-                        byte[] newCommand = new byte[5 + encryptedData.Length + (command.Length > 5 + lc ? 1 : 0)];
+                        byte[] newCommand = new byte[
+                            5 + encryptedData.Length + (command.Length > 5 + lc ? 1 : 0)
+                        ];
                         Array.Copy(command, 0, newCommand, 0, 4); // CLA INS P1 P2
-                        newCommand[0] |= Scp.Common.SecureMessagingClaBit; // Set secure messaging bit
-                        newCommand[4] = (byte)(encryptedData.Length + Scp.Scp03.MacSize); // New Lc includes MAC
+                        newCommand[0] |= Scp.Common.SECURE_MESSAGING_CLA_BIT; // Set secure messaging bit
+                        newCommand[4] = (byte)(encryptedData.Length + Scp.Scp03.MAC_SIZE); // New Lc includes MAC
                         Array.Copy(encryptedData, 0, newCommand, 5, encryptedData.Length);
 
                         // Copy Le if present
@@ -355,7 +473,8 @@ public static partial class CryptoService
             public static Result<byte[], SmartCardError> ApplyResponseEncryption(
                 byte[] response,
                 byte[] sEncKey,
-                uint encryptionCounter)
+                uint encryptionCounter
+            )
             {
                 int statusOffset = response.Length - 2;
                 if (statusOffset <= 0) // No data to encrypt
@@ -367,13 +486,91 @@ public static partial class CryptoService
                 // For SCP03 R-ENC, use counter-based IV
                 byte[] iv = BuildScp03Iv(encryptionCounter);
 
-                return Cipher.EncryptAesCbcWithPadding(sEncKey, iv, responseData)
+                return Cipher
+                    .EncryptAesCbcWithPadding(sEncKey, iv, responseData)
                     .Map(encryptedData =>
                     {
                         // Combine encrypted data with original status word
                         byte[] result = new byte[encryptedData.Length + 2];
                         Array.Copy(encryptedData, 0, result, 0, encryptedData.Length);
                         Array.Copy(response, statusOffset, result, encryptedData.Length, 2);
+                        return result;
+                    });
+            }
+
+            /// <summary>
+            /// Removes SCP03 command encryption (decrypts the data portion).
+            /// Inverse operation of ApplyCommandEncryption.
+            /// </summary>
+            /// <param name="command">The encrypted command APDU.</param>
+            /// <param name="sEncKey">The S-ENC session key.</param>
+            /// <param name="encryptionCounter">The encryption counter for IV.</param>
+            /// <returns>The command with decrypted data portion.</returns>
+            public static Result<byte[], SmartCardError> RemoveCommandEncryption(
+                byte[] command,
+                byte[] sEncKey,
+                uint encryptionCounter
+            )
+            {
+                if (command.Length <= 5) // No data to decrypt
+                    return Result.Success<byte[], SmartCardError>(command);
+
+                byte lc = command[4];
+                if (lc == 0 || command.Length < 5 + lc)
+                    return Result.Success<byte[], SmartCardError>(command);
+
+                // Extract encrypted data
+                byte[] encryptedData = new byte[lc];
+                Array.Copy(command, 5, encryptedData, 0, lc);
+
+                // Use counter-based IV for decryption
+                byte[] iv = BuildScp03Iv(encryptionCounter);
+
+                return Cipher
+                    .DecryptAesCbcWithPadding(sEncKey, iv, encryptedData)
+                    .Map(decryptedData =>
+                    {
+                        // Build new command with decrypted data
+                        byte[] result = new byte[5 + decryptedData.Length];
+                        Array.Copy(command, 0, result, 0, 4); // CLA, INS, P1, P2
+                        result[4] = (byte)decryptedData.Length; // Update Lc
+                        Array.Copy(decryptedData, 0, result, 5, decryptedData.Length);
+                        return result;
+                    });
+            }
+
+            /// <summary>
+            /// Removes SCP03 response encryption (decrypts the data portion).
+            /// Inverse operation of ApplyResponseEncryption.
+            /// </summary>
+            /// <param name="response">The encrypted response APDU.</param>
+            /// <param name="sEncKey">The S-ENC session key.</param>
+            /// <param name="encryptionCounter">The encryption counter for IV.</param>
+            /// <returns>The response with decrypted data portion.</returns>
+            public static Result<byte[], SmartCardError> RemoveResponseEncryption(
+                byte[] response,
+                byte[] sEncKey,
+                uint encryptionCounter
+            )
+            {
+                int statusOffset = response.Length - 2;
+                if (statusOffset <= 0) // No data to decrypt
+                    return Result.Success<byte[], SmartCardError>(response);
+
+                byte[] encryptedData = new byte[statusOffset];
+                Array.Copy(response, 0, encryptedData, 0, statusOffset);
+
+                // Use counter-based IV for decryption
+                byte[] iv = BuildScp03Iv(encryptionCounter);
+
+                return Cipher
+                    .DecryptAesCbcWithPadding(sEncKey, iv, encryptedData)
+                    .Map(decryptedData =>
+                    {
+                        // Combine decrypted data with original status word
+                        byte[] result = new byte[decryptedData.Length + 2];
+                        Array.Copy(decryptedData, 0, result, 0, decryptedData.Length);
+                        Array.Copy(response, statusOffset, result, decryptedData.Length, 2);
                         return result;
                     });
             }
@@ -386,7 +583,7 @@ public static partial class CryptoService
             /// <returns>The 16-byte IV for AES operations.</returns>
             private static byte[] BuildScp03Iv(uint counter)
             {
-                byte[] iv = new byte[Scp.Scp03.BlockSize];
+                byte[] iv = new byte[Scp.Scp03.BLOCK_SIZE];
                 // Counter in big-endian format in the last 4 bytes
                 iv[12] = (byte)(counter >> 24);
                 iv[13] = (byte)(counter >> 16);
@@ -430,13 +627,20 @@ public static partial class CryptoService
             /// </summary>
             /// <param name="protocol">The SCP protocol version.</param>
             /// <returns>The zero chaining value (8 bytes for SCP02, 16 bytes for SCP03).</returns>
-            public static Result<byte[], SmartCardError> GetZeroChainingValue(ScpVersion protocol) =>
+            public static Result<byte[], SmartCardError> GetZeroChainingValue(
+                ScpVersion protocol
+            ) =>
                 protocol switch
                 {
-                    ScpVersion.Scp02 => Result.Success<byte[], SmartCardError>(Scp.Common.ZeroChaining8),
-                    ScpVersion.Scp03 => Result.Success<byte[], SmartCardError>(Scp.Common.ZeroChaining16),
+                    ScpVersion.Scp02 => Result.Success<byte[], SmartCardError>(
+                        Scp.Common.ZeroChaining8
+                    ),
+                    ScpVersion.Scp03 => Result.Success<byte[], SmartCardError>(
+                        Scp.Common.ZeroChaining16
+                    ),
                     _ => Result.Failure<byte[], SmartCardError>(
-                        SmartCardError.InvalidArgument($"Unsupported protocol: {protocol}"))
+                        SmartCardError.InvalidArgument($"Unsupported protocol: {protocol}")
+                    ),
                 };
 
             /// <summary>
@@ -447,10 +651,11 @@ public static partial class CryptoService
             public static Result<int, SmartCardError> GetMacSize(ScpVersion protocol) =>
                 protocol switch
                 {
-                    ScpVersion.Scp02 => Result.Success<int, SmartCardError>(Scp.Scp02.MacSize),
-                    ScpVersion.Scp03 => Result.Success<int, SmartCardError>(Scp.Scp03.MacSize),
+                    ScpVersion.Scp02 => Result.Success<int, SmartCardError>(Scp.Scp02.MAC_SIZE),
+                    ScpVersion.Scp03 => Result.Success<int, SmartCardError>(Scp.Scp03.MAC_SIZE),
                     _ => Result.Failure<int, SmartCardError>(
-                        SmartCardError.InvalidArgument($"Unsupported protocol: {protocol}"))
+                        SmartCardError.InvalidArgument($"Unsupported protocol: {protocol}")
+                    ),
                 };
 
             /// <summary>
@@ -461,10 +666,15 @@ public static partial class CryptoService
             public static Result<int, SmartCardError> GetChainingValueSize(ScpVersion protocol) =>
                 protocol switch
                 {
-                    ScpVersion.Scp02 => Result.Success<int, SmartCardError>(Scp.Scp02.ChainingValueSize),
-                    ScpVersion.Scp03 => Result.Success<int, SmartCardError>(Scp.Scp03.ChainingValueSize),
+                    ScpVersion.Scp02 => Result.Success<int, SmartCardError>(
+                        Scp.Scp02.CHAINING_VALUE_SIZE
+                    ),
+                    ScpVersion.Scp03 => Result.Success<int, SmartCardError>(
+                        Scp.Scp03.CHAINING_VALUE_SIZE
+                    ),
                     _ => Result.Failure<int, SmartCardError>(
-                        SmartCardError.InvalidArgument($"Unsupported protocol: {protocol}"))
+                        SmartCardError.InvalidArgument($"Unsupported protocol: {protocol}")
+                    ),
                 };
         }
     }

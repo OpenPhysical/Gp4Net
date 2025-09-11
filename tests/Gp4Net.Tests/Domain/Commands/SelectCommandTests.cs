@@ -3,7 +3,6 @@ using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
-using Gp4Net.Services;
 using Gp4Net.Transport;
 using NUnit.Framework;
 
@@ -46,7 +45,7 @@ public class SelectCommandTests
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<InvalidDataError>();
-        InvalidDataError? error = (InvalidDataError)result.Error;
+        var error = (InvalidDataError)result.Error;
         _ = error.Field.Should().Be("AID");
         _ = error.Reason.Should().Be("cannot be null");
     }
@@ -72,7 +71,7 @@ public class SelectCommandTests
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<InvalidLengthError>();
-        InvalidLengthError? error = (InvalidLengthError)result.Error;
+        var error = (InvalidLengthError)result.Error;
         _ = error.Field.Should().Be("AID");
         _ = error.Expected.Should().Be(16);
         _ = error.Actual.Should().Be(17);
@@ -126,7 +125,7 @@ public class SelectCommandTests
     {
         byte[] aid = Convert.FromHexString("A000000151000000");
         Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid);
-        SelectCommand? command = result.Value;
+        var command = result.Value;
 
         _ = command.Cla.Should().Be(0x00);
         _ = command.Ins.Should().Be(0xA4);
@@ -141,9 +140,11 @@ public class SelectCommandTests
     {
         Result<SelectCommand, SmartCardError> result =
             SelectCommand.CreateForIssuerSecurityDomain();
-        SelectCommand? command = result.Value;
+        var command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         _ = apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x00, 0x00 });
     }
@@ -153,9 +154,11 @@ public class SelectCommandTests
     {
         byte[] aid = Convert.FromHexString("A000000151000000");
         Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid);
-        SelectCommand? command = result.Value;
+        var command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         byte[] expected = [0x00, 0xA4, 0x04, 0x00, 0x08, .. aid, .. new byte[] { 0x00 }];
         _ = apdu.Should().BeEquivalentTo(expected);
@@ -169,9 +172,11 @@ public class SelectCommandTests
             aid,
             SelectCommand.SelectMode.Next
         );
-        SelectCommand? command = result.Value;
+        var command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         byte[] expected = [0x00, 0xA4, 0x04, 0x02, 0x08, .. aid, .. new byte[] { 0x00 }];
         _ = apdu.Should().BeEquivalentTo(expected);
@@ -181,7 +186,7 @@ public class SelectCommandTests
     public void ToString_ReturnsSelect()
     {
         Result<SelectCommand, SmartCardError> result = SelectCommand.Create([]);
-        SelectCommand? command = result.Value;
+        var command = result.Value;
 
         _ = command.ToString().Should().Be("SELECT");
     }
@@ -191,7 +196,7 @@ public class SelectCommandTests
     {
         byte[] originalAid = Convert.FromHexString("A000000151000000");
         Result<SelectCommand, SmartCardError> result = SelectCommand.Create(originalAid);
-        SelectCommand? command = result.Value;
+        var command = result.Value;
 
         originalAid[0] = 0xFF;
 
@@ -230,7 +235,7 @@ public class SelectCommandTests
     {
         byte[] aid = Convert.FromHexString("A000000151000000");
         Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid);
-        SelectCommand? command = result.Value;
+        var command = result.Value;
 
         _ = command.IsExtendedLength.Should().BeFalse();
     }
@@ -239,7 +244,7 @@ public class SelectCommandTests
     [Test]
     public void CreateEmptySelect_IsObsolete_ButWorks()
     {
-        SelectCommand? command = Services.GlobalPlatform.Commands.CreateSelectIsdCommand().Value;
+        var command = Services.GlobalPlatform.Commands.CreateSelectIsdCommand().Value;
 
         _ = command.Aid.Should().BeEmpty();
         _ = command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
@@ -249,9 +254,11 @@ public class SelectCommandTests
     [Test]
     public void CreateEmptySelect_WithCustomControlInfo_SetsCorrectValue()
     {
-        SelectCommand? command = CommandFactory
-            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp)
-            .Value;
+        Result<SelectCommand, SmartCardError> result = SelectCommand.CreateForIssuerSecurityDomain(
+            SelectCommand.FileControlInfo.ReturnFcp
+        );
+        _ = result.IsSuccess.Should().BeTrue();
+        var command = result.Value;
 
         _ = command.Aid.Should().BeEmpty();
         _ = command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
@@ -282,26 +289,30 @@ public class SelectCommandTests
     [Test]
     public void ClassAndInstructionConstants_AreCorrect()
     {
-        _ = SelectCommand.ClassByte.Should().Be(0x00);
-        _ = SelectCommand.InstructionByte.Should().Be(0xA4);
+        _ = SelectCommand.CLASS_BYTE.Should().Be(0x00);
+        _ = SelectCommand.INSTRUCTION_BYTE.Should().Be(0xA4);
     }
 
     [Test]
     public void ExpectedResponseLength_WithNoResponseData_ReturnsNull()
     {
-        SelectCommand? command = CommandFactory
-            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.NoResponseData)
-            .Value;
+        Result<SelectCommand, SmartCardError> result = SelectCommand.CreateForIssuerSecurityDomain(
+            SelectCommand.FileControlInfo.NoResponseData
+        );
+        _ = result.IsSuccess.Should().BeTrue();
+        var command = result.Value;
 
-        _ = command.ExpectedResponseLength.HasNoValue.Should().BeTrue();
+        _ = command.ExpectedResponseLength.Should().Be(0);
     }
 
     [Test]
     public void ExpectedResponseLength_WithReturnFci_Returns256()
     {
-        SelectCommand? command = CommandFactory
-            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFci)
-            .Value;
+        Result<SelectCommand, SmartCardError> result = SelectCommand.CreateForIssuerSecurityDomain(
+            SelectCommand.FileControlInfo.ReturnFci
+        );
+        _ = result.IsSuccess.Should().BeTrue();
+        var command = result.Value;
 
         _ = command.ExpectedResponseLength.Should().Be(256);
     }
@@ -309,9 +320,11 @@ public class SelectCommandTests
     [Test]
     public void ExpectedResponseLength_WithReturnFcp_Returns256()
     {
-        SelectCommand? command = CommandFactory
-            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp)
-            .Value;
+        Result<SelectCommand, SmartCardError> result = SelectCommand.CreateForIssuerSecurityDomain(
+            SelectCommand.FileControlInfo.ReturnFcp
+        );
+        _ = result.IsSuccess.Should().BeTrue();
+        var command = result.Value;
 
         _ = command.ExpectedResponseLength.Should().Be(256);
     }
@@ -319,9 +332,11 @@ public class SelectCommandTests
     [Test]
     public void ExpectedResponseLength_WithReturnFmd_Returns256()
     {
-        SelectCommand? command = CommandFactory
-            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFmd)
-            .Value;
+        Result<SelectCommand, SmartCardError> result = SelectCommand.CreateForIssuerSecurityDomain(
+            SelectCommand.FileControlInfo.ReturnFmd
+        );
+        _ = result.IsSuccess.Should().BeTrue();
+        var command = result.Value;
 
         _ = command.ExpectedResponseLength.Should().Be(256);
     }
@@ -329,11 +344,15 @@ public class SelectCommandTests
     [Test]
     public void ToApdu_WithNoResponseData_GeneratesCorrectApdu()
     {
-        SelectCommand? command = CommandFactory
-            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.NoResponseData)
-            .Value;
+        Result<SelectCommand, SmartCardError> result = SelectCommand.CreateForIssuerSecurityDomain(
+            SelectCommand.FileControlInfo.NoResponseData
+        );
+        _ = result.IsSuccess.Should().BeTrue();
+        var command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         _ = apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x0C });
     }
@@ -341,11 +360,15 @@ public class SelectCommandTests
     [Test]
     public void ToApdu_WithReturnFcp_GeneratesCorrectApdu()
     {
-        SelectCommand? command = CommandFactory
-            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp)
-            .Value;
+        Result<SelectCommand, SmartCardError> result = SelectCommand.CreateForIssuerSecurityDomain(
+            SelectCommand.FileControlInfo.ReturnFcp
+        );
+        _ = result.IsSuccess.Should().BeTrue();
+        var command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         _ = apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x04, 0x00 });
     }
@@ -353,11 +376,15 @@ public class SelectCommandTests
     [Test]
     public void ToApdu_WithReturnFmd_GeneratesCorrectApdu()
     {
-        SelectCommand? command = CommandFactory
-            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFmd)
-            .Value;
+        Result<SelectCommand, SmartCardError> result = SelectCommand.CreateForIssuerSecurityDomain(
+            SelectCommand.FileControlInfo.ReturnFmd
+        );
+        _ = result.IsSuccess.Should().BeTrue();
+        var command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         _ = apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x08, 0x00 });
     }
@@ -366,19 +393,17 @@ public class SelectCommandTests
     public void ToApdu_WithAidAndReturnFcp_GeneratesCorrectApdu()
     {
         byte[] aid = Convert.FromHexString("A000000151000000");
-        SelectCommand? command = CommandFactory
-            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp)
-            .Value;
-        // Need to access through Create method since constructor is private
-        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid);
-        SelectCommand? createdCommand = result.Value;
+        Result<SelectCommand, SmartCardError> commandResult = SelectCommand.CreateWith(
+            aid,
+            SelectCommand.SelectMode.First,
+            SelectCommand.FileControlInfo.ReturnFcp
+        );
+        _ = commandResult.IsSuccess.Should().BeTrue();
+        var command = commandResult.Value;
 
-        // Create manually with ReturnFcp since we can't easily combine Create with different FileControlInfo
-        SelectCommand? manualCommand = CommandFactory
-            .CreateSelectIsdCommand(SelectCommand.FileControlInfo.ReturnFcp)
-            .Value;
-
-        byte[]? apdu = ApduBuilder.BuildApdu(manualCommand);
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         _ = apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x04, 0x00 });
     }
@@ -394,9 +419,11 @@ public class SelectCommandTests
             SelectCommand.FileControlInfo.NoResponseData,
         ];
 
-        foreach (SelectCommand.FileControlInfo option in options)
+        foreach (var option in options)
         {
-            SelectCommand? command = Services.GlobalPlatform.Commands.CreateSelectIsdCommand(option).Value;
+            var command = Services
+                .GlobalPlatform.Commands.CreateSelectIsdCommand(option)
+                .Value;
 
             _ = command
                 .ControlInfo.Should()
@@ -481,9 +508,11 @@ public class SelectCommandTests
 
         byte[] aid = Convert.FromHexString("A000000151000000");
         Result<SelectCommand, SmartCardError> result = SelectCommand.Create(aid);
-        SelectCommand? command = result.Value;
+        var command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         byte[] expected =
         [
@@ -511,9 +540,11 @@ public class SelectCommandTests
             aid,
             SelectCommand.SelectMode.Next
         );
-        SelectCommand? command = result.Value;
+        var command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         byte[] expected =
         [
@@ -538,9 +569,11 @@ public class SelectCommandTests
 
         Result<SelectCommand, SmartCardError> result =
             SelectCommand.CreateForIssuerSecurityDomain();
-        SelectCommand? command = result.Value;
+        var command = result.Value;
 
-        byte[]? apdu = ApduBuilder.BuildApdu(command);
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+        _ = apduResult.IsSuccess.Should().BeTrue();
+        byte[] apdu = apduResult.Value;
 
         byte[] expected =
         [

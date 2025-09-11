@@ -69,15 +69,16 @@ public class GpShellTraceParser
     /// </summary>
     public Result<ApduTrace, SmartCardError> ParseFile(string filePath)
     {
-        return Maybe.From(filePath)
-            .Where(path => !string.IsNullOrWhiteSpace(path))
-            .ToResult(SmartCardError.InvalidArgument("File path cannot be empty"))
-            .Ensure(File.Exists, SmartCardError.InvalidArgument("Trace file not found"))
-            .Bind(path => 
-            {
-                string content = File.ReadAllText(path);
-                return ParseString(content);
-            });
+        if (string.IsNullOrWhiteSpace(filePath))
+            return Result.Failure<ApduTrace, SmartCardError>(
+                SmartCardError.InvalidArgument("File path cannot be empty"));
+            
+        if (!File.Exists(filePath))
+            return Result.Failure<ApduTrace, SmartCardError>(
+                SmartCardError.InvalidArgument("Trace file not found"));
+            
+        string content = File.ReadAllText(filePath);
+        return ParseString(content);
     }
 
     /// <summary>
@@ -85,48 +86,60 @@ public class GpShellTraceParser
     /// </summary>
     public Result<ApduTrace, SmartCardError> ParseString(string traceContent)
     {
-        return Maybe.From(traceContent?.Trim())
-            .Where(content => !string.IsNullOrEmpty(content))
-            .ToResult(SmartCardError.InvalidArgument("Trace content cannot be empty"))
-            .Bind(content => 
-            {
-                string[] lines = content.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-                ParserState initialState = ParserState.Empty;
-                ApduTrace initialTrace = ApduTrace.CreateEmpty();
+        var trimmedContent = traceContent?.Trim();
+        if (string.IsNullOrEmpty(trimmedContent))
+            return Result.Failure<ApduTrace, SmartCardError>(
+                SmartCardError.InvalidArgument("Trace content cannot be empty"));
                 
-                return lines.Aggregate(
-                    Result.Success<(ApduTrace trace, ParserState state), SmartCardError>((initialTrace, initialState)),
-                    (accumResult, line) => accumResult.Bind(accum => 
+        string content = trimmedContent;
+        string[] lines = content.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+        var initialState = ParserState.Empty;
+        var initialTrace = ApduTrace.CreateEmpty();
+
+        return lines
+            .Aggregate(
+                Result.Success<(ApduTrace trace, ParserState state), SmartCardError>(
+                    (initialTrace, initialState)
+                ),
+                (accumResult, line) =>
+                    accumResult.Bind(accum =>
                         ProcessLineFunctional(line, accum.trace, accum.state)
                     )
-                ).Bind(final => 
-                    // Handle pending command if any
-                    final.state.PendingCommand.Match(
-                        pendingCmd => ApduExchange.Create(pendingCmd, Maybe<ApduResponse>.None)
+            )
+            .Bind(final =>
+                // Handle pending command if any
+                final.state.PendingCommand.Match(
+                    pendingCmd =>
+                        ApduExchange
+                            .Create(pendingCmd, Maybe<ApduResponse>.None)
                             .Bind(exchange => final.trace.WithExchange(exchange)),
-                        () => Result.Success<ApduTrace, SmartCardError>(final.trace)
-                    )
-                );
-            });
+                    () => Result.Success<ApduTrace, SmartCardError>(final.trace)
+                )
+            );
     }
 
     private Result<(ApduTrace trace, ParserState state), SmartCardError> ProcessLineFunctional(
-        string line, 
-        ApduTrace currentTrace, 
-        ParserState currentState)
+        string line,
+        ApduTrace currentTrace,
+        ParserState currentState
+    )
     {
         string trimmedLine = line.Trim();
 
         // Skip empty lines and comments
-        if (string.IsNullOrWhiteSpace(trimmedLine) || 
-            trimmedLine.StartsWith("#") || 
-            trimmedLine.StartsWith("//"))
+        if (
+            string.IsNullOrWhiteSpace(trimmedLine)
+            || trimmedLine.StartsWith("#")
+            || trimmedLine.StartsWith("//")
+        )
         {
-            return Result.Success<(ApduTrace, ParserState), SmartCardError>((currentTrace, currentState));
+            return Result.Success<(ApduTrace, ParserState), SmartCardError>(
+                (currentTrace, currentState)
+            );
         }
 
         // Check for ATR
-        Match atrMatch = AtrPattern.Match(trimmedLine);
+        var atrMatch = AtrPattern.Match(trimmedLine);
         if (atrMatch.Success)
         {
             return ParseHexStringSafe(atrMatch.Groups[1].Value)
@@ -138,36 +151,49 @@ public class GpShellTraceParser
         return ProcessCommandOrResponseFunctional(trimmedLine, currentTrace, currentState);
     }
 
-    private Result<(ApduTrace trace, ParserState state), SmartCardError> ProcessCommandOrResponseFunctional(
-        string line, 
-        ApduTrace currentTrace, 
-        ParserState currentState)
+    private Result<
+        (ApduTrace trace, ParserState state),
+        SmartCardError
+    > ProcessCommandOrResponseFunctional(
+        string line,
+        ApduTrace currentTrace,
+        ParserState currentState
+    )
     {
         // Check for command pattern
-        Match commandMatch = CommandPatterns.Match(line);
+        var commandMatch = CommandPatterns.Match(line);
         if (commandMatch.Success)
         {
             return ParseHexStringSafe(commandMatch.Groups[1].Value)
-                .Map(commandBytes => 
+                .Map(commandBytes =>
                 {
                     // If there's a pending command, complete it first
-                    ApduTrace intermediateTrace = currentState.PendingCommand.Match(
-                        pendingCmd => 
+                    var intermediateTrace = currentState.PendingCommand.Match(
+                        pendingCmd =>
                         {
-                            var exchangeResult = ApduExchange.Create(pendingCmd, Maybe<ApduResponse>.None);
-                            return exchangeResult.IsSuccess 
-                                ? currentTrace.WithExchange(exchangeResult.Value).GetValueOrDefault(currentTrace)
+                            var exchangeResult = ApduExchange.Create(
+                                pendingCmd,
+                                Maybe<ApduResponse>.None
+                            );
+                            return exchangeResult.IsSuccess
+                                ? currentTrace
+                                    .WithExchange(exchangeResult.Value)
+                                    .GetValueOrDefault(currentTrace)
                                 : currentTrace;
                         },
-                        () => currentTrace);
+                        () => currentTrace
+                    );
 
-                    ParserState newState = currentState with { PendingCommand = Maybe<byte[]>.From(commandBytes) };
+                    var newState = currentState with
+                    {
+                        PendingCommand = Maybe<byte[]>.From(commandBytes),
+                    };
                     return (intermediateTrace, newState);
                 });
         }
 
         // Check for response pattern
-        Match responseMatch = ResponsePatterns.Match(line);
+        var responseMatch = ResponsePatterns.Match(line);
         if (responseMatch.Success)
         {
             return ParseHexStringSafe(responseMatch.Groups[1].Value)
@@ -176,38 +202,67 @@ public class GpShellTraceParser
                     return currentState.PendingCommand.Match(
                         pendingCmd =>
                         {
-                            var response = new ApduResponse(responseBytes, (ushort)(responseBytes.Length >= 2 ? 
-                                (responseBytes[responseBytes.Length - 2] << 8) | responseBytes[responseBytes.Length - 1] : 0));
-                            return ApduExchange.Create(pendingCmd, Maybe<ApduResponse>.From(response))
+                            var response = new ApduResponse(
+                                responseBytes,
+                                (ushort)(
+                                    responseBytes.Length >= 2
+                                        ? (responseBytes[responseBytes.Length - 2] << 8)
+                                            | responseBytes[responseBytes.Length - 1]
+                                        : 0
+                                )
+                            );
+                            return ApduExchange
+                                .Create(pendingCmd, Maybe<ApduResponse>.From(response))
                                 .Bind(exchange => currentTrace.WithExchange(exchange))
-                                .Map(newTrace => 
+                                .Map(newTrace =>
                                 {
-                                    ParserState newState = currentState with { PendingCommand = Maybe<byte[]>.None };
+                                    var newState = currentState with
+                                    {
+                                        PendingCommand = Maybe<byte[]>.None,
+                                    };
                                     return (newTrace, newState);
                                 });
                         },
-                        () => Result.Success<(ApduTrace, ParserState), SmartCardError>((currentTrace, currentState))
+                        () =>
+                            Result.Success<(ApduTrace, ParserState), SmartCardError>(
+                                (currentTrace, currentState)
+                            )
                     );
                 });
         }
 
-        return Result.Success<(ApduTrace, ParserState), SmartCardError>((currentTrace, currentState));
+        return Result.Success<(ApduTrace, ParserState), SmartCardError>(
+            (currentTrace, currentState)
+        );
     }
-
 
     private static Result<byte[], SmartCardError> ParseHexStringSafe(string hex)
     {
-        return Maybe.From(hex)
+        return Maybe
+            .From(hex)
             .Where(h => !string.IsNullOrWhiteSpace(h))
             .ToResult(SmartCardError.InvalidData("Hex string cannot be empty"))
             .Map(h => Regex.Replace(h, @"[\s\-:,]", ""))
-            .Ensure(cleaned => cleaned.Length % 2 == 0, SmartCardError.InvalidData("Hex string must have even length"))
+            .Ensure(
+                cleaned => cleaned.Length % 2 == 0,
+                SmartCardError.InvalidData("Hex string must have even length")
+            )
             .Bind(cleaned =>
             {
-                var results = Enumerable.Range(0, cleaned.Length / 2)
-                    .Select(i => byte.TryParse(cleaned.AsSpan(i * 2, 2), NumberStyles.HexNumber, null, out byte b) 
-                        ? Result.Success<byte, SmartCardError>(b)
-                        : SmartCardError.InvalidData($"Invalid hex character at position {i * 2}"))
+                var results = Enumerable
+                    .Range(0, cleaned.Length / 2)
+                    .Select(i =>
+                        byte.TryParse(
+                            cleaned.AsSpan(i * 2, 2),
+                            NumberStyles.HexNumber,
+                            null,
+                            out byte b
+                        )
+                            ? Result.Success<byte, SmartCardError>(b)
+                            : SmartCardError.InvalidData(
+                                $"Invalid hex character at position {i * 2}"
+                            )
+                    )
                     .ToArray();
 
                 // Check if all parsing succeeded
@@ -216,7 +271,6 @@ public class GpShellTraceParser
                     : results.First(r => r.IsFailure).Error;
             });
     }
-
 
     private static ApduResponse ParseResponse(byte[] responseBytes)
     {
@@ -257,17 +311,13 @@ public class GpShellTraceParser
 
     private sealed record ParserState(
         Maybe<byte[]> PendingCommand,
-        Maybe<byte[]> PartialResponse, 
+        Maybe<byte[]> PartialResponse,
         Maybe<ApduExchange> LastExchange,
         string LastLine
     )
     {
-        public static ParserState Empty => new(
-            Maybe<byte[]>.None,
-            Maybe<byte[]>.None,
-            Maybe<ApduExchange>.None,
-            string.Empty
-        );
+        public static ParserState Empty =>
+            new(Maybe<byte[]>.None, Maybe<byte[]>.None, Maybe<ApduExchange>.None, string.Empty);
     }
 }
 

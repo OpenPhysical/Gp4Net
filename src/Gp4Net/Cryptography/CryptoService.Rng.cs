@@ -20,14 +20,14 @@ public interface IRngContext
     /// <param name="length">Number of random bytes to generate.</param>
     /// <returns>Random bytes or error if generation fails.</returns>
     Result<byte[], SmartCardError> GenerateBytes(int length);
-    
+
     /// <summary>
     /// Checks if the context has enough entropy for the specified number of bytes.
     /// </summary>
     /// <param name="requiredBytes">The number of bytes that will be requested.</param>
     /// <returns>True if the RNG can generate the required bytes.</returns>
     bool HasEnoughEntropy(int requiredBytes);
-    
+
     /// <summary>
     /// Gets the remaining entropy available in the context.
     /// Returns None for unlimited entropy (secure mode).
@@ -49,7 +49,9 @@ public interface IPreloadedRngContext : IRngContext
     /// </summary>
     /// <param name="length">Number of bytes to extract.</param>
     /// <returns>Result containing entropy and new context instance with updated position.</returns>
-    Result<(byte[] entropy, IPreloadedRngContext newState), SmartCardError> GetBytesWithNewState(int length);
+    Result<(byte[] entropy, IPreloadedRngContext newState), SmartCardError> GetBytesWithNewState(
+        int length
+    );
 
     /// <summary>
     /// Gets the total size of the entropy buffer.
@@ -79,7 +81,7 @@ public static partial class CryptoService
     public static class Rng
     {
         private static volatile IRngMode _currentMode = new SecureRngMode();
-        private static readonly object _modeLock = new object();
+        private static readonly object ModeLock = new object();
 
         /// <summary>
         /// Configures RNG to use secure cryptographic random generation for production.
@@ -88,7 +90,7 @@ public static partial class CryptoService
         /// </summary>
         public static void UseSecureMode()
         {
-            lock (_modeLock)
+            lock (ModeLock)
             {
                 _currentMode = new SecureRngMode();
             }
@@ -103,11 +105,12 @@ public static partial class CryptoService
         /// <returns>Success or failure based on entropy validation.</returns>
         public static UnitResult<SmartCardError> UseDeterministicMode(byte[] entropy)
         {
-            return DeterministicRngMode.Create(entropy)
+            return DeterministicRngMode
+                .Create(entropy)
                 .Match(
                     mode =>
                     {
-                        lock (_modeLock)
+                        lock (ModeLock)
                         {
                             _currentMode = mode;
                         }
@@ -160,7 +163,8 @@ public static partial class CryptoService
         /// <returns>A deterministic RNG context or error if entropy is invalid.</returns>
         public static Result<IRngContext, SmartCardError> CreateDeterministicContext(byte[] entropy)
         {
-            return DeterministicRngMode.Create(entropy)
+            return DeterministicRngMode
+                .Create(entropy)
                 .Map(mode => (IRngContext)new RngContextAdapter(mode));
         }
 
@@ -180,9 +184,12 @@ public static partial class CryptoService
         /// </summary>
         /// <param name="challenges">Sequential challenges from a card trace.</param>
         /// <returns>A deterministic RNG context or error if challenges are invalid.</returns>
-        public static Result<IRngContext, SmartCardError> CreateFromTraceChallenges(IEnumerable<byte[]> challenges)
+        public static Result<IRngContext, SmartCardError> CreateFromTraceChallenges(
+            IEnumerable<byte[]> challenges
+        )
         {
-            return Maybe.From(challenges)
+            return Maybe
+                .From(challenges)
                 .ToResult(SmartCardError.InvalidArgument("Challenges cannot be null"))
                 .Map(c => c.SelectMany(chunk => chunk).ToArray())
                 .Bind(CreateDeterministicContext);
@@ -196,12 +203,20 @@ public static partial class CryptoService
         /// <returns>A deterministic RNG context or error if parameters are invalid.</returns>
         public static Result<IRngContext, SmartCardError> CreateWithRepeatingPattern(
             byte[] pattern,
-            int repetitions)
+            int repetitions
+        )
         {
-            return Maybe.From(pattern)
+            return Maybe
+                .From(pattern)
                 .ToResult(SmartCardError.InvalidArgument("Pattern cannot be null"))
-                .Ensure(p => p.Length > 0, SmartCardError.InvalidArgument("Pattern cannot be empty"))
-                .Ensure(_ => repetitions > 0, SmartCardError.InvalidArgument($"Repetitions must be positive: {repetitions}"))
+                .Ensure(
+                    p => p.Length > 0,
+                    SmartCardError.InvalidArgument("Pattern cannot be empty")
+                )
+                .Ensure(
+                    _ => repetitions > 0,
+                    SmartCardError.InvalidArgument($"Repetitions must be positive: {repetitions}")
+                )
                 .Map(p => Enumerable.Range(0, repetitions).SelectMany(_ => p).ToArray())
                 .Bind(CreateDeterministicContext);
         }
@@ -213,7 +228,9 @@ public static partial class CryptoService
         /// </summary>
         /// <param name="entropy">The complete entropy supply for all random operations.</param>
         /// <returns>A preloaded RNG context or error if entropy is invalid.</returns>
-        public static Result<IPreloadedRngContext, SmartCardError> CreatePreloadedContext(byte[] entropy)
+        public static Result<IPreloadedRngContext, SmartCardError> CreatePreloadedContext(
+            byte[] entropy
+        )
         {
             return PreloadedRngContext.Create(entropy);
         }
@@ -223,9 +240,12 @@ public static partial class CryptoService
         /// </summary>
         /// <param name="entropyChunks">Sequence of entropy chunks to concatenate.</param>
         /// <returns>A preloaded RNG context or error if entropy is invalid.</returns>
-        public static Result<IPreloadedRngContext, SmartCardError> CreatePreloadedContext(IEnumerable<byte[]> entropyChunks)
+        public static Result<IPreloadedRngContext, SmartCardError> CreatePreloadedContext(
+            IEnumerable<byte[]> entropyChunks
+        )
         {
-            return Maybe.From(entropyChunks)
+            return Maybe
+                .From(entropyChunks)
                 .ToResult(SmartCardError.InvalidArgument("Entropy chunks cannot be null"))
                 .Map(chunks => chunks.SelectMany(chunk => chunk).ToArray())
                 .Bind(CreatePreloadedContext);
@@ -285,11 +305,10 @@ public static partial class CryptoService
                 return _mode.GetBytes(length);
             }
 
-            public bool HasEnoughEntropy(int requiredBytes) => 
+            public bool HasEnoughEntropy(int requiredBytes) =>
                 _mode.HasEnoughEntropy(requiredBytes);
 
-            public Maybe<int> RemainingEntropy => 
-                _mode.RemainingEntropy;
+            public Maybe<int> RemainingEntropy => _mode.RemainingEntropy;
         }
 
         /// <summary>
@@ -314,15 +333,19 @@ public static partial class CryptoService
                     () =>
                     {
                         byte[] bytes = new byte[length];
-                        SecureRandom random = new SecureRandom();
+                        var random = new SecureRandom();
                         random.NextBytes(bytes);
                         return bytes;
                     },
-                    ex => SmartCardError.CryptographicError($"Secure random generation failed: {ex.Message}")
+                    ex =>
+                        SmartCardError.CryptographicError(
+                            $"Secure random generation failed: {ex.Message}"
+                        )
                 );
             }
 
             public bool HasEnoughEntropy(int requiredBytes) => true;
+
             public Maybe<int> RemainingEntropy => Maybe<int>.None;
         }
 
@@ -344,9 +367,13 @@ public static partial class CryptoService
 
             public static Result<DeterministicRngMode, SmartCardError> Create(byte[] entropy)
             {
-                return Maybe.From(entropy)
+                return Maybe
+                    .From(entropy)
                     .ToResult(SmartCardError.InvalidArgument("Entropy cannot be null"))
-                    .Ensure(e => e.Length > 0, SmartCardError.InvalidArgument("Entropy buffer cannot be empty"))
+                    .Ensure(
+                        e => e.Length > 0,
+                        SmartCardError.InvalidArgument("Entropy buffer cannot be empty")
+                    )
                     .Map(e => new DeterministicRngMode((byte[])e.Clone()));
             }
 
@@ -375,8 +402,7 @@ public static partial class CryptoService
                 return requiredBytes >= 0 && _position + requiredBytes <= _entropy.Length;
             }
 
-            public Maybe<int> RemainingEntropy =>
-                Maybe<int>.From(_entropy.Length - _position);
+            public Maybe<int> RemainingEntropy => Maybe<int>.From(_entropy.Length - _position);
         }
 
         /// <summary>
@@ -396,9 +422,13 @@ public static partial class CryptoService
             /// <param name="entropy">The complete entropy supply to use for all random operations.</param>
             /// <returns>A result containing the RNG context or an error.</returns>
             public static Result<IPreloadedRngContext, SmartCardError> Create(byte[] entropy) =>
-                Maybe.From(entropy)
+                Maybe
+                    .From(entropy)
                     .ToResult(SmartCardError.InvalidArgument("Entropy cannot be null"))
-                    .Ensure(e => e.Length > 0, SmartCardError.InvalidArgument("Entropy buffer cannot be empty"))
+                    .Ensure(
+                        e => e.Length > 0,
+                        SmartCardError.InvalidArgument("Entropy buffer cannot be empty")
+                    )
                     .Map(e => (IPreloadedRngContext)new PreloadedRngContext(e.ToImmutableList()));
 
             /// <inheritdoc />
@@ -406,7 +436,10 @@ public static partial class CryptoService
                 GetBytesWithNewState(length).Map(result => result.entropy);
 
             /// <inheritdoc />
-            public Result<(byte[] entropy, IPreloadedRngContext newState), SmartCardError> GetBytesWithNewState(int length)
+            public Result<
+                (byte[] entropy, IPreloadedRngContext newState),
+                SmartCardError
+            > GetBytesWithNewState(int length)
             {
                 if (length < 0)
                     return SmartCardError.InvalidArgument($"Length cannot be negative: {length}");
@@ -421,7 +454,7 @@ public static partial class CryptoService
 
                 var entropy = EntropyBuffer.Skip(Position).Take(length).ToArray();
                 var newState = this with { Position = Position + length };
-                
+
                 return (entropy, newState);
             }
 

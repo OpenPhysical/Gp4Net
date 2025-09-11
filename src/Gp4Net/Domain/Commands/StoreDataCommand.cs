@@ -1,12 +1,9 @@
-using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Transport;
-using WSCT.Core;
-using WSCT.ISO7816;
 using JetBrains.Annotations;
+using WSCT.ISO7816;
 using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Domain.Commands;
@@ -17,7 +14,6 @@ namespace Gp4Net.Domain.Commands;
 [PublicAPI]
 public class StoreDataCommand : IApduCommand
 {
-
     /// <summary>
     /// Data structure format values for P1.
     /// </summary>
@@ -80,6 +76,12 @@ public class StoreDataCommand : IApduCommand
     /// </summary>
     public byte[] StoreData { get; }
 
+    /// <inheritdoc />
+    public byte Cla => GlobalPlatform.Cla.GP_STANDARD;
+
+    /// <inheritdoc />
+    public byte Ins => GlobalPlatform.Ins.STORE_DATA;
+
     /// <summary>
     /// Converts this command to a CommandAPDU.
     /// </summary>
@@ -87,18 +89,23 @@ public class StoreDataCommand : IApduCommand
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
         // Build APDU bytes using immutable construction
-        var headerBytes = new byte[] { GlobalPlatform.Cla.GpStandard, GlobalPlatform.Ins.StoreData, (byte)StructureFormat, (byte)Block };
-        
-        var apduBytes = StoreData.Length > 0
-            ? headerBytes
-                .Concat([(byte)StoreData.Length]) // Lc
-                .Concat(StoreData)
-                .ToArray()
-            : headerBytes;
-        
-        return Result.Success<CommandAPDU, SmartCardError>(
-            new CommandAPDU(apduBytes)
-        );
+        var headerBytes = new byte[]
+        {
+            GlobalPlatform.Cla.GP_STANDARD,
+            GlobalPlatform.Ins.STORE_DATA,
+            (byte)StructureFormat,
+            (byte)Block,
+        };
+
+        var apduBytes =
+            StoreData.Length > 0
+                ? headerBytes
+                    .Concat([(byte)StoreData.Length]) // Lc
+                    .Concat(StoreData)
+                    .ToArray()
+                : headerBytes;
+
+        return Result.Success<CommandAPDU, SmartCardError>(new CommandAPDU(apduBytes));
     }
 
     /// <summary>

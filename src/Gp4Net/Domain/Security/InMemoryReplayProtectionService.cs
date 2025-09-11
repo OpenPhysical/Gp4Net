@@ -34,7 +34,7 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
         }
 
         string counterKey = Convert.ToHexString(sequenceCounter);
-        ConcurrentDictionary<string, bool> keyCounters = _seenCounters.GetOrAdd(
+        var keyCounters = _seenCounters.GetOrAdd(
             keyVersion,
             _ => new ConcurrentDictionary<string, bool>()
         );
@@ -64,7 +64,7 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
         }
 
         string counterKey = Convert.ToHexString(sequenceCounter);
-        ConcurrentDictionary<string, bool> keyCounters = _seenCounters.GetOrAdd(
+        var keyCounters = _seenCounters.GetOrAdd(
             keyVersion,
             _ => new ConcurrentDictionary<string, bool>()
         );
@@ -77,16 +77,25 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
         }
 
         // Per GP spec: sequence counter should increment, so we can validate ordering
-        int counterValue = sequenceCounter[0] << 16 | sequenceCounter[1] << 8 | sequenceCounter[2];
+        // SCP02 uses 2-byte counters, SCP03 uses 3-byte counters
+        int counterValue = sequenceCounter.Length switch
+        {
+            2 => sequenceCounter[0] << 8 | sequenceCounter[1], // SCP02: 2-byte counter
+            3 => sequenceCounter[0] << 16 | sequenceCounter[1] << 8 | sequenceCounter[2], // SCP03: 3-byte counter
+            _ => 0, // Invalid counter length, but we've already validated it
+        };
 
         // Optional: Remove old counters that are significantly lower than current to prevent memory growth
         // This is safe because counters must increment
         if (keyCounters.Count > 100) // Arbitrary threshold
         {
-            List<string> keysToRemove = [.. keyCounters
-                .Keys.Select(k => (key: k, value: ParseCounterValue(k)))
-                .Where(kv => kv.value < counterValue - 50) // Keep last 50 counters
-                .Select(kv => kv.key)];
+            List<string> keysToRemove =
+            [
+                .. keyCounters
+                    .Keys.Select(k => (key: k, value: ParseCounterValue(k, sequenceCounter.Length)))
+                    .Where(kv => kv.value < counterValue - 50) // Keep last 50 counters
+                    .Select(kv => kv.key),
+            ];
 
             foreach (string key in keysToRemove)
             {
@@ -104,9 +113,20 @@ public class InMemoryReplayProtectionService : IReplayProtectionService
         return UnitResult.Success<SmartCardError>();
     }
 
-    private static int ParseCounterValue(string hexCounter)
+    private static int ParseCounterValue(string hexCounter, int expectedLength)
     {
         byte[] bytes = Convert.FromHexString(hexCounter);
-        return bytes[0] << 16 | bytes[1] << 8 | bytes[2];
+
+        // Extract the counter portion from the hex string
+        // Format is: {keyVersion:X2}{sequenceCounter}
+        // Skip first byte (key version) and parse the counter
+        byte[] counterBytes = bytes.Length > expectedLength ? bytes[1..] : bytes;
+
+        return counterBytes.Length switch
+        {
+            2 => counterBytes[0] << 8 | counterBytes[1], // SCP02: 2-byte counter
+            3 => counterBytes[0] << 16 | counterBytes[1] << 8 | counterBytes[2], // SCP03: 3-byte counter
+            _ => 0, // Invalid counter length
+        };
     }
 }

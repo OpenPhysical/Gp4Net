@@ -71,7 +71,7 @@ public class CardTypeInfo
     /// </summary>
     public override string ToString()
     {
-        return string.IsNullOrEmpty(Model) 
+        return string.IsNullOrEmpty(Model)
             ? $"{Manufacturer} {Family}"
             : $"{Manufacturer} {Family} {Model}";
     }

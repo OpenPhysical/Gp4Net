@@ -30,36 +30,36 @@ public class CardDiscoveryCapabilityTests
     public static class P71CardResponses
     {
         // GET DATA 0x0066 (Card Data) - Contains card manager and supported protocols information
-        public static readonly byte[] CardData_0x0066 = Convert.FromHexString(
+        public static readonly byte[] CardData0X0066 = Convert.FromHexString(
             "664D734B06072A864886FC6B01600B06092A864886FC6B020203630906072A864886FC6B03640B06092A864886FC6B040370650D060B2A864886FC6B0507020000660C060A2B060104012A026E0103"
         );
 
         // GET DATA 0x0067 (Card Capabilities) - Contains card capabilities and supported algorithms
-        public static readonly byte[] CardCapabilities_0x0067 = Convert.FromHexString(
+        public static readonly byte[] CardCapabilities0X0067 = Convert.FromHexString(
             "6728A00D800103810500102060708201078103E5BEC082031E030083010284010285017B86010C87017B"
         );
 
         // GET DATA 0x00C1 (Security Domain Info) - Contains security domain information
-        public static readonly byte[] SecurityDomainInfo_0x00C1_P71_Key01 = Convert.FromHexString(
+        public static readonly byte[] SecurityDomainInfo0X00C1P71Key01 = Convert.FromHexString(
             "C103000001"
         );
-        public static readonly byte[] SecurityDomainInfo_0x00C1_P71_Key19 = Convert.FromHexString(
+        public static readonly byte[] SecurityDomainInfo0X00C1P71Key19 = Convert.FromHexString(
             "C103000019"
         );
 
         // GET DATA 0x00E0 (Key Information Template) - Contains key information
-        public static readonly byte[] KeyInfoTemplate_0x00E0 = Convert.FromHexString(
+        public static readonly byte[] KeyInfoTemplate0X00E0 = Convert.FromHexString(
             "E012C00401018810C00402018810C00403018810"
         );
 
         // Alternative card with different capabilities (from gp_pro_list_success.txt)
-        public static readonly byte[] CardCapabilities_Alternative = Convert.FromHexString(
+        public static readonly byte[] CardCapabilitiesAlternative = Convert.FromHexString(
             "6724A0098001028104153555758103E5BEC082031E030083010284010285017B86010C87017B"
         );
-        public static readonly byte[] SecurityDomainInfo_Alternative = Convert.FromHexString(
+        public static readonly byte[] SecurityDomainInfoAlternative = Convert.FromHexString(
             "C1020000"
         );
-        public static readonly byte[] KeyInfoTemplate_Alternative = Convert.FromHexString(
+        public static readonly byte[] KeyInfoTemplateAlternative = Convert.FromHexString(
             "E012C00401018010C00402018010C00403018010"
         );
     }
@@ -70,7 +70,7 @@ public class CardDiscoveryCapabilityTests
         // Test that we can parse Card Data (0x0066) from real P71 card
         // This data contains OIDs for supported card manager and protocols
 
-        byte[] cardData = P71CardResponses.CardData_0x0066;
+        byte[] cardData = P71CardResponses.CardData0X0066;
 
         // Basic structure validation
         _ = cardData[0].Should().Be(0x66, "Card Data should start with tag 0x66");
@@ -103,7 +103,7 @@ public class CardDiscoveryCapabilityTests
     {
         // Test parsing real P71 card capabilities data (tag 0x0067)
         // This data uses the format expected by CardCapabilities.Parse, not CardCapabilitiesCodec
-        byte[] capabilitiesData = P71CardResponses.CardCapabilities_0x0067;
+        byte[] capabilitiesData = P71CardResponses.CardCapabilities0X0067;
 
         // Strip the tag and length bytes (0x67 0x28) to get the raw capabilities data
         byte[] rawData = [.. capabilitiesData.Skip(2)];
@@ -117,7 +117,7 @@ public class CardDiscoveryCapabilityTests
 
         if (result.IsSuccess)
         {
-            CardCapabilities? capabilities = result.Value;
+            var capabilities = result.Value;
             _ = capabilities.Should().NotBeNull("Decoded capabilities should not be null");
 
             // Verify the parsed SCP options
@@ -135,10 +135,10 @@ public class CardDiscoveryCapabilityTests
     {
         // Test SecurityDomainInfoCodec against both P71 configurations
         Result<SecurityDomainInfo, SmartCardError> sdInfo1 = SecurityDomainInfoCodec.Decode(
-            P71CardResponses.SecurityDomainInfo_0x00C1_P71_Key01
+            P71CardResponses.SecurityDomainInfo0X00C1P71Key01
         );
         Result<SecurityDomainInfo, SmartCardError> sdInfo2 = SecurityDomainInfoCodec.Decode(
-            P71CardResponses.SecurityDomainInfo_0x00C1_P71_Key19
+            P71CardResponses.SecurityDomainInfo0X00C1P71Key19
         );
 
         _ = sdInfo1.IsSuccess.Should().BeTrue("P71 Security Domain Info (key 01) should decode");
@@ -154,13 +154,13 @@ public class CardDiscoveryCapabilityTests
     public void KeyInfoTemplate_P71_ParsesWithCodec()
     {
         // Test KeyInfoTemplateCodec against real P71 key information
-        byte[] keyInfoData = P71CardResponses.KeyInfoTemplate_0x00E0;
+        byte[] keyInfoData = P71CardResponses.KeyInfoTemplate0X00E0;
 
         Result<KeyInfoTemplate, SmartCardError> result = KeyInfoTemplateCodec.Decode(keyInfoData);
 
         _ = result.IsSuccess.Should().BeTrue("P71 Key Info Template should decode successfully");
 
-        KeyInfoTemplate? keyInfo = result.Value;
+        var keyInfo = result.Value;
         _ = keyInfo.Should().NotBeNull("Decoded key info should not be null");
 
         // E012 = Key Info Template with length 0x12 (18 bytes)
@@ -173,8 +173,8 @@ public class CardDiscoveryCapabilityTests
     {
         // Compare P71 capabilities with alternative card using the correct parser
         // Strip tag and length bytes before parsing
-        byte[] p71RawData = [.. P71CardResponses.CardCapabilities_0x0067.Skip(2)];
-        byte[] altRawData = [.. P71CardResponses.CardCapabilities_Alternative.Skip(2)];
+        byte[] p71RawData = [.. P71CardResponses.CardCapabilities0X0067.Skip(2)];
+        byte[] altRawData = [.. P71CardResponses.CardCapabilitiesAlternative.Skip(2)];
 
         Result<CardCapabilities, SmartCardError> p71Result = CardCapabilities.TryParse(
             Maybe<byte[]>.From(p71RawData)
@@ -192,11 +192,11 @@ public class CardDiscoveryCapabilityTests
 
         // Length difference: 0x28 (40) vs 0x24 (36) - P71 has more capabilities
         _ = P71CardResponses
-            .CardCapabilities_0x0067[1]
+            .CardCapabilities0X0067[1]
             .Should()
             .Be(0x28, "P71 should have 40 bytes of capabilities");
         _ = P71CardResponses
-            .CardCapabilities_Alternative[1]
+            .CardCapabilitiesAlternative[1]
             .Should()
             .Be(0x24, "Alternative should have 36 bytes");
     }
@@ -241,7 +241,7 @@ public class CardDiscoveryCapabilityTests
         // Using the data from gp_pro_card_info.txt trace
 
         // Step 1: Parse card capabilities to determine supported protocols
-        byte[] capabilitiesRawData = [.. P71CardResponses.CardCapabilities_0x0067.Skip(2)];
+        byte[] capabilitiesRawData = [.. P71CardResponses.CardCapabilities0X0067.Skip(2)];
         Result<CardCapabilities, SmartCardError> capabilitiesResult = CardCapabilities.TryParse(
             Maybe<byte[]>.From(capabilitiesRawData)
         );
@@ -249,13 +249,13 @@ public class CardDiscoveryCapabilityTests
 
         // Step 2: Parse security domain info to get key version information
         Result<SecurityDomainInfo, SmartCardError> sdInfoResult = SecurityDomainInfoCodec.Decode(
-            P71CardResponses.SecurityDomainInfo_0x00C1_P71_Key19
+            P71CardResponses.SecurityDomainInfo0X00C1P71Key19
         );
         _ = sdInfoResult.IsSuccess.Should().BeTrue("Security domain info should be parseable");
 
         // Step 3: Parse key information to understand key structure
         Result<KeyInfoTemplate, SmartCardError> keyInfoResult = KeyInfoTemplateCodec.Decode(
-            P71CardResponses.KeyInfoTemplate_0x00E0
+            P71CardResponses.KeyInfoTemplate0X00E0
         );
         _ = keyInfoResult.IsSuccess.Should().BeTrue("Key info template should be parseable");
 
@@ -270,7 +270,7 @@ public class CardDiscoveryCapabilityTests
     public void CardData_OidParsing_IdentifiesProtocolSupport()
     {
         // Detailed analysis of Card Data OID structures
-        byte[] cardData = P71CardResponses.CardData_0x0066;
+        byte[] cardData = P71CardResponses.CardData0X0066;
 
         // Structure: 66 4D 73 4B 06 07 2A864886FC6B01 60 0B 06 09 2A864886FC6B020203 ...
         // 66 = Card Data tag

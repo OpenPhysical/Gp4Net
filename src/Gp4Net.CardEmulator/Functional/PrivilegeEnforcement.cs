@@ -1,4 +1,3 @@
-
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
@@ -12,7 +11,6 @@ namespace Gp4Net.CardEmulator.Functional;
 /// Functional privilege enforcement system according to GlobalPlatform Section 6.
 /// Validates operations based on application privileges and secure channel state.
 /// </summary>
-
 public static class PrivilegeEnforcement
 {
     /// <summary>
@@ -39,7 +37,7 @@ public static class PrivilegeEnforcement
         CommandInfo command
     )
     {
-        CommandPrivilegeRequirements requirements = command.ClassInstruction switch
+        var requirements = command.ClassInstruction switch
         {
             // Card Manager commands require Card Manager privileges
             0x80E6 => CommandPrivilegeRequirements.Create(
@@ -49,7 +47,9 @@ public static class PrivilegeEnforcement
             ), // Requires secure channel
 
             0x80E4 => CommandPrivilegeRequirements.Create(
-                Privilege.AuthorizedManagement | Privilege.DelegatedManagement | Privilege.SecurityDomain,
+                Privilege.AuthorizedManagement
+                    | Privilege.DelegatedManagement
+                    | Privilege.SecurityDomain,
                 SecurityLevel.CMac,
                 true
             ),
@@ -68,11 +68,7 @@ public static class PrivilegeEnforcement
                     SecurityLevel.CMac,
                     true
                 ),
-                _ => CommandPrivilegeRequirements.Create(
-                    Privilege.None,
-                    SecurityLevel.None,
-                    false
-                ),
+                _ => CommandPrivilegeRequirements.Create(Privilege.None, SecurityLevel.None, false),
             },
 
             // Key management commands
@@ -116,11 +112,7 @@ public static class PrivilegeEnforcement
                 false
             ),
 
-            _ => CommandPrivilegeRequirements.Create(
-                Privilege.None,
-                SecurityLevel.None,
-                false
-            ),
+            _ => CommandPrivilegeRequirements.Create(Privilege.None, SecurityLevel.None, false),
         };
 
         return Result.Success<CommandPrivilegeRequirements, SmartCardError>(requirements);
@@ -189,7 +181,7 @@ public static class PrivilegeEnforcement
         CommandInfo command
     )
     {
-        SecurityLevel required = command.ClassInstruction switch
+        var required = command.ClassInstruction switch
         {
             // Administrative commands require C-MAC
             0x80E6 or 0x80E4 or 0x80E8 or 0x80D8 or 0x80F0 => SecurityLevel.CMac,
@@ -217,7 +209,7 @@ public static class PrivilegeEnforcement
             return Result.Success<bool, SmartCardError>(true);
         }
 
-        SecurityLevel currentLevel = (SecurityLevel)state.SecurityLevel;
+        var currentLevel = (SecurityLevel)state.SecurityLevel;
         if (currentLevel >= required)
         {
             return Result.Success<bool, SmartCardError>(true);

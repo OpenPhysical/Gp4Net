@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
@@ -9,21 +7,16 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Pipeline;
 using Gp4Net.Services;
 using Gp4Net.Services.GlobalPlatform;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using Gp4Net.Tool.Services;
-using Gp4Net.Tool.Services.CardCommunication;
-using Gp4Net.Tool.Services.CardCommunication.Wsct;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Spectre.Console.Cli;
 using WSCT.Wrapper;
-using WSCT.Wrapper.Desktop.Core;
-using static Gp4Net.Pipeline.CommandProcessing;
 
 namespace Gp4Net.Tool.Commands.Card;
 
@@ -110,26 +103,21 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
     {
         _displayService.Info("Enumerating available card readers...");
 
-        return Result.Try(() =>
+        return Result
+            .Try(() =>
             {
-                using var context = new WsctCardContextWrapper();
-                var establishResult = context.Establish();
-                if (establishResult != ErrorCode.Success)
+                // Use ReaderEnumerationService instead of direct WSCT
+                var readersResult = ReaderEnumerationService
+                    .EnumeratePhysicalReadersAsync()
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (readersResult.IsFailure)
                 {
-                    return Result.Failure<string, SmartCardError>(
-                        SmartCardError.CommunicationError($"Failed to establish PC/SC context: {establishResult}")
-                    );
+                    return Result.Failure<string, SmartCardError>(readersResult.Error);
                 }
 
-                var listResult = context.ListReaders(string.Empty);
-                if (listResult != ErrorCode.Success)
-                {
-                    return Result.Failure<string, SmartCardError>(
-                        SmartCardError.CommunicationError($"Failed to list readers: {listResult}")
-                    );
-                }
-
-                var readers = context.Readers.ToList();
+                var readers = readersResult.Value.ToList();
                 if (readers.Count == 0)
                 {
                     return Result.Failure<string, SmartCardError>(
@@ -151,7 +139,9 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
                     if (!readers.Contains(settings.ReaderName))
                     {
                         return Result.Failure<string, SmartCardError>(
-                            SmartCardError.InvalidArgument($"Reader '{settings.ReaderName}' not found")
+                            SmartCardError.InvalidArgument(
+                                $"Reader '{settings.ReaderName}' not found"
+                            )
                         );
                     }
                     return Result.Success<string, SmartCardError>(settings.ReaderName);
@@ -162,13 +152,14 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
                 _displayService.Info($"Using reader: {selectedReader}");
                 return Result.Success<string, SmartCardError>(selectedReader);
             })
-            .MapError(ex => SmartCardError.CommunicationError(
-                $"Failed to enumerate readers: {ex}"
-            ))
+            .MapError(ex => SmartCardError.CommunicationError($"Failed to enumerate readers: {ex}"))
             .Bind(result => result);
     }
 
-    private Task<Result<bool, SmartCardError>> CreateSmartCardServiceForPhysicalCard(string readerName, Settings settings)
+    private Task<Result<bool, SmartCardError>> CreateSmartCardServiceForPhysicalCard(
+        string readerName,
+        Settings settings
+    )
     {
         _displayService.Success("✓ DI registration fixed - tool starts successfully");
         _displayService.Success("✓ Physical card integration architecture implemented");
@@ -188,7 +179,6 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
         return Task.FromResult(Result.Success<bool, SmartCardError>(true));
     }
 
-
     private async Task<Result<bool, SmartCardError>> TestSecureChannelEstablishment(
         ISmartCardService smartCardService,
         Settings settings
@@ -201,7 +191,7 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
 
         // Create proper KeySet from GP test keys
         byte protocolVersion = settings.UseScp03 ? (byte)0x03 : (byte)0x02;
-        Result<KeySet, SmartCardError> keySetResult =
+        var keySetResult =
             protocolVersion == 0x03
                 ? GpTestKeys.CreateScp03TestKeySet().Map(keySet => (KeySet)keySet)
                 : GpTestKeys.CreateScp02TestKeySet().Map(keySet => (KeySet)keySet);
@@ -225,9 +215,9 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
         Settings settings
     )
     {
-        SecurityLevel securityLevel = (SecurityLevel)settings.SecurityLevel;
+        var securityLevel = (SecurityLevel)settings.SecurityLevel;
 
-        Stopwatch sw = Stopwatch.StartNew();
+        var sw = Stopwatch.StartNew();
 
         // Establish secure channel using static ScpService
         var secureChannelResult = await ScpService.Establishment.EstablishAsync(
@@ -263,11 +253,10 @@ public class TestSecureChannelCommand : AsyncCommand<TestSecureChannelCommand.Se
         _displayService.Info("Testing secure messaging...");
 
         // Test with GET STATUS command through secure channel
-        Result<ImmutableList<ApplicationInfo>, SmartCardError> getStatusResult =
-            await Applications.GetApplicationsAndSecurityDomainsAsync(
-                (command, ct) => smartCardService.ExecuteCommandAsync(command, ct),
-                CancellationToken.None
-            );
+        var getStatusResult = await Applications.GetApplicationsAndSecurityDomainsAsync(
+            (command, ct) => smartCardService.ExecuteCommandAsync(command, ct),
+            CancellationToken.None
+        );
 
         return getStatusResult.Match(
             applications =>

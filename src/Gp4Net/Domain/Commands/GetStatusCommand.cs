@@ -1,15 +1,10 @@
-using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Services;
-using static Gp4Net.Services.TlvService;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
-using Gp4Net.Transport;
 using WSCT.ISO7816;
 using static Gp4Net.Constants.Constants;
 
@@ -21,7 +16,6 @@ namespace Gp4Net.Domain.Commands;
 [PublicAPI]
 public class GetStatusCommand : IApduCommand
 {
-
     /// <summary>
     /// Get status subset values for P1.
     /// </summary>
@@ -79,6 +73,37 @@ public class GetStatusCommand : IApduCommand
     /// </summary>
     public byte[] SearchCriteria { get; }
 
+    /// <inheritdoc />
+    public byte Cla => GlobalPlatform.Cla.GP_STANDARD;
+
+    /// <inheritdoc />
+    public byte Ins => GlobalPlatform.Ins.GET_STATUS;
+
+    /// <summary>
+    /// Gets the P1 parameter (status subset).
+    /// </summary>
+    public byte P1 => (byte)Subset;
+
+    /// <summary>
+    /// Gets the P2 parameter (response format).
+    /// </summary>
+    public byte P2 => (byte)Format;
+
+    /// <summary>
+    /// Gets the command data (search criteria).
+    /// </summary>
+    public byte[] Data => SearchCriteria;
+
+    /// <summary>
+    /// Gets the expected response length.
+    /// </summary>
+    public int ExpectedResponseLength => 256;
+
+    /// <summary>
+    /// Gets whether this command uses extended length encoding.
+    /// </summary>
+    public bool IsExtendedLength => false;
+
     /// <summary>
     /// Creates a WSCT CommandAPDU for this GET STATUS command.
     /// </summary>
@@ -86,8 +111,8 @@ public class GetStatusCommand : IApduCommand
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
         return ApduBuilder.CreateCommand(
-            GlobalPlatform.Cla.GpStandard,
-            GlobalPlatform.Ins.GetStatus,
+            GlobalPlatform.Cla.GP_STANDARD,
+            GlobalPlatform.Ins.GET_STATUS,
             (byte)Subset,
             (byte)Format,
             Maybe<byte[]>.From(SearchCriteria),
@@ -334,8 +359,8 @@ public class GetStatusResponse
     /// <returns>A Result containing either the parsed response or an error.</returns>
     public static Result<GetStatusResponse, SmartCardError> Parse(byte[] response)
     {
-        return TlvService.GlobalPlatformParsers
-            .ParseGetStatusResponse(response)
+        return TlvService
+            .GlobalPlatformParsers.ParseGetStatusResponse(response)
             .Map(entries => new GetStatusResponse(entries.ToList()));
     }
 }

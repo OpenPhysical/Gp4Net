@@ -1,6 +1,5 @@
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
 
 namespace Gp4Net.Domain.Commands;
@@ -66,7 +65,7 @@ public static class GetDataResponseExtensions
             return Maybe<CardCapabilities>.None;
         }
 
-        Result<CardCapabilities, SmartCardError> result = CardCapabilities.TryParse(
+        var result = CardCapabilities.TryParse(
             Maybe<byte[]>.From(data)
         );
         return result.Match(

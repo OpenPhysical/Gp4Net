@@ -1,11 +1,10 @@
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
-using Gp4Net.Cryptography;
-using static Gp4Net.Cryptography.CryptoService;
-using Gp4Net.Domain.Keys;
 using Gp4Net.Constants;
+using Gp4Net.Core;
+using Gp4Net.Domain.Keys;
 using Org.BouncyCastle.Security;
+using static Gp4Net.Cryptography.CryptoService;
 
 namespace Gp4Net.Domain;
 
@@ -197,7 +196,7 @@ public static class SecureChannelLifecycleTransitions
                 new AuthenticationFailedError($"Cannot authenticate from phase {current.Phase}")
             );
 
-        AuthenticatedState authState = new AuthenticatedState(
+        var authState = new AuthenticatedState(
             keys,
             level,
             externalAuthMac,
@@ -295,9 +294,9 @@ public static class SecureChannelLifecycleTransitions
         // Generate 8 bytes of cryptographically secure random data
         // This follows the pattern used in SecureChannelState.Create()
         byte[] sessionId = new byte[8];
-        SecureRandom secureRandom = new SecureRandom();
+        var secureRandom = new SecureRandom();
         secureRandom.NextBytes(sessionId);
-        
+
         return [.. sessionId];
     }
 }

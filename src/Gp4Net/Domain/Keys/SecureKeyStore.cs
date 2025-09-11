@@ -46,9 +46,11 @@ public sealed class SecureKeyStore
     public static Result<SecureKeyStore, SmartCardError> Create()
     {
         // Generate cryptographically secure master key and salt using CryptoService.Rng
-        return CryptoService.Rng.GenerateBytes(32) // 256-bit key
-            .Bind(masterKey => 
-                CryptoService.Rng.GenerateBytes(16) // 128-bit salt
+        return CryptoService
+            .Rng.GenerateBytes(32) // 256-bit key
+            .Bind(masterKey =>
+                CryptoService
+                    .Rng.GenerateBytes(16) // 128-bit salt
                     .Map(salt => new SecureKeyStore(
                         ImmutableDictionary<string, EncryptedKey>.Empty,
                         masterKey,
@@ -87,8 +89,8 @@ public sealed class SecureKeyStore
             () =>
             {
                 // Encrypt the key before storing
-                EncryptedKey encryptedKey = EncryptKey(keyId, keyData);
-                ImmutableDictionary<string, EncryptedKey> newKeys = _keys.Add(keyId, encryptedKey);
+                var encryptedKey = EncryptKey(keyId, keyData);
+                var newKeys = _keys.Add(keyId, encryptedKey);
 
                 // Clear the original key data
                 Array.Clear(keyData, 0, keyData.Length);
@@ -112,7 +114,7 @@ public sealed class SecureKeyStore
             );
         }
 
-        if (!_keys.TryGetValue(keyId, out EncryptedKey encryptedKey))
+        if (!_keys.TryGetValue(keyId, out var encryptedKey))
         {
             return Result.Failure<SecureKey, SmartCardError>(
                 SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found")
@@ -148,7 +150,7 @@ public sealed class SecureKeyStore
             );
         }
 
-        ImmutableDictionary<string, EncryptedKey> newKeys = _keys.Remove(keyId);
+        var newKeys = _keys.Remove(keyId);
         return Result.Success<SecureKeyStore, SmartCardError>(
             new SecureKeyStore(newKeys, _masterKey, _salt)
         );
@@ -184,9 +186,9 @@ public sealed class SecureKeyStore
         bool isScp03 = false
     )
     {
-        Result<SecureKey, SmartCardError> encKeyResult = GetKey(encKeyId);
-        Result<SecureKey, SmartCardError> macKeyResult = GetKey(macKeyId);
-        Result<SecureKey, SmartCardError> dekKeyResult = GetKey(dekKeyId);
+        var encKeyResult = GetKey(encKeyId);
+        var macKeyResult = GetKey(macKeyId);
+        var dekKeyResult = GetKey(dekKeyId);
 
         if (encKeyResult.IsFailure)
         {
@@ -203,9 +205,9 @@ public sealed class SecureKeyStore
             return Result.Failure<IKeySet, SmartCardError>(dekKeyResult.Error);
         }
 
-        using (SecureKey encKey = encKeyResult.Value)
-        using (SecureKey macKey = macKeyResult.Value)
-        using (SecureKey dekKey = dekKeyResult.Value)
+        using (var encKey = encKeyResult.Value)
+        using (var macKey = macKeyResult.Value)
+        using (var dekKey = dekKeyResult.Value)
         {
             return encKey.Use(encData =>
                 macKey.Use(macData =>
@@ -213,7 +215,7 @@ public sealed class SecureKeyStore
                     {
                         if (isScp03)
                         {
-                            Result<Scp03KeySet, SmartCardError> keySetResult = Scp03KeySet.Create(
+                            var keySetResult = Scp03KeySet.Create(
                                 encData,
                                 macData,
                                 dekData,
@@ -229,7 +231,7 @@ public sealed class SecureKeyStore
                         }
                         else
                         {
-                            Result<Scp02KeySet, SmartCardError> keySetResult = Scp02KeySet.Create(
+                            var keySetResult = Scp02KeySet.Create(
                                 encData,
                                 macData,
                                 dekData,
@@ -256,15 +258,15 @@ public sealed class SecureKeyStore
 
         // Generate IV
         byte[] iv = new byte[16];
-        SecureRandom random = new SecureRandom();
+        var random = new SecureRandom();
         random.NextBytes(iv);
 
         // Setup AES-CBC cipher
-        PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(
+        var cipher = new PaddedBufferedBlockCipher(
             new CbcBlockCipher(new AesEngine())
         );
-        KeyParameter keyParam = new KeyParameter(keySpecificKey);
-        ParametersWithIV keyParamWithIv = new ParametersWithIV(keyParam, iv);
+        var keyParam = new KeyParameter(keySpecificKey);
+        var keyParamWithIv = new ParametersWithIV(keyParam, iv);
 
         cipher.Init(true, keyParamWithIv);
 
@@ -288,11 +290,11 @@ public sealed class SecureKeyStore
         byte[] keySpecificKey = DeriveKeySpecificKey(keyId);
 
         // Setup AES-CBC cipher for decryption
-        PaddedBufferedBlockCipher cipher = new PaddedBufferedBlockCipher(
+        var cipher = new PaddedBufferedBlockCipher(
             new CbcBlockCipher(new AesEngine())
         );
-        KeyParameter keyParam = new KeyParameter(keySpecificKey);
-        ParametersWithIV keyParamWithIv = new ParametersWithIV(keyParam, encryptedKey.Iv);
+        var keyParam = new KeyParameter(keySpecificKey);
+        var keyParamWithIv = new ParametersWithIV(keyParam, encryptedKey.Iv);
 
         cipher.Init(false, keyParamWithIv); // false for decryption
 
@@ -323,10 +325,10 @@ public sealed class SecureKeyStore
         byte[] keyIdBytes = Encoding.UTF8.GetBytes(keyId);
         byte[] combinedSalt = [.. _salt, .. keyIdBytes];
 
-        Pkcs5S2ParametersGenerator generator = new Pkcs5S2ParametersGenerator(new Sha256Digest());
+        var generator = new Pkcs5S2ParametersGenerator(new Sha256Digest());
         generator.Init(_masterKey, combinedSalt, 10000);
 
-        KeyParameter keyParam = (KeyParameter)generator.GenerateDerivedParameters("AES", 256); // 256 bits
+        var keyParam = (KeyParameter)generator.GenerateDerivedParameters("AES", 256); // 256 bits
         return keyParam.GetKey();
     }
 

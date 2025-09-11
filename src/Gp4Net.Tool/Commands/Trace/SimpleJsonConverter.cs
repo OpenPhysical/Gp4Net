@@ -28,16 +28,17 @@ public class SimpleJsonConverter
 
     public async Task<string> ConvertToSimpleJson(string inputFile, bool includeDescriptions = true)
     {
-        List<(string Command, string Response, int ResponseTime)> exchanges = await ParseGpProTrace(
+        var exchanges = await ParseGpProTrace(
             inputFile
         );
-        Dictionary<string, OperationRange> operations = DetectOperations(exchanges);
+        var operations = DetectOperations(exchanges);
 
-        SimpleTraceData traceData = new SimpleTraceData
+        var traceData = new SimpleTraceData
         {
             Operations = operations,
-            Exchanges = [.. exchanges
-                .Select(
+            Exchanges =
+            [
+                .. exchanges.Select(
                     (ex, idx) =>
                         new SimpleExchange
                         {
@@ -46,13 +47,14 @@ public class SimpleJsonConverter
                             Description = includeDescriptions ? GetDescription(ex.Command) : null,
                             ResponseTimeMs = ex.ResponseTime > 20 ? ex.ResponseTime : null, // Only include if > 20ms
                         }
-                )],
+                ),
+            ],
         };
 
         // Extract card info from exchanges
         ExtractCardInfo(traceData, exchanges);
 
-        JsonSerializerOptions options = new JsonSerializerOptions
+        var options = new JsonSerializerOptions
         {
             WriteIndented = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -66,8 +68,8 @@ public class SimpleJsonConverter
     > ParseGpProTrace(string filename)
     {
         List<(string Command, string Response, int ResponseTime)> exchanges = [];
-        Regex commandPattern = new Regex(@"^A>> T=\d+ \([\d+]+\) ([0-9A-F\s]+)$");
-        Regex responsePattern = new Regex(@"^A<< \([\d+]+\) \((\d+)ms\) ([0-9A-F\s]+)$");
+        var commandPattern = new Regex(@"^A>> T=\d+ \([\d+]+\) ([0-9A-F\s]+)$");
+        var responsePattern = new Regex(@"^A<< \([\d+]+\) \((\d+)ms\) ([0-9A-F\s]+)$");
 
         string currentCommand = null;
         string[] lines = await File.ReadAllLinesAsync(filename);
@@ -76,14 +78,14 @@ public class SimpleJsonConverter
         {
             string trimmed = line.Trim();
 
-            Match cmdMatch = commandPattern.Match(trimmed);
+            var cmdMatch = commandPattern.Match(trimmed);
             if (cmdMatch.Success)
             {
                 currentCommand = cmdMatch.Groups[1].Value.Replace(" ", "").ToUpper();
                 continue;
             }
 
-            Match respMatch = responsePattern.Match(trimmed);
+            var respMatch = responsePattern.Match(trimmed);
             if (respMatch.Success && currentCommand != null)
             {
                 int responseTime = int.Parse(respMatch.Groups[1].Value);
@@ -100,7 +102,7 @@ public class SimpleJsonConverter
         List<(string Command, string Response, int ResponseTime)> exchanges
     )
     {
-        Dictionary<string, OperationRange> operations = new Dictionary<string, OperationRange>();
+        var operations = new Dictionary<string, OperationRange>();
         string currentOp = "";
         int opStart = 0;
 
@@ -202,7 +204,7 @@ public class SimpleJsonConverter
         List<(string Command, string Response, int ResponseTime)> exchanges
     )
     {
-        foreach ((string Command, string Response, int ResponseTime) ex in exchanges)
+        foreach (var ex in exchanges)
         {
             // Extract ISD AID from SELECT response
             if (ex.Command.StartsWith("00A4") && ex.Response.Contains("A000000151"))

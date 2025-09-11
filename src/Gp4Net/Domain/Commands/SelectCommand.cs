@@ -1,18 +1,14 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Services;
-using static Gp4Net.Services.TlvService;
 using Gp4Net.Transport;
-using WSCT.Core;
-using WSCT.ISO7816;
 using JetBrains.Annotations;
-using static Gp4Net.Constants.Constants;
+using WSCT.ISO7816;
+using static Gp4Net.Services.TlvService;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -20,17 +16,17 @@ namespace Gp4Net.Domain.Commands;
 /// Represents the SELECT command for selecting applications or security domains.
 /// </summary>
 [PublicAPI]
-public class SelectCommand : IApduCommand
+public class SelectCommand : GpCommandBase
 {
     /// <summary>
     /// The command class byte.
     /// </summary>
-    public const byte ClassByte = Apdu.Classes.Standard;
+    public const byte CLASS_BYTE = Apdu.Classes.STANDARD;
 
     /// <summary>
     /// The command instruction byte.
     /// </summary>
-    public const byte InstructionByte = Apdu.Instructions.Select;
+    public const byte INSTRUCTION_BYTE = Apdu.Instructions.SELECT;
 
     /// <summary>
     /// Selection control values for P1.
@@ -40,7 +36,7 @@ public class SelectCommand : IApduCommand
         /// <summary>
         /// Select by name (AID).
         /// </summary>
-        SelectByName = Apdu.SelectP1.SelectByName,
+        SelectByName = Apdu.SelectP1.SELECT_BY_NAME,
     }
 
     /// <summary>
@@ -51,22 +47,22 @@ public class SelectCommand : IApduCommand
         /// <summary>
         /// Return FCI template.
         /// </summary>
-        ReturnFci = Apdu.SelectP2.ReturnFci,
+        ReturnFci = Apdu.SelectP2.RETURN_FCI,
 
         /// <summary>
         /// Return FCP template.
         /// </summary>
-        ReturnFcp = Apdu.SelectP2.ReturnFcp,
+        ReturnFcp = Apdu.SelectP2.RETURN_FCP,
 
         /// <summary>
         /// Return FMD template.
         /// </summary>
-        ReturnFmd = Apdu.SelectP2.ReturnFmd,
+        ReturnFmd = Apdu.SelectP2.RETURN_FMD,
 
         /// <summary>
         /// No response data.
         /// </summary>
-        NoResponseData = Apdu.SelectP2.NoResponseData,
+        NoResponseData = Apdu.SelectP2.NO_RESPONSE_DATA,
     }
 
     /// <summary>
@@ -85,16 +81,80 @@ public class SelectCommand : IApduCommand
     public byte[] Aid { get; }
 
     /// <summary>
-    /// Initializes a new instance of the SelectCommand class.
+    /// Gets the P1 parameter (selection control).
     /// </summary>
-    /// <param name="aid">The application identifier to select (0-16 bytes, empty for auto-detection).</param>
+    public new byte P1 => (byte)Control;
+
+    /// <summary>
+    /// Gets the P2 parameter (file control information).
+    /// </summary>
+    public new byte P2 => (byte)ControlInfo;
+
+    /// <inheritdoc />
+    public new byte Cla => CLASS_BYTE;
+
+    /// <inheritdoc />
+    public new byte Ins => INSTRUCTION_BYTE;
+
+    /// <summary>
+    /// Gets the command data (AID).
+    /// </summary>
+    public byte[] Data => Aid;
+
+    /// <summary>
+    /// Gets the expected response length.
+    /// </summary>
+    public int ExpectedResponseLength => ControlInfo == FileControlInfo.NoResponseData ? 0 : 256;
+
+    /// <summary>
+    /// Gets whether this command uses extended length encoding.
+    /// </summary>
+    public bool IsExtendedLength => false;
+
+    /// <summary>
+    /// Initializes a new instance of the SelectCommand class for empty AID (ISD selection).
+    /// Creates a CC2 APDU (5 bytes: CLA INS P1 P2 Le).
+    /// </summary>
+    /// <param name="control">The selection control method.</param>
+    /// <param name="controlInfo">The file control information.</param>
+    private SelectCommand(
+        SelectionControl control,
+        FileControlInfo controlInfo
+    )
+        : base(
+            CLASS_BYTE,
+            INSTRUCTION_BYTE,
+            (byte)control,
+            (byte)controlInfo,
+            0u  // Use Le=0 which should encode as single 00 byte for "256 expected"
+        )
+    {
+        Aid = Array.Empty<byte>();
+        Control = control;
+        ControlInfo = controlInfo;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the SelectCommand class with AID.
+    /// Creates a CC4 APDU (CLA INS P1 P2 Lc Data Le) or CC3 (without Le).
+    /// </summary>
+    /// <param name="aid">The application identifier to select (1-16 bytes).</param>
     /// <param name="control">The selection control method.</param>
     /// <param name="controlInfo">The file control information.</param>
     private SelectCommand(
         byte[] aid,
-        SelectionControl control = SelectionControl.SelectByName,
-        FileControlInfo controlInfo = FileControlInfo.ReturnFci
+        SelectionControl control,
+        FileControlInfo controlInfo
     )
+        : base(
+            CLASS_BYTE,
+            INSTRUCTION_BYTE,
+            (byte)control,
+            (byte)controlInfo,
+            (uint)aid.Length,
+            aid,
+            controlInfo == FileControlInfo.NoResponseData ? 0u : 256u
+        )
     {
         Aid = (byte[])aid.Clone();
         Control = control;
@@ -147,19 +207,23 @@ public class SelectCommand : IApduCommand
         }
 
         // GP Card Specification v2.3.1 Table 11-80: P1 is always SelectByName (0x04) for AID selection
-        SelectionControl control = SelectionControl.SelectByName;
+        var control = SelectionControl.SelectByName;
 
         // GP Card Specification v2.3.1 Table 11-81: P2 parameter for SELECT command
         // 0x00 = First or only occurrence
         // 0x02 = Next occurrence
-        FileControlInfo controlInfo =
+        var controlInfo =
             mode == SelectMode.First
                 ? FileControlInfo.ReturnFci // 0x00 = First occurrence
                 : (FileControlInfo)SelectMode.Next; // 0x02 = Next occurrence
 
-        return Result.Success<SelectCommand, SmartCardError>(
-            new SelectCommand(aid, control, controlInfo)
-        );
+        return aid.Length == 0
+            ? Result.Success<SelectCommand, SmartCardError>(
+                new SelectCommand(control, controlInfo)
+            )
+            : Result.Success<SelectCommand, SmartCardError>(
+                new SelectCommand(aid, control, controlInfo)
+            );
     }
 
     /// <summary>
@@ -172,9 +236,19 @@ public class SelectCommand : IApduCommand
     }
 
     /// <summary>
-    /// Internal factory to construct a SELECT command with explicit mode and control info.
+    /// Creates a SELECT command for the Issuer Security Domain with specific file control information.
     /// </summary>
-    internal static Result<SelectCommand, SmartCardError> CreateWith(
+    /// <param name="controlInfo">The file control information to use.</param>
+    /// <returns>A Result containing the SelectCommand or an error.</returns>
+    public static Result<SelectCommand, SmartCardError> CreateForIssuerSecurityDomain(FileControlInfo controlInfo)
+    {
+        return CreateWith([], SelectMode.First, controlInfo);
+    }
+
+    /// <summary>
+    /// Factory to construct a SELECT command with explicit mode and control info.
+    /// </summary>
+    public static Result<SelectCommand, SmartCardError> CreateWith(
         byte[] aid,
         SelectMode mode,
         FileControlInfo controlInfo
@@ -199,24 +273,15 @@ public class SelectCommand : IApduCommand
             return new InvalidLengthError("AID", 16, aid.Length);
         }
 
-        SelectionControl control = SelectionControl.SelectByName;
+        var control = SelectionControl.SelectByName;
 
-        return Result.Success<SelectCommand, SmartCardError>(
-            new SelectCommand((byte[])aid.Clone(), control, controlInfo)
-        );
-    }
-
-    /// <summary>
-    /// Converts this command to a CommandAPDU.
-    /// </summary>
-    /// <returns>A result containing the CommandAPDU or an error.</returns>
-    public Result<CommandAPDU, SmartCardError> ToCommandApdu()
-    {
-        return ControlInfo == FileControlInfo.NoResponseData
-            ? Result.Success<CommandAPDU, SmartCardError>(
-                new CommandAPDU(ClassByte, InstructionByte, (byte)Control, (byte)ControlInfo, (uint)Aid.Length, Aid))
-            : Result.Success<CommandAPDU, SmartCardError>(
-                new CommandAPDU(ClassByte, InstructionByte, (byte)Control, (byte)ControlInfo, (uint)Aid.Length, Aid, 256));
+        return aid.Length == 0
+            ? Result.Success<SelectCommand, SmartCardError>(
+                new SelectCommand(control, controlInfo)
+            )
+            : Result.Success<SelectCommand, SmartCardError>(
+                new SelectCommand((byte[])aid.Clone(), control, controlInfo)
+            );
     }
 
     /// <summary>
@@ -226,18 +291,6 @@ public class SelectCommand : IApduCommand
     public override string ToString()
     {
         return "SELECT";
-    }
-
-    /// <inheritdoc />
-    public CommandAPDU ToApdu()
-    {
-        return ToCommandApdu().GetValueOrDefault(new CommandAPDU([]));
-    }
-
-    /// <inheritdoc />
-    public byte[] ToBytes()
-    {
-        return ToCommandApdu().Map(cmd => cmd.ToBytes()).GetValueOrDefault([]);
     }
 }
 
@@ -370,7 +423,7 @@ public class SelectResponse
         }
 
         // Try to parse FCI data
-        Result<Maybe<FileControlInformation>, SmartCardError> fciResult = ParseFciData(response);
+        var fciResult = ParseFciData(response);
         return fciResult.IsSuccess
             ? Result.Success<SelectResponse, SmartCardError>(
                 new SelectResponse(response, fciResult.Value)
@@ -402,7 +455,7 @@ public class SelectResponse
             );
         }
 
-        var parseResult = TlvService.TlvParser.ParseMultiple(data.ToImmutableArray());
+        var parseResult = TlvParser.ParseMultiple(data.ToImmutableArray());
         if (parseResult.IsFailure)
         {
             return Result.Success<Maybe<FileControlInformation>, SmartCardError>(
@@ -412,17 +465,22 @@ public class SelectResponse
         var tlvObjects = parseResult.Value.Objects;
 
         // Find FCI template (0x6F) using functional composition
-        TlvObject[] fciTemplate = [.. tlvObjects
-            .Select(tlv =>
-                tlv.Tag.ToNumber()
-                    .Match(
-                        tag => tag == 0x6F ? Maybe<TlvObject>.From(tlv) : Maybe<TlvObject>.None,
-                        error => Maybe<TlvObject>.None
-                    )
-            )
-            .Where(maybeTlv => maybeTlv.HasValue)
-            .SelectMany(maybeTlv => maybeTlv.Match(tlv => [tlv], () => Array.Empty<TlvObject>()))
-            .Take(1)];
+        TlvObject[] fciTemplate =
+        [
+            .. tlvObjects
+                .Select(tlv =>
+                    tlv.Tag.ToNumber()
+                        .Match(
+                            tag => tag == 0x6F ? Maybe<TlvObject>.From(tlv) : Maybe<TlvObject>.None,
+                            error => Maybe<TlvObject>.None
+                        )
+                )
+                .Where(maybeTlv => maybeTlv.HasValue)
+                .SelectMany(maybeTlv =>
+                    maybeTlv.Match(tlv => [tlv], () => Array.Empty<TlvObject>())
+                )
+                .Take(1),
+        ];
 
         if (fciTemplate.Length > 0)
         {
@@ -440,17 +498,17 @@ public class SelectResponse
     )
     {
         byte[] applicationAid = [];
-        Maybe<string> applicationLabel = Maybe<string>.None;
-        Maybe<byte> applicationPriorityIndicator = Maybe<byte>.None;
-        Maybe<ushort> maxCommandDataLength = Maybe<ushort>.None;
-        Maybe<ushort> maxResponseDataLength = Maybe<ushort>.None;
+        var applicationLabel = Maybe<string>.None;
+        var applicationPriorityIndicator = Maybe<byte>.None;
+        var maxCommandDataLength = Maybe<ushort>.None;
+        var maxResponseDataLength = Maybe<ushort>.None;
         byte[] issuerIdentificationNumber = [];
         byte[] cardImageNumber = [];
         byte[] cardData = [];
         byte[] discretionaryData = [];
 
         // Parse direct children of FCI template
-        var childrenResult = TlvService.TlvParser.ParseMultiple(fciTemplate.TlvData.Bytes);
+        var childrenResult = TlvParser.ParseMultiple(fciTemplate.TlvData.Bytes);
         if (childrenResult.IsFailure)
         {
             return Result.Failure<FileControlInformation, SmartCardError>(
@@ -458,7 +516,7 @@ public class SelectResponse
             );
         }
         var children = childrenResult.Value.Objects;
-        foreach (TlvObject tlv in children)
+        foreach (var tlv in children)
         {
             var tagResult = tlv.Tag.ToNumber();
             if (tagResult.IsFailure)
@@ -498,7 +556,7 @@ public class SelectResponse
                     // Not currently used but could be parsed
                     break;
                 case 0xA5: // FCI Proprietary Template
-                    Result<ProprietaryTemplateData, SmartCardError> proprietaryResult =
+                    var proprietaryResult =
                         ParseProprietaryTemplate(tlv);
                     if (proprietaryResult.IsFailure)
                         return Result.Failure<FileControlInformation, SmartCardError>(
@@ -550,13 +608,13 @@ public class SelectResponse
         TlvObject proprietaryTemplate
     )
     {
-        Maybe<ushort> maxCommandDataLength = Maybe<ushort>.None;
-        Maybe<ushort> maxResponseDataLength = Maybe<ushort>.None;
+        var maxCommandDataLength = Maybe<ushort>.None;
+        var maxResponseDataLength = Maybe<ushort>.None;
         byte[] issuerIdentificationNumber = [];
         byte[] cardImageNumber = [];
         byte[] cardData = [];
 
-        var childrenResult = TlvService.TlvParser.ParseMultiple(proprietaryTemplate.TlvData.Bytes);
+        var childrenResult = TlvParser.ParseMultiple(proprietaryTemplate.TlvData.Bytes);
         if (childrenResult.IsFailure)
         {
             return Result.Failure<ProprietaryTemplateData, SmartCardError>(
@@ -564,7 +622,7 @@ public class SelectResponse
             );
         }
         var children = childrenResult.Value.Objects;
-        foreach (TlvObject tlv in children)
+        foreach (var tlv in children)
         {
             var tagNumber = tlv.Tag.ToNumber();
             if (tagNumber.IsFailure)

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Services;
 using static Gp4Net.Services.TlvService;
 
 namespace Gp4Net.Domain.CardInfo;
@@ -51,7 +50,8 @@ public static class DiversificationDataParser
         try
         {
             // Use TlvParser to find CF tag (diversification data)
-            Maybe<TlvObject> cfElementMaybe = TlvService.TlvParser.FindByTag(data.ToImmutableArray(), 0xCF).Match(result => result, _ => Maybe<TlvObject>.None);
+            var cfElementMaybe = TlvParser.FindByTag(data.ToImmutableArray(), 0xCF)
+                .Match(result => result, _ => Maybe<TlvObject>.None);
 
             return cfElementMaybe.Match(
                 Some: cfElement => ParseScpFromCfElement(cfElement),
@@ -69,35 +69,37 @@ public static class DiversificationDataParser
     {
         try
         {
-
-        // CF tag found but content too short for SCP data (needs 10 bytes for 5 pairs)
-        if (cfElement.TlvData.Bytes.Length < 10)
-        {
-            return "[red]Parse error[/]";
-        }
-
-        // Parse 5 pairs of bytes (SCP version + i= parameter) from the CF content
-        var scpPairs = Enumerable
-            .Range(0, 5)
-            .Select(pairIndex => new
+            // CF tag found but content too short for SCP data (needs 10 bytes for 5 pairs)
+            if (cfElement.TlvData.Bytes.Length < 10)
             {
-                ScpVersion = cfElement.TlvData.Bytes[pairIndex * 2],
-                IParameter = cfElement.TlvData.Bytes[pairIndex * 2 + 1],
-            })
-            .Where(pair => !(pair.ScpVersion == 0x00 && pair.IParameter == 0x00)) // Skip empty slots
-            .ToList();
+                return "[red]Parse error[/]";
+            }
 
-        // Check for invalid SCP versions - fail if any found (functional approach)
-        bool hasInvalidScpVersion = scpPairs.Any(pair => pair.ScpVersion > 0x11);
-        if (hasInvalidScpVersion)
-        {
-            // This is likely card identification data, not SCP support
-            return "[red]None[/]";
-        }
+            // Parse 5 pairs of bytes (SCP version + i= parameter) from the CF content
+            var scpPairs = Enumerable
+                .Range(0, 5)
+                .Select(pairIndex => new
+                {
+                    ScpVersion = cfElement.TlvData.Bytes[pairIndex * 2],
+                    IParameter = cfElement.TlvData.Bytes[pairIndex * 2 + 1],
+                })
+                .Where(pair => !(pair.ScpVersion == 0x00 && pair.IParameter == 0x00)) // Skip empty slots
+                .ToList();
 
-        List<string> scpSupport = [.. scpPairs.Select(pair => $"SCP{pair.ScpVersion:X2} (i={pair.IParameter:X2})")];
+            // Check for invalid SCP versions - fail if any found (functional approach)
+            bool hasInvalidScpVersion = scpPairs.Any(pair => pair.ScpVersion > 0x11);
+            if (hasInvalidScpVersion)
+            {
+                // This is likely card identification data, not SCP support
+                return "[red]None[/]";
+            }
 
-        return scpSupport.Count > 0 ? string.Join(", ", scpSupport) : "[red]None[/]";
+            List<string> scpSupport =
+            [
+                .. scpPairs.Select(pair => $"SCP{pair.ScpVersion:X2} (i={pair.IParameter:X2})"),
+            ];
+
+            return scpSupport.Count > 0 ? string.Join(", ", scpSupport) : "[red]None[/]";
         }
         catch
         {

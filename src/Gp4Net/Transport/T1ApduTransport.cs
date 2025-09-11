@@ -6,7 +6,6 @@ using Gp4Net.Constants;
 using Gp4Net.Core;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
-using WSCT.ISO7816;
 
 namespace Gp4Net.Transport;
 
@@ -66,32 +65,45 @@ public class T1ApduTransport : IApduTransport
         var apduBytesResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
         if (apduBytesResult.IsFailure)
         {
-            return Result.Failure<ApduResponse, SmartCardError>(SmartCardError.InvalidArgument($"APDU build failed: {apduBytesResult.Error}"));
+            return Result.Failure<ApduResponse, SmartCardError>(
+                SmartCardError.InvalidArgument($"APDU build failed: {apduBytesResult.Error}")
+            );
         }
-        
+
         byte[] apduBytes = apduBytesResult.Value;
-        
-        // Validate extended length support  
-        if (apduBytes.Length > Apdu.Formats.ApduHeaderLength + Apdu.Formats.MaxShortLengthLc + 1 && !_supportsExtendedLength) // 5 header + 255 data + 1 Le for short APDU
+
+        // Validate extended length support
+        if (
+            apduBytes.Length > Apdu.Formats.APDU_HEADER_LENGTH + Apdu.Formats.MAX_SHORT_LENGTH_LC + 1
+            && !_supportsExtendedLength
+        ) // 5 header + 255 data + 1 Le for short APDU
         {
-            return Result.Failure<ApduResponse, SmartCardError>(SmartCardError.InvalidArgument("Extended length APDUs not supported by this transport"));
+            return Result.Failure<ApduResponse, SmartCardError>(
+                SmartCardError.InvalidArgument(
+                    "Extended length APDUs not supported by this transport"
+                )
+            );
         }
         _logger.LogDebug("T=1 Transmit: {Apdu}", BitConverter.ToString(apduBytes));
 
-        try
+        // Send command and handle exceptions functionally
+        var responseResult = await Gp4Net.Core.Functional.ResultExtensions.TryAsync<byte[], SmartCardError>(
+            async () => await channel.TransmitAsync(apduBytes, cancellationToken).ConfigureAwait(false),
+            ex =>
+            {
+                _logger.LogError(ex, "T=1 transmission failed");
+                return SmartCardError.CommunicationFailed($"T=1 transmission failed: {ex.Message}");
+            }
+        ).ConfigureAwait(false);
+
+        // If transmission failed, return error
+        if (responseResult.IsFailure)
         {
-            // T=1 handles chaining at the protocol level
-            var response = await channel
-                .TransmitAsync(apduBytes, cancellationToken)
-                .ConfigureAwait(false);
-                
-            return Result.Success<ApduResponse, SmartCardError>(ProcessResponse(response));
+            return Result.Failure<ApduResponse, SmartCardError>(responseResult.Error);
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "T=1 transmission failed");
-            return Result.Failure<ApduResponse, SmartCardError>(SmartCardError.CommunicationFailed($"T=1 transmission failed: {ex.Message}"));
-        }
+
+        // Process the response
+        return Result.Success<ApduResponse, SmartCardError>(ProcessResponse(responseResult.Value));
     }
 
     private static byte GetLeByte(int expectedLength)

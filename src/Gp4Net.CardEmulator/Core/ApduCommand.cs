@@ -56,6 +56,7 @@ public sealed record ApduCommand
         Data = [];
         RawBytes = [];
     }
+
     /// <summary>
     /// Functional factory method that creates ApduCommand using Result pattern.
     /// </summary>
@@ -98,8 +99,7 @@ public sealed record ApduCommand
     /// <summary>
     /// Creates ApduCommand without validation. Used internally after validation in Create method.
     /// </summary>
-    private static ApduCommand CreateUnsafe(byte[] rawBytes) => 
-        ParseApduBytes(rawBytes);
+    private static ApduCommand CreateUnsafe(byte[] rawBytes) => ParseApduBytes(rawBytes);
 
     /// <summary>
     /// Parses raw APDU bytes into structured components following ISO 7816 specification.
@@ -115,7 +115,7 @@ public sealed record ApduCommand
                 P2 = rawBytes[3],
                 Data = [],
                 Le = Maybe<byte>.None,
-                RawBytes = (byte[])rawBytes.Clone()
+                RawBytes = (byte[])rawBytes.Clone(),
             },
             5 => new ApduCommand
             {
@@ -125,9 +125,9 @@ public sealed record ApduCommand
                 P2 = rawBytes[3],
                 Data = [],
                 Le = Maybe<byte>.From(rawBytes[4]),
-                RawBytes = (byte[])rawBytes.Clone()
+                RawBytes = (byte[])rawBytes.Clone(),
             },
-            _ => ParseApduWithData(rawBytes)
+            _ => ParseApduWithData(rawBytes),
         };
 
     /// <summary>
@@ -148,7 +148,7 @@ public sealed record ApduCommand
                 P2 = rawBytes[3],
                 Data = data,
                 Le = Maybe<byte>.None,
-                RawBytes = (byte[])rawBytes.Clone()
+                RawBytes = (byte[])rawBytes.Clone(),
             }
             : new ApduCommand
             {
@@ -158,7 +158,7 @@ public sealed record ApduCommand
                 P2 = rawBytes[3],
                 Data = data,
                 Le = Maybe<byte>.From(rawBytes[5 + lc]),
-                RawBytes = (byte[])rawBytes.Clone()
+                RawBytes = (byte[])rawBytes.Clone(),
             };
     }
 
@@ -167,7 +167,7 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsSelect
     {
-        get { return Ins == GlobalPlatform.Ins.Select; }
+        get { return Ins == Gp4Net.Constants.Apdu.Instructions.SELECT; }
     }
 
     /// <summary>
@@ -175,7 +175,11 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsInitializeUpdate
     {
-        get { return Cla == GlobalPlatform.Cla.GpStandard && Ins == GlobalPlatform.Ins.InitializeUpdate; }
+        get
+        {
+            return Cla == GlobalPlatform.Cla.GP_STANDARD
+                && Ins == GlobalPlatform.Ins.INITIALIZE_UPDATE;
+        }
     }
 
     /// <summary>
@@ -183,7 +187,11 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsExternalAuthenticate
     {
-        get { return Cla == GlobalPlatform.Cla.Secured && Ins == GlobalPlatform.Ins.ExternalAuthenticate; }
+        get
+        {
+            return Cla == GlobalPlatform.Cla.SECURED
+                && Ins == Gp4Net.Constants.Apdu.Instructions.EXTERNAL_AUTHENTICATE;
+        }
     }
 
     /// <summary>
@@ -191,7 +199,11 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsInstall
     {
-        get { return Cla is GlobalPlatform.Cla.GpStandard or GlobalPlatform.Cla.Secured && Ins == GlobalPlatform.Ins.Install; }
+        get
+        {
+            return Cla is GlobalPlatform.Cla.GP_STANDARD or GlobalPlatform.Cla.SECURED
+                && Ins == GlobalPlatform.Ins.INSTALL;
+        }
     }
 
     /// <summary>
@@ -199,7 +211,11 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsLoad
     {
-        get { return Cla is GlobalPlatform.Cla.GpStandard or GlobalPlatform.Cla.Secured && Ins == GlobalPlatform.Ins.Load; }
+        get
+        {
+            return Cla is GlobalPlatform.Cla.GP_STANDARD or GlobalPlatform.Cla.SECURED
+                && Ins == GlobalPlatform.Ins.LOAD;
+        }
     }
 
     /// <summary>
@@ -207,7 +223,11 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsGetStatus
     {
-        get { return Cla is GlobalPlatform.Cla.GpStandard or GlobalPlatform.Cla.Secured && Ins == GlobalPlatform.Ins.GetStatus; }
+        get
+        {
+            return Cla is GlobalPlatform.Cla.GP_STANDARD or GlobalPlatform.Cla.SECURED
+                && Ins == GlobalPlatform.Ins.GET_STATUS;
+        }
     }
 
     /// <summary>
@@ -215,7 +235,11 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsDelete
     {
-        get { return Cla is GlobalPlatform.Cla.GpStandard or GlobalPlatform.Cla.Secured && Ins == GlobalPlatform.Ins.Delete; }
+        get
+        {
+            return Cla is GlobalPlatform.Cla.GP_STANDARD or GlobalPlatform.Cla.SECURED
+                && Ins == GlobalPlatform.Ins.DELETE;
+        }
     }
 
     /// <summary>
@@ -223,7 +247,7 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsGetData
     {
-        get { return Ins == GlobalPlatform.Ins.GetData; }
+        get { return Ins == Gp4Net.Constants.Apdu.Instructions.GET_DATA; }
     }
 
     /// <summary>
@@ -231,7 +255,11 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsPutKey
     {
-        get { return Cla is GlobalPlatform.Cla.GpStandard or GlobalPlatform.Cla.Secured && Ins == GlobalPlatform.Ins.PutKey; }
+        get
+        {
+            return Cla is GlobalPlatform.Cla.GP_STANDARD or GlobalPlatform.Cla.SECURED
+                && Ins == GlobalPlatform.Ins.PUT_KEY;
+        }
     }
 
     /// <summary>
@@ -239,7 +267,11 @@ public sealed record ApduCommand
     /// </summary>
     public bool IsSetStatus
     {
-        get { return Cla is GlobalPlatform.Cla.GpStandard or GlobalPlatform.Cla.Secured && Ins == GlobalPlatform.Ins.SetStatus; }
+        get
+        {
+            return Cla is GlobalPlatform.Cla.GP_STANDARD or GlobalPlatform.Cla.SECURED
+                && Ins == GlobalPlatform.Ins.SET_STATUS;
+        }
     }
 
     /// <summary>

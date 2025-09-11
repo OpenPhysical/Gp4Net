@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -183,30 +182,56 @@ public static class Responses
         GetStatusResponse response
     )
     {
-        return [.. response
-            .Applications.Select(entry =>
+        return
+        [
+            .. response.Applications.Select(entry =>
             {
                 // Map lifecycle state from GetStatusResponse to domain model
-                Constants.Constants.GlobalPlatform.LifecycleState lcState = entry.State switch
+                var lcState = entry.State switch
                 {
-                    ApplicationStatusEntry.LifecycleState.Loaded => Constants.Constants.GlobalPlatform.LifecycleState.Loaded,
-                    ApplicationStatusEntry.LifecycleState.Installed => Constants.Constants.GlobalPlatform.LifecycleState.Installed,
-                    ApplicationStatusEntry.LifecycleState.Selectable => Constants.Constants.GlobalPlatform.LifecycleState.Selectable,
-                    ApplicationStatusEntry.LifecycleState.Personalized =>
-                        Constants.Constants.GlobalPlatform.LifecycleState.Personalized,
-                    ApplicationStatusEntry.LifecycleState.Blocked => Constants.Constants.GlobalPlatform.LifecycleState.Locked,
-                    ApplicationStatusEntry.LifecycleState.Locked => Constants.Constants.GlobalPlatform.LifecycleState.Locked,
+                    ApplicationStatusEntry.LifecycleState.Loaded => Constants
+                        .Constants
+                        .GlobalPlatform
+                        .LifecycleState
+                        .Loaded,
+                    ApplicationStatusEntry.LifecycleState.Installed => Constants
+                        .Constants
+                        .GlobalPlatform
+                        .LifecycleState
+                        .Installed,
+                    ApplicationStatusEntry.LifecycleState.Selectable => Constants
+                        .Constants
+                        .GlobalPlatform
+                        .LifecycleState
+                        .Selectable,
+                    ApplicationStatusEntry.LifecycleState.Personalized => Constants
+                        .Constants
+                        .GlobalPlatform
+                        .LifecycleState
+                        .Personalized,
+                    ApplicationStatusEntry.LifecycleState.Blocked => Constants
+                        .Constants
+                        .GlobalPlatform
+                        .LifecycleState
+                        .Locked,
+                    ApplicationStatusEntry.LifecycleState.Locked => Constants
+                        .Constants
+                        .GlobalPlatform
+                        .LifecycleState
+                        .Locked,
                     _ => Constants.Constants.GlobalPlatform.LifecycleState.Unknown,
                 };
 
                 // Parse privileges from up to 3 bytes (C5: 3 bytes)
-                ImmutableList<Constants.Constants.GlobalPlatform.Privilege> privilegesList =
+                var privilegesList =
                     entry.Privileges.Length > 0
                         ? ParsePrivileges(entry.Privileges)
                         : ImmutableList<Constants.Constants.GlobalPlatform.Privilege>.Empty;
 
                 // Determine application type based on privileges
-                ApplicationType appType = privilegesList.Contains(Constants.Constants.GlobalPlatform.Privilege.SecurityDomain)
+                var appType = privilegesList.Contains(
+                    Constants.Constants.GlobalPlatform.Privilege.SecurityDomain
+                )
                     ? ApplicationType.IssuerSecurityDomain
                     : ApplicationType.Application;
 
@@ -218,22 +243,26 @@ public static class Responses
                     Version: Maybe<string>.None,
                     AssociatedSecurityDomain: Maybe<byte[]>.None,
                     ExecutableLoadFileAid: entry is { ExecutableLoadFileAid: { Length: > 0 } c4 }
-                        ? Maybe<byte[]>.From((byte[])c4)
+                        ? Maybe<byte[]>.From(c4)
                         : Maybe<byte[]>.None
                 );
-            })];
+            }),
+        ];
     }
 
     /// <summary>
     /// Parses privilege byte into individual privilege flags.
     /// </summary>
-    private static ImmutableList<Constants.Constants.GlobalPlatform.Privilege> ParsePrivileges(byte[] privBytes)
+    private static ImmutableList<Constants.Constants.GlobalPlatform.Privilege> ParsePrivileges(
+        byte[] privBytes
+    )
     {
         byte b1 = privBytes.Length > 0 ? privBytes[0] : (byte)0x00;
         byte b2 = privBytes.Length > 1 ? privBytes[1] : (byte)0x00;
         byte b3 = privBytes.Length > 2 ? privBytes[2] : (byte)0x00;
 
-        ImmutableList<Constants.Constants.GlobalPlatform.Privilege>.Builder list = ImmutableList.CreateBuilder<Constants.Constants.GlobalPlatform.Privilege>();
+        var list =
+            ImmutableList.CreateBuilder<Constants.Constants.GlobalPlatform.Privilege>();
 
         if ((b1 & 0x80) != 0)
             list.Add(Constants.Constants.GlobalPlatform.Privilege.SecurityDomain);
@@ -305,7 +334,8 @@ public static class Responses
         }
 
         // Try parsing with TlvParser for more complex structures
-        Result<TlvService.ParseResult, SmartCardError> parseResult = TlvService.TlvParser.ParseMultiple(data.ToImmutableArray());
+        var parseResult =
+            TlvService.TlvParser.ParseMultiple(data.ToImmutableArray());
         if (parseResult.IsFailure)
         {
             return [];
@@ -315,9 +345,9 @@ public static class Responses
         // For single-byte tags
         if (expectedTag <= 0xFF)
         {
-            IEnumerable<TlvService.TlvObject> candidates = elements.Where(e =>
+            var candidates = elements.Where(e =>
             {
-                Result<uint, SmartCardError> tagNumber = e.Tag.ToNumber();
+                var tagNumber = e.Tag.ToNumber();
                 return tagNumber is { IsSuccess: true, Value: var tagVal } && tagVal == expectedTag;
             });
 

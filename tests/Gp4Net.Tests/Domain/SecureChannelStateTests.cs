@@ -7,7 +7,6 @@ using System;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
 using NUnit.Framework;
@@ -25,7 +24,7 @@ public class SecureChannelStateTests
     [SetUp]
     public void SetUp()
     {
-        SessionKeys testKeys = new SessionKeys(
+        var testKeys = new SessionKeys(
             new byte[16], // S-ENC
             new byte[16], // S-MAC
             new byte[16], // S-RMAC
@@ -60,7 +59,7 @@ public class SecureChannelStateTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        SecureChannelState? state = result.Value;
+        var state = result.Value;
 
         _ = state.SecurityLevel.Should().Be(SecurityLevel.CMac);
         _ = state.ProtocolVersion.Should().Be(ScpVersion.Scp03);
@@ -86,7 +85,7 @@ public class SecureChannelStateTests
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<InvalidLengthError>();
-        InvalidLengthError? lengthError = (InvalidLengthError)result.Error;
+        var lengthError = (InvalidLengthError)result.Error;
         _ = lengthError.Expected.Should().Be(16); // SCP03 expects 16 bytes
     }
 
@@ -101,9 +100,9 @@ public class SecureChannelStateTests
             0x00 // implementation parameter
         );
         _ = result.IsSuccess.Should().BeTrue();
-        SecureChannelState? state = result.Value;
+        var state = result.Value;
 
-        SecureChannelState? newState = state.IncrementEncryptionCounter();
+        var newState = state.IncrementEncryptionCounter();
 
         _ = newState.EncryptionCounter.Should().Be(1);
         _ = newState.SessionKeys.Should().Be(_sessionKeys);
@@ -124,7 +123,7 @@ public class SecureChannelStateTests
             0x00 // implementation parameter
         );
         _ = result.IsSuccess.Should().BeTrue();
-        SecureChannelState? state = result.Value;
+        var state = result.Value;
 
         byte[] newMacChaining = new byte[16];
         Array.Fill(newMacChaining, (byte)0xFF);
@@ -140,7 +139,7 @@ public class SecureChannelStateTests
         );
 
         _ = updateResult.IsSuccess.Should().BeTrue();
-        SecureChannelState? newState = updateResult.Value;
+        var newState = updateResult.Value;
 
         _ = newState.MacChaining.Value.Should().Equal(newMacChaining);
         _ = newState.SessionKeys.Should().Be(_sessionKeys);
@@ -160,7 +159,7 @@ public class SecureChannelStateTests
             0x00 // implementation parameter
         );
         _ = result.IsSuccess.Should().BeTrue();
-        SecureChannelState? state = result.Value;
+        var state = result.Value;
 
         Result<SecureChannelState, SmartCardError> updateResult = state.UpdateMacChaining(null!);
 
@@ -181,7 +180,7 @@ public class SecureChannelStateTests
             0x00 // implementation parameter
         );
         _ = result.IsSuccess.Should().BeTrue();
-        SecureChannelState? state = result.Value;
+        var state = result.Value;
 
         byte[] newMacChaining = new byte[16];
         Array.Fill(newMacChaining, (byte)0xAA);
@@ -200,7 +199,7 @@ public class SecureChannelStateTests
         );
 
         _ = updateResult.IsSuccess.Should().BeTrue();
-        SecureChannelState? newState = updateResult.Value;
+        var newState = updateResult.Value;
 
         _ = newState.EncryptionCounter.Should().Be(newCounter);
         _ = newState.MacChaining.Value.Should().Equal(newMacChaining);
@@ -222,11 +221,11 @@ public class SecureChannelStateTests
             0x00 // implementation parameter
         );
         _ = result.IsSuccess.Should().BeTrue();
-        SecureChannelState? originalState = result.Value;
+        var originalState = result.Value;
 
         // Perform multiple operations
-        SecureChannelState? state1 = originalState.IncrementEncryptionCounter();
-        SecureChannelState? state2 = state1.IncrementEncryptionCounter();
+        var state1 = originalState.IncrementEncryptionCounter();
+        var state2 = state1.IncrementEncryptionCounter();
 
         // Verify each state is independent
         _ = originalState.EncryptionCounter.Should().Be(0);

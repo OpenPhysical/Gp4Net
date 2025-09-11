@@ -34,7 +34,7 @@ public class KeyInformationTemplateTests
         _ = template.IsSuccess.Should().BeTrue();
         _ = template.Value.Keys.Should().HaveCount(1);
 
-        KeyEntry? key = template.Value.Keys.First();
+        var key = template.Value.Keys.First();
         _ = key.KeyId.Should().Be(1);
         _ = key.KeyVersion.Should().Be(1);
         _ = key.KeyTypes.Should().HaveCount(2);
@@ -62,7 +62,7 @@ public class KeyInformationTemplateTests
         );
 
         // Assert
-        KeyEntry key = template.Value.Keys.First();
+        var key = template.Value.Keys.First();
         _ = key.KeyId.Should().Be(16);
         _ = key.KeyVersion.Should().Be(2);
         _ = key.PrimaryKeyType.Should().HaveValue(KeyType.Aes);
@@ -90,7 +90,7 @@ public class KeyInformationTemplateTests
         );
 
         // Assert
-        KeyEntry? key = template.Value.Keys.First();
+        var key = template.Value.Keys.First();
         _ = key.KeyTypes.Should().HaveCount(3);
         _ = key.KeyTypes.Should().Contain(KeyType.Des);
         _ = key.KeyTypes.Should().Contain(KeyType.TripleDes2Key);
@@ -156,7 +156,7 @@ public class KeyInformationTemplateTests
         _ = template.Value.Keys[3].KeyVersion.Should().Be(1);
 
         // All are AES keys
-        foreach (KeyEntry? key in template.Value.Keys)
+        foreach (var key in template.Value.Keys)
         {
             _ = key.PrimaryKeyType.Should().HaveValue(KeyType.Aes);
         }

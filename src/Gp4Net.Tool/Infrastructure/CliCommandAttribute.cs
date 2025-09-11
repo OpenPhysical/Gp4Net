@@ -1,4 +1,5 @@
 using System;
+using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Tool.Infrastructure;
 
@@ -21,7 +22,7 @@ public class CliCommandAttribute : Attribute
     /// <summary>
     /// Gets the parent branch name for nested commands.
     /// </summary>
-    public string Branch { get; }
+    public Maybe<string> Branch { get; }
 
     /// <summary>
     /// Gets whether this is an alias.
@@ -38,13 +39,13 @@ public class CliCommandAttribute : Attribute
     public CliCommandAttribute(
         string name,
         string description,
-        string branch = null,
+        string branch = "",
         bool isAlias = false
     )
     {
-        Name = name ?? throw new ArgumentNullException(nameof(name));
-        Description = description ?? throw new ArgumentNullException(nameof(description));
-        Branch = branch;
+        Name = name;
+        Description = description;
+        Branch = branch == "" ? Maybe<string>.None : Maybe<string>.From(branch);
         IsAlias = isAlias;
     }
 }

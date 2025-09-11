@@ -13,7 +13,7 @@ public static class GlobalPlatformOids
     /// <summary>
     /// GlobalPlatform OID prefix: 1.2.840.114283
     /// </summary>
-    public const string GlobalPlatformPrefix = "1.2.840.114283";
+    public const string GLOBAL_PLATFORM_PREFIX = "1.2.840.114283";
 
     /// <summary>
     /// Known GlobalPlatform OIDs and their descriptions.
@@ -75,7 +75,7 @@ public static class GlobalPlatformOids
     /// <returns>True if the OID is a GlobalPlatform OID.</returns>
     public static bool IsGlobalPlatformOid(string oid)
     {
-        return !string.IsNullOrEmpty(oid) && oid.StartsWith(GlobalPlatformPrefix);
+        return !string.IsNullOrEmpty(oid) && oid.StartsWith(GLOBAL_PLATFORM_PREFIX);
     }
 
     /// <summary>
@@ -144,7 +144,7 @@ public static class GlobalPlatformOids
     /// <returns>A summary of the capabilities.</returns>
     public static CapabilitiesSummary AnalyzeOids(IEnumerable<string> oids)
     {
-        CapabilitiesSummary summary = new CapabilitiesSummary();
+        var summary = new CapabilitiesSummary();
 
         foreach (string oid in oids)
         {
@@ -236,7 +236,7 @@ public static class GlobalPlatformOids
             if (AllOids.Count > 0)
             {
                 lines.Add("\nAll Capabilities:");
-                foreach (KeyValuePair<string, string> kvp in AllOids.OrderBy(k => k.Key))
+                foreach (var kvp in AllOids.OrderBy(k => k.Key))
                 {
                     lines.Add($"  - {kvp.Key}: {kvp.Value}");
                 }

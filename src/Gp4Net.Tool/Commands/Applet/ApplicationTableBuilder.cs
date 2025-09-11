@@ -64,7 +64,7 @@ public static class ApplicationTableBuilder
         string filter = null
     )
     {
-        IReadOnlyList<ApplicationInfo> filteredApps =
+        var filteredApps =
             string.IsNullOrEmpty(filter) || filter == "all"
                 ? applications
                 : FilterApplications(applications, filter);
@@ -76,18 +76,18 @@ public static class ApplicationTableBuilder
         }
 
         // Group applications by type for better organization
-        IOrderedEnumerable<IGrouping<ApplicationType, ApplicationInfo>> grouped = filteredApps
+        var grouped = filteredApps
             .GroupBy(a => a.Type)
             .OrderBy(g => GetTypePriority(g.Key));
 
-        foreach (IGrouping<ApplicationType, ApplicationInfo> group in grouped)
+        foreach (var group in grouped)
         {
             if (grouped.Count() > 1)
             {
                 yield return new SectionHeaderRow(GetTypeDisplayName(group.Key) + "s");
             }
 
-            foreach (ApplicationInfo app in group.OrderBy(a => Convert.ToHexString(a.Aid)))
+            foreach (var app in group.OrderBy(a => Convert.ToHexString(a.Aid)))
             {
                 yield return BuildApplicationDataRow(app, showExtended);
             }

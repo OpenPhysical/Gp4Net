@@ -45,9 +45,9 @@ public static class CommandSettingsExtensions
         }
 
         // Extract and convert hex keys using pure functions
-        Maybe<byte[]> encKey = ExtractHexKey(GetEncKeyProperty(settings));
-        Maybe<byte[]> macKey = ExtractHexKey(GetMacKeyProperty(settings));
-        Maybe<byte[]> dekKey = ExtractHexKey(GetDekKeyProperty(settings));
+        var encKey = ExtractHexKey(GetEncKeyProperty(settings));
+        var macKey = ExtractHexKey(GetMacKeyProperty(settings));
+        var dekKey = ExtractHexKey(GetDekKeyProperty(settings));
 
         // Validate that all keys are present if any are provided
         return encKey.Bind(enc =>
@@ -62,7 +62,7 @@ public static class CommandSettingsExtensions
     private static bool HasExplicitKeyProperties(SecureCommandSettings settings)
     {
         // Use dynamic property access with safe fallbacks
-        Type settingsType = settings.GetType();
+        var settingsType = settings.GetType();
 
         return HasPropertyWithValue(settingsType, settings, "KeyEnc")
             || HasPropertyWithValue(settingsType, settings, "KeyMac")
@@ -98,7 +98,7 @@ public static class CommandSettingsExtensions
     /// </summary>
     private static byte ExtractKeyVersion(SecureCommandSettings settings)
     {
-        Maybe<string> keyVersionProperty = GetPropertyValue(
+        var keyVersionProperty = GetPropertyValue(
             settings.GetType(),
             settings,
             "KeyVersion"

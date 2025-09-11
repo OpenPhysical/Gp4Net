@@ -10,6 +10,16 @@ namespace Gp4Net.Transport;
 public interface IApduCommand
 {
     /// <summary>
+    /// Gets the command class byte.
+    /// </summary>
+    byte Cla { get; }
+
+    /// <summary>
+    /// Gets the command instruction byte.
+    /// </summary>
+    byte Ins { get; }
+
+    /// <summary>
     /// Converts this command to a WSCT CommandAPDU.
     /// </summary>
     /// <returns>The CommandAPDU representation of this command.</returns>

@@ -3,20 +3,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
-using Gp4Net.Core;
 using JetBrains.Annotations;
+using Gp4Net.Core;
 
 namespace Gp4Net.Constants;
-
 public static partial class Constants
 {
     /// <summary>
     /// ISO 7816-4 and GlobalPlatform status word constants organized by functional category.
     /// Status words are two-byte values returned in APDU responses indicating command execution results.
-    /// 
+    ///
     /// Organization follows ISO 7816-4 specification sections 5.1.3 and Annex A, plus
     /// GlobalPlatform Card Specification sections covering response processing.
-    /// 
+    ///
     /// Reference: ISO/IEC 7816-4:2020 - Identification cards - Integrated circuit cards - Part 4: Organization, security and commands for interchange
     /// Reference: GlobalPlatform Card Specification v2.3.1 - Section 11.1.1 Response Processing
     /// </summary>
@@ -24,18 +23,10 @@ public static partial class Constants
     public static class StatusWords
     {
         /// <summary>
-        /// Success status words indicating normal command completion.
-        /// ISO 7816-4 Section 5.1.3 - Process completed
+        /// Command completed successfully without errors.
+        /// ISO 7816-4: 0x9000 - Normal processing - No error
         /// </summary>
-        [PublicAPI]
-        public static class Success
-        {
-            /// <summary>
-            /// Command completed successfully without errors.
-            /// ISO 7816-4: 0x9000 - Normal processing - No error
-            /// </summary>
-            public static readonly StatusWord Normal = new(0x9000);
-        }
+        public static readonly StatusWord Success = new(0x9000);
 
         /// <summary>
         /// Information status words providing additional details about successful operations.
@@ -297,7 +288,7 @@ public static partial class Constants
         public static class Legacy
         {
             /// <summary>Success - Command completed successfully.</summary>
-            public static readonly StatusWord Success = StatusWords.Success.Normal;
+            public static readonly StatusWord Success = StatusWords.Success;
 
             /// <summary>Incorrect data field or parameters in data field.</summary>
             public static readonly StatusWord IncorrectData = ParameterErrors.IncorrectDataField;
@@ -306,7 +297,8 @@ public static partial class Constants
             public static readonly StatusWord MemoryError = FunctionErrors.InsufficientMemory;
 
             /// <summary>Conditions of use not satisfied.</summary>
-            public static readonly StatusWord ConditionsNotSatisfied = CheckingErrors.ConditionsNotSatisfied;
+            public static readonly StatusWord ConditionsNotSatisfied =
+                CheckingErrors.ConditionsNotSatisfied;
 
             /// <summary>Generic failure or internal error.</summary>
             public static readonly StatusWord GenericFailure = InstructionErrors.NoPreciseDiagnosis;
@@ -315,13 +307,16 @@ public static partial class Constants
             public static readonly StatusWord WrongLength = ExecutionErrors.WrongLength;
 
             /// <summary>Class not supported.</summary>
-            public static readonly StatusWord ClassNotSupported = InstructionErrors.ClassNotSupported;
+            public static readonly StatusWord ClassNotSupported =
+                InstructionErrors.ClassNotSupported;
 
             /// <summary>Instruction not supported.</summary>
-            public static readonly StatusWord InstructionNotSupported = InstructionErrors.InstructionNotSupported;
+            public static readonly StatusWord InstructionNotSupported =
+                InstructionErrors.InstructionNotSupported;
 
             /// <summary>Function not supported.</summary>
-            public static readonly StatusWord FunctionNotSupported = FunctionErrors.FunctionNotSupported;
+            public static readonly StatusWord FunctionNotSupported =
+                FunctionErrors.FunctionNotSupported;
 
             /// <summary>File not found.</summary>
             public static readonly StatusWord FileNotFound = FunctionErrors.FileNotFound;
@@ -336,25 +331,31 @@ public static partial class Constants
             public static readonly StatusWord LcInconsistent = FunctionErrors.NcInconsistentP1P2;
 
             /// <summary>Referenced data not found.</summary>
-            public static readonly StatusWord ReferencedDataNotFound = FunctionErrors.ReferencedDataNotFound;
+            public static readonly StatusWord ReferencedDataNotFound =
+                FunctionErrors.ReferencedDataNotFound;
 
             /// <summary>Security status not satisfied.</summary>
-            public static readonly StatusWord SecurityStatusNotSatisfied = CheckingErrors.SecurityStatusNotSatisfied;
+            public static readonly StatusWord SecurityStatusNotSatisfied =
+                CheckingErrors.SecurityStatusNotSatisfied;
 
             /// <summary>Authentication method blocked.</summary>
-            public static readonly StatusWord AuthenticationMethodBlocked = CheckingErrors.AuthenticationMethodBlocked;
+            public static readonly StatusWord AuthenticationMethodBlocked =
+                CheckingErrors.AuthenticationMethodBlocked;
 
             /// <summary>Reference data not usable.</summary>
-            public static readonly StatusWord ReferenceDataNotUsable = CheckingErrors.ReferenceDataNotUsable;
+            public static readonly StatusWord ReferenceDataNotUsable =
+                CheckingErrors.ReferenceDataNotUsable;
 
             /// <summary>Command not allowed (no current EF).</summary>
             public static readonly StatusWord CommandNotAllowed = CheckingErrors.CommandNotAllowed;
 
             /// <summary>Expected secure messaging data objects missing.</summary>
-            public static readonly StatusWord SecureMessagingMissing = CheckingErrors.SecureMessagingMissing;
+            public static readonly StatusWord SecureMessagingMissing =
+                CheckingErrors.SecureMessagingMissing;
 
             /// <summary>Incorrect secure messaging data objects.</summary>
-            public static readonly StatusWord SecureMessagingIncorrect = CheckingErrors.SecureMessagingIncorrect;
+            public static readonly StatusWord SecureMessagingIncorrect =
+                CheckingErrors.SecureMessagingIncorrect;
         }
     }
 }

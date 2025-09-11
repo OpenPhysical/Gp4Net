@@ -42,7 +42,7 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
     /// <summary>
     /// Gets the first status byte (SW1).
     /// </summary>
-    public byte SW1
+    public byte Sw1
     {
         get { return (byte)(_value >> 8); }
     }
@@ -50,7 +50,7 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
     /// <summary>
     /// Gets the second status byte (SW2).
     /// </summary>
-    public byte SW2
+    public byte Sw2
     {
         get { return (byte)(_value & 0xFF); }
     }

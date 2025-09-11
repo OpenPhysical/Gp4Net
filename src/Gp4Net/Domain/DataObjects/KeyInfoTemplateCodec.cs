@@ -3,15 +3,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
-using System;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Services;
-using static Gp4Net.Services.TlvService;
 using JetBrains.Annotations;
+using static Gp4Net.Services.TlvService;
 
 namespace Gp4Net.Domain.DataObjects;
 
@@ -34,33 +32,45 @@ public static class KeyInfoTemplateCodec
                 SmartCardError.InvalidArgument("KeyInfo cannot be null")
             );
 
-        using MemoryStream stream = new MemoryStream();
+        using var stream = new MemoryStream();
 
         // Tag 0xE0 for key information template
         stream.WriteByte(0xE0);
 
         // Calculate content length
-        MemoryStream contentStream = new MemoryStream();
+        var contentStream = new MemoryStream();
 
         // Key version number (C0)
-        if (keyInfo.KeyVersionNumber.HasValue)
-        {
-            WriteTlv(contentStream, 0xC0, [keyInfo.KeyVersionNumber.Value]);
-        }
+        var versionResult = keyInfo.KeyVersionNumber.Match(
+            version => WriteTlv(contentStream, 0xC0, [version]),
+            () => Result.Success()
+        );
+        if (versionResult.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidData(versionResult.Error)
+            );
 
         // Key identifier (C1)
-        if (keyInfo.KeyIdentifier.HasValue)
-        {
-            WriteTlv(contentStream, 0xC1, [keyInfo.KeyIdentifier.Value]);
-        }
+        var identifierResult = keyInfo.KeyIdentifier.Match(
+            identifier => WriteTlv(contentStream, 0xC1, [identifier]),
+            () => Result.Success()
+        );
+        if (identifierResult.IsFailure)
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.InvalidData(identifierResult.Error)
+            );
 
         // Key types and lengths (C2)
         if (keyInfo.KeyTypesAndLengths.Length > 0)
         {
-            byte[] keyData = keyInfo.KeyTypesAndLengths
-                .SelectMany(keyType => new[] { keyType.Type, keyType.Length })
+            byte[] keyData = keyInfo
+                .KeyTypesAndLengths.SelectMany(keyType => new[] { keyType.Type, keyType.Length })
                 .ToArray();
-            WriteTlv(contentStream, 0xC2, keyData);
+            var typesResult = WriteTlv(contentStream, 0xC2, keyData);
+            if (typesResult.IsFailure)
+                return Result.Failure<byte[], SmartCardError>(
+                    SmartCardError.InvalidData(typesResult.Error)
+                );
         }
 
         byte[] content = contentStream.ToArray();
@@ -100,13 +110,19 @@ public static class KeyInfoTemplateCodec
             );
 
         // Parse the outer TLV structure using functional composition
-        return TlvService.TlvParser.Parse(data.ToImmutableArray())
-            .Bind(outerTlv => outerTlv.Tag.ToNumber()
-                .Bind(tagNumber => tagNumber == 0xE0
-                    ? Result.Success<TlvObject, SmartCardError>(outerTlv)
-                    : Result.Failure<TlvObject, SmartCardError>(
-                        SmartCardError.InvalidData("Invalid key information template format - expected tag 0xE0")
-                    ))
+        return TlvParser.Parse(data.ToImmutableArray())
+            .Bind(outerTlv =>
+                outerTlv
+                    .Tag.ToNumber()
+                    .Bind(tagNumber =>
+                        tagNumber == 0xE0
+                            ? Result.Success<TlvObject, SmartCardError>(outerTlv)
+                            : Result.Failure<TlvObject, SmartCardError>(
+                                SmartCardError.InvalidData(
+                                    "Invalid key information template format - expected tag 0xE0"
+                                )
+                            )
+                    )
             )
             .Bind(ProcessKeyInfoContent);
     }
@@ -118,9 +134,9 @@ public static class KeyInfoTemplateCodec
     /// <returns>A Result containing the decoded key information template.</returns>
     private static Result<KeyInfoTemplate, SmartCardError> ProcessKeyInfoContent(TlvObject outerTlv)
     {
-        return TlvService.TlvParser.ParseMultiple(outerTlv.TlvData.Bytes)
-            .Map(parseResult => parseResult.Objects
-                .Aggregate(
+        return TlvParser.ParseMultiple(outerTlv.TlvData.Bytes)
+            .Map(parseResult =>
+                parseResult.Objects.Aggregate(
                     new KeyInfoTemplate(),
                     (keyInfo, element) => ProcessKeyInfoElement(keyInfo, element)
                 )
@@ -136,21 +152,29 @@ public static class KeyInfoTemplateCodec
     /// <returns>Updated key information template.</returns>
     private static KeyInfoTemplate ProcessKeyInfoElement(KeyInfoTemplate keyInfo, TlvObject element)
     {
-        return element.Tag.ToNumber()
+        return element
+            .Tag.ToNumber()
             .Match(
-                tagNumber => tagNumber switch
-                {
-                    0xC0 when element.Length.LengthValue == 1 => // Key version number
-                        keyInfo with { KeyVersionNumber = Maybe<byte>.From(element.TlvData.Bytes[0]) },
-                    
-                    0xC1 when element.Length.LengthValue == 1 => // Key identifier
-                        keyInfo with { KeyIdentifier = Maybe<byte>.From(element.TlvData.Bytes[0]) },
-                    
-                    0xC2 when element.TlvData.Bytes.Length >= 2 => // Key types and lengths
+                tagNumber =>
+                    tagNumber switch
+                    {
+                        0xC0 when element.Length.LengthValue == 1 => // Key version number
+                        keyInfo with
+                        {
+                            KeyVersionNumber = Maybe<byte>.From(element.TlvData.Bytes[0]),
+                        },
+
+                        0xC1 when element.Length.LengthValue == 1 => // Key identifier
+                        keyInfo with
+                        {
+                            KeyIdentifier = Maybe<byte>.From(element.TlvData.Bytes[0]),
+                        },
+
+                        0xC2 when element.TlvData.Bytes.Length >= 2 => // Key types and lengths
                         ProcessKeyTypesAndLengths(keyInfo, element.TlvData.Bytes),
-                    
-                    _ => keyInfo // Ignore unrecognized or malformed elements
-                },
+
+                        _ => keyInfo, // Ignore unrecognized or malformed elements
+                    },
                 _ => keyInfo // Ignore elements with invalid tags
             );
     }
@@ -161,17 +185,31 @@ public static class KeyInfoTemplateCodec
     /// <param name="keyInfo">The current key information template.</param>
     /// <param name="data">The key types and lengths data.</param>
     /// <returns>Updated key information template with key types and lengths.</returns>
-    private static KeyInfoTemplate ProcessKeyTypesAndLengths(KeyInfoTemplate keyInfo, ImmutableArray<byte> data)
+    private static KeyInfoTemplate ProcessKeyTypesAndLengths(
+        KeyInfoTemplate keyInfo,
+        ImmutableArray<byte> data
+    )
     {
-        var keyTypes = Enumerable.Range(0, data.Length / 2)
+        var keyTypes = Enumerable
+            .Range(0, data.Length / 2)
             .Select(i => new KeyTypeAndLength(data[i * 2], data[i * 2 + 1]))
             .ToImmutableArray();
-            
-        return keyInfo with { KeyTypesAndLengths = keyTypes };
+
+        return keyInfo with
+        {
+            KeyTypesAndLengths = keyTypes,
+        };
     }
 
-    private static void WriteTlv(Stream stream, byte tag, byte[] value)
+    private static Result WriteTlv(Stream stream, byte tag, byte[] value)
     {
+        if (value.Length > 255)
+        {
+            return Result.Failure(
+                SmartCardError.InvalidData($"Value too long for simple TLV encoding: {value.Length} bytes").Message
+            );
+        }
+
         stream.WriteByte(tag);
 
         switch (value.Length)
@@ -184,13 +222,10 @@ public static class KeyInfoTemplateCodec
                 stream.WriteByte(0x81);
                 stream.WriteByte((byte)value.Length);
                 break;
-            default:
-                throw new ArgumentException(
-                    $"Value too long for simple TLV encoding: {value.Length} bytes"
-                );
         }
 
         stream.Write(value, 0, value.Length);
+        return Result.Success();
     }
 }
 
@@ -214,7 +249,8 @@ public sealed record KeyInfoTemplate
     /// <summary>
     /// Key types and their lengths.
     /// </summary>
-    public ImmutableArray<KeyTypeAndLength> KeyTypesAndLengths { get; init; } = ImmutableArray<KeyTypeAndLength>.Empty;
+    public ImmutableArray<KeyTypeAndLength> KeyTypesAndLengths { get; init; } =
+        ImmutableArray<KeyTypeAndLength>.Empty;
 }
 
 /// <summary>

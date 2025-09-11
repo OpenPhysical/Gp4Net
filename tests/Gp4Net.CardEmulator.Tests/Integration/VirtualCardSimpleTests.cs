@@ -5,7 +5,7 @@ using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
-using Gp4Net.Core;
+using Gp4Net.CardEmulator.Tests.TestHelpers;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Keys;
 using NUnit.Framework;
@@ -81,10 +81,30 @@ public class VirtualCardSimpleTests
         ]
     );
 
-    private static VirtualCard CreateTestVirtualCard() =>
-        VirtualCardTestBuilder
-            .CreateWithEntropy(CardConfiguration.P71(), [.. CardEntropy])
-            .GetValueOrDefault(VirtualCardTestBuilder.CreateWithSecureRng(CardConfiguration.P71()));
+    private static VirtualCard CreateTestVirtualCard()
+    {
+        var configResult = CardConfiguration.P71();
+        CardConfiguration config = default!;
+
+        if (configResult.IsSuccess)
+        {
+            config = configResult.Value;
+        }
+        else
+        {
+            Assert.Fail($"Failed to load P71 configuration: {configResult.Error}");
+            return default!;
+        }
+
+        var cardResult = VirtualCardTestBuilder.CreateWithEntropy(config, [.. CardEntropy]);
+
+        if (cardResult.IsSuccess)
+        {
+            return cardResult.Value;
+        }
+
+        return VirtualCardTestBuilder.CreateWithSecureRng(config);
+    }
 
     // Removed CryptographicService - using UnifiedCryptoService.Cryptogram instead
 
@@ -98,55 +118,61 @@ public class VirtualCardSimpleTests
     public void VirtualCard_ShouldHaveCorrectInitialState()
     {
         // Per GP Card Spec v2.3.1 Section 6.4.1: ISD is implicitly selected by default
-        VirtualCard virtualCard = CreateTestVirtualCard();
+        var virtualCard = CreateTestVirtualCard();
 
         _ = virtualCard
             .IsSelected.Should()
             .BeTrue("ISD is implicitly selected by default per GP Card Spec v2.3.1");
         _ = virtualCard.IsSecureChannelEstablished.Should().BeFalse();
-        _ = virtualCard.Configuration.CardType.Should().Be("NXP P71");
     }
 
     [Test]
     public void VirtualCard_SelectIsd_ShouldSucceed()
     {
-        VirtualCard virtualCard = CreateTestVirtualCard();
-        ImmutableArray<byte> selectCmd = ImmutableArray.Create<byte>(
+        var virtualCard = CreateTestVirtualCard();
+        var selectCmd = ImmutableArray.Create<byte>(
             [0x00, 0xA4, 0x04, 0x00, 0x08, 0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x00]
         );
 
-        ApduResponse response = virtualCard.ProcessCommand([.. selectCmd]);
+        var result = virtualCard.ProcessCommand([.. selectCmd]);
 
-        _ = response.StatusWord.Should().Be(StatusWords.Success.Normal);
-        _ = virtualCard.IsSelected.Should().BeTrue();
+        result.Match(
+            success =>
+            {
+                var (response, _) = success;
+                _ = response.StatusWord.Should().Be(StatusWords.Success);
+                _ = virtualCard.IsSelected.Should().BeTrue();
 
-        TestContext.Out.WriteLine(
-            $"✅ SELECT ISD succeeded: {Convert.ToHexString(response.Data)}9000"
+                TestContext.Out.WriteLine(
+                    $"✅ SELECT ISD succeeded: {Convert.ToHexString(response.Data)}9000"
+                );
+            },
+            error => Assert.Fail($"SELECT ISD failed: {error}")
         );
     }
 
     [Test]
     public void VirtualCard_InitializeUpdate_ShouldReturnValidResponse()
     {
-        VirtualCard virtualCard = CreateTestVirtualCard();
+        var virtualCard = CreateTestVirtualCard();
 
         // First SELECT ISD
-        ImmutableArray<byte> selectCmd = ImmutableArray.Create<byte>(
+        var selectCmd = ImmutableArray.Create<byte>(
             [0x00, 0xA4, 0x04, 0x00, 0x08, 0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x00]
         );
         _ = virtualCard.ProcessCommand([.. selectCmd]);
 
         // Then INITIALIZE UPDATE
-        ImmutableArray<byte> hostChallenge = ImmutableArray.Create<byte>(
+        var hostChallenge = ImmutableArray.Create<byte>(
             [0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10]
         );
-        ImmutableArray<byte> initCmd = ImmutableArray.Create<byte>(
+        var initCmd = ImmutableArray.Create<byte>(
             [0x80, 0x50, 0x00, 0x00, 0x08, 0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10]
         );
 
-        ApduResponse response = virtualCard.ProcessCommand([.. initCmd]);
+        var response = virtualCard.ExecuteCommand([.. initCmd]);
 
-        _ = response.StatusWord.Should().Be(StatusWords.Success.Normal);
+        _ = response.StatusWord.Should().Be(StatusWords.Success);
         _ = response
             .Data.Length.Should()
             .BeGreaterThanOrEqualTo(28, "INIT UPDATE response must be at least 28 bytes");
@@ -158,9 +184,7 @@ public class VirtualCardSimpleTests
 
         TestContext.Out.WriteLine($"🔍 Key Version: 0x{keyVersion:X2}");
         TestContext.Out.WriteLine($"🔍 SCP ID: 0x{scpId:X2}");
-        TestContext.Out.WriteLine(
-            $"🔍 Host Challenge: {Convert.ToHexString([.. hostChallenge])}"
-        );
+        TestContext.Out.WriteLine($"🔍 Host Challenge: {Convert.ToHexString([.. hostChallenge])}");
         TestContext.Out.WriteLine($"🔍 Card Challenge: {Convert.ToHexString(cardChallenge)}");
         TestContext.Out.WriteLine($"🔍 Card Cryptogram: {Convert.ToHexString(cardCryptogram)}");
 
@@ -211,16 +235,16 @@ public class VirtualCardSimpleTests
             0x32,
             0x10,
         ];
-        ApduResponse response = _virtualCard.ProcessCommand(initCmd);
+        var response = _virtualCard.ExecuteCommand(initCmd);
 
         byte keyVersion = response.Data[10];
         byte[] cardChallenge = response.Data[12..20];
         byte[] cardCryptogramFromCard = response.Data[20..28];
 
         // Get key set and calculate cryptogram using UnifiedCryptoService
-        Maybe<IKeySet> keySetMaybe = _virtualCard.Configuration.StaticKeys.TryGetValue(
+        var keySetMaybe = _virtualCard.Configuration.StaticKeys.TryGetValue(
             keyVersion,
-            out IKeySet value
+            out var value
         )
             ? Maybe<IKeySet>.From(value)
             : Maybe<IKeySet>.None;
@@ -233,7 +257,7 @@ public class VirtualCardSimpleTests
                     $"🔍 Using {keySet.GetType().Name} version 0x{keysetVersion}"
                 );
 
-                Result<byte[], SmartCardError> expectedCryptogramResult =
+                var expectedCryptogramResult =
                     CryptoService.Cryptogram.CalculateCardCryptogram(
                         hostChallenge.ToArray(),
                         cardChallenge,

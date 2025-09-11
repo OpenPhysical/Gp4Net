@@ -1,8 +1,6 @@
-
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
-using Gp4Net.CardEmulator.Core;
-using static Gp4Net.Constants.Constants;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using JetBrains.Annotations;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
@@ -24,52 +22,49 @@ public static partial class ScpEnforcer
     {
         /// <summary>Commands that can be executed without secure channel establishment.</summary>
         public static readonly ImmutableHashSet<byte> OpenAccessCommands =
-            ImmutableHashSet.Create<byte>(
-                GlobalPlatform.Ins.Select, // SELECT
-                GlobalPlatform.Ins.InitializeUpdate, // INITIALIZE UPDATE
-                GlobalPlatform.Ins.ExternalAuthenticate, // EXTERNAL AUTHENTICATE (completes secure channel establishment)
-                GlobalPlatform.Ins.GetData // GET DATA (some data objects)
+            ImmutableHashSet.Create(
+                Apdu.Instructions.SELECT, // SELECT
+                Ins.INITIALIZE_UPDATE, // INITIALIZE UPDATE
+                Apdu.Instructions.EXTERNAL_AUTHENTICATE, // EXTERNAL AUTHENTICATE (completes secure channel establishment)
+                Apdu.Instructions.GET_DATA // GET DATA per GP spec - no special security requirements
             );
 
         /// <summary>Commands that require secure channel establishment but no additional security.</summary>
         public static readonly ImmutableHashSet<byte> AuthenticatedCommands =
-            ImmutableHashSet.Create<byte>(
-                GlobalPlatform.Ins.GetData // GET DATA (protected data objects)
-            );
+            ImmutableHashSet.Create<byte>();
 
         /// <summary>Commands that require C-MAC security level (command authentication).</summary>
         public static readonly ImmutableHashSet<byte> CommandMacRequiredCommands =
-            ImmutableHashSet.Create<byte>(
-                GlobalPlatform.Ins.Install, // INSTALL
-                GlobalPlatform.Ins.Load, // LOAD
-                GlobalPlatform.Ins.Delete, // DELETE
-                GlobalPlatform.Ins.PutKey, // PUT KEY
-                GlobalPlatform.Ins.StoreData, // STORE DATA
-                GlobalPlatform.Ins.GetStatus // GET STATUS (some variants)
+            ImmutableHashSet.Create(
+                Ins.INSTALL, // INSTALL
+                Ins.LOAD, // LOAD
+                Ins.DELETE, // DELETE
+                Ins.PUT_KEY, // PUT KEY
+                Ins.STORE_DATA, // STORE DATA
+                Ins.GET_STATUS // GET STATUS (some variants)
             );
 
         /// <summary>Commands that require C-ENC security level (command encryption).</summary>
         public static readonly ImmutableHashSet<byte> CommandEncryptionRequiredCommands =
-            ImmutableHashSet.Create<byte>(
-                GlobalPlatform.Ins.PutKey, // PUT KEY (key data must be encrypted)
-                GlobalPlatform.Ins.StoreData // STORE DATA (sensitive data)
+            ImmutableHashSet.Create(
+                Ins.PUT_KEY, // PUT KEY (key data must be encrypted)
+                Ins.STORE_DATA // STORE DATA (sensitive data)
             );
 
         /// <summary>Commands that require R-MAC security level (response authentication).</summary>
         public static readonly ImmutableHashSet<byte> ResponseMacRequiredCommands =
-            ImmutableHashSet.Create<byte>(
-                GlobalPlatform.Ins.Install, // INSTALL
-                GlobalPlatform.Ins.Load, // LOAD
-                GlobalPlatform.Ins.Delete, // DELETE
-                GlobalPlatform.Ins.PutKey, // PUT KEY
-                GlobalPlatform.Ins.GetStatus // GET STATUS
+            ImmutableHashSet.Create(
+                Ins.INSTALL, // INSTALL
+                Ins.LOAD, // LOAD
+                Ins.DELETE, // DELETE
+                Ins.PUT_KEY, // PUT KEY
+                Ins.GET_STATUS // GET STATUS
             );
 
         /// <summary>Commands that require R-ENC security level (response encryption).</summary>
         public static readonly ImmutableHashSet<byte> ResponseEncryptionRequiredCommands =
-            ImmutableHashSet.Create<byte>(
-                GlobalPlatform.Ins.GetData, // GET DATA (sensitive data)
-                GlobalPlatform.Ins.GetStatus // GET STATUS (sensitive status)
+            ImmutableHashSet.Create(
+                Ins.GET_STATUS // GET STATUS (sensitive status)
             );
     }
 
@@ -99,7 +94,7 @@ public static partial class ScpEnforcer
     )
     {
         // GP Appendix E.1.2 - Command-specific security requirements
-        SecurityLevelRequirements requirements = new SecurityLevelRequirements(
+        var requirements = new SecurityLevelRequirements(
             RequiresSecureChannel: !SecurityRequirements.OpenAccessCommands.Contains(instruction),
             RequiresCommandMac: SecurityRequirements.CommandMacRequiredCommands.Contains(
                 instruction
@@ -116,7 +111,7 @@ public static partial class ScpEnforcer
         );
 
         // Special cases based on command parameters per GP Appendix E.1.3
-        SecurityLevelRequirements enhancedRequirements = ApplyCommandSpecificRules(
+        var enhancedRequirements = ApplyCommandSpecificRules(
             instruction,
             commandData,
             requirements
@@ -162,17 +157,15 @@ public static partial class ScpEnforcer
     {
         return instruction switch
         {
-            // GET DATA - Security depends on requested data object
-            Ins.GetData when commandData.Length >= 4 => ApplyGetDataSecurityRules(
-                commandData,
-                baseRequirements
-            ),
-
             // INSTALL - All variants require C-MAC and R-MAC
-            Ins.Install => baseRequirements with { RequiresCommandMac = true, RequiresResponseMac = true },
+            Ins.INSTALL => baseRequirements with
+            {
+                RequiresCommandMac = true,
+                RequiresResponseMac = true,
+            },
 
             // PUT KEY - Always requires encryption for key data
-            Ins.PutKey => baseRequirements with
+            Ins.PUT_KEY => baseRequirements with
             {
                 RequiresCommandEncryption = true,
                 RequiresCommandMac = true,
@@ -184,51 +177,6 @@ public static partial class ScpEnforcer
         };
     }
 
-    /// <summary>
-    /// Applies GET DATA specific security rules based on requested data object per GP Table E-2.
-    /// </summary>
-    private static SecurityLevelRequirements ApplyGetDataSecurityRules(
-        byte[] commandData,
-        SecurityLevelRequirements baseRequirements
-    )
-    {
-        // Per ISO 7816-4: APDU format is CLA INS P1 P2 [Lc] [Data] [Le]
-        // GET DATA command requires P1P2 parameters to identify the requested data object
-        // Minimum 4 bytes needed: CLA (0) + INS (1) + P1 (2) + P2 (3)
-        if (commandData.Length < 4)
-            return baseRequirements;
-
-        // Extract P1P2 (data object identifier)
-        ushort dataObjectId = (ushort)(commandData[2] << 8 | commandData[3]);
-
-        return dataObjectId switch
-        {
-            // Sensitive data objects require encryption
-            0x00C1
-            or // Security Domain Info
-            0x00CF
-            or // Key Diversification Data
-            0x00E0 => // Key Information Template
-            baseRequirements with
-            {
-                RequiresResponseEncryption = true,
-            },
-
-            // Protected data objects require authentication only
-            0x0066
-            or // Card Capabilities
-            0x0067
-            or // Card Management Type and Version
-            0x9F7F => // Card Production Life Cycle
-            baseRequirements with
-            {
-                RequiresSecureChannel = true,
-            },
-
-            // Public data objects - no additional requirements
-            _ => baseRequirements,
-        };
-    }
 
     /// <summary>
     /// Creates command security context for validation processing.
@@ -259,7 +207,7 @@ public static partial class ScpEnforcer
     )
     {
         // For INITIALIZE UPDATE, verify that the currently selected entity can handle secure channel operations
-        if (context.Instruction == Ins.InitializeUpdate)
+        if (context.Instruction == Ins.INITIALIZE_UPDATE)
         {
             return ValidateSecurityDomainCapabilities(context);
         }
@@ -284,7 +232,7 @@ public static partial class ScpEnforcer
     > ValidateSecurityDomainCapabilities(CommandSecurityContext context)
     {
         // ISD is always implicitly selected and can always handle INITIALIZE UPDATE
-        Maybe<VirtualApplication> selectedApp = context.CardState.CurrentlySelectedApplication;
+        var selectedApp = context.CardState.CurrentlySelectedApplication;
 
         // Use functional pattern matching approach
         return selectedApp.Match(

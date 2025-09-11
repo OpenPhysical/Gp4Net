@@ -25,7 +25,8 @@ public record LoggingService(Maybe<ILogger> Logger)
     /// <summary>
     /// Logs an information message if logger is available.
     /// </summary>
-    public void LogInformation(string message) => Logger.Match(l => l.LogInformation(message), () => { });
+    public void LogInformation(string message) =>
+        Logger.Match(l => l.LogInformation(message), () => { });
 
     /// <summary>
     /// Logs an information message with parameters if logger is available.

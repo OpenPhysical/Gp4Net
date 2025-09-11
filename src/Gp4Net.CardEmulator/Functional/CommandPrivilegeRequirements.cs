@@ -1,5 +1,3 @@
-
-using Gp4Net.CardEmulator.Core;
 using Gp4Net.Domain;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
 

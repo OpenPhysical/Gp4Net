@@ -18,7 +18,7 @@ public class CardUuidTests
     public void Generate_ProducesValidUuid()
     {
         // Act
-        Result<CardUuid, SmartCardError> result = CardUuid.Generate();
+        var result = CardUuid.Generate();
 
         // Assert
         result.Match(
@@ -35,8 +35,8 @@ public class CardUuidTests
     public void Generate_ProducesUniqueUuids()
     {
         // Act
-        Result<CardUuid, SmartCardError> result1 = CardUuid.Generate();
-        Result<CardUuid, SmartCardError> result2 = CardUuid.Generate();
+        var result1 = CardUuid.Generate();
+        var result2 = CardUuid.Generate();
 
         // Assert
         result1.IsSuccess.Should().BeTrue();
@@ -60,10 +60,10 @@ public class CardUuidTests
     public void FromGuid_WithValidGuid_ReturnsSuccess()
     {
         // Arrange
-        Guid guid = Guid.NewGuid();
+        var guid = Guid.NewGuid();
 
         // Act
-        Result<CardUuid, SmartCardError> result = CardUuid.FromGuid(guid);
+        var result = CardUuid.FromGuid(guid);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -78,10 +78,10 @@ public class CardUuidTests
     public void FromGuid_WithEmptyGuid_ReturnsFailure()
     {
         // Arrange
-        Guid emptyGuid = Guid.Empty;
+        var emptyGuid = Guid.Empty;
 
         // Act
-        Result<CardUuid, SmartCardError> result = CardUuid.FromGuid(emptyGuid);
+        var result = CardUuid.FromGuid(emptyGuid);
 
         // Assert
         result.IsFailure.Should().BeTrue();
@@ -92,11 +92,11 @@ public class CardUuidTests
     public void FromBytes_WithValidBytes_ReturnsSuccess()
     {
         // Arrange
-        Guid guid = Guid.NewGuid();
+        var guid = Guid.NewGuid();
         byte[] bytes = guid.ToByteArray();
 
         // Act
-        Result<CardUuid, SmartCardError> result = CardUuid.FromBytes(bytes);
+        var result = CardUuid.FromBytes(bytes);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -111,7 +111,7 @@ public class CardUuidTests
     public void FromBytes_WithNullBytes_ReturnsFailure()
     {
         // Act
-        Result<CardUuid, SmartCardError> result = CardUuid.FromBytes(null!);
+        var result = CardUuid.FromBytes(null!);
 
         // Assert
         result.IsFailure.Should().BeTrue();
@@ -124,7 +124,7 @@ public class CardUuidTests
         byte[] incorrectBytes = new byte[15]; // Should be 16
 
         // Act
-        Result<CardUuid, SmartCardError> result = CardUuid.FromBytes(incorrectBytes);
+        var result = CardUuid.FromBytes(incorrectBytes);
 
         // Assert
         result.IsFailure.Should().BeTrue();
@@ -134,8 +134,8 @@ public class CardUuidTests
     public void ToByteArray_ReturnsCorrectBytes()
     {
         // Arrange
-        Guid guid = Guid.NewGuid();
-        Result<CardUuid, SmartCardError> uuidResult = CardUuid.FromGuid(guid);
+        var guid = Guid.NewGuid();
+        var uuidResult = CardUuid.FromGuid(guid);
         byte[] expectedBytes = guid.ToByteArray();
 
         // Act & Assert
@@ -153,8 +153,8 @@ public class CardUuidTests
     public void ToString_ReturnsGuidString()
     {
         // Arrange
-        Guid guid = Guid.NewGuid();
-        Result<CardUuid, SmartCardError> uuidResult = CardUuid.FromGuid(guid);
+        var guid = Guid.NewGuid();
+        var uuidResult = CardUuid.FromGuid(guid);
 
         // Act & Assert
         uuidResult.Match(
@@ -171,8 +171,8 @@ public class CardUuidTests
     public void ToStringWithFormat_ReturnsFormattedGuidString()
     {
         // Arrange
-        Guid guid = Guid.NewGuid();
-        Result<CardUuid, SmartCardError> uuidResult = CardUuid.FromGuid(guid);
+        var guid = Guid.NewGuid();
+        var uuidResult = CardUuid.FromGuid(guid);
 
         // Act & Assert
         uuidResult.Match(
@@ -189,7 +189,7 @@ public class CardUuidTests
     public void IsEmpty_WithEmptyUuid_ReturnsTrue()
     {
         // Arrange
-        CardUuid emptyUuid = CardUuid.Empty;
+        var emptyUuid = CardUuid.Empty;
 
         // Act & Assert
         _ = emptyUuid.IsEmpty.Should().BeTrue();
@@ -199,7 +199,7 @@ public class CardUuidTests
     public void IsEmpty_WithNonEmptyUuid_ReturnsFalse()
     {
         // Arrange
-        Result<CardUuid, SmartCardError> nonEmptyUuidResult = CardUuid.Generate();
+        var nonEmptyUuidResult = CardUuid.Generate();
 
         // Act & Assert
         nonEmptyUuidResult.Match(
@@ -212,9 +212,9 @@ public class CardUuidTests
     public void Equality_WithSameGuid_ReturnsTrue()
     {
         // Arrange
-        Guid guid = Guid.NewGuid();
-        Result<CardUuid, SmartCardError> uuid1Result = CardUuid.FromGuid(guid);
-        Result<CardUuid, SmartCardError> uuid2Result = CardUuid.FromGuid(guid);
+        var guid = Guid.NewGuid();
+        var uuid1Result = CardUuid.FromGuid(guid);
+        var uuid2Result = CardUuid.FromGuid(guid);
 
         // Act & Assert
         uuid1Result.Match(
@@ -236,8 +236,8 @@ public class CardUuidTests
     public void Equality_WithDifferentGuids_ReturnsFalse()
     {
         // Arrange
-        Result<CardUuid, SmartCardError> uuid1Result = CardUuid.Generate();
-        Result<CardUuid, SmartCardError> uuid2Result = CardUuid.Generate();
+        var uuid1Result = CardUuid.Generate();
+        var uuid2Result = CardUuid.Generate();
 
         // Act & Assert
         uuid1Result.Match(
@@ -259,14 +259,14 @@ public class CardUuidTests
     public void RoundTrip_ByteArrayConversion_PreservesUuid()
     {
         // Arrange
-        Result<CardUuid, SmartCardError> originalUuidResult = CardUuid.Generate();
+        var originalUuidResult = CardUuid.Generate();
 
         // Act & Assert
         originalUuidResult.Match(
             originalUuid =>
             {
                 byte[] bytes = originalUuid.ToByteArray();
-                Result<CardUuid, SmartCardError> reconstructedUuidResult = CardUuid.FromBytes(
+                var reconstructedUuidResult = CardUuid.FromBytes(
                     bytes
                 );
 

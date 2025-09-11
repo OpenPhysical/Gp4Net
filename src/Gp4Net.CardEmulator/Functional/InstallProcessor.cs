@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
-
 using System;
 using System.Collections.Immutable;
 using System.Linq;
@@ -11,12 +10,8 @@ using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Domain;
 using Gp4Net.Core;
-using Gp4Net.Domain;
 using Gp4Net.Cryptography;
-using Gp4Net.Services;
 using JetBrains.Annotations;
-using static Gp4Net.Constants.Constants;
-using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.CardEmulator.Functional;
 
@@ -37,16 +32,18 @@ public static class InstallProcessor
     public static Result<(ApduResponse, CardState), SmartCardError> Process(
         ParsedCommand command,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return command.P1 switch
         {
             0x02 => ProcessInstallForLoad(command, state, config),
-            0x04 => ProcessInstallForInstall(command, state, config), 
+            0x04 => ProcessInstallForInstall(command, state, config),
             0x08 => ProcessInstallForMakeSelectable(command, state, config),
             0x0C => ProcessInstallForInstallAndMakeSelectable(command, state, config),
             _ => Result.Failure<(ApduResponse, CardState), SmartCardError>(
-                SmartCardError.IncorrectP1P2($"Invalid P1 parameter: {command.P1:X2}"))
+                SmartCardError.IncorrectP1P2($"Invalid P1 parameter: {command.P1:X2}")
+            ),
         };
     }
 
@@ -56,12 +53,17 @@ public static class InstallProcessor
     private static Result<(ApduResponse, CardState), SmartCardError> ProcessInstallForLoad(
         ParsedCommand command,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return ParseInstallForLoadData(command.Data)
-            .Bind(installData => ValidateInstallToken(installData.InstallToken, state, config)
-                .Bind(isValidToken => CreateInstallForLoadResponse(installData, state))
-                .Map(response => (response, state.WithLoadFileAid(installData.LoadFileAid.ToArray()))));
+            .Bind(installData =>
+                ValidateInstallToken(installData.InstallToken, state, config)
+                    .Bind(isValidToken => CreateInstallForLoadResponse(installData, state))
+                    .Map(response =>
+                        (response, state.WithLoadFileAid(installData.LoadFileAid.ToArray()))
+                    )
+            );
     }
 
     /// <summary>
@@ -70,7 +72,8 @@ public static class InstallProcessor
     private static Result<(ApduResponse, CardState), SmartCardError> ProcessInstallForInstall(
         ParsedCommand command,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return ParseInstallForInstallData(command.Data)
             .Bind(installData => ValidateApplicationInstall(installData, state, config))
@@ -81,10 +84,14 @@ public static class InstallProcessor
     /// <summary>
     /// Processes Install for Make Selectable (P1=0x08) which makes an application selectable.
     /// </summary>
-    private static Result<(ApduResponse, CardState), SmartCardError> ProcessInstallForMakeSelectable(
+    private static Result<
+        (ApduResponse, CardState),
+        SmartCardError
+    > ProcessInstallForMakeSelectable(
         ParsedCommand command,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return ParseMakeSelectableData(command.Data)
             .Bind(data => ValidateApplicationExists(data.ApplicationAid, state))
@@ -95,10 +102,14 @@ public static class InstallProcessor
     /// <summary>
     /// Processes combined Install for Install and Make Selectable (P1=0x0C).
     /// </summary>
-    private static Result<(ApduResponse, CardState), SmartCardError> ProcessInstallForInstallAndMakeSelectable(
+    private static Result<
+        (ApduResponse, CardState),
+        SmartCardError
+    > ProcessInstallForInstallAndMakeSelectable(
         ParsedCommand command,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return ProcessInstallForInstall(command, state, config)
             .Bind(result => ProcessInstallForMakeSelectable(command, result.Item2, config));
@@ -113,11 +124,11 @@ public static class InstallProcessor
             return SmartCardError.InvalidData("Install for Load data too short");
 
         int offset = 0;
-        
+
         // Parse Load File AID (mandatory)
         if (offset >= data.Length)
             return SmartCardError.InvalidData("Missing Load File AID length");
-        
+
         byte loadFileAidLength = data[offset++];
         if (offset + loadFileAidLength > data.Length)
             return SmartCardError.InvalidData("Load File AID data truncated");
@@ -128,7 +139,7 @@ public static class InstallProcessor
         // Parse Security Domain AID (mandatory)
         if (offset >= data.Length)
             return SmartCardError.InvalidData("Missing Security Domain AID length");
-        
+
         byte sdAidLength = data[offset++];
         if (offset + sdAidLength > data.Length)
             return SmartCardError.InvalidData("Security Domain AID data truncated");
@@ -137,32 +148,42 @@ public static class InstallProcessor
         offset += sdAidLength;
 
         // Parse Load File Data Block Hash (optional)
-        var loadFileHash = offset < data.Length && data[offset] > 0
-            ? Maybe<ImmutableArray<byte>>.From(ImmutableArray.Create(data, offset + 1, data[offset]))
-            : Maybe<ImmutableArray<byte>>.None;
+        var loadFileHash =
+            offset < data.Length && data[offset] > 0
+                ? Maybe<ImmutableArray<byte>>.From(
+                    ImmutableArray.Create(data, offset + 1, data[offset])
+                )
+                : Maybe<ImmutableArray<byte>>.None;
 
         if (loadFileHash.HasValue)
             offset += 1 + data[offset];
 
         // Parse Load Parameters (optional)
-        var loadParameters = offset < data.Length && data[offset] > 0
-            ? Maybe<ImmutableArray<byte>>.From(ImmutableArray.Create(data, offset + 1, data[offset]))
-            : Maybe<ImmutableArray<byte>>.None;
+        var loadParameters =
+            offset < data.Length && data[offset] > 0
+                ? Maybe<ImmutableArray<byte>>.From(
+                    ImmutableArray.Create(data, offset + 1, data[offset])
+                )
+                : Maybe<ImmutableArray<byte>>.None;
 
         if (loadParameters.HasValue)
             offset += 1 + data[offset];
 
         // Parse Install Token (optional)
-        var installToken = offset < data.Length
-            ? Maybe<ImmutableArray<byte>>.From(ImmutableArray.Create(data, offset, data.Length - offset))
-            : Maybe<ImmutableArray<byte>>.None;
+        var installToken =
+            offset < data.Length
+                ? Maybe<ImmutableArray<byte>>.From(
+                    ImmutableArray.Create(data, offset, data.Length - offset)
+                )
+                : Maybe<ImmutableArray<byte>>.None;
 
         return new InstallForLoadData(
             loadFileAid,
             securityDomainAid,
             loadFileHash,
             loadParameters,
-            installToken);
+            installToken
+        );
     }
 
     /// <summary>
@@ -171,13 +192,15 @@ public static class InstallProcessor
     private static Result<bool, SmartCardError> ValidateInstallToken(
         Maybe<ImmutableArray<byte>> token,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         return token.Match(
-            Some: tokenData => ValidateTokenStructure(tokenData.ToArray())
-                .Bind(parsedToken => ValidateTokenSignature(parsedToken, state, config))
-                .Bind(validToken => ValidateTokenAuthorization(validToken, state, config))
-                .Map(_ => true),
+            Some: tokenData =>
+                ValidateTokenStructure(tokenData.ToArray())
+                    .Bind(parsedToken => ValidateTokenSignature(parsedToken, state, config))
+                    .Bind(validToken => ValidateTokenAuthorization(validToken, state, config))
+                    .Map(_ => true),
             None: () => Result.Success<bool, SmartCardError>(true) // No token provided - assume valid for emulation
         );
     }
@@ -187,11 +210,12 @@ public static class InstallProcessor
     /// </summary>
     private static Result<ApduResponse, SmartCardError> CreateInstallForLoadResponse(
         InstallForLoadData installData,
-        CardState state)
+        CardState state
+    )
     {
         // Create Load File Data Block Hash (simulated)
         byte[] lfdbh = ComputeSimulatedLfdbh(installData.LoadFileAid.ToArray());
-        
+
         // Response format: Length of LFDBH (1 byte) + LFDBH + Status Word
         byte[] responseData = new byte[1 + lfdbh.Length];
         responseData[0] = (byte)lfdbh.Length;
@@ -214,10 +238,11 @@ public static class InstallProcessor
     private static byte[] ComputeSimulatedLfdbh(byte[] loadFileAid)
     {
         // Simple deterministic hash based on Load File AID for emulation
-        return CryptoService.Hash.Sha256(loadFileAid)
+        return CryptoService
+            .Hash.Sha256(loadFileAid)
             .Match(
                 onSuccess: hash => hash[..20], // Take first 20 bytes
-                onFailure: _ => new byte[20]   // Fallback to zeros
+                onFailure: _ => new byte[20] // Fallback to zeros
             );
     }
 
@@ -229,10 +254,12 @@ public static class InstallProcessor
         if (tokenData.Length < 8)
             return SmartCardError.SecurityStatusNotSatisfied("Install token too short");
 
-        return Result.Success<InstallToken, SmartCardError>(new InstallToken(
-            ImmutableArray.Create(tokenData, 0, Math.Min(8, tokenData.Length)),
-            ImmutableArray.Create(tokenData, 8, Math.Max(0, tokenData.Length - 8))
-        ));
+        return Result.Success<InstallToken, SmartCardError>(
+            new InstallToken(
+                ImmutableArray.Create(tokenData, 0, Math.Min(8, tokenData.Length)),
+                ImmutableArray.Create(tokenData, 8, Math.Max(0, tokenData.Length - 8))
+            )
+        );
     }
 
     /// <summary>
@@ -241,7 +268,8 @@ public static class InstallProcessor
     private static Result<InstallToken, SmartCardError> ValidateTokenSignature(
         InstallToken token,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         // Simplified validation - in real implementation, verify cryptographic signature
         return Result.Success<InstallToken, SmartCardError>(token);
@@ -253,7 +281,8 @@ public static class InstallProcessor
     private static Result<InstallToken, SmartCardError> ValidateTokenAuthorization(
         InstallToken token,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         // Simplified validation - in real implementation, check authorization levels
         return Result.Success<InstallToken, SmartCardError>(token);
@@ -262,13 +291,17 @@ public static class InstallProcessor
     /// <summary>
     /// Parses Install for Install command data.
     /// </summary>
-    private static Result<InstallForInstallData, SmartCardError> ParseInstallForInstallData(byte[] data)
+    private static Result<InstallForInstallData, SmartCardError> ParseInstallForInstallData(
+        byte[] data
+    )
     {
         // Simplified parsing for emulation - in real implementation, parse full TLV structure
-        return Result.Success<InstallForInstallData, SmartCardError>(new InstallForInstallData(
-            ImmutableArray.Create(data, 0, Math.Min(16, data.Length)), // Application AID
-            ImmutableArray.Create(data, 0, Math.Min(16, data.Length))  // Load File AID (same for simplicity)
-        ));
+        return Result.Success<InstallForInstallData, SmartCardError>(
+            new InstallForInstallData(
+                ImmutableArray.Create(data, 0, Math.Min(16, data.Length)), // Application AID
+                ImmutableArray.Create(data, 0, Math.Min(16, data.Length)) // Load File AID (same for simplicity)
+            )
+        );
     }
 
     /// <summary>
@@ -277,14 +310,18 @@ public static class InstallProcessor
     private static Result<InstallForInstallData, SmartCardError> ValidateApplicationInstall(
         InstallForInstallData data,
         CardState state,
-        CardConfiguration config)
+        CardConfiguration config
+    )
     {
         // Check if application already exists
-        bool exists = state.Applications.Values
-            .Any(app => app.Aid.SequenceEqual(data.ApplicationAid));
-        
+        bool exists = state.Applications.Values.Any(app =>
+            app.Aid.SequenceEqual(data.ApplicationAid)
+        );
+
         return exists
-            ? Result.Failure<InstallForInstallData, SmartCardError>(SmartCardError.InvalidData("Application already exists"))
+            ? Result.Failure<InstallForInstallData, SmartCardError>(
+                SmartCardError.InvalidData("Application already exists")
+            )
             : Result.Success<InstallForInstallData, SmartCardError>(data);
     }
 
@@ -293,7 +330,8 @@ public static class InstallProcessor
     /// </summary>
     private static Result<CardState, SmartCardError> CreateApplicationInstance(
         InstallForInstallData data,
-        CardState state)
+        CardState state
+    )
     {
         string aidString = Convert.ToHexString(data.ApplicationAid.ToArray());
         var newApp = new InstalledApplication(
@@ -301,10 +339,10 @@ public static class InstallProcessor
             data.LoadFileAid.ToArray(), // Load file AID
             0x01, // LOADED state
             0x00, // No privileges
-            ImmutableDictionary<string, byte[]>.Empty);
-        
-        return Result.Success<CardState, SmartCardError>(
-            state.WithApplication(aidString, newApp));
+            ImmutableDictionary<string, byte[]>.Empty
+        );
+
+        return Result.Success<CardState, SmartCardError>(state.WithApplication(aidString, newApp));
     }
 
     /// <summary>
@@ -312,9 +350,7 @@ public static class InstallProcessor
     /// </summary>
     private static Result<MakeSelectableData, SmartCardError> ParseMakeSelectableData(byte[] data)
     {
-        return new MakeSelectableData(
-            ImmutableArray.Create(data, 0, Math.Min(16, data.Length))
-        );
+        return new MakeSelectableData(ImmutableArray.Create(data, 0, Math.Min(16, data.Length)));
     }
 
     /// <summary>
@@ -322,12 +358,15 @@ public static class InstallProcessor
     /// </summary>
     private static Result<InstalledApplication, SmartCardError> ValidateApplicationExists(
         ImmutableArray<byte> applicationAid,
-        CardState state)
+        CardState state
+    )
     {
         string aidString = Convert.ToHexString(applicationAid.ToArray());
         return state.Applications.ContainsKey(aidString)
             ? Result.Success<InstalledApplication, SmartCardError>(state.Applications[aidString])
-            : Result.Failure<InstalledApplication, SmartCardError>(SmartCardError.InvalidData("Application not found"));
+            : Result.Failure<InstalledApplication, SmartCardError>(
+                SmartCardError.InvalidData("Application not found")
+            );
     }
 
     /// <summary>
@@ -335,13 +374,15 @@ public static class InstallProcessor
     /// </summary>
     private static Result<CardState, SmartCardError> MakeApplicationSelectable(
         InstalledApplication app,
-        CardState state)
+        CardState state
+    )
     {
         string aidString = Convert.ToHexString(app.Aid);
         var selectableApp = app with { LifecycleState = 0x07 }; // SELECTABLE state
-        
+
         return Result.Success<CardState, SmartCardError>(
-            state.WithApplication(aidString, selectableApp));
+            state.WithApplication(aidString, selectableApp)
+        );
     }
 
     /// <summary>
@@ -352,25 +393,24 @@ public static class InstallProcessor
         ImmutableArray<byte> SecurityDomainAid,
         Maybe<ImmutableArray<byte>> LoadFileDataBlockHash,
         Maybe<ImmutableArray<byte>> LoadParameters,
-        Maybe<ImmutableArray<byte>> InstallToken);
+        Maybe<ImmutableArray<byte>> InstallToken
+    );
 
     /// <summary>
     /// Data structure for Install for Install command.
     /// </summary>
     private record InstallForInstallData(
         ImmutableArray<byte> ApplicationAid,
-        ImmutableArray<byte> LoadFileAid);
+        ImmutableArray<byte> LoadFileAid
+    );
 
     /// <summary>
     /// Data structure for Make Selectable command.
     /// </summary>
-    private record MakeSelectableData(
-        ImmutableArray<byte> ApplicationAid);
+    private record MakeSelectableData(ImmutableArray<byte> ApplicationAid);
 
     /// <summary>
     /// Parsed install token structure.
     /// </summary>
-    private record InstallToken(
-        ImmutableArray<byte> TokenData,
-        ImmutableArray<byte> Signature);
+    private record InstallToken(ImmutableArray<byte> TokenData, ImmutableArray<byte> Signature);
 }

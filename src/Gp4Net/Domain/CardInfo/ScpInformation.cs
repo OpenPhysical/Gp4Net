@@ -92,24 +92,21 @@ public record ScpProtocolInfo
             return FormatScpVersion(Version);
         }
 
-        List<string> lines = [$"{FormatScpVersion(Version)}:"];
+        var header = $"{FormatScpVersion(Version)}:";
+        var options = ImplementationOptions
+            .OrderBy(opt => (byte)opt)
+            .Select(option => $"  - i={(byte)option:X2}: {GetImplementationDescription(Version, option)}");
 
-        foreach (ScpImplementation option in ImplementationOptions.OrderBy(opt => (byte)opt))
-        {
-            string description = GetImplementationDescription(option);
-            lines.Add($"  - i={(byte)option:X2}: {description}");
-        }
-
-        return string.Join("\n", lines);
+        return string.Join("\n", new[] { header }.Concat(options));
     }
 
     /// <summary>
     /// Gets a human-readable description for an SCP implementation option.
     /// </summary>
-    private static string GetImplementationDescription(ScpImplementation implementation)
+    private static string GetImplementationDescription(byte scpVersion, ScpImplementation implementation)
     {
         // For SCP02, use the bitmap-based description system from extension methods
-        if (implementation.IsScp02())
+        if (scpVersion == 0x02)
         {
             return implementation.GetDescription();
         }

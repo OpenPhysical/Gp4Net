@@ -18,7 +18,6 @@ namespace Gp4Net.Shared;
 [PublicAPI]
 public static class ErrorFactory
 {
-
     /// <summary>
     /// Creates null argument error.
     /// REPLACES: SmartCardError.InvalidArgument("{field} cannot be null")
@@ -37,15 +36,23 @@ public static class ErrorFactory
     /// Creates invalid length error.
     /// REPLACES: SmartCardError.InvalidArgument("{field} must be {expected} bytes, got {actual}")
     /// </summary>
-    public static SmartCardError InvalidLength(string fieldName, int expectedLength, int actualLength) =>
-        SmartCardError.InvalidArgument($"{fieldName} must be {expectedLength} bytes, got {actualLength}");
+    public static SmartCardError InvalidLength(
+        string fieldName,
+        int expectedLength,
+        int actualLength
+    ) =>
+        SmartCardError.InvalidArgument(
+            $"{fieldName} must be {expectedLength} bytes, got {actualLength}"
+        );
 
     /// <summary>
     /// Creates invalid range error.
     /// REPLACES: SmartCardError.InvalidArgument("{field} must be between {min} and {max}")
     /// </summary>
     public static SmartCardError InvalidRange(string fieldName, int min, int max, int actual) =>
-        SmartCardError.InvalidArgument($"{fieldName} must be between {min} and {max}, got {actual}");
+        SmartCardError.InvalidArgument(
+            $"{fieldName} must be between {min} and {max}, got {actual}"
+        );
 
     /// <summary>
     /// Creates unsupported value error.
@@ -248,7 +255,9 @@ public static class ErrorFactory
     /// REPLACES: SmartCardError.InvalidData("{field} TLV invalid length: expected {expected}, got {actual}")
     /// </summary>
     public static SmartCardError TlvInvalidLength(string fieldName, int expected, int actual) =>
-        SmartCardError.InvalidData($"{fieldName} TLV invalid length: expected {expected}, got {actual}");
+        SmartCardError.InvalidData(
+            $"{fieldName} TLV invalid length: expected {expected}, got {actual}"
+        );
 
     /// <summary>
     /// Creates TLV structure invalid error.
@@ -296,15 +305,20 @@ public static class ErrorFactory
     /// Creates failed Result with invalid length error.
     /// REPLACES: Result.Failure&lt;T, SmartCardError&gt;(SmartCardError.InvalidArgument(...))
     /// </summary>
-    public static Result<T, SmartCardError> FailureInvalidLength<T>(string fieldName, int expected, int actual) =>
-        Result.Failure<T, SmartCardError>(InvalidLength(fieldName, expected, actual));
+    public static Result<T, SmartCardError> FailureInvalidLength<T>(
+        string fieldName,
+        int expected,
+        int actual
+    ) => Result.Failure<T, SmartCardError>(InvalidLength(fieldName, expected, actual));
 
     /// <summary>
     /// Creates failed Result with cryptographic error.
     /// REPLACES: Result.Failure&lt;T, SmartCardError&gt;(SmartCardError.CryptographicError(...))
     /// </summary>
-    public static Result<T, SmartCardError> FailureCryptographicError<T>(string operation, string details) =>
-        Result.Failure<T, SmartCardError>(CryptographicFailed(operation, details));
+    public static Result<T, SmartCardError> FailureCryptographicError<T>(
+        string operation,
+        string details
+    ) => Result.Failure<T, SmartCardError>(CryptographicFailed(operation, details));
 
     /// <summary>
     /// Creates failed Result with MAC verification error.
@@ -329,12 +343,21 @@ public static class ErrorFactory
         return ex switch
         {
             ArgumentNullException argEx => FailureNullArgument<T>(argEx.ParamName ?? "parameter"),
-            ArgumentException argEx => Result.Failure<T, SmartCardError>(SmartCardError.InvalidArgument(argEx.Message)),
-            InvalidOperationException => Result.Failure<T, SmartCardError>(SmartCardError.InvalidData(ex.Message)),
-            UnauthorizedAccessException => Result.Failure<T, SmartCardError>(SmartCardError.SecurityError(ex.Message)),
-            TimeoutException => Result.Failure<T, SmartCardError>(SmartCardError.CommunicationError($"Operation timed out: {operation}")),
-            _ => Result.Failure<T, SmartCardError>(SmartCardError.UnexpectedError($"{operation} failed", ex))
+            ArgumentException argEx => Result.Failure<T, SmartCardError>(
+                SmartCardError.InvalidArgument(argEx.Message)
+            ),
+            InvalidOperationException => Result.Failure<T, SmartCardError>(
+                SmartCardError.InvalidData(ex.Message)
+            ),
+            UnauthorizedAccessException => Result.Failure<T, SmartCardError>(
+                SmartCardError.SecurityError(ex.Message)
+            ),
+            TimeoutException => Result.Failure<T, SmartCardError>(
+                SmartCardError.CommunicationError($"Operation timed out: {operation}")
+            ),
+            _ => Result.Failure<T, SmartCardError>(
+                SmartCardError.UnexpectedError($"{operation} failed", ex)
+            ),
         };
     }
-
 }

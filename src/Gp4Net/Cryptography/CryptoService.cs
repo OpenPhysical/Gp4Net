@@ -5,6 +5,7 @@
 
 using CSharpFunctionalExtensions;
 using JetBrains.Annotations;
+
 namespace Gp4Net.Cryptography;
 
 /// <summary>
@@ -25,8 +26,9 @@ public static partial class CryptoService
     {
         /// <summary>SCP02 - Triple DES based secure channel protocol.</summary>
         Scp02 = 0x02,
+
         /// <summary>SCP03 - AES based secure channel protocol.</summary>
-        Scp03 = 0x03
+        Scp03 = 0x03,
     }
 
     /// <summary>
@@ -36,8 +38,9 @@ public static partial class CryptoService
     {
         /// <summary>Card cryptogram.</summary>
         Card = 0,
+
         /// <summary>Host cryptogram.</summary>
-        Host = 1
+        Host = 1,
     }
 
     /// <summary>
@@ -47,10 +50,13 @@ public static partial class CryptoService
     {
         /// <summary>Gets the protocol version.</summary>
         byte ProtocolVersion { get; }
+
         /// <summary>Gets the key for cryptogram calculation.</summary>
         byte[] Key { get; }
+
         /// <summary>Gets the data to calculate cryptogram over.</summary>
         byte[] Data { get; }
+
         /// <summary>Gets the cryptogram type.</summary>
         CryptogramType Type { get; }
     }
@@ -62,12 +68,16 @@ public static partial class CryptoService
     {
         /// <summary>Gets the protocol version.</summary>
         ScpVersion Protocol { get; }
+
         /// <summary>Gets the base keyset.</summary>
         object BaseKeySet { get; }
+
         /// <summary>Gets the host challenge.</summary>
         byte[] HostChallenge { get; }
+
         /// <summary>Gets the card challenge.</summary>
         byte[] CardChallenge { get; }
+
         /// <summary>Gets the sequence counter (SCP02 only).</summary>
         Maybe<byte[]> SequenceCounter { get; }
     }

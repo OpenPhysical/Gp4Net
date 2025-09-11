@@ -4,7 +4,6 @@ using log4net;
 using log4net.Appender;
 using log4net.Core;
 using log4net.Layout;
-using log4net.Repository;
 using log4net.Repository.Hierarchy;
 
 namespace Gp4Net.Tool.Pipeline;
@@ -27,7 +26,7 @@ public static class VerboseLoggingHelper
             return; // No change needed
         }
 
-        ILoggerRepository logRepository = LogManager.GetRepository(
+        var logRepository = LogManager.GetRepository(
             Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly()
         );
 

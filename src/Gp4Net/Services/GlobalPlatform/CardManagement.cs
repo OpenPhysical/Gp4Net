@@ -23,7 +23,11 @@ public static class CardManagement
     public static async Task<Result<bool, SmartCardError>> DeleteApplicationAsync(
         byte[] aid,
         bool deleteRelated,
-        Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
+        Func<
+            CommandAPDU,
+            CancellationToken,
+            Task<Result<CommandResponse, SmartCardError>>
+        > executeCommand,
         CancellationToken cancellationToken = default
     )
     {
@@ -47,7 +51,11 @@ public static class CardManagement
     public static async Task<Result<bool, SmartCardError>> SetLifecycleStateAsync(
         byte[] aid,
         byte p1,
-        Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
+        Func<
+            CommandAPDU,
+            CancellationToken,
+            Task<Result<CommandResponse, SmartCardError>>
+        > executeCommand,
         CancellationToken cancellationToken = default
     )
     {
@@ -61,11 +69,15 @@ public static class CardManagement
         return await cmdResult
             .Bind(cmd => cmd.ToCommandApdu())
             .Bind(async commandApdu => await executeCommand(commandApdu, cancellationToken))
-            .Map(response => response.IsSuccess
-                ? Result.Success<bool, SmartCardError>(true)
-                : Result.Failure<bool, SmartCardError>(
-                    SmartCardError.CardError($"SET STATUS failed with SW: {response.StatusWord:X4}")
-                ))
+            .Map(response =>
+                response.IsSuccess
+                    ? Result.Success<bool, SmartCardError>(true)
+                    : Result.Failure<bool, SmartCardError>(
+                        SmartCardError.CardError(
+                            $"SET STATUS failed with SW: {response.StatusWord:X4}"
+                        )
+                    )
+            )
             .Bind(result => result);
     }
 }

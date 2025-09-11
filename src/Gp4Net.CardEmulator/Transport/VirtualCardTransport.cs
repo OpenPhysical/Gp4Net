@@ -4,8 +4,8 @@ using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
 using Gp4Net.Transport;
-using TransportApduResponse = Gp4Net.Transport.ApduResponse;
 using JetBrains.Annotations;
+using TransportApduResponse = Gp4Net.Transport.ApduResponse;
 
 namespace Gp4Net.CardEmulator.Transport;
 
@@ -16,7 +16,7 @@ namespace Gp4Net.CardEmulator.Transport;
 [PublicAPI]
 public sealed class VirtualCardTransport : IApduTransport
 {
-    private readonly VirtualCard _virtualCard;
+    private readonly IVirtualCard _virtualCard;
 
     /// <summary>
     /// Gets the transport protocol type (always T=1 for virtual cards).
@@ -42,7 +42,7 @@ public sealed class VirtualCardTransport : IApduTransport
     /// Initializes a new instance of VirtualCardTransport.
     /// </summary>
     /// <param name="virtualCard">The virtual card to communicate with.</param>
-    private VirtualCardTransport(VirtualCard virtualCard)
+    private VirtualCardTransport(IVirtualCard virtualCard)
     {
         _virtualCard = virtualCard;
     }
@@ -52,7 +52,7 @@ public sealed class VirtualCardTransport : IApduTransport
     /// </summary>
     /// <param name="virtualCard">The virtual card to wrap.</param>
     /// <returns>A result containing the transport or an error.</returns>
-    public static Result<VirtualCardTransport, SmartCardError> Create(VirtualCard virtualCard)
+    public static Result<VirtualCardTransport, SmartCardError> Create(IVirtualCard virtualCard)
     {
         return Maybe
             .From(virtualCard)
@@ -73,7 +73,9 @@ public sealed class VirtualCardTransport : IApduTransport
         CancellationToken cancellationToken = default
     )
     {
-        return Task.FromResult(Result.Success<TransportApduResponse, SmartCardError>(TransmitCommand(command)));
+        return Task.FromResult(
+            Result.Success<TransportApduResponse, SmartCardError>(TransmitCommand(command))
+        );
     }
 
     /// <summary>
@@ -82,8 +84,11 @@ public sealed class VirtualCardTransport : IApduTransport
     private TransportApduResponse TransmitCommand(IApduCommand command)
     {
         byte[] commandBytes = BuildApduBytes(command);
-        Core.ApduResponse virtualResponse = _virtualCard.ProcessCommand(commandBytes);
-        return new TransportApduResponse(virtualResponse.Data, virtualResponse.StatusWord);
+        var result = _virtualCard.ProcessCommand(commandBytes);
+        return result.Match(
+            success => new TransportApduResponse(success.Response.Data, success.Response.StatusWord),
+            error => new TransportApduResponse([], new StatusWord(0x6F, 0x00))
+        );
     }
 
     /// <summary>

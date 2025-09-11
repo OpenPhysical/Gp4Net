@@ -125,7 +125,7 @@ public class CplcData
             );
         }
 
-        CplcData cplc = new CplcData { Data = new byte[data.Length] };
+        var cplc = new CplcData { Data = new byte[data.Length] };
         Array.Copy(data, cplc.Data, data.Length);
 
         // Parse according to CPLC structure
@@ -184,7 +184,7 @@ public class CplcData
     /// </summary>
     public override string ToString()
     {
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
         _ = sb.AppendLine("CPLC Data:");
         _ = sb.AppendLine($"  IC Fabricator: {IcFabricator:X4}");
         _ = sb.AppendLine($"  IC Type: {IcType:X4}");

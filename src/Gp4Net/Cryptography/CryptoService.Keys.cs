@@ -36,13 +36,17 @@ public static partial class CryptoService
             if (macKey.Length != 16 && macKey.Length != 24 && macKey.Length != 32)
             {
                 return Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("Delete Token MAC key must be 16, 24, or 32 bytes for AES.")
+                    SmartCardError.InvalidArgument(
+                        "Delete Token MAC key must be 16, 24, or 32 bytes for AES."
+                    )
                 );
             }
 
             return aid.Length switch
             {
-                0 => Result.Failure<byte[], SmartCardError>(SmartCardError.InvalidArgument("AID cannot be empty.")),
+                0 => Result.Failure<byte[], SmartCardError>(
+                    SmartCardError.InvalidArgument("AID cannot be empty.")
+                ),
                 < 5 or > 16 => Result.Failure<byte[], SmartCardError>(
                     SmartCardError.InvalidArgument("AID length must be 5-16 bytes per GP spec.")
                 ),
@@ -51,16 +55,19 @@ public static partial class CryptoService
                         Result.Try(
                             () =>
                             {
-                                CMac cmac = new CMac(new AesEngine(), 128);
+                                var cmac = new CMac(new AesEngine(), 128);
                                 cmac.Init(new KeyParameter(macKey));
                                 byte[] mac = new byte[16];
                                 cmac.BlockUpdate(input, 0, input.Length);
                                 cmac.DoFinal(mac, 0);
                                 return mac;
                             },
-                            ex => SmartCardError.CryptographicError($"Delete token calculation failed: {ex.Message}")
+                            ex =>
+                                SmartCardError.CryptographicError(
+                                    $"Delete token calculation failed: {ex.Message}"
+                                )
                         )
-                    )
+                    ),
             };
         }
 
@@ -80,9 +87,7 @@ public static partial class CryptoService
                     List<byte> body = [0x4F, (byte)aid.Length];
                     body.AddRange(aid);
 
-                    optionalTlv
-                        .Where(tlv => tlv.Length > 0)
-                        .Execute(tlv => body.AddRange(tlv));
+                    optionalTlv.Where(tlv => tlv.Length > 0).Execute(tlv => body.AddRange(tlv));
 
                     byte[] berLength = EncodeBerLength(body.Count);
 
@@ -92,7 +97,10 @@ public static partial class CryptoService
 
                     return input.ToArray();
                 },
-                ex => SmartCardError.CryptographicError($"Delete token input construction failed: {ex.Message}")
+                ex =>
+                    SmartCardError.CryptographicError(
+                        $"Delete token input construction failed: {ex.Message}"
+                    )
             );
         }
 
@@ -105,7 +113,7 @@ public static partial class CryptoService
             {
                 < 0x80 => [(byte)length],
                 <= 0xFF => [0x81, (byte)length],
-                _ => [0x82, (byte)(length >> 8 & 0xFF), (byte)(length & 0xFF)]
+                _ => [0x82, (byte)(length >> 8 & 0xFF), (byte)(length & 0xFF)],
             };
         }
 
@@ -133,7 +141,7 @@ public static partial class CryptoService
                     counterBlock[14] = (byte)(encryptionCounter >> 8);
                     counterBlock[15] = (byte)encryptionCounter;
 
-                    AesEngine cipher = new AesEngine();
+                    var cipher = new AesEngine();
                     cipher.Init(true, new KeyParameter(sEncKey));
 
                     byte[] icv = new byte[16];

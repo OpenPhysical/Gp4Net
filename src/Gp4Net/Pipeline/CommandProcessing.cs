@@ -7,7 +7,6 @@ using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
-using WSCT.ISO7816;
 
 namespace Gp4Net.Pipeline;
 
@@ -33,7 +32,7 @@ public static class CommandProcessing
         IApduTransport Transport,
         Maybe<SecureChannelState> SecureChannel,
         ILogger Logger,
-        CommandOptions Options = null
+        CommandOptions Options
     )
     {
         /// <summary>
@@ -52,10 +51,6 @@ public static class CommandProcessing
             return this with { SecureChannel = Maybe<SecureChannelState>.None };
         }
 
-        /// <summary>
-        /// Gets the effective options, using defaults if not specified.
-        /// </summary>
-        public CommandOptions EffectiveOptions => Options ?? CommandOptions.Default;
     }
 
     /// <summary>
@@ -85,7 +80,8 @@ public static class CommandProcessing
         /// Checks if the command was successful.
         /// </summary>
         public bool IsSuccess =>
-            StatusWord == Constants.Constants.StatusWords.Legacy.Success || (StatusWord & 0xFF00) == 0x6100;
+            StatusWord == Constants.Constants.StatusWords.Legacy.Success
+            || (StatusWord & 0xFF00) == 0x6100;
     }
 
     /// <summary>

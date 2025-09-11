@@ -8,14 +8,11 @@ using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain;
-using Gp4Net.Services;
 using Gp4Net.Services.GlobalPlatform;
 using Gp4Net.Tool.Pipeline;
-using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
-using StatusSubset = Gp4Net.Domain.Commands.GetStatusCommand.StatusSubset;
 
 namespace Gp4Net.Tool.Commands.Applet;
 
@@ -43,7 +40,7 @@ public class StatusCommand : IPipelineCommand<StatusCommand.Settings>
                 await DisplayCardInfoAsync(ctx);
             }
 
-            Result<ImmutableList<ApplicationInfo>, SmartCardError> statusResult =
+            var statusResult =
                 await RetrieveApplicationStatus(ctx);
             return await statusResult.Match(
                 async applications => await ProcessApplications(ctx, applications, settings),
@@ -88,16 +85,21 @@ public class StatusCommand : IPipelineCommand<StatusCommand.Settings>
     )
     {
         // Build semantic rows using pure functional composition
-        List<ApplicationTableBuilder.ApplicationRow> semanticRows = [.. ApplicationTableBuilder
-            .BuildApplicationRows(
+        List<ApplicationTableBuilder.ApplicationRow> semanticRows =
+        [
+            .. ApplicationTableBuilder.BuildApplicationRows(
                 applications,
                 showExtended: false,
                 showSummary: true,
                 filter: null
-            )];
+            ),
+        ];
 
         // Check if we have any applications to display
-        List<ApplicationTableBuilder.ApplicationDataRow> applicationRows = [.. semanticRows.OfType<ApplicationTableBuilder.ApplicationDataRow>()];
+        List<ApplicationTableBuilder.ApplicationDataRow> applicationRows =
+        [
+            .. semanticRows.OfType<ApplicationTableBuilder.ApplicationDataRow>(),
+        ];
         if (!applicationRows.Any())
         {
             context.Display.Warning("No applets found on card");
@@ -140,7 +142,7 @@ public class StatusCommand : IPipelineCommand<StatusCommand.Settings>
 
     private static Table CreateApplicationDetailsTable(ApplicationInfo app)
     {
-        Table table = new Table()
+        var table = new Table()
             .AddColumn("Property")
             .AddColumn("Value")
             .Title($"[bold]{app.Type}: [cyan]{Convert.ToHexString(app.Aid)}[/][/]")

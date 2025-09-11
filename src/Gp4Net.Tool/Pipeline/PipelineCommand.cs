@@ -55,7 +55,7 @@ public class PipelineCommand<TSettings> : AsyncCommand<TSettings>
     /// </summary>
     private static bool IsVerboseEnabled(TSettings settings)
     {
-        PropertyInfo verboseProperty = typeof(TSettings).GetProperty(
+        var verboseProperty = typeof(TSettings).GetProperty(
             "Verbose",
             BindingFlags.Public | BindingFlags.Instance
         );

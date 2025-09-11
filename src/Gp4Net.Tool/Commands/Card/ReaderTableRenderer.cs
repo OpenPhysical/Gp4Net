@@ -17,9 +17,9 @@ public static class ReaderTableRenderer
     /// <param name="rows">Sequence of semantic reader rows</param>
     public static void RenderToTable(IEnumerable<ReaderTableBuilder.ReaderRow> rows)
     {
-        Table table = CreateTable();
+        var table = CreateTable();
 
-        foreach (ReaderTableBuilder.ReaderRow row in rows)
+        foreach (var row in rows)
         {
             RenderSemanticRow(table, row);
         }
@@ -33,7 +33,7 @@ public static class ReaderTableRenderer
     /// <param name="rows">Sequence of semantic reader rows</param>
     public static void RenderToConsole(IEnumerable<ReaderTableBuilder.ReaderRow> rows)
     {
-        foreach (ReaderTableBuilder.ReaderRow row in rows)
+        foreach (var row in rows)
         {
             switch (row)
             {
@@ -71,7 +71,7 @@ public static class ReaderTableRenderer
     /// </summary>
     private static Table CreateTable()
     {
-        Table table = new Table();
+        var table = new Table();
 
         // Reader table columns
         _ = table.AddColumn("Index");
@@ -117,11 +117,11 @@ public static class ReaderTableRenderer
     /// </summary>
     public static void RenderPostTableRows(IEnumerable<ReaderTableBuilder.ReaderRow> rows)
     {
-        IEnumerable<ReaderTableBuilder.ReaderRow> postTableRows = rows.Where(r =>
+        var postTableRows = rows.Where(r =>
             r is ReaderTableBuilder.SummaryRow or ReaderTableBuilder.InfoRow
         );
 
-        foreach (ReaderTableBuilder.ReaderRow row in postTableRows)
+        foreach (var row in postTableRows)
         {
             switch (row)
             {

@@ -15,7 +15,7 @@ public interface ICommandBuilder<out TCommand>
     /// </summary>
     /// <returns>The constructed CommandAPDU.</returns>
     CommandAPDU BuildCommand();
-    
+
     /// <summary>
     /// Builds the command instance (for backwards compatibility).
     /// </summary>

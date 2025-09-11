@@ -28,7 +28,7 @@ public static class DataOperations
     /// <returns>The parsed TLV elements or an error.</returns>
     public static Result<ImmutableList<TlvObject>, SmartCardError> ParseTlvData(byte[] data)
     {
-        return TlvService.TlvParser.ParseMultiple(data.ToImmutableArray())
+        return TlvParser.ParseMultiple(data.ToImmutableArray())
             .Map(parseResult => parseResult.Objects.ToImmutableList());
     }
 
@@ -41,13 +41,13 @@ public static class DataOperations
     public static Maybe<byte[]> FindElementValue(ImmutableList<TlvObject> elements, int tag)
     {
         var foundElements = elements
-            .Where(e => e.Tag.ToNumber().Map(tagNum => tagNum == (uint)tag).GetValueOrDefault(false))
+            .Where(e =>
+                e.Tag.ToNumber().Map(tagNum => tagNum == (uint)tag).GetValueOrDefault(false)
+            )
             .Select(e => e.TlvData.Bytes.ToArray())
             .ToImmutableArray();
 
-        return foundElements.Length > 0
-            ? Maybe<byte[]>.From(foundElements[0])
-            : Maybe<byte[]>.None;
+        return foundElements.Length > 0 ? Maybe<byte[]>.From(foundElements[0]) : Maybe<byte[]>.None;
     }
 
     /// <summary>
@@ -102,7 +102,7 @@ public static class DataOperations
             <= 255 => [0x81, (byte)length],
             <= 65535 => [0x82, (byte)(length >> 8), (byte)(length & 0xFF)],
             // For larger lengths (unlikely in smart card context)
-            _ => [0x83, (byte)(length >> 16), (byte)(length >> 8), (byte)(length & 0xFF)]
+            _ => [0x83, (byte)(length >> 16), (byte)(length >> 8), (byte)(length & 0xFF)],
         };
     }
 
@@ -114,18 +114,22 @@ public static class DataOperations
     /// <returns>Parsed FCI elements or an error.</returns>
     public static Result<FciTemplate, SmartCardError> ParseFciTemplate(byte[] fciData)
     {
-        Result<ImmutableList<TlvObject>, SmartCardError> parseResult = ParseTlvData(fciData);
+        var parseResult = ParseTlvData(fciData);
 
         if (parseResult.IsFailure)
         {
             return Result.Failure<FciTemplate, SmartCardError>(parseResult.Error);
         }
 
-        ImmutableList<TlvObject> elements = parseResult.Value;
+        var elements = parseResult.Value;
 
         // Look for FCI template tag
         var fciElements = elements
-            .Where(e => e.Tag.ToNumber().Map(tagNum => tagNum == Tlv.Iso7816Tags.FciTemplate).GetValueOrDefault(false))
+            .Where(e =>
+                e.Tag.ToNumber()
+                    .Map(tagNum => tagNum == Tlv.Iso7816Tags.FCI_TEMPLATE)
+                    .GetValueOrDefault(false)
+            )
             .ToImmutableArray();
 
         if (fciElements.Length == 0)
@@ -138,7 +142,7 @@ public static class DataOperations
         var fciElement = fciElements[0];
 
         // Parse the FCI template contents
-        Result<ImmutableList<TlvObject>, SmartCardError> fciContentsResult = ParseTlvData(
+        var fciContentsResult = ParseTlvData(
             fciElement.TlvData.Bytes.ToArray()
         );
 
@@ -147,12 +151,12 @@ public static class DataOperations
             return Result.Failure<FciTemplate, SmartCardError>(fciContentsResult.Error);
         }
 
-        ImmutableList<TlvObject> fciContents = fciContentsResult.Value;
+        var fciContents = fciContentsResult.Value;
 
         // Extract common FCI elements
-        Maybe<byte[]> aid = FindElementValue(fciContents, 0x84);
-        Maybe<byte[]> proprietaryInfo = FindElementValue(fciContents, 0xA5);
-        Maybe<byte[]> applicationLabel = FindElementValue(fciContents, 0x50);
+        var aid = FindElementValue(fciContents, 0x84);
+        var proprietaryInfo = FindElementValue(fciContents, 0xA5);
+        var applicationLabel = FindElementValue(fciContents, 0x50);
 
         return Result.Success<FciTemplate, SmartCardError>(
             new FciTemplate(
@@ -183,27 +187,29 @@ public static class DataOperations
     /// <returns>Parsed key components or an error.</returns>
     public static Result<KeyComponents, SmartCardError> ParseKeyInformation(byte[] keyData)
     {
-        Result<ImmutableList<TlvObject>, SmartCardError> parseResult = ParseTlvData(keyData);
+        var parseResult = ParseTlvData(keyData);
 
         if (parseResult.IsFailure)
         {
             return Result.Failure<KeyComponents, SmartCardError>(parseResult.Error);
         }
 
-        ImmutableList<TlvObject> elements = parseResult.Value;
+        var elements = parseResult.Value;
 
         // Extract key components (typical structure varies by key type)
-        Maybe<byte[]> keyValue = FindElementValue(elements, 0x80); // Key value
-        Maybe<byte[]> kcv = FindElementValue(elements, 0x03); // Key Check Value
-        Maybe<byte[]> keyType = FindElementValue(elements, 0x01); // Key type identifier
+        var keyValue = FindElementValue(elements, 0x80); // Key value
+        var kcv = FindElementValue(elements, 0x03); // Key Check Value
+        var keyType = FindElementValue(elements, 0x01); // Key type identifier
 
         return keyValue.Match(
-            kv => Result.Success<KeyComponents, SmartCardError>(
-                new KeyComponents(KeyValue: kv, KeyCheckValue: kcv, KeyType: keyType)
-            ),
-            () => Result.Failure<KeyComponents, SmartCardError>(
-                SmartCardError.InvalidResponse("No key value found in key information")
-            )
+            kv =>
+                Result.Success<KeyComponents, SmartCardError>(
+                    new KeyComponents(KeyValue: kv, KeyCheckValue: kcv, KeyType: keyType)
+                ),
+            () =>
+                Result.Failure<KeyComponents, SmartCardError>(
+                    SmartCardError.InvalidResponse("No key value found in key information")
+                )
         );
     }
 
@@ -215,9 +221,7 @@ public static class DataOperations
     private static byte[] CombineArrays(params byte[][] arrays)
     {
         // Calculate total length without using null-coalescing
-        int totalLength = arrays
-            .Where(a => a is { Length: > 0 })
-            .Sum(a => a.Length);
+        int totalLength = arrays.Where(a => a is { Length: > 0 }).Sum(a => a.Length);
 
         byte[] result = new byte[totalLength];
 

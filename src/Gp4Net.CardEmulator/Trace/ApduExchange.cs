@@ -41,7 +41,11 @@ public class ApduExchange
     /// Private constructor for ApduExchange class.
     /// Use Create factory method instead.
     /// </summary>
-    private ApduExchange(byte[] command, Maybe<ApduResponse> response, Maybe<IReadOnlyDictionary<string, object>> metadata)
+    private ApduExchange(
+        byte[] command,
+        Maybe<ApduResponse> response,
+        Maybe<IReadOnlyDictionary<string, object>> metadata
+    )
     {
         Command = command;
         Response = response;
@@ -94,6 +98,10 @@ public class ApduExchange
     /// </summary>
     public ApduExchange WithResponse(ApduResponse response)
     {
-        return new ApduExchange(Command, Maybe<ApduResponse>.From(response), Maybe<IReadOnlyDictionary<string, object>>.From(Metadata));
+        return new ApduExchange(
+            Command,
+            Maybe<ApduResponse>.From(response),
+            Maybe<IReadOnlyDictionary<string, object>>.From(Metadata)
+        );
     }
 }

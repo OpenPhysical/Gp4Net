@@ -6,11 +6,9 @@
 using System;
 using System.Collections.Generic;
 using CSharpFunctionalExtensions;
-using static Gp4Net.Constants.Constants;
 using Gp4Net.Core;
-using Gp4Net.Transport;
-using WSCT.Core;
 using WSCT.ISO7816;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -19,7 +17,6 @@ namespace Gp4Net.Domain.Commands;
 /// </summary>
 public class BeginRMacSessionCommand
 {
-
     /// <summary>
     /// Gets the command class byte.
     /// </summary>
@@ -28,7 +25,7 @@ public class BeginRMacSessionCommand
     /// <summary>
     /// Gets the instruction byte.
     /// </summary>
-    public byte Ins => GlobalPlatform.Ins.BeginRMacSession;
+    public byte Ins => GlobalPlatform.Ins.BEGIN_R_MAC_SESSION;
 
     /// <summary>
     /// Gets the P1 parameter (security level for responses).
@@ -72,13 +69,18 @@ public class BeginRMacSessionCommand
     /// <param name="p1">The P1 parameter (0x10 for R-MAC, 0x30 for R-ENCRYPTION and R-MAC).</param>
     /// <param name="data">Optional data field.</param>
     /// <param name="mac">Optional MAC value (8 bytes).</param>
-    private BeginRMacSessionCommand(byte cla, byte p1, Maybe<byte[]> data = default, Maybe<byte[]> mac = default)
+    private BeginRMacSessionCommand(
+        byte cla,
+        byte p1,
+        Maybe<byte[]> data = default,
+        Maybe<byte[]> mac = default
+    )
     {
         Cla = cla;
         P1 = p1;
         CommandData = data.Map(d => (byte[])d.Clone());
         Mac = mac.Map(m => (byte[])m.Clone());
-        
+
         // Build the combined data field for IApduCommand interface
         var combinedData = new List<byte>();
         CommandData.Execute(d => combinedData.AddRange(d));
@@ -96,7 +98,7 @@ public class BeginRMacSessionCommand
     /// <returns>A Result containing the BeginRMacSessionCommand or an error.</returns>
     public static Result<BeginRMacSessionCommand, SmartCardError> Create(
         SecurityLevel securityLevel,
-        byte cla = GlobalPlatform.Cla.GpStandard,
+        byte cla = GlobalPlatform.Cla.GP_STANDARD,
         Maybe<byte[]> data = default,
         Maybe<byte[]> mac = default
     )
@@ -110,9 +112,11 @@ public class BeginRMacSessionCommand
         }
 
         // Validate CLA byte
-        if (cla != GlobalPlatform.Cla.GpStandard && 
-            cla != GlobalPlatform.Cla.RMacSecure && 
-            cla != GlobalPlatform.Cla.RMacEncrypted)
+        if (
+            cla != GlobalPlatform.Cla.GP_STANDARD
+            && cla != GlobalPlatform.Cla.R_MAC_SECURE
+            && cla != GlobalPlatform.Cla.R_MAC_ENCRYPTED
+        )
         {
             return Result.Failure<BeginRMacSessionCommand, SmartCardError>(
                 SmartCardError.InvalidArgument(
@@ -123,10 +127,12 @@ public class BeginRMacSessionCommand
 
         // Validate MAC length if provided
         var macValidation = mac.Match(
-            m => m.Length != 8
-                ? Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("MAC must be exactly 8 bytes"))
-                : Result.Success<byte[], SmartCardError>(m),
+            m =>
+                m.Length != 8
+                    ? Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.InvalidArgument("MAC must be exactly 8 bytes")
+                    )
+                    : Result.Success<byte[], SmartCardError>(m),
             () => Result.Success<byte[], SmartCardError>([])
         );
 
@@ -169,7 +175,6 @@ public class BeginRMacSessionCommand
 /// </summary>
 public class EndRMacSessionCommand
 {
-
     /// <summary>
     /// Gets the command class byte.
     /// </summary>
@@ -178,7 +183,7 @@ public class EndRMacSessionCommand
     /// <summary>
     /// Gets the instruction byte.
     /// </summary>
-    public byte Ins => GlobalPlatform.Ins.EndRMacSession;
+    public byte Ins => GlobalPlatform.Ins.END_R_MAC_SESSION;
 
     /// <summary>
     /// Gets the P1 parameter (fixed to end session).
@@ -221,7 +226,7 @@ public class EndRMacSessionCommand
         Cla = cla;
         P2 = p2;
         Mac = mac.Map(m => (byte[])m.Clone());
-        
+
         // Build the data field for IApduCommand interface
         Data = Mac.Match(m => (byte[])m.Clone(), () => []);
     }
@@ -235,7 +240,7 @@ public class EndRMacSessionCommand
     /// <returns>A Result containing the EndRMacSessionCommand or an error.</returns>
     public static Result<EndRMacSessionCommand, SmartCardError> Create(
         SecurityLevel securityLevel,
-        byte cla = GlobalPlatform.Cla.GpStandard,
+        byte cla = GlobalPlatform.Cla.GP_STANDARD,
         Maybe<byte[]> mac = default
     )
     {
@@ -248,9 +253,11 @@ public class EndRMacSessionCommand
         }
 
         // Validate CLA byte
-        if (cla != GlobalPlatform.Cla.GpStandard && 
-            cla != GlobalPlatform.Cla.RMacSecure && 
-            cla != GlobalPlatform.Cla.RMacEncrypted)
+        if (
+            cla != GlobalPlatform.Cla.GP_STANDARD
+            && cla != GlobalPlatform.Cla.R_MAC_SECURE
+            && cla != GlobalPlatform.Cla.R_MAC_ENCRYPTED
+        )
         {
             return Result.Failure<EndRMacSessionCommand, SmartCardError>(
                 SmartCardError.InvalidArgument(
@@ -261,10 +268,12 @@ public class EndRMacSessionCommand
 
         // Validate MAC length if provided
         var macValidation = mac.Match(
-            m => m.Length != 8
-                ? Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("MAC must be exactly 8 bytes"))
-                : Result.Success<byte[], SmartCardError>(m),
+            m =>
+                m.Length != 8
+                    ? Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.InvalidArgument("MAC must be exactly 8 bytes")
+                    )
+                    : Result.Success<byte[], SmartCardError>(m),
             () => Result.Success<byte[], SmartCardError>([])
         );
 
@@ -329,17 +338,20 @@ public class EndRMacSessionResponse
     public static Result<EndRMacSessionResponse, SmartCardError> Parse(Maybe<byte[]> responseData)
     {
         return responseData.Match(
-            data => data.Length != 8
-                ? Result.Failure<EndRMacSessionResponse, SmartCardError>(
-                    SmartCardError.InvalidData(
-                        $"Response must be exactly 8 bytes, but got {data.Length} bytes"
-                    ))
-                : Result.Success<EndRMacSessionResponse, SmartCardError>(
-                    new EndRMacSessionResponse(data)
-                ),
-            () => Result.Failure<EndRMacSessionResponse, SmartCardError>(
-                SmartCardError.InvalidData("Response data is required")
-            )
+            data =>
+                data.Length != 8
+                    ? Result.Failure<EndRMacSessionResponse, SmartCardError>(
+                        SmartCardError.InvalidData(
+                            $"Response must be exactly 8 bytes, but got {data.Length} bytes"
+                        )
+                    )
+                    : Result.Success<EndRMacSessionResponse, SmartCardError>(
+                        new EndRMacSessionResponse(data)
+                    ),
+            () =>
+                Result.Failure<EndRMacSessionResponse, SmartCardError>(
+                    SmartCardError.InvalidData("Response data is required")
+                )
         );
     }
 

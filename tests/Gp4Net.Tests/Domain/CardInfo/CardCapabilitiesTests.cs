@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
@@ -36,18 +35,18 @@ public class CardCapabilitiesTests
             Maybe<byte[]>.From(data)
         );
         _ = result.IsSuccess.Should().BeTrue();
-        CardCapabilities? capabilities = result.Value;
+        var capabilities = result.Value;
 
         // Assert
         _ = capabilities.Should().NotBeNull();
         _ = capabilities.ScpOptions.Should().HaveCount(1);
 
-        ScpOption? scpOption = capabilities.ScpOptions.First();
+        var scpOption = capabilities.ScpOptions.First();
         _ = scpOption.ScpId.Should().Be(0x03);
         _ = scpOption.Implementation.Should().Be(0x70);
 
         _ = capabilities.SupportedKeyLengths.ContainsKey(0x03).Should().BeTrue();
-        ImmutableList<int>? keyLengths = capabilities.SupportedKeyLengths[0x03];
+        var keyLengths = capabilities.SupportedKeyLengths[0x03];
         _ = keyLengths.Should().Contain(128);
         _ = keyLengths.Should().Contain(192);
         _ = keyLengths.Should().Contain(256);
@@ -71,7 +70,7 @@ public class CardCapabilitiesTests
             Maybe<byte[]>.From(data)
         );
         _ = result.IsSuccess.Should().BeTrue();
-        CardCapabilities? capabilities = result.Value;
+        var capabilities = result.Value;
 
         // Assert
         _ = capabilities.SdPrivileges.HasValue.Should().BeTrue();
@@ -100,7 +99,7 @@ public class CardCapabilitiesTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            CardCapabilities capabilities = result.Value;
+            var capabilities = result.Value;
 
             // Assert
             _ = capabilities.AppPrivileges.HasValue.Should().BeTrue();
@@ -130,7 +129,7 @@ public class CardCapabilitiesTests
             Maybe<byte[]>.From(data)
         );
         _ = result.IsSuccess.Should().BeTrue();
-        CardCapabilities? capabilities = result.Value;
+        var capabilities = result.Value;
 
         // Assert
         _ = capabilities.Algorithms.HasValue.Should().BeTrue();
@@ -156,11 +155,11 @@ public class CardCapabilitiesTests
             Maybe<byte[]>.From(data)
         );
         _ = result.IsSuccess.Should().BeTrue();
-        CardCapabilities? capabilities = result.Value;
+        var capabilities = result.Value;
 
         // Assert
         _ = capabilities.CipherSuites.ContainsKey(CipherUsage.DapVerification).Should().BeTrue();
-        ImmutableList<CipherSuite>? ciphers = capabilities.CipherSuites[
+        var ciphers = capabilities.CipherSuites[
             CipherUsage.DapVerification
         ];
         _ = ciphers.Should().Contain(CipherSuite.Des3Mac);
@@ -216,7 +215,7 @@ public class CardCapabilitiesTests
             Maybe<byte[]>.From(data)
         );
         _ = result.IsSuccess.Should().BeTrue();
-        CardCapabilities? capabilities = result.Value;
+        var capabilities = result.Value;
 
         // Assert
         _ = capabilities.Should().NotBeNull();
@@ -262,7 +261,7 @@ public class CardCapabilitiesTests
             Maybe<byte[]>.From(data)
         );
         _ = result.IsSuccess.Should().BeTrue();
-        CardCapabilities? capabilities = result.Value;
+        var capabilities = result.Value;
         string? output = capabilities.ToString();
 
         // Assert

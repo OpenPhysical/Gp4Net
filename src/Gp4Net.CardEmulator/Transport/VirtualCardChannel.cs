@@ -4,8 +4,8 @@ using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
 using Gp4Net.Transport;
-using EmulatorApduResponse = Gp4Net.CardEmulator.Core.ApduResponse;
 using JetBrains.Annotations;
+using EmulatorApduResponse = Gp4Net.CardEmulator.Core.ApduResponse;
 
 namespace Gp4Net.CardEmulator.Transport;
 
@@ -16,7 +16,7 @@ namespace Gp4Net.CardEmulator.Transport;
 [PublicAPI]
 public sealed class VirtualCardChannel : ICardChannel
 {
-    private readonly VirtualCard _virtualCard;
+    private readonly IVirtualCard _virtualCard;
 
     /// <summary>
     /// Gets the active transport protocol for this channel (always T=1 for virtual cards).
@@ -32,7 +32,7 @@ public sealed class VirtualCardChannel : ICardChannel
     /// Initializes a new instance of VirtualCardChannel.
     /// </summary>
     /// <param name="virtualCard">The virtual card to communicate with.</param>
-    private VirtualCardChannel(VirtualCard virtualCard)
+    private VirtualCardChannel(IVirtualCard virtualCard)
     {
         _virtualCard = virtualCard;
     }
@@ -42,7 +42,7 @@ public sealed class VirtualCardChannel : ICardChannel
     /// </summary>
     /// <param name="virtualCard">The virtual card to wrap.</param>
     /// <returns>A result containing the channel or an error.</returns>
-    public static Result<VirtualCardChannel, SmartCardError> Create(VirtualCard virtualCard)
+    public static Result<VirtualCardChannel, SmartCardError> Create(IVirtualCard virtualCard)
     {
         return Maybe
             .From(virtualCard)
@@ -58,8 +58,11 @@ public sealed class VirtualCardChannel : ICardChannel
     /// <returns>The raw response from the virtual card.</returns>
     public Task<byte[]> TransmitAsync(byte[] command, CancellationToken cancellationToken = default)
     {
-        EmulatorApduResponse response = _virtualCard.ProcessCommand(command);
-        return Task.FromResult(BuildResponseBytes(response));
+        var result = _virtualCard.ProcessCommand(command);
+        return result.Match(
+            success => Task.FromResult(BuildResponseBytes(success.Response)),
+            error => Task.FromResult(new byte[] { 0x6F, 0x00 })
+        );
     }
 
     /// <summary>
@@ -75,8 +78,8 @@ public sealed class VirtualCardChannel : ICardChannel
             response.Data.CopyTo(responseBytes, 0);
         }
 
-        responseBytes[responseBytes.Length - 2] = response.StatusWord.SW1;
-        responseBytes[responseBytes.Length - 1] = response.StatusWord.SW2;
+        responseBytes[responseBytes.Length - 2] = response.StatusWord.Sw1;
+        responseBytes[responseBytes.Length - 1] = response.StatusWord.Sw2;
 
         return responseBytes;
     }

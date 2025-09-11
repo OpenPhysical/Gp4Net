@@ -26,13 +26,13 @@ public static partial class CryptoService
         {
             return key.Length switch
             {
-                16 => Result.Success<byte[], SmartCardError>(
-                    ConcatenateArrays(key, key[..8])
-                ),
+                16 => Result.Success<byte[], SmartCardError>(ConcatenateArrays(key, key[..8])),
                 24 => Result.Success<byte[], SmartCardError>(key),
                 _ => Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument($"3DES key must be 16 or 24 bytes, got {key.Length}")
-                )
+                    SmartCardError.InvalidArgument(
+                        $"3DES key must be 16 or 24 bytes, got {key.Length}"
+                    )
+                ),
             };
         }
 
@@ -45,7 +45,7 @@ public static partial class CryptoService
         /// <returns>The padded data.</returns>
         public static Result<byte[], SmartCardError> ApplyIso7816Padding(byte[] data, int blockSize)
         {
-            UnitResult<SmartCardError> validation = ValidateBlockSize(blockSize);
+            var validation = ValidateBlockSize(blockSize);
             return validation.IsSuccess
                 ? ApplyPadding(data, blockSize)
                 : Result.Failure<byte[], SmartCardError>(validation.Error);
@@ -56,7 +56,7 @@ public static partial class CryptoService
         /// </summary>
         private static Result<byte[], SmartCardError> ApplyPadding(byte[] data, int blockSize)
         {
-            ISO7816d4Padding padding = new ISO7816d4Padding();
+            var padding = new ISO7816d4Padding();
             int paddingLength = blockSize - data.Length % blockSize;
             byte[] paddedData = new byte[data.Length + paddingLength];
             Array.Copy(data, 0, paddedData, 0, data.Length);
@@ -89,7 +89,7 @@ public static partial class CryptoService
         /// </summary>
         private static Result<byte[], SmartCardError> RemovePadding(byte[] paddedData)
         {
-            ISO7816d4Padding padding = new ISO7816d4Padding();
+            var padding = new ISO7816d4Padding();
             int padCount = padding.PadCount(paddedData);
 
             if (padCount < 0 || padCount >= paddedData.Length)
@@ -118,7 +118,7 @@ public static partial class CryptoService
                 .Match(
                     () =>
                     {
-                        Pkcs7Padding padding = new Pkcs7Padding();
+                        var padding = new Pkcs7Padding();
                         int paddingLength = blockSize - data.Length % blockSize;
                         byte[] paddedData = new byte[data.Length + paddingLength];
                         Array.Copy(data, 0, paddedData, 0, data.Length);
@@ -127,7 +127,8 @@ public static partial class CryptoService
 
                         return Result.Success<byte[], SmartCardError>(paddedData);
                     },
-                    error => Result.Failure<byte[], SmartCardError>(error));
+                    error => Result.Failure<byte[], SmartCardError>(error)
+                );
         }
 
         /// <summary>
@@ -145,7 +146,7 @@ public static partial class CryptoService
                 );
             }
 
-            Pkcs7Padding padding = new Pkcs7Padding();
+            var padding = new Pkcs7Padding();
             int padCount = padding.PadCount(paddedData);
 
             if (padCount < 0 || padCount >= paddedData.Length)
@@ -189,7 +190,7 @@ public static partial class CryptoService
             byte[] paddedData = new byte[targetLength];
             Array.Copy(data, 0, paddedData, 0, data.Length);
 
-            ISO7816d4Padding padding = new ISO7816d4Padding();
+            var padding = new ISO7816d4Padding();
             padding.AddPadding(paddedData, data.Length);
 
             return Result.Success<byte[], SmartCardError>(paddedData);
@@ -209,9 +210,7 @@ public static partial class CryptoService
                 return false;
             }
 
-            int result = a
-                .Zip(b, (x, y) => x ^ y)
-                .Aggregate(0, (acc, xor) => acc | xor);
+            int result = a.Zip(b, (x, y) => x ^ y).Aggregate(0, (acc, xor) => acc | xor);
 
             return result == 0;
         }
@@ -259,7 +258,12 @@ public static partial class CryptoService
                         return data;
                     }
 
-                    byte[] paddedData = [.. data, (byte)0x80, .. Enumerable.Repeat((byte)0x00, paddingNeeded - 1)];
+                    byte[] paddedData =
+                    [
+                        .. data,
+                        0x80,
+                        .. Enumerable.Repeat((byte)0x00, paddingNeeded - 1),
+                    ];
 
                     return paddedData;
                 },
@@ -289,14 +293,7 @@ public static partial class CryptoService
         {
             if (protocolVersion == ScpVersion.Scp03)
             {
-                List<byte> macInput =
-                [
-                    0x84,
-                    ins,
-                    p1,
-                    p2,
-                    (byte)(data.Length + 8),
-                ];
+                List<byte> macInput = [0x84, ins, p1, p2, (byte)(data.Length + 8)];
                 macInput.AddRange(data);
                 return [.. macInput];
             }
@@ -333,9 +330,10 @@ public static partial class CryptoService
         private static UnitResult<SmartCardError> ValidateBlockSize(int blockSize)
         {
             return blockSize is <= 0 or > 255
-                ? UnitResult.Failure(SmartCardError.InvalidArgument($"Invalid block size: {blockSize}"))
+                ? UnitResult.Failure(
+                    SmartCardError.InvalidArgument($"Invalid block size: {blockSize}")
+                )
                 : UnitResult.Success<SmartCardError>();
         }
-
     }
 }

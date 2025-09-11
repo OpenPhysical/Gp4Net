@@ -45,11 +45,7 @@ public class VirtualCardReader
     /// <param name="readerName">The name of the virtual reader.</param>
     /// <param name="insertedCard">The currently inserted card, if any.</param>
     /// <param name="connected">Whether the reader is connected.</param>
-    public VirtualCardReader(
-        string readerName,
-        Maybe<IVirtualCard> insertedCard,
-        bool connected
-    )
+    public VirtualCardReader(string readerName, Maybe<IVirtualCard> insertedCard, bool connected)
     {
         _readerName = readerName;
         _insertedCard = insertedCard;
@@ -63,13 +59,10 @@ public class VirtualCardReader
     /// <returns>A new virtual card reader instance, or an error.</returns>
     public static Result<VirtualCardReader, SmartCardError> Create(string readerName)
     {
-        return Maybe.From(readerName)
+        return Maybe
+            .From(readerName)
             .ToResult(SmartCardError.InvalidArgument("Reader name cannot be null"))
-            .Map(validName => new VirtualCardReader(
-                validName,
-                Maybe<IVirtualCard>.None,
-                false
-            ));
+            .Map(validName => new VirtualCardReader(validName, Maybe<IVirtualCard>.None, false));
     }
 
     /// <summary>
@@ -90,7 +83,11 @@ public class VirtualCardReader
                     )
                     : Result.Success<IVirtualCard, SmartCardError>(validCard)
             )
-            .Map(validCard => new VirtualCardReader(_readerName, Maybe<IVirtualCard>.From(validCard), _connected));
+            .Map(validCard => new VirtualCardReader(
+                _readerName,
+                Maybe<IVirtualCard>.From(validCard),
+                _connected
+            ));
     }
 
     /// <summary>
@@ -112,9 +109,11 @@ public class VirtualCardReader
     {
         return IsCardPresent
             ? Result.Success<VirtualCardReader, SmartCardError>(
-                new VirtualCardReader(_readerName, _insertedCard, true))
+                new VirtualCardReader(_readerName, _insertedCard, true)
+            )
             : Result.Failure<VirtualCardReader, SmartCardError>(
-                SmartCardError.InvalidArgument("No card present to connect to"));
+                SmartCardError.InvalidArgument("No card present to connect to")
+            );
     }
 
     /// <summary>
@@ -135,11 +134,15 @@ public class VirtualCardReader
     {
         return (!IsConnected || !IsCardPresent)
             ? Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidArgument("Reader not connected or no card present"))
+                SmartCardError.InvalidArgument("Reader not connected or no card present")
+            )
             : _insertedCard.Match(
                 card => Result.Success<byte[], SmartCardError>(card.GetAtr()),
-                () => Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("No card present")));
+                () =>
+                    Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.InvalidArgument("No card present")
+                    )
+            );
     }
 
     /// <summary>
@@ -155,14 +158,21 @@ public class VirtualCardReader
             .Bind(validCommand =>
                 !IsConnected
                     ? Result.Failure<ApduResponse, SmartCardError>(
-                        SmartCardError.InvalidArgument("Reader is not connected"))
-                    : !IsCardPresent
+                        SmartCardError.InvalidArgument("Reader is not connected")
+                    )
+                : !IsCardPresent
                     ? Result.Failure<ApduResponse, SmartCardError>(
-                        SmartCardError.InvalidArgument("No card is present"))
-                    : _insertedCard.Match(
-                        card => Result.Success<ApduResponse, SmartCardError>(card.ProcessCommand(validCommand)),
-                        () => Result.Failure<ApduResponse, SmartCardError>(
-                            SmartCardError.InvalidArgument("No card present"))));
+                        SmartCardError.InvalidArgument("No card is present")
+                    )
+                : _insertedCard.Match(
+                    card => card.ProcessCommand(validCommand)
+                        .Map(result => result.Response),
+                    () =>
+                        Result.Failure<ApduResponse, SmartCardError>(
+                            SmartCardError.InvalidArgument("No card present")
+                        )
+                )
+            );
     }
 }
 
@@ -190,7 +200,7 @@ public class VirtualReaderManager
     {
         return Maybe<VirtualCardReader>
             .From(reader)
-            .ToResult(SmartCardError.InvalidArgument("Reader cannot be null"))
+            .ToResult(SmartCardError.InvalidArgument("Invalid Reader Name"))
             .Tap(r => _readers[r.ReaderName] = r)
             .Map(_ => UnitResult.Success<SmartCardError>());
     }
@@ -199,11 +209,12 @@ public class VirtualReaderManager
     /// Removes a virtual reader from the manager.
     /// </summary>
     /// <param name="readerName">The name of the reader to remove.</param>
+    /// @todo mutation
     public UnitResult<SmartCardError> RemoveReader(string readerName)
     {
         return Maybe<string>
             .From(readerName)
-            .ToResult(SmartCardError.InvalidArgument("Reader name cannot be null"))
+            .ToResult(SmartCardError.InvalidArgument("Invalid Reader Name"))
             .Tap(name => _readers.Remove(name))
             .Map(_ => UnitResult.Success<SmartCardError>());
     }
@@ -212,16 +223,18 @@ public class VirtualReaderManager
     /// Gets a virtual reader by name.
     /// </summary>
     /// <param name="readerName">The name of the reader.</param>
-    /// <returns>The virtual reader, or null if not found.</returns>
-    public VirtualCardReader? GetReader(string readerName)
+    /// <returns>The virtual reader if found, or None if not found.</returns>
+    public Maybe<VirtualCardReader> GetReader(string readerName)
     {
-        _readers.TryGetValue(readerName, out VirtualCardReader? reader);
-        return reader;
+        return _readers.TryGetValue(readerName, out var reader)
+            ? Maybe<VirtualCardReader>.From(reader)
+            : Maybe<VirtualCardReader>.None;
     }
 
     /// <summary>
     /// Clears all virtual readers.
     /// </summary>
+    /// @TODO This should not be done as a side effect.  It's terrible, requires mutation to actually be useful.  Remove.'
     public UnitResult<SmartCardError> Clear()
     {
         // Functional approach - no side effects, just clear the collection
@@ -233,20 +246,25 @@ public class VirtualReaderManager
     /// Creates a standard test setup with a P71 Card.
     /// </summary>
     /// <returns>The name of the created reader.</returns>
+    /// @TODO This should not done as a string.  It's terrible, requires mutation to actually be useful.  Remove.
     public string CreateStandardTestSetup()
     {
         const string readerName = "Virtual P71 Reader 00 00";
 
-        VirtualCard p71Card = VirtualCardTestBuilder.CreateWithSecureRng(CardConfiguration.P71());
-
-        return VirtualCardReader.Create(readerName)
-            .Bind(reader => reader.WithCard(p71Card))
+        return CardConfiguration
+            .P71()
+            .Bind(config => Maybe<VirtualCard>
+                .From(VirtualCardTestBuilder.CreateWithSecureRng(config))
+                .ToResult(SmartCardError.InvalidData("Failed to create virtual card")))
+            .Bind(p71Card => VirtualCardReader
+                .Create(readerName)
+                .Bind(reader => reader.WithCard(p71Card)))
             .Match(
                 readerWithCard =>
                 {
                     AddReader(readerWithCard);
                     return readerName;
-                },
-                error => string.Empty); // Return empty string on error - functional approach
+                }, static _ => string.Empty
+            );
     }
 }

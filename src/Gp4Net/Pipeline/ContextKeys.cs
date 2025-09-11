@@ -8,80 +8,80 @@ public static class ContextKeys
     /// <summary>
     /// The current secure channel session.
     /// </summary>
-    public const string SecureChannelSession = "SecureChannelSession";
+    public const string SECURE_CHANNEL_SESSION = "SecureChannelSession";
 
     /// <summary>
     /// The ISD (Issuer Security Domain) AID.
     /// </summary>
-    public const string IssuerSecurityDomainAid = "IsdAid";
+    public const string ISSUER_SECURITY_DOMAIN_AID = "IsdAid";
 
     /// <summary>
     /// The currently selected application AID.
     /// </summary>
-    public const string SelectedApplicationAid = "SelectedAid";
+    public const string SELECTED_APPLICATION_AID = "SelectedAid";
 
     /// <summary>
     /// The card ATR (Answer To Reset).
     /// </summary>
-    public const string CardAtr = "CardAtr";
+    public const string CARD_ATR = "CardAtr";
 
     /// <summary>
     /// The current security level.
     /// </summary>
-    public const string SecurityLevel = "SecurityLevel";
+    public const string SECURITY_LEVEL = "SecurityLevel";
 
     /// <summary>
     /// The SCP (Secure Channel Protocol) version.
     /// </summary>
-    public const string ScpVersion = "ScpVersion";
+    public const string SCP_VERSION = "ScpVersion";
 
     /// <summary>
     /// Card capabilities information.
     /// </summary>
-    public const string CardCapabilities = "CardCapabilities";
+    public const string CARD_CAPABILITIES = "CardCapabilities";
 
     /// <summary>
     /// The current key set being used.
     /// </summary>
-    public const string KeySet = "KeySet";
+    public const string KEY_SET = "KeySet";
 
     /// <summary>
     /// Command execution metadata (timing, retries, etc).
     /// </summary>
-    public const string CommandMetadata = "CommandMetadata";
+    public const string COMMAND_METADATA = "CommandMetadata";
 
     /// <summary>
     /// Key for the card protocol.
     /// </summary>
-    public const string CardProtocol = "CARD_PROTOCOL";
+    public const string CARD_PROTOCOL = "CARD_PROTOCOL";
 
     /// <summary>
     /// The card challenge from INITIALIZE UPDATE.
     /// </summary>
-    public const string CardChallenge = "CardChallenge";
+    public const string CARD_CHALLENGE = "CardChallenge";
 
     /// <summary>
     /// The secure channel protocol being used.
     /// </summary>
-    public const string SecureChannelProtocol = "SecureChannelProtocol";
+    public const string SECURE_CHANNEL_PROTOCOL = "SecureChannelProtocol";
 
     /// <summary>
     /// Card production lifecycle data.
     /// </summary>
-    public const string CardProductionLifeCycleData = "CardProductionLifeCycleData";
+    public const string CARD_PRODUCTION_LIFE_CYCLE_DATA = "CardProductionLifeCycleData";
 
     /// <summary>
     /// General card data.
     /// </summary>
-    public const string CardData = "CardData";
+    public const string CARD_DATA = "CardData";
 
     /// <summary>
     /// Key information template.
     /// </summary>
-    public const string KeyInformationTemplate = "KeyInformationTemplate";
+    public const string KEY_INFORMATION_TEMPLATE = "KeyInformationTemplate";
 
     /// <summary>
     /// The selected AID (alias for SelectedApplicationAid).
     /// </summary>
-    public const string SelectedAid = "SelectedAid";
+    public const string SELECTED_AID = "SelectedAid";
 }

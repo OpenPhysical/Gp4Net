@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Domain.Commands;
@@ -26,10 +27,13 @@ public class CardInfoTableBuilderTests
     public void BuildCardInfoRows_EmptyCardInfo_ReturnsMinimalRows()
     {
         // Empty card information
-        CardInformation? cardInfo = CardInformation.Empty;
+        var cardInfo = CardInformation.Empty;
 
         // Build rows
-        List<CardInfoTableBuilder.TableRow> rows = [.. CardInfoTableBuilder.BuildCardInfoRows(cardInfo, isSecureChannelEstablished: false)];
+        List<CardInfoTableBuilder.TableRow> rows =
+        [
+            .. CardInfoTableBuilder.BuildCardInfoRows(cardInfo, isSecureChannelEstablished: false),
+        ];
 
         // Should have at least connection status
         _ = rows.Should().HaveCount(c => c >= 2);
@@ -38,11 +42,11 @@ public class CardInfoTableBuilderTests
         _ = rows[0].Should().BeOfType<CardInfoTableBuilder.StatusRow>();
         _ = rows[1].Should().BeOfType<CardInfoTableBuilder.StatusRow>();
 
-        CardInfoTableBuilder.StatusRow connectionRow = (CardInfoTableBuilder.StatusRow)rows[0];
+        var connectionRow = (CardInfoTableBuilder.StatusRow)rows[0];
         _ = connectionRow.Name.Should().Be("Connection");
         _ = connectionRow.IsAvailable.Should().BeTrue();
 
-        CardInfoTableBuilder.StatusRow secureChannelRow = (CardInfoTableBuilder.StatusRow)rows[1];
+        var secureChannelRow = (CardInfoTableBuilder.StatusRow)rows[1];
         _ = secureChannelRow.Name.Should().Be("Secure Channel");
         _ = secureChannelRow.IsAvailable.Should().BeFalse();
     }
@@ -55,13 +59,16 @@ public class CardInfoTableBuilderTests
     {
         // Card info with ATR
         byte[] atr = [0x3B, 0xD5, 0x18, 0xFF, 0x81, 0x91, 0xFE];
-        CardInformation cardInfo = CardInformation.Empty with { Atr = Maybe<byte[]>.From(atr) };
+        var cardInfo = CardInformation.Empty with { Atr = Maybe<byte[]>.From(atr) };
 
         // Build rows
-        List<CardInfoTableBuilder.TableRow> rows = [.. CardInfoTableBuilder.BuildCardInfoRows(cardInfo, isSecureChannelEstablished: false)];
+        List<CardInfoTableBuilder.TableRow> rows =
+        [
+            .. CardInfoTableBuilder.BuildCardInfoRows(cardInfo, isSecureChannelEstablished: false),
+        ];
 
         // Should have ATR row
-        CardInfoTableBuilder.PropertyRow? atrRow = rows.OfType<CardInfoTableBuilder.PropertyRow>()
+        var atrRow = rows.OfType<CardInfoTableBuilder.PropertyRow>()
             .FirstOrDefault(r => r.Name == "ATR");
 
         _ = atrRow.Should().NotBeNull();
@@ -81,22 +88,25 @@ public class CardInfoTableBuilderTests
         Result<CplcData, SmartCardError> cplcResult = CplcData.Parse(cplcBytes);
         _ = cplcResult.IsSuccess.Should().BeTrue();
 
-        CardInformation cardInfo = CardInformation.Empty with
+        var cardInfo = CardInformation.Empty with
         {
             Cplc = Maybe<CplcData>.From(cplcResult.Value),
         };
 
         // Build rows
-        List<CardInfoTableBuilder.TableRow> rows = [.. CardInfoTableBuilder.BuildCardInfoRows(cardInfo, isSecureChannelEstablished: false)];
+        List<CardInfoTableBuilder.TableRow> rows =
+        [
+            .. CardInfoTableBuilder.BuildCardInfoRows(cardInfo, isSecureChannelEstablished: false),
+        ];
 
         // Should have manufacturing section
-        CardInfoTableBuilder.SectionHeader? sectionHeader =
+        var sectionHeader =
             rows.OfType<CardInfoTableBuilder.SectionHeader>()
                 .FirstOrDefault(h => h.Title == "Manufacturing");
         _ = sectionHeader.Should().NotBeNull();
 
         // Should have IC Fabricator row
-        CardInfoTableBuilder.PropertyRow? fabricatorRow =
+        var fabricatorRow =
             rows.OfType<CardInfoTableBuilder.PropertyRow>()
                 .FirstOrDefault(r => r.Name == "IC Fabricator");
         _ = fabricatorRow.Should().NotBeNull();
@@ -116,13 +126,16 @@ public class CardInfoTableBuilderTests
         );
         _ = keyInfoResult.IsSuccess.Should().BeTrue();
 
-        CardInformation cardInfo = CardInformation.Empty with
+        var cardInfo = CardInformation.Empty with
         {
             KeyInfo = Maybe<KeyInformationTemplate>.From(keyInfoResult.Value),
         };
 
         // Build rows
-        List<CardInfoTableBuilder.TableRow> rows = [.. CardInfoTableBuilder.BuildCardInfoRows(cardInfo, isSecureChannelEstablished: true)];
+        List<CardInfoTableBuilder.TableRow> rows =
+        [
+            .. CardInfoTableBuilder.BuildCardInfoRows(cardInfo, isSecureChannelEstablished: true),
+        ];
 
         // Should have rows generated
         _ = rows.Should().NotBeEmpty();
@@ -130,21 +143,21 @@ public class CardInfoTableBuilderTests
             .HaveCount(c => c > 2, $"Expected more than 2 rows but found {rows.Count}");
 
         // Should have key section
-        CardInfoTableBuilder.SectionHeader? sectionHeader =
+        var sectionHeader =
             rows.OfType<CardInfoTableBuilder.SectionHeader>()
                 .FirstOrDefault(h => h.Title == "Cryptographic Keys");
         _ = sectionHeader.Should().NotBeNull();
 
         // Should have ENC, MAC, and KEK keys
-        CardInfoTableBuilder.PropertyRow? encKey = rows.OfType<CardInfoTableBuilder.PropertyRow>()
+        var encKey = rows.OfType<CardInfoTableBuilder.PropertyRow>()
             .FirstOrDefault(r => r.Name.Contains("ENC Key"));
         _ = encKey.Should().NotBeNull();
 
-        CardInfoTableBuilder.PropertyRow? macKey = rows.OfType<CardInfoTableBuilder.PropertyRow>()
+        var macKey = rows.OfType<CardInfoTableBuilder.PropertyRow>()
             .FirstOrDefault(r => r.Name.Contains("MAC Key"));
         _ = macKey.Should().NotBeNull();
 
-        CardInfoTableBuilder.PropertyRow? kekKey = rows.OfType<CardInfoTableBuilder.PropertyRow>()
+        var kekKey = rows.OfType<CardInfoTableBuilder.PropertyRow>()
             .FirstOrDefault(r => r.Name.Contains("KEK Key"));
         _ = kekKey.Should().NotBeNull();
     }
@@ -160,22 +173,25 @@ public class CardInfoTableBuilderTests
         Result<SelectResponse, SmartCardError> selectResponse = SelectResponse.Parse(isdBytes);
         _ = selectResponse.IsSuccess.Should().BeTrue();
 
-        CardInformation cardInfo = CardInformation.Empty with
+        var cardInfo = CardInformation.Empty with
         {
             IsdInfo = Maybe<SelectResponse>.From(selectResponse.Value),
         };
 
         // Build rows
-        List<CardInfoTableBuilder.TableRow> rows = [.. CardInfoTableBuilder.BuildCardInfoRows(cardInfo, isSecureChannelEstablished: false)];
+        List<CardInfoTableBuilder.TableRow> rows =
+        [
+            .. CardInfoTableBuilder.BuildCardInfoRows(cardInfo, isSecureChannelEstablished: false),
+        ];
 
         // Should have ISD status
-        CardInfoTableBuilder.StatusRow? isdStatus = rows.OfType<CardInfoTableBuilder.StatusRow>()
+        var isdStatus = rows.OfType<CardInfoTableBuilder.StatusRow>()
             .FirstOrDefault(r => r.Name == "ISD");
         _ = isdStatus.Should().NotBeNull();
         _ = isdStatus!.IsAvailable.Should().BeTrue();
 
         // Should have ISD AID
-        CardInfoTableBuilder.PropertyRow? aidRow = rows.OfType<CardInfoTableBuilder.PropertyRow>()
+        var aidRow = rows.OfType<CardInfoTableBuilder.PropertyRow>()
             .FirstOrDefault(r => r.Name == "ISD AID");
         _ = aidRow.Should().NotBeNull();
         _ = aidRow!.Value.Should().Be("A000000151000000");
@@ -188,32 +204,32 @@ public class CardInfoTableBuilderTests
     public void SemanticRowTypes_AreImmutable()
     {
         // Create different row types
-        CardInfoTableBuilder.PropertyRow propertyRow = new CardInfoTableBuilder.PropertyRow(
+        var propertyRow = new CardInfoTableBuilder.PropertyRow(
             "Test",
             "Value"
         );
-        CardInfoTableBuilder.StatusRow statusRow = new CardInfoTableBuilder.StatusRow(
+        var statusRow = new CardInfoTableBuilder.StatusRow(
             "Status",
             true,
             "Details"
         );
-        CardInfoTableBuilder.SectionHeader sectionHeader = new CardInfoTableBuilder.SectionHeader(
+        var sectionHeader = new CardInfoTableBuilder.SectionHeader(
             "Section"
         );
-        CardInfoTableBuilder.ErrorRow errorRow = new CardInfoTableBuilder.ErrorRow(
+        var errorRow = new CardInfoTableBuilder.ErrorRow(
             "Error",
             "Message"
         );
-        CardInfoTableBuilder.InfoRow infoRow = new CardInfoTableBuilder.InfoRow("Information");
+        var infoRow = new CardInfoTableBuilder.InfoRow("Information");
 
         // All should be records with value equality
-        CardInfoTableBuilder.PropertyRow propertyRow2 = new CardInfoTableBuilder.PropertyRow(
+        var propertyRow2 = new CardInfoTableBuilder.PropertyRow(
             "Test",
             "Value"
         );
         _ = propertyRow.Should().Be(propertyRow2);
 
-        CardInfoTableBuilder.StatusRow statusRow2 = new CardInfoTableBuilder.StatusRow(
+        var statusRow2 = new CardInfoTableBuilder.StatusRow(
             "Status",
             true,
             "Details"
@@ -251,12 +267,24 @@ public class CardInfoTableBuilderTests
             keyInfoBytes
         );
         Result<CardDataInfo, SmartCardError> cardData = CardDataInfo.Parse(cardDataBytes);
-        ScpInformation? scpInfo = ScpCapabilitiesParser.ParseDetailed(capabilitiesBytes);
+        // Parse SCP capabilities directly from the capabilities data
+        var scpInfo = capabilities.IsSuccess
+            ? new ScpInformation(
+                capabilities.Value.ScpOptions
+                    .GroupBy(opt => opt.ScpId)
+                    .Select(group => new ScpProtocolInfo(
+                        group.Key,
+                        group.Select(opt => (ScpImplementation)opt.Implementation).ToList()
+                    ))
+                    .OrderBy(p => p.Version)
+                    .ToList()
+            )
+            : new ScpInformation(new List<ScpProtocolInfo>());
         Result<SecurityDomainStatus, SmartCardError> securityStatus = SecurityDomainStatus.Parse(
             securityBytes
         );
 
-        CardInformation cardInfo = new CardInformation(
+        var cardInfo = new CardInformation(
             Maybe<byte[]>.From(atr),
             Maybe<CplcData>.From(cplcResult.Value),
             capabilities.IsSuccess
@@ -278,15 +306,18 @@ public class CardInfoTableBuilderTests
         );
 
         // Build rows - should not throw any null exceptions
-        List<CardInfoTableBuilder.TableRow> rows = [.. CardInfoTableBuilder.BuildCardInfoRows(cardInfo, isSecureChannelEstablished: true)];
+        List<CardInfoTableBuilder.TableRow> rows =
+        [
+            .. CardInfoTableBuilder.BuildCardInfoRows(cardInfo, isSecureChannelEstablished: true),
+        ];
 
         // Should have many rows
         _ = rows.Should().HaveCount(c => c > 10);
 
         // Should have no null values in any property rows
-        IEnumerable<CardInfoTableBuilder.PropertyRow> propertyRows =
+        var propertyRows =
             rows.OfType<CardInfoTableBuilder.PropertyRow>();
-        foreach (CardInfoTableBuilder.PropertyRow row in propertyRows)
+        foreach (var row in propertyRows)
         {
             _ = row.Name.Should().NotBeNull();
             _ = row.Value.Should().NotBeNull();

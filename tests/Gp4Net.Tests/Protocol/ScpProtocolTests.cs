@@ -3,13 +3,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
-using System;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Domain.Security;
-using Gp4Net.Tests.TestVectors;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Protocol;
@@ -23,7 +20,6 @@ namespace Gp4Net.Tests.Protocol;
 [Category("Protocol")]
 public class ScpProtocolTests
 {
-
     [Test]
     public void Scp02_KeySetCreation_WithValidKeys_Succeeds()
     {
@@ -53,7 +49,7 @@ public class ScpProtocolTests
         byte[] dekKey = new byte[16];
 
         // Act
-        Scp03KeySet keySet = new Scp03KeySet(encKey, macKey, dekKey, 0x01);
+        var keySet = new Scp03KeySet(encKey, macKey, dekKey, 0x01);
 
         // Assert
         _ = keySet.Should().NotBeNull("Valid keys should create successful key set");
@@ -61,5 +57,4 @@ public class ScpProtocolTests
         _ = keySet.MacKey.Should().BeEquivalentTo(macKey);
         _ = keySet.DekKey.Should().BeEquivalentTo(dekKey);
     }
-
 }

@@ -11,7 +11,6 @@ using Gp4Net.Pipeline;
 using Gp4Net.Services;
 using Gp4Net.Tests.Infrastructure;
 using Gp4Net.Tool.Services;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 using WSCT.ISO7816;
@@ -36,15 +35,9 @@ public class ReaderNameResolverTests
         var logger = NullLogger<SmartCardService>.Instance;
         var readers = _virtualCardService.GetReaders();
         var readerName = readers.Count > 0 ? readers.First() : "Virtual P71 Reader 00 00";
-        _cardService = VirtualCardConnectionService.CreateServiceAsync(
-                readerName,
-                logger,
-                CancellationToken.None
-            ).Result
-            .Match(
-                service => service,
-                error => new DisconnectedSmartCardService()
-            );
+        _cardService = VirtualCardConnectionService
+            .CreateServiceAsync(readerName, logger, CancellationToken.None)
+            .Result.Match(service => service, error => new DisconnectedSmartCardService());
     }
 
     [TearDown]
@@ -58,7 +51,7 @@ public class ReaderNameResolverTests
     public async Task ResolveAsync_WithAutoKeyword_ReturnsFirstAvailableReader()
     {
         // Arrange
-        Maybe<string> autoInput = Maybe<string>.From("auto");
+        var autoInput = Maybe<string>.From("auto");
 
         // Act
         Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
@@ -70,7 +63,7 @@ public class ReaderNameResolverTests
         _ = result.Should().BeSuccess();
         result.Match(
             readerName => _ = readerName.Should().NotBeNullOrWhiteSpace(),
-            error => Assert.Fail($"Expected success but got error: {error.Message}")
+            error => Assert.Fail($"Expected success but got error: {error}")
         );
     }
 
@@ -78,7 +71,7 @@ public class ReaderNameResolverTests
     public async Task ResolveAsync_WithEmptyInput_ReturnsFirstAvailableReader()
     {
         // Arrange
-        Maybe<string> emptyInput = Maybe<string>.None;
+        var emptyInput = Maybe<string>.None;
 
         // Act
         Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
@@ -90,7 +83,7 @@ public class ReaderNameResolverTests
         _ = result.Should().BeSuccess();
         result.Match(
             readerName => _ = readerName.Should().NotBeNullOrWhiteSpace(),
-            error => Assert.Fail($"Expected success but got error: {error.Message}")
+            error => Assert.Fail($"Expected success but got error: {error}")
         );
     }
 
@@ -99,13 +92,14 @@ public class ReaderNameResolverTests
     {
         // Arrange
         var availableReadersResult = await _cardService.GetReadersAsync();
-        
+
         await availableReadersResult
-            .ToMaybe()
-            .ToResult("Failed to get readers")
             .Bind(async readers =>
             {
-                var exactReaderName = readers.First();
+                if (readers.Length == 0)
+                    return UnitResult.Failure<SmartCardError>(SmartCardError.CommunicationError("No readers available"));
+
+                var exactReaderName = readers[0];
                 var input = Maybe<string>.From(exactReaderName);
 
                 // Act
@@ -115,15 +109,17 @@ public class ReaderNameResolverTests
                 result.Should().BeSuccess();
                 result.Match(
                     readerName => readerName.Should().Be(exactReaderName),
-                    error => Assert.Fail($"Expected success but got error: {error.Message}")
+                    error => Assert.Fail($"Expected success but got error: {error}")
                 );
-                
-                return Result.Success();
-            })
-            .Match(
-                _ => Task.CompletedTask,
-                error => Task.FromResult(Assert.Inconclusive($"Cannot run test: {error}"))
-            );
+
+                return UnitResult.Success<SmartCardError>();
+            });
+
+        // Handle the result - check if test can proceed
+        if (availableReadersResult.IsFailure)
+        {
+            Assert.Inconclusive($"Cannot run test: {availableReadersResult.Error}");
+        }
     }
 
     [Test]
@@ -131,13 +127,14 @@ public class ReaderNameResolverTests
     {
         // Arrange
         var availableReadersResult = await _cardService.GetReadersAsync();
-        
+
         await availableReadersResult
-            .ToMaybe()
-            .ToResult("Failed to get readers")
             .Bind(async readers =>
             {
-                var exactReaderName = readers.First();
+                if (readers.Length == 0)
+                    return UnitResult.Failure<SmartCardError>(SmartCardError.CommunicationError("No readers available"));
+
+                var exactReaderName = readers[0];
                 var lowerCaseInput = Maybe<string>.From(exactReaderName.ToLowerInvariant());
 
                 // Act
@@ -147,22 +144,24 @@ public class ReaderNameResolverTests
                 result.Should().BeSuccess();
                 result.Match(
                     readerName => readerName.Should().Be(exactReaderName),
-                    error => Assert.Fail($"Expected success but got error: {error.Message}")
+                    error => Assert.Fail($"Expected success but got error: {error}")
                 );
-                
-                return Result.Success();
-            })
-            .Match(
-                _ => Task.CompletedTask,
-                error => Task.FromResult(Assert.Inconclusive($"Cannot run test: {error}"))
-            );
+
+                return UnitResult.Success<SmartCardError>();
+            });
+
+        // Handle the result - check if test can proceed
+        if (availableReadersResult.IsFailure)
+        {
+            Assert.Inconclusive($"Cannot run test: {availableReadersResult.Error}");
+        }
     }
 
     [Test]
     public async Task ResolveAsync_WithPartialMatch_ReturnsMatchingReader()
     {
         // Arrange
-        Maybe<string> partialInput = Maybe<string>.From("Virtual");
+        var partialInput = Maybe<string>.From("Virtual");
 
         // Act
         Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
@@ -174,7 +173,7 @@ public class ReaderNameResolverTests
         _ = result.Should().BeSuccess();
         result.Match(
             readerName => _ = readerName.Should().Contain("Virtual"),
-            error => Assert.Fail($"Expected success but got error: {error.Message}")
+            error => Assert.Fail($"Expected success but got error: {error}")
         );
     }
 
@@ -182,7 +181,7 @@ public class ReaderNameResolverTests
     public async Task ResolveAsync_WithPartialMatchCaseInsensitive_ReturnsMatchingReader()
     {
         // Arrange
-        Maybe<string> partialInput = Maybe<string>.From("virtual");
+        var partialInput = Maybe<string>.From("virtual");
 
         // Act
         Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
@@ -194,7 +193,7 @@ public class ReaderNameResolverTests
         _ = result.Should().BeSuccess();
         result.Match(
             readerName => _ = readerName.Should().Contain("Virtual"),
-            error => Assert.Fail($"Expected success but got error: {error.Message}")
+            error => Assert.Fail($"Expected success but got error: {error}")
         );
     }
 
@@ -202,7 +201,7 @@ public class ReaderNameResolverTests
     public async Task ResolveAsync_WithNonExistentReader_ReturnsError()
     {
         // Arrange
-        Maybe<string> nonExistentInput = Maybe<string>.From("NonExistentReader123");
+        var nonExistentInput = Maybe<string>.From("NonExistentReader123");
 
         // Act
         Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
@@ -211,7 +210,7 @@ public class ReaderNameResolverTests
         );
 
         // Assert
-        _ = result.Should().BeFailure();
+        _ = result.IsFailure.Should().BeTrue();
         result.Match(
             readerName => Assert.Fail($"Expected failure but got success: {readerName}"),
             error =>
@@ -227,7 +226,7 @@ public class ReaderNameResolverTests
     {
         // Arrange
         var failingCardService = new DisconnectedSmartCardService();
-        Maybe<string> input = Maybe<string>.From("auto");
+        var input = Maybe<string>.From("auto");
 
         // Act
         Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
@@ -236,7 +235,7 @@ public class ReaderNameResolverTests
         );
 
         // Assert
-        _ = result.Should().BeFailure();
+        _ = result.IsFailure.Should().BeTrue();
         result.Match(
             readerName => Assert.Fail($"Expected failure but got success: {readerName}"),
             error => _ = error.Message.Should().Contain("Failed to enumerate readers")
@@ -256,7 +255,7 @@ public class ReaderNameResolverTests
     public async Task ResolveAsync_WithDetectKeyword_ReturnsFirstAvailableReader()
     {
         // Arrange
-        Maybe<string> detectInput = Maybe<string>.From("detect");
+        var detectInput = Maybe<string>.From("detect");
 
         // Act
         Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
@@ -268,7 +267,7 @@ public class ReaderNameResolverTests
         _ = result.Should().BeSuccess();
         result.Match(
             readerName => _ = readerName.Should().NotBeNullOrWhiteSpace(),
-            error => Assert.Fail($"Expected success but got error: {error.Message}")
+            error => Assert.Fail($"Expected success but got error: {error}")
         );
     }
 
@@ -276,7 +275,7 @@ public class ReaderNameResolverTests
     public async Task ResolveAsync_WithFirstKeyword_ReturnsFirstAvailableReader()
     {
         // Arrange
-        Maybe<string> firstInput = Maybe<string>.From("first");
+        var firstInput = Maybe<string>.From("first");
 
         // Act
         Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
@@ -288,7 +287,7 @@ public class ReaderNameResolverTests
         _ = result.Should().BeSuccess();
         result.Match(
             readerName => _ = readerName.Should().NotBeNullOrWhiteSpace(),
-            error => Assert.Fail($"Expected success but got error: {error.Message}")
+            error => Assert.Fail($"Expected success but got error: {error}")
         );
     }
 
@@ -299,7 +298,7 @@ public class ReaderNameResolverTests
         // In our test environment, we only have virtual readers, so this tests the fallback logic
 
         // Arrange
-        Maybe<string> autoInput = Maybe<string>.From("auto");
+        var autoInput = Maybe<string>.From("auto");
 
         // Act
         Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
@@ -311,7 +310,7 @@ public class ReaderNameResolverTests
         _ = result.Should().BeSuccess();
         result.Match(
             readerName => _ = readerName.Should().NotBeNullOrWhiteSpace(),
-            error => Assert.Fail($"Expected success but got error: {error.Message}")
+            error => Assert.Fail($"Expected success but got error: {error}")
         );
         // In test environment, will return virtual reader as fallback
     }
@@ -324,56 +323,104 @@ internal sealed class DisconnectedSmartCardService : ISmartCardService
 {
     public IPipelineContext Context { get; } = new SimplePipelineContext();
 
-    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(CommandAPDU command, CancellationToken cancellationToken = default)
+    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
+        CommandAPDU command,
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<CommandResponse, SmartCardError>(
-            SmartCardError.CommunicationError("No card connection in test environment")));
+        return Task.FromResult(
+            Result.Failure<CommandResponse, SmartCardError>(
+                SmartCardError.CommunicationError("No card connection in test environment")
+            )
+        );
     }
 
-    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(CommandAPDU command, CommandOptions options, CancellationToken cancellationToken = default)
+    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
+        CommandAPDU command,
+        bool useSecureChannel,
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<CommandResponse, SmartCardError>(
-            SmartCardError.CommunicationError("No card connection in test environment")));
+        return Task.FromResult(
+            Result.Failure<CommandResponse, SmartCardError>(
+                SmartCardError.CommunicationError("No card connection in test environment")
+            )
+        );
+    }
+
+    public Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
+        CommandAPDU command,
+        CommandOptions options,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return Task.FromResult(
+            Result.Failure<CommandResponse, SmartCardError>(
+                SmartCardError.CommunicationError("No card connection in test environment")
+            )
+        );
     }
 
     public Result<ISmartCardService, SmartCardError> WithContext(IPipelineContext context)
     {
         return Result.Failure<ISmartCardService, SmartCardError>(
-            SmartCardError.CommunicationError("Cannot update context in disconnected service"));
+            SmartCardError.CommunicationError("Cannot update context in disconnected service")
+        );
     }
 
     public Result<ISmartCardService, SmartCardError> WithContextValue<T>(string key, T value)
     {
         return Result.Failure<ISmartCardService, SmartCardError>(
-            SmartCardError.CommunicationError("Cannot update context in disconnected service"));
+            SmartCardError.CommunicationError("Cannot update context in disconnected service")
+        );
     }
 
-    public Task<Result<bool, SmartCardError>> IsConnectedAsync(CancellationToken cancellationToken = default)
+    public Task<Result<bool, SmartCardError>> IsConnectedAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         return Task.FromResult(Result.Success<bool, SmartCardError>(false));
     }
 
-    public Task<Result<byte[], SmartCardError>> GetAtrAsync(CancellationToken cancellationToken = default)
+    public Task<Result<byte[], SmartCardError>> GetAtrAsync(
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<byte[], SmartCardError>(
-            SmartCardError.CommunicationError("No ATR available in test environment")));
+        return Task.FromResult(
+            Result.Failure<byte[], SmartCardError>(
+                SmartCardError.CommunicationError("No ATR available in test environment")
+            )
+        );
     }
 
-    public Task<Result<string[], SmartCardError>> GetReadersAsync(CancellationToken cancellationToken = default)
+    public Task<Result<string[], SmartCardError>> GetReadersAsync(
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<string[], SmartCardError>(
-            SmartCardError.CommunicationError("No readers available in test environment")));
+        return Task.FromResult(
+            Result.Failure<string[], SmartCardError>(
+                SmartCardError.CommunicationError("No readers available in test environment")
+            )
+        );
     }
 
-    public Task<Result<bool, SmartCardError>> IsSecureChannelEstablishedAsync(CancellationToken cancellationToken = default)
+    public Task<Result<bool, SmartCardError>> IsSecureChannelEstablishedAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         return Task.FromResult(Result.Success<bool, SmartCardError>(false));
     }
 
-    public Task<Result<CommandResponse, SmartCardError>> SendCommandAsync(byte[] command, CancellationToken cancellationToken = default)
+    public Task<Result<CommandResponse, SmartCardError>> SendCommandAsync(
+        byte[] command,
+        CancellationToken cancellationToken = default
+    )
     {
-        return Task.FromResult(Result.Failure<CommandResponse, SmartCardError>(
-            SmartCardError.CommunicationError("No card connection in test environment")));
+        return Task.FromResult(
+            Result.Failure<CommandResponse, SmartCardError>(
+                SmartCardError.CommunicationError("No card connection in test environment")
+            )
+        );
     }
 
     public void Dispose() { }
@@ -384,7 +431,10 @@ internal sealed class DisconnectedSmartCardService : ISmartCardService
 /// </summary>
 internal sealed class SimplePipelineContext : IPipelineContext
 {
-    private readonly ImmutableDictionary<string, object> _values = ImmutableDictionary<string, object>.Empty;
+    private readonly ImmutableDictionary<string, object> _values = ImmutableDictionary<
+        string,
+        object
+    >.Empty;
 
     public Maybe<T> Get<T>(string key)
     {

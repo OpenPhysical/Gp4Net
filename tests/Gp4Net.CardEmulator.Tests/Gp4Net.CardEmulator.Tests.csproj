@@ -10,7 +10,8 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.2" />
     <PackageReference Include="coverlet.msbuild" Version="6.0.2" />
-    <PackageReference Include="CSharpFunctionalExtensions.FluentAssertions" Version="1.1.0" />
+    <PackageReference Include="CSharpFunctionalExtensions" Version="3.6.0" />
+    <PackageReference Include="CSharpFunctionalExtensions.AwesomeAssertions" Version="1.1.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="NUnit" Version="4.3.1" />
     <PackageReference Include="NUnit.Analyzers" Version="4.4.0" />

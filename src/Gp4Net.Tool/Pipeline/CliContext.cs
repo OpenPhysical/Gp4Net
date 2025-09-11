@@ -1,15 +1,9 @@
 using System;
-using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Domain;
-using Gp4Net.Domain.CardInfo;
-using Gp4Net.Domain.Commands;
-using Gp4Net.Domain.Keys;
 using Gp4Net.Services;
-using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 
@@ -37,7 +31,8 @@ public class CliContext : ICliExecutionContext
         SecureChannelRequest,
         CancellationToken,
         Task<Result<SecureChannelExecutionContext, SmartCardError>>
-    > EstablishSecureChannelAsync { get; }
+    > EstablishSecureChannelAsync
+    { get; }
 
     public CliContext(
         IDisplayService display,
@@ -61,7 +56,6 @@ public class CliContext : ICliExecutionContext
                 cancellationToken
             );
     }
-
 
     /// <summary>
     /// Ensures a card connection is established using pure functional patterns.

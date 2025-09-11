@@ -1,6 +1,5 @@
 {
   "sdk": {
-    "version": "9.0.302",
     "rollForward": "latestMajor"
   },
   "msbuild-sdks": {

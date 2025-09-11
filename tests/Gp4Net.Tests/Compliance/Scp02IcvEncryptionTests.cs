@@ -1,8 +1,8 @@
 using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using Gp4Net.Constants;
+using Gp4Net.Core;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Compliance;
@@ -122,7 +122,7 @@ public class Scp02IcvEncryptionTests
     public void Scp02_Should_Not_Encrypt_First_ICV_Of_Session()
     {
         // Arrange
-        ScpImplementation implementation = ScpImplementation.Scp02I15; // CLR mode with ICV encryption
+        var implementation = ScpImplementation.Scp02I15; // CLR mode with ICV encryption
         byte[] initialIcv = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]; // Zero ICV
         byte[] cMacKey =
         [
@@ -145,7 +145,7 @@ public class Scp02IcvEncryptionTests
         ];
 
         // Act - Process first ICV (should not be encrypted)
-        Result<byte[], SmartCardError> firstIcvResult = ProcessIcvForMacCalculation(
+        var firstIcvResult = ProcessIcvForMacCalculation(
             initialIcv,
             cMacKey,
             implementation,
@@ -182,7 +182,7 @@ public class Scp02IcvEncryptionTests
     public void Scp02_Should_Encrypt_ICV_Before_Subsequent_CMac_Calculations()
     {
         // Arrange
-        ScpImplementation implementation = ScpImplementation.Scp02I15; // CLR mode with ICV encryption
+        var implementation = ScpImplementation.Scp02I15; // CLR mode with ICV encryption
         byte[] previousCMac = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88];
         byte[] cMacKey =
         [
@@ -205,7 +205,7 @@ public class Scp02IcvEncryptionTests
         ];
 
         // Act - Process subsequent ICV (should be encrypted)
-        Result<byte[], SmartCardError> subsequentIcvResult = ProcessIcvForMacCalculation(
+        var subsequentIcvResult = ProcessIcvForMacCalculation(
             previousCMac,
             cMacKey,
             implementation,
@@ -280,7 +280,7 @@ public class Scp02IcvEncryptionTests
         ];
 
         // Act - Process ICV (should not be encrypted for non-encryption implementations)
-        Result<byte[], SmartCardError> icvResult = ProcessIcvForMacCalculation(
+        var icvResult = ProcessIcvForMacCalculation(
             previousCMac,
             cMacKey,
             implementation,
@@ -340,10 +340,10 @@ public class Scp02IcvEncryptionTests
         byte[] encryptionKey = ExtractIcvEncryptionKey(cMacKey);
 
         // Simulate single DES encryption (simplified for testing)
-        byte[] encryptedIcv = [.. icv.Zip(
-                encryptionKey,
-                (icvByte, keyByte) => (byte)(icvByte ^ keyByte)
-            )];
+        byte[] encryptedIcv =
+        [
+            .. icv.Zip(encryptionKey, (icvByte, keyByte) => (byte)(icvByte ^ keyByte)),
+        ];
 
         return Result.Success<byte[], SmartCardError>(encryptedIcv);
     }

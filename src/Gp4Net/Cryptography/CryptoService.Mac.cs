@@ -1,7 +1,8 @@
+using System;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using Gp4Net.Constants;
+using Gp4Net.Core;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Paddings;
@@ -23,23 +24,47 @@ public static partial class CryptoService
         /// </summary>
         /// <param name="sMacKey">The S-MAC session key (16 or 24 bytes).</param>
         /// <param name="data">The data to authenticate.</param>
+        /// <param name="icv">The Initial Chaining Value (8 bytes) for MAC chaining.</param>
         /// <returns>8-byte MAC or error.</returns>
         public static Result<byte[], SmartCardError> CalculateScp02CommandMac(
             byte[] sMacKey,
-            byte[] data
+            byte[] data,
+            byte[] icv
         )
         {
-            return Validation.ValidateInputs(sMacKey, data)
-                .Bind(() => Validation.ValidateKeyLength(sMacKey, [16, 24], "SCP02 S-MAC key must be 16 or 24 bytes"))
+            return Validation
+                .ValidateInputs(sMacKey, data, icv)
+                .Bind(() =>
+                    Validation.ValidateKeyLength(
+                        sMacKey,
+                        [16, 24],
+                        "SCP02 S-MAC key must be 16 or 24 bytes"
+                    )
+                )
+                .Bind(() =>
+                    Validation.ValidateExactLength(
+                        icv,
+                        8,
+                        "ICV"
+                    )
+                )
                 .Bind(() =>
                     Result.Try(
                         () =>
                         {
-                            ISO9797Alg3Mac mac = new ISO9797Alg3Mac(
+                            // Expand 16-byte key to 24 bytes if needed (K1||K2 -> K1||K2||K1)
+                            byte[] expandedKey = sMacKey.Length == 16 
+                                ? Utils.ExpandTripleDesKey(sMacKey).Value 
+                                : sMacKey;
+                            
+                            // Use ISO9797Alg3Mac with ISO7816d4Padding
+                            // Initialize with ICV using ParametersWithIV
+                            var mac = new ISO9797Alg3Mac(
                                 new DesEngine(),
+                                64,  // 64 bits output
                                 new ISO7816d4Padding()
                             );
-                            mac.Init(new KeyParameter(sMacKey));
+                            mac.Init(new ParametersWithIV(new KeyParameter(expandedKey), icv));
                             mac.BlockUpdate(data, 0, data.Length);
 
                             byte[] result = new byte[8];
@@ -47,7 +72,10 @@ public static partial class CryptoService
 
                             return result;
                         },
-                        ex => SmartCardError.CryptographicError($"SCP02 Command MAC calculation failed: {ex.Message}")
+                        ex =>
+                            SmartCardError.CryptographicError(
+                                $"SCP02 Command MAC calculation failed: {ex.Message}"
+                            )
                     )
                 );
         }
@@ -58,23 +86,47 @@ public static partial class CryptoService
         /// </summary>
         /// <param name="sMacKey">The S-MAC session key (16 or 24 bytes).</param>
         /// <param name="data">The data to authenticate.</param>
+        /// <param name="icv">The Initial Chaining Value (8 bytes) for MAC chaining.</param>
         /// <returns>8-byte MAC or error.</returns>
         public static Result<byte[], SmartCardError> CalculateScp02ResponseMac(
             byte[] sMacKey,
-            byte[] data
+            byte[] data,
+            byte[] icv
         )
         {
-            return Validation.ValidateInputs(sMacKey, data)
-                .Bind(() => Validation.ValidateKeyLength(sMacKey, [16, 24], "SCP02 S-MAC key must be 16 or 24 bytes"))
+            return Validation
+                .ValidateInputs(sMacKey, data, icv)
+                .Bind(() =>
+                    Validation.ValidateKeyLength(
+                        sMacKey,
+                        [16, 24],
+                        "SCP02 S-MAC key must be 16 or 24 bytes"
+                    )
+                )
+                .Bind(() =>
+                    Validation.ValidateExactLength(
+                        icv,
+                        8,
+                        "ICV"
+                    )
+                )
                 .Bind(() =>
                     Result.Try(
                         () =>
                         {
-                            ISO9797Alg3Mac mac = new ISO9797Alg3Mac(
+                            // Expand 16-byte key to 24 bytes if needed (K1||K2 -> K1||K2||K1)
+                            byte[] expandedKey = sMacKey.Length == 16 
+                                ? Utils.ExpandTripleDesKey(sMacKey).Value 
+                                : sMacKey;
+                            
+                            // Use ISO9797Alg3Mac with ISO7816d4Padding
+                            // Initialize with ICV using ParametersWithIV
+                            var mac = new ISO9797Alg3Mac(
                                 new DesEngine(),
+                                64,  // 64 bits output
                                 new ISO7816d4Padding()
                             );
-                            mac.Init(new KeyParameter(sMacKey));
+                            mac.Init(new ParametersWithIV(new KeyParameter(expandedKey), icv));
                             mac.BlockUpdate(data, 0, data.Length);
 
                             byte[] result = new byte[8];
@@ -82,7 +134,10 @@ public static partial class CryptoService
 
                             return result;
                         },
-                        ex => SmartCardError.CryptographicError($"SCP02 Response MAC calculation failed: {ex.Message}")
+                        ex =>
+                            SmartCardError.CryptographicError(
+                                $"SCP02 Response MAC calculation failed: {ex.Message}"
+                            )
                     )
                 );
         }
@@ -99,13 +154,20 @@ public static partial class CryptoService
             byte[] data
         )
         {
-            return Validation.ValidateInputs(sMacKey, data)
-                .Bind(() => Validation.ValidateKeyLength(sMacKey, [16, 24, 32], "SCP03 S-MAC key must be 16, 24, or 32 bytes"))
+            return Validation
+                .ValidateInputs(sMacKey, data)
+                .Bind(() =>
+                    Validation.ValidateKeyLength(
+                        sMacKey,
+                        [16, 24, 32],
+                        "SCP03 S-MAC key must be 16, 24, or 32 bytes"
+                    )
+                )
                 .Bind(() =>
                     Result.Try(
                         () =>
                         {
-                            CMac cmac = new CMac(new AesEngine(), 128);
+                            var cmac = new CMac(new AesEngine(), 128);
                             cmac.Init(new KeyParameter(sMacKey));
                             cmac.BlockUpdate(data, 0, data.Length);
 
@@ -114,7 +176,10 @@ public static partial class CryptoService
 
                             return fullMac.Take(8).ToArray();
                         },
-                        ex => SmartCardError.CryptographicError($"SCP03 Command MAC calculation failed: {ex.Message}")
+                        ex =>
+                            SmartCardError.CryptographicError(
+                                $"SCP03 Command MAC calculation failed: {ex.Message}"
+                            )
                     )
                 );
         }
@@ -131,13 +196,20 @@ public static partial class CryptoService
             byte[] data
         )
         {
-            return Validation.ValidateInputs(sMacKey, data)
-                .Bind(() => Validation.ValidateKeyLength(sMacKey, [16, 24, 32], "SCP03 S-MAC key must be 16, 24, or 32 bytes"))
+            return Validation
+                .ValidateInputs(sMacKey, data)
+                .Bind(() =>
+                    Validation.ValidateKeyLength(
+                        sMacKey,
+                        [16, 24, 32],
+                        "SCP03 S-MAC key must be 16, 24, or 32 bytes"
+                    )
+                )
                 .Bind(() =>
                     Result.Try(
                         () =>
                         {
-                            CMac cmac = new CMac(new AesEngine(), 128);
+                            var cmac = new CMac(new AesEngine(), 128);
                             cmac.Init(new KeyParameter(sMacKey));
                             cmac.BlockUpdate(data, 0, data.Length);
 
@@ -146,7 +218,10 @@ public static partial class CryptoService
 
                             return fullMac.Take(8).ToArray();
                         },
-                        ex => SmartCardError.CryptographicError($"SCP03 Response MAC calculation failed: {ex.Message}")
+                        ex =>
+                            SmartCardError.CryptographicError(
+                                $"SCP03 Response MAC calculation failed: {ex.Message}"
+                            )
                     )
                 );
         }
@@ -158,15 +233,25 @@ public static partial class CryptoService
         /// <param name="sMacKey">The S-MAC session key (16, 24, or 32 bytes).</param>
         /// <param name="data">The data to authenticate.</param>
         /// <returns>16-byte full MAC for chaining or error.</returns>
-        public static Result<byte[], SmartCardError> CalculateScp03FullMac(byte[] sMacKey, byte[] data)
+        public static Result<byte[], SmartCardError> CalculateScp03FullMac(
+            byte[] sMacKey,
+            byte[] data
+        )
         {
-            return Validation.ValidateInputs(sMacKey, data)
-                .Bind(() => Validation.ValidateKeyLength(sMacKey, [16, 24, 32], "SCP03 S-MAC key must be 16, 24, or 32 bytes"))
+            return Validation
+                .ValidateInputs(sMacKey, data)
+                .Bind(() =>
+                    Validation.ValidateKeyLength(
+                        sMacKey,
+                        [16, 24, 32],
+                        "SCP03 S-MAC key must be 16, 24, or 32 bytes"
+                    )
+                )
                 .Bind(() =>
                     Result.Try(
                         () =>
                         {
-                            CMac cmac = new CMac(new AesEngine(), 128);
+                            var cmac = new CMac(new AesEngine(), 128);
                             cmac.Init(new KeyParameter(sMacKey));
                             cmac.BlockUpdate(data, 0, data.Length);
 
@@ -175,7 +260,10 @@ public static partial class CryptoService
 
                             return fullMac;
                         },
-                        ex => SmartCardError.CryptographicError($"SCP03 Full MAC calculation failed: {ex.Message}")
+                        ex =>
+                            SmartCardError.CryptographicError(
+                                $"SCP03 Full MAC calculation failed: {ex.Message}"
+                            )
                     )
                 );
         }
@@ -207,21 +295,20 @@ public static partial class CryptoService
                     cMacSessionKey.Length == 16
                         ? Result.Success<byte[], SmartCardError>(cMacSessionKey)
                         : Result.Failure<byte[], SmartCardError>(
-                            SmartCardError.InvalidArgument("C-MAC session key must be 16 bytes for SCP02")
+                            SmartCardError.InvalidArgument(
+                                "C-MAC session key must be 16 bytes for SCP02"
+                            )
                         )
                 )
                 .Bind(_ =>
-                    implementation.IsScp02()
-                        ? Result.Success<ScpImplementation, SmartCardError>(implementation)
-                        : Result.Failure<ScpImplementation, SmartCardError>(
-                            SmartCardError.InvalidArgument("AID MAC calculation only applies to SCP02 implementations")
-                        )
-                )
-                .Bind(_ =>
+                    // This method is specifically for SCP02 MAC-over-AID calculation
+                    // The caller must ensure this is used only with SCP02
                     implementation.HasMacOverAid()
                         ? Result.Success<ScpImplementation, SmartCardError>(implementation)
                         : Result.Failure<ScpImplementation, SmartCardError>(
-                            SmartCardError.InvalidArgument("Implementation does not support MAC over AID")
+                            SmartCardError.InvalidArgument(
+                                "Implementation does not support MAC over AID (i-param bit 4)"
+                            )
                         )
                 )
                 .Bind(_ => Utils.ApplyGpPadding(selectedAid))
@@ -240,8 +327,8 @@ public static partial class CryptoService
             return Result.Try(
                 () =>
                 {
-                    DesEngine engine = new DesEngine();
-                    ISO9797Alg3Mac desMac = new ISO9797Alg3Mac(engine);
+                    var engine = new DesEngine();
+                    var desMac = new ISO9797Alg3Mac(engine);
                     desMac.Init(new KeyParameter(macKey));
 
                     desMac.BlockUpdate(paddedData, 0, paddedData.Length);

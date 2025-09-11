@@ -35,7 +35,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
                 $"[cyan]Scanning Oracle Java Card SDKs at: {Markup.Escape(settings.SdkPath)}[/]"
             );
 
-            Dictionary<string, PackageInfo> mappings = await ScanForPackageMappingsAsync(
+            var mappings = await ScanForPackageMappingsAsync(
                 settings.SdkPath
             );
 
@@ -68,7 +68,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
 
     private static Task<Dictionary<string, PackageInfo>> ScanForPackageMappingsAsync(string sdkPath)
     {
-        Dictionary<string, PackageInfo> mappings = new Dictionary<string, PackageInfo>();
+        var mappings = new Dictionary<string, PackageInfo>();
 
         AnsiConsole
             .Status()
@@ -89,7 +89,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
 
                         try
                         {
-                            PackageInfo packageInfo = ParseExpFile(expFile);
+                            var packageInfo = ParseExpFile(expFile);
                             if (packageInfo != null)
                             {
                                 string aidHex = Convert.ToHexString(packageInfo.Aid).ToUpper();
@@ -301,25 +301,25 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         string outputPath
     )
     {
-        JsonSerializerOptions options = new JsonSerializerOptions
+        var options = new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         };
 
         // Load existing data if file exists
-        Dictionary<string, object> existingData = new Dictionary<string, object>();
-        Dictionary<string, object> existingPackages = new Dictionary<string, object>();
+        var existingData = new Dictionary<string, object>();
+        var existingPackages = new Dictionary<string, object>();
 
         if (File.Exists(outputPath))
         {
             try
             {
                 string existingJson = await File.ReadAllTextAsync(outputPath);
-                JsonDocument existingDoc = JsonDocument.Parse(existingJson);
+                var existingDoc = JsonDocument.Parse(existingJson);
 
                 // Preserve existing non-package data
-                foreach (JsonProperty element in existingDoc.RootElement.EnumerateObject())
+                foreach (var element in existingDoc.RootElement.EnumerateObject())
                 {
                     if (element.Name != "packages")
                     {
@@ -335,7 +335,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
                     else
                     {
                         // Load existing packages
-                        foreach (JsonProperty pkg in element.Value.EnumerateObject())
+                        foreach (var pkg in element.Value.EnumerateObject())
                         {
                             object deserializedPackage = JsonSerializer.Deserialize<object>(
                                 pkg.Value.GetRawText(),
@@ -359,8 +359,8 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         }
 
         // Merge new packages with existing ones (new ones take precedence)
-        Dictionary<string, object> allPackages = new Dictionary<string, object>(existingPackages);
-        foreach (KeyValuePair<string, PackageInfo> mapping in mappings)
+        var allPackages = new Dictionary<string, object>(existingPackages);
+        foreach (var mapping in mappings)
         {
             allPackages[mapping.Key] = new
             {
@@ -375,7 +375,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
         }
 
         // Create final JSON structure
-        Dictionary<string, object> jsonData = new Dictionary<string, object>(existingData)
+        var jsonData = new Dictionary<string, object>(existingData)
         {
             ["generatedAt"] = DateTime.UtcNow,
             ["packageCount"] = allPackages.Count,
@@ -394,7 +394,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
 
     private static void DisplayPackageMappings(Dictionary<string, PackageInfo> mappings)
     {
-        Table table = new Table()
+        var table = new Table()
             .AddColumn("Package AID")
             .AddColumn("Package Name")
             .AddColumn("Version")
@@ -402,7 +402,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
             .AddColumn("Source File");
 
         foreach (
-            KeyValuePair<string, PackageInfo> mapping in mappings
+            var mapping in mappings
                 .OrderBy(m => m.Value.SdkVersion)
                 .ThenBy(m => m.Value.Name)
         )

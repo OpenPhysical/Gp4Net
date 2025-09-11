@@ -12,9 +12,9 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.OpenPhysical;
-using Gp4Net.Pipeline;
-using Gp4Net.Transport;
+using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
+using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -25,6 +25,7 @@ namespace Gp4Net.Tool.Commands.Card;
 /// Command to write data to ISD using PUT DATA operations.
 /// </summary>
 [PublicAPI]
+[CliCommand("put-data", "Write data objects to the card (IIN, CIN, OPID, etc.)", "card")]
 [CommandHandler(Description = "Write data objects to the card")]
 public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
 {
@@ -33,14 +34,14 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
     /// </summary>
     public async Task<int> ExecuteAsync(ICliExecutionContext context, Settings settings)
     {
-        Result<ICliExecutionContext, SmartCardError> connectionResult = await context
+        var connectionResult = await context
             .WithVerbose(settings.Verbose)
             .RequireCardConnection(settings.GetReaderName());
 
         return await connectionResult.Match(
             async connectedCtx =>
             {
-                Result<ICliExecutionContext, SmartCardError> secureChannelResult =
+                var secureChannelResult =
                     await connectedCtx.RequireSecureChannel(1, settings.GetKeyset());
                 return await secureChannelResult.Match(
                     async secureCtx => await PutDataObjects(secureCtx, settings),
@@ -66,7 +67,7 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         try
         {
             // Parse data to write
-            Dictionary<string, string> dataToWrite = new Dictionary<string, string>();
+            var dataToWrite = new Dictionary<string, string>();
 
             // Handle different input methods
             if (!string.IsNullOrEmpty(settings.ConfigFile))
@@ -171,12 +172,12 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
             // Try to parse as JSON
             try
             {
-                Dictionary<string, JsonElement> jsonData = JsonSerializer.Deserialize<
+                var jsonData = JsonSerializer.Deserialize<
                     Dictionary<string, JsonElement>
                 >(content);
                 if (jsonData != null)
                 {
-                    foreach (KeyValuePair<string, JsonElement> kvp in jsonData)
+                    foreach (var kvp in jsonData)
                     {
                         dataToWrite[kvp.Key.ToLowerInvariant()] = kvp.Value.ToString();
                     }
@@ -301,9 +302,9 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
     {
         string opidString = dataToWrite["opid"];
 
-        if (!OpenPhysicalId.TryParse(opidString, out OpenPhysicalId opid) || opid == null)
+        if (!OpenPhysicalId.TryParse(opidString, out var opid) || opid == null)
         {
-            OpidValidationResult validation = OpidValidator.ValidateOpid(opidString);
+            var validation = OpidValidator.ValidateOpid(opidString);
             context.Display.Error($"Invalid OPID: {validation.ErrorMessage}");
             return false;
         }
@@ -327,9 +328,9 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         ICliExecutionContext context
     )
     {
-        Table table = new Table().AddColumn("Data Object").AddColumn("Value").AddColumn("Encoding");
+        var table = new Table().AddColumn("Data Object").AddColumn("Value").AddColumn("Encoding");
 
-        foreach (KeyValuePair<string, string> kvp in dataToWrite)
+        foreach (var kvp in dataToWrite)
         {
             string encoding = kvp.Key switch
             {
@@ -351,7 +352,7 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         Settings settings
     )
     {
-        ImmutableDictionary<string, string> dataItems = dataToWrite.ToImmutableDictionary();
+        var dataItems = dataToWrite.ToImmutableDictionary();
 
         return await WriteDataObjectsSequentially(
             dataItems,
@@ -378,11 +379,11 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         }
 
         (string key, string value) = dataItems[currentIndex];
-        Result<bool, SmartCardError> writeResult = await WriteDataObject(key, value, context);
+        var writeResult = await WriteDataObject(key, value, context);
 
         DisplayWriteResult(key, writeResult, context);
 
-        ImmutableArray<(string key, Result<bool, SmartCardError> result)> updatedResults =
+        var updatedResults =
             processedResults.Add((key, writeResult));
 
         if (writeResult.IsFailure && !settings.ContinueOnError)
@@ -461,7 +462,7 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         string value
     )
     {
-        Result<(ushort tag, byte[] data), SmartCardError> result = key switch
+        var result = key switch
         {
             "iin" => Result.Success<(ushort tag, byte[] data), SmartCardError>(
                 (
@@ -495,7 +496,7 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         (ushort tag, byte[] data) = tagData;
         byte[] tlvData = CreateTlvData(tag, data);
 
-        Result<StoreDataCommand, SmartCardError> storeResult = StoreDataCommand.CreateWithFormat(
+        var storeResult = StoreDataCommand.CreateWithFormat(
             StoreDataCommand.DataStructureFormat.BerTlv,
             StoreDataCommand.BlockFormat.FirstOrOnly,
             tlvData
@@ -508,7 +509,7 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
                 return await ConstructApduBytes(storeCommand)
                     .Bind(async apduBytes =>
                     {
-                        Result<CommandResponse, SmartCardError> responseResult =
+                        var responseResult =
                             await context.CardService.SendCommandAsync(apduBytes);
                         return responseResult.Match(
                             response =>
@@ -557,7 +558,7 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
 
         // Try parsing as tag:data or tag=data format
         string fullString = $"{key}:{value}";
-        Result<(ushort tag, byte[] data), SmartCardError> result =
+        var result =
             DataObjectParser.ParseRawDataObject(fullString);
         if (result.IsSuccess)
         {

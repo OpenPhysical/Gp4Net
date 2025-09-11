@@ -13,7 +13,6 @@ public static partial class CryptoService
     /// </summary>
     public static class Validation
     {
-
         /// <summary>
         /// Validates that both key and data are not null or empty.
         /// </summary>
@@ -27,8 +26,8 @@ public static partial class CryptoService
             string errorMessage
         )
         {
-            Maybe<byte[]> keyMaybe = Maybe<byte[]>.From(key);
-            Maybe<byte[]> dataMaybe = Maybe<byte[]>.From(data);
+            var keyMaybe = Maybe<byte[]>.From(key);
+            var dataMaybe = Maybe<byte[]>.From(data);
 
             return keyMaybe.HasValue && dataMaybe.HasValue
                 ? UnitResult.Success<SmartCardError>()
@@ -39,21 +38,25 @@ public static partial class CryptoService
         /// Validates that key and data parameters are valid using functional patterns.
         /// Per functional programming requirements, we use Maybe&lt;T&gt; instead of null checks.
         /// </summary>
-        public static UnitResult<SmartCardError> ValidateInputs(
-            byte[] key,
-            byte[] data
-        )
+        public static UnitResult<SmartCardError> ValidateInputs(byte[] key, byte[] data)
         {
             return Maybe<byte[]>
                 .From(key)
                 .Match(
-                    Some: _ => Maybe<byte[]>
-                        .From(data)
-                        .Match(
-                            Some: _ => UnitResult.Success<SmartCardError>(),
-                            None: () => UnitResult.Failure(SmartCardError.InvalidArgument("Data parameter is required"))
-                        ),
-                    None: () => UnitResult.Failure(SmartCardError.InvalidArgument("Key parameter is required"))
+                    Some: _ =>
+                        Maybe<byte[]>
+                            .From(data)
+                            .Match(
+                                Some: _ => UnitResult.Success<SmartCardError>(),
+                                None: () =>
+                                    UnitResult.Failure(
+                                        SmartCardError.InvalidArgument("Data parameter is required")
+                                    )
+                            ),
+                    None: () =>
+                        UnitResult.Failure(
+                            SmartCardError.InvalidArgument("Key parameter is required")
+                        )
                 );
         }
 
@@ -61,29 +64,39 @@ public static partial class CryptoService
         /// Validates that key, IV, and data parameters are valid using functional patterns.
         /// Per functional programming requirements, we use Maybe&lt;T&gt; instead of null checks.
         /// </summary>
-        public static UnitResult<SmartCardError> ValidateInputs(
-            byte[] key,
-            byte[] iv,
-            byte[] data
-        )
+        public static UnitResult<SmartCardError> ValidateInputs(byte[] key, byte[] iv, byte[] data)
         {
             return Maybe<byte[]>
                 .From(key)
                 .Match(
-                    Some: _ => Maybe<byte[]>
-                        .From(iv)
-                        .Match(
-                            Some: _ => Maybe<byte[]>
-                                .From(data)
-                                .Match(
-                                    Some: _ => UnitResult.Success<SmartCardError>(),
-                                    None: () => UnitResult.Failure(SmartCardError.InvalidArgument("Data parameter is required"))
-                                ),
-                            None: () => UnitResult.Failure(SmartCardError.InvalidArgument("IV parameter is required"))
-                        ),
-                    None: () => UnitResult.Failure(SmartCardError.InvalidArgument("Key parameter is required"))
+                    Some: _ =>
+                        Maybe<byte[]>
+                            .From(iv)
+                            .Match(
+                                Some: _ =>
+                                    Maybe<byte[]>
+                                        .From(data)
+                                        .Match(
+                                            Some: _ => UnitResult.Success<SmartCardError>(),
+                                            None: () =>
+                                                UnitResult.Failure(
+                                                    SmartCardError.InvalidArgument(
+                                                        "Data parameter is required"
+                                                    )
+                                                )
+                                        ),
+                                None: () =>
+                                    UnitResult.Failure(
+                                        SmartCardError.InvalidArgument("IV parameter is required")
+                                    )
+                            ),
+                    None: () =>
+                        UnitResult.Failure(
+                            SmartCardError.InvalidArgument("Key parameter is required")
+                        )
                 );
         }
+
         public static UnitResult<SmartCardError> ValidateIvLength(
             byte[] iv,
             int expectedLength,
@@ -94,6 +107,7 @@ public static partial class CryptoService
                 ? UnitResult.Success<SmartCardError>()
                 : UnitResult.Failure(SmartCardError.InvalidArgument(errorMessage));
         }
+
         /// <summary>
         /// Validates that a cryptographic key has one of the expected lengths.
         /// </summary>
@@ -113,6 +127,7 @@ public static partial class CryptoService
                     SmartCardError.InvalidArgument($"{errorMessage}, got {key.Length}")
                 );
         }
+
         /// <summary>
         /// Validates that data is present and has content.
         /// Pure functional validation using explicit array length checks.
@@ -123,6 +138,7 @@ public static partial class CryptoService
                 ? UnitResult.Success<SmartCardError>()
                 : UnitResult.Failure(SmartCardError.InvalidArgument(errorMessage));
         }
+
         /// <summary>
         /// Validates that data length is properly aligned to the specified block size.
         /// </summary>

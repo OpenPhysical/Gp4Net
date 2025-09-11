@@ -33,8 +33,7 @@ public static class ApduBuilder
         Maybe<int> le = default
     )
     {
-        return BuildApduBytes(cla, ins, p1, p2, data, le)
-            .Map(bytes => new CommandAPDU(bytes));
+        return BuildApduBytes(cla, ins, p1, p2, data, le).Map(bytes => new CommandAPDU(bytes));
     }
 
     /// <summary>
@@ -78,20 +77,22 @@ public static class ApduBuilder
     }
 
     private static Result<byte[], SmartCardError> AppendDataBytes(
-        ImmutableArray<byte>.Builder builder, 
-        byte[] commandData, 
-        Maybe<int> le)
+        ImmutableArray<byte>.Builder builder,
+        byte[] commandData,
+        Maybe<int> le
+    )
     {
         // Security check: Validate data length against APDU limits
         int dataLength = commandData.Length;
-        if (dataLength > Apdu.Formats.MaxApduDataLength)
+        if (dataLength > Apdu.Formats.MAX_APDU_DATA_LENGTH)
         {
             return SmartCardError.InvalidArgument(
-                $"Data length ({dataLength}) exceeds maximum APDU data length ({Apdu.Formats.MaxApduDataLength})"
+                $"Data length ({dataLength}) exceeds maximum APDU data length ({Apdu.Formats.MAX_APDU_DATA_LENGTH})"
             );
         }
 
-        bool isExtendedLength = dataLength > 255 || le.Map(len => len > 255).GetValueOrDefault(false);
+        bool isExtendedLength =
+            dataLength > 255 || le.Map(len => len > 255).GetValueOrDefault(false);
 
         // Add Lc (data length)
         if (isExtendedLength && dataLength > 255)
@@ -125,23 +126,24 @@ public static class ApduBuilder
 
         // Add data
         builder.AddRange(commandData);
-        
+
         return Result.Success<byte[], SmartCardError>(builder.ToArray());
     }
 
     private static Result<byte[], SmartCardError> AppendLengthBytes(
         ImmutableArray<byte>.Builder builder,
         byte[] commandData,
-        int expectedLength)
+        int expectedLength
+    )
     {
         bool isExtendedLength = commandData.Length > 255 || expectedLength > 255;
         bool hasData = commandData.Length > 0;
 
         // Security check: Validate expected response length
-        if (expectedLength > Apdu.Formats.MaxExtendedLength)
+        if (expectedLength > Apdu.Formats.MAX_EXTENDED_LENGTH)
         {
             return SmartCardError.InvalidArgument(
-                $"Expected response length ({expectedLength}) exceeds maximum ({Apdu.Formats.MaxExtendedLength})"
+                $"Expected response length ({expectedLength}) exceeds maximum ({Apdu.Formats.MAX_EXTENDED_LENGTH})"
             );
         }
 

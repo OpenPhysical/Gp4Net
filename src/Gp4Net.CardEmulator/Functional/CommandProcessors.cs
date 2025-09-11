@@ -1,17 +1,15 @@
-
 using System;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Constants;
 using JetBrains.Annotations;
-using Microsoft.Extensions.Logging;
+using static Gp4Net.CardEmulator.Domain.CommandRequests;
 using static Gp4Net.Cryptography.CryptoService;
-using static Gp4Net.Constants.Constants.GlobalPlatform;
 
 namespace Gp4Net.CardEmulator.Functional;
 
@@ -47,7 +45,7 @@ public static class CommandProcessors
             .Map(aid => CreateSelectResponse(aid, config))
             .Map(response =>
             {
-                CardState newState = state.WithSelected();
+                var newState = state.WithSelected();
                 logging.LogDebug("Virtual card SELECT success, setting IsSelected to true");
                 return (response, newState);
             });
@@ -77,7 +75,10 @@ public static class CommandProcessors
         );
 
         // Delegate to protocol-specific processors
-        ILogger logger = logging.Logger.Match(l => l, () => Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        var logger = logging.Logger.Match(
+            l => l,
+            () => Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance
+        );
         if (Scp02CommandProcessors.IsScp02Command(command, state, logger))
         {
             logging.LogDebug("Routing to SCP02 processor");
@@ -127,7 +128,10 @@ public static class CommandProcessors
         logging.LogDebug("State SCP Version: 0x{ScpVersion:X2}", state.ScpVersion);
 
         // Delegate to protocol-specific processors
-        ILogger logger = logging.Logger.Match(l => l, () => Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        var logger = logging.Logger.Match(
+            l => l,
+            () => Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance
+        );
         bool isScp02 = Scp02CommandProcessors.IsScp02Command(command, state, logger);
         bool isScp03 = Scp03CommandProcessors.IsScp03Command(command, state);
 
@@ -181,7 +185,12 @@ public static class CommandProcessors
         return ParseGetDataCommand(command)
             .Bind(tag => ValidateGetDataAccess(tag, state))
             .Bind(tag => RetrieveDataObject(tag, state, config))
-            .Map(data => (new ApduResponse(data, Gp4Net.Constants.Constants.StatusWords.Success.Normal), state));
+            .Map(data =>
+                (
+                    new ApduResponse(data, Gp4Net.Constants.Constants.StatusWords.Success),
+                    state
+                )
+            );
     }
 
     /// <summary>
@@ -198,7 +207,12 @@ public static class CommandProcessors
         return ParseGetStatusCommand(command)
             .Bind(request => ValidateGetStatusAccess(request, state))
             .Bind(request => RetrieveStatusData(request, state, config))
-            .Map(data => (new ApduResponse(data, Gp4Net.Constants.Constants.StatusWords.Success.Normal), state));
+            .Map(data =>
+                (
+                    new ApduResponse(data, Gp4Net.Constants.Constants.StatusWords.Success),
+                    state
+                )
+            );
     }
 
     // Helper methods for command parsing and validation
@@ -226,7 +240,9 @@ public static class CommandProcessors
 
         if (!IsValidSelectCla(cla))
         {
-            return Result.Failure<byte[], SmartCardError>(SmartCardError.Unsupported("Class not supported"));
+            return Result.Failure<byte[], SmartCardError>(
+                SmartCardError.Unsupported("Class not supported")
+            );
         }
 
         switch (command.Length)
@@ -306,7 +322,7 @@ public static class CommandProcessors
         fciData[offset++] = 0x01;
         fciData[offset++] = 0x00; // Maximum length of data field in command message
 
-        return new ApduResponse(fciData, Gp4Net.Constants.Constants.StatusWords.Success.Normal);
+    return new ApduResponse(fciData, Gp4Net.Constants.Constants.StatusWords.Success);
     }
 
     private static Result<InitializeUpdateRequest, SmartCardError> ParseInitializeUpdateCommand(
@@ -378,8 +394,7 @@ public static class CommandProcessors
             {
                 // SCP02: Generate 6-byte random challenge and combine with 2-byte sequence counter
                 byte[] sequenceCounter = state.GetSequenceCounter(request.KeyVersion);
-                return CryptoService.Rng
-                    .GenerateBytes(6)
+                return Rng.GenerateBytes(6)
                     .Map(randomChallenge =>
                     {
                         // Combine sequence counter + random challenge for 8-byte total
@@ -406,9 +421,9 @@ public static class CommandProcessors
     )
     {
         // Get the keyset for the requested key version
-        IKeySet? keySet =
-            state.InstalledKeys.TryGetValue(request.KeyVersion, out IKeySet? keys) ? keys
-            : config.StaticKeys.TryGetValue(request.KeyVersion, out IKeySet? staticKeys)
+        var keySet =
+            state.InstalledKeys.TryGetValue(request.KeyVersion, out var keys) ? keys
+            : config.StaticKeys.TryGetValue(request.KeyVersion, out var staticKeys)
                 ? staticKeys
             : config.StaticKeys.Values.FirstOrDefault();
 
@@ -428,7 +443,7 @@ public static class CommandProcessors
         // SCP03 pseudo-random generation using AES encryption
         // Per GP SCP03 Amendment D: Use AES encryption with sequence counter and AID for predictable challenges
         byte[] input = sequenceCounter.Concat(aid).ToArray();
-        return CryptoService.Cipher.EncryptAesEcb(scp03Keys.EncKey, input)
+        return Cipher.EncryptAesEcb(scp03Keys.EncKey, input)
             .Map(encrypted => encrypted.Take(8).ToArray())
             .Map(challenge => (request, challenge));
     }
@@ -440,7 +455,7 @@ public static class CommandProcessors
         IRngContext rngContext
     )
     {
-        (InitializeUpdateRequest request, byte[] cardChallenge) = data;
+        (var request, byte[] cardChallenge) = data;
 
         // Determine the effective key version to use
         byte effectiveKeyVersion = request.KeyVersion;
@@ -457,39 +472,41 @@ public static class CommandProcessors
         }
 
         // Get the appropriate keys
-        Maybe<IKeySet> installedKeySet = state.InstalledKeys.ContainsKey(effectiveKeyVersion)
+        var installedKeySet = state.InstalledKeys.ContainsKey(effectiveKeyVersion)
             ? Maybe<IKeySet>.From(state.InstalledKeys[effectiveKeyVersion])
             : Maybe<IKeySet>.None;
-        Maybe<IKeySet> staticKeySet = config.StaticKeys.ContainsKey(effectiveKeyVersion)
+        var staticKeySet = config.StaticKeys.ContainsKey(effectiveKeyVersion)
             ? Maybe<IKeySet>.From(config.StaticKeys[effectiveKeyVersion])
             : Maybe<IKeySet>.None;
 
-        Maybe<IKeySet> fallbackKeySet = config.StaticKeys.Values.Any()
+        var fallbackKeySet = config.StaticKeys.Values.Any()
             ? Maybe<IKeySet>.From(config.StaticKeys.Values.First())
             : Maybe<IKeySet>.None;
 
-        Result<IKeySet, SmartCardError> keySetResult = installedKeySet
+        var keySetResult = installedKeySet
             .ToResult(SmartCardError.ReferencedDataNotFound())
             .Match(
                 success => Result.Success<IKeySet, SmartCardError>(success),
-                _ => staticKeySet.ToResult(SmartCardError.ReferencedDataNotFound())
-                    .Match(
-                        success => Result.Success<IKeySet, SmartCardError>(success),
-                        _ => fallbackKeySet.ToResult(SmartCardError.ReferencedDataNotFound())
-                    )
+                _ =>
+                    staticKeySet
+                        .ToResult(SmartCardError.ReferencedDataNotFound())
+                        .Match(
+                            success => Result.Success<IKeySet, SmartCardError>(success),
+                            _ => fallbackKeySet.ToResult(SmartCardError.ReferencedDataNotFound())
+                        )
             );
 
         if (keySetResult.IsFailure)
             return Result.Failure<InitializeUpdateData, SmartCardError>(keySetResult.Error);
 
-        IKeySet keys = keySetResult.Value;
+        var keys = keySetResult.Value;
         if (installedKeySet.HasNoValue && staticKeySet.HasNoValue && fallbackKeySet.HasValue)
         {
             effectiveKeyVersion = keys.KeyVersion;
         }
 
         // For SCP02, we need to pass the sequence counter separately
-        Maybe<byte[]> sequenceCounter = Maybe<byte[]>.None;
+        var sequenceCounter = Maybe<byte[]>.None;
         if (state.ScpVersion == 0x02)
         {
             // SCP02: cardChallenge should be 8 bytes (2 byte seq + 6 byte random)
@@ -500,14 +517,14 @@ public static class CommandProcessors
                 byte[] randomPart = cardChallenge.Skip(2).Take(6).ToArray();
 
                 // Calculate card cryptogram using unified crypto service
-                return CryptoService.Cryptogram.CalculateCardCryptogram(
-                    request.HostChallenge,
-                    randomPart,
-                    keys,
-                    state.ScpVersion,
-                    (byte)state.ScpImplementation,
-                    sequenceCounter
-                )
+                return Cryptogram.CalculateCardCryptogram(
+                        request.HostChallenge,
+                        randomPart,
+                        keys,
+                        state.ScpVersion,
+                        (byte)state.ScpImplementation,
+                        sequenceCounter
+                    )
                     .Map(cryptogram => new InitializeUpdateData(
                         effectiveKeyVersion,
                         state.ScpVersion,
@@ -525,14 +542,14 @@ public static class CommandProcessors
 
         // SCP03: cardChallenge is 8 bytes of random data
         // Calculate card cryptogram using unified crypto service
-        return CryptoService.Cryptogram.CalculateCardCryptogram(
-            request.HostChallenge,
-            cardChallenge,
-            keys,
-            state.ScpVersion,
-            (byte)state.ScpImplementation,
-            Maybe<byte[]>.None
-        )
+        return Cryptogram.CalculateCardCryptogram(
+                request.HostChallenge,
+                cardChallenge,
+                keys,
+                state.ScpVersion,
+                (byte)state.ScpImplementation,
+                Maybe<byte[]>.None
+            )
             .Map(cryptogram => new InitializeUpdateData(
                 effectiveKeyVersion,
                 state.ScpVersion,
@@ -583,7 +600,7 @@ public static class CommandProcessors
         offset += 8;
 
         // Sequence counter for SCP03 (3 bytes)
-        CardState newState = state;
+        var newState = state;
         if (data.ScpVersion == 0x03)
         {
             byte[] sequenceCounter = state.GetSequenceCounter(data.KeyVersion);
@@ -604,15 +621,13 @@ public static class CommandProcessors
             .WithChallenges(data.HostChallenge, data.CardChallenge)
             .WithKeys(data.Keys);
 
-        return (new ApduResponse(actualResponse, Gp4Net.Constants.Constants.StatusWords.Success.Normal), newState);
+        return (
+            new ApduResponse(actualResponse, Gp4Net.Constants.Constants.StatusWords.Success),
+            newState
+        );
     }
 
     // Additional helper records for command data
-    private record InitializeUpdateRequest(
-        byte KeyVersion,
-        byte KeyIdentifier,
-        byte[] HostChallenge
-    );
 
     private record InitializeUpdateData(
         byte KeyVersion,
@@ -745,7 +760,7 @@ public static class CommandProcessors
     )
     {
         // For SCP02, extract sequence counter from card challenge
-        (Maybe<byte[]> sequenceCounter, byte[] cardChallengeForCrypto) =
+        (var sequenceCounter, byte[] cardChallengeForCrypto) =
             state.ScpVersion == 0x02
                 ? ExtractScp02Components(cardChallenge)
                 : (Maybe<byte[]>.None, cardChallenge);
@@ -757,8 +772,7 @@ public static class CommandProcessors
                 )
             );
 
-        return CryptoService.Cryptogram
-            .CalculateHostCryptogram(
+        return Cryptogram.CalculateHostCryptogram(
                 hostChallenge,
                 cardChallengeForCrypto,
                 currentKeys,
@@ -789,7 +803,7 @@ public static class CommandProcessors
     {
         if (cardChallenge.Length == 8)
         {
-            Maybe<byte[]> sequenceCounter = Maybe<byte[]>.From(cardChallenge.Take(2).ToArray());
+            var sequenceCounter = Maybe<byte[]>.From(cardChallenge.Take(2).ToArray());
             byte[] cardChallengeForCrypto = cardChallenge.Skip(2).Take(6).ToArray();
             return (sequenceCounter, cardChallengeForCrypto);
         }
@@ -803,19 +817,26 @@ public static class CommandProcessors
         IRngContext rngContext
     )
     {
-        return state.HostChallenge.ToResult(SmartCardError.ConditionsNotSatisfied())
+        return state
+            .HostChallenge.ToResult(SmartCardError.ConditionsNotSatisfied())
             .Bind(hostChallenge =>
-                state.CardChallenge.ToResult(SmartCardError.ConditionsNotSatisfied())
+                state
+                    .CardChallenge.ToResult(SmartCardError.ConditionsNotSatisfied())
                     .Bind(cardChallenge =>
-                        state.CurrentKeys.ToResult(SmartCardError.ConditionsNotSatisfied())
+                        state
+                            .CurrentKeys.ToResult(SmartCardError.ConditionsNotSatisfied())
                             .Bind(currentKeys =>
                                 CreateKeyDerivationContext(
-                                    currentKeys,
-                                    hostChallenge,
-                                    cardChallenge,
-                                    state.ScpVersion,
-                                    state.ScpImplementation)
-                                .Bind(CryptoService.KeyDerivation.DeriveSessionKeys))));
+                                        currentKeys,
+                                        hostChallenge,
+                                        cardChallenge,
+                                        state.ScpVersion,
+                                        state.ScpImplementation
+                                    )
+                                    .Bind(CryptoService.KeyDerivation.DeriveSessionKeys)
+                            )
+                    )
+            );
     }
 
     private static Result<IKeyDerivationContext, SmartCardError> CreateKeyDerivationContext(
@@ -823,21 +844,21 @@ public static class CommandProcessors
         byte[] hostChallenge,
         byte[] cardChallenge,
         byte scpVersion,
-        ScpImplementation implementation)
+        ScpImplementation implementation
+    )
     {
         return scpVersion == 0x02
-            ? KeyDerivationContext.CreateForScp02(
-                keys,
-                hostChallenge,
-                cardChallenge,
-                cardChallenge.Take(2).ToArray(), // sequence counter from card challenge
-                implementation)
+            ? KeyDerivationContext
+                .CreateForScp02(
+                    keys,
+                    hostChallenge,
+                    cardChallenge,
+                    cardChallenge.Take(2).ToArray(), // sequence counter from card challenge
+                    implementation
+                )
                 .Map(context => (IKeyDerivationContext)context)
-            : KeyDerivationContext.CreateForScp03(
-                keys,
-                hostChallenge,
-                cardChallenge,
-                implementation)
+            : KeyDerivationContext
+                .CreateForScp03(keys, hostChallenge, cardChallenge, implementation)
                 .Map(context => (IKeyDerivationContext)context);
     }
 
@@ -847,8 +868,8 @@ public static class CommandProcessors
     )
     {
         // Create functional secure channel state
-        SecurityLevel securityLevel = (SecurityLevel)0x01; // Basic security level
-        Result<SecureChannelState, SmartCardError> secureChannelStateResult =
+        var securityLevel = (SecurityLevel)0x01; // Basic security level
+        var secureChannelStateResult =
             SecureChannelState.Create(
                 sessionKeys: sessionKeys,
                 securityLevel: securityLevel,
@@ -859,16 +880,30 @@ public static class CommandProcessors
 
         if (secureChannelStateResult.IsFailure)
         {
-            return (new ApduResponse([], Gp4Net.Constants.Constants.StatusWords.CheckingErrors.AuthenticationMethodBlocked), state);
+            return (
+                new ApduResponse(
+                    [],
+                    Gp4Net
+                        .Constants
+                        .Constants
+                        .StatusWords
+                        .CheckingErrors
+                        .AuthenticationMethodBlocked
+                ),
+                state
+            );
         }
 
-        SecureChannelState? secureChannelState = secureChannelStateResult.Value;
+        var secureChannelState = secureChannelStateResult.Value;
 
         // Update state with established secure channel
-        CardState newState = state.WithSecureChannel(secureChannelState);
+        var newState = state.WithSecureChannel(secureChannelState);
 
         // EXTERNAL AUTHENTICATE response is typically empty on success
-        return (new ApduResponse([], Gp4Net.Constants.Constants.StatusWords.Success.Normal), newState);
+        return (
+            new ApduResponse([], Gp4Net.Constants.Constants.StatusWords.Success),
+            newState
+        );
     }
 
     // Placeholder implementations for other commands
@@ -897,13 +932,13 @@ public static class CommandProcessors
     )
     {
         // Check if this tag exists in the card configuration
-        if (config.DefaultDataObjects.TryGetValue(tag, out byte[]? data))
+        if (config.DefaultDataObjects.TryGetValue(tag, out byte[] data))
         {
             return Result.Success<byte[], SmartCardError>(data);
         }
 
         // Check if this tag exists in the card state
-        if (state.DataObjects.TryGetValue(tag, out byte[]? stateData))
+        if (state.DataObjects.TryGetValue(tag, out byte[] stateData))
         {
             return Result.Success<byte[], SmartCardError>(stateData);
         }
@@ -924,20 +959,21 @@ public static class CommandProcessors
         byte p2 = command[3]; // Reference control parameter - Table 11-34
 
         // Validate P1 parameter per Table 11-33
-        StatusRequestType requestType = p1 switch
+        var requestType = p1 switch
         {
             0x80 => StatusRequestType.IssuerSecurityDomain,
             0x40 => StatusRequestType.Applications,
             0x20 => StatusRequestType.ExecutableLoadFiles,
             0x10 => StatusRequestType.ExecutableModules,
-            _ => StatusRequestType.Applications // Default for invalid P1
+            _ => StatusRequestType.Applications, // Default for invalid P1
         };
 
         // P2 contains format and criteria information per Table 11-34
         bool includeTaggedFormat = (p2 & 0x02) != 0;
 
         return Result.Success<GetStatusRequest, SmartCardError>(
-            new GetStatusRequest(requestType, p2, includeTaggedFormat));
+            new GetStatusRequest(requestType, p2, includeTaggedFormat)
+        );
     }
 
     /// <summary>
@@ -952,7 +988,8 @@ public static class CommandProcessors
         // Per GP Table 11-2: GET STATUS requires AUTHENTICATED security level
         if (state.SecurityLevel < 0x01) // AUTHENTICATED = 0x01
             return Result.Failure<GetStatusRequest, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied());
+                SmartCardError.SecurityStatusNotSatisfied()
+            );
 
         return Result.Success<GetStatusRequest, SmartCardError>(request);
     }
@@ -973,23 +1010,24 @@ public static class CommandProcessors
             StatusRequestType.Applications => RetrieveApplicationStatus(state, config),
             StatusRequestType.ExecutableLoadFiles => RetrieveLoadFileStatus(state, config),
             StatusRequestType.ExecutableModules => RetrieveModuleStatus(state, config),
-            _ => Result.Failure<byte[], SmartCardError>(SmartCardError.IncorrectP1P2())
+            _ => Result.Failure<byte[], SmartCardError>(SmartCardError.IncorrectP1P2()),
         };
     }
 
     /// <summary>
     /// Retrieves Issuer Security Domain status per GP specification.
     /// </summary>
-    private static Result<byte[], SmartCardError> RetrieveIsdStatus(CardState state, CardConfiguration config)
+    private static Result<byte[], SmartCardError> RetrieveIsdStatus(
+        CardState state,
+        CardConfiguration config
+    )
     {
         // ISD status: AID (5-16 bytes) + Life Cycle State (1 byte) + Privileges (1 byte)
         byte[] isdAid = config.IsdAid;
         byte lifecycleState = 0x07; // SELECTABLE per GP Card Specification Table 11-1
         byte privileges = 0x81; // Security Domain + Authorized Management + Personalized per Table 8-1
 
-        byte[] statusData = isdAid
-            .Concat([lifecycleState, privileges])
-            .ToArray();
+        byte[] statusData = isdAid.Concat([lifecycleState, privileges]).ToArray();
 
         return Result.Success<byte[], SmartCardError>(statusData);
     }
@@ -997,12 +1035,16 @@ public static class CommandProcessors
     /// <summary>
     /// Retrieves installed applications status per GP specification.
     /// </summary>
-    private static Result<byte[], SmartCardError> RetrieveApplicationStatus(CardState state, CardConfiguration config)
+    private static Result<byte[], SmartCardError> RetrieveApplicationStatus(
+        CardState state,
+        CardConfiguration config
+    )
     {
         // Return applications in TLV format per GP Table 11-36
-        byte[] responseData = state.Applications.Values
-            .SelectMany(app => app.Aid
-                .Concat([(byte)app.LifecycleState, (byte)app.Privileges]))
+        byte[] responseData = state
+            .Applications.Values.SelectMany(app =>
+                app.Aid.Concat([app.LifecycleState, (byte)app.Privileges])
+            )
             .ToArray();
 
         return Result.Success<byte[], SmartCardError>(responseData);
@@ -1011,12 +1053,17 @@ public static class CommandProcessors
     /// <summary>
     /// Retrieves load file status per GP specification.
     /// </summary>
-    private static Result<byte[], SmartCardError> RetrieveLoadFileStatus(CardState state, CardConfiguration config)
+    private static Result<byte[], SmartCardError> RetrieveLoadFileStatus(
+        CardState state,
+        CardConfiguration config
+    )
     {
-        byte[] responseData = state.LoadFiles
-            .SelectMany(loadFile => loadFile.Aid
-                .Concat([(byte)loadFile.LifecycleState])
-                .Concat(loadFile.AssociatedSecurityDomainAid))
+        byte[] responseData = state
+            .LoadFiles.SelectMany(loadFile =>
+                loadFile
+                    .Aid.Concat([loadFile.LifecycleState])
+                    .Concat(loadFile.AssociatedSecurityDomainAid)
+            )
             .ToArray();
 
         return Result.Success<byte[], SmartCardError>(responseData);
@@ -1025,12 +1072,17 @@ public static class CommandProcessors
     /// <summary>
     /// Retrieves executable modules status per GP specification.
     /// </summary>
-    private static Result<byte[], SmartCardError> RetrieveModuleStatus(CardState state, CardConfiguration config)
+    private static Result<byte[], SmartCardError> RetrieveModuleStatus(
+        CardState state,
+        CardConfiguration config
+    )
     {
-        byte[] responseData = state.LoadFiles
-            .SelectMany(loadFile => loadFile.ExecutableModules
-                .SelectMany(module => module.Aid
-                    .Concat([(byte)module.LifecycleState])))
+        byte[] responseData = state
+            .LoadFiles.SelectMany(loadFile =>
+                loadFile.ExecutableModules.SelectMany(module =>
+                    module.Aid.Concat([module.LifecycleState])
+                )
+            )
             .ToArray();
 
         return Result.Success<byte[], SmartCardError>(responseData);
@@ -1052,11 +1104,6 @@ public static class CommandProcessors
         return false;
     }
 
-    private record ExternalAuthenticateRequest(
-        byte SecurityLevel,
-        byte[] HostCryptogram,
-        byte[] HostMac
-    );
 
     /// <summary>
     /// Status request types per GlobalPlatform Card Specification v2.3.1 Table 11-33.
@@ -1066,7 +1113,7 @@ public static class CommandProcessors
         IssuerSecurityDomain = 0x80,
         Applications = 0x40,
         ExecutableLoadFiles = 0x20,
-        ExecutableModules = 0x10
+        ExecutableModules = 0x10,
     }
 
     /// <summary>

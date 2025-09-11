@@ -88,7 +88,7 @@ public static class SemanticTableBuilder
     /// <returns>A data row containing the specified information.</returns>
     public static DataRow CreateDataRow(params (string key, string value)[] data)
     {
-        Dictionary<string, string> dictionary = data.ToDictionary(
+        var dictionary = data.ToDictionary(
             pair => pair.key,
             pair => pair.value
         );

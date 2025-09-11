@@ -38,82 +38,23 @@ public static class PhysicalCardConnectionService
         CancellationToken cancellationToken = default
     )
     {
-        return EnumerateReadersAsync()
-            .Bind(readers => SelectReader(readerName, readers))
+        // Use unified ReaderEnumerationService instead of duplicating logic
+        return ReaderEnumerationService
+            .EnumeratePhysicalReadersAsync(cancellationToken)
+            .Bind(readers => Task.FromResult(SelectReader(readerName, readers)))
             .Bind(selectedReader => ConnectToCard(selectedReader, logger));
-    }
-
-    /// <summary>
-    /// Enumerates available physical card readers using WSCT.
-    /// </summary>
-    private static Task<Result<string[], SmartCardError>> EnumerateReadersAsync()
-    {
-        using var context = new WsctCardContextWrapper();
-        var errorCode = context.Establish();
-        
-        if (errorCode != ErrorCode.Success)
-        {
-            return Task.FromResult(
-                Result.Failure<string[], SmartCardError>(
-                    SmartCardError.CommunicationError($"Failed to establish context: {errorCode}")
-                )
-            );
-        }
-        
-        errorCode = context.ListReaders(null);
-        if (errorCode != ErrorCode.Success)
-        {
-            return Task.FromResult(
-                Result.Success<string[], SmartCardError>(Array.Empty<string>())
-            );
-        }
-        
-        return Task.FromResult(
-            Result.Success<string[], SmartCardError>(context.Readers.ToArray())
-        );
     }
 
     /// <summary>
     /// Selects a specific reader from the available readers.
     /// </summary>
-    private static Result<string, SmartCardError> SelectReader(string requestedReader, string[] availableReaders)
+    private static Result<string, SmartCardError> SelectReader(
+        string requestedReader,
+        string[] availableReaders
+    )
     {
-        if (availableReaders.Length == 0)
-        {
-            return Result.Failure<string, SmartCardError>(
-                SmartCardError.CommunicationError("No card readers found on the system")
-            );
-        }
-
-        var readerList = ImmutableList.Create(availableReaders);
-
-        // Try exact match first
-        var exactMatches = readerList
-            .Where(r => string.Equals(r, requestedReader, StringComparison.OrdinalIgnoreCase))
-            .ToImmutableList();
-        
-        if (exactMatches.Any())
-        {
-            return Result.Success<string, SmartCardError>(exactMatches.First());
-        }
-
-        // Try partial match
-        var partialMatches = readerList
-            .Where(r => r.Contains(requestedReader, StringComparison.OrdinalIgnoreCase))
-            .ToImmutableList();
-        
-        if (partialMatches.Any())
-        {
-            return Result.Success<string, SmartCardError>(partialMatches.First());
-        }
-
-        // No match found
-        var availableList = string.Join(", ", readerList.Select(r => $"'{r}'"));
-        return Result.Failure<string, SmartCardError>(
-            SmartCardError.InvalidArgument(
-                $"Reader '{requestedReader}' not found. Available readers: {availableList}"
-            )
-        );
+        // Delegate to unified ReaderEnumerationService for consistent matching logic
+        return ReaderEnumerationService.SelectReaderByPartialMatch(requestedReader, availableReaders);
     }
 
     /// <summary>
@@ -127,20 +68,25 @@ public static class PhysicalCardConnectionService
         // Create WSCT context and channel using existing wrappers
         var context = new WsctCardContextWrapper();
         var establishError = context.Establish();
-        
+
         if (establishError != ErrorCode.Success)
         {
             context.Dispose();
             return Task.FromResult(
                 Result.Failure<ISmartCardService, SmartCardError>(
-                    SmartCardError.CommunicationError($"Failed to establish context: {establishError}")
+                    SmartCardError.CommunicationError(
+                        $"Failed to establish context: {establishError}"
+                    )
                 )
             );
         }
-        
+
         var channel = context.CreateCardChannel(readerName);
-        var connectError = channel.Connect(WSCT.Wrapper.ShareMode.Shared, WSCT.Wrapper.Protocol.Any);
-        
+        var connectError = channel.Connect(
+            WSCT.Wrapper.ShareMode.Shared,
+            WSCT.Wrapper.Protocol.Any
+        );
+
         if (connectError != ErrorCode.Success)
         {
             channel.Dispose();
@@ -161,12 +107,18 @@ public static class PhysicalCardConnectionService
             Channel: cardChannel,
             Transport: transport,
             SecureChannel: Maybe<SecureChannelState>.None,
-            Options: CommandOptions.Default,
+            Options: new CommandOptions(
+                UseSecureChannel: false,
+                CaptureMetrics: true,
+                EnableLogging: true,     // Enable logging infrastructure
+                VerboseLogging: false,   // CLI will override if --verbose
+                DebugLogging: false      // CLI will override if --debug
+            ),
             Logger: logger
         );
 
         // Create command processor pipeline
-        var processor = Gp4Net.Pipeline.CommandProcessors.CreatePipeline(
+        var processor = CommandProcessors.CreatePipeline(
             enableLogging: true,
             enableSecureChannel: true
         );
@@ -183,7 +135,7 @@ public static class PhysicalCardConnectionService
 /// <summary>
 /// Adapter that implements ICardChannel for WSCT CardChannel.
 /// </summary>
-internal class WsctCardChannel : Gp4Net.Transport.ICardChannel
+internal class WsctCardChannel : ICardChannel
 {
     private readonly ICardChannelWrapper _channel;
 
@@ -197,11 +149,11 @@ internal class WsctCardChannel : Gp4Net.Transport.ICardChannel
 
     public Task<byte[]> TransmitAsync(byte[] command, CancellationToken cancellationToken = default)
     {
-        var cmd = new WSCT.ISO7816.CommandAPDU(command);
-        var rsp = new WSCT.ISO7816.ResponseAPDU();
-        
+        var cmd = new CommandAPDU(command);
+        var rsp = new ResponseAPDU();
+
         var errorCode = _channel.Transmit(cmd, rsp);
-        
+
         if (errorCode != ErrorCode.Success)
         {
             return Task.FromResult(Array.Empty<byte>());
@@ -211,11 +163,11 @@ internal class WsctCardChannel : Gp4Net.Transport.ICardChannel
         var udr = Maybe<byte[]>.From(rsp.Udr);
         var dataLength = udr.Map(d => d.Length).GetValueOrDefault(0);
         var responseBytes = new byte[dataLength + 2];
-        
+
         udr.Execute(data => Array.Copy(data, 0, responseBytes, 0, data.Length));
         responseBytes[dataLength] = rsp.Sw1;
         responseBytes[dataLength + 1] = rsp.Sw2;
-        
+
         return Task.FromResult(responseBytes);
     }
 }
@@ -223,7 +175,7 @@ internal class WsctCardChannel : Gp4Net.Transport.ICardChannel
 /// <summary>
 /// Adapter that implements IApduTransport for WSCT.
 /// </summary>
-internal class WsctApduTransport : Gp4Net.Transport.IApduTransport
+internal class WsctApduTransport : IApduTransport
 {
     private readonly ICardChannelWrapper _channel;
 
@@ -237,23 +189,24 @@ internal class WsctApduTransport : Gp4Net.Transport.IApduTransport
         _channel = channel;
     }
 
-    public Task<Result<Gp4Net.Transport.ApduResponse, SmartCardError>> TransmitAsync(
+    public Task<Result<ApduResponse, SmartCardError>> TransmitAsync(
         IApduCommand command,
-        Gp4Net.Transport.ICardChannel channel,
+        ICardChannel channel,
         CancellationToken cancellationToken = default
     )
     {
-        var result = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command))
+        var result = ApduBuilder
+            .BuildApdu(Maybe<IApduCommand>.From(command))
             .Bind(commandBytes =>
             {
-                var cmd = new WSCT.ISO7816.CommandAPDU(commandBytes);
-                var rsp = new WSCT.ISO7816.ResponseAPDU();
-                
+                var cmd = new CommandAPDU(commandBytes);
+                var rsp = new ResponseAPDU();
+
                 var errorCode = _channel.Transmit(cmd, rsp);
-                
+
                 if (errorCode != ErrorCode.Success)
                 {
-                    return Result.Failure<Gp4Net.Transport.ApduResponse, SmartCardError>(
+                    return Result.Failure<ApduResponse, SmartCardError>(
                         SmartCardError.CommunicationError($"Transmission failed: {errorCode}")
                     );
                 }
@@ -262,14 +215,14 @@ internal class WsctApduTransport : Gp4Net.Transport.IApduTransport
                 var udr = Maybe<byte[]>.From(rsp.Udr);
                 var data = udr.GetValueOrDefault(Array.Empty<byte>());
                 var statusWord = (ushort)((rsp.Sw1 << 8) | rsp.Sw2);
-                
-                var response = new Gp4Net.Transport.ApduResponse(
+
+                var response = new ApduResponse(
                     data: data,
                     statusWord: statusWord
                 );
-                return Result.Success<Gp4Net.Transport.ApduResponse, SmartCardError>(response);
+                return Result.Success<ApduResponse, SmartCardError>(response);
             });
-        
+
         return Task.FromResult(result);
     }
 }

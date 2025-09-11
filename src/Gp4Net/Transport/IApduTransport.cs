@@ -3,8 +3,6 @@ using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using JetBrains.Annotations;
-using WSCT.ISO7816;
-using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Transport;
 
@@ -70,6 +68,3 @@ public enum TransportProtocol
     /// </summary>
     Tcl,
 }
-
-
-

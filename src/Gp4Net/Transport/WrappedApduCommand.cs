@@ -37,6 +37,12 @@ public sealed class WrappedApduCommand : IApduCommand
     /// </summary>
     public byte[] WrappedBytes => _bytes;
 
+    /// <inheritdoc />
+    public byte Cla => _command.Cla;
+
+    /// <inheritdoc />
+    public byte Ins => _command.Ins;
+
     /// <summary>
     /// Creates a new WrappedApduCommand from a CommandAPDU.
     /// </summary>

@@ -1,12 +1,9 @@
 using System;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
-using WSCT.Core;
-using WSCT.ISO7816;
 using static Gp4Net.Pipeline.CommandProcessing;
 
 namespace Gp4Net.Pipeline;
@@ -24,7 +21,7 @@ public static class FunctionComposition
     {
         return async (command, environment, cancellationToken) =>
         {
-            Result<CommandResult, SmartCardError> result = await first(
+            var result = await first(
                 command,
                 environment,
                 cancellationToken
@@ -33,7 +30,7 @@ public static class FunctionComposition
             return await result.Bind(async cmdResult =>
             {
                 // Check if the first processor created a wrapped command
-                IApduCommand commandForSecond = command;
+                var commandForSecond = command;
 
                 // Only create WrappedApduCommand if we have wrapped command bytes AND we're not dealing with response data
                 // The key insight: wrapped command bytes are only valid if they represent an APDU command (>=4 bytes)
@@ -47,8 +44,10 @@ public static class FunctionComposition
                 if (hasWrappedCommandBytes)
                 {
                     // First processor wrapped the command, create WrappedApduCommand for subsequent processors
-                    Result<WrappedApduCommand, SmartCardError> wrappedResult =
-                        Result.Success<WrappedApduCommand, SmartCardError>(WrappedApduCommand.Create(cmdResult.Data));
+                    var wrappedResult = Result.Success<
+                        WrappedApduCommand,
+                        SmartCardError
+                    >(WrappedApduCommand.Create(cmdResult.Data));
 
                     if (wrappedResult.IsFailure)
                     {
@@ -60,7 +59,7 @@ public static class FunctionComposition
                 }
 
                 // Use the updated environment from the first processor
-                Result<CommandResult, SmartCardError> secondResult = await second(
+                var secondResult = await second(
                     commandForSecond,
                     cmdResult.UpdatedEnvironment,
                     cancellationToken
@@ -110,14 +109,17 @@ public static class FunctionComposition
                 : Identity(command, environment, cancellationToken);
     }
 
-
     /// <summary>
     /// The identity processor - returns the command result unchanged.
     /// </summary>
     public static readonly CommandProcessor Identity = (command, environment, cancellationToken) =>
         Task.FromResult(
             Result.Success<CommandResult, SmartCardError>(
-                CommandResult.Success([], Constants.Constants.StatusWords.Legacy.Success, environment)
+                CommandResult.Success(
+                    [],
+                    Constants.Constants.StatusWords.Legacy.Success,
+                    environment
+                )
             )
         );
 
@@ -126,22 +128,35 @@ public static class FunctionComposition
     /// </summary>
     private static CommandMetadata MergeMetadata(CommandMetadata first, CommandMetadata second)
     {
-        return Maybe<CommandMetadata>.From(first).Match(
-            Some: firstMeta => Maybe<CommandMetadata>.From(second).Match(
-                Some: secondMeta => new CommandMetadata(
-                    ExecutionTime: secondMeta.ExecutionTime.HasValue ? secondMeta.ExecutionTime : firstMeta.ExecutionTime,
-                    TransmittedBytes: secondMeta.TransmittedBytes.HasValue ? secondMeta.TransmittedBytes : firstMeta.TransmittedBytes,
-                    ReceivedBytes: secondMeta.ReceivedBytes.HasValue ? secondMeta.ReceivedBytes : firstMeta.ReceivedBytes,
-                    SecureChannelWrapped: secondMeta.SecureChannelWrapped || firstMeta.SecureChannelWrapped,
-                    SecureChannelUnwrapped: secondMeta.SecureChannelUnwrapped || firstMeta.SecureChannelUnwrapped,
-                    ResponseLogged: secondMeta.ResponseLogged || firstMeta.ResponseLogged
-                ),
-                None: () => firstMeta
-            ),
-            None: () => second
-        );
+        return Maybe<CommandMetadata>
+            .From(first)
+            .Match(
+                Some: firstMeta =>
+                    Maybe<CommandMetadata>
+                        .From(second)
+                        .Match(
+                            Some: secondMeta => new CommandMetadata(
+                                ExecutionTime: secondMeta.ExecutionTime.HasValue
+                                    ? secondMeta.ExecutionTime
+                                    : firstMeta.ExecutionTime,
+                                TransmittedBytes: secondMeta.TransmittedBytes.HasValue
+                                    ? secondMeta.TransmittedBytes
+                                    : firstMeta.TransmittedBytes,
+                                ReceivedBytes: secondMeta.ReceivedBytes.HasValue
+                                    ? secondMeta.ReceivedBytes
+                                    : firstMeta.ReceivedBytes,
+                                SecureChannelWrapped: secondMeta.SecureChannelWrapped
+                                    || firstMeta.SecureChannelWrapped,
+                                SecureChannelUnwrapped: secondMeta.SecureChannelUnwrapped
+                                    || firstMeta.SecureChannelUnwrapped,
+                                ResponseLogged: secondMeta.ResponseLogged
+                                    || firstMeta.ResponseLogged
+                            ),
+                            None: () => firstMeta
+                        ),
+                None: () => second
+            );
     }
-
 
     /// <summary>
     /// Determines if the command result contains response data rather than command data.
@@ -159,7 +174,8 @@ public static class FunctionComposition
                 metadata =>
                     metadata.ExecutionTime.HasValue
                     || metadata.ReceivedBytes.HasValue
-                    || cmdResult.StatusWord != Constants.Constants.StatusWords.Legacy.Success && cmdResult.Data.Length < 4,
+                    || cmdResult.StatusWord != Constants.Constants.StatusWords.Legacy.Success
+                        && cmdResult.Data.Length < 4,
                 () => false
             );
     }

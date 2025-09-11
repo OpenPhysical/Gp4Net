@@ -1,9 +1,8 @@
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Cryptography;
-using static Gp4Net.Cryptography.CryptoService;
 using JetBrains.Annotations;
+using static Gp4Net.Cryptography.CryptoService;
 
 namespace Gp4Net.Domain;
 
@@ -47,7 +46,7 @@ public record MacChainingState(
         if (initialValue.Length != expectedSize)
         {
             return new InvalidLengthError(
-                $"SCP{protocolVersion:X2} chaining value",
+                $"SCP{(byte)protocolVersion:X2} chaining value",
                 expectedSize,
                 initialValue.Length
             );

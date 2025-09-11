@@ -1,10 +1,8 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Services;
-using Gp4Net.Core;
 using Gp4Net.Tests.Infrastructure;
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
@@ -25,7 +23,7 @@ public class T0ApduTransportTests
     public T0ApduTransportTests()
     {
         _logger = NullLogger<T0ApduTransport>.Instance;
-        VirtualCardService virtualCardService = new VirtualCardService();
+        var virtualCardService = new VirtualCardService();
         virtualCardService.SetupComprehensiveTestEnvironment();
         // Connect to the first virtual reader
         var readers = virtualCardService.GetReaders();
@@ -59,7 +57,7 @@ public class T0ApduTransportTests
     public async Task TransmitAsync_WithGetResponseChaining_Works()
     {
         // Arrange
-        TestCommand command = new TestCommand(); // Uses default GP ISD AID
+        var command = new TestCommand(); // Uses default GP ISD AID
 
         // Act
         var result = await _transport.TransmitAsync(command, _channel);
@@ -72,7 +70,7 @@ public class T0ApduTransportTests
     public async Task TransmitAsync_WithWrongLengthLe_RetriesWithCorrectLength()
     {
         // Arrange
-        TestCommand command = new TestCommand { ExpectedResponseLength = Maybe<int>.From(256) };
+        var command = new TestCommand { ExpectedResponseLength = Maybe<int>.From(256) };
 
         // Act
         var result = await _transport.TransmitAsync(command, _channel);
@@ -85,7 +83,7 @@ public class T0ApduTransportTests
     public async Task TransmitAsync_WithNoLe_DoesNotAddLeByte()
     {
         // Arrange
-        TestCommand command = new TestCommand { ExpectedResponseLength = Maybe<int>.None };
+        var command = new TestCommand { ExpectedResponseLength = Maybe<int>.None };
 
         // Act
         var result = await _transport.TransmitAsync(command, _channel);
@@ -125,11 +123,18 @@ public class T0ApduTransportTests
         /// <returns>The CommandAPDU representation of this command.</returns>
         public CommandAPDU ToApdu()
         {
-            return ExpectedResponseLength
-                .Match(
-                    expectedLength => new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data, (uint)expectedLength),
-                    () => new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data)
-                );
+            return ExpectedResponseLength.Match(
+                expectedLength => new CommandAPDU(
+                    Cla,
+                    Ins,
+                    P1,
+                    P2,
+                    (uint)Data.Length,
+                    Data,
+                    (uint)expectedLength
+                ),
+                () => new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data)
+            );
         }
 
         /// <summary>
@@ -167,7 +172,7 @@ internal class TestCardChannel : ICardChannel
         await Task.CompletedTask; // Satisfy async requirement
 
         // Use virtual card service API directly
-        VirtualCommandResponse response = _virtualCardService.SendCommand(command);
+        var response = _virtualCardService.SendCommand(command);
 
         // Combine response data and status word into full response
         byte[] fullResponse = new byte[response.Data.Length + 2];

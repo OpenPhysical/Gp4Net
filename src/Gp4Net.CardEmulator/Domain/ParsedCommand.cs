@@ -1,6 +1,5 @@
 using System;
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 
 namespace Gp4Net.CardEmulator.Domain;
 
@@ -18,16 +17,16 @@ public record ParsedCommand(byte Cla, byte Ins, byte P1, byte P2, byte[] FullCom
     /// Gets the data portion of the APDU command.
     /// Handles both short and extended APDUs according to ISO 7816-4.
     /// </summary>
-    public byte[] Data 
+    public byte[] Data
     {
         get
         {
             if (FullCommand.Length <= 4)
                 return Array.Empty<byte>();
-            
+
             if (FullCommand.Length == 5)
                 return Array.Empty<byte>(); // Case 2: CLA INS P1 P2 Le
-                
+
             // Check for extended APDU (first byte of Lc is 0x00)
             if (FullCommand[4] == 0x00 && FullCommand.Length >= 7)
             {
@@ -43,11 +42,11 @@ public record ParsedCommand(byte Cla, byte Ins, byte P1, byte P2, byte[] FullCom
                 if (FullCommand.Length >= 5 + lc)
                     return FullCommand[5..(5 + lc)];
             }
-            
+
             return Array.Empty<byte>();
         }
     }
-    
+
     /// <summary>
     /// Parses raw command bytes into a structured ParsedCommand.
     /// </summary>
@@ -59,13 +58,15 @@ public record ParsedCommand(byte Cla, byte Ins, byte P1, byte P2, byte[] FullCom
         {
             return Result.Failure<ParsedCommand>("Command must be at least 4 bytes");
         }
-        
-        return Result.Success(new ParsedCommand(
-            Cla: command[0],
-            Ins: command[1],
-            P1: command[2],
-            P2: command[3],
-            FullCommand: command
-        ));
+
+        return Result.Success(
+            new ParsedCommand(
+                Cla: command[0],
+                Ins: command[1],
+                P1: command[2],
+                P2: command[3],
+                FullCommand: command
+            )
+        );
     }
 }

@@ -20,7 +20,7 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Encode_CompleteSecurityDomainInfo_ProducesExpectedFormat()
     {
-        SecurityDomainInfo sdInfo = new SecurityDomainInfo
+        var sdInfo = new SecurityDomainInfo
         {
             Oid = Convert.FromHexString("A000000151000000"), // GP OID
             SecurityDomainAid = Convert.FromHexString("4F08A000000151000000"), // AID with length
@@ -52,7 +52,7 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Encode_MinimalSecurityDomainInfo_ProducesValidFormat()
     {
-        SecurityDomainInfo sdInfo = new SecurityDomainInfo
+        var sdInfo = new SecurityDomainInfo
         {
             Oid = Convert.FromHexString("A000000151"),
         };
@@ -104,7 +104,7 @@ public class SecurityDomainInfoCodecTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        SecurityDomainInfo? sdInfo = result.Value;
+        var sdInfo = result.Value;
 
         _ = sdInfo.Oid.Should().HaveValue(Convert.FromHexString("A000000151000000"));
         _ = sdInfo.ImageData.Should().HaveValue(new byte[] { 0x01, 0x02, 0x03 });
@@ -142,11 +142,15 @@ public class SecurityDomainInfoCodecTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            SecurityDomainInfo sdInfo = result.Value;
+            var sdInfo = result.Value;
 
-            _ = sdInfo.Oid.Should().HaveValue().And.TheValue.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
+            _ = sdInfo
+                .Oid.Should()
+                .HaveValue()
+                .And.TheValue.Should()
+                .BeEquivalentTo(Convert.FromHexString("A000000151"));
             _ = sdInfo.SecurityDomainAid.Should().HaveValue();
-            
+
             sdInfo.SecurityDomainAid.Map(aidData =>
             {
                 _ = aidData[0].Should().Be(0x4F, "should preserve tag");
@@ -196,19 +200,23 @@ public class SecurityDomainInfoCodecTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        SecurityDomainInfo? sdInfo = result.Value;
-        _ = sdInfo.Oid.Should().HaveValue().And.TheValue.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
+        var sdInfo = result.Value;
+        _ = sdInfo
+            .Oid.Should()
+            .HaveValue()
+            .And.TheValue.Should()
+            .BeEquivalentTo(Convert.FromHexString("A000000151"));
     }
 
     [Test]
     public void RoundTrip_PreservesAllData()
     {
-        SecurityDomainInfo original = new SecurityDomainInfo
+        var original = new SecurityDomainInfo
         {
-            Oid = Convert.FromHexString("A000000151000000"),
-            SecurityDomainAid = Convert.FromHexString("4F08A000000151000000"),
-            ImageData = Convert.FromHexString("010203040506070809"),
-            LifeCycleData = Convert.FromHexString("0F"),
+            Oid = Maybe<byte[]>.From(Convert.FromHexString("A000000151000000")),
+            SecurityDomainAid = Maybe<byte[]>.From(Convert.FromHexString("4F08A000000151000000")),
+            ImageData = Maybe<byte[]>.From(Convert.FromHexString("010203040506070809")),
+            LifeCycleData = Maybe<byte[]>.From(Convert.FromHexString("0F")),
         };
 
         Result<byte[], SmartCardError> encodedResult = SecurityDomainInfoCodec.Encode(original);
@@ -219,18 +227,26 @@ public class SecurityDomainInfoCodecTests
         );
 
         _ = decoded.IsSuccess.Should().BeTrue();
-        SecurityDomainInfo? result = decoded.Value;
+        var result = decoded.Value;
 
-        _ = result.Oid.Should().Be(original.Oid);
-        _ = result.SecurityDomainAid.Should().Be(original.SecurityDomainAid);
-        _ = result.ImageData.Should().Be(original.ImageData);
-        _ = result.LifeCycleData.Should().Be(original.LifeCycleData);
+        original.Oid.Match(
+            oid => _ = result.Oid.Should().HaveValue(oid),
+            () => _ = result.Oid.Should().HaveNoValue());
+        original.SecurityDomainAid.Match(
+            aid => _ = result.SecurityDomainAid.Should().HaveValue(aid),
+            () => _ = result.SecurityDomainAid.Should().HaveNoValue());
+        original.ImageData.Match(
+            data => _ = result.ImageData.Should().HaveValue(data),
+            () => _ = result.ImageData.Should().HaveNoValue());
+        original.LifeCycleData.Match(
+            data => _ = result.LifeCycleData.Should().HaveValue(data),
+            () => _ = result.LifeCycleData.Should().HaveNoValue());
     }
 
     [Test]
     public void Encode_EmptySecurityDomainInfo_ProducesMinimalStructure()
     {
-        SecurityDomainInfo sdInfo = new SecurityDomainInfo();
+        var sdInfo = new SecurityDomainInfo();
 
         Result<byte[], SmartCardError> encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
 
@@ -254,7 +270,7 @@ public class SecurityDomainInfoCodecTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        SecurityDomainInfo? sdInfo = result.Value;
+        var sdInfo = result.Value;
         _ = sdInfo.Oid.Should().HaveNoValue();
         _ = sdInfo.SecurityDomainAid.Should().HaveNoValue();
         _ = sdInfo.ImageData.Should().HaveNoValue();
@@ -283,9 +299,13 @@ public class SecurityDomainInfoCodecTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        SecurityDomainInfo? sdInfo = result.Value;
+        var sdInfo = result.Value;
 
-        _ = sdInfo.Oid.Should().HaveValue().And.TheValue.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
+        _ = sdInfo
+            .Oid.Should()
+            .HaveValue()
+            .And.TheValue.Should()
+            .BeEquivalentTo(Convert.FromHexString("A000000151"));
         _ = sdInfo.SecurityDomainAid.Should().HaveNoValue();
         _ = sdInfo.ImageData.Should().HaveNoValue();
         _ = sdInfo.LifeCycleData.Should().HaveNoValue();
@@ -308,14 +328,14 @@ public class SecurityDomainInfoCodecTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        SecurityDomainInfo? sdInfo = result.Value;
+        var sdInfo = result.Value;
         _ = sdInfo.Oid.Should().HaveNoValue(); // Should not set zero-length OID
     }
 
     [Test]
     public void Encode_OnlyImageData_ProducesValidStructure()
     {
-        SecurityDomainInfo sdInfo = new SecurityDomainInfo
+        var sdInfo = new SecurityDomainInfo
         {
             ImageData = Convert.FromHexString("ABCDEF"),
         };
@@ -359,9 +379,13 @@ public class SecurityDomainInfoCodecTests
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        SecurityDomainInfo? sdInfo = result.Value;
-        _ = sdInfo.Oid.Should().HaveValue().And.TheValue.Should().BeEquivalentTo(Convert.FromHexString("A000000151"));
+        var sdInfo = result.Value;
+        _ = sdInfo
+            .Oid.Should()
+            .HaveValue()
+            .And.TheValue.Should()
+            .BeEquivalentTo(Convert.FromHexString("A000000151"));
         // Unknown tag should be handled as potential AID data
-        _ = sdInfo.SecurityDomainAid.Should().NotHaveNoValue();
+        _ = sdInfo.SecurityDomainAid.Should().HaveValue();
     }
 }

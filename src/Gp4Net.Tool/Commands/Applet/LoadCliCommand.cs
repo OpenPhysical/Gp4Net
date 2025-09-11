@@ -1,11 +1,8 @@
 using System.ComponentModel;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Domain;
-using Gp4Net.Services;
 using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
@@ -74,8 +71,10 @@ public class LoadCommand : IPipelineCommand<LoadCommand.Settings>
 
         context.Display.Info("Loading CAP file package...");
         context.Display.Error("CAP file loading not yet implemented with static services.");
-        Result<bool, SmartCardError> loadResult = Result.Failure<bool, SmartCardError>(
-            SmartCardError.Unsupported("CAP file loading functionality needs to be implemented using static GlobalPlatformService methods")
+        var loadResult = Result.Failure<bool, SmartCardError>(
+            SmartCardError.Unsupported(
+                "CAP file loading functionality needs to be implemented using static GlobalPlatformService methods"
+            )
         );
 
         return loadResult.Match(

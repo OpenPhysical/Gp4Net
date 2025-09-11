@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using CardResponse = Gp4Net.Transport.ApduResponse;
 
 namespace Gp4Net.Tests.TestBuilders;
 

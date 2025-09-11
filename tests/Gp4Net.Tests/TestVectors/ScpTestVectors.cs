@@ -168,7 +168,7 @@ public record Scp03TestVector : IScpTestVector
     /// <summary>
     /// Expected derived session R-MAC key.
     /// </summary>
-    public required byte[] ExpectedSRMacKey { get; init; }
+    public required byte[] ExpectedSrMacKey { get; init; }
 
     public required byte[] ExpectedCardCryptogram { get; init; }
     public required byte[] ExpectedHostCryptogram { get; init; }
@@ -263,13 +263,13 @@ public static class ScpTestVectors
     {
         string jsonPath = GetJsonFilePath("scp02_test_vectors.json");
         string jsonContent = File.ReadAllText(jsonPath);
-        JsonDocument document = JsonDocument.Parse(jsonContent);
+        var document = JsonDocument.Parse(jsonContent);
 
-        JsonElement root = document.RootElement;
+        var root = document.RootElement;
         string source = root.GetProperty("source").GetString()!;
         List<Scp02TestVector> vectors = [];
 
-        foreach (JsonElement vectorElement in root.GetProperty("vectors").EnumerateArray())
+        foreach (var vectorElement in root.GetProperty("vectors").EnumerateArray())
         {
             vectors.Add(
                 new Scp02TestVector
@@ -359,13 +359,13 @@ public static class ScpTestVectors
     {
         string jsonPath = GetJsonFilePath("scp03_test_vectors.json");
         string jsonContent = File.ReadAllText(jsonPath);
-        JsonDocument document = JsonDocument.Parse(jsonContent);
+        var document = JsonDocument.Parse(jsonContent);
 
-        JsonElement root = document.RootElement;
+        var root = document.RootElement;
         string source = root.GetProperty("source").GetString()!;
         List<Scp03TestVector> vectors = [];
 
-        foreach (JsonElement vectorElement in root.GetProperty("vectors").EnumerateArray())
+        foreach (var vectorElement in root.GetProperty("vectors").EnumerateArray())
         {
             vectors.Add(
                 new Scp03TestVector
@@ -403,7 +403,7 @@ public static class ScpTestVectors
                             .GetProperty("s_mac")
                             .GetString()!
                     ),
-                    ExpectedSRMacKey = Convert.FromHexString(
+                    ExpectedSrMacKey = Convert.FromHexString(
                         vectorElement
                             .GetProperty("expected_session_keys")
                             .GetProperty("s_rmac")
@@ -433,13 +433,13 @@ public static class ScpTestVectors
     {
         string jsonPath = GetJsonFilePath("scp02_test_vectors.json");
         string jsonContent = File.ReadAllText(jsonPath);
-        JsonDocument document = JsonDocument.Parse(jsonContent);
+        var document = JsonDocument.Parse(jsonContent);
 
-        JsonElement root = document.RootElement;
+        var root = document.RootElement;
         string source = root.GetProperty("source").GetString()!;
         List<Scp02CMacTestVector> vectors = [];
 
-        foreach (JsonElement vectorElement in root.GetProperty("cmac_vectors").EnumerateArray())
+        foreach (var vectorElement in root.GetProperty("cmac_vectors").EnumerateArray())
         {
             vectors.Add(
                 new Scp02CMacTestVector
@@ -467,11 +467,11 @@ public static class ScpTestVectors
     private static string GetJsonFilePath(string fileName)
     {
         // Find the JSON file relative to the test assembly
-        Assembly assembly = Assembly.GetExecutingAssembly();
+        var assembly = Assembly.GetExecutingAssembly();
         string assemblyDir = Path.GetDirectoryName(assembly.Location)!;
 
         // Navigate up to find the project root (look for scripts directory)
-        DirectoryInfo? currentDir = new DirectoryInfo(assemblyDir);
+        var currentDir = new DirectoryInfo(assemblyDir);
         while (
             currentDir != null && !Directory.Exists(Path.Combine(currentDir.FullName, "scripts"))
         )

@@ -146,7 +146,7 @@ public sealed class KeyLifecycleManager
         KeyManagementConfiguration config = null
     )
     {
-        KeyManagementConfiguration configuration = config ?? KeyManagementConfiguration.Default;
+        var configuration = config ?? KeyManagementConfiguration.Default;
 
         return SecureKeyStore
             .Create()
@@ -167,7 +167,7 @@ public sealed class KeyLifecycleManager
     )
     {
         // Validate key
-        Result<bool, string> validationResult = _config.ValidateKey(keyData, purpose.ToString());
+        var validationResult = _config.ValidateKey(keyData, purpose.ToString());
         if (validationResult.IsFailure)
         {
             return Result.Failure<KeyLifecycleManager, SmartCardError>(
@@ -180,7 +180,7 @@ public sealed class KeyLifecycleManager
             .AddKey(keyId, keyData)
             .Map(newStore =>
             {
-                KeyMetadata metadata = new KeyMetadata(
+                var metadata = new KeyMetadata(
                     keyId,
                     purpose,
                     DateTime.UtcNow,
@@ -188,7 +188,7 @@ public sealed class KeyLifecycleManager
                     DateTime.UtcNow
                 );
 
-                ImmutableDictionary<string, KeyMetadata> newMetadata = _metadata.Add(
+                var newMetadata = _metadata.Add(
                     keyId,
                     metadata
                 );
@@ -204,7 +204,7 @@ public sealed class KeyLifecycleManager
         Func<byte[], Result<T, SmartCardError>> operation
     )
     {
-        if (!_metadata.TryGetValue(keyId, out KeyMetadata metadata))
+        if (!_metadata.TryGetValue(keyId, out var metadata))
         {
             return Result.Failure<(T, KeyLifecycleManager), SmartCardError>(
                 SmartCardError.InvalidArgument($"Key '{keyId}' not found")
@@ -233,17 +233,17 @@ public sealed class KeyLifecycleManager
             .Map(result =>
             {
                 // Update metadata
-                KeyMetadata updatedMetadata = metadata with
+                var updatedMetadata = metadata with
                 {
                     UsageCount = metadata.UsageCount + 1,
                     LastUsedUtc = DateTime.UtcNow,
                 };
 
-                ImmutableDictionary<string, KeyMetadata> newMetadata = _metadata.SetItem(
+                var newMetadata = _metadata.SetItem(
                     keyId,
                     updatedMetadata
                 );
-                KeyLifecycleManager newManager = new KeyLifecycleManager(
+                var newManager = new KeyLifecycleManager(
                     _config,
                     _keyStore,
                     newMetadata
@@ -258,7 +258,7 @@ public sealed class KeyLifecycleManager
     /// </summary>
     public bool IsKeyValid(string keyId)
     {
-        if (!_metadata.TryGetValue(keyId, out KeyMetadata metadata))
+        if (!_metadata.TryGetValue(keyId, out var metadata))
         {
             return false;
         }
@@ -273,7 +273,7 @@ public sealed class KeyLifecycleManager
             return false;
         }
 
-        TimeSpan keyAge = DateTime.UtcNow - metadata.CreatedUtc;
+        var keyAge = DateTime.UtcNow - metadata.CreatedUtc;
         if (keyAge.TotalMinutes > _config.KeyLifetimeMinutes)
         {
             return false;
@@ -287,7 +287,7 @@ public sealed class KeyLifecycleManager
     /// </summary>
     public Maybe<KeyAuditInfo> GetKeyAuditInfo(string keyId)
     {
-        return _metadata.TryGetValue(keyId, out KeyMetadata metadata)
+        return _metadata.TryGetValue(keyId, out var metadata)
             ? Maybe<KeyAuditInfo>.From(
                 new KeyAuditInfo(
                     metadata.KeyId,
@@ -303,7 +303,7 @@ public sealed class KeyLifecycleManager
 
     private bool IsRotationRequired(KeyMetadata metadata)
     {
-        TimeSpan age = DateTime.UtcNow - metadata.CreatedUtc;
+        var age = DateTime.UtcNow - metadata.CreatedUtc;
         return age.TotalDays >= _config.KeyRotationIntervalDays;
     }
 

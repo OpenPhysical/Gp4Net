@@ -7,9 +7,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Functional;
+using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Constants;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Profiles;
@@ -63,7 +63,7 @@ public static class CardProfileLoader
             );
         }
 
-        JsonSerializerOptions options = new JsonSerializerOptions
+        var options = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
             ReadCommentHandling = JsonCommentHandling.Skip,
@@ -101,10 +101,10 @@ public static class CardProfileLoader
                                     .Map(dataObjects =>
                                     {
                                         // Determine SCP version and implementation
-                                        (byte scpVersion, ScpImplementation scpImplementation) =
+                                        (byte scpVersion, var scpImplementation) =
                                             DetermineScpDefaults(profile);
 
-                                        CardConfiguration config = new CardConfiguration(
+                                        var config = new CardConfiguration(
                                             Atr: atrBytes,
                                             IsdAid: isdAidBytes,
                                             StaticKeys: staticKeys,
@@ -163,15 +163,15 @@ public static class CardProfileLoader
     {
         // Keys is now non-nullable, no need to check
 
-        Result<byte[], SmartCardError> encResult = ParseHexString(profile.Keys.Enc, "ENC key");
+        var encResult = ParseHexString(profile.Keys.Enc, "ENC key");
         if (encResult.IsFailure)
             return Result.Failure<IKeySet, SmartCardError>(encResult.Error);
 
-        Result<byte[], SmartCardError> macResult = ParseHexString(profile.Keys.Mac, "MAC key");
+        var macResult = ParseHexString(profile.Keys.Mac, "MAC key");
         if (macResult.IsFailure)
             return Result.Failure<IKeySet, SmartCardError>(macResult.Error);
 
-        Result<byte[], SmartCardError> dekResult = ParseHexString(profile.Keys.Dek, "DEK key");
+        var dekResult = ParseHexString(profile.Keys.Dek, "DEK key");
         if (dekResult.IsFailure)
             return Result.Failure<IKeySet, SmartCardError>(dekResult.Error);
 
@@ -263,7 +263,7 @@ public static class CardProfileLoader
         if (hasScp02)
         {
             // Check if card explicitly supports SCP02 i=15 (prefer it over i=55)
-            List<string> scp02Implementations = profile
+            var scp02Implementations = profile
                 .CardData.Capabilities.ScpSupport.Where(s => s.Protocol == "0x02")
                 .SelectMany(s => s.Implementations)
                 .ToList();
@@ -280,22 +280,21 @@ public static class CardProfileLoader
         return (0x02, ScpImplementation.Scp02I15);
     }
 
-    private static ImmutableList<byte> BuildSupportedInstructions()
+    private static SupportedInstructions BuildSupportedInstructions()
     {
-        // Standard GP instructions
-        return ImmutableList.Create<byte>(
-            0xA4, // SELECT
-            0x50, // INITIALIZE UPDATE
-            0x82, // EXTERNAL AUTHENTICATE
-            0xCA, // GET DATA
-            0xF2, // GET STATUS
-            0xE6, // INSTALL
-            0xE8, // LOAD
-            0xE4, // DELETE
-            0xD8, // PUT KEY
-            0xDA, // PUT DATA
-            0x70, // MANAGE CHANNEL
-            0xF0 // MANAGE SECURE ENVIRONMENT
+        // Standard GP instructions with type safety
+        return new SupportedInstructions(
+            Select: true,
+            InitializeUpdate: true,
+            ExternalAuthenticate: true,
+            GetData: true,
+            GetStatus: true,
+            Install: true,
+            Load: true,
+            Delete: true,
+            PutKey: true,
+            StoreData: true,
+            ManageChannel: true
         );
     }
 

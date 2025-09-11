@@ -13,8 +13,7 @@ namespace Gp4Net.CardEmulator.Cards;
 /// Functional virtual card that replays APDU responses from a trace.
 /// Simple, clean implementation focusing on core functionality.
 /// </summary>
-
-public sealed record TraceReplayCard : IFunctionalVirtualCard
+public sealed record TraceReplayCard : IVirtualCard
 {
     private readonly ApduTrace _trace;
     private readonly ImmutableList<ApduExchange> _executedExchanges;
@@ -29,7 +28,6 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
     /// Gets whether a secure channel is established.
     /// </summary>
     public bool IsSecureChannelEstablished { get; }
-
 
     /// <summary>
     /// Initializes a new TraceReplayCard with trace and state.
@@ -74,8 +72,9 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
     /// <returns>ATR bytes from trace or default JavaCard ATR.</returns>
     public byte[] GetAtr()
     {
-        return _trace.Atr
-            .GetValueOrDefault(Convert.FromHexString("3B7D94000080318065B08311AC83009000"));
+        return _trace.Atr.GetValueOrDefault(
+            Convert.FromHexString("3B7D94000080318065B08311AC83009000")
+        );
     }
 
     /// <summary>
@@ -84,7 +83,7 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
     /// <param name="command">The APDU command bytes.</param>
     /// <returns>The APDU response and updated card instance, or an error.</returns>
     public Result<
-        (ApduResponse Response, IFunctionalVirtualCard UpdatedCard),
+        (ApduResponse Response, IVirtualCard UpdatedCard),
         SmartCardError
     > ProcessCommand(byte[] command)
     {
@@ -93,7 +92,7 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
                 FindResponseForCommand(cmd)
                     .Map(response =>
                         CreateUpdatedCard(cmd, response)
-                            .Map(updatedCard => (response, (IFunctionalVirtualCard)updatedCard))
+                            .Map(updatedCard => (response, (IVirtualCard)updatedCard))
                     )
             )
             .Bind(result => result);
@@ -103,7 +102,7 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
     /// Resets the virtual card to its initial state.
     /// </summary>
     /// <returns>A new card instance in reset state.</returns>
-    public Result<IFunctionalVirtualCard, SmartCardError> Reset()
+    public Result<IVirtualCard, SmartCardError> Reset()
     {
         TraceReplayCard resetCard = new(
             _trace,
@@ -113,7 +112,7 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
             nextExchangeIndex: 0
         );
 
-        return Result.Success<IFunctionalVirtualCard, SmartCardError>(resetCard);
+        return Result.Success<IVirtualCard, SmartCardError>(resetCard);
     }
 
     /// <summary>
@@ -140,19 +139,17 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
     private Result<ApduResponse, SmartCardError> FindResponseForCommand(byte[] command)
     {
         // Try sequential replay first - most common case
-        ApduResponse sequentialResponse = TrySequentialReplay(command);
+        var sequentialResponse = TrySequentialReplay(command);
         if (sequentialResponse.IsSuccessful)
             return Result.Success<ApduResponse, SmartCardError>(sequentialResponse);
 
         // Try exact command match
-        ApduResponse exactMatchResponse = TryExactMatch(command);
+        var exactMatchResponse = TryExactMatch(command);
         if (exactMatchResponse.IsSuccessful)
             return Result.Success<ApduResponse, SmartCardError>(exactMatchResponse);
 
-
-
         // Try pattern match by instruction
-        ApduResponse patternResponse = TryPatternMatch(command);
+        var patternResponse = TryPatternMatch(command);
         return Result.Success<ApduResponse, SmartCardError>(patternResponse);
     }
 
@@ -166,13 +163,10 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
         if (_nextExchangeIndex >= _trace.Exchanges.Count)
             return ApduResponse.Error(StatusWords.InstructionErrors.InstructionNotSupported);
 
-        ApduExchange nextExchange = _trace.Exchanges[_nextExchangeIndex];
+        var nextExchange = _trace.Exchanges[_nextExchangeIndex];
 
         return CommandHeaderMatches(command, nextExchange.Command)
-            ? nextExchange.Response.Match(
-                response => response,
-                () => ApduResponse.Error(0x6D00)
-            )
+            ? nextExchange.Response.Match(response => response, () => ApduResponse.Error(0x6D00))
             : ApduResponse.Error(0x6D00);
     }
 
@@ -185,17 +179,15 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
     {
         string commandKey = BitConverter.ToString(command);
 
-        ApduExchange[] matchingExchanges = _trace
+        var matchingExchanges = _trace
             .Exchanges.Where(ex => BitConverter.ToString(ex.Command) == commandKey)
             .ToArray();
 
         if (matchingExchanges.Length == 0)
             return ApduResponse.Error(StatusWords.InstructionErrors.InstructionNotSupported);
 
-        return matchingExchanges[0].Response.Match(
-            response => response,
-            () => ApduResponse.Error(0x6D00)
-        );
+        return matchingExchanges[0]
+            .Response.Match(response => response, () => ApduResponse.Error(0x6D00));
     }
 
     /// <summary>
@@ -207,17 +199,15 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
     {
         byte ins = command[1];
 
-        ApduExchange[] matchingExchanges = _trace
+        var matchingExchanges = _trace
             .Exchanges.Where(ex => ex.Command.Length >= 2 && ex.Command[1] == ins)
             .ToArray();
 
         if (matchingExchanges.Length == 0)
             return ApduResponse.Error(StatusWords.InstructionErrors.InstructionNotSupported);
 
-        return matchingExchanges[0].Response.Match(
-            response => response,
-            () => ApduResponse.Error(0x6D00)
-        );
+        return matchingExchanges[0]
+            .Response.Match(response => response, () => ApduResponse.Error(0x6D00));
     }
 
     /// <summary>
@@ -255,10 +245,10 @@ public sealed record TraceReplayCard : IFunctionalVirtualCard
             .Create(command, Maybe.From(response))
             .Map(exchange =>
             {
-                ImmutableList<ApduExchange>.Builder exchangeBuilder =
+                var exchangeBuilder =
                     _executedExchanges.ToBuilder();
                 exchangeBuilder.Add(exchange);
-                ImmutableList<ApduExchange> newExecutedExchanges = exchangeBuilder.ToImmutable();
+                var newExecutedExchanges = exchangeBuilder.ToImmutable();
 
                 (bool newSelected, bool newSecureChannel, int newIndex) = CalculateNewState(
                     command,

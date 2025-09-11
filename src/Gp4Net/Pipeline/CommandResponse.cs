@@ -73,7 +73,7 @@ public record CommandResponse(
     /// </summary>
     public CommandResponse WithMetadata(string key, object value)
     {
-        Dictionary<string, object> newMetadata = new Dictionary<string, object>(Metadata)
+        var newMetadata = new Dictionary<string, object>(Metadata)
         {
             [key] = value,
         };
@@ -106,26 +106,25 @@ public static class ResponseMetadata
     /// <summary>
     /// The time taken to execute the command.
     /// </summary>
-    public const string ExecutionTime = "ExecutionTime";
-
+    public const string EXECUTION_TIME = "ExecutionTime";
 
     /// <summary>
     /// Whether the command was wrapped with secure channel.
     /// </summary>
-    public const string SecureChannelWrapped = "SecureChannelWrapped";
+    public const string SECURE_CHANNEL_WRAPPED = "SecureChannelWrapped";
 
     /// <summary>
     /// The actual bytes sent to the card.
     /// </summary>
-    public const string TransmittedBytes = "TransmittedBytes";
+    public const string TRANSMITTED_BYTES = "TransmittedBytes";
 
     /// <summary>
     /// The actual bytes received from the card.
     /// </summary>
-    public const string ReceivedBytes = "ReceivedBytes";
+    public const string RECEIVED_BYTES = "ReceivedBytes";
 
     /// <summary>
     /// Any warnings or non-fatal issues during execution.
     /// </summary>
-    public const string Warnings = "Warnings";
+    public const string WARNINGS = "Warnings";
 }

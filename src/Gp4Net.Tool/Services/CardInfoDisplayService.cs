@@ -24,7 +24,7 @@ public static class CardInfoDisplayService
         Maybe<Color> borderColor = default
     )
     {
-        Table table = new Table()
+        var table = new Table()
             .AddColumn(new TableColumn("Property").NoWrap())
             .AddColumn(new TableColumn("Value"));
 

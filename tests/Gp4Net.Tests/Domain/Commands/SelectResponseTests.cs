@@ -21,7 +21,7 @@ public class SelectResponseTests
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<InvalidDataError>();
-        InvalidDataError? error = (InvalidDataError)result.Error;
+        var error = (InvalidDataError)result.Error;
         _ = error.Field.Should().Be("Response");
         _ = error.Reason.Should().Be("cannot be null");
     }
@@ -34,7 +34,7 @@ public class SelectResponseTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            SelectResponse? response = result.Value;
+            var response = result.Value;
             _ = response.RawData.Should().BeEmpty();
             _ = response.Fci.HasValue.Should().BeFalse();
         }
@@ -50,7 +50,7 @@ public class SelectResponseTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            SelectResponse? response = result.Value;
+            var response = result.Value;
             _ = response.RawData.Should().BeEquivalentTo(nonFciData);
             _ = response.Fci.HasValue.Should().BeFalse();
         }
@@ -66,7 +66,7 @@ public class SelectResponseTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            SelectResponse? response = result.Value;
+            var response = result.Value;
             byte[]? aid = response.Fci.Map(fci => fci.ApplicationAid).GetValueOrDefault([]);
             _ = aid.Should().BeEquivalentTo(Convert.FromHexString("A000000151000000"));
 
@@ -84,7 +84,7 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithComplexFci_ParsesAllFields()
     {
-        TlvTestBuilder tlvBuilder = new TlvTestBuilder();
+        var tlvBuilder = new TlvTestBuilder();
         tlvBuilder.Add(
             0x6F,
             builder =>
@@ -113,7 +113,7 @@ public class SelectResponseTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            SelectResponse? response = result.Value;
+            var response = result.Value;
             _ = response.Fci.HasValue.Should().BeTrue();
             _ = response.Fci.Match(
                 fci =>
@@ -191,7 +191,7 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithSingleByteMaxLengths_ParsesCorrectly()
     {
-        TlvTestBuilder tlvBuilder = new TlvTestBuilder();
+        var tlvBuilder = new TlvTestBuilder();
         tlvBuilder.Add(
             0x6F,
             builder =>
@@ -214,7 +214,7 @@ public class SelectResponseTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            SelectResponse? response = result.Value;
+            var response = result.Value;
             _ = response.Fci.HasValue.Should().BeTrue();
             _ = response.Fci.Match(
                 fci =>
@@ -257,7 +257,7 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithEmptyApplicationLabel_ParsesCorrectly()
     {
-        TlvTestBuilder tlvBuilder = new TlvTestBuilder();
+        var tlvBuilder = new TlvTestBuilder();
         tlvBuilder.Add(
             0x6F,
             builder =>
@@ -273,7 +273,7 @@ public class SelectResponseTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            SelectResponse? response = result.Value;
+            var response = result.Value;
             _ = response.Fci.HasValue.Should().BeTrue();
             _ = response.Fci.Match(
                 fci =>
@@ -304,7 +304,7 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithEmptyPriorityIndicator_HandlesGracefully()
     {
-        TlvTestBuilder tlvBuilder = new TlvTestBuilder();
+        var tlvBuilder = new TlvTestBuilder();
         tlvBuilder.Add(
             0x6F,
             builder =>
@@ -320,7 +320,7 @@ public class SelectResponseTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            SelectResponse? response = result.Value;
+            var response = result.Value;
             _ = response.Fci.HasValue.Should().BeTrue();
             _ = response.Fci.Match(
                 fci =>
@@ -340,7 +340,7 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithPdolTag_IgnoresItGracefully()
     {
-        TlvTestBuilder tlvBuilder = new TlvTestBuilder();
+        var tlvBuilder = new TlvTestBuilder();
         tlvBuilder.Add(
             0x6F,
             builder =>
@@ -356,7 +356,7 @@ public class SelectResponseTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            SelectResponse? response = result.Value;
+            var response = result.Value;
             _ = response.Fci.HasValue.Should().BeTrue();
             _ = response.Fci.Match(
                 fci =>
@@ -386,7 +386,7 @@ public class SelectResponseTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            SelectResponse? response = result.Value;
+            var response = result.Value;
             _ = response.Fci.HasValue.Should().BeFalse();
             _ = response.RawData.Should().BeEquivalentTo(malformedData);
         }
@@ -402,7 +402,7 @@ public class SelectResponseTests
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsSuccess)
         {
-            SelectResponse? response = result.Value;
+            var response = result.Value;
             _ = response.Fci.HasValue.Should().BeTrue();
         }
     }
@@ -411,7 +411,7 @@ public class SelectResponseTests
     public void Constructor_ClonesRawData()
     {
         byte[] originalData = [0x01, 0x02, 0x03];
-        SelectResponse response = new SelectResponse(originalData);
+        var response = new SelectResponse(originalData);
 
         originalData[0] = 0xFF;
 
@@ -422,7 +422,7 @@ public class SelectResponseTests
     public void Constructor_WithFci_StoresBoth()
     {
         byte[] rawData = [0x01, 0x02, 0x03];
-        FileControlInformation fci = new FileControlInformation(
+        var fci = new FileControlInformation(
             applicationAid: Convert.FromHexString("A000000151000000"),
             applicationLabel: string.Empty,
             applicationPriorityIndicator: Maybe<byte>.None,
@@ -434,11 +434,11 @@ public class SelectResponseTests
             discretionaryData: []
         );
 
-        SelectResponse response = new SelectResponse(rawData, fci);
+        var response = new SelectResponse(rawData, fci);
 
         _ = response.RawData.Should().BeEquivalentTo(rawData);
         _ = response.Fci.HasValue.Should().BeTrue();
-        FileControlInformation? actualFci = response.Fci.GetValueOrDefault();
+        var actualFci = response.Fci.GetValueOrDefault();
         _ = actualFci.Should().BeEquivalentTo(fci);
     }
 }
@@ -459,7 +459,7 @@ public class FileControlInformationTests
         byte[] cardData = [0x9A, 0xBC];
         byte[] discretionaryData = [0xDE, 0xF0];
 
-        FileControlInformation fci = new FileControlInformation(
+        var fci = new FileControlInformation(
             applicationAid: aid,
             applicationLabel: label,
             applicationPriorityIndicator: priority,
@@ -485,7 +485,7 @@ public class FileControlInformationTests
     [Test]
     public void Constructor_WithNullParameters_HandlesCorrectly()
     {
-        FileControlInformation fci = new FileControlInformation(
+        var fci = new FileControlInformation(
             applicationAid: [],
             applicationLabel: null!,
             applicationPriorityIndicator: Maybe<byte>.None,
@@ -517,7 +517,7 @@ public class FileControlInformationTests
         byte[] cardData = [0x9A, 0xBC];
         byte[] discretionaryData = [0xDE, 0xF0];
 
-        FileControlInformation fci = new FileControlInformation(
+        var fci = new FileControlInformation(
             applicationAid: aid,
             applicationLabel: string.Empty,
             applicationPriorityIndicator: Maybe<byte>.None,
@@ -556,7 +556,7 @@ public class FileControlInformationTests
     [Test]
     public void Constructor_WithEmptyArrays_HandlesCorrectly()
     {
-        FileControlInformation fci = new FileControlInformation(
+        var fci = new FileControlInformation(
             applicationAid: [],
             applicationLabel: string.Empty,
             applicationPriorityIndicator: Maybe<byte>.None,

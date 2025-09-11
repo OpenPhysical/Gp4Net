@@ -1,11 +1,9 @@
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using WSCT.Core;
-using WSCT.ISO7816;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Transport;
 using JetBrains.Annotations;
+using WSCT.ISO7816;
 
 namespace Gp4Net.Domain.Security;
 
@@ -89,7 +87,9 @@ public static class SecurityValidation
         ushort sw = (ushort)(response[^2] << 8 | response[^1]);
 
         // Per GP spec: R-MAC only for success and warning status words
-        return sw == Gp4Net.Constants.Constants.StatusWords.Legacy.Success || (sw & 0xFF00) == 0x6200 || (sw & 0xFF00) == 0x6300;
+        return sw == Constants.Constants.StatusWords.Legacy.Success
+            || (sw & 0xFF00) == 0x6200
+            || (sw & 0xFF00) == 0x6300;
     }
 
     /// <summary>

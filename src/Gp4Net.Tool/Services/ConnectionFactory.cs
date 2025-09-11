@@ -49,15 +49,31 @@ public static class ConnectionFactory
     )
     {
         return ValidateConnectionSpec(connectionSpec)
-            .Bind(spec => DetermineConnectionType(spec)
-                .Bind(connectionType => connectionType switch
-                {
-                    ConnectionType.Virtual => CreateVirtualConnection(spec, logger, cancellationToken),
-                    ConnectionType.Physical => CreatePhysicalConnection(spec, logger, cancellationToken),
-                    _ => Task.FromResult(Result.Failure<ISmartCardService, SmartCardError>(
-                        SmartCardError.InvalidArgument($"Unknown connection type for: {spec}")
-                    ))
-                }));
+            .Bind(spec =>
+                DetermineConnectionType(spec)
+                    .Bind(connectionType =>
+                        connectionType switch
+                        {
+                            ConnectionType.Virtual => CreateVirtualConnection(
+                                spec,
+                                logger,
+                                cancellationToken
+                            ),
+                            ConnectionType.Physical => CreatePhysicalConnection(
+                                spec,
+                                logger,
+                                cancellationToken
+                            ),
+                            _ => Task.FromResult(
+                                Result.Failure<ISmartCardService, SmartCardError>(
+                                    SmartCardError.InvalidArgument(
+                                        $"Unknown connection type for: {spec}"
+                                    )
+                                )
+                            ),
+                        }
+                    )
+            );
     }
 
     /// <summary>
@@ -66,7 +82,7 @@ public static class ConnectionFactory
     private enum ConnectionType
     {
         Virtual,
-        Physical
+        Physical,
     }
 
     /// <summary>
@@ -83,10 +99,12 @@ public static class ConnectionFactory
     /// <summary>
     /// Determines the connection type from the specification.
     /// </summary>
-    private static Result<ConnectionType, SmartCardError> DetermineConnectionType(string connectionSpec)
+    private static Result<ConnectionType, SmartCardError> DetermineConnectionType(
+        string connectionSpec
+    )
     {
         const string virtualPrefix = "virtual:";
-        
+
         return connectionSpec.StartsWith(virtualPrefix, StringComparison.OrdinalIgnoreCase)
             ? Result.Success<ConnectionType, SmartCardError>(ConnectionType.Virtual)
             : Result.Success<ConnectionType, SmartCardError>(ConnectionType.Physical);
@@ -101,7 +119,11 @@ public static class ConnectionFactory
         CancellationToken cancellationToken
     )
     {
-        return VirtualCardConnectionService.CreateServiceAsync(virtualSpec, logger, cancellationToken);
+        return VirtualCardConnectionService.CreateServiceAsync(
+            virtualSpec,
+            logger,
+            cancellationToken
+        );
     }
 
     /// <summary>
@@ -113,6 +135,10 @@ public static class ConnectionFactory
         CancellationToken cancellationToken
     )
     {
-        return PhysicalCardConnectionService.CreateServiceAsync(readerName, logger, cancellationToken);
+        return PhysicalCardConnectionService.CreateServiceAsync(
+            readerName,
+            logger,
+            cancellationToken
+        );
     }
 }

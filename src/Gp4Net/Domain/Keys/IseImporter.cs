@@ -114,20 +114,20 @@ public static class IseImporter
             );
         }
 
-        Result<List<IseKeyEntry>, SmartCardError> parseResult = ParseIseContent(content);
+        var parseResult = ParseIseContent(content);
         if (parseResult.IsFailure)
         {
             return Result.Failure<SecureKeyStore, SmartCardError>(parseResult.Error);
         }
 
-        List<IseKeyEntry> entries = parseResult.Value;
-        SecureKeyStore currentStore = store;
+        var entries = parseResult.Value;
+        var currentStore = store;
 
         // Import each key entry into the store
-        foreach (IseKeyEntry entry in entries)
+        foreach (var entry in entries)
         {
             string keyId = GenerateKeyId(entry);
-            Result<SecureKeyStore, SmartCardError> addResult = currentStore.AddKey(
+            var addResult = currentStore.AddKey(
                 keyId,
                 entry.KeyValue
             );
@@ -172,16 +172,16 @@ public static class IseImporter
             );
         }
 
-        SecureKeyStore currentStore = store;
+        var currentStore = store;
         string protocol = isScp03 ? "SCP03" : "SCP02";
 
         // Import the three standard GP test keys
         KeyType[] keyTypes = [KeyType.Enc, KeyType.Mac, KeyType.Dek];
 
-        foreach (KeyType keyType in keyTypes)
+        foreach (var keyType in keyTypes)
         {
             string keyId = $"{keySetName}_{protocol}_{keyType}_{keyVersion:X2}";
-            Result<SecureKeyStore, SmartCardError> addResult = currentStore.AddKey(
+            var addResult = currentStore.AddKey(
                 keyId,
                 GpTestKeys.GpTestKey
             );
@@ -241,10 +241,13 @@ public static class IseImporter
     private static Result<List<IseKeyEntry>, SmartCardError> ParseIseContent(string content)
     {
         List<IseKeyEntry> entries = [];
-        List<string> lines = [.. content
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Select(line => line.Trim())
-            .Where(line => !string.IsNullOrWhiteSpace(line) && !line.StartsWith('#'))];
+        List<string> lines =
+        [
+            .. content
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Trim())
+                .Where(line => !string.IsNullOrWhiteSpace(line) && !line.StartsWith('#')),
+        ];
 
         if (lines.Count == 0)
         {
@@ -303,13 +306,13 @@ public static class IseImporter
                 continue;
             }
 
-            Result<KeyType, SmartCardError> keyTypeResult = ParseKeyType(keyName);
+            var keyTypeResult = ParseKeyType(keyName);
             if (keyTypeResult.IsFailure)
             {
                 continue;
             }
 
-            Result<byte[], SmartCardError> hexParseResult = Result.Try(
+            var hexParseResult = Result.Try(
                 () =>
                 {
                     string cleanedHex = hexValue.Replace(" ", "").Replace("-", "");
@@ -356,7 +359,7 @@ public static class IseImporter
 
         for (int i = 0; i < 3; i++)
         {
-            Result<byte[], SmartCardError> hexParseResult = Result.Try(
+            var hexParseResult = Result.Try(
                 () =>
                 {
                     string cleanedHex = lines[i].Replace(" ", "").Replace("-", "");
@@ -398,7 +401,7 @@ public static class IseImporter
                 List<IseKeyEntry> entries = [];
                 KeyType[] keyTypes = [KeyType.Enc, KeyType.Mac, KeyType.Dek];
 
-                foreach (KeyType keyType in keyTypes)
+                foreach (var keyType in keyTypes)
                 {
                     entries.Add(
                         new IseKeyEntry(

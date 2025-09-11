@@ -10,7 +10,6 @@ using Gp4Net.Core;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Services;
 using Gp4Net.Tool.Pipeline;
-using Gp4Net.Tool.Services;
 using JetBrains.Annotations;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -88,7 +87,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
                 byte[] capFileData = await File.ReadAllBytesAsync(capFilePath);
                 _displayService.Info($"File size: {capFileData.Length} bytes");
 
-                CapFileValidationResult validationResult = CapFileLoadingWorkflow.ValidateCapFile(
+                var validationResult = CapFileLoadingWorkflow.ValidateCapFile(
                     capFileData
                 );
                 return (validationResult, capFileData);
@@ -162,7 +161,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
     private void DisplayCapFileInformation(CapFileStructure capFile)
     {
-        Table table = new Table()
+        var table = new Table()
             .AddColumn("Property")
             .AddColumn("Value")
             .Title("[bold]CAP File Information[/]")
@@ -204,9 +203,12 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             (0x04, "APPLET"),
         ];
 
-        List<string> flagsInterpreted = [.. flagMappings
-            .Where(mapping => (headerFlags & mapping.mask) != 0)
-            .Select(mapping => mapping.name)];
+        List<string> flagsInterpreted =
+        [
+            .. flagMappings
+                .Where(mapping => (headerFlags & mapping.mask) != 0)
+                .Select(mapping => mapping.name),
+        ];
 
         return flagsInterpreted.Any()
             ? $"0x{headerFlags:X2} ({string.Join(", ", flagsInterpreted)})"
@@ -217,13 +219,13 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
     {
         AnsiConsole.MarkupLine("[bold]Components:[/]");
 
-        Table componentsTable = new Table()
+        var componentsTable = new Table()
             .AddColumn("Tag")
             .AddColumn("Name")
             .AddColumn("Size")
             .AddColumn("Notes");
 
-        foreach (CapComponent component in capFile.Components)
+        foreach (var component in capFile.Components)
         {
             string componentName = GetComponentName(component.Tag);
             string notes = GetComponentNotes(component.Tag, component.Size);
@@ -242,9 +244,9 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("[bold]Applets:[/]");
 
-            Table appletsTable = new Table().AddColumn("AID").AddColumn("Install Method Offset");
+            var appletsTable = new Table().AddColumn("AID").AddColumn("Install Method Offset");
 
-            foreach (AppletInfo applet in capFile.Applets)
+            foreach (var applet in capFile.Applets)
             {
                 _ = appletsTable.AddRow(
                     $"[dim]{Convert.ToHexString(applet.Aid)}[/]",
@@ -260,7 +262,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
     {
         AnsiConsole.MarkupLine("[bold]Security Analysis:[/]");
 
-        Table securityTable = new Table().AddColumn("Aspect").AddColumn("Details");
+        var securityTable = new Table().AddColumn("Aspect").AddColumn("Details");
 
         // Analyze header flags from security perspective
         List<string> capabilities = [];
@@ -290,9 +292,11 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
         // Check for sensitive components
         bool hasExport = capFile.Components.Any(c =>
-            c.Tag == Constants.Constants.JavaCard.ComponentTags.Export
+            c.Tag == Constants.Constants.JavaCard.ComponentTags.EXPORT
         );
-        bool hasDebug = capFile.Components.Any(c => c.Tag == Constants.Constants.JavaCard.ComponentTags.Debug);
+        bool hasDebug = capFile.Components.Any(c =>
+            c.Tag == Constants.Constants.JavaCard.ComponentTags.DEBUG
+        );
 
         List<string> sensitiveComponents = [];
         if (hasExport)
@@ -319,7 +323,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         if (capFile.Manifest?.ImportedPackages is { Count: > 0 })
         {
             List<string> cryptoImports = [];
-            foreach (ImportedPackage import in capFile.Manifest.ImportedPackages)
+            foreach (var import in capFile.Manifest.ImportedPackages)
             {
                 string aidUpper = import.Aid.ToUpper().Replace(":", "").Replace("0X", "");
                 if (aidUpper.Contains("A0000000620102"))
@@ -340,8 +344,8 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         }
 
         // Static field analysis summary
-        CapComponent staticFieldComponent = capFile.Components.FirstOrDefault(c =>
-            c.Tag == Constants.Constants.JavaCard.ComponentTags.StaticField
+        var staticFieldComponent = capFile.Components.FirstOrDefault(c =>
+            c.Tag == Constants.Constants.JavaCard.ComponentTags.STATIC_FIELD
         );
         if (staticFieldComponent is { Size: > 0 })
         {
@@ -355,7 +359,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         if (capFile.Applets.Count > 0)
         {
             List<string> appletInfo = [];
-            foreach (AppletInfo applet in capFile.Applets)
+            foreach (var applet in capFile.Applets)
             {
                 appletInfo.Add($"AID: {Convert.ToHexString(applet.Aid)}");
             }
@@ -369,13 +373,13 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
     {
         try
         {
-            MemoryRequirements memoryReq = CapFileLoadingWorkflow.EstimateMemoryRequirements(
+            var memoryReq = CapFileLoadingWorkflow.EstimateMemoryRequirements(
                 capFileData
             );
 
             AnsiConsole.MarkupLine("[bold]Memory Requirements (Estimated):[/]");
 
-            Table memoryTable = new Table().AddColumn("Memory Type").AddColumn("Estimated Size");
+            var memoryTable = new Table().AddColumn("Memory Type").AddColumn("Estimated Size");
 
             _ = memoryTable.AddRow("Code Memory", $"{memoryReq.CodeMemory} bytes");
             _ = memoryTable.AddRow("Data Memory", $"{memoryReq.DataMemory} bytes");
@@ -400,7 +404,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         {
             AnsiConsole.MarkupLine("[bold]Manifest Information:[/]");
 
-            Table manifestTable = new Table().AddColumn("Property").AddColumn("Value");
+            var manifestTable = new Table().AddColumn("Property").AddColumn("Value");
 
             if (!string.IsNullOrEmpty(manifest.PackageName))
             {
@@ -451,13 +455,13 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
                 AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine("[bold]Import Dependencies:[/]");
 
-                Table importsTable = new Table()
+                var importsTable = new Table()
                     .AddColumn("Package AID")
                     .AddColumn("Required Version")
                     .AddColumn("Resolved Package")
                     .AddColumn("SDK Version");
 
-                foreach (ImportedPackage import in manifest.ImportedPackages)
+                foreach (var import in manifest.ImportedPackages)
                 {
                     string formattedAid = FormatAidAsHex(import.Aid);
 
@@ -465,7 +469,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
                     string resolvedName = "[dim]Unknown[/]";
                     string sdkVersion = "[dim]N/A[/]";
 
-                    if (packageRegistry.TryResolveAid(formattedAid, out PackageInfo packageInfo))
+                    if (packageRegistry.TryResolveAid(formattedAid, out var packageInfo))
                     {
                         resolvedName = $"[green]{packageInfo?.DisplayName ?? "Unknown"}[/]";
                         sdkVersion = $"[yellow]{packageInfo?.SdkVersion ?? "Unknown"}[/]";
@@ -542,13 +546,13 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             AnsiConsole.MarkupLine("[bold]Class File Analysis:[/]");
 
             // Check if this is a ZIP/JAR file
-            using MemoryStream stream = new MemoryStream(capFileData);
-            using ZipArchive archive = new ZipArchive(stream, ZipArchiveMode.Read);
+            using var stream = new MemoryStream(capFileData);
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
 
             List<string> classFiles = [];
-            Dictionary<string, int> otherFiles = new Dictionary<string, int>();
+            var otherFiles = new Dictionary<string, int>();
 
-            foreach (ZipArchiveEntry entry in archive.Entries)
+            foreach (var entry in archive.Entries)
             {
                 if (entry.FullName.EndsWith(".class", StringComparison.OrdinalIgnoreCase))
                 {
@@ -637,7 +641,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             {
                 AnsiConsole.WriteLine();
                 AnsiConsole.WriteLine("Other file types:");
-                foreach (KeyValuePair<string, int> fileType in otherFiles.OrderBy(f => f.Key))
+                foreach (var fileType in otherFiles.OrderBy(f => f.Key))
                 {
                     AnsiConsole.WriteLine($"  • {fileType.Value} {fileType.Key} files");
                 }
@@ -654,8 +658,8 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         try
         {
             // Find the static field component
-            CapComponent staticFieldComponent = capFile.Components.FirstOrDefault(c =>
-                c.Tag == Constants.Constants.JavaCard.ComponentTags.StaticField
+            var staticFieldComponent = capFile.Components.FirstOrDefault(c =>
+                c.Tag == Constants.Constants.JavaCard.ComponentTags.STATIC_FIELD
             );
             if (staticFieldComponent == null)
             {
@@ -729,7 +733,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             string ascii = new string(
                 [.. lineBytes.Select(b => b is >= 32 and < 127 ? (char)b : '.')]
             );
-            AnsiConsole.WriteLine($"  {i:X4}:  {hex, -47} |{ascii}|");
+            AnsiConsole.WriteLine($"  {i:X4}:  {hex,-47} |{ascii}|");
         }
         AnsiConsole.WriteLine();
     }

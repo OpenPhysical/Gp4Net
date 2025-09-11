@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -80,7 +79,7 @@ public class ChipInfo
     /// <returns>Chip information derived from CPLC data.</returns>
     public static ChipInfo FromCplcData(CplcData cplc)
     {
-        ChipInfo info = new ChipInfo
+        var info = new ChipInfo
         {
             Manufacturer = Enum.IsDefined(typeof(IcFabricator), cplc.IcFabricator)
                 ? (IcFabricator)cplc.IcFabricator
@@ -98,11 +97,11 @@ public class ChipInfo
         {
             case IcType.P71D321:
             case IcType.P71D320:
-                info.Platform = ChipPlatform.SmartMX3;
+                info.Platform = ChipPlatform.SmartMx3;
                 info.Architecture = "IntegralSecurity 2.0";
                 info.Certifications = ImmutableList.Create(
-                    SecurityCertification.CommonCriteriaEAL6Plus,
-                    SecurityCertification.FIPS140_2_Level3
+                    SecurityCertification.CommonCriteriaEal6Plus,
+                    SecurityCertification.Fips1402Level3
                 );
                 info.CryptoCapabilities = CryptoCapabilities.P71D321Standard;
                 info.SecurityFeatures = SecurityFeatures.P71D321Standard;
@@ -111,19 +110,19 @@ public class ChipInfo
 
             case IcType.P61:
             case IcType.P60:
-                info.Platform = ChipPlatform.SmartMX2;
+                info.Platform = ChipPlatform.SmartMx2;
                 info.Architecture = "IntegralSecurity";
                 info.Certifications = ImmutableList.Create(
-                    SecurityCertification.CommonCriteriaEAL5Plus
+                    SecurityCertification.CommonCriteriaEal5Plus
                 );
                 break;
 
-            case IcType.P5CD081:
-            case IcType.P5CD041:
-                info.Platform = ChipPlatform.SmartMX;
+            case IcType.P5Cd081:
+            case IcType.P5Cd041:
+                info.Platform = ChipPlatform.SmartMx;
                 info.Architecture = "IntegralSecurity";
                 info.Certifications = ImmutableList.Create(
-                    SecurityCertification.CommonCriteriaEAL5Plus
+                    SecurityCertification.CommonCriteriaEal5Plus
                 );
                 break;
 
@@ -135,25 +134,25 @@ public class ChipInfo
         // Determine OS-specific information
         switch (info.OperatingSystem)
         {
-            case OperatingSystemId.JCOP4:
+            case OperatingSystemId.Jcop4:
                 info.JcopVersion = "4";
                 info.JavaCardVersion = "3.0.5";
                 info.GlobalPlatformVersion = "2.3.1";
                 break;
 
-            case OperatingSystemId.JCOP3:
+            case OperatingSystemId.Jcop3:
                 info.JcopVersion = "3";
                 info.JavaCardVersion = "3.0.4";
                 info.GlobalPlatformVersion = "2.2.1";
                 break;
 
-            case OperatingSystemId.JCOP242:
+            case OperatingSystemId.Jcop242:
                 info.JcopVersion = "2.4.2";
                 info.JavaCardVersion = "2.2.2";
                 info.GlobalPlatformVersion = "2.1.1";
                 break;
 
-            case OperatingSystemId.JCOP241:
+            case OperatingSystemId.Jcop241:
                 info.JcopVersion = "2.4.1";
                 info.JavaCardVersion = "2.2.2";
                 info.GlobalPlatformVersion = "2.1.1";
@@ -169,7 +168,7 @@ public class ChipInfo
     /// <returns>Formatted chip description.</returns>
     public string GetDescription()
     {
-        IEnumerable<string> parts = new[]
+        var parts = new[]
         {
             Manufacturer != IcFabricator.Unknown ? Manufacturer.ToString() : null,
             Platform != ChipPlatform.Unknown ? Platform.ToString() : null,
@@ -214,13 +213,13 @@ public class ChipInfo
             Certifications.Select(c =>
                 c switch
                 {
-                    SecurityCertification.CommonCriteriaEAL4Plus => "CC EAL4+",
-                    SecurityCertification.CommonCriteriaEAL5Plus => "CC EAL5+",
-                    SecurityCertification.CommonCriteriaEAL6Plus => "CC EAL6+",
-                    SecurityCertification.FIPS140_2_Level1 => "FIPS 140-2 L1",
-                    SecurityCertification.FIPS140_2_Level2 => "FIPS 140-2 L2",
-                    SecurityCertification.FIPS140_2_Level3 => "FIPS 140-2 L3",
-                    SecurityCertification.EMVCo => "EMVCo",
+                    SecurityCertification.CommonCriteriaEal4Plus => "CC EAL4+",
+                    SecurityCertification.CommonCriteriaEal5Plus => "CC EAL5+",
+                    SecurityCertification.CommonCriteriaEal6Plus => "CC EAL6+",
+                    SecurityCertification.Fips1402Level1 => "FIPS 140-2 L1",
+                    SecurityCertification.Fips1402Level2 => "FIPS 140-2 L2",
+                    SecurityCertification.Fips1402Level3 => "FIPS 140-2 L3",
+                    SecurityCertification.EmvCo => "EMVCo",
                     _ => c.ToString(),
                 }
             )
@@ -233,7 +232,7 @@ public class ChipInfo
     /// <returns>Operating system description.</returns>
     public string GetOperatingSystemDescription()
     {
-        IEnumerable<string> parts = new[]
+        var parts = new[]
         {
             JcopVersion.Match(v => $"JCOP {v}", () => null),
             JavaCardVersion.Match(v => $"Java Card {v}", () => null),
@@ -249,19 +248,19 @@ public class ChipInfo
     /// <returns>Crypto capabilities summary.</returns>
     public string GetCryptoSummary()
     {
-        IEnumerable<string> capabilities = new[]
+        var capabilities = new[]
         {
-            CryptoCapabilities.HasFlag(CryptoCapabilities.TripleDES) ? "3DES" : null,
-            CryptoCapabilities.HasFlag(CryptoCapabilities.AES256) ? "AES-128/192/256"
-            : CryptoCapabilities.HasFlag(CryptoCapabilities.AES192) ? "AES-128/192"
-            : CryptoCapabilities.HasFlag(CryptoCapabilities.AES128) ? "AES-128"
+            CryptoCapabilities.HasFlag(CryptoCapabilities.TripleDes) ? "3DES" : null,
+            CryptoCapabilities.HasFlag(CryptoCapabilities.Aes256) ? "AES-128/192/256"
+            : CryptoCapabilities.HasFlag(CryptoCapabilities.Aes192) ? "AES-128/192"
+            : CryptoCapabilities.HasFlag(CryptoCapabilities.Aes128) ? "AES-128"
             : null,
-            CryptoCapabilities.HasFlag(CryptoCapabilities.RSA4096) ? "RSA-2048/4096"
-            : CryptoCapabilities.HasFlag(CryptoCapabilities.RSA2048) ? "RSA-2048"
+            CryptoCapabilities.HasFlag(CryptoCapabilities.Rsa4096) ? "RSA-2048/4096"
+            : CryptoCapabilities.HasFlag(CryptoCapabilities.Rsa2048) ? "RSA-2048"
             : null,
-            CryptoCapabilities.HasFlag(CryptoCapabilities.ECC544) ? "ECC P-256/384/521/544"
-            : CryptoCapabilities.HasFlag(CryptoCapabilities.ECC521) ? "ECC P-256/384/521"
-            : CryptoCapabilities.HasFlag(CryptoCapabilities.ECC256) ? "ECC P-256"
+            CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc544) ? "ECC P-256/384/521/544"
+            : CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc521) ? "ECC P-256/384/521"
+            : CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc256) ? "ECC P-256"
             : null,
         }.Where(c => c != null);
 

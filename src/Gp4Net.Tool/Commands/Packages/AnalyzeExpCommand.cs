@@ -36,7 +36,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
                 $"[cyan]Analyzing .exp file: {Markup.Escape(settings.ExpFilePath)}[/]"
             );
 
-            ExpFileAnalysis analysis = await AnalyzeExpFileAsync(
+            var analysis = await AnalyzeExpFileAsync(
                 settings.ExpFilePath,
                 settings.SdkVersion
             );
@@ -70,7 +70,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
     )
     {
         byte[] fileBytes = File.ReadAllBytes(expFilePath);
-        ExpFileAnalysis analysis = new ExpFileAnalysis
+        var analysis = new ExpFileAnalysis
         {
             FilePath = expFilePath,
             FileSize = fileBytes.Length,
@@ -135,7 +135,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
     private static void ExtractStrings(byte[] fileBytes, ExpFileAnalysis analysis)
     {
         List<string> strings = [];
-        StringBuilder currentString = new StringBuilder();
+        var currentString = new StringBuilder();
 
         for (int i = 0; i < fileBytes.Length; i++)
         {
@@ -182,7 +182,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
             analysis.PathBasedPackageName = pathBasedPackageName;
 
             // Use jcalgscan method to find AID
-            PackageInfo packageInfo = TryExtractAidMapping(
+            var packageInfo = TryExtractAidMapping(
                 fileBytes,
                 pathBasedPackageName,
                 analysis.SdkVersion,
@@ -197,7 +197,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
         // Also try with detected package names from strings
         foreach (string possibleName in analysis.PossiblePackageNames.Take(5)) // Limit to first 5
         {
-            PackageInfo packageInfo = TryExtractAidMapping(
+            var packageInfo = TryExtractAidMapping(
                 fileBytes,
                 possibleName,
                 analysis.SdkVersion,
@@ -227,8 +227,10 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
     private static void ExtractVersionInfo(byte[] fileBytes, ExpFileAnalysis analysis)
     {
         // Look for version-like patterns in the strings
-        List<string> versionPatterns = [.. analysis
-            .ExtractedStrings.Where(s => Regex.IsMatch(s, @"\d+\.\d+(\.\d+)?"))];
+        List<string> versionPatterns =
+        [
+            .. analysis.ExtractedStrings.Where(s => Regex.IsMatch(s, @"\d+\.\d+(\.\d+)?")),
+        ];
 
         analysis.PossibleVersions = versionPatterns;
     }
@@ -408,7 +410,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
     private static void DisplayAnalysis(ExpFileAnalysis analysis, Settings settings)
     {
         // Basic file information
-        Table basicTable = new Table().AddColumn("Property").AddColumn("Value");
+        var basicTable = new Table().AddColumn("Property").AddColumn("Value");
 
         _ = basicTable.AddRow("File Path", Markup.Escape(analysis.RelativePath));
         _ = basicTable.AddRow("File Size", $"{analysis.FileSize} bytes");
@@ -433,7 +435,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
         if (analysis.PackageInfo != null)
         {
             AnsiConsole.WriteLine();
-            Table packageTable = new Table().AddColumn("Property").AddColumn("Value");
+            var packageTable = new Table().AddColumn("Property").AddColumn("Value");
 
             _ = packageTable.AddRow("Package Name", analysis.PackageInfo.Name);
             _ = packageTable.AddRow(
@@ -528,25 +530,25 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
 
     private static async Task SaveToDatabase(PackageInfo packageInfo, string databasePath)
     {
-        JsonSerializerOptions options = new JsonSerializerOptions
+        var options = new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         };
 
         // Load existing data if file exists
-        Dictionary<string, object> existingData = new Dictionary<string, object>();
-        Dictionary<string, object> existingPackages = new Dictionary<string, object>();
+        var existingData = new Dictionary<string, object>();
+        var existingPackages = new Dictionary<string, object>();
 
         if (File.Exists(databasePath))
         {
             try
             {
                 string existingJson = await File.ReadAllTextAsync(databasePath);
-                JsonDocument existingDoc = JsonDocument.Parse(existingJson);
+                var existingDoc = JsonDocument.Parse(existingJson);
 
                 // Preserve existing non-package data
-                foreach (JsonProperty element in existingDoc.RootElement.EnumerateObject())
+                foreach (var element in existingDoc.RootElement.EnumerateObject())
                 {
                     if (element.Name != "packages")
                     {
@@ -562,7 +564,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
                     else
                     {
                         // Load existing packages
-                        foreach (JsonProperty pkg in element.Value.EnumerateObject())
+                        foreach (var pkg in element.Value.EnumerateObject())
                         {
                             object deserializedPackage = JsonSerializer.Deserialize<object>(
                                 pkg.Value.GetRawText(),
@@ -609,7 +611,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
         };
 
         // Create final JSON structure
-        Dictionary<string, object> jsonData = new Dictionary<string, object>(existingData)
+        var jsonData = new Dictionary<string, object>(existingData)
         {
             ["generatedAt"] = DateTime.UtcNow,
             ["packageCount"] = existingPackages.Count,

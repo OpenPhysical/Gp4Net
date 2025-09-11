@@ -7,19 +7,19 @@ namespace Gp4Net.CardEmulator.Persistence;
 /// Contains the results of AES-256-GCM encryption including IV, ciphertext, and authentication tag.
 /// </summary>
 [PublicAPI]
-public record EncryptedPayload(string Algorithm, byte[] IV, byte[] Ciphertext, byte[] AuthTag)
+public record EncryptedPayload(string Algorithm, byte[] Iv, byte[] Ciphertext, byte[] AuthTag)
 {
     /// <summary>
     /// Gets the total size of the encrypted payload in bytes.
     /// </summary>
-    public int TotalSize => IV.Length + Ciphertext.Length + AuthTag.Length;
+    public int TotalSize => Iv.Length + Ciphertext.Length + AuthTag.Length;
 
     /// <summary>
     /// Validates that the encrypted payload has the expected structure for AES-256-GCM.
     /// </summary>
     public bool IsValid =>
         Algorithm == "aes-256-gcm"
-        && IV.Length == 12
+        && Iv.Length == 12
         && AuthTag.Length == 16
         && Ciphertext.Length > 0;
 }

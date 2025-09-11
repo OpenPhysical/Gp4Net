@@ -28,7 +28,7 @@ public record CardContent(
     {
         get
         {
-            ImmutableList<CardEntity>.Builder entities = ImmutableList.CreateBuilder<CardEntity>();
+            var entities = ImmutableList.CreateBuilder<CardEntity>();
 
             // Add ISD first
             IssuerSecurityDomain.Execute(isd =>
@@ -36,19 +36,19 @@ public record CardContent(
             );
 
             // Add security domains
-            foreach (ApplicationInfo ssd in SecurityDomains)
+            foreach (var ssd in SecurityDomains)
             {
                 entities.Add(new CardEntity.SecurityDomainEntity(ssd));
             }
 
             // Add applications
-            foreach (ApplicationInfo app in Applications)
+            foreach (var app in Applications)
             {
                 entities.Add(new CardEntity.ApplicationEntity(app));
             }
 
             // Add load files
-            foreach (ExecutableLoadFile loadFile in ExecutableLoadFiles)
+            foreach (var loadFile in ExecutableLoadFiles)
             {
                 entities.Add(new CardEntity.LoadFileEntity(loadFile));
             }

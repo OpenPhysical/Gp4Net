@@ -4,13 +4,12 @@ using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Services;
-using static Gp4Net.Services.TlvService;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
 using WSCT.ISO7816;
 using static Gp4Net.Constants.Constants;
+using static Gp4Net.Services.TlvService;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -20,7 +19,6 @@ namespace Gp4Net.Domain.Commands;
 [PublicAPI]
 public class GetDataCommand : IApduCommand
 {
-
     /// <summary>
     /// Common data object identifiers.
     /// </summary>
@@ -203,16 +201,15 @@ public class GetDataCommand : IApduCommand
         );
     }
 
-
     /// <summary>
     /// Gets the class byte.
     /// </summary>
-    public byte Cla => GlobalPlatform.Cla.GpStandard;
+    public byte Cla => GlobalPlatform.Cla.GP_STANDARD;
 
     /// <summary>
     /// Gets the instruction byte.
     /// </summary>
-    public byte Ins => GlobalPlatform.Ins.GetData;
+    public byte Ins => Apdu.Instructions.GET_DATA;
 
     /// <summary>
     /// Gets the command data.
@@ -222,7 +219,7 @@ public class GetDataCommand : IApduCommand
     /// <summary>
     /// Gets the expected response length.
     /// </summary>
-    public Maybe<int> ExpectedResponseLength => Maybe<int>.From(256);
+    public Maybe<int> ExpectedResponseLength => Maybe<int>.From(0); // 0 means 256 in short APDU format
 
     /// <summary>
     /// Gets whether this command uses extended length.
@@ -235,11 +232,9 @@ public class GetDataCommand : IApduCommand
     /// <returns>A Result containing the CommandAPDU.</returns>
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
-        return ExpectedResponseLength.Match(
-            Some: le => Result.Success<CommandAPDU, SmartCardError>(
-                new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data, (uint)le)),
-            None: () => Result.Success<CommandAPDU, SmartCardError>(
-                new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data))
+        // GET DATA always expects response data, use Le=0 (which means 256 in short APDU)
+        return Result.Success<CommandAPDU, SmartCardError>(
+            new CommandAPDU(Cla, Ins, P1, P2, 0u)
         );
     }
 
@@ -351,11 +346,15 @@ public class GetDataResponse
         byte[] response
     )
     {
-        return TlvService.TlvParser.Parse(response.ToImmutableArray())
+        return TlvParser.Parse(response.ToImmutableArray())
             .Match(
                 tlvObject =>
                     Result.Success<GetDataResponse, SmartCardError>(
-                        new GetDataResponse(dataObjectIdentifier, response, Maybe<TlvObject>.From(tlvObject))
+                        new GetDataResponse(
+                            dataObjectIdentifier,
+                            response,
+                            Maybe<TlvObject>.From(tlvObject)
+                        )
                     ),
                 error =>
                     Result.Failure<GetDataResponse, SmartCardError>(
@@ -376,9 +375,10 @@ public class GetDataResponse
         }
 
         // CPLC data can be in raw format or TLV format
-        byte[] dataToparse = IsTlvFormat && TlvObject.HasValue 
-            ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
-            : Data;
+        byte[] dataToparse =
+            IsTlvFormat && TlvObject.HasValue
+                ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
+                : Data;
 
         if (dataToparse.Length < 42)
         {
@@ -401,9 +401,10 @@ public class GetDataResponse
             return Maybe<CardDataInfo>.None;
         }
 
-        byte[] dataToparse = IsTlvFormat && TlvObject.HasValue 
-            ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
-            : Data;
+        byte[] dataToparse =
+            IsTlvFormat && TlvObject.HasValue
+                ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
+                : Data;
 
         return Maybe<byte[]>
             .From(dataToparse)
@@ -431,9 +432,10 @@ public class GetDataResponse
             return Maybe<CardCapabilities>.None;
         }
 
-        byte[] dataToparse = IsTlvFormat && TlvObject.HasValue 
-            ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
-            : Data;
+        byte[] dataToparse =
+            IsTlvFormat && TlvObject.HasValue
+                ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
+                : Data;
 
         return Maybe<byte[]>
             .From(dataToparse)
@@ -454,9 +456,10 @@ public class GetDataResponse
     /// <returns>The value formatted as a hex string.</returns>
     public string GetValueAsHexString()
     {
-        byte[] dataToUse = IsTlvFormat && TlvObject.HasValue 
-            ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
-            : Data;
+        byte[] dataToUse =
+            IsTlvFormat && TlvObject.HasValue
+                ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
+                : Data;
         return Maybe<byte[]>
             .From(dataToUse)
             .Map(data => Convert.ToHexString(data))
@@ -469,9 +472,10 @@ public class GetDataResponse
     /// <returns>The numeric value or None if not applicable.</returns>
     public Maybe<uint> GetValueAsNumber()
     {
-        byte[] dataToUse = IsTlvFormat && TlvObject.HasValue 
-            ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
-            : Data;
+        byte[] dataToUse =
+            IsTlvFormat && TlvObject.HasValue
+                ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
+                : Data;
 
         return Maybe<byte[]>
             .From(dataToUse)
@@ -500,9 +504,10 @@ public class GetDataResponse
             return Maybe<KeyInformationTemplate>.None;
         }
 
-        byte[] dataToparse = IsTlvFormat && TlvObject.HasValue 
-            ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
-            : Data;
+        byte[] dataToparse =
+            IsTlvFormat && TlvObject.HasValue
+                ? TlvObject.Match(tlv => tlv.TlvData.Bytes.ToArray(), () => Data)
+                : Data;
 
         return Maybe<byte[]>
             .From(dataToparse)

@@ -157,15 +157,15 @@ public class Scp02KeySet : KeySet
         byte keyId = 0
     )
     {
-        Result<bool, SmartCardError> encKeyValidation = ValidateKey(encKey, nameof(encKey));
+        var encKeyValidation = ValidateKey(encKey, nameof(encKey));
         if (encKeyValidation.IsFailure)
             return Result.Failure<Scp02KeySet, SmartCardError>(encKeyValidation.Error);
 
-        Result<bool, SmartCardError> macKeyValidation = ValidateKey(macKey, nameof(macKey));
+        var macKeyValidation = ValidateKey(macKey, nameof(macKey));
         if (macKeyValidation.IsFailure)
             return Result.Failure<Scp02KeySet, SmartCardError>(macKeyValidation.Error);
 
-        Result<bool, SmartCardError> dekKeyValidation = ValidateKey(dekKey, nameof(dekKey));
+        var dekKeyValidation = ValidateKey(dekKey, nameof(dekKey));
         if (dekKeyValidation.IsFailure)
             return Result.Failure<Scp02KeySet, SmartCardError>(dekKeyValidation.Error);
 
@@ -236,19 +236,19 @@ public class Scp03KeySet : KeySet
         byte keyId = 0
     )
     {
-        Result<bool, SmartCardError> encKeyValidation = ValidateKey(encKey, nameof(encKey));
+        var encKeyValidation = ValidateKey(encKey, nameof(encKey));
         if (encKeyValidation.IsFailure)
             return Result.Failure<Scp03KeySet, SmartCardError>(encKeyValidation.Error);
 
-        Result<bool, SmartCardError> macKeyValidation = ValidateKey(macKey, nameof(macKey));
+        var macKeyValidation = ValidateKey(macKey, nameof(macKey));
         if (macKeyValidation.IsFailure)
             return Result.Failure<Scp03KeySet, SmartCardError>(macKeyValidation.Error);
 
-        Result<bool, SmartCardError> dekKeyValidation = ValidateKey(dekKey, nameof(dekKey));
+        var dekKeyValidation = ValidateKey(dekKey, nameof(dekKey));
         if (dekKeyValidation.IsFailure)
             return Result.Failure<Scp03KeySet, SmartCardError>(dekKeyValidation.Error);
 
-        Result<bool, SmartCardError> lengthMatchValidation = ValidateKeyLengthsMatch(
+        var lengthMatchValidation = ValidateKeyLengthsMatch(
             encKey,
             macKey,
             dekKey

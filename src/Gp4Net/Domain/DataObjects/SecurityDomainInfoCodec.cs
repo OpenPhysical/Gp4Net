@@ -3,16 +3,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Services;
-using static Gp4Net.Services.TlvService;
 using JetBrains.Annotations;
+using static Gp4Net.Services.TlvService;
 
 namespace Gp4Net.Domain.DataObjects;
 
@@ -35,36 +32,56 @@ public static class SecurityDomainInfoCodec
                 SmartCardError.InvalidArgument("Security domain info cannot be null")
             );
 
-        using MemoryStream stream = new MemoryStream();
+        using var stream = new MemoryStream();
 
         // Tag 0xC1 for security domain information
         stream.WriteByte(0xC1);
 
         // Calculate content length
-        MemoryStream contentStream = new MemoryStream();
+        var contentStream = new MemoryStream();
 
         // OID (9F70) - two-byte tag
         sdInfo.Oid.Match(
-            oid => { WriteTlvWithTag(contentStream, [0x9F, 0x70], oid); },
-            () => { /* No OID to write */ }
+            oid =>
+            {
+                WriteTlvWithTag(contentStream, [0x9F, 0x70], oid);
+            },
+            () =>
+            { /* No OID to write */
+            }
         );
 
         // Security Domain AID (if present)
         sdInfo.SecurityDomainAid.Match(
-            aid => { contentStream.Write(aid, 0, aid.Length); },
-            () => { /* No AID to write */ }
+            aid =>
+            {
+                contentStream.Write(aid, 0, aid.Length);
+            },
+            () =>
+            { /* No AID to write */
+            }
         );
 
         // Image data (C5)
         sdInfo.ImageData.Match(
-            imageData => { WriteTlv(contentStream, 0xC5, imageData); },
-            () => { /* No image data to write */ }
+            imageData =>
+            {
+                WriteTlv(contentStream, 0xC5, imageData);
+            },
+            () =>
+            { /* No image data to write */
+            }
         );
 
         // Application production life cycle data (C4)
         sdInfo.LifeCycleData.Match(
-            lifeCycleData => { WriteTlv(contentStream, 0xC4, lifeCycleData); },
-            () => { /* No life cycle data to write */ }
+            lifeCycleData =>
+            {
+                WriteTlv(contentStream, 0xC4, lifeCycleData);
+            },
+            () =>
+            { /* No life cycle data to write */
+            }
         );
 
         byte[] content = contentStream.ToArray();
@@ -104,79 +121,121 @@ public static class SecurityDomainInfoCodec
             );
 
         // Parse the outer TLV structure using functional composition
-        return TlvParser.Parse(data.ToImmutableArray())
-            .Bind(outerTlv => outerTlv.Tag.ToNumber()
-                .Bind(tagNumber => tagNumber != 0xC1
-                    ? Result.Failure<SecurityDomainInfo, SmartCardError>(
-                        SmartCardError.InvalidData("Invalid security domain information format - expected tag 0xC1"))
-                    : ParseSecurityDomainContent(outerTlv)));
+        return TlvParser
+            .Parse(data.ToImmutableArray())
+            .Bind(outerTlv =>
+                outerTlv
+                    .Tag.ToNumber()
+                    .Bind(tagNumber =>
+                        tagNumber != 0xC1
+                            ? Result.Failure<SecurityDomainInfo, SmartCardError>(
+                                SmartCardError.InvalidData(
+                                    "Invalid security domain information format - expected tag 0xC1"
+                                )
+                            )
+                            : ParseSecurityDomainContent(outerTlv)
+                    )
+            );
     }
 
-    private static Result<SecurityDomainInfo, SmartCardError> ParseSecurityDomainContent(TlvObject outerTlv)
+    private static Result<SecurityDomainInfo, SmartCardError> ParseSecurityDomainContent(
+        TlvObject outerTlv
+    )
     {
         var sdInfo = new SecurityDomainInfo();
 
-            // Parse all TLV elements within the security domain data
-            var elementsResult = TlvService.TlvParser.ParseMultiple(outerTlv.TlvData.Bytes);
-            if (elementsResult.IsFailure) 
-                return Result.Failure<SecurityDomainInfo, SmartCardError>(elementsResult.Error);
-            var elements = elementsResult.Value.Objects;
+        // Parse all TLV elements within the security domain data
+        var elementsResult = TlvParser.ParseMultiple(outerTlv.TlvData.Bytes);
+        if (elementsResult.IsFailure)
+            return Result.Failure<SecurityDomainInfo, SmartCardError>(elementsResult.Error);
+        var elements = elementsResult.Value.Objects;
 
-            foreach (TlvObject element in elements)
+        foreach (var element in elements)
+        {
+            switch (element.Tag.Bytes.Length)
             {
-                switch (element.Tag.Bytes.Length)
-                {
-                    // Handle two-byte tags for OID (9F70)
-                    case 2 when element.Tag.Bytes[0] == 0x9F && element.Tag.Bytes[1] == 0x70:
+                // Handle two-byte tags for OID (9F70)
+                case 2 when element.Tag.Bytes[0] == 0x9F && element.Tag.Bytes[1] == 0x70:
                     {
                         // Only set OID if it has actual content
                         if (element.TlvData.Bytes.Length > 0)
                         {
-                            sdInfo = sdInfo with { Oid = Maybe<byte[]>.From(element.TlvData.Bytes.ToArray()) };
+                            sdInfo = sdInfo with
+                            {
+                                Oid = Maybe<byte[]>.From(element.TlvData.Bytes.ToArray()),
+                            };
                         }
                         break;
                     }
-                    case 1:
-                        var elementTagNumber = element.Tag.ToNumber();
-                        elementTagNumber.Match(
-                            tagNumber => {
-                                switch (tagNumber)
-                                {
-                                    case 0xC5: // Image data
-                                        sdInfo = sdInfo with { ImageData = Maybe<byte[]>.From(element.TlvData.Bytes.ToArray()) };
-                                        break;
+                case 1:
+                    var elementTagNumber = element.Tag.ToNumber();
+                    elementTagNumber.Match(
+                        tagNumber =>
+                        {
+                            switch (tagNumber)
+                            {
+                                case 0xC5: // Image data
+                                    sdInfo = sdInfo with
+                                    {
+                                        ImageData = Maybe<byte[]>.From(
+                                            element.TlvData.Bytes.ToArray()
+                                        ),
+                                    };
+                                    break;
 
-                                    case 0xC4: // Life cycle data
-                                        sdInfo = sdInfo with { LifeCycleData = Maybe<byte[]>.From(element.TlvData.Bytes.ToArray()) };
-                                        break;
+                                case 0xC4: // Life cycle data
+                                    sdInfo = sdInfo with
+                                    {
+                                        LifeCycleData = Maybe<byte[]>.From(
+                                            element.TlvData.Bytes.ToArray()
+                                        ),
+                                    };
+                                    break;
 
-                                    default:
-                                        // Could be AID data - store as SecurityDomainAid if not yet set
-                                        if (!sdInfo.SecurityDomainAid.HasValue && element.TlvData.Bytes.Length > 0)
+                                default:
+                                    // Could be AID data - store as SecurityDomainAid if not yet set
+                                    if (
+                                        !sdInfo.SecurityDomainAid.HasValue
+                                        && element.TlvData.Bytes.Length > 0
+                                    )
+                                    {
+                                        // Reconstruct TLV format for AID
+                                        using var aidStream = new MemoryStream();
+                                        WriteTlv(
+                                            aidStream,
+                                            (byte)tagNumber,
+                                            element.TlvData.Bytes.ToArray()
+                                        );
+                                        sdInfo = sdInfo with
                                         {
-                                            // Reconstruct TLV format for AID
-                                            using var aidStream = new MemoryStream();
-                                            WriteTlv(
-                                                aidStream,
-                                                (byte)tagNumber,
-                                                element.TlvData.Bytes.ToArray()
-                                            );
-                                            sdInfo = sdInfo with { SecurityDomainAid = Maybe<byte[]>.From(aidStream.ToArray()) };
-                                        }
-                                        break;
-                                }
-                            },
-                            error => { /* Ignore invalid tag numbers */ }
-                        );
-                        break;
-                }
+                                            SecurityDomainAid = Maybe<byte[]>.From(
+                                                aidStream.ToArray()
+                                            ),
+                                        };
+                                    }
+                                    break;
+                            }
+                        },
+                        error =>
+                        { /* Ignore invalid tag numbers */
+                        }
+                    );
+                    break;
             }
+        }
 
         return sdInfo;
     }
 
-    private static void WriteTlv(Stream stream, byte tag, byte[] value)
+    private static Result WriteTlv(Stream stream, byte tag, byte[] value)
     {
+        if (value.Length > 255)
+        {
+            return Result.Failure(
+                SmartCardError.InvalidData($"Value too long for simple TLV encoding: {value.Length} bytes").Message
+            );
+        }
+
         stream.WriteByte(tag);
 
         switch (value.Length)
@@ -189,17 +248,21 @@ public static class SecurityDomainInfoCodec
                 stream.WriteByte(0x81);
                 stream.WriteByte((byte)value.Length);
                 break;
-            default:
-                throw new ArgumentException(
-                    $"Value too long for simple TLV encoding: {value.Length} bytes"
-                );
         }
 
         stream.Write(value, 0, value.Length);
+        return Result.Success();
     }
 
-    private static void WriteTlvWithTag(Stream stream, byte[] tag, byte[] value)
+    private static Result WriteTlvWithTag(Stream stream, byte[] tag, byte[] value)
     {
+        if (value.Length > 255)
+        {
+            return Result.Failure(
+                SmartCardError.InvalidData($"Value too long for simple TLV encoding: {value.Length} bytes").Message
+            );
+        }
+
         stream.Write(tag, 0, tag.Length);
 
         switch (value.Length)
@@ -212,13 +275,10 @@ public static class SecurityDomainInfoCodec
                 stream.WriteByte(0x81);
                 stream.WriteByte((byte)value.Length);
                 break;
-            default:
-                throw new ArgumentException(
-                    $"Value too long for simple TLV encoding: {value.Length} bytes"
-                );
         }
 
         stream.Write(value, 0, value.Length);
+        return Result.Success();
     }
 }
 

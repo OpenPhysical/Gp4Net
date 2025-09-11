@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -64,8 +63,8 @@ public sealed class ImmutablePipelineContext : IPipelineContext
             return this;
         }
 
-        ImmutableDictionary<string, object>.Builder builder = _values.ToBuilder();
-        foreach (KeyValuePair<string, object> kvp in values)
+        var builder = _values.ToBuilder();
+        foreach (var kvp in values)
         {
             builder[kvp.Key] = kvp.Value;
         }
@@ -105,7 +104,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
 
     public override string ToString()
     {
-        IEnumerable<string> items = _values.Select(kvp =>
+        var items = _values.Select(kvp =>
             $"{kvp.Key}: {kvp.Value?.GetType().Name ?? "null"}"
         );
         return $"PipelineContext[{string.Join(", ", items)}]";

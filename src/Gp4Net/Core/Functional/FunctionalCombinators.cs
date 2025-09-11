@@ -27,11 +27,11 @@ public static class FunctionalCombinators
                 (E)(object)SmartCardError.InvalidArgument("No operations provided")
             );
 
-        Maybe<Result<T, E>> lastFailure = Maybe<Result<T, E>>.None;
+        var lastFailure = Maybe<Result<T, E>>.None;
 
-        foreach (Func<Task<Result<T, E>>> operation in operationsList)
+        foreach (var operation in operationsList)
         {
-            Result<T, E> result = await operation();
+            var result = await operation();
             if (result.IsSuccess)
                 return result;
             lastFailure = Maybe<Result<T, E>>.From(result);
@@ -57,8 +57,8 @@ public static class FunctionalCombinators
                 (E)(object)SmartCardError.InvalidArgument("No operations provided")
             );
 
-        Result<T, E>[] results = await Task.WhenAll(tasks);
-        Result<T, E> successResult = results.FirstOrDefault(r => r.IsSuccess);
+        var results = await Task.WhenAll(tasks);
+        var successResult = results.FirstOrDefault(r => r.IsSuccess);
         return successResult.IsSuccess ? successResult : results.Last();
     }
 
@@ -71,7 +71,7 @@ public static class FunctionalCombinators
         Func<S, Task<Result<T, E>>> operation
     )
     {
-        Result<T, E>[] results = await Task.WhenAll(source.Select(operation));
+        var results = await Task.WhenAll(source.Select(operation));
         return [.. results.Where(r => r.IsSuccess).Select(r => r.Value)];
     }
 
@@ -83,11 +83,11 @@ public static class FunctionalCombinators
         Func<S, Task<Result<T, E>>> operation
     )
     {
-        ImmutableList<T>.Builder results = ImmutableList.CreateBuilder<T>();
+        var results = ImmutableList.CreateBuilder<T>();
 
-        foreach (S item in source)
+        foreach (var item in source)
         {
-            Result<T, E> result = await operation(item);
+            var result = await operation(item);
             if (result.IsFailure)
                 return Result.Failure<ImmutableList<T>, E>(result.Error);
             results.Add(result.Value);
@@ -104,9 +104,9 @@ public static class FunctionalCombinators
         this IEnumerable<Result<T, E>> results
     )
     {
-        ImmutableList<T>.Builder values = ImmutableList.CreateBuilder<T>();
+        var values = ImmutableList.CreateBuilder<T>();
 
-        foreach (Result<T, E> result in results)
+        foreach (var result in results)
         {
             if (result.IsFailure)
                 return Result.Failure<ImmutableList<T>, E>(result.Error);
@@ -125,11 +125,11 @@ public static class FunctionalCombinators
         Func<TAcc, T, Task<Result<TAcc, E>>> folder
     )
     {
-        TAcc accumulator = initial;
+        var accumulator = initial;
 
-        foreach (T item in source)
+        foreach (var item in source)
         {
-            Result<TAcc, E> result = await folder(accumulator, item);
+            var result = await folder(accumulator, item);
             if (result.IsFailure)
                 return result;
             accumulator = result.Value;
@@ -137,7 +137,6 @@ public static class FunctionalCombinators
 
         return Result.Success<TAcc, E>(accumulator);
     }
-
 
     /// <summary>
     /// Helper to get first matching result from async sequence.
@@ -147,9 +146,9 @@ public static class FunctionalCombinators
         Func<Task<T>, Task<bool>> predicate
     )
     {
-        foreach (Task<T> task in tasks)
+        foreach (var task in tasks)
         {
-            T result = await task;
+            var result = await task;
             if (await predicate(Task.FromResult(result)))
                 return result;
         }
@@ -161,7 +160,7 @@ public static class FunctionalCombinators
     /// </summary>
     private static async Task<T2> Map<T1, T2>(this Task<T1> task, Func<T1, T2> mapper)
     {
-        T1 result = await task;
+        var result = await task;
         return mapper(result);
     }
 
@@ -172,10 +171,10 @@ public static class FunctionalCombinators
         this IEnumerable<Result<T, E>> results
     )
     {
-        ImmutableList<T>.Builder successes = ImmutableList.CreateBuilder<T>();
-        ImmutableList<E>.Builder failures = ImmutableList.CreateBuilder<E>();
+        var successes = ImmutableList.CreateBuilder<T>();
+        var failures = ImmutableList.CreateBuilder<E>();
 
-        foreach (Result<T, E> result in results)
+        foreach (var result in results)
         {
             if (result.IsSuccess)
                 successes.Add(result.Value);
@@ -194,15 +193,15 @@ public static class FunctionalCombinators
         Func<TState, Maybe<(T value, TState next)>> generator
     )
     {
-        TState state = initial;
+        var state = initial;
 
         while (true)
         {
-            Maybe<(T value, TState next)> result = generator(state);
+            var result = generator(state);
             if (!result.HasValue)
                 yield break;
 
-            (T value, TState next) = result.Value;
+            (var value, var next) = result.Value;
             yield return value;
             state = next;
         }
@@ -216,16 +215,16 @@ public static class FunctionalCombinators
         Func<TState, Task<Maybe<(T value, TState next)>>> generator
     )
     {
-        ImmutableList<T>.Builder results = ImmutableList.CreateBuilder<T>();
-        TState state = initial;
+        var results = ImmutableList.CreateBuilder<T>();
+        var state = initial;
 
         while (true)
         {
-            Maybe<(T value, TState next)> result = await generator(state);
+            var result = await generator(state);
             if (!result.HasValue)
                 break;
 
-            (T value, TState next) = result.Value;
+            (var value, var next) = result.Value;
             results.Add(value);
             state = next;
         }

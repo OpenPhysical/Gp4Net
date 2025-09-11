@@ -14,13 +14,26 @@ namespace Gp4Net.Services;
 public interface ISmartCardService : IDisposable
 {
     /// <summary>
-    /// Executes a command through the card communication pipeline.
+    /// Executes a command through the card communication pipeline without secure channel.
     /// </summary>
     /// <param name="command">The APDU command to execute.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the command execution.</returns>
     Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
         CommandAPDU command,
+        CancellationToken cancellationToken = default
+    );
+
+    /// <summary>
+    /// Executes a command with explicit secure channel choice.
+    /// </summary>
+    /// <param name="command">The APDU command to execute.</param>
+    /// <param name="useSecureChannel">Whether to use secure channel wrapping.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The result of the command execution.</returns>
+    Task<Result<CommandResponse, SmartCardError>> ExecuteCommandAsync(
+        CommandAPDU command,
+        bool useSecureChannel,
         CancellationToken cancellationToken = default
     );
 

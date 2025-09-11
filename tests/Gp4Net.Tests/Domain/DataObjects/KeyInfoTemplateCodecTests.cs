@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
+using System.Linq;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -17,11 +18,12 @@ public class KeyInfoTemplateCodecTests
     [Test]
     public void Encode_CompleteKeyInfo_ProducesExpectedFormat()
     {
-        KeyInfoTemplate keyInfo = new KeyInfoTemplate
+        var keyInfo = new KeyInfoTemplate
         {
             KeyVersionNumber = 0x01,
             KeyIdentifier = 0x00,
-            KeyTypesAndLengths = [
+            KeyTypesAndLengths =
+            [
                 new KeyTypeAndLength(0x80, 0x10), // DES, 16 bytes
                 new KeyTypeAndLength(0x81, 0x10), // DES-ECB, 16 bytes
                 new KeyTypeAndLength(0x82, 0x10), // DES-MAC, 16 bytes
@@ -47,7 +49,7 @@ public class KeyInfoTemplateCodecTests
     [Test]
     public void Encode_MinimalKeyInfo_ProducesValidFormat()
     {
-        KeyInfoTemplate keyInfo = new KeyInfoTemplate { KeyVersionNumber = 0x01 };
+        var keyInfo = new KeyInfoTemplate { KeyVersionNumber = 0x01 };
 
         Result<byte[], SmartCardError> encodedResult = KeyInfoTemplateCodec.Encode(keyInfo);
 
@@ -86,7 +88,7 @@ public class KeyInfoTemplateCodecTests
         Result<KeyInfoTemplate, SmartCardError> result = KeyInfoTemplateCodec.Decode(testData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyInfoTemplate? keyInfo = result.Value;
+        var keyInfo = result.Value;
 
         _ = keyInfo.KeyVersionNumber.HasValue.Should().BeTrue();
         _ = keyInfo.KeyVersionNumber.Value.Should().Be(0x01);
@@ -94,11 +96,11 @@ public class KeyInfoTemplateCodecTests
         _ = keyInfo.KeyIdentifier.Value.Should().Be(0x00);
         _ = keyInfo.KeyTypesAndLengths.Should().HaveCount(2);
 
-        KeyTypeAndLength? firstKeyType = keyInfo.KeyTypesAndLengths[0];
+        var firstKeyType = keyInfo.KeyTypesAndLengths[0];
         _ = firstKeyType.Type.Should().Be(0x80);
         _ = firstKeyType.Length.Should().Be(0x10);
 
-        KeyTypeAndLength? secondKeyType = keyInfo.KeyTypesAndLengths[1];
+        var secondKeyType = keyInfo.KeyTypesAndLengths[1];
         _ = secondKeyType.Type.Should().Be(0x81);
         _ = secondKeyType.Length.Should().Be(0x10);
     }
@@ -137,7 +139,7 @@ public class KeyInfoTemplateCodecTests
         Result<KeyInfoTemplate, SmartCardError> result = KeyInfoTemplateCodec.Decode(testData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyInfoTemplate? keyInfo = result.Value;
+        var keyInfo = result.Value;
         _ = keyInfo.KeyVersionNumber.HasValue.Should().BeTrue();
         _ = keyInfo.KeyVersionNumber.Value.Should().Be(0x01);
         _ = keyInfo.KeyIdentifier.HasValue.Should().BeTrue();
@@ -147,16 +149,16 @@ public class KeyInfoTemplateCodecTests
     [Test]
     public void RoundTrip_PreservesAllData()
     {
-        KeyInfoTemplate original = new KeyInfoTemplate
+        var original = new KeyInfoTemplate
         {
             KeyVersionNumber = Maybe<byte>.From(0x02),
             KeyIdentifier = Maybe<byte>.From(0x01),
             KeyTypesAndLengths =
-            {
-                new KeyTypeAndLength { Type = 0x80, Length = 0x18 }, // 3DES, 24 bytes
-                new KeyTypeAndLength { Type = 0x88, Length = 0x10 }, // AES, 16 bytes
-                new KeyTypeAndLength { Type = 0x88, Length = 0x20 }, // AES, 32 bytes
-            },
+            [
+                new KeyTypeAndLength(0x80, 0x18), // 3DES, 24 bytes
+                new KeyTypeAndLength(0x88, 0x10), // AES, 16 bytes
+                new KeyTypeAndLength(0x88, 0x20), // AES, 32 bytes
+            ],
         };
 
         Result<byte[], SmartCardError> encodedResult = KeyInfoTemplateCodec.Encode(original);
@@ -165,26 +167,26 @@ public class KeyInfoTemplateCodecTests
         Result<KeyInfoTemplate, SmartCardError> decoded = KeyInfoTemplateCodec.Decode(encoded);
 
         _ = decoded.IsSuccess.Should().BeTrue();
-        KeyInfoTemplate? result = decoded.Value;
+        var result = decoded.Value;
 
         _ = result.KeyVersionNumber.Should().Be(original.KeyVersionNumber);
         _ = result.KeyIdentifier.Should().Be(original.KeyIdentifier);
-        _ = result.KeyTypesAndLengths.Count.Should().Be(original.KeyTypesAndLengths.Count);
+        _ = result.KeyTypesAndLengths.Count().Should().Be(original.KeyTypesAndLengths.Count());
 
-        for (int i = 0; i < original.KeyTypesAndLengths.Count; i++)
-        {
-            _ = result.KeyTypesAndLengths[i].Type.Should().Be(original.KeyTypesAndLengths[i].Type);
-            _ = result
-                .KeyTypesAndLengths[i]
-                .Length.Should()
-                .Be(original.KeyTypesAndLengths[i].Length);
-        }
+        _ = original.KeyTypesAndLengths.Zip(result.KeyTypesAndLengths, (orig, res) => new { orig, res })
+            .Select(pair =>
+            {
+                _ = pair.res.Type.Should().Be(pair.orig.Type);
+                _ = pair.res.Length.Should().Be(pair.orig.Length);
+                return Result.Success();
+            })
+            .ToList();
     }
 
     [Test]
     public void Encode_EmptyKeyInfo_ProducesMinimalStructure()
     {
-        KeyInfoTemplate keyInfo = new KeyInfoTemplate();
+        var keyInfo = new KeyInfoTemplate();
 
         Result<byte[], SmartCardError> encodedResult = KeyInfoTemplateCodec.Encode(keyInfo);
 
@@ -206,7 +208,7 @@ public class KeyInfoTemplateCodecTests
         Result<KeyInfoTemplate, SmartCardError> result = KeyInfoTemplateCodec.Decode(emptyData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyInfoTemplate? keyInfo = result.Value;
+        var keyInfo = result.Value;
         _ = keyInfo.KeyVersionNumber.HasValue.Should().BeFalse();
         _ = keyInfo.KeyIdentifier.HasValue.Should().BeFalse();
         _ = keyInfo.KeyTypesAndLengths.Should().BeEmpty();
@@ -230,7 +232,7 @@ public class KeyInfoTemplateCodecTests
         Result<KeyInfoTemplate, SmartCardError> result = KeyInfoTemplateCodec.Decode(testData);
 
         _ = result.IsSuccess.Should().BeTrue();
-        KeyInfoTemplate? keyInfo = result.Value;
+        var keyInfo = result.Value;
         _ = keyInfo.KeyVersionNumber.HasValue.Should().BeTrue();
         _ = keyInfo.KeyVersionNumber.Value.Should().Be(0x01);
         _ = keyInfo.KeyTypesAndLengths.Should().BeEmpty(); // Should not add incomplete pair
@@ -239,12 +241,9 @@ public class KeyInfoTemplateCodecTests
     [Test]
     public void Encode_OnlyKeyTypes_ProducesValidStructure()
     {
-        KeyInfoTemplate keyInfo = new KeyInfoTemplate
+        var keyInfo = new KeyInfoTemplate
         {
-            KeyTypesAndLengths =
-            {
-                new KeyTypeAndLength { Type = 0x88, Length = 0x20 }, // AES, 32 bytes
-            },
+            KeyTypesAndLengths = [new KeyTypeAndLength(0x88, 0x20)] // AES, 32 bytes
         };
 
         Result<byte[], SmartCardError> encodedResult = KeyInfoTemplateCodec.Encode(keyInfo);

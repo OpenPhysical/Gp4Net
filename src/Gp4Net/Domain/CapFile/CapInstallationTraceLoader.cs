@@ -113,29 +113,29 @@ public static class CapInstallationTraceLoader
 
     private static Result<TraceMetadata, SmartCardError> ExtractMetadata(JsonElement root)
     {
-        if (!root.TryGetProperty("metadata", out JsonElement metadataElement))
+        if (!root.TryGetProperty("metadata", out var metadataElement))
         {
             return Result.Failure<TraceMetadata, SmartCardError>(
                 SmartCardError.InvalidData("Missing metadata section in trace")
             );
         }
 
-        if (!metadataElement.TryGetProperty("card", out JsonElement cardElement))
+        if (!metadataElement.TryGetProperty("card", out var cardElement))
         {
             return Result.Failure<TraceMetadata, SmartCardError>(
                 SmartCardError.InvalidData("Missing card metadata in trace")
             );
         }
 
-        string atr = cardElement.TryGetProperty("atr", out JsonElement atrElement)
+        string atr = cardElement.TryGetProperty("atr", out var atrElement)
             ? atrElement.GetString() ?? "UNKNOWN"
             : "UNKNOWN";
 
-        string isdAid = cardElement.TryGetProperty("isd_aid", out JsonElement isdElement)
+        string isdAid = cardElement.TryGetProperty("isd_aid", out var isdElement)
             ? isdElement.GetString() ?? "A000000151000000"
             : "A000000151000000";
 
-        string cardType = cardElement.TryGetProperty("card_type", out JsonElement typeElement)
+        string cardType = cardElement.TryGetProperty("card_type", out var typeElement)
             ? typeElement.GetString() ?? "UNKNOWN"
             : "UNKNOWN";
 
@@ -148,14 +148,14 @@ public static class CapInstallationTraceLoader
         JsonElement root
     )
     {
-        if (!root.TryGetProperty("exchanges", out JsonElement exchangesElement))
+        if (!root.TryGetProperty("exchanges", out var exchangesElement))
         {
             return Result.Failure<ImmutableArray<TraceExchange>, SmartCardError>(
                 SmartCardError.InvalidData("Missing exchanges section in trace")
             );
         }
 
-        ImmutableArray<TraceExchange>.Builder exchanges =
+        var exchanges =
             ImmutableArray.CreateBuilder<TraceExchange>();
 
         return exchangesElement
@@ -180,41 +180,41 @@ public static class CapInstallationTraceLoader
         return Result.Try(
             () =>
             {
-                int index = exchangeElement.TryGetProperty("index", out JsonElement indexElement)
+                int index = exchangeElement.TryGetProperty("index", out var indexElement)
                     ? indexElement.GetInt32()
                     : 0;
 
                 string command = exchangeElement.TryGetProperty(
                     "command",
-                    out JsonElement cmdElement
+                    out var cmdElement
                 )
                     ? cmdElement.GetString() ?? ""
                     : "";
 
                 string response = exchangeElement.TryGetProperty(
                     "response",
-                    out JsonElement respElement
+                    out var respElement
                 )
                     ? respElement.GetString() ?? ""
                     : "";
 
                 string description = exchangeElement.TryGetProperty(
                     "description",
-                    out JsonElement descElement
+                    out var descElement
                 )
                     ? descElement.GetString() ?? ""
                     : "";
 
                 int responseTime = exchangeElement.TryGetProperty(
                     "response_time_ms",
-                    out JsonElement timeElement
+                    out var timeElement
                 )
                     ? timeElement.GetInt32()
                     : 0;
 
                 bool secureMessaging = exchangeElement.TryGetProperty(
                     "secure_messaging",
-                    out JsonElement secureElement
+                    out var secureElement
                 )
                     ? secureElement.GetBoolean()
                     : false;
@@ -263,7 +263,7 @@ public static class CapInstallationTraceLoader
         ImmutableArray<TraceExchange> exchanges
     )
     {
-        TraceExchange selectExchange = exchanges.FirstOrDefault(e =>
+        var selectExchange = exchanges.FirstOrDefault(e =>
             e.Command.StartsWith("00A404", StringComparison.OrdinalIgnoreCase)
         );
 
@@ -276,11 +276,11 @@ public static class CapInstallationTraceLoader
         ImmutableArray<TraceExchange> exchanges
     )
     {
-        TraceExchange initUpdate = exchanges.FirstOrDefault(e =>
+        var initUpdate = exchanges.FirstOrDefault(e =>
             e.Command.StartsWith("8050", StringComparison.OrdinalIgnoreCase)
         );
 
-        TraceExchange extAuth = exchanges.FirstOrDefault(e =>
+        var extAuth = exchanges.FirstOrDefault(e =>
             e.Command.StartsWith("8482", StringComparison.OrdinalIgnoreCase)
         );
 
@@ -299,7 +299,7 @@ public static class CapInstallationTraceLoader
         ImmutableArray<TraceExchange> exchanges
     )
     {
-        TraceExchange installForLoad = exchanges.FirstOrDefault(e =>
+        var installForLoad = exchanges.FirstOrDefault(e =>
             e.Command.StartsWith("84E602", StringComparison.OrdinalIgnoreCase)
         );
 

@@ -57,9 +57,10 @@ public sealed class SecureKeyStorage : IDisposable
                 keyData.CopyTo(copy, 0);
                 return Result.Success<byte[], SmartCardError>(copy);
             },
-            () => Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidArgument("Key data is not available")
-            )
+            () =>
+                Result.Failure<byte[], SmartCardError>(
+                    SmartCardError.InvalidArgument("Key data is not available")
+                )
         );
     }
 
@@ -83,9 +84,10 @@ public sealed class SecureKeyStorage : IDisposable
                 action(keyData);
                 return Result.Success<bool, SmartCardError>(true);
             },
-            () => Result.Failure<bool, SmartCardError>(
-                SmartCardError.InvalidArgument("Key data is not available")
-            )
+            () =>
+                Result.Failure<bool, SmartCardError>(
+                    SmartCardError.InvalidArgument("Key data is not available")
+                )
         );
     }
 
@@ -106,9 +108,10 @@ public sealed class SecureKeyStorage : IDisposable
 
         return _keyData.Match(
             keyData => Result.Success<T, SmartCardError>(func(keyData)),
-            () => Result.Failure<T, SmartCardError>(
-                SmartCardError.InvalidArgument("Key data is not available")
-            )
+            () =>
+                Result.Failure<T, SmartCardError>(
+                    SmartCardError.InvalidArgument("Key data is not available")
+                )
         );
     }
 
@@ -139,7 +142,6 @@ public sealed class SecureKeyStorage : IDisposable
             _isDisposed = true;
         }
     }
-
 }
 
 /// <summary>
@@ -280,7 +282,7 @@ public sealed class SecureSessionKeys : IDisposable
                 SmartCardError.InvalidArgument("SecureSessionKeys has been disposed")
             );
         }
-        
+
         return _dek.Match(
             dek => dek.UseKey(key => action(Maybe<byte[]>.From(key))),
             () =>
@@ -303,22 +305,16 @@ public sealed class SecureSessionKeys : IDisposable
                 SmartCardError.InvalidArgument("SecureSessionKeys has been disposed")
             );
         }
-        
-        return _sEnc.GetKeyCopy()
+
+        return _sEnc
+            .GetKeyCopy()
             .Bind(sEnc => _sMac.GetKeyCopy().Map(sMac => (sEnc, sMac)))
             .Bind(keys => _sRMac.GetKeyCopy().Map(sRMac => (keys.sEnc, keys.sMac, sRMac)))
             .Map(keys =>
             {
                 byte[] dekKey = default;
-                _dek.Execute(d => 
-                    d.GetKeyCopy().Tap(key => dekKey = key)
-                );
-                return new SessionKeys(
-                    keys.sEnc,
-                    keys.sMac,
-                    keys.sRMac,
-                    dekKey
-                );
+                _dek.Execute(d => d.GetKeyCopy().Tap(key => dekKey = key));
+                return new SessionKeys(keys.sEnc, keys.sMac, keys.sRMac, dekKey);
             });
     }
 
@@ -336,5 +332,4 @@ public sealed class SecureSessionKeys : IDisposable
             _isDisposed = true;
         }
     }
-
 }

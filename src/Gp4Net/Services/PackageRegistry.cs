@@ -25,13 +25,7 @@ public class PackageRegistry
     /// </summary>
     public PackageRegistry()
     {
-        Result<
-            (
-                ImmutableDictionary<string, PackageInfo> packages,
-                ImmutableDictionary<string, PackageInfo> aidLookup
-            ),
-            SmartCardError
-        > result = LoadPackageDatabase();
+        var result = LoadPackageDatabase();
 
         if (result.IsSuccess)
         {
@@ -104,10 +98,10 @@ public class PackageRegistry
         SmartCardError
     > LoadPackageDatabase()
     {
-        Assembly assembly = Assembly.GetExecutingAssembly();
+        var assembly = Assembly.GetExecutingAssembly();
         string resourceName = "Gp4Net.Data.known-packages.json";
 
-        Maybe<Stream> streamMaybe = Maybe<Stream>.From(
+        var streamMaybe = Maybe<Stream>.From(
             assembly.GetManifestResourceStream(resourceName)
         );
         if (streamMaybe.HasNoValue)
@@ -121,17 +115,17 @@ public class PackageRegistry
             >(SmartCardError.InvalidArgument($"Could not find embedded resource: {resourceName}"));
         }
 
-        using Stream stream = streamMaybe.Value;
+        using var stream = streamMaybe.Value;
 
-        using StreamReader reader = new StreamReader(stream);
+        using var reader = new StreamReader(stream);
         string json = reader.ReadToEnd();
 
-        JsonSerializerOptions options = new JsonSerializerOptions
+        var options = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         };
 
-        Maybe<PackageDatabase> databaseMaybe = Maybe<PackageDatabase>.From(
+        var databaseMaybe = Maybe<PackageDatabase>.From(
             JsonSerializer.Deserialize<PackageDatabase>(json, options)
         );
         if (databaseMaybe.HasNoValue || databaseMaybe.Value.Packages.Count == 0)
@@ -145,10 +139,10 @@ public class PackageRegistry
             >(SmartCardError.InvalidArgument("Invalid package database format"));
         }
 
-        PackageDatabase database = databaseMaybe.Value;
+        var database = databaseMaybe.Value;
 
         // Functional transformation to immutable collections
-        ImmutableDictionary<string, PackageInfo> packages = database.Packages.ToImmutableDictionary(
+        var packages = database.Packages.ToImmutableDictionary(
             kvp => kvp.Key,
             kvp => new PackageInfo
             {
@@ -164,7 +158,7 @@ public class PackageRegistry
         );
 
         // Create AID lookup from packages with non-empty AIDs
-        ImmutableDictionary<string, PackageInfo> aidLookup = packages
+        var aidLookup = packages
             .Values.Where(pkg => !string.IsNullOrEmpty(pkg.Aid))
             .ToImmutableDictionary(pkg => pkg.Aid.ToUpper(), pkg => pkg);
 

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -30,25 +29,32 @@ public static class VirtualCardServiceExtensions
     /// </summary>
     /// <param name="service">The virtual card service to configure.</param>
     /// <returns>The configured service for method chaining.</returns>
-    public static VirtualCardService SetupComprehensiveTestEnvironment(this VirtualCardService service)
+    public static VirtualCardService SetupComprehensiveTestEnvironment(
+        this VirtualCardService service
+    )
     {
-        VirtualReaderManager manager = service.GetReaderManager();
-        
+        var manager = service.GetReaderManager();
+
         // Create standard test readers that tests expect
+        // Note: Since VirtualReaderManager is now immutable, these operations don't modify the manager
+        // This method needs to be refactored to return a new service with updated manager
         CreateTestReader(manager, "Virtual P71 Reader 00 00");
         CreateTestReader(manager, "Virtual Test Reader 01 00");
         CreateTestReader(manager, "Virtual Debug Reader 02 00");
-        
+
         return service;
     }
 
     /// <summary>
     /// Creates a test reader and adds it to the manager.
+    /// Note: Since VirtualReaderManager is immutable, this method doesn't actually modify the manager.
     /// </summary>
     private static void CreateTestReader(VirtualReaderManager manager, string readerName)
     {
+        // This no longer modifies the manager since it's immutable
+        // The AddReader method now returns a new manager instance
         VirtualCardReader.Create(readerName)
-            .Tap(reader => manager.AddReader(reader));
+            .Bind(reader => manager.AddReader(reader));
     }
 
     /// <summary>
@@ -92,8 +98,8 @@ public static class VirtualCardServiceExtensions
         CancellationToken cancellationToken = default
     )
     {
-        VirtualCommandResponse response = service.SendCommand(command);
-        
+        var response = service.SendCommand(command);
+
         return response.Error.Match(
             error => Task.FromException<byte[]>(new InvalidOperationException(error.ToString())),
             () =>
@@ -101,11 +107,11 @@ public static class VirtualCardServiceExtensions
                 // Combine data and status word as tests expect
                 byte[] responseBytes = new byte[response.Data.Length + 2];
                 response.Data.CopyTo(responseBytes, 0);
-                
+
                 // Add status word (big-endian)
                 responseBytes[^2] = (byte)(response.StatusWord >> 8);
                 responseBytes[^1] = (byte)(response.StatusWord & 0xFF);
-                
+
                 return Task.FromResult(responseBytes);
             }
         );
@@ -118,8 +124,8 @@ public static class VirtualCardServiceExtensions
     /// <returns>A keyset resolver populated with test keys.</returns>
     public static TestKeysetResolver CreateTestKeysetResolver()
     {
-        TestKeysetResolver resolver = new TestKeysetResolver();
-        
+        var resolver = new TestKeysetResolver();
+
         // Add default GlobalPlatform test keys
         var defaultScp02Keys = Scp02KeySet.Create(
             encKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
@@ -127,14 +133,14 @@ public static class VirtualCardServiceExtensions
             dekKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
             keyVersion: 1
         );
-        
+
         return defaultScp02Keys.Match(
             keys =>
             {
                 var resolverWithTestKeys = resolver.AddKeyset("GP_TEST_KEYS", keys);
                 return resolverWithTestKeys.AddKeyset("DEFAULT", keys);
             },
-            error => resolver  // Return empty resolver on key creation failure
+            error => resolver // Return empty resolver on key creation failure
         );
     }
 }
@@ -151,9 +157,8 @@ public class TestKeysetResolver : IKeysetResolver
     /// <summary>
     /// Initializes a new instance with empty keysets.
     /// </summary>
-    public TestKeysetResolver() : this(new Dictionary<string, IKeySet>())
-    {
-    }
+    public TestKeysetResolver()
+        : this(new Dictionary<string, IKeySet>()) { }
 
     /// <summary>
     /// Initializes a new instance with provided keysets.
@@ -163,17 +168,26 @@ public class TestKeysetResolver : IKeysetResolver
         _keysets = keysets;
     }
 
-    public Result<IKeySet, SmartCardError> ResolveFromHexKeys(string hexEncKey, string hexMacKey, string hexDekKey, byte keyVersion)
+    public Result<IKeySet, SmartCardError> ResolveFromHexKeys(
+        string hexEncKey,
+        string hexMacKey,
+        string hexDekKey,
+        byte keyVersion
+    )
     {
         return CreateDefaultScp02KeySet();
     }
 
     public Result<Scp02KeySet, SmartCardError> ResolveScp02KeySet(string keyId, byte keyVersion)
     {
-        return CreateDefaultScp02KeySet().Bind(keyset => 
-            keyset is Scp02KeySet scp02Keys 
-                ? Result.Success<Scp02KeySet, SmartCardError>(scp02Keys)
-                : Result.Failure<Scp02KeySet, SmartCardError>(SmartCardError.InvalidArgument("Failed to create SCP02 keys")));
+        return CreateDefaultScp02KeySet()
+            .Bind(keyset =>
+                keyset is Scp02KeySet scp02Keys
+                    ? Result.Success<Scp02KeySet, SmartCardError>(scp02Keys)
+                    : Result.Failure<Scp02KeySet, SmartCardError>(
+                        SmartCardError.InvalidArgument("Failed to create SCP02 keys")
+                    )
+            );
     }
 
     public Result<Scp03KeySet, SmartCardError> ResolveScp03KeySet(string keyId, byte keyVersion)
@@ -183,28 +197,31 @@ public class TestKeysetResolver : IKeysetResolver
 
     public Result<IKeySet, SmartCardError> GetTestKeys(byte protocolVersion, byte keyVersion)
     {
-        return protocolVersion == 0x03 
+        return protocolVersion == 0x03
             ? CreateDefaultScp03KeySet().Map(keyset => (IKeySet)keyset)
             : CreateDefaultScp02KeySet();
     }
 
     public Result<IKeySet, SmartCardError> ResolveKeyset(
-        string keysetName, 
-        Dictionary<string, string> parameters, 
-        Maybe<byte[]> encKey, 
-        Maybe<byte[]> macKey, 
-        Maybe<byte[]> dekKey, 
-        byte keyVersion, 
-        Maybe<InitializeUpdateResponse> cardResponse)
+        string keysetName,
+        Dictionary<string, string> parameters,
+        Maybe<byte[]> encKey,
+        Maybe<byte[]> macKey,
+        Maybe<byte[]> dekKey,
+        byte keyVersion,
+        Maybe<InitializeUpdateResponse> cardResponse
+    )
     {
         return Maybe<string>
             .From(keysetName)
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .ToResult(SmartCardError.InvalidArgument("Keyset identifier cannot be null or empty"))
-            .Bind(id => 
-                Maybe<IKeySet>.From(_keysets.TryGetValue(id, out var keyset) ? keyset : default)
+            .Bind(id =>
+                Maybe<IKeySet>
+                    .From(_keysets.TryGetValue(id, out var keyset) ? keyset : default)
                     .ToResult(SmartCardError.InvalidArgument($"Keyset '{id}' not found"))
-                    .OnFailureCompensate(() => CreateDefaultScp02KeySet()));
+                    .OnFailureCompensate(() => CreateDefaultScp02KeySet())
+            );
     }
 
     /// <summary>
@@ -222,13 +239,15 @@ public class TestKeysetResolver : IKeysetResolver
             .Match(
                 id =>
                 {
-                    Dictionary<string, IKeySet> newKeysets = new Dictionary<string, IKeySet>(_keysets)
+                    var newKeysets = new Dictionary<string, IKeySet>(
+                        _keysets
+                    )
                     {
-                        [id] = keyset
+                        [id] = keyset,
                     };
                     return new TestKeysetResolver(newKeysets);
                 },
-                () => this  // Return unchanged if invalid identifier
+                () => this // Return unchanged if invalid identifier
             );
     }
 
@@ -248,12 +267,14 @@ public class TestKeysetResolver : IKeysetResolver
 
     private static Result<IKeySet, SmartCardError> CreateDefaultScp02KeySet()
     {
-        return Scp02KeySet.Create(
-            encKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
-            macKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
-            dekKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
-            keyVersion: 1
-        ).Map(keyset => (IKeySet)keyset);
+        return Scp02KeySet
+            .Create(
+                encKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
+                macKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
+                dekKey: Convert.FromHexString("404142434445464748494A4B4C4D4E4F"),
+                keyVersion: 1
+            )
+            .Map(keyset => (IKeySet)keyset);
     }
 
     private static Result<Scp03KeySet, SmartCardError> CreateDefaultScp03KeySet()
@@ -284,18 +305,19 @@ public static class TestContextHelper
         // Use the current working directory as a starting point
         // This assumes tests are run from the project root
         string currentDir = Directory.GetCurrentDirectory();
-        
+
         // Check if we're already in the project root (has src directory)
         if (Directory.Exists(Path.Combine(currentDir, "src")))
         {
             return currentDir;
         }
-        
+
         // If not, try going up one level (common when running from bin/Debug)
         string parentDir = Directory.GetParent(currentDir)?.FullName ?? currentDir;
         string grandParentDir = Directory.GetParent(parentDir)?.FullName ?? parentDir;
-        string greatGrandParentDir = Directory.GetParent(grandParentDir)?.FullName ?? grandParentDir;
-        
+        string greatGrandParentDir =
+            Directory.GetParent(grandParentDir)?.FullName ?? grandParentDir;
+
         // Check each level for project root indicators
         if (Directory.Exists(Path.Combine(parentDir, "src")))
         {
@@ -309,7 +331,7 @@ public static class TestContextHelper
         {
             return greatGrandParentDir;
         }
-        
+
         // Fallback to current directory
         return currentDir;
     }
@@ -346,10 +368,13 @@ public static class TestContextHelper
     /// <param name="keyset">The keyset to include.</param>
     /// <param name="channelState">The secure channel state.</param>
     /// <returns>Fully configured pipeline context for secure channel tests.</returns>
-    public static IPipelineContext WithKeysetAndChannel(KeySet keyset, SecureChannelState channelState)
+    public static IPipelineContext WithKeysetAndChannel(
+        KeySet keyset,
+        SecureChannelState channelState
+    )
     {
-        return ImmutablePipelineContext.Empty
-            .With("Keyset", keyset)
+        return ImmutablePipelineContext
+            .Empty.With("Keyset", keyset)
             .With("SecureChannelState", channelState);
     }
 }

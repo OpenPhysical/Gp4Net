@@ -6,8 +6,8 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Domain.Commands;
-using Gp4Net.Transport;
 using Gp4Net.Tests.Infrastructure;
+using Gp4Net.Transport;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Integration;
@@ -47,7 +47,7 @@ public class CapLoadingIntegrationTests
             capFileData
         );
         Assert.That(capFileResult.IsSuccess, Is.True, "Failed to parse CAP file");
-        CapFileStructure? capFile = capFileResult.Value;
+        var capFile = capFileResult.Value;
     }
 
     [Test]
@@ -61,7 +61,7 @@ public class CapLoadingIntegrationTests
             capFileData
         );
         Assert.That(capFileResult.IsSuccess, Is.True, "Failed to parse CAP file");
-        CapFileStructure? capFile = capFileResult.Value;
+        var capFile = capFileResult.Value;
 
         // Verify we have the expected package from the trace (OpenFIPS201 package)
         byte[] expectedPackageAid = Convert.FromHexString("A00000030800001000");
@@ -73,7 +73,7 @@ public class CapLoadingIntegrationTests
             maxBlockSize: 245
         );
         Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
-        IList<LoadCommand>? loadCommands = result.Value;
+        var loadCommands = result.Value;
 
         // Assert - Verify we generated the expected number of commands
         Assert.That(
@@ -83,7 +83,7 @@ public class CapLoadingIntegrationTests
         );
 
         // Verify first command structure matches trace expectations
-        LoadCommand firstCommand = loadCommands[0];
+        var firstCommand = loadCommands[0];
         Assert.Multiple(() =>
         {
             Assert.That(
@@ -99,7 +99,7 @@ public class CapLoadingIntegrationTests
         });
 
         // Verify final command structure
-        LoadCommand lastCommand = loadCommands.Last();
+        var lastCommand = loadCommands.Last();
         Assert.That(
             lastCommand.IsFinalBlock,
             Is.True,
@@ -107,7 +107,12 @@ public class CapLoadingIntegrationTests
         );
 
         // Convert to APDUs for secure channel wrapping
-        List<byte[]> plainApdus = [.. loadCommands.Select(cmd => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(cmd)).GetValueOrDefault([]))];
+        List<byte[]> plainApdus =
+        [
+            .. loadCommands.Select(cmd =>
+                ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(cmd)).GetValueOrDefault([])
+            ),
+        ];
 
         // Verify APDU structure matches trace format
         byte[] firstApdu = plainApdus[0];
@@ -134,8 +139,13 @@ public class CapLoadingIntegrationTests
 
         // Assert - Verify load commands generated successfully
         Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
-        IList<LoadCommand>? loadCommands = result.Value;
-        List<byte[]> plainApdus = [.. loadCommands.Select(cmd => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(cmd)).GetValueOrDefault([]))];
+        var loadCommands = result.Value;
+        List<byte[]> plainApdus =
+        [
+            .. loadCommands.Select(cmd =>
+                ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(cmd)).GetValueOrDefault([])
+            ),
+        ];
         Assert.That(plainApdus.Count > 0, "Should have generated LOAD APDUs");
 
         // Verify APDU structure using functional composition - NO imperative loops
@@ -172,7 +182,7 @@ public class CapLoadingIntegrationTests
             capFileData
         );
         Assert.That(capFileResult.IsSuccess, Is.True, "Failed to parse CAP file");
-        CapFileStructure? capFile = capFileResult.Value;
+        var capFile = capFileResult.Value;
 
         // Generate INSTALL [for load] command
         Result<InstallCommand.InstallForLoadCommand, SmartCardError> installForLoadResult =
@@ -182,8 +192,10 @@ public class CapLoadingIntegrationTests
             );
 
         Assert.That(installForLoadResult.IsSuccess, Is.True, "CreateForLoad should succeed");
-        InstallCommand.InstallForLoadCommand? installForLoadCmd = installForLoadResult.Value;
-        Result<byte[], SmartCardError> installForLoadApduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(installForLoadCmd));
+        var installForLoadCmd = installForLoadResult.Value;
+        Result<byte[], SmartCardError> installForLoadApduResult = ApduBuilder.BuildApdu(
+            Maybe<IApduCommand>.From(installForLoadCmd)
+        );
         byte[] installForLoadApdu = installForLoadApduResult.GetValueOrDefault([]);
 
         // Generate LOAD commands
@@ -192,8 +204,10 @@ public class CapLoadingIntegrationTests
             maxBlockSize: 245
         );
         Assert.That(result.IsSuccess, Is.True, "CreateFromCapFile should succeed");
-        IList<LoadCommand>? loadCommands = result.Value;
-        Result<byte[], SmartCardError> firstLoadApduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(loadCommands[0]));
+        var loadCommands = result.Value;
+        Result<byte[], SmartCardError> firstLoadApduResult = ApduBuilder.BuildApdu(
+            Maybe<IApduCommand>.From(loadCommands[0])
+        );
         byte[] firstLoadApdu = firstLoadApduResult.GetValueOrDefault([]);
 
         Assert.Multiple(() =>
@@ -231,7 +245,7 @@ public class CapLoadingIntegrationTests
 
         // Look for CAP magic "DECAFFED" across all LOAD commands
         List<byte> allLoadData = [];
-        foreach (LoadCommand cmd in loadCommands)
+        foreach (var cmd in loadCommands)
         {
             if (cmd.Data != null)
             {
