@@ -34,7 +34,12 @@ public static class CapInstallationTraceLoader
                         SmartCardError.UnexpectedError($"Failed to parse trace JSON: {ex.Message}")
                 )
             )
-            .Map(jsonDoc => new CapInstallationTrace(jsonDoc));
+            .Bind(jsonDoc =>
+                Maybe<JsonDocument>
+                    .From(jsonDoc)
+                    .ToResult(SmartCardError.UnexpectedError("JSON document is null"))
+                    .Map(doc => new CapInstallationTrace(doc))
+            );
     }
 
     /// <summary>

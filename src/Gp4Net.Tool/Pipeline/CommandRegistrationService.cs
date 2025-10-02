@@ -66,8 +66,7 @@ public static class CommandRegistrationService
 
         foreach (var commandType in commandTypes)
         {
-            var attribute =
-                commandType.GetCustomAttribute<CommandHandlerAttribute>()!;
+            var attribute = commandType.GetCustomAttribute<CommandHandlerAttribute>()!;
             var commandInterface = commandType
                 .GetInterfaces()
                 .FirstOrDefault(i =>
@@ -104,17 +103,11 @@ public static class CommandRegistrationService
             className = className[..^7]; // Remove "Command" suffix
         }
 
-        string result = "";
-        for (int i = 0; i < className.Length; i++)
-        {
-            if (i > 0 && char.IsUpper(className[i]))
-            {
-                result += "-";
-            }
-            result += char.ToLower(className[i]);
-        }
-
-        return result;
+        return string.Concat(
+            className.Select((c, i) =>
+                i > 0 && char.IsUpper(c) ? $"-{char.ToLower(c)}" : char.ToLower(c).ToString()
+            )
+        );
     }
 }
 
@@ -127,25 +120,25 @@ public class CommandHandlerInfo
     /// <summary>
     /// Gets or sets the command name.
     /// </summary>
-    public string CommandName { get; set; } = string.Empty;
+    public required string CommandName { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the command description.
     /// </summary>
-    public string Description { get; set; }
+    public required string Description { get; set; }
 
     /// <summary>
     /// Gets or sets the command implementation type.
     /// </summary>
-    public Type CommandType { get; set; } = null!;
+    public required Type CommandType { get; set; }
 
     /// <summary>
     /// Gets or sets the settings type.
     /// </summary>
-    public Type SettingsType { get; set; } = null!;
+    public required Type SettingsType { get; set; }
 
     /// <summary>
     /// Gets or sets the pipeline command adapter type.
     /// </summary>
-    public Type PipelineCommandType { get; set; } = null!;
+    public required Type PipelineCommandType { get; set; }
 }

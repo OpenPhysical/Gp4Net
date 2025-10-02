@@ -57,11 +57,9 @@ public class ApduTrace
     /// <returns>A new trace instance with the added exchange, or an error.</returns>
     public Result<ApduTrace, SmartCardError> WithExchange(ApduExchange exchange)
     {
-        return Result.Success<ApduTrace, SmartCardError>(new ApduTrace(
-                ImmutableList.CreateRange(_exchanges.Append(exchange)),
-                Atr,
-                Metadata
-            ));
+        return Result.Success<ApduTrace, SmartCardError>(
+            new ApduTrace(ImmutableList.CreateRange(_exchanges.Append(exchange)), Atr, Metadata)
+        );
     }
 
     /// <summary>
@@ -71,7 +69,9 @@ public class ApduTrace
     /// <returns>A new trace instance with the ATR set, or an error.</returns>
     public Result<ApduTrace, SmartCardError> WithAtr(byte[] atr)
     {
-        return Result.Success<ApduTrace, SmartCardError>(new ApduTrace(_exchanges, Maybe<byte[]>.From(atr), Metadata));
+        return Result.Success<ApduTrace, SmartCardError>(
+            new ApduTrace(_exchanges, Maybe<byte[]>.From(atr), Metadata)
+        );
     }
 
     /// <summary>

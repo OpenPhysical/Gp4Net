@@ -36,8 +36,7 @@ public interface ICliExecutionContext
         SecureChannelRequest,
         CancellationToken,
         Task<Result<SecureChannelExecutionContext, SmartCardError>>
-    > EstablishSecureChannelAsync
-    { get; }
+    > EstablishSecureChannelAsync { get; }
 
     /// <summary>
     /// Ensures a card connection is established with the specified reader.

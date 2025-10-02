@@ -222,16 +222,18 @@ public sealed class UnitResultAssertions<TError>
     {
         if (_result.IsSuccess)
         {
-            Assert.Fail(
-                $"Expected failure with error {expectedError}, but got success. {because}"
-            );
+            Assert.Fail($"Expected failure with error {expectedError}, but got success. {because}");
         }
         else
         {
             // Use property access for the error instead of Match
             Assert.That(_result.IsFailure, Is.True);
             var error = _result.Error;
-            Assert.That(error.Equals(expectedError), Is.True, $"Expected {expectedError}, but got {error}. {because}");
+            Assert.That(
+                error?.Equals(expectedError) ?? false,
+                Is.True,
+                $"Expected {expectedError}, but got {error}. {because}"
+            );
         }
         return this;
     }

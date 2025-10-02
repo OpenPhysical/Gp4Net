@@ -115,6 +115,15 @@ public interface ISmartCardService : IDisposable
         byte[] command,
         CancellationToken cancellationToken = default
     );
+
+    /// <summary>
+    /// Gets the detected card transport capabilities including extended APDU support and optimal block size.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The detected card transport capabilities.</returns>
+    Task<Result<CardTransportCapabilities, SmartCardError>> GetCardTransportCapabilitiesAsync(
+        CancellationToken cancellationToken = default
+    );
 }
 
 /// <summary>

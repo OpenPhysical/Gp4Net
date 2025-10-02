@@ -178,23 +178,27 @@ public sealed record KeyDerivationContext(
     {
         return keySet switch
         {
-            Scp02KeySet => sequenceCounter.HasValue
-                ? CreateForScp02(
-                    keySet,
-                    hostChallenge,
-                    cardChallenge,
-                    sequenceCounter.Value,
-                    implementation.GetValueOrDefault(ScpImplementation.Scp02I15)
-                )
-                : Result.Failure<KeyDerivationContext, SmartCardError>(
-                    SmartCardError.InvalidArgument("SCP02 requires sequence counter")
-                ),
+            Scp02KeySet
+                => sequenceCounter.HasValue
+                    ? CreateForScp02(
+                        keySet,
+                        hostChallenge,
+                        cardChallenge,
+                        sequenceCounter.Value,
+                        implementation.GetValueOrDefault(ScpImplementation.Scp02I15)
+                    )
+                    : Result.Failure<KeyDerivationContext, SmartCardError>(
+                        SmartCardError.InvalidArgument("SCP02 requires sequence counter")
+                    ),
 
             Scp03KeySet => CreateForScp03(keySet, hostChallenge, cardChallenge, implementation),
 
-            _ => Result.Failure<KeyDerivationContext, SmartCardError>(
-                SmartCardError.InvalidArgument($"Unsupported key set type: {keySet.GetType().Name}")
-            ),
+            _
+                => Result.Failure<KeyDerivationContext, SmartCardError>(
+                    SmartCardError.InvalidArgument(
+                        $"Unsupported key set type: {keySet.GetType().Name}"
+                    )
+                ),
         };
     }
 

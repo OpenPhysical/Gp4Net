@@ -36,9 +36,7 @@ public static class Scp03CommandProcessors
     {
         logger.Match(l => l.LogDebug("Processing SCP03 INITIALIZE UPDATE command"), () => { });
 
-        var result = ParseInitializeUpdateCommand(
-                command
-            )
+        var result = ParseInitializeUpdateCommand(command)
             .Bind(request =>
             {
                 logger.Match(l => l.LogDebug("ParseInitializeUpdateCommand succeeded"), () => { });
@@ -124,8 +122,10 @@ public static class Scp03CommandProcessors
 
     // Helper methods and data structures
 
-
-    private record Scp03ChallengeData(CommandRequests.InitializeUpdateRequest Request, byte[] CardChallenge);
+    private record Scp03ChallengeData(
+        CommandRequests.InitializeUpdateRequest Request,
+        byte[] CardChallenge
+    );
 
     private record Scp03CryptogramData(
         byte KeyVersion,
@@ -136,7 +136,6 @@ public static class Scp03CommandProcessors
         byte[] SequenceCounter,
         IKeySet Keys
     );
-
 
     private static Result<InitializeUpdateRequest, SmartCardError> ParseInitializeUpdateCommand(
         byte[] command
@@ -241,10 +240,7 @@ public static class Scp03CommandProcessors
             // Using pseudo-random challenge generation (i=70)
 
             // Get the key set for pseudo-random generation
-            if (
-                !TryGetKeySet(request.KeyVersion, state, config, out var keySet)
-                || keySet == null
-            )
+            if (!TryGetKeySet(request.KeyVersion, state, config, out var keySet) || keySet == null)
             {
                 // Key set not found for requested version
                 return SmartCardError.ReferencedDataNotFound();
@@ -263,11 +259,10 @@ public static class Scp03CommandProcessors
             // Get sequence counter
             byte[] sequenceCounter = state.GetSequenceCounter(request.KeyVersion);
 
-            // Generate pseudo-random challenge using AES encryption
-            byte[] input = sequenceCounter.Concat(config.IsdAid).ToArray();
+            // Derive pseudo-random challenge per GP SCP03 Amendment D using S-ENC KDF
+            byte[] context = sequenceCounter.Concat(config.IsdAid).ToArray();
             return CryptoService
-                .Cipher.EncryptAesEcb(scp03Keys.EncKey, input)
-                .Map(encrypted => encrypted.Take(8).ToArray())
+                .KeyDerivation.DeriveScp03Data(scp03Keys.EncKey, 0x02, context, 64)
                 .Map(challenge => new Scp03ChallengeData(request, challenge));
         }
 
@@ -297,9 +292,7 @@ public static class Scp03CommandProcessors
             {
                 // DefaultKeyVersion is 0xFF, finding SCP03 key
                 // For SCP03 context, prefer SCP03 key versions
-                var scp03Key = config.StaticKeys.FirstOrDefault(kvp =>
-                    kvp.Value is Scp03KeySet
-                );
+                var scp03Key = config.StaticKeys.FirstOrDefault(kvp => kvp.Value is Scp03KeySet);
                 effectiveKeyVersion =
                     scp03Key.Key != 0 ? scp03Key.Key : config.StaticKeys.Keys.FirstOrDefault();
             }
@@ -325,25 +318,37 @@ public static class Scp03CommandProcessors
         // Get sequence counter
         byte[] sequenceCounter = state.GetSequenceCounter(effectiveKeyVersion);
 
-        // Calculate card cryptogram using AES-CMAC
-        return CryptoService
-            .Cryptogram.CalculateCardCryptogram(
+        // CRITICAL FIX: Derive session keys BEFORE calculating cryptogram
+        // Per GP Card Spec v2.3.1 Amendment D Section 6.2.2.2:
+        // "The card cryptogram is calculated using the session key S-MAC"
+        var scp03Keys = (Scp03KeySet)keys;
+
+        return KeyDerivationContext
+            .CreateForScp03(
+                scp03Keys,
                 data.Request.HostChallenge,
                 data.CardChallenge,
-                keys,
-                0x03,
-                (byte)state.ScpImplementation,
-                Maybe<byte[]>.None
+                Maybe<ScpImplementation>.From(state.ScpImplementation)
             )
-            .Map(cryptogram => new Scp03CryptogramData(
-                effectiveKeyVersion,
-                state.ScpImplementation,
-                data.Request.HostChallenge,
-                data.CardChallenge,
-                cryptogram,
-                sequenceCounter,
-                keys
-            ));
+            .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context))
+            .Bind(sessionKeys =>
+                // Calculate cryptogram using SESSION S-MAC key (not static MAC key)
+                CryptoService
+                    .Cryptogram.CalculateScp03CardCryptogram(
+                        sessionKeys.SMac,
+                        data.Request.HostChallenge,
+                        data.CardChallenge
+                    )
+                    .Map(cryptogram => new Scp03CryptogramData(
+                        effectiveKeyVersion,
+                        state.ScpImplementation,
+                        data.Request.HostChallenge,
+                        data.CardChallenge,
+                        cryptogram,
+                        sequenceCounter,
+                        keys
+                    ))
+            );
     }
 
     private static (ApduResponse, CardState) CreateScp03InitializeUpdateResponse(
@@ -652,65 +657,88 @@ public static class Scp03CommandProcessors
                                     () => { }
                                 );
 
-                                return CryptoService
-                                    .Cryptogram.CalculateHostCryptogram(
+                                // Ensure we have SCP03 keys
+                                if (currentKeys is not Scp03KeySet scp03Keys)
+                                {
+                                    logger.Match(
+                                        l => l.LogError("SCP03 EXTERNAL AUTHENTICATE: Current keys are not SCP03 keys"),
+                                        () => { }
+                                    );
+                                    return Result.Failure<ExternalAuthenticateRequest, SmartCardError>(
+                                        SmartCardError.InvalidArgument("SCP03 requires SCP03 key set")
+                                    );
+                                }
+
+                                // CRITICAL FIX: Derive session keys BEFORE verifying cryptogram
+                                // Per GP Card Spec v2.3.1 Amendment D Section 6.2.2.3:
+                                // "The host cryptogram is calculated using the session key S-MAC"
+                                return KeyDerivationContext
+                                    .CreateForScp03(
+                                        scp03Keys,
                                         hostChallenge,
                                         cardChallenge,
-                                        currentKeys,
-                                        0x03,
-                                        (byte)state.ScpImplementation,
-                                        Maybe<byte[]>.None
+                                        Maybe<ScpImplementation>.From(state.ScpImplementation)
                                     )
-                                    .Bind(expectedCryptogram =>
-                                    {
-                                        logger.Match(
-                                            l =>
-                                                l.LogDebug(
-                                                    "Expected Host Cryptogram: {Expected}",
-                                                    Convert.ToHexString(expectedCryptogram)
-                                                ),
-                                            () => { }
-                                        );
-                                        logger.Match(
-                                            l =>
-                                                l.LogDebug(
-                                                    "Received Host Cryptogram: {Received}",
-                                                    Convert.ToHexString(request.HostCryptogram)
-                                                ),
-                                            () => { }
-                                        );
-
-                                        if (
-                                            !request.HostCryptogram.SequenceEqual(
-                                                expectedCryptogram
+                                    .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context))
+                                    .Bind(sessionKeys =>
+                                        // Calculate expected cryptogram using SESSION S-MAC key
+                                        CryptoService
+                                            .Cryptogram.CalculateScp03HostCryptogram(
+                                                sessionKeys.SMac,
+                                                hostChallenge,
+                                                cardChallenge
                                             )
-                                        )
-                                        {
-                                            logger.Match(
-                                                l =>
-                                                    l.LogError(
-                                                        "SCP03 EXTERNAL AUTHENTICATE: Host cryptogram verification failed"
-                                                    ),
-                                                () => { }
-                                            );
-                                            return Result.Failure<
-                                                ExternalAuthenticateRequest,
-                                                SmartCardError
-                                            >(SmartCardError.SecurityStatusNotSatisfied());
-                                        }
+                                            .Bind(expectedCryptogram =>
+                                            {
+                                                logger.Match(
+                                                    l =>
+                                                        l.LogDebug(
+                                                            "Expected Host Cryptogram: {Expected}",
+                                                            Convert.ToHexString(expectedCryptogram)
+                                                        ),
+                                                    () => { }
+                                                );
+                                                logger.Match(
+                                                    l =>
+                                                        l.LogDebug(
+                                                            "Received Host Cryptogram: {Received}",
+                                                            Convert.ToHexString(request.HostCryptogram)
+                                                        ),
+                                                    () => { }
+                                                );
 
-                                        logger.Match(
-                                            l =>
-                                                l.LogDebug(
-                                                    "SCP03 EXTERNAL AUTHENTICATE: Host cryptogram verified successfully"
-                                                ),
-                                            () => { }
-                                        );
-                                        return Result.Success<
-                                            ExternalAuthenticateRequest,
-                                            SmartCardError
-                                        >(request);
-                                    });
+                                                if (
+                                                    !request.HostCryptogram.SequenceEqual(
+                                                        expectedCryptogram
+                                                    )
+                                                )
+                                                {
+                                                    logger.Match(
+                                                        l =>
+                                                            l.LogError(
+                                                                "SCP03 EXTERNAL AUTHENTICATE: Host cryptogram verification failed"
+                                                            ),
+                                                        () => { }
+                                                    );
+                                                    return Result.Failure<
+                                                        ExternalAuthenticateRequest,
+                                                        SmartCardError
+                                                    >(SmartCardError.SecurityStatusNotSatisfied());
+                                                }
+
+                                                logger.Match(
+                                                    l =>
+                                                        l.LogDebug(
+                                                            "SCP03 EXTERNAL AUTHENTICATE: Host cryptogram verified successfully"
+                                                        ),
+                                                    () => { }
+                                                );
+                                                return Result.Success<
+                                                    ExternalAuthenticateRequest,
+                                                    SmartCardError
+                                                >(request);
+                                            })
+                                    );
                             },
                             () =>
                                 Result.Failure<ExternalAuthenticateRequest, SmartCardError>(
@@ -829,21 +857,17 @@ public static class Scp03CommandProcessors
 
         // Calculate the MAC chaining value from the EXTERNAL AUTHENTICATE MAC
         // Per SCP03 spec, this becomes the chaining value for subsequent operations
-        var initialMacChaining = CalculateExternalAuthenticateMacChaining(
-            request,
-            state
-        );
+        var initialMacChaining = CalculateExternalAuthenticateMacChaining(request, state);
 
         // Create functional secure channel state
-        var secureChannelStateResult =
-            SecureChannelState.Create(
-                sessionKeys: sessionKeys,
-                securityLevel: securityLevel,
-                protocolVersion: (CryptoService.ScpVersion)
-                    Gp4Net.Constants.Constants.GlobalPlatform.Protocols.SCP03,
-                initialMacChainingValue: initialMacChaining.ToArray(),
-                implementationParameter: 0x00
-            );
+        var secureChannelStateResult = SecureChannelState.Create(
+            sessionKeys: sessionKeys,
+            securityLevel: securityLevel,
+            protocolVersion: (CryptoService.ScpVersion)
+                Gp4Net.Constants.Constants.GlobalPlatform.Protocols.SCP03,
+            initialMacChainingValue: initialMacChaining.ToArray(),
+            implementationParameter: 0x00
+        );
 
         if (secureChannelStateResult.IsFailure)
         {
@@ -884,10 +908,7 @@ public static class Scp03CommandProcessors
         );
 
         // SCP03 EXTERNAL AUTHENTICATE response is typically empty on success
-        return (
-            new ApduResponse([], Gp4Net.Constants.Constants.StatusWords.Success),
-            newState
-        );
+        return (new ApduResponse([], Gp4Net.Constants.Constants.StatusWords.Success), newState);
     }
 
     /// <summary>
@@ -909,11 +930,10 @@ public static class Scp03CommandProcessors
         }
 
         // Create EXTERNAL AUTHENTICATE command for MAC calculation
-        var externalAuthCommandResult =
-            ExternalAuthenticateCommand.CreateWithoutMac(
-                (SecurityLevel)request.SecurityLevel,
-                request.HostCryptogram
-            );
+        var externalAuthCommandResult = ExternalAuthenticateCommand.CreateWithoutMac(
+            (SecurityLevel)request.SecurityLevel,
+            request.HostCryptogram
+        );
 
         if (externalAuthCommandResult.IsFailure)
         {
@@ -932,7 +952,7 @@ public static class Scp03CommandProcessors
                 // For SCP03, use a simple 16-byte zero initialization
                 byte[] mac = new byte[16];
                 Array.Copy(request.HostMac, 0, mac, 0, Math.Min(request.HostMac.Length, 16));
-                return ImmutableArray.Create(mac);
+                return [.. mac];
             },
             () =>
             {

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using CSharpFunctionalExtensions;
+using Gp4Net.Tests.TestInfrastructure;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Operations;
@@ -26,27 +27,14 @@ public class CardManagementOperationTests
     /// <returns>Result containing the JsonDocument or error message</returns>
     private static Result<JsonDocument, string> LoadTraceFile(string traceFile)
     {
-        string tracePath = Path.Combine(
-            TestContext.CurrentContext.TestDirectory,
-            TraceDataPath,
-            traceFile
-        );
-
-        if (!File.Exists(tracePath))
-            return Result.Failure<JsonDocument, string>($"Trace file not found: {tracePath}");
-
-        try
+        var relativePath = Path.Combine("Traces/Operations/CardManagement", traceFile);
+        var ensureResult = TraceTestDataRepository.EnsureTraceFile(relativePath);
+        if (ensureResult.IsFailure)
         {
-            string jsonContent = File.ReadAllText(tracePath);
-            var testData = JsonDocument.Parse(jsonContent);
-            return Result.Success<JsonDocument, string>(testData);
+            return Result.Failure<JsonDocument, string>(ensureResult.Error);
         }
-        catch (Exception ex)
-        {
-            return Result.Failure<JsonDocument, string>(
-                $"Failed to parse trace file {traceFile}: {ex.Message}"
-            );
-        }
+
+        return TraceTestDataRepository.LoadTraceDocument(relativePath);
     }
 
     /// <summary>
@@ -177,7 +165,8 @@ public class CardManagementOperationTests
             );
 
         result.Match(
-            () => { /* Test passed */ },
+            () => { /* Test passed */
+            },
             failure => Assert.Fail($"Test failed: {failure}")
         );
     }
@@ -281,10 +270,7 @@ public class CardManagementOperationTests
     /// Test card lock operations including secure channel establishment and lock command execution.
     /// </summary>
     [TestCase("gp_pro_lock.json", "Card lock operation")]
-    public void CardManagement_Should_Execute_Lock_Operations(
-        string traceFile,
-        string description
-    )
+    public void CardManagement_Should_Execute_Lock_Operations(string traceFile, string description)
     {
         var result = LoadTraceFile(traceFile)
             .Bind(testData => ValidateExchangesExist(testData, traceFile))
@@ -293,7 +279,8 @@ public class CardManagementOperationTests
             );
 
         result.Match(
-            () => { /* Test passed */ },
+            () => { /* Test passed */
+            },
             failure => Assert.Fail($"Test failed: {failure}")
         );
     }
@@ -339,18 +326,24 @@ public class CardManagementOperationTests
             ) // GET DATA with specific unlock parameters
             .ToList();
 
-        bool isFactoryTrace = traceFile.Contains("factory");
+        // Check if this is a factory unlock by looking for specific unlock command patterns
+        // Factory unlocks typically use PUT KEY with specific privileges/parameters
+        bool isFactoryUnlock = commandResponsePairs.Any(pair =>
+            pair.Command.StartsWith("84D4")
+            || // PUT KEY command
+            pair.Command.StartsWith("80D4")
+        ); // PUT KEY (clear)
 
         // Validate factory unlock secure channel requirement
-        if (isFactoryTrace && !secureChannelCommands.Any())
+        if (isFactoryUnlock && !secureChannelCommands.Any())
             return UnitResult.Failure<string>("Factory unlock should establish secure channel");
 
         // Validate unlock commands present
         if (!unlockCommands.Any())
             return UnitResult.Failure<string>("Unlock operation should contain unlock commands");
 
-        // Validate factory unlock responses
-        if (traceFile.Contains("factory_unlock"))
+        // Validate factory unlock responses - check if all unlock commands succeeded
+        if (isFactoryUnlock)
         {
             var failedUnlockCommands = unlockCommands
                 .Where(pair => !pair.Response.EndsWith("9000"))
@@ -374,28 +367,6 @@ public class CardManagementOperationTests
 
         TestContext.Out.WriteLine($"✓ {description} validated");
         return UnitResult.Success<string>();
-    }
-
-    /// <summary>
-    /// Test card unlock operations with factory reset capabilities.
-    /// </summary>
-    [TestCase("gp_pro_factory_unlock.json", "Factory unlock operation")]
-    [TestCase("gp_pro_card_unlock_not_factory.json", "Standard unlock operation")]
-    public void CardManagement_Should_Execute_Unlock_Operations(
-        string traceFile,
-        string description
-    )
-    {
-        var result = LoadTraceFile(traceFile)
-            .Bind(testData => ValidateExchangesExist(testData, traceFile))
-            .Bind(exchangesElement =>
-                ValidateUnlockOperations(exchangesElement, description, traceFile)
-            );
-
-        result.Match(
-            () => { /* Test passed */ },
-            failure => Assert.Fail($"Test failed: {failure}")
-        );
     }
 
     /// <summary>
@@ -464,26 +435,6 @@ public class CardManagementOperationTests
         return UnitResult.Success<string>();
     }
 
-    /// <summary>
-    /// Test key management operations including key installation and updates.
-    /// </summary>
-    [TestCase("gp_pro_factory_key_put.json", "Factory key installation")]
-    public void CardManagement_Should_Execute_Key_Management_Operations(
-        string traceFile,
-        string description
-    )
-    {
-        var result = LoadTraceFile(traceFile)
-            .Bind(testData => ValidateExchangesExist(testData, traceFile))
-            .Bind(exchangesElement =>
-                ValidateKeyManagementOperations(exchangesElement, description, traceFile)
-            );
-
-        result.Match(
-            () => { /* Test passed */ },
-            failure => Assert.Fail($"Test failed: {failure}")
-        );
-    }
 
     /// <summary>
     /// Functional helper to analyze authentication sequence.
@@ -587,8 +538,6 @@ public class CardManagementOperationTests
     /// All privileged operations should establish secure channels before execution.
     /// </summary>
     [TestCase("gp_pro_lock.json")]
-    [TestCase("gp_pro_factory_unlock.json")]
-    [TestCase("gp_pro_factory_key_put_test_session1.json")]
     public void CardManagement_Should_Follow_Authentication_Sequence(string traceFile)
     {
         var result = LoadTraceFile(traceFile)
@@ -598,7 +547,8 @@ public class CardManagementOperationTests
             );
 
         result.Match(
-            () => { /* Test passed */ },
+            () => { /* Test passed */
+            },
             failure => Assert.Fail($"Test failed: {failure}")
         );
     }

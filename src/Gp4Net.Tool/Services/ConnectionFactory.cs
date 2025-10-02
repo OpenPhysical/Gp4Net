@@ -54,23 +54,18 @@ public static class ConnectionFactory
                     .Bind(connectionType =>
                         connectionType switch
                         {
-                            ConnectionType.Virtual => CreateVirtualConnection(
-                                spec,
-                                logger,
-                                cancellationToken
-                            ),
-                            ConnectionType.Physical => CreatePhysicalConnection(
-                                spec,
-                                logger,
-                                cancellationToken
-                            ),
-                            _ => Task.FromResult(
-                                Result.Failure<ISmartCardService, SmartCardError>(
-                                    SmartCardError.InvalidArgument(
-                                        $"Unknown connection type for: {spec}"
+                            ConnectionType.Virtual
+                                => CreateVirtualConnection(spec, logger, cancellationToken),
+                            ConnectionType.Physical
+                                => CreatePhysicalConnection(spec, logger, cancellationToken),
+                            _
+                                => Task.FromResult(
+                                    Result.Failure<ISmartCardService, SmartCardError>(
+                                        SmartCardError.InvalidArgument(
+                                            $"Unknown connection type for: {spec}"
+                                        )
                                     )
-                                )
-                            ),
+                                ),
                         }
                     )
             );

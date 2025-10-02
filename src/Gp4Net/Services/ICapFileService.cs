@@ -67,5 +67,8 @@ public interface ICapFileService
     /// Result containing true if hash verification succeeds,
     /// or SmartCardError if hash mismatch or computation fails.
     /// </returns>
-    Result<bool, SmartCardError> VerifyLoadFileDataBlockHash(byte[] capFileData, byte[] expectedHash);
+    Result<bool, SmartCardError> VerifyLoadFileDataBlockHash(
+        byte[] capFileData,
+        byte[] expectedHash
+    );
 }

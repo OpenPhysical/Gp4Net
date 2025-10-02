@@ -96,14 +96,19 @@ public sealed record ApplicationRegistry
     /// Reference: GP Card Specification v2.3.1 Section 11.1 (SELECT command processing)
     /// </summary>
     public Result<
-        (ApplicationRegistry UpdatedRegistry, ApduResponse Response),
+        (ApplicationRegistry UpdatedRegistry, ApduResponse Response, CardState UpdatedState),
         SmartCardError
-    > RouteCommand(byte[] command, CardState cardState, IRngContext rngContext)
+    > RouteCommand(
+        byte[] command,
+        CardState cardState,
+        CardConfiguration config,
+        IRngContext rngContext
+    )
     {
         if (command.Length < 4)
         {
-            return Result.Success<(ApplicationRegistry, ApduResponse), SmartCardError>(
-                (this, ApduResponse.WrongLength())
+            return Result.Success<(ApplicationRegistry, ApduResponse, CardState), SmartCardError>(
+                (this, ApduResponse.WrongLength(), cardState)
             );
         }
 
@@ -112,15 +117,21 @@ public sealed record ApplicationRegistry
         // Handle SELECT command specially - it affects application selection
         if (instruction == ApduIns.SELECT)
         {
-            return ProcessSelectCommand(command, cardState);
+            return ProcessSelectCommand(command, cardState)
+                .Map(result =>
+                {
+                    var (updatedRegistry, response) = result;
+                    var updatedState = cardState.WithApplicationRegistry(updatedRegistry);
+                    return (updatedRegistry, response, updatedState);
+                });
         }
 
         // Route to currently selected application
         return SelectedApplicationAid.Match(
-            selectedAid => RouteToApplication(selectedAid, command, cardState, rngContext),
+            selectedAid => RouteToApplication(selectedAid, command, cardState, config, rngContext),
             () =>
-                Result.Success<(ApplicationRegistry, ApduResponse), SmartCardError>(
-                    (this, ApduResponse.ConditionsNotSatisfied())
+                Result.Success<(ApplicationRegistry, ApduResponse, CardState), SmartCardError>(
+                    (this, ApduResponse.ConditionsNotSatisfied(), cardState)
                 )
         );
     }
@@ -285,19 +296,12 @@ public sealed record ApplicationRegistry
                     : Result.Success<(ApplicationRegistry, ApduResponse), SmartCardError>(
                         (
                             this,
-                            ApduResponse.Error(
-                                Constants.Constants.StatusWords.Legacy.FileNotFound
-                            )
+                            ApduResponse.Error(Constants.Constants.StatusWords.Legacy.FileNotFound)
                         )
                     ),
             () =>
                 Result.Success<(ApplicationRegistry, ApduResponse), SmartCardError>(
-                    (
-                        this,
-                        ApduResponse.Error(
-                            Constants.Constants.StatusWords.Legacy.FileNotFound
-                        )
-                    )
+                    (this, ApduResponse.Error(Constants.Constants.StatusWords.Legacy.FileNotFound))
                 )
         );
     }
@@ -327,19 +331,15 @@ public sealed record ApplicationRegistry
 
         return matchingApps.Count switch
         {
-            0 => Result.Success<(ApplicationRegistry, ApduResponse), SmartCardError>(
-                (
-                    this,
-                    ApduResponse.Error(Constants.Constants.StatusWords.Legacy.FileNotFound)
-                )
-            ),
+            0
+                => Result.Success<(ApplicationRegistry, ApduResponse), SmartCardError>(
+                    (this, ApduResponse.Error(Constants.Constants.StatusWords.Legacy.FileNotFound))
+                ),
             1 => SelectApplicationInternal(matchingApps[0].Aid, matchingApps[0], fileControlInfo),
-            _ => Result.Success<(ApplicationRegistry, ApduResponse), SmartCardError>(
-                (
-                    this,
-                    ApduResponse.Error(Constants.Constants.StatusWords.Legacy.FileNotFound)
-                )
-            ), // Multiple matches - ambiguous
+            _
+                => Result.Success<(ApplicationRegistry, ApduResponse), SmartCardError>(
+                    (this, ApduResponse.Error(Constants.Constants.StatusWords.Legacy.FileNotFound))
+                ), // Multiple matches - ambiguous
         };
     }
 
@@ -369,13 +369,13 @@ public sealed record ApplicationRegistry
         return application.LifecycleState switch
         {
             LifecycleState.Selectable => Result.Success<IApplication, SmartCardError>(application),
-            LifecycleState.Personalized => Result.Success<IApplication, SmartCardError>(
-                application
-            ),
+            LifecycleState.Personalized
+                => Result.Success<IApplication, SmartCardError>(application),
             LifecycleState.Locked => Result.Success<IApplication, SmartCardError>(application), // Can still select but with limited functionality
-            _ => Result.Failure<IApplication, SmartCardError>(
-                SmartCardError.ConditionsNotSatisfied()
-            ),
+            _
+                => Result.Failure<IApplication, SmartCardError>(
+                    SmartCardError.ConditionsNotSatisfied()
+                ),
         };
     }
 
@@ -453,30 +453,36 @@ public sealed record ApplicationRegistry
         return fciTemplate;
     }
 
-    private Result<(ApplicationRegistry, ApduResponse), SmartCardError> RouteToApplication(
+    private Result<
+        (ApplicationRegistry UpdatedRegistry, ApduResponse Response, CardState UpdatedState),
+        SmartCardError
+    > RouteToApplication(
         ImmutableArray<byte> applicationAid,
         byte[] command,
         CardState cardState,
+        CardConfiguration config,
         IRngContext rngContext
     )
     {
         return Applications.TryGetValue(applicationAid, out var application)
             ? ValidateApplicationState(application, command)
                 .Bind(app => ValidateSecurityRequirements(app, command, cardState))
-                .Bind(app => app.ProcessCommand(command, cardState, rngContext))
+                .Bind(app => app.ProcessCommand(command, cardState, config, rngContext))
                 .Map(result =>
                 {
-                    var (updatedApp, response) = result;
+                    var (updatedApp, updatedState, response) = result;
                     var builder = Applications.ToBuilder();
                     builder[applicationAid] = updatedApp;
                     var newApplications = builder.ToImmutable();
                     var updatedRegistry = this with { Applications = newApplications };
-                    return (updatedRegistry, response);
+                    var stateWithRegistry = updatedState.WithApplicationRegistry(updatedRegistry);
+                    return (updatedRegistry, response, stateWithRegistry);
                 })
-            : Result.Success<(ApplicationRegistry, ApduResponse), SmartCardError>(
+            : Result.Success<(ApplicationRegistry, ApduResponse, CardState), SmartCardError>(
                 (
                     this,
-                    ApduResponse.Error(Constants.Constants.StatusWords.Legacy.FileNotFound)
+                    ApduResponse.Error(Constants.Constants.StatusWords.Legacy.FileNotFound),
+                    cardState
                 )
             );
     }
@@ -493,14 +499,16 @@ public sealed record ApplicationRegistry
         {
             LifecycleState.Selectable => Result.Success<IApplication, SmartCardError>(app),
             LifecycleState.Personalized => Result.Success<IApplication, SmartCardError>(app),
-            LifecycleState.Locked => instruction == ApduIns.SELECT
-                ? Result.Success<IApplication, SmartCardError>(app)
-                : Result.Failure<IApplication, SmartCardError>(
+            LifecycleState.Locked
+                => instruction == ApduIns.SELECT
+                    ? Result.Success<IApplication, SmartCardError>(app)
+                    : Result.Failure<IApplication, SmartCardError>(
+                        SmartCardError.ConditionsNotSatisfied()
+                    ),
+            _
+                => Result.Failure<IApplication, SmartCardError>(
                     SmartCardError.ConditionsNotSatisfied()
                 ),
-            _ => Result.Failure<IApplication, SmartCardError>(
-                SmartCardError.ConditionsNotSatisfied()
-            ),
         };
     }
 

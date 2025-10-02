@@ -146,10 +146,7 @@ public class ChipInfoTests
     public void GetCryptoSummary_WithP71Capabilities_ReturnsComprehensiveSummary()
     {
         // Arrange
-        var chipInfo = new ChipInfo
-        {
-            CryptoCapabilities = CryptoCapabilities.P71D321Standard,
-        };
+        var chipInfo = new ChipInfo { CryptoCapabilities = CryptoCapabilities.P71D321Standard };
 
         // Act
         string? summary = chipInfo.GetCryptoSummary();

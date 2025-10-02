@@ -163,10 +163,10 @@ public static class ErrorTranslationService
             0x6F00 => "No precise diagnosis available",
 
             // Handle ranges
-            _ when (statusWord & 0xFF00) == 0x6100 =>
-                $"More data available ({statusWord & 0xFF} bytes)",
-            _ when (statusWord & 0xFF00) == 0x6C00 =>
-                $"Wrong length ({statusWord & 0xFF} bytes expected)",
+            _ when (statusWord & 0xFF00) == 0x6100
+                => $"More data available ({statusWord & 0xFF} bytes)",
+            _ when (statusWord & 0xFF00) == 0x6C00
+                => $"Wrong length ({statusWord & 0xFF} bytes expected)",
 
             // Default case
             _ => $"Unknown status word: 0x{statusWord:X4}",
@@ -224,65 +224,70 @@ public static class ErrorTranslationService
     {
         return statusWord switch
         {
-            0x6982 => (
-                ErrorSeverity.Error,
-                ImmutableList.Create(
-                    "Secure channel not established",
-                    "Authentication required",
-                    "Insufficient privileges"
+            0x6982
+                => (
+                    ErrorSeverity.Error,
+                    ImmutableList.Create(
+                        "Secure channel not established",
+                        "Authentication required",
+                        "Insufficient privileges"
+                    ),
+                    ImmutableList.Create(
+                        "Establish secure channel with valid keys",
+                        "Verify authentication state",
+                        "Check required privileges for operation"
+                    )
                 ),
-                ImmutableList.Create(
-                    "Establish secure channel with valid keys",
-                    "Verify authentication state",
-                    "Check required privileges for operation"
-                )
-            ),
 
-            0x6985 => (
-                ErrorSeverity.Error,
-                ImmutableList.Create(
-                    "Application has dependent objects",
-                    "Lifecycle state prevents deletion",
-                    "Security conditions not met"
+            0x6985
+                => (
+                    ErrorSeverity.Error,
+                    ImmutableList.Create(
+                        "Application has dependent objects",
+                        "Lifecycle state prevents deletion",
+                        "Security conditions not met"
+                    ),
+                    ImmutableList.Create(
+                        "Delete dependent objects first",
+                        "Use delete-related option if appropriate",
+                        "Check application lifecycle state"
+                    )
                 ),
-                ImmutableList.Create(
-                    "Delete dependent objects first",
-                    "Use delete-related option if appropriate",
-                    "Check application lifecycle state"
-                )
-            ),
 
-            0x6A82 => (
-                ErrorSeverity.Error,
-                ImmutableList.Create(
-                    "Application not installed on card",
-                    "Incorrect AID specified",
-                    "Application already deleted"
+            0x6A82
+                => (
+                    ErrorSeverity.Error,
+                    ImmutableList.Create(
+                        "Application not installed on card",
+                        "Incorrect AID specified",
+                        "Application already deleted"
+                    ),
+                    ImmutableList.Create(
+                        "Verify AID is correct",
+                        "Check installed applications with GET STATUS",
+                        "Ensure application exists before attempting operation"
+                    )
                 ),
-                ImmutableList.Create(
-                    "Verify AID is correct",
-                    "Check installed applications with GET STATUS",
-                    "Ensure application exists before attempting operation"
-                )
-            ),
 
-            0x6283 => (
-                ErrorSeverity.Warning,
-                ImmutableList.Create(
-                    "Application is personalized",
-                    "Application locked by card issuer"
+            0x6283
+                => (
+                    ErrorSeverity.Warning,
+                    ImmutableList.Create(
+                        "Application is personalized",
+                        "Application locked by card issuer"
+                    ),
+                    ImmutableList.Create(
+                        "Application may be protected - proceed with caution",
+                        "Contact card issuer for unlock procedures"
+                    )
                 ),
-                ImmutableList.Create(
-                    "Application may be protected - proceed with caution",
-                    "Contact card issuer for unlock procedures"
-                )
-            ),
 
-            _ => (
-                ErrorSeverity.Error,
-                ImmutableList.Create("Refer to GlobalPlatform specification for details"),
-                ImmutableList.Create("Check card documentation", "Verify command parameters")
-            ),
+            _
+                => (
+                    ErrorSeverity.Error,
+                    ImmutableList.Create("Refer to GlobalPlatform specification for details"),
+                    ImmutableList.Create("Check card documentation", "Verify command parameters")
+                ),
         };
     }
 
@@ -296,49 +301,56 @@ public static class ErrorTranslationService
     {
         return errorCode switch
         {
-            "COMMUNICATION_ERROR" => (
-                ImmutableList.Create(
-                    "Card not present in reader",
-                    "Reader communication failure",
-                    "PC/SC subsystem error"
+            "COMMUNICATION_ERROR"
+                => (
+                    ImmutableList.Create(
+                        "Card not present in reader",
+                        "Reader communication failure",
+                        "PC/SC subsystem error"
+                    ),
+                    ImmutableList.Create(
+                        "Ensure card is properly inserted",
+                        "Check reader connection",
+                        "Restart PC/SC service if necessary"
+                    )
                 ),
-                ImmutableList.Create(
-                    "Ensure card is properly inserted",
-                    "Check reader connection",
-                    "Restart PC/SC service if necessary"
-                )
-            ),
 
-            "SECURITY_ERROR" => (
-                ImmutableList.Create(
-                    "Invalid authentication keys",
-                    "Secure channel establishment failed",
-                    "Cryptographic operation failed"
+            "SECURITY_ERROR"
+                => (
+                    ImmutableList.Create(
+                        "Invalid authentication keys",
+                        "Secure channel establishment failed",
+                        "Cryptographic operation failed"
+                    ),
+                    ImmutableList.Create(
+                        "Verify key sets are correct",
+                        "Check key diversification",
+                        "Ensure secure channel is established"
+                    )
                 ),
-                ImmutableList.Create(
-                    "Verify key sets are correct",
-                    "Check key diversification",
-                    "Ensure secure channel is established"
-                )
-            ),
 
-            "INVALID_DATA" => (
-                ImmutableList.Create(
-                    "Malformed command data",
-                    "Invalid file format",
-                    "Incorrect parameter values"
+            "INVALID_DATA"
+                => (
+                    ImmutableList.Create(
+                        "Malformed command data",
+                        "Invalid file format",
+                        "Incorrect parameter values"
+                    ),
+                    ImmutableList.Create(
+                        "Verify input data format",
+                        "Check parameter values",
+                        "Validate file integrity"
+                    )
                 ),
-                ImmutableList.Create(
-                    "Verify input data format",
-                    "Check parameter values",
-                    "Validate file integrity"
-                )
-            ),
 
-            _ => (
-                ImmutableList.Create("Unexpected error condition"),
-                ImmutableList.Create("Check logs for detailed error information", "Retry operation")
-            ),
+            _
+                => (
+                    ImmutableList.Create("Unexpected error condition"),
+                    ImmutableList.Create(
+                        "Check logs for detailed error information",
+                        "Retry operation"
+                    )
+                ),
         };
     }
 

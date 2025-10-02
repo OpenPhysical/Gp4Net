@@ -110,12 +110,16 @@ public class GetStatusCommand : IApduCommand
     /// <returns>A Result containing the CommandAPDU or an error.</returns>
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
+        // Only pass search criteria if it's non-empty
+        var data =
+            SearchCriteria.Length > 0 ? Maybe<byte[]>.From(SearchCriteria) : Maybe<byte[]>.None;
+
         return ApduBuilder.CreateCommand(
             GlobalPlatform.Cla.GP_STANDARD,
             GlobalPlatform.Ins.GET_STATUS,
             (byte)Subset,
             (byte)Format,
-            Maybe<byte[]>.From(SearchCriteria),
+            data,
             Maybe<int>.From(256)
         );
     }
@@ -238,13 +242,35 @@ public class GetStatusCommand : IApduCommand
     /// <inheritdoc />
     public CommandAPDU ToApdu()
     {
-        return ToCommandApdu().GetValueOrDefault(new CommandAPDU([]));
+        return ToCommandApdu()
+            .GetValueOrDefault(
+                new CommandAPDU(
+                    GlobalPlatform.Cla.GP_STANDARD,
+                    GlobalPlatform.Ins.GET_STATUS,
+                    0x00,
+                    0x00
+                )
+            );
     }
 
     /// <inheritdoc />
     public byte[] ToBytes()
     {
-        return ToCommandApdu().Map(cmd => cmd.ToBytes()).GetValueOrDefault([]);
+        // Only pass search criteria if it's non-empty
+        var data =
+            SearchCriteria.Length > 0 ? Maybe<byte[]>.From(SearchCriteria) : Maybe<byte[]>.None;
+
+        // Build APDU bytes directly to avoid WSCT reconstruction issues
+        return ApduBuilder
+            .BuildApduBytes(
+                GlobalPlatform.Cla.GP_STANDARD,
+                GlobalPlatform.Ins.GET_STATUS,
+                (byte)Subset,
+                (byte)Format,
+                data,
+                Maybe<int>.From(256)
+            )
+            .GetValueOrDefault([]);
     }
 }
 

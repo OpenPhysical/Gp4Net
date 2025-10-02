@@ -50,7 +50,6 @@ public static class CommandProcessing
         {
             return this with { SecureChannel = Maybe<SecureChannelState>.None };
         }
-
     }
 
     /// <summary>

@@ -12,14 +12,14 @@ public record EncryptedPayload(string Algorithm, byte[] Iv, byte[] Ciphertext, b
     /// <summary>
     /// Gets the total size of the encrypted payload in bytes.
     /// </summary>
-    public int TotalSize => Iv.Length + Ciphertext.Length + AuthTag.Length;
+    public int TotalSize => (Iv?.Length ?? 0) + (Ciphertext?.Length ?? 0) + (AuthTag?.Length ?? 0);
 
     /// <summary>
     /// Validates that the encrypted payload has the expected structure for AES-256-GCM.
     /// </summary>
     public bool IsValid =>
-        Algorithm == "aes-256-gcm"
-        && Iv.Length == 12
-        && AuthTag.Length == 16
-        && Ciphertext.Length > 0;
+        string.Equals(Algorithm, "aes-256-gcm", System.StringComparison.OrdinalIgnoreCase)
+        && Iv is { Length: 12 }
+        && AuthTag is { Length: 16 }
+        && Ciphertext is { Length: > 0 };
 }

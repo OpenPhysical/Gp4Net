@@ -10,6 +10,7 @@ using Gp4Net.CardEmulator.Functional;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
+using Gp4Net.Shared;
 using JetBrains.Annotations;
 
 namespace Gp4Net.CardEmulator.Profiles;
@@ -25,44 +26,33 @@ public static class CardProfileLoader
     /// </summary>
     /// <param name="jsonPath">Path to the JSON profile file.</param>
     /// <returns>Result containing the card configuration or error.</returns>
-    public static Result<CardConfiguration, SmartCardError> LoadFromFile(string jsonPath)
-    {
-        if (string.IsNullOrWhiteSpace(jsonPath))
-        {
-            return Result.Failure<CardConfiguration, SmartCardError>(
-                SmartCardError.InvalidArgument("JSON path cannot be null or empty")
-            );
-        }
-
-        if (!File.Exists(jsonPath))
-        {
-            return Result.Failure<CardConfiguration, SmartCardError>(
-                SmartCardError.InvalidArgument($"Profile file not found: {jsonPath}")
-            );
-        }
-
-        return Result
-            .Try(
-                () => File.ReadAllText(jsonPath),
-                ex => SmartCardError.InvalidData($"Failed to read profile file: {ex.Message}")
-            )
+    public static Result<CardConfiguration, SmartCardError> LoadFromFile(string jsonPath) =>
+        Maybe<string>
+            .From(jsonPath)
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .ToResult(ErrorFactory.EmptyArgument("JSON path"))
+            .Ensure(File.Exists, SmartCardError.InvalidArgument($"Profile file not found: {jsonPath}"))
+            .Bind(path =>
+                Result.Try(
+                    () => File.ReadAllText(path),
+                    ex => SmartCardError.InvalidData($"Failed to read profile file: {ex.Message}")
+                ))
             .Bind(LoadFromJson);
-    }
 
     /// <summary>
     /// Loads a card configuration from a JSON string.
     /// </summary>
     /// <param name="json">JSON content.</param>
     /// <returns>Result containing the card configuration or error.</returns>
-    public static Result<CardConfiguration, SmartCardError> LoadFromJson(string json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-        {
-            return Result.Failure<CardConfiguration, SmartCardError>(
-                SmartCardError.InvalidArgument("JSON content cannot be null or empty")
-            );
-        }
+    public static Result<CardConfiguration, SmartCardError> LoadFromJson(string json) =>
+        Maybe<string>
+            .From(json)
+            .Where(content => !string.IsNullOrWhiteSpace(content))
+            .ToResult(ErrorFactory.EmptyArgument("JSON content"))
+            .Bind(ParseCardConfiguration);
 
+    private static Result<CardConfiguration, SmartCardError> ParseCardConfiguration(string json)
+    {
         var options = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
@@ -177,15 +167,18 @@ public static class CardProfileLoader
 
         return profile.Type.ToUpperInvariant() switch
         {
-            "SCP02" => Scp02KeySet
-                .Create(encResult.Value, macResult.Value, dekResult.Value, version)
-                .Map(ks => (IKeySet)ks),
-            "SCP03" => Scp03KeySet
-                .Create(encResult.Value, macResult.Value, dekResult.Value, version)
-                .Map(ks => (IKeySet)ks),
-            _ => Result.Failure<IKeySet, SmartCardError>(
-                SmartCardError.InvalidData($"Unknown key set type: {profile.Type}")
-            ),
+            "SCP02"
+                => Scp02KeySet
+                    .Create(encResult.Value, macResult.Value, dekResult.Value, version)
+                    .Map(ks => (IKeySet)ks),
+            "SCP03"
+                => Scp03KeySet
+                    .Create(encResult.Value, macResult.Value, dekResult.Value, version)
+                    .Map(ks => (IKeySet)ks),
+            _
+                => Result.Failure<IKeySet, SmartCardError>(
+                    SmartCardError.InvalidData($"Unknown key set type: {profile.Type}")
+                ),
         };
     }
 
@@ -298,25 +291,18 @@ public static class CardProfileLoader
         );
     }
 
-    private static Result<byte[], SmartCardError> ParseHexString(string hex, string fieldName)
+    private static Result<byte[], SmartCardError> ParseHexString(string hex, string fieldName) =>
+        Maybe<string>
+            .From(hex)
+            .Where(h => !string.IsNullOrWhiteSpace(h))
+            .ToResult(ErrorFactory.EmptyArgument(fieldName))
+            .Map(h => h.Replace(" ", "").Replace("-", ""))
+            .Ensure(cleaned => cleaned.Length % 2 == 0,
+                SmartCardError.InvalidData($"{fieldName} must have even number of hex digits"))
+            .Bind(cleaned => ConvertHexToBytes(cleaned, fieldName));
+
+    private static Result<byte[], SmartCardError> ConvertHexToBytes(string cleaned, string fieldName)
     {
-        if (string.IsNullOrWhiteSpace(hex))
-        {
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidData($"{fieldName} cannot be null or empty")
-            );
-        }
-
-        // Remove any spaces or dashes
-        string cleaned = hex.Replace(" ", "").Replace("-", "");
-
-        // Ensure even number of characters
-        if (cleaned.Length % 2 != 0)
-        {
-            return Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidData($"{fieldName} must have even number of hex digits")
-            );
-        }
 
         return Result.Try(
             () => Convert.FromHexString(cleaned),

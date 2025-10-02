@@ -40,8 +40,7 @@ public class StatusCommand : IPipelineCommand<StatusCommand.Settings>
                 await DisplayCardInfoAsync(ctx);
             }
 
-            var statusResult =
-                await RetrieveApplicationStatus(ctx);
+            var statusResult = await RetrieveApplicationStatus(ctx);
             return await statusResult.Match(
                 async applications => await ProcessApplications(ctx, applications, settings),
                 error =>

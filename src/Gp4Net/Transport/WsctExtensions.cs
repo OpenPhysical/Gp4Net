@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using JetBrains.Annotations;
@@ -84,7 +83,7 @@ public static class WsctExtensions
     /// <returns>The raw response APDU bytes.</returns>
     public static byte[] ToBytes(this ResponseAPDU response)
     {
-        var udr = response.Udr ?? System.Array.Empty<byte>();
+        var udr = response.Udr ?? [];
         var result = new byte[udr.Length + 2];
         if (udr.Length > 0)
             System.Array.Copy(udr, 0, result, 0, udr.Length);

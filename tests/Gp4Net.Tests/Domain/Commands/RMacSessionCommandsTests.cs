@@ -131,7 +131,7 @@ public class RMacSessionCommandsTests
         Result<EndRMacSessionResponse, SmartCardError> result = EndRMacSessionResponse.Parse(null);
 
         _ = result.IsFailure.Should().BeTrue();
-        _ = result.Error.Message.Should().Contain("Response data cannot be null");
+        _ = result.Error.Message.Should().Contain("Response data is required");
     }
 
     [Test]

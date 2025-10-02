@@ -136,11 +136,11 @@ public class SecurityDomainStatus
                     // Single byte counter
                     return Maybe<ushort>.From(data[0]);
                 case >= 2:
-                    {
-                        // Two byte counter (big-endian)
-                        ushort counter = (ushort)(data[^2] << 8 | data[^1]);
-                        return Maybe<ushort>.From(counter);
-                    }
+                {
+                    // Two byte counter (big-endian)
+                    ushort counter = (ushort)(data[^2] << 8 | data[^1]);
+                    return Maybe<ushort>.From(counter);
+                }
                 default:
                     return Maybe<ushort>.None;
             }

@@ -265,9 +265,7 @@ public class ApplicationDisplayService
     /// <param name="applications">The applications to display.</param>
     public static void DisplayDetailedInformation(IReadOnlyList<ApplicationInfo> applications)
     {
-        var groups = applications.GroupBy(a =>
-            a.Type
-        );
+        var groups = applications.GroupBy(a => a.Type);
 
         foreach (var group in groups)
         {
@@ -304,16 +302,16 @@ public class ApplicationDisplayService
     {
         return filter.ToLowerInvariant() switch
         {
-            "isd" => applications
-                .Where(a => a.Type == ApplicationType.IssuerSecurityDomain)
-                .ToList(),
-            "apps" or "applets" => applications
-                .Where(a => a.Type == ApplicationType.Application)
-                .ToList(),
+            "isd"
+                => applications.Where(a => a.Type == ApplicationType.IssuerSecurityDomain).ToList(),
+            "apps"
+            or "applets"
+                => applications.Where(a => a.Type == ApplicationType.Application).ToList(),
             "packages" => applications.Where(a => a.Type == ApplicationType.LoadFile).ToList(),
-            "ssd" => applications
-                .Where(a => a.Type == ApplicationType.SupplementarySecurityDomain)
-                .ToList(),
+            "ssd"
+                => applications
+                    .Where(a => a.Type == ApplicationType.SupplementarySecurityDomain)
+                    .ToList(),
             _ => applications,
         };
     }

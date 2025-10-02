@@ -83,7 +83,7 @@ public class KeyInformationTemplate
 
         // Parse the content for C0 tags
         return TlvParser
-            .ParseMultiple(contentToParse.ToImmutableArray())
+            .ParseMultiple([.. contentToParse])
             .Map(parseResult =>
             {
                 IReadOnlyList<KeyEntry> keys = parseResult
@@ -93,22 +93,19 @@ public class KeyInformationTemplate
                             .Match(onSuccess: tagNumber => tagNumber == 0xC0, onFailure: _ => false)
                     )
                     .Select(element => ParseKeyInformationData(element.TlvData.Bytes.ToArray()))
+                    .Where(maybeKey => maybeKey.HasValue)
+                    .Select(maybeKey => maybeKey.Value)
                     .ToImmutableList();
 
                 return new KeyInformationTemplate(data, keys);
             });
     }
 
-    private static KeyEntry ParseKeyInformationData(byte[] data)
+    private static Maybe<KeyEntry> ParseKeyInformationData(byte[] data)
     {
         if (data.Length < 3)
         {
-            return new KeyEntry
-            {
-                KeyId = 0,
-                KeyVersion = 0,
-                KeyTypes = [],
-            };
+            return Maybe<KeyEntry>.None;
         }
 
         IReadOnlyList<KeyType> keyTypes = data.Skip(2)
@@ -116,12 +113,12 @@ public class KeyInformationTemplate
             .Where(keyType => keyType != KeyType.Unknown)
             .ToImmutableList();
 
-        return new KeyEntry
+        return Maybe<KeyEntry>.From(new KeyEntry
         {
             KeyId = data[0],
             KeyVersion = data[1],
             KeyTypes = keyTypes,
-        };
+        });
     }
 
     private static KeyType ParseKeyType(byte value)
@@ -218,7 +215,7 @@ public record KeyEntry
             .GetValueOrDefault("Unknown");
         string lengthStr = KeyLength > 0 ? $"length: {KeyLength / 8} ({keyTypeStr})" : keyTypeStr;
 
-        return $"Version: {KeyVersion} (0x{KeyVersion:X2}) ID: {KeyId} (0x{KeyId:X2}) type: {keyTypeStr,-12} {lengthStr}";
+        return $"Version: {KeyVersion} (0x{KeyVersion:X2}) ID: {KeyId} (0x{KeyId:X2}) type: {keyTypeStr, -12} {lengthStr}";
     }
 }
 

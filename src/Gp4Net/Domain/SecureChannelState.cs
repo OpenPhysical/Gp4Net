@@ -20,7 +20,8 @@ public record SecureChannelState(
     MacChainingState MacChaining,
     uint EncryptionCounter,
     ImmutableArray<byte> SessionId,
-    byte ImplementationParameter
+    byte ImplementationParameter,
+    ImmutableArray<byte> LastStrippedCommand
 )
 {
     /// <summary>
@@ -53,7 +54,6 @@ public record SecureChannelState(
                 None: () => SmartCardError.InvalidArgument("MAC chaining state cannot be null")
             );
     }
-
 
     /// <summary>
     /// Creates a new secure channel state with both updated MAC chaining state and incremented counter.
@@ -225,7 +225,8 @@ public record SecureChannelState(
                 macChainingResult.Value,
                 0, // Start with counter = 0 per GP specification
                 [.. sessionId],
-                implementationParameter
+                implementationParameter,
+                ImmutableArray<byte>.Empty
             )
         );
     }
@@ -268,5 +269,25 @@ public record SecureChannelState(
         }
 
         return Result.Success<SecureChannelState, SmartCardError>(this);
+    }
+
+    /// <summary>
+    /// Updates the cached stripped command (CLA|INS|P1|P2|Lc|Plaintext Data without MAC/Le).
+    /// Used for SCP02 R-MAC verification as per GP E.4.5.
+    /// </summary>
+    public Result<SecureChannelState, SmartCardError> UpdateLastStrippedCommand(byte[] bytes)
+    {
+        return Maybe<byte[]>
+            .From(bytes)
+            .Match(
+                Some: value =>
+                    Result.Success<SecureChannelState, SmartCardError>(
+                        this with
+                        {
+                            LastStrippedCommand = [.. value]
+                        }
+                    ),
+                None: () => SmartCardError.InvalidArgument("Stripped command cannot be null")
+            );
     }
 }

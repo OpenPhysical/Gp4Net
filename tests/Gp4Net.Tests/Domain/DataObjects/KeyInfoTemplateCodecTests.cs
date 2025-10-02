@@ -173,7 +173,8 @@ public class KeyInfoTemplateCodecTests
         _ = result.KeyIdentifier.Should().Be(original.KeyIdentifier);
         _ = result.KeyTypesAndLengths.Count().Should().Be(original.KeyTypesAndLengths.Count());
 
-        _ = original.KeyTypesAndLengths.Zip(result.KeyTypesAndLengths, (orig, res) => new { orig, res })
+        _ = original
+            .KeyTypesAndLengths.Zip(result.KeyTypesAndLengths, (orig, res) => new { orig, res })
             .Select(pair =>
             {
                 _ = pair.res.Type.Should().Be(pair.orig.Type);
@@ -243,7 +244,7 @@ public class KeyInfoTemplateCodecTests
     {
         var keyInfo = new KeyInfoTemplate
         {
-            KeyTypesAndLengths = [new KeyTypeAndLength(0x88, 0x20)] // AES, 32 bytes
+            KeyTypesAndLengths = [new KeyTypeAndLength(0x88, 0x20)], // AES, 32 bytes
         };
 
         Result<byte[], SmartCardError> encodedResult = KeyInfoTemplateCodec.Encode(keyInfo);

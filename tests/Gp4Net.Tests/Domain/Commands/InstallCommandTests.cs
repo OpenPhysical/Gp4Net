@@ -106,9 +106,7 @@ public class InstallCommandTests
     [Test]
     public void InstallForLoadCommand_Data_WithMinimalParameters_BuildsCorrectStructure()
     {
-        var command = InstallCommand
-            .InstallForLoadCommand.Create(_validPackageAid)
-            .Value;
+        var command = InstallCommand.InstallForLoadCommand.Create(_validPackageAid).Value;
 
         byte[]? data = command.Data;
 
@@ -186,9 +184,7 @@ public class InstallCommandTests
     [Test]
     public void InstallForLoadCommand_ApduProperties_ReturnsCorrectValues()
     {
-        var command = InstallCommand
-            .InstallForLoadCommand.Create(_validPackageAid)
-            .Value;
+        var command = InstallCommand.InstallForLoadCommand.Create(_validPackageAid).Value;
 
         _ = command.Cla.Should().Be(0x80);
         _ = command.Ins.Should().Be(0xE6);
@@ -201,9 +197,7 @@ public class InstallCommandTests
     [Test]
     public void InstallForLoadCommand_ToApdu_GeneratesCorrectApdu()
     {
-        var command = InstallCommand
-            .InstallForLoadCommand.Create(_validPackageAid)
-            .Value;
+        var command = InstallCommand.InstallForLoadCommand.Create(_validPackageAid).Value;
 
         Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
         _ = apduResult.IsSuccess.Should().BeTrue();
@@ -221,9 +215,7 @@ public class InstallCommandTests
     [Test]
     public void InstallForLoadCommand_ToString_ReturnsCorrectString()
     {
-        var command = InstallCommand
-            .InstallForLoadCommand.Create(_validPackageAid)
-            .Value;
+        var command = InstallCommand.InstallForLoadCommand.Create(_validPackageAid).Value;
 
         _ = command.ToString().Should().Be("INSTALL [for load]");
     }
@@ -743,9 +735,7 @@ public class InstallCommandTests
     [Test]
     public void InstallCommand_IsImmutable_PropertiesCannotBeModified()
     {
-        var command = InstallCommand
-            .InstallForLoadCommand.Create(_validPackageAid)
-            .Value;
+        var command = InstallCommand.InstallForLoadCommand.Create(_validPackageAid).Value;
         byte[] originalPackageAid = [.. command.PackageAid];
 
         // Verify that the PackageAid property returns an immutable array

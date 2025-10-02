@@ -9,7 +9,4 @@ namespace Gp4Net.Domain.CapFile;
 /// </summary>
 /// <param name="AccumulatedData">The accumulated CAP file data bytes from all received blocks.</param>
 /// <param name="LastBlockNumber">The sequence number of the last processed block (0xFF indicates no previous block).</param>
-internal sealed record LoadContext(
-    ImmutableList<byte> AccumulatedData,
-    byte LastBlockNumber
-);
+internal sealed record LoadContext(ImmutableList<byte> AccumulatedData, byte LastBlockNumber);

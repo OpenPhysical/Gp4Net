@@ -165,7 +165,6 @@ public static partial class TlvService
                 });
         }
 
-
         /// <summary>
         /// Parses a tag from the data.
         /// </summary>
@@ -191,7 +190,7 @@ public static partial class TlvService
             {
                 // Single byte tag
                 return Result.Success<(TlvTag, int), SmartCardError>(
-                    (new TlvTag(ImmutableArray.Create(firstByte)), offset + 1)
+                    (new TlvTag([firstByte]), offset + 1)
                 );
             }
 

@@ -1,0 +1,537 @@
+{
+  "metadata": {
+    "source": {
+      "file": "tests/Gp4Net.Tests/TestData/Traces/Raw/gp_pro_scp03_renc.log",
+      "type": "gp_pro",
+      "generated": "2025-09-19T04:31:04Z",
+      "tool_version": "gp4net-1.0"
+    },
+    "card": {
+      "atr": "3BD518FF8191FE1FC38073C821100A",
+      "isd_aid": "A000000151000000",
+      "card_type": "NXP_P71",
+      "cplc": {
+        "ic_fabricator": "4790",
+        "ic_type": "D321",
+        "os_id": "4700",
+        "ic_serial": "55891920"
+      }
+    },
+    "sessions": [
+      {
+        "session_id": "session_1",
+        "scp_version": 3,
+        "scp_implementation": "i=70",
+        "key_version": 1,
+        "security_level": "C_MAC|R_MAC|C_ENC|R_ENC",
+        "key_diversification": "none",
+        "host_challenge": "A51709B085AF91C1",
+        "card_challenge": "6A81C79CAF176D07",
+        "sequence_counter": "000001",
+        "derivation_data": {
+          "kdd": "0370000000000000000001",
+          "host_challenge": "A51709B085AF91C1",
+          "card_challenge": "6A81C79CAF176D07",
+          "card_cryptogram": "3D7EF2F518F30000"
+        },
+        "operations": [
+          "secure_channel_establish",
+          "list",
+          "list2",
+          "list3",
+          "list4"
+        ]
+      }
+    ]
+  },
+  "operations": {
+    "select_isd": {
+      "description": "SELECT ISD",
+      "session_id": "session_1",
+      "start_exchange": 1,
+      "end_exchange": 1,
+      "commands": [
+        "SELECT"
+      ],
+      "expected_cli": "gp4net card info"
+    },
+    "get_data": {
+      "description": "GET secure channel protocol details",
+      "session_id": "session_1",
+      "start_exchange": 2,
+      "end_exchange": 2,
+      "commands": [
+        "GET CPLC"
+      ],
+      "expected_cli": "gp4net card info"
+    },
+    "get_data2": {
+      "description": "GET secure channel protocol details",
+      "session_id": "session_1",
+      "start_exchange": 3,
+      "end_exchange": 3,
+      "commands": [
+        "GET IIN"
+      ],
+      "expected_cli": "gp4net card info"
+    },
+    "get_data3": {
+      "description": "GET secure channel protocol details",
+      "session_id": "session_1",
+      "start_exchange": 4,
+      "end_exchange": 4,
+      "commands": [
+        "GET CIN"
+      ],
+      "expected_cli": "gp4net card info"
+    },
+    "get_data4": {
+      "description": "GET secure channel protocol details",
+      "session_id": "session_1",
+      "start_exchange": 5,
+      "end_exchange": 5,
+      "commands": [
+        "GET KDD"
+      ],
+      "expected_cli": "gp4net card info"
+    },
+    "get_data5": {
+      "description": "GET secure channel protocol details",
+      "session_id": "session_1",
+      "start_exchange": 6,
+      "end_exchange": 6,
+      "commands": [
+        "GET SSC"
+      ],
+      "expected_cli": "gp4net card info"
+    },
+    "get_data6": {
+      "description": "GET secure channel protocol details",
+      "session_id": "session_1",
+      "start_exchange": 7,
+      "end_exchange": 7,
+      "commands": [
+        "GET CARD DATA"
+      ],
+      "expected_cli": "gp4net card info"
+    },
+    "get_data7": {
+      "description": "GET secure channel protocol details",
+      "session_id": "session_1",
+      "start_exchange": 8,
+      "end_exchange": 8,
+      "commands": [
+        "GET CARD CAPABILITIES"
+      ],
+      "expected_cli": "gp4net card info"
+    },
+    "get_data8": {
+      "description": "GET secure channel protocol details",
+      "session_id": "session_1",
+      "start_exchange": 9,
+      "end_exchange": 9,
+      "commands": [
+        "GET KEY INFORMATION"
+      ],
+      "expected_cli": "gp4net card info"
+    },
+    "secure_channel_establish": {
+      "description": "SCP authentication",
+      "session_id": "session_1",
+      "start_exchange": 10,
+      "end_exchange": 11,
+      "commands": [
+        "INITIALIZE UPDATE",
+        "EXTERNAL AUTHENTICATE"
+      ],
+      "expected_cli": "gp4net card test-sc -k gp_test_keys"
+    },
+    "list": {
+      "description": "List applications on card",
+      "session_id": "session_1",
+      "start_exchange": 12,
+      "end_exchange": 12,
+      "commands": [
+        "GET STATUS"
+      ],
+      "expected_cli": "gp4net applet list"
+    },
+    "list2": {
+      "description": "List applications on card",
+      "session_id": "session_1",
+      "start_exchange": 13,
+      "end_exchange": 13,
+      "commands": [
+        "GET STATUS"
+      ],
+      "expected_cli": "gp4net applet list"
+    },
+    "list3": {
+      "description": "List applications on card",
+      "session_id": "session_1",
+      "start_exchange": 14,
+      "end_exchange": 14,
+      "commands": [
+        "GET STATUS"
+      ],
+      "expected_cli": "gp4net applet list"
+    },
+    "list4": {
+      "description": "List applications on card",
+      "session_id": "session_1",
+      "start_exchange": 15,
+      "end_exchange": 15,
+      "commands": [
+        "GET STATUS"
+      ],
+      "expected_cli": "gp4net applet list"
+    }
+  },
+  "usage_examples": [
+    {
+      "description": "SELECT ISD only",
+      "command": "gp4net card info -r \u0027virtual:trace.json?operations=select_isd\u0027"
+    },
+    {
+      "description": "GET secure channel protocol details only",
+      "command": "gp4net card info -r \u0027virtual:trace.json?operations=get_data\u0027"
+    },
+    {
+      "description": "GET secure channel protocol details only",
+      "command": "gp4net card info -r \u0027virtual:trace.json?operations=get_data2\u0027"
+    },
+    {
+      "description": "GET secure channel protocol details only",
+      "command": "gp4net card info -r \u0027virtual:trace.json?operations=get_data3\u0027"
+    },
+    {
+      "description": "GET secure channel protocol details only",
+      "command": "gp4net card info -r \u0027virtual:trace.json?operations=get_data4\u0027"
+    },
+    {
+      "description": "GET secure channel protocol details only",
+      "command": "gp4net card info -r \u0027virtual:trace.json?operations=get_data5\u0027"
+    },
+    {
+      "description": "GET secure channel protocol details only",
+      "command": "gp4net card info -r \u0027virtual:trace.json?operations=get_data6\u0027"
+    },
+    {
+      "description": "GET secure channel protocol details only",
+      "command": "gp4net card info -r \u0027virtual:trace.json?operations=get_data7\u0027"
+    },
+    {
+      "description": "GET secure channel protocol details only",
+      "command": "gp4net card info -r \u0027virtual:trace.json?operations=get_data8\u0027"
+    },
+    {
+      "description": "SCP authentication only",
+      "command": "gp4net card test-sc -k gp_test_keys -r \u0027virtual:trace.json?operations=secure_channel_establish\u0027"
+    },
+    {
+      "description": "List applications on card only",
+      "command": "gp4net applet list -r \u0027virtual:trace.json?operations=list\u0027"
+    },
+    {
+      "description": "List applications on card only",
+      "command": "gp4net applet list -r \u0027virtual:trace.json?operations=list2\u0027"
+    },
+    {
+      "description": "List applications on card only",
+      "command": "gp4net applet list -r \u0027virtual:trace.json?operations=list3\u0027"
+    },
+    {
+      "description": "List applications on card only",
+      "command": "gp4net applet list -r \u0027virtual:trace.json?operations=list4\u0027"
+    },
+    {
+      "description": "Complete workflow",
+      "command": "gp4net script eval \u0027full_workflow()\u0027 -r \u0027virtual:trace.json?operations=select_isd,get_data,get_data2,get_data3,get_data4,get_data5,get_data6,get_data7,get_data8,secure_channel_establish,list,list2,list3,list4\u0027"
+    }
+  ],
+  "exchanges": [
+    {
+      "index": 1,
+      "operation": "select_isd",
+      "session_id": "",
+      "step_in_operation": 1,
+      "command": "00A4040000",
+      "response": "6F108408A000000151000000A5049F6501FF9000",
+      "response_time_ms": 13,
+      "description": "SELECT",
+      "source_line": 13,
+      "secure_messaging": false,
+      "security_level": "None",
+      "validation": {
+        "type": "STRUCTURE",
+        "is_valid": true,
+        "details": "Non-secure command structure validated"
+      }
+    },
+    {
+      "index": 2,
+      "operation": "get_data",
+      "session_id": "",
+      "step_in_operation": 1,
+      "command": "80CA9F7F00",
+      "response": "9F7F2A4790D32147000000000023455589192048390000000000000000186495353839313900000000000000009000",
+      "response_time_ms": 13,
+      "description": "GET CPLC",
+      "source_line": 21,
+      "secure_messaging": false,
+      "security_level": "None",
+      "validation": {
+        "type": "STRUCTURE",
+        "is_valid": true,
+        "details": "Non-secure command structure validated"
+      }
+    },
+    {
+      "index": 3,
+      "operation": "get_data2",
+      "session_id": "",
+      "step_in_operation": 1,
+      "command": "80CA004200",
+      "response": "6A88",
+      "response_time_ms": 12,
+      "description": "GET IIN",
+      "source_line": 48,
+      "secure_messaging": false,
+      "security_level": "None",
+      "validation": {
+        "type": "STRUCTURE",
+        "is_valid": true,
+        "details": "Non-secure command structure validated"
+      }
+    },
+    {
+      "index": 4,
+      "operation": "get_data3",
+      "session_id": "",
+      "step_in_operation": 1,
+      "command": "80CA004500",
+      "response": "6A88",
+      "response_time_ms": 12,
+      "description": "GET CIN",
+      "source_line": 52,
+      "secure_messaging": false,
+      "security_level": "None",
+      "validation": {
+        "type": "STRUCTURE",
+        "is_valid": true,
+        "details": "Non-secure command structure validated"
+      }
+    },
+    {
+      "index": 5,
+      "operation": "get_data4",
+      "session_id": "",
+      "step_in_operation": 1,
+      "command": "80CA00CF00",
+      "response": "CF0A037000000000000000009000",
+      "response_time_ms": 10,
+      "description": "GET KDD",
+      "source_line": 56,
+      "secure_messaging": false,
+      "security_level": "None",
+      "validation": {
+        "type": "STRUCTURE",
+        "is_valid": true,
+        "details": "Non-secure command structure validated"
+      }
+    },
+    {
+      "index": 6,
+      "operation": "get_data5",
+      "session_id": "",
+      "step_in_operation": 1,
+      "command": "80CA00C100",
+      "response": "C10300004E9000",
+      "response_time_ms": 12,
+      "description": "GET SSC",
+      "source_line": 60,
+      "secure_messaging": false,
+      "security_level": "None",
+      "validation": {
+        "type": "STRUCTURE",
+        "is_valid": true,
+        "details": "Non-secure command structure validated"
+      }
+    },
+    {
+      "index": 7,
+      "operation": "get_data6",
+      "session_id": "",
+      "step_in_operation": 1,
+      "command": "80CA006600",
+      "response": "664D734B06072A864886FC6B01600B06092A864886FC6B020203630906072A864886FC6B03640B06092A864886FC6B040370650D060B2A864886FC6B0507020000660C060A2B060104012A026E01039000",
+      "response_time_ms": 18,
+      "description": "GET CARD DATA",
+      "source_line": 65,
+      "secure_messaging": false,
+      "security_level": "None",
+      "validation": {
+        "type": "STRUCTURE",
+        "is_valid": true,
+        "details": "Non-secure command structure validated"
+      }
+    },
+    {
+      "index": 8,
+      "operation": "get_data7",
+      "session_id": "",
+      "step_in_operation": 1,
+      "command": "80CA006700",
+      "response": "6728A00D800103810500102060708201078103E5BEC082031E030083010284010285017B86010C87017B9000",
+      "response_time_ms": 14,
+      "description": "GET CARD CAPABILITIES",
+      "source_line": 97,
+      "secure_messaging": false,
+      "security_level": "None",
+      "validation": {
+        "type": "STRUCTURE",
+        "is_valid": true,
+        "details": "Non-secure command structure validated"
+      }
+    },
+    {
+      "index": 9,
+      "operation": "get_data8",
+      "session_id": "",
+      "step_in_operation": 1,
+      "command": "80CA00E000",
+      "response": "E012C00401018810C00402018810C004030188109000",
+      "response_time_ms": 14,
+      "description": "GET KEY INFORMATION",
+      "source_line": 119,
+      "secure_messaging": false,
+      "security_level": "None",
+      "validation": {
+        "type": "STRUCTURE",
+        "is_valid": true,
+        "details": "Non-secure command structure validated"
+      }
+    },
+    {
+      "index": 10,
+      "operation": "secure_channel_establish",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "8050000008A51709B085AF91C100",
+      "response": "03700000000000000000010370BE906A81C79CAF176D073D7EF2F518F300004F9000",
+      "response_time_ms": 51,
+      "description": "INITIALIZE UPDATE",
+      "source_line": 138,
+      "secure_messaging": false,
+      "security_level": "None",
+      "scp_data": {
+        "host_challenge": "A51709B085AF91C1",
+        "card_challenge": "6A81C79CAF176D07",
+        "card_cryptogram": "3D7EF2F518F30000",
+        "key_version": 1,
+        "scp_id": "03",
+        "session_established": false
+      },
+      "validation": {
+        "type": "INITIALIZE_UPDATE",
+        "is_valid": true,
+        "details": "Valid card cryptogram for Scp03"
+      }
+    },
+    {
+      "index": 11,
+      "operation": "secure_channel_establish",
+      "session_id": "session_1",
+      "step_in_operation": 2,
+      "command": "84823300102A233480144D41037D79C57D90E3067200",
+      "response": "9000",
+      "response_time_ms": 18,
+      "description": "EXTERNAL AUTHENTICATE",
+      "source_line": 151,
+      "secure_messaging": true,
+      "security_level": "None",
+      "scp_data": {
+        "key_version": 0,
+        "host_cryptogram": "233480144D41037D79C57D90E3067200",
+        "session_established": true
+      },
+      "validation": {
+        "type": "EXTERNAL_AUTHENTICATE",
+        "is_valid": true,
+        "details": "Valid host cryptogram and MAC for Scp03, security level 0x33"
+      }
+    },
+    {
+      "index": 12,
+      "operation": "list",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "84F2800218A7EA1DB31FC2BB6B648E7D0E9C4AE73C8F5117736D54228900",
+      "response": "4E44DB0863ED9F4514FD486ADB60ABA86605A4E37F3513858891E0A87ADF2E488471521D30C42CB372EF09B0508EC5BA25D4CA2294EA19F19000",
+      "response_time_ms": 36,
+      "description": "GET STATUS",
+      "source_line": 153,
+      "secure_messaging": true,
+      "security_level": "C_MAC|C_DECRYPTION|R_MAC|R_ENCRYPTION",
+      "validation": {
+        "type": "SECURE_MESSAGING",
+        "is_valid": true,
+        "details": "Valid secure exchange (INS=0xF2)"
+      }
+    },
+    {
+      "index": 13,
+      "operation": "list2",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "84F24002183AC2124F306660FD37648FA99259A67EFB2CF95957E7F3C500",
+      "response": "6A88",
+      "response_time_ms": 20,
+      "description": "GET STATUS",
+      "source_line": 161,
+      "secure_messaging": true,
+      "security_level": "C_MAC|C_DECRYPTION|R_MAC|R_ENCRYPTION",
+      "validation": {
+        "type": "SECURE_MESSAGING",
+        "is_valid": true,
+        "details": "Valid secure exchange (INS=0xF2)"
+      }
+    },
+    {
+      "index": 14,
+      "operation": "list3",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "84F2100218CD17D3C2304E05C659014B2EC658561BD955DF5196E064A000",
+      "response": "75B00F1C4748397FCA75602CB05E7E871DDB949C48A91CBC53520C569B6972B56166BF42B9B7709238AF722117A308E9DE447019A86097D921EE9CD5ECED6298ADBC4A38172A602DF4698D095E02DADF02A4049F4B2B16AB4EB02859FC7CDEC9146950048657942AEDB3D85B71C4D62A24D435A0F4C77A2DB2D25141098AFDF9E09968266188755B68CB6E92470C5E2BB7D09A90920992DA73F4EC1430D0E9B5B2FC0A3B82B58E699000",
+      "response_time_ms": 59,
+      "description": "GET STATUS",
+      "source_line": 163,
+      "secure_messaging": true,
+      "security_level": "C_MAC|C_DECRYPTION|R_MAC|R_ENCRYPTION",
+      "validation": {
+        "type": "SECURE_MESSAGING",
+        "is_valid": true,
+        "details": "Valid secure exchange (INS=0xF2)"
+      }
+    },
+    {
+      "index": 15,
+      "operation": "list4",
+      "session_id": "session_1",
+      "step_in_operation": 1,
+      "command": "84F22002181E16CEA61FA7C414DF0CC762E7DE3A50CBF3BD9AD144FF3900",
+      "response": "6D3319C3356687458251A95A4259D4A737FC2409585951344111575A640438CD37D99CBF439645BE322C2B3F1E504E785E874BFC5388A863D94FA6FFC147EF09F0ED4230D5D4762A5DAF5E0189746E8EC411F491FDF627B91FC4EA99673C1B5FFADF50B10A41E3B4CD5B44EE0D045DA05C6BE335255EF27DB718A16DEA2303A66AEEDDFE36B3567B9000",
+      "response_time_ms": 56,
+      "description": "GET STATUS",
+      "source_line": 187,
+      "secure_messaging": true,
+      "security_level": "C_MAC|C_DECRYPTION|R_MAC|R_ENCRYPTION",
+      "validation": {
+        "type": "SECURE_MESSAGING",
+        "is_valid": true,
+        "details": "Valid secure exchange (INS=0xF2)"
+      }
+    }
+  ]
+}

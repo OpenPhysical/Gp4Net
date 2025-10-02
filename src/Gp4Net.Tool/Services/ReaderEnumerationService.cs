@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Tool.Services.CardCommunication;
 using Gp4Net.Tool.Services.CardCommunication.Wsct;
 using JetBrains.Annotations;
 using WSCT.Wrapper;
@@ -43,7 +42,9 @@ public static class ReaderEnumerationService
             {
                 return Task.FromResult(
                     Result.Failure<string[], SmartCardError>(
-                        SmartCardError.CommunicationError($"Failed to establish PC/SC context: {errorCode}")
+                        SmartCardError.CommunicationError(
+                            $"Failed to establish PC/SC context: {errorCode}"
+                        )
                     )
                 );
             }
@@ -52,10 +53,10 @@ public static class ReaderEnumerationService
             if (errorCode != ErrorCode.Success)
             {
                 // No readers found is not an error, just return empty array
-                return Task.FromResult(Result.Success<string[], SmartCardError>(Array.Empty<string>()));
+                return Task.FromResult(Result.Success<string[], SmartCardError>([]));
             }
 
-            var readers = context.Readers?.ToArray() ?? Array.Empty<string>();
+            var readers = context.Readers?.ToArray() ?? [];
             return Task.FromResult(Result.Success<string[], SmartCardError>(readers));
         }
         catch (Exception ex)
@@ -93,8 +94,7 @@ public static class ReaderEnumerationService
         {
             // Virtual readers are resolvable if they have the correct format
             // Actual profile validation happens during connection
-            return ParseVirtualReaderSpec(readerSpec)
-                .Map(_ => true);
+            return ParseVirtualReaderSpec(readerSpec).Map(_ => true);
         }
 
         // For physical readers, check if it exists in the system
@@ -111,8 +111,8 @@ public static class ReaderEnumerationService
     /// <returns>True if the spec refers to a virtual reader</returns>
     public static bool IsVirtualReader(string readerSpec)
     {
-        return !string.IsNullOrWhiteSpace(readerSpec) &&
-               readerSpec.StartsWith(VirtualPrefix, StringComparison.OrdinalIgnoreCase);
+        return !string.IsNullOrWhiteSpace(readerSpec)
+            && readerSpec.StartsWith(VirtualPrefix, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -130,7 +130,7 @@ public static class ReaderEnumerationService
         }
 
         var profilePath = spec.Substring(VirtualPrefix.Length).Trim();
-        
+
         if (string.IsNullOrWhiteSpace(profilePath))
         {
             return Result.Failure<string, SmartCardError>(
@@ -164,7 +164,7 @@ public static class ReaderEnumerationService
         var exactMatches = availableReaders
             .Where(r => string.Equals(r, requestedReader, StringComparison.OrdinalIgnoreCase))
             .ToArray();
-        
+
         if (exactMatches.Length > 0)
         {
             return Result.Success<string, SmartCardError>(exactMatches.First());
@@ -177,15 +177,17 @@ public static class ReaderEnumerationService
 
         return partialMatches.Length switch
         {
-            0 => Result.Failure<string, SmartCardError>(
-                SmartCardError.InvalidArgument($"No reader found matching: {requestedReader}")
-            ),
+            0
+                => Result.Failure<string, SmartCardError>(
+                    SmartCardError.InvalidArgument($"No reader found matching: {requestedReader}")
+                ),
             1 => Result.Success<string, SmartCardError>(partialMatches.First()),
-            _ => Result.Failure<string, SmartCardError>(
-                SmartCardError.InvalidArgument(
-                    $"Multiple readers match '{requestedReader}': {string.Join(", ", partialMatches)}"
-                )
-            )
+            _
+                => Result.Failure<string, SmartCardError>(
+                    SmartCardError.InvalidArgument(
+                        $"Multiple readers match '{requestedReader}': {string.Join(", ", partialMatches)}"
+                    )
+                ),
         };
     }
 }

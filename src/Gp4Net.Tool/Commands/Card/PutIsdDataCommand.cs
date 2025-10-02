@@ -41,8 +41,10 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
         return await connectionResult.Match(
             async connectedCtx =>
             {
-                var secureChannelResult =
-                    await connectedCtx.RequireSecureChannel(1, settings.GetKeyset());
+                var secureChannelResult = await connectedCtx.RequireSecureChannel(
+                    1,
+                    settings.GetKeyset()
+                );
                 return await secureChannelResult.Match(
                     async secureCtx => await PutDataObjects(secureCtx, settings),
                     async secureChannelError =>
@@ -172,9 +174,7 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
             // Try to parse as JSON
             try
             {
-                var jsonData = JsonSerializer.Deserialize<
-                    Dictionary<string, JsonElement>
-                >(content);
+                var jsonData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(content);
                 if (jsonData != null)
                 {
                     foreach (var kvp in jsonData)
@@ -383,8 +383,7 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
 
         DisplayWriteResult(key, writeResult, context);
 
-        var updatedResults =
-            processedResults.Add((key, writeResult));
+        var updatedResults = processedResults.Add((key, writeResult));
 
         if (writeResult.IsFailure && !settings.ContinueOnError)
         {
@@ -464,25 +463,34 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
     {
         var result = key switch
         {
-            "iin" => Result.Success<(ushort tag, byte[] data), SmartCardError>(
-                (
-                    GetDataCommand.DataObjects.IssuerIdentificationNumber,
-                    Encoding.ASCII.GetBytes(value)
-                )
-            ),
-            "cin" => Result.Success<(ushort tag, byte[] data), SmartCardError>(
-                (GetDataCommand.DataObjects.CardImageNumber, Encoding.ASCII.GetBytes(value))
-            ),
-            "manager-url" => Result.Success<(ushort tag, byte[] data), SmartCardError>(
-                (GetDataCommand.DataObjects.SecurityDomainManagerUrl, Encoding.UTF8.GetBytes(value))
-            ),
-            _ when key.StartsWith("0x") => Result.Try(
-                () => ParseRawDataObject(key, value),
-                ex => SmartCardError.InvalidData($"Invalid raw data object format: {ex.Message}")
-            ),
-            _ => Result.Failure<(ushort tag, byte[] data), SmartCardError>(
-                SmartCardError.InvalidData($"Unknown data object: {key}")
-            ),
+            "iin"
+                => Result.Success<(ushort tag, byte[] data), SmartCardError>(
+                    (
+                        GetDataCommand.DataObjects.IssuerIdentificationNumber,
+                        Encoding.ASCII.GetBytes(value)
+                    )
+                ),
+            "cin"
+                => Result.Success<(ushort tag, byte[] data), SmartCardError>(
+                    (GetDataCommand.DataObjects.CardImageNumber, Encoding.ASCII.GetBytes(value))
+                ),
+            "manager-url"
+                => Result.Success<(ushort tag, byte[] data), SmartCardError>(
+                    (
+                        GetDataCommand.DataObjects.SecurityDomainManagerUrl,
+                        Encoding.UTF8.GetBytes(value)
+                    )
+                ),
+            _ when key.StartsWith("0x")
+                => Result.Try(
+                    () => ParseRawDataObject(key, value),
+                    ex =>
+                        SmartCardError.InvalidData($"Invalid raw data object format: {ex.Message}")
+                ),
+            _
+                => Result.Failure<(ushort tag, byte[] data), SmartCardError>(
+                    SmartCardError.InvalidData($"Unknown data object: {key}")
+                ),
         };
 
         return Task.FromResult(result);
@@ -509,8 +517,7 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
                 return await ConstructApduBytes(storeCommand)
                     .Bind(async apduBytes =>
                     {
-                        var responseResult =
-                            await context.CardService.SendCommandAsync(apduBytes);
+                        var responseResult = await context.CardService.SendCommandAsync(apduBytes);
                         return responseResult.Match(
                             response =>
                                 Result.Success<bool, SmartCardError>(response.StatusWord == 0x9000),
@@ -558,8 +565,7 @@ public class PutIsdDataCommand : IPipelineCommand<PutIsdDataCommand.Settings>
 
         // Try parsing as tag:data or tag=data format
         string fullString = $"{key}:{value}";
-        var result =
-            DataObjectParser.ParseRawDataObject(fullString);
+        var result = DataObjectParser.ParseRawDataObject(fullString);
         if (result.IsSuccess)
         {
             return result.Value;

@@ -98,13 +98,9 @@ public static class CommandSettingsExtensions
     /// </summary>
     private static byte ExtractKeyVersion(SecureCommandSettings settings)
     {
-        var keyVersionProperty = GetPropertyValue(
-            settings.GetType(),
-            settings,
-            "KeyVersion"
-        );
+        var keyVersionProperty = GetPropertyValue(settings.GetType(), settings, "KeyVersion");
         return keyVersionProperty
-            .Bind(value =>
+            .Bind(static value =>
                 byte.TryParse(value, out byte result) ? Maybe<byte>.From(result) : Maybe<byte>.None
             )
             .GetValueOrDefault(0x01);
@@ -163,7 +159,7 @@ public static class CommandSettingsExtensions
     )
     {
         return GetPropertyValue(settingsType, settings, propertyName)
-            .Where(value => !string.IsNullOrEmpty(value))
+            .Where(static value => !string.IsNullOrEmpty(value))
             .HasValue;
     }
 }

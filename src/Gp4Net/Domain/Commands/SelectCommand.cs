@@ -1,13 +1,10 @@
 using System;
-using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Transport;
 using JetBrains.Annotations;
-using WSCT.ISO7816;
 using static Gp4Net.Services.TlvService;
 
 namespace Gp4Net.Domain.Commands;
@@ -112,40 +109,67 @@ public class SelectCommand : GpCommandBase
     public bool IsExtendedLength => false;
 
     /// <summary>
-    /// Initializes a new instance of the SelectCommand class for empty AID (ISD selection).
+    /// Initializes a new instance of the SelectCommand class for empty AID (ISD selection) with no response.
+    /// Creates a CC1 APDU (4 bytes: CLA INS P1 P2).
+    /// </summary>
+    /// <param name="control">The selection control method.</param>
+    private SelectCommand(SelectionControl control)
+        : base(CLASS_BYTE, INSTRUCTION_BYTE, (byte)control, (byte)FileControlInfo.NoResponseData)
+    {
+        Aid = [];
+        Control = control;
+        ControlInfo = FileControlInfo.NoResponseData;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the SelectCommand class for empty AID (ISD selection) with response.
     /// Creates a CC2 APDU (5 bytes: CLA INS P1 P2 Le).
     /// </summary>
     /// <param name="control">The selection control method.</param>
     /// <param name="controlInfo">The file control information.</param>
-    private SelectCommand(
-        SelectionControl control,
-        FileControlInfo controlInfo
-    )
+    private SelectCommand(SelectionControl control, FileControlInfo controlInfo)
         : base(
             CLASS_BYTE,
             INSTRUCTION_BYTE,
             (byte)control,
             (byte)controlInfo,
-            0u  // Use Le=0 which should encode as single 00 byte for "256 expected"
+            0u // Le=0 means 256 in standard APDU
         )
     {
-        Aid = Array.Empty<byte>();
+        Aid = [];
         Control = control;
         ControlInfo = controlInfo;
     }
 
     /// <summary>
-    /// Initializes a new instance of the SelectCommand class with AID.
-    /// Creates a CC4 APDU (CLA INS P1 P2 Lc Data Le) or CC3 (without Le).
+    /// Initializes a new instance of the SelectCommand class with AID and no response.
+    /// Creates a CC3 APDU (CLA INS P1 P2 Lc Data).
+    /// </summary>
+    /// <param name="aid">The application identifier to select (1-16 bytes).</param>
+    /// <param name="control">The selection control method.</param>
+    private SelectCommand(byte[] aid, SelectionControl control)
+        : base(
+            CLASS_BYTE,
+            INSTRUCTION_BYTE,
+            (byte)control,
+            (byte)FileControlInfo.NoResponseData,
+            (uint)aid.Length,
+            aid
+        )
+    {
+        Aid = (byte[])aid.Clone();
+        Control = control;
+        ControlInfo = FileControlInfo.NoResponseData;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the SelectCommand class with AID and response.
+    /// Creates a CC4 APDU (CLA INS P1 P2 Lc Data Le).
     /// </summary>
     /// <param name="aid">The application identifier to select (1-16 bytes).</param>
     /// <param name="control">The selection control method.</param>
     /// <param name="controlInfo">The file control information.</param>
-    private SelectCommand(
-        byte[] aid,
-        SelectionControl control,
-        FileControlInfo controlInfo
-    )
+    private SelectCommand(byte[] aid, SelectionControl control, FileControlInfo controlInfo)
         : base(
             CLASS_BYTE,
             INSTRUCTION_BYTE,
@@ -153,7 +177,7 @@ public class SelectCommand : GpCommandBase
             (byte)controlInfo,
             (uint)aid.Length,
             aid,
-            controlInfo == FileControlInfo.NoResponseData ? 0u : 256u
+            0u // Le=0 means 256 in standard APDU
         )
     {
         Aid = (byte[])aid.Clone();
@@ -217,13 +241,22 @@ public class SelectCommand : GpCommandBase
                 ? FileControlInfo.ReturnFci // 0x00 = First occurrence
                 : (FileControlInfo)SelectMode.Next; // 0x02 = Next occurrence
 
-        return aid.Length == 0
-            ? Result.Success<SelectCommand, SmartCardError>(
-                new SelectCommand(control, controlInfo)
-            )
-            : Result.Success<SelectCommand, SmartCardError>(
-                new SelectCommand(aid, control, controlInfo)
-            );
+        if (aid.Length == 0)
+        {
+            return controlInfo == FileControlInfo.NoResponseData
+                ? Result.Success<SelectCommand, SmartCardError>(new SelectCommand(control))
+                : Result.Success<SelectCommand, SmartCardError>(
+                    new SelectCommand(control, controlInfo)
+                );
+        }
+        else
+        {
+            return controlInfo == FileControlInfo.NoResponseData
+                ? Result.Success<SelectCommand, SmartCardError>(new SelectCommand(aid, control))
+                : Result.Success<SelectCommand, SmartCardError>(
+                    new SelectCommand(aid, control, controlInfo)
+                );
+        }
     }
 
     /// <summary>
@@ -240,7 +273,9 @@ public class SelectCommand : GpCommandBase
     /// </summary>
     /// <param name="controlInfo">The file control information to use.</param>
     /// <returns>A Result containing the SelectCommand or an error.</returns>
-    public static Result<SelectCommand, SmartCardError> CreateForIssuerSecurityDomain(FileControlInfo controlInfo)
+    public static Result<SelectCommand, SmartCardError> CreateForIssuerSecurityDomain(
+        FileControlInfo controlInfo
+    )
     {
         return CreateWith([], SelectMode.First, controlInfo);
     }
@@ -275,13 +310,24 @@ public class SelectCommand : GpCommandBase
 
         var control = SelectionControl.SelectByName;
 
-        return aid.Length == 0
-            ? Result.Success<SelectCommand, SmartCardError>(
-                new SelectCommand(control, controlInfo)
-            )
-            : Result.Success<SelectCommand, SmartCardError>(
-                new SelectCommand((byte[])aid.Clone(), control, controlInfo)
-            );
+        if (aid.Length == 0)
+        {
+            return controlInfo == FileControlInfo.NoResponseData
+                ? Result.Success<SelectCommand, SmartCardError>(new SelectCommand(control))
+                : Result.Success<SelectCommand, SmartCardError>(
+                    new SelectCommand(control, controlInfo)
+                );
+        }
+        else
+        {
+            return controlInfo == FileControlInfo.NoResponseData
+                ? Result.Success<SelectCommand, SmartCardError>(
+                    new SelectCommand((byte[])aid.Clone(), control)
+                )
+                : Result.Success<SelectCommand, SmartCardError>(
+                    new SelectCommand((byte[])aid.Clone(), control, controlInfo)
+                );
+        }
     }
 
     /// <summary>
@@ -455,7 +501,7 @@ public class SelectResponse
             );
         }
 
-        var parseResult = TlvParser.ParseMultiple(data.ToImmutableArray());
+        var parseResult = TlvParser.ParseMultiple([.. data]);
         if (parseResult.IsFailure)
         {
             return Result.Success<Maybe<FileControlInformation>, SmartCardError>(
@@ -556,8 +602,7 @@ public class SelectResponse
                     // Not currently used but could be parsed
                     break;
                 case 0xA5: // FCI Proprietary Template
-                    var proprietaryResult =
-                        ParseProprietaryTemplate(tlv);
+                    var proprietaryResult = ParseProprietaryTemplate(tlv);
                     if (proprietaryResult.IsFailure)
                         return Result.Failure<FileControlInformation, SmartCardError>(
                             proprietaryResult.Error

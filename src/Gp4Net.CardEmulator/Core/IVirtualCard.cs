@@ -21,10 +21,9 @@ public interface IVirtualCard
     /// </summary>
     /// <param name="command">The APDU command bytes.</param>
     /// <returns>The APDU response and updated card instance, or an error.</returns>
-    Result<
-        (ApduResponse Response, IVirtualCard UpdatedCard),
-        SmartCardError
-    > ProcessCommand(byte[] command);
+    Result<(ApduResponse Response, IVirtualCard UpdatedCard), SmartCardError> ProcessCommand(
+        byte[] command
+    );
 
     /// <summary>
     /// Resets the virtual card to its initial state.

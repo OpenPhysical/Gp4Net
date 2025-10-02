@@ -49,7 +49,7 @@ public static partial class Constants
         {
             // ISO 7816-4 instructions are in Apdu.Instructions - use those for:
             // - SELECT (0xA4) → Apdu.Instructions.SELECT
-            // - EXTERNAL_AUTHENTICATE (0x82) → Apdu.Instructions.EXTERNAL_AUTHENTICATE  
+            // - EXTERNAL_AUTHENTICATE (0x82) → Apdu.Instructions.EXTERNAL_AUTHENTICATE
             // - GET_DATA (0xCA) → Apdu.Instructions.GET_DATA
             // - GET_RESPONSE (0xC0) → Apdu.Instructions.GET_RESPONSE
             // - MANAGE_CHANNEL (0x70) → Apdu.Instructions.MANAGE_CHANNEL
@@ -370,23 +370,23 @@ public static partial class Constants
             /// </summary>
             public static readonly ImmutableHashSet<byte> OpenAccessCommands =
                 ImmutableHashSet.Create(
-                    Apdu.Instructions.SELECT,                // 0xA4 - Application/ISD selection
-                    Ins.INITIALIZE_UPDATE,                   // 0x50 - Start secure channel establishment
-                    Apdu.Instructions.EXTERNAL_AUTHENTICATE  // 0x82 - Complete secure channel establishment
+                    Apdu.Instructions.SELECT, // 0xA4 - Application/ISD selection
+                    Ins.INITIALIZE_UPDATE, // 0x50 - Start secure channel establishment
+                    Apdu.Instructions.EXTERNAL_AUTHENTICATE // 0x82 - Complete secure channel establishment
                 );
-            
+
             /// <summary>
             /// Commands that require Command MAC (C-MAC) security level.
             /// Reference: GP Card Specification v2.3.1 Table E-1
             /// </summary>
             public static readonly ImmutableHashSet<byte> CommandMacRequiredCommands =
                 ImmutableHashSet.Create(
-                    Ins.INSTALL,     // 0xE6 - Application installation/removal
-                    Ins.LOAD,        // 0xE8 - Load CAP file
-                    Ins.DELETE,      // 0xE4 - Delete application/package
-                    Ins.PUT_KEY,     // 0xD8 - Add/update keys
-                    Ins.STORE_DATA,  // 0xE2 - Store card data
-                    Ins.GET_STATUS   // 0xF2 - Query application status
+                    Ins.INSTALL, // 0xE6 - Application installation/removal
+                    Ins.LOAD, // 0xE8 - Load CAP file
+                    Ins.DELETE, // 0xE4 - Delete application/package
+                    Ins.PUT_KEY, // 0xD8 - Add/update keys
+                    Ins.STORE_DATA, // 0xE2 - Store card data
+                    Ins.GET_STATUS // 0xF2 - Query application status
                 );
         }
 

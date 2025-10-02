@@ -163,17 +163,16 @@ public static partial class TlvService
             // Check for GP-specific encoding: length 128 as 0x80
             if (lengthValue == 128 && !useLongForm)
             {
-                return Result.Success<ImmutableArray<byte>, SmartCardError>(
-                    ImmutableArray.Create<byte>(0x80)
-                );
+                return Result.Success<ImmutableArray<byte>, SmartCardError>([0x80]);
             }
 
             // Short form (if length <= 127 and not forcing long form)
-            if (lengthValue <= Constants.Constants.Tlv.Parsing.MAX_SHORT_FORM_LENGTH && !useLongForm)
+            if (
+                lengthValue <= Constants.Constants.Tlv.Parsing.MAX_SHORT_FORM_LENGTH
+                && !useLongForm
+            )
             {
-                return Result.Success<ImmutableArray<byte>, SmartCardError>(
-                    ImmutableArray.Create((byte)lengthValue)
-                );
+                return Result.Success<ImmutableArray<byte>, SmartCardError>([(byte)lengthValue]);
             }
 
             // Long form
@@ -200,7 +199,9 @@ public static partial class TlvService
             var builder = ImmutableArray.CreateBuilder<byte>(bytesNeeded + 1);
 
             // First byte: 0x80 | number of length bytes
-            builder.Add((byte)(Constants.Constants.Tlv.Parsing.LONG_FORM_LENGTH_MASK | bytesNeeded));
+            builder.Add(
+                (byte)(Constants.Constants.Tlv.Parsing.LONG_FORM_LENGTH_MASK | bytesNeeded)
+            );
 
             // Add length bytes in big-endian order
             var lengthBytes = Enumerable
@@ -258,14 +259,15 @@ public static partial class TlvService
             {
                 <= 0xFF => TlvTag.FromByte((byte)tagNumber),
                 <= 0xFFFF => TlvTag.FromUShort((ushort)tagNumber),
-                _ => new TlvTag(
-                    ImmutableArray.Create(
-                        (byte)(tagNumber >> 24),
-                        (byte)(tagNumber >> 16),
-                        (byte)(tagNumber >> 8),
-                        (byte)tagNumber
-                    )
-                ),
+                _
+                    => new TlvTag(
+                        [
+                            (byte)(tagNumber >> 24),
+                            (byte)(tagNumber >> 16),
+                            (byte)(tagNumber >> 8),
+                            (byte)tagNumber
+                        ]
+                    ),
             };
 
             return TlvObject.Create(tag, new TlvValue(value)).Bind(Encode);

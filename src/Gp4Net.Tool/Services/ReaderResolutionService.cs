@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -29,7 +27,8 @@ public class ReaderResolutionService : IReaderResolutionService
     /// <inheritdoc/>
     public async Task<Result<ReaderResolution, SmartCardError>> ResolveReaderAsync(
         Maybe<string> explicitReader,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         // Priority 1: Explicit --reader flag
         // If explicit reader is specified, use it exclusively (no fallback)
@@ -42,8 +41,10 @@ public class ReaderResolutionService : IReaderResolutionService
                 return await envReader.Match(
                     async reader => await ResolveEnvironmentReader(reader, cancellationToken),
                     // Priority 3: Auto-detection of single reader with media
-                    async () => await AutoDetectReader(cancellationToken));
-            });
+                    async () => await AutoDetectReader(cancellationToken)
+                );
+            }
+        );
     }
 
     /// <summary>
@@ -51,29 +52,35 @@ public class ReaderResolutionService : IReaderResolutionService
     /// </summary>
     private async Task<Result<ReaderResolution, SmartCardError>> ResolveExplicitReader(
         string readerSpec,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         // Check if it's a virtual reader
         if (ReaderEnumerationService.IsVirtualReader(readerSpec))
         {
             // Virtual readers don't need enumeration, just validation
-            return ReaderEnumerationService.ParseVirtualReaderSpec(readerSpec)
+            return ReaderEnumerationService
+                .ParseVirtualReaderSpec(readerSpec)
                 .Map(profilePath => ReaderResolution.FromExplicitFlag(readerSpec, true));
         }
 
         // For physical readers, enumerate and match
-        var readersResult = await ReaderEnumerationService.EnumeratePhysicalReadersAsync(cancellationToken);
-        
+        var readersResult = await ReaderEnumerationService.EnumeratePhysicalReadersAsync(
+            cancellationToken
+        );
+
         return readersResult.Bind(readers =>
         {
             if (readers.Length == 0)
             {
                 return Result.Failure<ReaderResolution, SmartCardError>(
-                    SmartCardError.CommunicationError("No smart card readers found on this system"));
+                    SmartCardError.CommunicationError("No smart card readers found on this system")
+                );
             }
 
             // Try partial matching
-            return ReaderEnumerationService.SelectReaderByPartialMatch(readerSpec, readers)
+            return ReaderEnumerationService
+                .SelectReaderByPartialMatch(readerSpec, readers)
                 .Map(matchedReader => ReaderResolution.FromExplicitFlag(matchedReader, false));
         });
     }
@@ -83,32 +90,41 @@ public class ReaderResolutionService : IReaderResolutionService
     /// </summary>
     private async Task<Result<ReaderResolution, SmartCardError>> ResolveEnvironmentReader(
         string readerSpec,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         // Check if it's a virtual reader
         if (ReaderEnumerationService.IsVirtualReader(readerSpec))
         {
-            return ReaderEnumerationService.ParseVirtualReaderSpec(readerSpec)
+            return ReaderEnumerationService
+                .ParseVirtualReaderSpec(readerSpec)
                 .Map(profilePath => ReaderResolution.FromEnvironment(readerSpec, true));
         }
 
         // For physical readers, enumerate and match
-        var readersResult = await ReaderEnumerationService.EnumeratePhysicalReadersAsync(cancellationToken);
-        
+        var readersResult = await ReaderEnumerationService.EnumeratePhysicalReadersAsync(
+            cancellationToken
+        );
+
         return readersResult.Bind(readers =>
         {
             if (readers.Length == 0)
             {
                 return Result.Failure<ReaderResolution, SmartCardError>(
-                    SmartCardError.CommunicationError("No smart card readers found on this system"));
+                    SmartCardError.CommunicationError("No smart card readers found on this system")
+                );
             }
 
             // Try partial matching for environment variable too
-            return ReaderEnumerationService.SelectReaderByPartialMatch(readerSpec, readers)
+            return ReaderEnumerationService
+                .SelectReaderByPartialMatch(readerSpec, readers)
                 .Map(matchedReader => ReaderResolution.FromEnvironment(matchedReader, false))
-                .MapError(error => SmartCardError.InvalidArgument(
-                    $"Reader '{readerSpec}' from GP4NET_READER environment variable not found. " +
-                    $"Update the environment variable or use --reader option to override."));
+                .MapError(error =>
+                    SmartCardError.InvalidArgument(
+                        $"Reader '{readerSpec}' from GP4NET_READER environment variable not found. "
+                            + $"Update the environment variable or use --reader option to override."
+                    )
+                );
         });
     }
 
@@ -116,26 +132,37 @@ public class ReaderResolutionService : IReaderResolutionService
     /// Auto-detects a single reader with media present.
     /// </summary>
     private async Task<Result<ReaderResolution, SmartCardError>> AutoDetectReader(
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         // Get all readers with media present
-        var readersWithMediaResult = await ReaderStatusService.GetReadersWithMediaAsync(cancellationToken);
-        
+        var readersWithMediaResult = await ReaderStatusService.GetReadersWithMediaAsync(
+            cancellationToken
+        );
+
         return readersWithMediaResult.Bind(readersWithMedia =>
         {
             return readersWithMedia.Length switch
             {
-                0 => Result.Failure<ReaderResolution, SmartCardError>(
-                    SmartCardError.CommunicationError(
-                        "No smart cards detected in any reader. Please insert a smart card.")),
-                
-                1 => Result.Success<ReaderResolution, SmartCardError>(
-                    ReaderResolution.FromAutoDetection(readersWithMedia[0])),
-                
-                _ => Result.Failure<ReaderResolution, SmartCardError>(
-                    SmartCardError.InvalidArgument(
-                        $"Multiple readers have cards present: {string.Join(", ", readersWithMedia)}. " +
-                        "Use --reader option to specify which reader to use."))
+                0
+                    => Result.Failure<ReaderResolution, SmartCardError>(
+                        SmartCardError.CommunicationError(
+                            "No smart cards detected in any reader. Please insert a smart card."
+                        )
+                    ),
+
+                1
+                    => Result.Success<ReaderResolution, SmartCardError>(
+                        ReaderResolution.FromAutoDetection(readersWithMedia[0])
+                    ),
+
+                _
+                    => Result.Failure<ReaderResolution, SmartCardError>(
+                        SmartCardError.InvalidArgument(
+                            $"Multiple readers have cards present: {string.Join(", ", readersWithMedia)}. "
+                                + "Use --reader option to specify which reader to use."
+                        )
+                    ),
             };
         });
     }

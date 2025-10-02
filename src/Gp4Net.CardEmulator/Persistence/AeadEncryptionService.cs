@@ -88,25 +88,45 @@ public class AeadEncryptionService : IDisposable
 
     private static Result<bool, SmartCardError> ValidateKey(byte[] key)
     {
+        if (key is null)
+        {
+            return Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("Encryption key must be 32 bytes (AES-256)")
+            );
+        }
+
         return key.Length == 32
             ? Result.Success<bool, SmartCardError>(true)
             : Result.Failure<bool, SmartCardError>(
-                SmartCardError.InvalidArgument("Encryption key must be 32 bytes (AES-256)"));
+                SmartCardError.InvalidArgument("Encryption key must be 32 bytes (AES-256)")
+            );
     }
 
     private static Result<bool, SmartCardError> ValidatePlaintext(byte[] plaintext)
     {
-        return Result.Success<bool, SmartCardError>(true);
+        return plaintext is null
+            ? Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("Plaintext cannot be null")
+            )
+            : Result.Success<bool, SmartCardError>(true);
     }
 
     private static Result<bool, SmartCardError> ValidateEncryptedPayload(
         EncryptedPayload encryptedPayload
     )
     {
+        if (encryptedPayload is null)
+        {
+            return Result.Failure<bool, SmartCardError>(
+                SmartCardError.InvalidArgument("Invalid encrypted payload structure")
+            );
+        }
+
         return encryptedPayload.IsValid
             ? Result.Success<bool, SmartCardError>(true)
             : Result.Failure<bool, SmartCardError>(
-                SmartCardError.InvalidArgument("Invalid encrypted payload structure"));
+                SmartCardError.InvalidArgument("Invalid encrypted payload structure")
+            );
     }
 
     private static Result<bool, SmartCardError> ValidateCardUuid(CardUuid cardUuid)

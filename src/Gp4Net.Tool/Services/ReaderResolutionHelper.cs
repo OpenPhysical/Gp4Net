@@ -30,22 +30,28 @@ public static class ReaderResolutionHelper
         ISmartCardServiceFactory serviceFactory,
         IReaderResolutionService resolutionService,
         IDisplayService displayService,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         // Resolve the reader
-        var resolutionResult = await resolutionService.ResolveReaderAsync(explicitReader, cancellationToken);
-        
+        var resolutionResult = await resolutionService.ResolveReaderAsync(
+            explicitReader,
+            cancellationToken
+        );
+
         return await resolutionResult
             .Tap(resolution => DisplayResolutionInfo(resolution, displayService))
-            .Bind(async resolution => 
+            .Bind(async resolution =>
             {
                 // Connect to the resolved reader
                 var connectionResult = await serviceFactory.CreateConnectedAsync(
-                    resolution.ReaderName, 
-                    cancellationToken);
-                
+                    resolution.ReaderName,
+                    cancellationToken
+                );
+
                 return connectionResult.Tap(service =>
-                    displayService.Success($"Connected to {resolution.ReaderName}"));
+                    displayService.Success($"Connected to {resolution.ReaderName}")
+                );
             });
     }
 
@@ -57,20 +63,21 @@ public static class ReaderResolutionHelper
     /// <param name="displayService">Service for displaying information.</param>
     public static void DisplayResolutionInfo(
         ReaderResolution resolution,
-        IDisplayService displayService)
+        IDisplayService displayService
+    )
     {
         var message = resolution.Method switch
         {
-            ResolutionMethod.ExplicitFlag => 
-                $"Using reader specified via --reader flag: {resolution.ReaderName}",
-            
-            ResolutionMethod.Environment => 
-                $"Using reader from GP4NET_READER environment variable: {resolution.ReaderName}",
-            
-            ResolutionMethod.AutoDetection => 
-                $"Auto-detected single reader with card present: {resolution.ReaderName}",
-            
-            _ => $"Using reader: {resolution.ReaderName}"
+            ResolutionMethod.ExplicitFlag
+                => $"Using reader specified via --reader flag: {resolution.ReaderName}",
+
+            ResolutionMethod.Environment
+                => $"Using reader from GP4NET_READER environment variable: {resolution.ReaderName}",
+
+            ResolutionMethod.AutoDetection
+                => $"Auto-detected single reader with card present: {resolution.ReaderName}",
+
+            _ => $"Using reader: {resolution.ReaderName}",
         };
 
         displayService.Info(message);
@@ -86,27 +93,28 @@ public static class ReaderResolutionHelper
     {
         return error.Message switch
         {
-            var msg when msg.Contains("No smart card readers found") =>
-                "No smart card readers found on this system.\n" +
-                "Please connect a smart card reader and try again.",
-            
-            var msg when msg.Contains("No smart cards detected") =>
-                "No smart cards detected in any reader.\n" +
-                "Please insert a smart card and try again.",
-            
-            var msg when msg.Contains("Multiple readers have cards") =>
-                error.Message + "\n" +
-                "Example: gp4net card info --reader \"Reader Name\"",
-            
-            var msg when msg.Contains("Multiple readers match") =>
-                error.Message + "\n" +
-                "Be more specific with the reader name or use the full name.",
-            
-            var msg when msg.Contains("environment variable") =>
-                error.Message + "\n" +
-                "You can also unset the environment variable to use auto-detection.",
-            
-            _ => error.Message
+            var msg when msg.Contains("No smart card readers found")
+                => "No smart card readers found on this system.\n"
+                    + "Please connect a smart card reader and try again.",
+
+            var msg when msg.Contains("No smart cards detected")
+                => "No smart cards detected in any reader.\n"
+                    + "Please insert a smart card and try again.",
+
+            var msg when msg.Contains("Multiple readers have cards")
+                => error.Message + "\n" + "Example: gp4net card info --reader \"Reader Name\"",
+
+            var msg when msg.Contains("Multiple readers match")
+                => error.Message
+                    + "\n"
+                    + "Be more specific with the reader name or use the full name.",
+
+            var msg when msg.Contains("environment variable")
+                => error.Message
+                    + "\n"
+                    + "You can also unset the environment variable to use auto-detection.",
+
+            _ => error.Message,
         };
     }
 
@@ -121,14 +129,18 @@ public static class ReaderResolutionHelper
     public static async Task<Result<string, SmartCardError>> ResolveReaderNameAsync(
         string readerName,
         IReaderResolutionService resolutionService,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
-        var explicitReader = string.IsNullOrWhiteSpace(readerName) 
-            ? Maybe<string>.None 
+        var explicitReader = string.IsNullOrWhiteSpace(readerName)
+            ? Maybe<string>.None
             : Maybe<string>.From(readerName.Trim());
 
-        var resolutionResult = await resolutionService.ResolveReaderAsync(explicitReader, cancellationToken);
-        
+        var resolutionResult = await resolutionService.ResolveReaderAsync(
+            explicitReader,
+            cancellationToken
+        );
+
         return resolutionResult.Map(resolution => resolution.ReaderName);
     }
 }

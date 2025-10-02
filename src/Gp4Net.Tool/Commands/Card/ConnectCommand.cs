@@ -39,11 +39,10 @@ public class ConnectCommand : IPipelineCommand<ConnectCommand.Settings>
         context.Display.Success("Successfully connected to card");
 
         // Try to select ISD and get basic card information
-        var selectResult =
-            await Discovery.DetectAndSelectIsdAsync(
-                (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
-                CancellationToken.None
-            );
+        var selectResult = await Discovery.DetectAndSelectIsdAsync(
+            (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
+            CancellationToken.None
+        );
 
         if (selectResult.IsSuccess)
         {

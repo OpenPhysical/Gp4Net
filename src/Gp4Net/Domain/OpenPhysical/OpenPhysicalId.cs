@@ -90,11 +90,9 @@ public class OpenPhysicalId
         string cin = digitsOnly.Substring(5);
 
         // Validate that the total digit count matches the expected count for this format
-        var expectedCountValid = format.GetExpectedDigitCount()
-            .Match(
-                expectedCount => digitsOnly.Length == expectedCount,
-                _ => false
-            );
+        var expectedCountValid = format
+            .GetExpectedDigitCount()
+            .Match(expectedCount => digitsOnly.Length == expectedCount, _ => false);
 
         if (!expectedCountValid)
         {
@@ -165,11 +163,9 @@ public class OpenPhysicalId
         }
 
         // Validate that the total length matches the expected format
-        var expectedLengthValid = format.GetExpectedDigitCount()
-            .Match(
-                expectedLength => fullDigits.Length == expectedLength,
-                _ => false
-            );
+        var expectedLengthValid = format
+            .GetExpectedDigitCount()
+            .Match(expectedLength => fullDigits.Length == expectedLength, _ => false);
 
         if (!expectedLengthValid)
         {
@@ -196,23 +192,23 @@ public class OpenPhysicalId
         // All OpidFormat enum values (2-9) are handled explicitly
         return Format switch
         {
-            OpidFormat.Format2 =>
-                $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 3)}-{fullDigits.Substring(7, 3)}",
-            OpidFormat.Format3 =>
-                $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 3)}-{fullDigits.Substring(7, 4)}",
-            OpidFormat.Format4 =>
-                $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 4)}",
-            OpidFormat.Format5 =>
-                $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 5)}",
-            OpidFormat.Format6 =>
-                $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 5)}-{fullDigits.Substring(9, 5)}",
-            OpidFormat.Format7 =>
-                $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 4)}-{fullDigits.Substring(12, 4)}",
-            OpidFormat.Format8 =>
-                $"{fullDigits.Substring(0, 5)}-{fullDigits.Substring(5, 4)}-{fullDigits.Substring(9, 4)}-{fullDigits.Substring(13, 4)}",
-            OpidFormat.Format9 =>
-                $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 4)}-{fullDigits.Substring(12, 5)}",
-            _ => string.Empty // Invalid format - should never occur due to validation in constructor
+            OpidFormat.Format2
+                => $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 3)}-{fullDigits.Substring(7, 3)}",
+            OpidFormat.Format3
+                => $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 3)}-{fullDigits.Substring(7, 4)}",
+            OpidFormat.Format4
+                => $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 4)}",
+            OpidFormat.Format5
+                => $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 5)}",
+            OpidFormat.Format6
+                => $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 5)}-{fullDigits.Substring(9, 5)}",
+            OpidFormat.Format7
+                => $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 4)}-{fullDigits.Substring(12, 4)}",
+            OpidFormat.Format8
+                => $"{fullDigits.Substring(0, 5)}-{fullDigits.Substring(5, 4)}-{fullDigits.Substring(9, 4)}-{fullDigits.Substring(13, 4)}",
+            OpidFormat.Format9
+                => $"{fullDigits.Substring(0, 4)}-{fullDigits.Substring(4, 4)}-{fullDigits.Substring(8, 4)}-{fullDigits.Substring(12, 5)}",
+            _ => string.Empty, // Invalid format - should never occur due to validation in constructor
         };
     }
 

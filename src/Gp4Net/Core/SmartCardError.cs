@@ -318,13 +318,8 @@ public record SmartCardError(
     /// </summary>
     public SmartCardError WithContext(string key, object value)
     {
-        var currentContext = Context.GetValueOrDefault(
-            new Dictionary<string, object>()
-        );
-        var newContext = new Dictionary<string, object>(currentContext)
-        {
-            [key] = value,
-        };
+        var currentContext = Context.GetValueOrDefault(new Dictionary<string, object>());
+        var newContext = new Dictionary<string, object>(currentContext) { [key] = value };
         return this with { Context = Maybe<IReadOnlyDictionary<string, object>>.From(newContext) };
     }
 
@@ -333,9 +328,7 @@ public record SmartCardError(
     /// </summary>
     public SmartCardError WithContext(IReadOnlyDictionary<string, object> additionalContext)
     {
-        var currentContext = Context.GetValueOrDefault(
-            new Dictionary<string, object>()
-        );
+        var currentContext = Context.GetValueOrDefault(new Dictionary<string, object>());
         var newContext = new Dictionary<string, object>(currentContext);
         foreach (var kvp in additionalContext)
         {

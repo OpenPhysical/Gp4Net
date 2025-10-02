@@ -50,11 +50,13 @@ public interface IApplication
     /// </summary>
     /// <param name="command">APDU command to process</param>
     /// <param name="cardState">Current card state (for secure channel, etc.)</param>
+    /// <param name="config">Card configuration describing static capabilities and keys</param>
     /// <param name="rngContext">RNG context for cryptographic operations</param>
     /// <returns>Updated application and APDU response, or error</returns>
-    Result<(IApplication UpdatedApplication, ApduResponse Response), SmartCardError> ProcessCommand(
+    Result<ApplicationCommandResult, SmartCardError> ProcessCommand(
         byte[] command,
         CardState cardState,
+        CardConfiguration config,
         IRngContext rngContext
     );
 

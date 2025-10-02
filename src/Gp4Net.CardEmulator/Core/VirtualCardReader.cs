@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Functional;
 using Gp4Net.Core;
@@ -160,63 +161,109 @@ public class VirtualCardReader
                     ? Result.Failure<ApduResponse, SmartCardError>(
                         SmartCardError.InvalidArgument("Reader is not connected")
                     )
-                : !IsCardPresent
-                    ? Result.Failure<ApduResponse, SmartCardError>(
-                        SmartCardError.InvalidArgument("No card is present")
-                    )
-                : _insertedCard.Match(
-                    card => card.ProcessCommand(validCommand)
-                        .Map(result => result.Response),
-                    () =>
-                        Result.Failure<ApduResponse, SmartCardError>(
-                            SmartCardError.InvalidArgument("No card present")
+                    : !IsCardPresent
+                        ? Result.Failure<ApduResponse, SmartCardError>(
+                            SmartCardError.InvalidArgument("No card is present")
                         )
-                )
+                        : _insertedCard.Match(
+                            card =>
+                                card.ProcessCommand(validCommand).Map(result => result.Response),
+                            () =>
+                                Result.Failure<ApduResponse, SmartCardError>(
+                                    SmartCardError.InvalidArgument("No card present")
+                                )
+                        )
             );
     }
 }
 
 /// <summary>
-/// Manages a collection of virtual card readers for testing.
+/// Builder for constructing immutable VirtualReaderManager instances.
+/// Allows mutation during construction, produces immutable manager.
 /// </summary>
 [PublicAPI]
-public class VirtualReaderManager
+public class VirtualReaderManagerBuilder
 {
     private readonly Dictionary<string, VirtualCardReader> _readers = new();
 
     /// <summary>
-    /// Gets the list of available reader names.
-    /// </summary>
-    public IReadOnlyList<string> GetReaderNames()
-    {
-        return new List<string>(_readers.Keys);
-    }
-
-    /// <summary>
-    /// Adds a virtual reader to the manager.
+    /// Adds a virtual reader to the builder.
     /// </summary>
     /// <param name="reader">The virtual reader to add.</param>
-    public UnitResult<SmartCardError> AddReader(VirtualCardReader reader)
+    /// <returns>Result containing this builder for fluent chaining.</returns>
+    public Result<VirtualReaderManagerBuilder, SmartCardError> WithReader(VirtualCardReader reader)
     {
         return Maybe<VirtualCardReader>
             .From(reader)
-            .ToResult(SmartCardError.InvalidArgument("Invalid Reader Name"))
-            .Tap(r => _readers[r.ReaderName] = r)
-            .Map(_ => UnitResult.Success<SmartCardError>());
+            .ToResult(SmartCardError.InvalidArgument("Invalid Reader"))
+            .Map(r =>
+            {
+                _readers[r.ReaderName] = r;
+                return this;
+            });
     }
 
     /// <summary>
-    /// Removes a virtual reader from the manager.
+    /// Adds a P71 virtual reader with the specified name.
     /// </summary>
-    /// <param name="readerName">The name of the reader to remove.</param>
-    /// @todo mutation
-    public UnitResult<SmartCardError> RemoveReader(string readerName)
+    /// <param name="readerName">The name for the P71 reader.</param>
+    /// <returns>Result containing this builder for fluent chaining.</returns>
+    public Result<VirtualReaderManagerBuilder, SmartCardError> WithP71Reader(string readerName)
     {
-        return Maybe<string>
-            .From(readerName)
-            .ToResult(SmartCardError.InvalidArgument("Invalid Reader Name"))
-            .Tap(name => _readers.Remove(name))
-            .Map(_ => UnitResult.Success<SmartCardError>());
+        return CardConfiguration
+            .P71()
+            .Bind(config =>
+                Maybe<VirtualCard>
+                    .From(VirtualCardTestBuilder.CreateWithSecureRng(config))
+                    .ToResult(SmartCardError.InvalidData("Failed to create virtual card"))
+            )
+            .Bind(p71Card =>
+                VirtualCardReader.Create(readerName).Bind(reader => reader.WithCard(p71Card))
+            )
+            .Bind(readerWithCard => WithReader(readerWithCard));
+    }
+
+    /// <summary>
+    /// Builds an immutable VirtualReaderManager from the accumulated readers.
+    /// </summary>
+    /// <returns>Immutable VirtualReaderManager instance.</returns>
+    public VirtualReaderManager Build()
+    {
+        return new VirtualReaderManager(_readers.ToImmutableDictionary());
+    }
+}
+
+/// <summary>
+/// Manages a collection of virtual card readers.
+/// Immutable once constructed - use VirtualReaderManagerBuilder to create instances.
+/// </summary>
+[PublicAPI]
+public class VirtualReaderManager
+{
+    private readonly ImmutableDictionary<string, VirtualCardReader> _readers;
+
+    /// <summary>
+    /// Initializes a new instance with an empty reader collection.
+    /// </summary>
+    public VirtualReaderManager()
+        : this(ImmutableDictionary<string, VirtualCardReader>.Empty) { }
+
+    /// <summary>
+    /// Internal constructor for builder use.
+    /// </summary>
+    /// <param name="readers">The immutable dictionary of readers.</param>
+    internal VirtualReaderManager(ImmutableDictionary<string, VirtualCardReader> readers)
+    {
+        _readers = readers;
+    }
+
+    /// <summary>
+    /// Gets the list of available reader names.
+    /// </summary>
+    /// <returns>Read-only list of reader names.</returns>
+    public IReadOnlyList<string> GetReaderNames()
+    {
+        return _readers.Keys.ToImmutableList();
     }
 
     /// <summary>
@@ -229,42 +276,5 @@ public class VirtualReaderManager
         return _readers.TryGetValue(readerName, out var reader)
             ? Maybe<VirtualCardReader>.From(reader)
             : Maybe<VirtualCardReader>.None;
-    }
-
-    /// <summary>
-    /// Clears all virtual readers.
-    /// </summary>
-    /// @TODO This should not be done as a side effect.  It's terrible, requires mutation to actually be useful.  Remove.'
-    public UnitResult<SmartCardError> Clear()
-    {
-        // Functional approach - no side effects, just clear the collection
-        _readers.Clear();
-        return UnitResult.Success<SmartCardError>();
-    }
-
-    /// <summary>
-    /// Creates a standard test setup with a P71 Card.
-    /// </summary>
-    /// <returns>The name of the created reader.</returns>
-    /// @TODO This should not done as a string.  It's terrible, requires mutation to actually be useful.  Remove.
-    public string CreateStandardTestSetup()
-    {
-        const string readerName = "Virtual P71 Reader 00 00";
-
-        return CardConfiguration
-            .P71()
-            .Bind(config => Maybe<VirtualCard>
-                .From(VirtualCardTestBuilder.CreateWithSecureRng(config))
-                .ToResult(SmartCardError.InvalidData("Failed to create virtual card")))
-            .Bind(p71Card => VirtualCardReader
-                .Create(readerName)
-                .Bind(reader => reader.WithCard(p71Card)))
-            .Match(
-                readerWithCard =>
-                {
-                    AddReader(readerWithCard);
-                    return readerName;
-                }, static _ => string.Empty
-            );
     }
 }

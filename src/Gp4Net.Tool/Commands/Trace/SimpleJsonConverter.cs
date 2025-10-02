@@ -14,23 +14,22 @@ namespace Gp4Net.Tool.Commands.Trace;
 /// </summary>
 public class SimpleJsonConverter
 {
-    private static readonly Dictionary<string, string> CommandNames = new()
-    {
-        { "00A4", "SELECT" },
-        { "80CA", "GET DATA" },
-        { "80F2", "GET STATUS" },
-        { "8050", "INITIALIZE UPDATE" },
-        { "8482", "EXTERNAL AUTHENTICATE" },
-        { "84E6", "INSTALL" },
-        { "84E8", "LOAD" },
-        { "84E4", "DELETE" },
-    };
+    private static readonly Dictionary<string, string> CommandNames =
+        new()
+        {
+            { "00A4", "SELECT" },
+            { "80CA", "GET DATA" },
+            { "80F2", "GET STATUS" },
+            { "8050", "INITIALIZE UPDATE" },
+            { "8482", "EXTERNAL AUTHENTICATE" },
+            { "84E6", "INSTALL" },
+            { "84E8", "LOAD" },
+            { "84E4", "DELETE" },
+        };
 
     public async Task<string> ConvertToSimpleJson(string inputFile, bool includeDescriptions = true)
     {
-        var exchanges = await ParseGpProTrace(
-            inputFile
-        );
+        var exchanges = await ParseGpProTrace(inputFile);
         var operations = DetectOperations(exchanges);
 
         var traceData = new SimpleTraceData

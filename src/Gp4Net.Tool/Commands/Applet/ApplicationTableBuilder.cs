@@ -11,7 +11,7 @@ namespace Gp4Net.Tool.Commands.Applet;
 
 /// <summary>
 /// Pure functional table builder for application information display.
-/// Uses semantic row types and functional composition per CLAUDE.md patterns.
+/// Uses semantic row types and functional composition per project architecture guidelines.
 /// Eliminates imperative table building and ensures consistent formatting.
 /// </summary>
 public static class ApplicationTableBuilder
@@ -76,9 +76,7 @@ public static class ApplicationTableBuilder
         }
 
         // Group applications by type for better organization
-        var grouped = filteredApps
-            .GroupBy(a => a.Type)
-            .OrderBy(g => GetTypePriority(g.Key));
+        var grouped = filteredApps.GroupBy(a => a.Type).OrderBy(g => GetTypePriority(g.Key));
 
         foreach (var group in grouped)
         {
@@ -172,32 +170,31 @@ public static class ApplicationTableBuilder
     {
         return filter.ToLowerInvariant() switch
         {
-            "isd" => applications
-                .Where(a => a.Type == ApplicationType.IssuerSecurityDomain)
-                .ToList(),
-            "ssd" => applications
-                .Where(a => a.Type == ApplicationType.SupplementarySecurityDomain)
-                .ToList(),
-            "app" or "applet" => applications
-                .Where(a => a.Type == ApplicationType.Application)
-                .ToList(),
-            "pkg" or "package" => applications
-                .Where(a => a.Type == ApplicationType.LoadFile)
-                .ToList(),
-            "selectable" => applications
-                .Where(a => a.LifecycleState == LifecycleState.Selectable)
-                .ToList(),
+            "isd"
+                => applications.Where(a => a.Type == ApplicationType.IssuerSecurityDomain).ToList(),
+            "ssd"
+                => applications
+                    .Where(a => a.Type == ApplicationType.SupplementarySecurityDomain)
+                    .ToList(),
+            "app"
+            or "applet"
+                => applications.Where(a => a.Type == ApplicationType.Application).ToList(),
+            "pkg"
+            or "package"
+                => applications.Where(a => a.Type == ApplicationType.LoadFile).ToList(),
+            "selectable"
+                => applications.Where(a => a.LifecycleState == LifecycleState.Selectable).ToList(),
             "locked" => applications.Where(a => a.LifecycleState == LifecycleState.Locked).ToList(),
-            "installed" => applications
-                .Where(a => a.LifecycleState == LifecycleState.Installed)
-                .ToList(),
-            _ when filter.Length >= 6 => applications
-                .Where(a =>
-                    Convert
-                        .ToHexString(a.Aid)
-                        .Contains(filter.ToUpperInvariant(), StringComparison.OrdinalIgnoreCase)
-                )
-                .ToList(),
+            "installed"
+                => applications.Where(a => a.LifecycleState == LifecycleState.Installed).ToList(),
+            _ when filter.Length >= 6
+                => applications
+                    .Where(a =>
+                        Convert
+                            .ToHexString(a.Aid)
+                            .Contains(filter.ToUpperInvariant(), StringComparison.OrdinalIgnoreCase)
+                    )
+                    .ToList(),
             _ => applications,
         };
     }

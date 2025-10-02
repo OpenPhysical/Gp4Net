@@ -52,8 +52,7 @@ public class LoadFileParsingTests
             + "E31B4F07A00000006202029F700101CE020103CC08A000000151000000";
 
         var response = MakeResponse(respHex);
-        var exec =
-            ResponseExecutor(response);
+        var exec = ResponseExecutor(response);
 
         Result<ImmutableList<ExecutableLoadFile>, SmartCardError> result =
             await Applications.GetExecutableLoadFilesWithModulesAsync(exec);
@@ -65,9 +64,7 @@ public class LoadFileParsingTests
         _ = elfs.Count.Should().BeGreaterThanOrEqualTo(4);
 
         // SSD creation package
-        var ssdPkg = elfs.FirstOrDefault(e =>
-            Convert.ToHexString(e.Aid) == "A0000001515350"
-        );
+        var ssdPkg = elfs.FirstOrDefault(e => Convert.ToHexString(e.Aid) == "A0000001515350");
         _ = ssdPkg.Should().NotBeNull();
         _ = ssdPkg!.LifecycleState.Should().Be(LifecycleState.Loaded);
         _ = ssdPkg.VersionString.Should().Be("255.255");
@@ -95,8 +92,7 @@ public class LoadFileParsingTests
             + "E31B4F07A00000006202029F700101CE020103CC08A000000151000000";
 
         var response = MakeResponse(respHex);
-        var exec =
-            ResponseExecutor(response);
+        var exec = ResponseExecutor(response);
 
         Result<ImmutableList<ExecutableLoadFile>, SmartCardError> result =
             await Applications.GetExecutableLoadFilesAsync(exec);

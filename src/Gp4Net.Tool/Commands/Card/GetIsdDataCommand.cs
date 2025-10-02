@@ -58,31 +58,31 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
 
             return dataObject switch
             {
-                "iin" => await GetSingleDataObjectAsync(
-                    context,
-                    settings,
-                    "IIN",
-                    GetDataCommand.DataObjects.IssuerIdentificationNumber
-                ),
-                "cin" => await GetSingleDataObjectAsync(
-                    context,
-                    settings,
-                    "CIN",
-                    GetDataCommand.DataObjects.CardImageNumber
-                ),
-                "manager-url" => await GetSingleDataObjectAsync(
-                    context,
-                    settings,
-                    "Manager URL",
-                    GetDataCommand.DataObjects.SecurityDomainManagerUrl
-                ),
+                "iin"
+                    => await GetSingleDataObjectAsync(
+                        context,
+                        settings,
+                        "IIN",
+                        GetDataCommand.DataObjects.IssuerIdentificationNumber
+                    ),
+                "cin"
+                    => await GetSingleDataObjectAsync(
+                        context,
+                        settings,
+                        "CIN",
+                        GetDataCommand.DataObjects.CardImageNumber
+                    ),
+                "manager-url"
+                    => await GetSingleDataObjectAsync(
+                        context,
+                        settings,
+                        "Manager URL",
+                        GetDataCommand.DataObjects.SecurityDomainManagerUrl
+                    ),
                 "opid" => await GetOpidDataAsync(context, settings),
                 "all" => await GetAllDataAsync(context, settings),
-                _ when dataObject.StartsWith("0x") => await GetRawDataObjectAsync(
-                    context,
-                    settings,
-                    dataObject
-                ),
+                _ when dataObject.StartsWith("0x")
+                    => await GetRawDataObjectAsync(context, settings, dataObject),
                 _ => HandleInvalidDataObject(context, dataObject),
             };
         }
@@ -107,8 +107,10 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 .Bind(command => command.ToCommandApdu())
                 .Bind(async apdu =>
                 {
-                    var response =
-                        await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    var response = await context.CardService.ExecuteCommandAsync(
+                        apdu,
+                        CancellationToken.None
+                    );
                     return response.Bind(resp => Responses.ParseGetDataResponse(resp));
                 });
             if (dataResult.IsSuccess)
@@ -155,8 +157,10 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 .Bind(command => command.ToCommandApdu())
                 .Bind(async apdu =>
                 {
-                    var response =
-                        await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    var response = await context.CardService.ExecuteCommandAsync(
+                        apdu,
+                        CancellationToken.None
+                    );
                     return response.Bind(resp => Responses.ParseGetDataResponse(resp));
                 });
             if (dataResult.IsSuccess)
@@ -193,8 +197,10 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 .Bind(command => command.ToCommandApdu())
                 .Bind(async apdu =>
                 {
-                    var response =
-                        await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    var response = await context.CardService.ExecuteCommandAsync(
+                        apdu,
+                        CancellationToken.None
+                    );
                     return response.Bind(Responses.ParseGetDataResponse);
                 });
             var cinResult = await Gp4Net
@@ -204,8 +210,10 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 .Bind(command => command.ToCommandApdu())
                 .Bind(async apdu =>
                 {
-                    var response =
-                        await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    var response = await context.CardService.ExecuteCommandAsync(
+                        apdu,
+                        CancellationToken.None
+                    );
                     return response.Bind(Responses.ParseGetDataResponse);
                 });
             var urlResult = await Gp4Net
@@ -215,8 +223,10 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                 .Bind(command => command.ToCommandApdu())
                 .Bind(async apdu =>
                 {
-                    var response =
-                        await context.CardService.ExecuteCommandAsync(apdu, CancellationToken.None);
+                    var response = await context.CardService.ExecuteCommandAsync(
+                        apdu,
+                        CancellationToken.None
+                    );
                     return response.Bind(Responses.ParseGetDataResponse);
                 });
 
@@ -262,10 +272,7 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
             string managerUrl = urlDecodeResult.Value;
 
             // Try to reconstruct OPID
-            if (
-                OpenPhysicalId.TryFromCardData(iin, cin, managerUrl, out var opid)
-                && opid != null
-            )
+            if (OpenPhysicalId.TryFromCardData(iin, cin, managerUrl, out var opid) && opid != null)
             {
                 DisplayOpidData(context, settings, opid, iin, cin, managerUrl);
                 return 0;
@@ -325,11 +332,10 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                     .Bind(command => command.ToCommandApdu())
                     .Bind(async apdu =>
                     {
-                        var response =
-                            await context.CardService.ExecuteCommandAsync(
-                                apdu,
-                                CancellationToken.None
-                            );
+                        var response = await context.CardService.ExecuteCommandAsync(
+                            apdu,
+                            CancellationToken.None
+                        );
                         return response.Bind(resp => Responses.ParseGetDataResponse(resp));
                     });
                 if (dataResult.IsSuccess)
@@ -375,14 +381,7 @@ public class GetIsdDataCommand : IPipelineCommand<GetIsdDataCommand.Settings>
                                 .Map(bytes => Encoding.ASCII.GetString(bytes))
                                 .Bind(url =>
                                 {
-                                    if (
-                                        OpenPhysicalId.TryFromCardData(
-                                            iin,
-                                            cin,
-                                            url,
-                                            out var opid
-                                        )
-                                    )
+                                    if (OpenPhysicalId.TryFromCardData(iin, cin, url, out var opid))
                                     {
                                         return Result.Success<OpenPhysicalId, SmartCardError>(opid);
                                     }

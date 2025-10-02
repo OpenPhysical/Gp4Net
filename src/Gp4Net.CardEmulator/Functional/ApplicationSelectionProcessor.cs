@@ -78,16 +78,13 @@ public static class ApplicationSelectionProcessor
             return Result.Failure<SelectCommandData, SmartCardError>(SmartCardError.WrongLength());
         }
 
-        var aid =
-            lc == 0 ? ImmutableArray<byte>.Empty : [.. command.Skip(5).Take(lc)];
+        var aid = lc == 0 ? ImmutableArray<byte>.Empty : [.. command.Skip(5).Take(lc)];
 
         return Result.Success<SelectCommandData, SmartCardError>(
             new SelectCommandData(
                 aid,
                 selectionControl,
-                (FileControlInformation)(
-                    p2 & CommonBytes.LOWER_NIBBLE_MASK
-                ),
+                (FileControlInformation)(p2 & CommonBytes.LOWER_NIBBLE_MASK),
                 (p1 & 0x04) != 0 // File occurrence bit
             )
         );
@@ -103,18 +100,12 @@ public static class ApplicationSelectionProcessor
     {
         return selectData.SelectionControl switch
         {
-            var ctrl when ctrl == Apdu.SelectP1.SELECT_BY_NAME => ProcessSelectByName(
-                state,
-                selectData.Aid
-            ),
-            var ctrl when ctrl == Apdu.SelectP1.SELECT_BY_FILE_ID => ProcessSelectFirst(
-                state,
-                selectData.Aid
-            ),
-            var ctrl when ctrl == Apdu.SelectP1.SELECT_EF_UNDER_CURRENT_DF => ProcessSelectNext(
-                state,
-                selectData.Aid
-            ),
+            var ctrl when ctrl == Apdu.SelectP1.SELECT_BY_NAME
+                => ProcessSelectByName(state, selectData.Aid),
+            var ctrl when ctrl == Apdu.SelectP1.SELECT_BY_FILE_ID
+                => ProcessSelectFirst(state, selectData.Aid),
+            var ctrl when ctrl == Apdu.SelectP1.SELECT_EF_UNDER_CURRENT_DF
+                => ProcessSelectNext(state, selectData.Aid),
             _ => Result.Failure<CardState, SmartCardError>(SmartCardError.IncorrectData()),
         };
     }
@@ -197,8 +188,10 @@ public static class ApplicationSelectionProcessor
         }
 
         // Find next occurrence based on selection history
-        var lastSelected = Maybe<string>.From(state.ApplicationContext.SelectionHistory.LastOrDefault());
-        
+        var lastSelected = Maybe<string>.From(
+            state.ApplicationContext.SelectionHistory.LastOrDefault()
+        );
+
         return lastSelected.Match(
             selected =>
             {
@@ -213,7 +206,7 @@ public static class ApplicationSelectionProcessor
                         .ApplicationContext.SelectApplication([.. nextAid])
                         .Map(newContext => state.WithApplicationContext(newContext).WithSelected());
                 }
-                
+
                 // If at end of list, select first
                 var firstApp = candidates.First();
                 return state
@@ -229,7 +222,8 @@ public static class ApplicationSelectionProcessor
                 return state
                     .ApplicationContext.SelectApplication(firstApp.Aid)
                     .Map(newContext => state.WithApplicationContext(newContext).WithSelected());
-            });
+            }
+        );
     }
 
     /// <summary>
@@ -299,11 +293,8 @@ public static class ApplicationSelectionProcessor
         //     9F70 (Life Cycle State) - 1 byte: 0x07 (INITIALIZED)
 
         byte[] proprietaryData = BuildProprietaryData();
-        var aidTlvResult = TlvEncoder.EncodeSimple(0x84, isdAid.ToImmutableArray());
-        var proprietaryTlvResult = TlvEncoder.EncodeSimple(
-            0xA5,
-            proprietaryData.ToImmutableArray()
-        );
+        var aidTlvResult = TlvEncoder.EncodeSimple(0x84, [.. isdAid]);
+        var proprietaryTlvResult = TlvEncoder.EncodeSimple(0xA5, [.. proprietaryData]);
 
         return aidTlvResult
             .Bind(aidTlv =>
@@ -325,11 +316,8 @@ public static class ApplicationSelectionProcessor
     private static byte[] BuildProprietaryData()
     {
         // Life cycle state: SELECTABLE (INITIALIZED)
-        byte[] lifecycleState =
-        [
-            LifecycleStates.SELECTABLE,
-        ];
-        var lifecycleTlvResult = TlvEncoder.EncodeSimple(0x9F70, lifecycleState.ToImmutableArray());
+        byte[] lifecycleState = [LifecycleStates.SELECTABLE];
+        var lifecycleTlvResult = TlvEncoder.EncodeSimple(0x9F70, [.. lifecycleState]);
         var lifecycleTlv = lifecycleTlvResult.Match(
             success => success.ToArray(),
             error => [0x9F, 0x70, 0x01, lifecycleState[0]] // Fallback to manual construction

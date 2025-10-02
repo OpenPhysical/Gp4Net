@@ -76,6 +76,9 @@ public static partial class Constants
 
                 /// <summary>S-RMAC key derivation constant.</summary>
                 public static readonly byte[] SrMac = [0x01, 0x02];
+
+                /// <summary>S-DEK key derivation constant.</summary>
+                public static readonly byte[] SDek = [0x01, 0x81];
             }
 
             /// <summary>
@@ -210,6 +213,27 @@ public static partial class Constants
                 /// Used for deriving the session response MAC key.
                 /// </summary>
                 SRMac = 0x07,
+
+                /// <summary>
+                /// S-DEK key derivation label.
+                /// Used for deriving the session data encryption key.
+                /// </summary>
+                SDek = 0x08,
+            }
+
+            /// <summary>
+            /// Cryptogram derivation constants for SCP03.
+            /// Per GlobalPlatform Card Specification v2.3 - SCP03 Amendment D v1.2.
+            /// Table 4-1: Data Derivation Constants.
+            /// </summary>
+            [PublicAPI]
+            public static class CryptogramDerivation
+            {
+                /// <summary>Card cryptogram derivation constant (0x00).</summary>
+                public const byte CardCryptogram = 0x00;
+
+                /// <summary>Host cryptogram derivation constant (0x01).</summary>
+                public const byte HostCryptogram = 0x01;
             }
 
             /// <summary>
@@ -274,6 +298,27 @@ public static partial class Constants
 
             /// <summary>Zero MAC chaining value for SCP03 (16 bytes).</summary>
             public static readonly byte[] ZeroChaining16 = new byte[16];
+
+            /// <summary>Cryptogram data size for SCP02 (24 bytes).</summary>
+            public const int CRYPTOGRAM_DATA_SIZE_24 = 24;
+
+            /// <summary>IV counter offset in SCP03 (12 bytes).</summary>
+            public const int IV_COUNTER_OFFSET = 12;
+
+            /// <summary>ISO 7816-4 padding byte (0x80).</summary>
+            public const byte ISO7816_PADDING_BYTE = 0x80;
+
+            /// <summary>MAC truncation size for both SCP02 and SCP03 (8 bytes).</summary>
+            public const int MAC_TRUNCATION_SIZE = 8;
+
+            /// <summary>AES-CMAC block size in bits (128 bits = 16 bytes).</summary>
+            public const int AES_CMAC_BLOCK_BITS = 128;
+
+            /// <summary>Cryptogram data extraction offset for SCP02 (8 bytes).</summary>
+            public const int CRYPTOGRAM_EXTRACTION_OFFSET = 8;
+
+            /// <summary>Cryptogram data extraction length for SCP02 (8 bytes).</summary>
+            public const int CRYPTOGRAM_EXTRACTION_LENGTH = 8;
         }
 
         /// <summary>

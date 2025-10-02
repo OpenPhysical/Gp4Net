@@ -27,6 +27,12 @@
     <ProjectReference Include="..\..\src\Gp4Net.CardEmulator\Gp4Net.CardEmulator.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <None Update="..\applets\**\*">
+      <Link>tests\applets\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
     <None Update="TestData\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

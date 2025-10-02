@@ -39,7 +39,7 @@ public static class ApduBuilder
     /// <summary>
     /// Builds an APDU byte array with explicit parameters.
     /// </summary>
-    private static Result<byte[], SmartCardError> BuildApduBytes(
+    internal static Result<byte[], SmartCardError> BuildApduBytes(
         byte cla,
         byte ins,
         byte p1,
@@ -136,7 +136,7 @@ public static class ApduBuilder
         int expectedLength
     )
     {
-        bool isExtendedLength = commandData.Length > 255 || expectedLength > 255;
+        bool isExtendedLength = commandData.Length > 255 || expectedLength > 256;
         bool hasData = commandData.Length > 0;
 
         // Security check: Validate expected response length
@@ -194,6 +194,6 @@ public static class ApduBuilder
     {
         return command
             .ToResult(SmartCardError.InvalidArgument("Command cannot be null"))
-            .Map(cmd => cmd.ToBytes());
+            .Map(cmd => cmd.ToApdu().ToBytes());
     }
 }

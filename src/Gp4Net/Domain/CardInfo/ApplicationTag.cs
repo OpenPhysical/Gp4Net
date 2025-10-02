@@ -1,4 +1,3 @@
-using System;
 using CSharpFunctionalExtensions;
 
 namespace Gp4Net.Domain.CardInfo;
@@ -41,30 +40,32 @@ public record ApplicationTag(
     /// <summary>
     /// Gets the standard name for known application tags per GP specification.
     /// </summary>
-    private static string GetTagName(byte tagNumber) => tagNumber switch
-    {
-        0x60 => "Application tag 0",     // Card Management Type and Version
-        0x63 => "Application tag 3",     // Card Identification Scheme
-        0x64 => "Application tag 4",     // Secure Channel Protocol
-        0x65 => "Application tag 5",     // Card configuration details (optional)
-        0x66 => "Application tag 6",     // Card/chip details (optional)
-        0x67 => "Application tag 7",     // ISD Trust Point certificate info (optional)
-        0x68 => "Application tag 8",     // ISD certificate info (conditional)
-        _ => $"Application tag {tagNumber:X2}"
-    };
+    private static string GetTagName(byte tagNumber) =>
+        tagNumber switch
+        {
+            0x60 => "Application tag 0", // Card Management Type and Version
+            0x63 => "Application tag 3", // Card Identification Scheme
+            0x64 => "Application tag 4", // Secure Channel Protocol
+            0x65 => "Application tag 5", // Card configuration details (optional)
+            0x66 => "Application tag 6", // Card/chip details (optional)
+            0x67 => "Application tag 7", // ISD Trust Point certificate info (optional)
+            0x68 => "Application tag 8", // ISD certificate info (conditional)
+            _ => $"Application tag {tagNumber:X2}",
+        };
 
     /// <summary>
     /// Gets a description of what this tag contains based on GP specification.
     /// </summary>
-    public string GetDescription() => TagNumber switch
-    {
-        0x60 => "Card Management Type and Version",
-        0x63 => "Card Identification Scheme",
-        0x64 => "Secure Channel Protocol of ISD",
-        0x65 => "Card Configuration Details",
-        0x66 => "Card/Chip Details",
-        0x67 => "ISD Trust Point Certificate Information",
-        0x68 => "ISD Certificate Information",
-        _ => "Unknown Application Tag"
-    };
+    public string GetDescription() =>
+        TagNumber switch
+        {
+            0x60 => "Card Management Type and Version",
+            0x63 => "Card Identification Scheme",
+            0x64 => "Secure Channel Protocol of ISD",
+            0x65 => "Card Configuration Details",
+            0x66 => "Card/Chip Details",
+            0x67 => "ISD Trust Point Certificate Information",
+            0x68 => "ISD Certificate Information",
+            _ => "Unknown Application Tag",
+        };
 }

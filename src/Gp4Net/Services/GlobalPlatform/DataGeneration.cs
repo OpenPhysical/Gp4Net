@@ -88,7 +88,7 @@ public static class DataGeneration
         {
             KeyVersionNumber = Maybe<byte>.From(keyVersionNumber),
             KeyIdentifier = Maybe<byte>.From(keyIdentifier),
-            KeyTypesAndLengths = keyTypes.ToImmutableArray(),
+            KeyTypesAndLengths = [.. keyTypes],
         };
 
         return KeyInfoTemplateCodec.Encode(keyInfo);
@@ -151,9 +151,10 @@ public static class DataGeneration
             0x0067 => BuildLegacyCardCapabilities(),
             0x00E0 => BuildKeyInformationTemplate(keyVersionNumber, keyIdentifier, keyTypes),
             0x9F7F => BuildCplcData(),
-            _ => Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidArgument($"Unsupported data object tag: 0x{tag:X4}")
-            ),
+            _
+                => Result.Failure<byte[], SmartCardError>(
+                    SmartCardError.InvalidArgument($"Unsupported data object tag: 0x{tag:X4}")
+                ),
         };
     }
 
@@ -169,17 +170,14 @@ public static class DataGeneration
     )
     {
         // Build TLV components functionally
-        var protocolTlvResult = TlvObject.Create(
-            TlvTag.FromByte(0x80),
-            new TlvValue(ImmutableArray.Create(protocol))
-        );
+        var protocolTlvResult = TlvObject.Create(TlvTag.FromByte(0x80), new TlvValue([protocol]));
 
         var implementationsTlvResult =
             implementations.Count > 0
                 ? TlvObject
                     .Create(
                         TlvTag.FromByte(0x81),
-                        new TlvValue(implementations.Select(impl => (byte)impl).ToImmutableArray())
+                        new TlvValue([.. implementations.Select(impl => (byte)impl)])
                     )
                     .Map(Maybe<TlvObject>.From)
                 : Result.Success<Maybe<TlvObject>, SmartCardError>(Maybe<TlvObject>.None);
@@ -193,9 +191,11 @@ public static class DataGeneration
                     .Create(
                         TlvTag.FromByte(0x82),
                         new TlvValue(
-                            relevantKeyTypes
-                                .SelectMany(kt => new byte[] { kt.Type, kt.Length })
-                                .ToImmutableArray()
+                            [
+                                .. relevantKeyTypes.SelectMany(kt =>
+                                    new byte[] { kt.Type, kt.Length }
+                                )
+                            ]
                         )
                     )
                     .Map(Maybe<TlvObject>.From)

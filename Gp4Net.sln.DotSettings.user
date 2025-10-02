@@ -5,9 +5,7 @@
   &lt;Project Location="/Users/mistial/Projects/OpenPhysical/Gp4Net/tests/Gp4Net.Tests" Presentation="&amp;lt;Gp4Net.Tests&amp;gt;" /&gt;
 &lt;/SessionState&gt;</s:String>
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=7ce84f90_002D6ae2_002D4e9e_002D860e_002Deb90f45871f3/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="Junie Session" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
-  &lt;TestAncestor&gt;
-    &lt;TestId&gt;NUnit3x::BC76946A-E27D-4179-9745-4F83F266F480::net9.0::Gp4Net.Tests.Cryptography.Scp02CryptogramTests&lt;/TestId&gt;
-  &lt;/TestAncestor&gt;
+  &lt;Project Location="/Users/mistial/Projects/OpenPhysical/Gp4Net/tests/Gp4Net.Tests" Presentation="&amp;lt;Gp4Net.Tests&amp;gt;" /&gt;
 &lt;/SessionState&gt;</s:String>
 	
 	

@@ -24,33 +24,25 @@ public abstract class GpCommandBase : CommandAPDU, IApduCommand
     /// Protected constructor for CC1 commands (no data, no response).
     /// </summary>
     protected GpCommandBase(byte cla, byte ins, byte p1, byte p2)
-        : base(cla, ins, p1, p2)
-    {
-    }
+        : base(cla, ins, p1, p2) { }
 
     /// <summary>
     /// Protected constructor for CC2 commands (no data, with response).
     /// </summary>
     protected GpCommandBase(byte cla, byte ins, byte p1, byte p2, uint le)
-        : base(cla, ins, p1, p2, le)
-    {
-    }
+        : base(cla, ins, p1, p2, le) { }
 
     /// <summary>
     /// Protected constructor for CC3 commands (with data, no response).
     /// </summary>
     protected GpCommandBase(byte cla, byte ins, byte p1, byte p2, uint lc, byte[] udc)
-        : base(cla, ins, p1, p2, lc, udc)
-    {
-    }
+        : base(cla, ins, p1, p2, lc, udc) { }
 
     /// <summary>
     /// Protected constructor for CC4 commands (with data, with response).
     /// </summary>
     protected GpCommandBase(byte cla, byte ins, byte p1, byte p2, uint lc, byte[] udc, uint le)
-        : base(cla, ins, p1, p2, lc, udc, le)
-    {
-    }
+        : base(cla, ins, p1, p2, lc, udc, le) { }
 
     /// <summary>
     /// Factory method for creating commands with validation in functional style.
@@ -61,19 +53,18 @@ public abstract class GpCommandBase : CommandAPDU, IApduCommand
     /// <returns>A Result containing the command or an error.</returns>
     protected static Result<T, SmartCardError> CreateValidated<T>(
         Func<T> factory,
-        params (bool condition, string error)[] validations)
+        params (bool condition, string error)[] validations
+    )
         where T : GpCommandBase
     {
-        var errors = validations
-            .Where(v => !v.condition)
-            .Select(v => v.error)
-            .ToList();
+        var errors = validations.Where(v => !v.condition).Select(v => v.error).ToList();
 
         return errors.Any()
             ? Result.Failure<T, SmartCardError>(SmartCardError.InvalidData(errors.First()))
             : Result.Try(
                 factory,
-                ex => SmartCardError.InvalidData($"Failed to create command: {ex.Message}"));
+                ex => SmartCardError.InvalidData($"Failed to create command: {ex.Message}")
+            );
     }
 
     /// <summary>

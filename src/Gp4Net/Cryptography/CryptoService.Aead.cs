@@ -1,6 +1,7 @@
 using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Modes;
 using Org.BouncyCastle.Crypto.Parameters;
@@ -35,43 +36,45 @@ public static partial class CryptoService
         )
         {
             return ValidateAesGcmInputs(key, nonce, plaintext, tagLength)
-                .Bind(() =>
-                    Result.Try(
-                        () =>
-                        {
-                            var gcmCipher = new GcmBlockCipher(new AesEngine());
-                            var parameters = new AeadParameters(
-                                new KeyParameter(key),
-                                tagLength,
-                                nonce,
-                                associatedData
-                            );
-                            gcmCipher.Init(true, parameters);
-
-                            int outputLength = gcmCipher.GetOutputSize(plaintext.Length);
-                            byte[] output = new byte[outputLength];
-                            int len = gcmCipher.ProcessBytes(
-                                plaintext,
-                                0,
-                                plaintext.Length,
-                                output,
-                                0
-                            );
-                            len += gcmCipher.DoFinal(output, len);
-
-                            if (len < outputLength)
+                .Bind(
+                    () =>
+                        Result.Try(
+                            () =>
                             {
-                                byte[] result = new byte[len];
-                                Array.Copy(output, 0, result, 0, len);
-                                return result;
-                            }
+                                var gcmCipher = new GcmBlockCipher(new AesEngine());
+                                var parameters = new AeadParameters(
+                                    new KeyParameter(key),
+                                    tagLength,
+                                    nonce,
+                                    associatedData
+                                );
+                                gcmCipher.Init(true, parameters);
 
-                            return output;
-                        }, static ex =>
-                            SmartCardError.CryptographicError(
-                                $"AES-GCM encryption failed: {ex.Message}"
-                            )
-                    )
+                                int outputLength = gcmCipher.GetOutputSize(plaintext.Length);
+                                byte[] output = new byte[outputLength];
+                                int len = gcmCipher.ProcessBytes(
+                                    plaintext,
+                                    0,
+                                    plaintext.Length,
+                                    output,
+                                    0
+                                );
+                                len += gcmCipher.DoFinal(output, len);
+
+                                if (len < outputLength)
+                                {
+                                    byte[] result = new byte[len];
+                                    Array.Copy(output, 0, result, 0, len);
+                                    return result;
+                                }
+
+                                return output;
+                            },
+                            static ex =>
+                                SmartCardError.CryptographicError(
+                                    $"AES-GCM encryption failed: {ex.Message}"
+                                )
+                        )
                 );
         }
 
@@ -95,38 +98,44 @@ public static partial class CryptoService
         {
             return ValidateAesGcmInputs(key, nonce, ciphertext, tagLength)
                 .Bind(() => ValidateCiphertextLength(ciphertext, tagLength))
-                .Bind(() =>
-                    Result.Try(
-                        () =>
-                        {
-                            var gcmCipher = new GcmBlockCipher(new AesEngine());
-                            var parameters = new AeadParameters(
-                                new KeyParameter(key),
-                                tagLength,
-                                nonce,
-                                associatedData
-                            );
-                            gcmCipher.Init(false, parameters);
+                .Bind(
+                    () =>
+                        Result.Try(
+                            () =>
+                            {
+                                var gcmCipher = new GcmBlockCipher(new AesEngine());
+                                var parameters = new AeadParameters(
+                                    new KeyParameter(key),
+                                    tagLength,
+                                    nonce,
+                                    associatedData
+                                );
+                                gcmCipher.Init(false, parameters);
 
-                            int outputLength = gcmCipher.GetOutputSize(ciphertext.Length);
-                            byte[] output = new byte[outputLength];
-                            int len = gcmCipher.ProcessBytes(
-                                ciphertext,
-                                0,
-                                ciphertext.Length,
-                                output,
-                                0
-                            );
-                            len += gcmCipher.DoFinal(output, len);
+                                int outputLength = gcmCipher.GetOutputSize(ciphertext.Length);
+                                byte[] output = new byte[outputLength];
+                                int len = gcmCipher.ProcessBytes(
+                                    ciphertext,
+                                    0,
+                                    ciphertext.Length,
+                                    output,
+                                    0
+                                );
+                                len += gcmCipher.DoFinal(output, len);
 
-                            byte[] result = new byte[len];
-                            Array.Copy(output, 0, result, 0, len);
-                            return result;
-                        }, static ex =>
-                            SmartCardError.CryptographicError(
-                                $"AES-GCM decryption failed: {ex.Message}"
-                            )
-                    )
+                                byte[] result = new byte[len];
+                                Array.Copy(output, 0, result, 0, len);
+                                return result;
+                            },
+                            static ex =>
+                                ex is Org.BouncyCastle.Crypto.InvalidCipherTextException
+                                    ? SmartCardError.IntegrityError(
+                                        $"AES-GCM decryption failed: {ex.Message}"
+                                    )
+                                    : SmartCardError.CryptographicError(
+                                        $"AES-GCM decryption failed: {ex.Message}"
+                                    )
+                        )
                 );
         }
 
@@ -142,28 +151,31 @@ public static partial class CryptoService
         {
             return Validation
                 .ValidateInputs(key, data)
-                .Bind(() =>
-                    Validation.ValidateKeyLength(
-                        key,
-                        [16, 24, 32],
-                        "AES key must be 16, 24, or 32 bytes"
-                    )
-                )
-                .Bind(() =>
-                    nonce.Length > 0
-                        ? UnitResult.Success<SmartCardError>()
-                        : UnitResult.Failure(
-                            SmartCardError.InvalidArgument("Nonce cannot be empty")
+                .Bind(
+                    () =>
+                        Validation.ValidateKeyLength(
+                            key,
+                            [16, 24, 32],
+                            "AES key must be 16, 24, or 32 bytes"
                         )
                 )
-                .Bind(() =>
-                    tagLength is 96 or 104 or 112 or 120 or 128
-                        ? UnitResult.Success<SmartCardError>()
-                        : UnitResult.Failure(
-                            SmartCardError.InvalidArgument(
-                                "Tag length must be 96, 104, 112, 120, or 128 bits"
+                .Bind(
+                    () =>
+                        nonce.Length > 0
+                            ? UnitResult.Success<SmartCardError>()
+                            : UnitResult.Failure(
+                                SmartCardError.InvalidArgument("Nonce cannot be empty")
                             )
-                        )
+                )
+                .Bind(
+                    () =>
+                        tagLength is 96 or 104 or 112 or 120 or 128
+                            ? UnitResult.Success<SmartCardError>()
+                            : UnitResult.Failure(
+                                SmartCardError.InvalidArgument(
+                                    "Tag length must be 96, 104, 112, 120, or 128 bits"
+                                )
+                            )
                 );
         }
 

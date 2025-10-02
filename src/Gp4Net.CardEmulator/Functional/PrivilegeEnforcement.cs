@@ -40,77 +40,88 @@ public static class PrivilegeEnforcement
         var requirements = command.ClassInstruction switch
         {
             // Card Manager commands require Card Manager privileges
-            0x80E6 => CommandPrivilegeRequirements.Create(
-                Privilege.AuthorizedManagement | Privilege.SecurityDomain,
-                SecurityLevel.CMac,
-                true
-            ), // Requires secure channel
+            0x80E6
+                => CommandPrivilegeRequirements.Create(
+                    Privilege.AuthorizedManagement | Privilege.SecurityDomain,
+                    SecurityLevel.CMac,
+                    true
+                ), // Requires secure channel
 
-            0x80E4 => CommandPrivilegeRequirements.Create(
-                Privilege.AuthorizedManagement
-                    | Privilege.DelegatedManagement
-                    | Privilege.SecurityDomain,
-                SecurityLevel.CMac,
-                true
-            ),
+            0x80E4
+                => CommandPrivilegeRequirements.Create(
+                    Privilege.AuthorizedManagement
+                        | Privilege.DelegatedManagement
+                        | Privilege.SecurityDomain,
+                    SecurityLevel.CMac,
+                    true
+                ),
 
-            0x80E8 => CommandPrivilegeRequirements.Create(
-                Privilege.AuthorizedManagement | Privilege.SecurityDomain,
-                SecurityLevel.CMac,
-                true
-            ),
+            0x80E8
+                => CommandPrivilegeRequirements.Create(
+                    Privilege.AuthorizedManagement | Privilege.SecurityDomain,
+                    SecurityLevel.CMac,
+                    true
+                ),
 
             // Security Domain commands
-            0x80F2 => command.P1 switch
-            {
-                0x80 or 0x90 => CommandPrivilegeRequirements.Create(
+            0x80F2
+                => command.P1 switch
+                {
+                    0x80
+                    or 0x90
+                        => CommandPrivilegeRequirements.Create(
+                            Privilege.SecurityDomain,
+                            SecurityLevel.CMac,
+                            true
+                        ),
+                    _
+                        => CommandPrivilegeRequirements.Create(
+                            Privilege.None,
+                            SecurityLevel.None,
+                            false
+                        ),
+                },
+
+            // Key management commands
+            0x80D8
+                => CommandPrivilegeRequirements.Create(
                     Privilege.SecurityDomain,
                     SecurityLevel.CMac,
                     true
                 ),
-                _ => CommandPrivilegeRequirements.Create(Privilege.None, SecurityLevel.None, false),
-            },
-
-            // Key management commands
-            0x80D8 => CommandPrivilegeRequirements.Create(
-                Privilege.SecurityDomain,
-                SecurityLevel.CMac,
-                true
-            ),
 
             // Card lock/terminate commands
-            0x80F0 => command.P1 switch
-            {
-                0x00 => CommandPrivilegeRequirements.Create(
-                    Privilege.CardLock,
-                    SecurityLevel.CMac,
-                    true
-                ),
-                0x01 => CommandPrivilegeRequirements.Create(
-                    Privilege.CardTerminate,
-                    SecurityLevel.CMac,
-                    true
-                ),
-                _ => CommandPrivilegeRequirements.Create(
-                    Privilege.CardReset,
-                    SecurityLevel.CMac,
-                    true
-                ),
-            },
+            0x80F0
+                => command.P1 switch
+                {
+                    0x00
+                        => CommandPrivilegeRequirements.Create(
+                            Privilege.CardLock,
+                            SecurityLevel.CMac,
+                            true
+                        ),
+                    0x01
+                        => CommandPrivilegeRequirements.Create(
+                            Privilege.CardTerminate,
+                            SecurityLevel.CMac,
+                            true
+                        ),
+                    _
+                        => CommandPrivilegeRequirements.Create(
+                            Privilege.CardReset,
+                            SecurityLevel.CMac,
+                            true
+                        ),
+                },
 
             // Basic commands (SELECT, etc.) - no special privileges
-            0x00A4 => CommandPrivilegeRequirements.Create(
-                Privilege.None,
-                SecurityLevel.None,
-                false
-            ),
+            0x00A4
+                => CommandPrivilegeRequirements.Create(Privilege.None, SecurityLevel.None, false),
 
             // Secure channel establishment
-            0x8050 or 0x8482 => CommandPrivilegeRequirements.Create(
-                Privilege.None,
-                SecurityLevel.None,
-                false
-            ),
+            0x8050
+            or 0x8482
+                => CommandPrivilegeRequirements.Create(Privilege.None, SecurityLevel.None, false),
 
             _ => CommandPrivilegeRequirements.Create(Privilege.None, SecurityLevel.None, false),
         };
@@ -242,31 +253,42 @@ public static class PrivilegeEnforcement
     {
         return app.State switch
         {
-            ApplicationState.Blocked => command.ClassInstruction switch
-            {
-                // Only basic commands allowed when blocked
-                0x00A4 => Result.Success<bool, SmartCardError>(true),
-                _ => Result.Failure<bool, SmartCardError>(SmartCardError.ConditionsNotSatisfied()),
-            },
+            ApplicationState.Blocked
+                => command.ClassInstruction switch
+                {
+                    // Only basic commands allowed when blocked
+                    0x00A4 => Result.Success<bool, SmartCardError>(true),
+                    _
+                        => Result.Failure<bool, SmartCardError>(
+                            SmartCardError.ConditionsNotSatisfied()
+                        ),
+                },
 
-            ApplicationState.Locked => command.ClassInstruction switch
-            {
-                // Limited commands when locked
-                0x00A4 or 0x80F0 => Result.Success<bool, SmartCardError>(true),
-                _ => Result.Failure<bool, SmartCardError>(SmartCardError.ConditionsNotSatisfied()),
-            },
+            ApplicationState.Locked
+                => command.ClassInstruction switch
+                {
+                    // Limited commands when locked
+                    0x00A4 or 0x80F0 => Result.Success<bool, SmartCardError>(true),
+                    _
+                        => Result.Failure<bool, SmartCardError>(
+                            SmartCardError.ConditionsNotSatisfied()
+                        ),
+                },
 
-            ApplicationState.Installed => command.ClassInstruction switch
-            {
-                // Installation state allows personalization commands
-                0x00A4 or 0x80E6 or 0x80DA => Result.Success<bool, SmartCardError>(true),
-                _ => Result.Failure<bool, SmartCardError>(SmartCardError.ConditionsNotSatisfied()),
-            },
+            ApplicationState.Installed
+                => command.ClassInstruction switch
+                {
+                    // Installation state allows personalization commands
+                    0x00A4 or 0x80E6 or 0x80DA => Result.Success<bool, SmartCardError>(true),
+                    _
+                        => Result.Failure<bool, SmartCardError>(
+                            SmartCardError.ConditionsNotSatisfied()
+                        ),
+                },
 
-            ApplicationState.Selectable or ApplicationState.Personalized => Result.Success<
-                bool,
-                SmartCardError
-            >(true),
+            ApplicationState.Selectable
+            or ApplicationState.Personalized
+                => Result.Success<bool, SmartCardError>(true),
 
             _ => Result.Failure<bool, SmartCardError>(SmartCardError.ConditionsNotSatisfied()),
         };

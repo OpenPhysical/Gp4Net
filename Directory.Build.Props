@@ -12,7 +12,7 @@
     <Description>A purely functional .NET implementation of GlobalPlatform Secure Channel Protocols (SCP02 and SCP03) for smart card communication</Description>
     <PackageReleaseNotes>See CHANGELOG.md for detailed release notes.</PackageReleaseNotes>
     <PackageIcon>logo_64x64.png</PackageIcon>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReadmeFile>docs/README.md</PackageReadmeFile>
 
 
     <!-- Build options -->

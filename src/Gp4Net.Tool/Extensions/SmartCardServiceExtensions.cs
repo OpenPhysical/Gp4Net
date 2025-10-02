@@ -22,8 +22,15 @@ public static class SmartCardServiceExtensions
     /// <param name="settings">The command settings containing logging configuration.</param>
     /// <param name="useSecureChannel">Whether to use secure channel.</param>
     /// <returns>A function that can be used with higher-level services.</returns>
-    public static Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> 
-        CreateExecutor(this ISmartCardService service, StandardCommandSettings settings, bool useSecureChannel = false)
+    public static Func<
+        CommandAPDU,
+        CancellationToken,
+        Task<Result<CommandResponse, SmartCardError>>
+    > CreateExecutor(
+        this ISmartCardService service,
+        StandardCommandSettings settings,
+        bool useSecureChannel = false
+    )
     {
         var options = settings.GetCommandOptions();
         var finalOptions = options with { UseSecureChannel = useSecureChannel };
@@ -38,8 +45,15 @@ public static class SmartCardServiceExtensions
     /// <param name="settings">The card command settings containing logging configuration.</param>
     /// <param name="useSecureChannel">Whether to use secure channel.</param>
     /// <returns>A function that can be used with higher-level services.</returns>
-    public static Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> 
-        CreateExecutor(this ISmartCardService service, CardCommandSettings settings, bool useSecureChannel = false)
+    public static Func<
+        CommandAPDU,
+        CancellationToken,
+        Task<Result<CommandResponse, SmartCardError>>
+    > CreateExecutor(
+        this ISmartCardService service,
+        CardCommandSettings settings,
+        bool useSecureChannel = false
+    )
     {
         var options = settings.GetCommandOptions(useSecureChannel);
 
@@ -53,8 +67,15 @@ public static class SmartCardServiceExtensions
     /// <param name="settings">The secure command settings containing logging configuration.</param>
     /// <param name="useSecureChannel">Whether to use secure channel.</param>
     /// <returns>A function that can be used with higher-level services.</returns>
-    public static Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> 
-        CreateExecutor(this ISmartCardService service, SecureCommandSettings settings, bool useSecureChannel = true)
+    public static Func<
+        CommandAPDU,
+        CancellationToken,
+        Task<Result<CommandResponse, SmartCardError>>
+    > CreateExecutor(
+        this ISmartCardService service,
+        SecureCommandSettings settings,
+        bool useSecureChannel = true
+    )
     {
         var options = settings.GetCommandOptions(useSecureChannel);
 

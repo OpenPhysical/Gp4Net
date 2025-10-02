@@ -21,12 +21,12 @@ public static class PrivilegeHelpers
     {
         uint value = (uint)privilege;
         // Direct mapping: enum value matches wire format exactly
-        return new[]
-        {
+        return
+        [
             (byte)(value & 0xFF), // Byte 1 (LSB)
             (byte)((value >> 8) & 0xFF), // Byte 2
-            (byte)((value >> 16) & 0xFF), // Byte 3 (MSB)
-        };
+            (byte)((value >> 16) & 0xFF) // Byte 3 (MSB)
+        ];
     }
 
     /// <summary>
@@ -41,7 +41,7 @@ public static class PrivilegeHelpers
         // If only byte 1 privileges are set, return 1 byte
         if ((value & 0xFFFFFF00) == 0)
         {
-            return new[] { (byte)value };
+            return [(byte)value];
         }
 
         // Otherwise return full 3 bytes
@@ -66,21 +66,24 @@ public static class PrivilegeHelpers
 
         return bytes.Length switch
         {
-            1 => Result.Success<Privilege, SmartCardError>(
-                // Legacy 1-byte format: only byte 1, bytes 2-3 are 0x00
-                (Privilege)bytes[0]
-            ),
+            1
+                => Result.Success<Privilege, SmartCardError>(
+                    // Legacy 1-byte format: only byte 1, bytes 2-3 are 0x00
+                    (Privilege)bytes[0]
+                ),
 
-            3 => Result.Success<Privilege, SmartCardError>(
-                // Full 3-byte format: direct mapping to enum
-                (Privilege)(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16))
-            ),
+            3
+                => Result.Success<Privilege, SmartCardError>(
+                    // Full 3-byte format: direct mapping to enum
+                    (Privilege)(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16))
+                ),
 
-            _ => Result.Failure<Privilege, SmartCardError>(
-                SmartCardError.InvalidArgument(
-                    $"Invalid privilege byte length: {bytes.Length}. Expected 1 or 3 bytes."
-                )
-            ),
+            _
+                => Result.Failure<Privilege, SmartCardError>(
+                    SmartCardError.InvalidArgument(
+                        $"Invalid privilege byte length: {bytes.Length}. Expected 1 or 3 bytes."
+                    )
+                ),
         };
     }
 
@@ -164,7 +167,7 @@ public static class PrivilegeHelpers
             (Privilege.ReceiptGeneration, "Receipt Generation"),
             (Privilege.CipheredLoadFileDataBlock, "Ciphered Load File"),
             (Privilege.ContactlessActivation, "Contactless Activation"),
-            (Privilege.ContactlessSelfActivation, "Contactless Self-Activation")
+            (Privilege.ContactlessSelfActivation, "Contactless Self-Activation"),
         };
 
         var activePrivileges = privilegeMapping

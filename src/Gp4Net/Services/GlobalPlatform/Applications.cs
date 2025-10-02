@@ -44,42 +44,33 @@ public static class Applications
     )
     {
         // Retrieve ISD and applications
-        var isdTask =
-            GetIssuerSecurityDomainAsync(executeCommand, cancellationToken);
-        var appsTask =
-            GetApplicationsAndSecurityDomainsAsync(executeCommand, cancellationToken);
+        var isdTask = GetIssuerSecurityDomainAsync(executeCommand, cancellationToken);
+        var appsTask = GetApplicationsAndSecurityDomainsAsync(executeCommand, cancellationToken);
 
         // Retrieve load files
-        var loadFilesTask =
-            GetExecutableLoadFilesAsync(executeCommand, cancellationToken);
-        var loadFilesWithModulesTask =
-            GetExecutableLoadFilesWithModulesAsync(executeCommand, cancellationToken);
+        var loadFilesTask = GetExecutableLoadFilesAsync(executeCommand, cancellationToken);
+        var loadFilesWithModulesTask = GetExecutableLoadFilesWithModulesAsync(
+            executeCommand,
+            cancellationToken
+        );
 
-        // Wait for all tasks
-        await Task.WhenAll(isdTask, appsTask, loadFilesTask, loadFilesWithModulesTask);
-
-        // Check for failures and get values
+        // Wait for all tasks to complete
         var isdResult = await isdTask;
         var appsResult = await appsTask;
         var loadFilesResult = await loadFilesTask;
         var loadFilesWithModulesResult = await loadFilesWithModulesTask;
 
-        if (isdResult.IsFailure)
-            return Result.Failure<CardContent, SmartCardError>(isdResult.Error);
-        if (appsResult.IsFailure)
-            return Result.Failure<CardContent, SmartCardError>(appsResult.Error);
-        if (loadFilesResult.IsFailure)
-            return Result.Failure<CardContent, SmartCardError>(loadFilesResult.Error);
-        if (loadFilesWithModulesResult.IsFailure)
-            return Result.Failure<CardContent, SmartCardError>(loadFilesWithModulesResult.Error);
-
-        // Combine results into CardContent
-        return CombineIntoCardContent(
-            isdResult.Value,
-            appsResult.Value,
-            loadFilesResult.Value,
-            loadFilesWithModulesResult.Value
-        );
+        // Combine results functionally using railway-oriented programming
+        return isdResult
+            .Bind(isd =>
+                appsResult.Bind(apps =>
+                    loadFilesResult.Bind(loadFiles =>
+                        loadFilesWithModulesResult.Bind(loadFilesWithModules =>
+                            CombineIntoCardContent(isd, apps, loadFiles, loadFilesWithModules)
+                        )
+                    )
+                )
+            );
     }
 
     /// <summary>
@@ -154,21 +145,12 @@ public static class Applications
             new byte[] { 0x4F, 0x00 }
         );
 
-        var parseResult = await cmdResult
+        return await cmdResult
             .Bind(command => command.ToCommandApdu())
             .Bind(async commandApdu => await executeCommand(commandApdu, cancellationToken))
-            .Bind(response => Responses.ParseGetStatusResponse(response));
-
-        return parseResult.Map(apps =>
-            apps.Select(app => new ExecutableLoadFile(
-                    Aid: app.Aid,
-                    LifecycleState: app.LifecycleState,
-                    Version: Maybe<string>.None,
-                    ExecutableModules: ImmutableList<ExecutableModule>.Empty,
-                    AssociatedSecurityDomainAid: app.AssociatedSecurityDomain
-                ))
-                .ToImmutableList()
-        );
+            .Bind(response =>
+                TlvService.GlobalPlatformParsers.ParseLoadFilesResponse(response.Data)
+            );
     }
 
     /// <summary>
@@ -191,22 +173,12 @@ public static class Applications
             new byte[] { 0x4F, 0x00 }
         );
 
-        // Parse response and convert to ExecutableLoadFile objects with modules
-        var parseResult = await cmdResult
+        return await cmdResult
             .Bind(command => command.ToCommandApdu())
             .Bind(async commandApdu => await executeCommand(commandApdu, cancellationToken))
-            .Bind(response => Responses.ParseGetStatusResponse(response));
-
-        return parseResult.Map(apps =>
-            apps.Select(app => new ExecutableLoadFile(
-                    Aid: app.Aid,
-                    LifecycleState: app.LifecycleState,
-                    Version: Maybe<string>.None,
-                    ExecutableModules: ImmutableList<ExecutableModule>.Empty,
-                    AssociatedSecurityDomainAid: app.AssociatedSecurityDomain
-                ))
-                .ToImmutableList()
-        );
+            .Bind(response =>
+                TlvService.GlobalPlatformParsers.ParseLoadFilesResponse(response.Data)
+            );
     }
 
     #region Private Helper Methods

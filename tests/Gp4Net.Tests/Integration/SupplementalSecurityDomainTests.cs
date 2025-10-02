@@ -60,7 +60,7 @@ public class SupplementalSecurityDomainTests
     /// Per GP Card Spec v2.3.1 Section 6.4.1: ISD is implicitly selected by default.
     /// </summary>
     [Test]
-    public async Task InitializeUpdate_WithImplicitIsdSelection_ShouldSucceed()
+    public void InitializeUpdate_WithImplicitIsdSelection_ShouldSucceed()
     {
         // Arrange
         _ = _virtualCard.IsSelected.Should().BeTrue("ISD should be implicitly selected by default");
@@ -110,7 +110,7 @@ public class SupplementalSecurityDomainTests
     /// This verifies backward compatibility with explicit selection patterns.
     /// </summary>
     [Test]
-    public async Task InitializeUpdate_WithExplicitIsdSelection_ShouldSucceed()
+    public void InitializeUpdate_WithExplicitIsdSelection_ShouldSucceed()
     {
         // Arrange - Explicitly select ISD first
         byte[] selectIsdCommand = [0x00, 0xA4, 0x04, 0x00, 0x00]; // SELECT with empty AID = select ISD
@@ -159,29 +159,24 @@ public class SupplementalSecurityDomainTests
     /// Per GP specification: Only Security Domains can process INITIALIZE UPDATE commands.
     /// </summary>
     [Test]
-    public async Task InitializeUpdate_WithRegularApplicationSelected_ShouldFail()
+    public void InitializeUpdate_WithRegularApplicationSelected_ShouldFail()
     {
         // Arrange - Install a regular application without SecurityDomain privileges
         ImmutableArray<byte> appAid = [0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00, 0x01];
+        ImmutableArray<byte> isdAid = [.. _virtualCard.Configuration.IsdAid];
+
         Result<CardState, SmartCardError> installResult =
             _virtualCard.CurrentState.InstallApplication(
                 appAid,
                 "Test Application",
-                ImmutableArray<byte>.Empty // NO SecurityDomain privilege
+                isdAid, // Associated with ISD
+                Privilege.None // NO SecurityDomain privilege
             );
 
         _ = installResult.IsSuccess.Should().BeTrue("Application installation should succeed");
 
-        // Update card state with the new application context
-        var newState = _virtualCard.CurrentState.WithApplicationContext(
-            _virtualCard
-                .CurrentState.ApplicationContext.InstallApplication(
-                    appAid,
-                    "Test Application",
-                    ImmutableArray<byte>.Empty
-                )
-                .Value
-        );
+        // Note: State changes through InstallApplication are functional but virtual card state
+        // is managed internally. The test proceeds with commands on the existing card instance.
 
         // Select the regular application
         byte[] selectAppCommand =
@@ -258,23 +253,27 @@ public class SupplementalSecurityDomainTests
     /// This validates that supplemental Security Domains can establish their own secure channels.
     /// </summary>
     [Test]
-    public async Task InitializeUpdate_WithSupplementalSecurityDomainSelected_ShouldSucceed()
+    public void InitializeUpdate_WithSupplementalSecurityDomainSelected_ShouldSucceed()
     {
         // Arrange - Create a supplemental Security Domain with SecurityDomain privileges
         ImmutableArray<byte> ssdAid = [0xA0, 0x00, 0x00, 0x01, 0x51, 0x53, 0x44, 0x01]; // Supplemental Security Domain AID
+        ImmutableArray<byte> isdAid = [.. _virtualCard.Configuration.IsdAid];
 
         // Install supplemental Security Domain with SecurityDomain privileges
         Result<CardState, SmartCardError> installSsdResult =
             _virtualCard.CurrentState.InstallApplication(
                 ssdAid,
                 "Test Supplemental Security Domain",
-                ImmutableArray<byte>.Empty, // Associated with ISD
+                isdAid, // Associated with ISD
                 Privilege.SecurityDomain // HAS SecurityDomain privilege
             );
 
         _ = installSsdResult
             .IsSuccess.Should()
             .BeTrue("Supplemental Security Domain installation should succeed");
+
+        // Note: State changes through InstallApplication are functional but virtual card state
+        // is managed internally. The test proceeds with commands on the existing card instance.
 
         // For this test, we'll assume the SSD can be selected and has proper secure channel capabilities
         // In a real implementation, the virtual card would need to support SSD selection and key management
@@ -320,7 +319,7 @@ public class SupplementalSecurityDomainTests
     /// Verifies that after reset, ISD is implicitly selected and INITIALIZE UPDATE works.
     /// </summary>
     [Test]
-    public async Task InitializeUpdate_AfterCardReset_ShouldSucceedWithImplicitIsd()
+    public void InitializeUpdate_AfterCardReset_ShouldSucceedWithImplicitIsd()
     {
         // Arrange - Reset card to ensure clean state
         _virtualCard.Reset();

@@ -41,9 +41,10 @@ public static class InstallProcessor
             0x04 => ProcessInstallForInstall(command, state, config),
             0x08 => ProcessInstallForMakeSelectable(command, state, config),
             0x0C => ProcessInstallForInstallAndMakeSelectable(command, state, config),
-            _ => Result.Failure<(ApduResponse, CardState), SmartCardError>(
-                SmartCardError.IncorrectP1P2($"Invalid P1 parameter: {command.P1:X2}")
-            ),
+            _
+                => Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                    SmartCardError.IncorrectP1P2($"Invalid P1 parameter: {command.P1:X2}")
+                ),
         };
     }
 
@@ -229,7 +230,7 @@ public static class InstallProcessor
     /// </summary>
     private static ApduResponse CreateSuccessResponse()
     {
-        return ApduResponse.Success(Array.Empty<byte>());
+        return ApduResponse.Success([]);
     }
 
     /// <summary>

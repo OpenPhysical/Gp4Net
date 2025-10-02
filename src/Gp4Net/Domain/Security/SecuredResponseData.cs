@@ -28,32 +28,32 @@ public sealed record SecuredResponseData
     /// For R-MAC-only responses, this contains the plaintext data.
     /// </summary>
     public ImmutableArray<byte> Data { get; }
-    
+
     /// <summary>
     /// The R-MAC verification result if R-MAC is present.
     /// </summary>
     public Maybe<VerifiedRMac> VerifiedMac { get; }
-    
+
     /// <summary>
     /// The decrypted data if R-ENC was applied.
     /// </summary>
     public Maybe<DecryptedResponseData> DecryptedData { get; }
-    
+
     /// <summary>
     /// Indicates whether the data is encrypted (R-ENC enabled).
     /// </summary>
     public bool IsEncrypted { get; }
-    
+
     /// <summary>
     /// The validated session keys for R-MAC verification and optional decryption.
     /// </summary>
     public SessionKeys ValidatedKeys { get; }
-    
+
     /// <summary>
     /// The protocol version (SCP02 or SCP03).
     /// </summary>
     public ScpVersion ProtocolVersion { get; }
-    
+
     /// <summary>
     /// Private constructor ensures validation through factory method.
     /// </summary>
@@ -63,7 +63,8 @@ public sealed record SecuredResponseData
         Maybe<DecryptedResponseData> decryptedData,
         bool isEncrypted,
         SessionKeys keys,
-        ScpVersion protocolVersion)
+        ScpVersion protocolVersion
+    )
     {
         Data = data;
         VerifiedMac = verifiedMac;
@@ -72,7 +73,7 @@ public sealed record SecuredResponseData
         ValidatedKeys = keys;
         ProtocolVersion = protocolVersion;
     }
-    
+
     /// <summary>
     /// Extracts secured response data from a ResponseAPDU with a valid session.
     /// </summary>
@@ -81,68 +82,71 @@ public sealed record SecuredResponseData
     /// <returns>Success with SecuredResponseData containing verification proofs.</returns>
     public static Result<SecuredResponseData, SmartCardError> Extract(
         ResponseAPDU response,
-        SecureChannelState validSession)
+        SecureChannelState validSession
+    )
     {
         return Maybe<ResponseAPDU>
             .From(response)
             .ToResult(SmartCardError.InvalidArgument("Response cannot be null"))
-            .Bind(_ => Maybe<SecureChannelState>
-                .From(validSession)
-                .ToResult(SmartCardError.InvalidArgument("Session state cannot be null")))
+            .Bind(_ =>
+                Maybe<SecureChannelState>
+                    .From(validSession)
+                    .ToResult(SmartCardError.InvalidArgument("Session state cannot be null"))
+            )
             .Map(session =>
             {
-                var udr = response.Udr ?? Array.Empty<byte>();
-                
+                var udr = response.Udr ?? [];
+
                 // Extract R-MAC if enabled
                 var macProof = session.SecurityLevel.HasRMac()
-                    ? ExtractAndBuildRMacProof(udr, response, session).GetValueOrDefault(Maybe<VerifiedRMac>.None)
+                    ? ExtractAndBuildRMacProof(udr, response, session)
+                        .GetValueOrDefault(Maybe<VerifiedRMac>.None)
                     : Maybe<VerifiedRMac>.None;
-                
+
                 // Note: Actual decryption would happen elsewhere, we just mark if it's needed
                 var encProof = session.SecurityLevel.HasREncryption()
                     ? Maybe<DecryptedResponseData>.None // Will be populated after decryption
                     : Maybe<DecryptedResponseData>.None;
-                
+
                 return new SecuredResponseData(
-                    udr.ToImmutableArray(),
+                    [.. udr],
                     macProof,
                     encProof,
                     session.SecurityLevel.HasREncryption(),
                     session.SessionKeys,
-                    session.ProtocolVersion);
+                    session.ProtocolVersion
+                );
             });
     }
-    
+
     /// <summary>
     /// Extracts R-MAC and builds verification proof.
     /// </summary>
     private static Result<Maybe<VerifiedRMac>, SmartCardError> ExtractAndBuildRMacProof(
         byte[] udr,
         ResponseAPDU response,
-        SecureChannelState session)
+        SecureChannelState session
+    )
     {
         var macSize = 8; // Both SCP02 and SCP03 use 8-byte R-MACs
-        
+
         if (udr.Length < macSize)
         {
             return Result.Failure<Maybe<VerifiedRMac>, SmartCardError>(
-                SmartCardError.InvalidData($"Response too short for R-MAC: {udr.Length} bytes"));
+                SmartCardError.InvalidData($"Response too short for R-MAC: {udr.Length} bytes")
+            );
         }
-        
+
         // R-MAC is the first 'macSize' bytes of Udr
         var extractedMac = new byte[macSize];
         Array.Copy(udr, 0, extractedMac, 0, macSize);
-        
+
         // Create proof (actual verification happens elsewhere)
-        var proof = new VerifiedRMac(
-            extractedMac.ToImmutableArray(),
-            DateTime.UtcNow,
-            session.MacChaining);
-        
-        return Result.Success<Maybe<VerifiedRMac>, SmartCardError>(
-            Maybe<VerifiedRMac>.From(proof));
+        var proof = new VerifiedRMac([.. extractedMac], DateTime.UtcNow, session.MacChaining);
+
+        return Result.Success<Maybe<VerifiedRMac>, SmartCardError>(Maybe<VerifiedRMac>.From(proof));
     }
-    
+
     /// <summary>
     /// Creates a new instance with decrypted data after successful decryption.
     /// </summary>
@@ -151,18 +155,16 @@ public sealed record SecuredResponseData
     /// <returns>A new instance with decrypted data populated.</returns>
     public SecuredResponseData WithDecryptedData(byte[] decryptedData, uint counterUsed)
     {
-        var decrypted = new DecryptedResponseData(
-            decryptedData.ToImmutableArray(),
-            counterUsed,
-            DateTime.UtcNow);
-        
+        var decrypted = new DecryptedResponseData([.. decryptedData], counterUsed, DateTime.UtcNow);
+
         return new SecuredResponseData(
             Data,
             VerifiedMac,
             Maybe<DecryptedResponseData>.From(decrypted),
             IsEncrypted,
             ValidatedKeys,
-            ProtocolVersion);
+            ProtocolVersion
+        );
     }
 }
 

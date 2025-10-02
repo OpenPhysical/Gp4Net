@@ -24,7 +24,7 @@ public class T0ApduTransportTests
     {
         _logger = NullLogger<T0ApduTransport>.Instance;
         var virtualCardService = new VirtualCardService();
-        virtualCardService.SetupComprehensiveTestEnvironment();
+        virtualCardService.SetupTestEnvironment();
         // Connect to the first virtual reader
         var readers = virtualCardService.GetReaders();
         if (readers.Count > 0)

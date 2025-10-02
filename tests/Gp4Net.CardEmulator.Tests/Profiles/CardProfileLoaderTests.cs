@@ -68,9 +68,7 @@ public class CardProfileLoaderTests
     public void LoadFromJson_WithValidP71Profile_ReturnsConfiguration()
     {
         // Act
-        var result = CardProfileLoader.LoadFromJson(
-            SampleP71Profile
-        );
+        var result = CardProfileLoader.LoadFromJson(SampleP71Profile);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -142,9 +140,7 @@ public class CardProfileLoaderTests
         }";
 
         // Act
-        var result = CardProfileLoader.LoadFromJson(
-            scp03Profile
-        );
+        var result = CardProfileLoader.LoadFromJson(scp03Profile);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -161,9 +157,7 @@ public class CardProfileLoaderTests
         string invalidJson = "{ invalid json }";
 
         // Act
-        var result = CardProfileLoader.LoadFromJson(
-            invalidJson
-        );
+        var result = CardProfileLoader.LoadFromJson(invalidJson);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -183,9 +177,7 @@ public class CardProfileLoaderTests
         }";
 
         // Act
-        var result = CardProfileLoader.LoadFromJson(
-            incompleteJson
-        );
+        var result = CardProfileLoader.LoadFromJson(incompleteJson);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -205,9 +197,7 @@ public class CardProfileLoaderTests
         }";
 
         // Act
-        var result = CardProfileLoader.LoadFromJson(
-            badHexJson
-        );
+        var result = CardProfileLoader.LoadFromJson(badHexJson);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -239,9 +229,7 @@ public class CardProfileLoaderTests
         }";
 
         // Act
-        var result = CardProfileLoader.LoadFromJson(
-            badKeyJson
-        );
+        var result = CardProfileLoader.LoadFromJson(badKeyJson);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -273,9 +261,7 @@ public class CardProfileLoaderTests
         }";
 
         // Act
-        var result = CardProfileLoader.LoadFromJson(
-            unknownKeyTypeJson
-        );
+        var result = CardProfileLoader.LoadFromJson(unknownKeyTypeJson);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -292,9 +278,7 @@ public class CardProfileLoaderTests
             File.WriteAllText(tempFile, SampleP71Profile);
 
             // Act
-            var result = CardProfileLoader.LoadFromFile(
-                tempFile
-            );
+            var result = CardProfileLoader.LoadFromFile(tempFile);
 
             // Assert
             _ = result.IsSuccess.Should().BeTrue();
@@ -314,9 +298,7 @@ public class CardProfileLoaderTests
         string nonExistentFile = Path.Combine(Path.GetTempPath(), "non_existent_profile.json");
 
         // Act
-        var result = CardProfileLoader.LoadFromFile(
-            nonExistentFile
-        );
+        var result = CardProfileLoader.LoadFromFile(nonExistentFile);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -331,7 +313,7 @@ public class CardProfileLoaderTests
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
-        _ = result.Error.Message.Should().Contain("JSON path cannot be null or empty");
+        _ = result.Error.Message.Should().Contain("JSON path cannot be empty");
     }
 
     [Test]
@@ -348,9 +330,7 @@ public class CardProfileLoaderTests
         }";
 
         // Act
-        var result = CardProfileLoader.LoadFromJson(
-            jsonWithSpaces
-        );
+        var result = CardProfileLoader.LoadFromJson(jsonWithSpaces);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();
@@ -365,9 +345,7 @@ public class CardProfileLoaderTests
     public void LoadFromJson_SupportedInstructions_ContainsStandardGpCommands()
     {
         // Act
-        var result = CardProfileLoader.LoadFromJson(
-            SampleP71Profile
-        );
+        var result = CardProfileLoader.LoadFromJson(SampleP71Profile);
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue();

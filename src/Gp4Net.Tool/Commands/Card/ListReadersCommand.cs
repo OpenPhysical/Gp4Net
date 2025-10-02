@@ -28,8 +28,7 @@ public class ListReadersCommand : IPipelineCommand<ListReadersCommand.Settings>
                 .WithVerbose(settings.Verbose)
                 .ExecuteAsync(async ctx =>
                 {
-                    var readersResult =
-                        await ctx.CardService.GetReadersAsync();
+                    var readersResult = await ctx.CardService.GetReadersAsync();
                     string[] readers = readersResult.Match(success => success, error => []);
 
                     // Build semantic rows using pure functional composition

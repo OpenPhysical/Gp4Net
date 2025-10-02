@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
-using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -46,8 +45,7 @@ public static class SecurityDomainInfoCodec
             {
                 WriteTlvWithTag(contentStream, [0x9F, 0x70], oid);
             },
-            () =>
-            { /* No OID to write */
+            () => { /* No OID to write */
             }
         );
 
@@ -57,8 +55,7 @@ public static class SecurityDomainInfoCodec
             {
                 contentStream.Write(aid, 0, aid.Length);
             },
-            () =>
-            { /* No AID to write */
+            () => { /* No AID to write */
             }
         );
 
@@ -68,8 +65,7 @@ public static class SecurityDomainInfoCodec
             {
                 WriteTlv(contentStream, 0xC5, imageData);
             },
-            () =>
-            { /* No image data to write */
+            () => { /* No image data to write */
             }
         );
 
@@ -79,8 +75,7 @@ public static class SecurityDomainInfoCodec
             {
                 WriteTlv(contentStream, 0xC4, lifeCycleData);
             },
-            () =>
-            { /* No life cycle data to write */
+            () => { /* No life cycle data to write */
             }
         );
 
@@ -122,7 +117,7 @@ public static class SecurityDomainInfoCodec
 
         // Parse the outer TLV structure using functional composition
         return TlvParser
-            .Parse(data.ToImmutableArray())
+            .Parse([.. data])
             .Bind(outerTlv =>
                 outerTlv
                     .Tag.ToNumber()
@@ -156,17 +151,17 @@ public static class SecurityDomainInfoCodec
             {
                 // Handle two-byte tags for OID (9F70)
                 case 2 when element.Tag.Bytes[0] == 0x9F && element.Tag.Bytes[1] == 0x70:
+                {
+                    // Only set OID if it has actual content
+                    if (element.TlvData.Bytes.Length > 0)
                     {
-                        // Only set OID if it has actual content
-                        if (element.TlvData.Bytes.Length > 0)
+                        sdInfo = sdInfo with
                         {
-                            sdInfo = sdInfo with
-                            {
-                                Oid = Maybe<byte[]>.From(element.TlvData.Bytes.ToArray()),
-                            };
-                        }
-                        break;
+                            Oid = Maybe<byte[]>.From(element.TlvData.Bytes.ToArray()),
+                        };
                     }
+                    break;
+                }
                 case 1:
                     var elementTagNumber = element.Tag.ToNumber();
                     elementTagNumber.Match(
@@ -232,7 +227,9 @@ public static class SecurityDomainInfoCodec
         if (value.Length > 255)
         {
             return Result.Failure(
-                SmartCardError.InvalidData($"Value too long for simple TLV encoding: {value.Length} bytes").Message
+                SmartCardError
+                    .InvalidData($"Value too long for simple TLV encoding: {value.Length} bytes")
+                    .Message
             );
         }
 
@@ -259,7 +256,9 @@ public static class SecurityDomainInfoCodec
         if (value.Length > 255)
         {
             return Result.Failure(
-                SmartCardError.InvalidData($"Value too long for simple TLV encoding: {value.Length} bytes").Message
+                SmartCardError
+                    .InvalidData($"Value too long for simple TLV encoding: {value.Length} bytes")
+                    .Message
             );
         }
 

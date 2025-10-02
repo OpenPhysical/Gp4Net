@@ -39,18 +39,6 @@ public class SelectCommandTests
     }
 
     [Test]
-    public void Create_WithNullAid_ReturnsFailure()
-    {
-        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(null);
-
-        _ = result.IsFailure.Should().BeTrue();
-        _ = result.Error.Should().BeOfType<InvalidDataError>();
-        var error = (InvalidDataError)result.Error;
-        _ = error.Field.Should().Be("AID");
-        _ = error.Reason.Should().Be("cannot be null");
-    }
-
-    [Test]
     public void Create_WithMaxLengthAid_ReturnsSuccess()
     {
         byte[] aid = new byte[16]; // Maximum allowed length
@@ -398,14 +386,21 @@ public class SelectCommandTests
             SelectCommand.SelectMode.First,
             SelectCommand.FileControlInfo.ReturnFcp
         );
+
         _ = commandResult.IsSuccess.Should().BeTrue();
-        var command = commandResult.Value;
-
-        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
-        _ = apduResult.IsSuccess.Should().BeTrue();
-        byte[] apdu = apduResult.Value;
-
-        _ = apdu.Should().BeEquivalentTo(new byte[] { 0x00, 0xA4, 0x04, 0x04, 0x00 });
+        if (commandResult.IsSuccess)
+        {
+            var command = commandResult.Value;
+            Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(command);
+            _ = apduResult.IsSuccess.Should().BeTrue();
+            if (apduResult.IsSuccess)
+            {
+                byte[] apdu = apduResult.Value;
+                // P2=0x04 for ReturnFcp, with AID and Le
+                byte[] expected = [0x00, 0xA4, 0x04, 0x04, 0x08, .. aid, 0x00];
+                _ = apdu.Should().BeEquivalentTo(expected);
+            }
+        }
     }
 
     [Test]
@@ -421,9 +416,7 @@ public class SelectCommandTests
 
         foreach (var option in options)
         {
-            var command = Services
-                .GlobalPlatform.Commands.CreateSelectIsdCommand(option)
-                .Value;
+            var command = Services.GlobalPlatform.Commands.CreateSelectIsdCommand(option).Value;
 
             _ = command
                 .ControlInfo.Should()

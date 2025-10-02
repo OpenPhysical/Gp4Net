@@ -31,14 +31,13 @@ public class CliContext : ICliExecutionContext
         SecureChannelRequest,
         CancellationToken,
         Task<Result<SecureChannelExecutionContext, SmartCardError>>
-    > EstablishSecureChannelAsync
-    { get; }
+    > EstablishSecureChannelAsync { get; }
 
     public CliContext(
         IDisplayService display,
         ISmartCardService cardService,
         IKeysetResolver keysetResolver,
-        ILogger<CliContext> logger = null
+        ILogger<CliContext> logger
     )
     {
         // Pure assignment - dependency injection framework ensures non-null services

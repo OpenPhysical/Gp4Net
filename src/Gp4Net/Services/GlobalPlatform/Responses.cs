@@ -189,36 +189,18 @@ public static class Responses
                 // Map lifecycle state from GetStatusResponse to domain model
                 var lcState = entry.State switch
                 {
-                    ApplicationStatusEntry.LifecycleState.Loaded => Constants
-                        .Constants
-                        .GlobalPlatform
-                        .LifecycleState
-                        .Loaded,
-                    ApplicationStatusEntry.LifecycleState.Installed => Constants
-                        .Constants
-                        .GlobalPlatform
-                        .LifecycleState
-                        .Installed,
-                    ApplicationStatusEntry.LifecycleState.Selectable => Constants
-                        .Constants
-                        .GlobalPlatform
-                        .LifecycleState
-                        .Selectable,
-                    ApplicationStatusEntry.LifecycleState.Personalized => Constants
-                        .Constants
-                        .GlobalPlatform
-                        .LifecycleState
-                        .Personalized,
-                    ApplicationStatusEntry.LifecycleState.Blocked => Constants
-                        .Constants
-                        .GlobalPlatform
-                        .LifecycleState
-                        .Locked,
-                    ApplicationStatusEntry.LifecycleState.Locked => Constants
-                        .Constants
-                        .GlobalPlatform
-                        .LifecycleState
-                        .Locked,
+                    ApplicationStatusEntry.LifecycleState.Loaded
+                        => Constants.Constants.GlobalPlatform.LifecycleState.Loaded,
+                    ApplicationStatusEntry.LifecycleState.Installed
+                        => Constants.Constants.GlobalPlatform.LifecycleState.Installed,
+                    ApplicationStatusEntry.LifecycleState.Selectable
+                        => Constants.Constants.GlobalPlatform.LifecycleState.Selectable,
+                    ApplicationStatusEntry.LifecycleState.Personalized
+                        => Constants.Constants.GlobalPlatform.LifecycleState.Personalized,
+                    ApplicationStatusEntry.LifecycleState.Blocked
+                        => Constants.Constants.GlobalPlatform.LifecycleState.Locked,
+                    ApplicationStatusEntry.LifecycleState.Locked
+                        => Constants.Constants.GlobalPlatform.LifecycleState.Locked,
                     _ => Constants.Constants.GlobalPlatform.LifecycleState.Unknown,
                 };
 
@@ -261,8 +243,7 @@ public static class Responses
         byte b2 = privBytes.Length > 1 ? privBytes[1] : (byte)0x00;
         byte b3 = privBytes.Length > 2 ? privBytes[2] : (byte)0x00;
 
-        var list =
-            ImmutableList.CreateBuilder<Constants.Constants.GlobalPlatform.Privilege>();
+        var list = ImmutableList.CreateBuilder<Constants.Constants.GlobalPlatform.Privilege>();
 
         if ((b1 & 0x80) != 0)
             list.Add(Constants.Constants.GlobalPlatform.Privilege.SecurityDomain);
@@ -334,8 +315,7 @@ public static class Responses
         }
 
         // Try parsing with TlvParser for more complex structures
-        var parseResult =
-            TlvService.TlvParser.ParseMultiple(data.ToImmutableArray());
+        var parseResult = TlvService.TlvParser.ParseMultiple([.. data]);
         if (parseResult.IsFailure)
         {
             return [];

@@ -96,9 +96,7 @@ public class P71VirtualCard
     {
         return CardConfiguration
             .P71()
-            .Bind(config => CardState
-                .Create()
-                .Bind(_ => VirtualCard.Create(config, rngContext)))
+            .Bind(config => CardState.Create().Bind(_ => VirtualCard.Create(config, rngContext)))
             .Map(baseCard => new P71VirtualCard("P71_SCP02_Default", baseCard));
     }
 
@@ -117,9 +115,7 @@ public class P71VirtualCard
         return CardConfiguration
             .DualProtocol()
             .Map(config => config.WithScpDefaults(0x03, ScpImplementation.Scp03I70))
-            .Bind(config => CardState
-                .Create()
-                .Bind(_ => VirtualCard.Create(config, rngContext)))
+            .Bind(config => CardState.Create().Bind(_ => VirtualCard.Create(config, rngContext)))
             .Map(baseCard => new P71VirtualCard("P71_SCP03_Default", baseCard));
     }
 }

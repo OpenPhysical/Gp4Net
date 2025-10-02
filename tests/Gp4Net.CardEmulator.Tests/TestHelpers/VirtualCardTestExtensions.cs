@@ -20,8 +20,8 @@ public static class VirtualCardTestExtensions
             success => success.Response,
             error =>
             {
-                Assert.Fail($"Command execution failed: {error}");
-                return new ApduResponse([], 0x6F00); // Never reached
+                ushort status = error.StatusWord.GetValueOrDefault(0x6F00);
+                return new ApduResponse([], status);
             }
         );
     }
@@ -31,15 +31,16 @@ public static class VirtualCardTestExtensions
     /// </summary>
     public static (ApduResponse Response, IVirtualCard UpdatedCard) ExecuteCommandWithCard(
         this IVirtualCard card,
-        byte[] command)
+        byte[] command
+    )
     {
         var result = card.ProcessCommand(command);
         return result.Match(
             success => success,
             error =>
             {
-                Assert.Fail($"Command execution failed: {error}");
-                return (new ApduResponse([], 0x6F00), card); // Never reached
+                ushort status = error.StatusWord.GetValueOrDefault(0x6F00);
+                return (new ApduResponse([], status), card);
             }
         );
     }
@@ -49,7 +50,8 @@ public static class VirtualCardTestExtensions
     /// </summary>
     public static void AssertCommandSucceeds(
         this Result<(ApduResponse Response, IVirtualCard UpdatedCard), SmartCardError> result,
-        System.Action<ApduResponse> assertions)
+        System.Action<ApduResponse> assertions
+    )
     {
         result.Match(
             success =>

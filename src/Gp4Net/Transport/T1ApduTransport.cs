@@ -74,7 +74,8 @@ public class T1ApduTransport : IApduTransport
 
         // Validate extended length support
         if (
-            apduBytes.Length > Apdu.Formats.APDU_HEADER_LENGTH + Apdu.Formats.MAX_SHORT_LENGTH_LC + 1
+            apduBytes.Length
+                > Apdu.Formats.APDU_HEADER_LENGTH + Apdu.Formats.MAX_SHORT_LENGTH_LC + 1
             && !_supportsExtendedLength
         ) // 5 header + 255 data + 1 Le for short APDU
         {
@@ -87,14 +88,19 @@ public class T1ApduTransport : IApduTransport
         _logger.LogDebug("T=1 Transmit: {Apdu}", BitConverter.ToString(apduBytes));
 
         // Send command and handle exceptions functionally
-        var responseResult = await Gp4Net.Core.Functional.ResultExtensions.TryAsync<byte[], SmartCardError>(
-            async () => await channel.TransmitAsync(apduBytes, cancellationToken).ConfigureAwait(false),
-            ex =>
-            {
-                _logger.LogError(ex, "T=1 transmission failed");
-                return SmartCardError.CommunicationFailed($"T=1 transmission failed: {ex.Message}");
-            }
-        ).ConfigureAwait(false);
+        var responseResult = await Gp4Net
+            .Core.Functional.ResultExtensions.TryAsync<byte[], SmartCardError>(
+                async () =>
+                    await channel.TransmitAsync(apduBytes, cancellationToken).ConfigureAwait(false),
+                ex =>
+                {
+                    _logger.LogError(ex, "T=1 transmission failed");
+                    return SmartCardError.CommunicationFailed(
+                        $"T=1 transmission failed: {ex.Message}"
+                    );
+                }
+            )
+            .ConfigureAwait(false);
 
         // If transmission failed, return error
         if (responseResult.IsFailure)

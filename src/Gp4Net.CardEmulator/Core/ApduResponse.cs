@@ -65,7 +65,7 @@ public class ApduResponse
     /// <returns>A successful APDU response.</returns>
     public static ApduResponse Success(byte[] data)
     {
-    return new ApduResponse(data, Constants.Constants.StatusWords.Success);
+        return new ApduResponse(data, Constants.Constants.StatusWords.Success);
     }
 
     /// <summary>

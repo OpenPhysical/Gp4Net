@@ -87,9 +87,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
                 byte[] capFileData = await File.ReadAllBytesAsync(capFilePath);
                 _displayService.Info($"File size: {capFileData.Length} bytes");
 
-                var validationResult = CapFileLoadingWorkflow.ValidateCapFile(
-                    capFileData
-                );
+                var validationResult = CapFileLoadingWorkflow.ValidateCapFile(capFileData);
                 return (validationResult, capFileData);
             },
             ex => SmartCardError.InvalidArgument($"Failed to load/validate CAP file: {ex.Message}")
@@ -373,9 +371,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
     {
         try
         {
-            var memoryReq = CapFileLoadingWorkflow.EstimateMemoryRequirements(
-                capFileData
-            );
+            var memoryReq = CapFileLoadingWorkflow.EstimateMemoryRequirements(capFileData);
 
             AnsiConsole.MarkupLine("[bold]Memory Requirements (Estimated):[/]");
 
@@ -733,7 +729,7 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             string ascii = new string(
                 [.. lineBytes.Select(b => b is >= 32 and < 127 ? (char)b : '.')]
             );
-            AnsiConsole.WriteLine($"  {i:X4}:  {hex,-47} |{ascii}|");
+            AnsiConsole.WriteLine($"  {i:X4}:  {hex, -47} |{ascii}|");
         }
         AnsiConsole.WriteLine();
     }

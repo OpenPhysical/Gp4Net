@@ -1,13 +1,10 @@
 using System;
 using System.Linq;
 using CSharpFunctionalExtensions;
-using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain.Keys;
 using Kdf108.Domain.Kdf;
-using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Engines;
-using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Modes;
 using Org.BouncyCastle.Crypto.Parameters;
 
@@ -38,12 +35,13 @@ public static partial class CryptoService
         {
             return Validation
                 .ValidateInputs(baseKey, sequenceCounter)
-                .Bind(() =>
-                    Validation.ValidateKeyLength(
-                        baseKey,
-                        [16, 24],
-                        "SCP02 base key must be 16 or 24 bytes"
-                    )
+                .Bind(
+                    () =>
+                        Validation.ValidateKeyLength(
+                            baseKey,
+                            [16, 24],
+                            "SCP02 base key must be 16 or 24 bytes"
+                        )
                 )
                 .Bind(() => ValidateSequenceCounterLength(sequenceCounter, 2))
                 .Bind(() => ValidateScp02DerivationConstant(derivationConstant))
@@ -55,7 +53,11 @@ public static partial class CryptoService
 
         /// <summary>
         /// Derives SCP03 session keys using AES-CMAC with specific derivation data.
-        /// Per GlobalPlatform SCP03 v1.1.1 Section 4.1.5.
+        /// Per GlobalPlatform SCP03 v1.1.1 Section 4.1.5 and Table 4-1.
+        /// Valid derivation constants (Table 4-1):
+        ///   0x04 S-ENC, 0x06 S-MAC, 0x07 S-RMAC, 0x08 S-DEK
+        /// (Other permitted constants in this implementation for KDF-based data derivations:
+        ///   0x00 Card cryptogram, 0x01 Host cryptogram, 0x02 Card challenge.)
         /// </summary>
         /// <param name="baseKey">The base static key (16, 24, or 32 bytes).</param>
         /// <param name="hostChallenge">The host challenge (8 bytes).</param>
@@ -71,20 +73,29 @@ public static partial class CryptoService
         {
             return Validation
                 .ValidateInputs(baseKey, hostChallenge)
-                .Bind(() =>
-                    Validation.ValidateKeyLength(
-                        baseKey,
-                        [16, 24, 32],
-                        "SCP03 base key must be 16, 24, or 32 bytes"
-                    )
+                .Bind(
+                    () =>
+                        Validation.ValidateKeyLength(
+                            baseKey,
+                            [16, 24, 32],
+                            "SCP03 base key must be 16, 24, or 32 bytes"
+                        )
                 )
                 .Bind(() => ValidateChallengeLength(hostChallenge, 8, "Host challenge"))
                 .Bind(() => ValidateChallengeLength(cardChallenge, 8, "Card challenge"))
                 .Bind(() => ValidateDerivationConstant(derivationConstant))
                 .Bind(() =>
-                    BuildScp03DerivationData(hostChallenge, cardChallenge, derivationConstant)
-                )
-                .Bind(derivationData => DeriveUsingAesCmac(baseKey, derivationData));
+                {
+                    // Build context as host Challenge || card Challenge
+                    var context = hostChallenge.Concat(cardChallenge).ToArray();
+                    // Use KDF108 to derive session key with same length as base key
+                    return DeriveScp03Data(
+                        baseKey,
+                        derivationConstant,
+                        context,
+                        baseKey.Length * 8
+                    );
+                });
         }
 
         /// <summary>
@@ -147,13 +158,14 @@ public static partial class CryptoService
             byte derivationConstant
         )
         {
-            // SCP03 uses: 0x04 (S-ENC), 0x06 (S-MAC), 0x07 (S-RMAC), 0x08 (S-DEK)
-            // Also allow 0x01-0x03 for backward compatibility with some implementations
-            return derivationConstant is >= 0x01 and <= 0x08
+            // Allowed per GP SCP03 Table 4-1 (exclude RFU values such as 0x03, 0x05)
+            // 0x00 card cryptogram, 0x01 host cryptogram, 0x02 card challenge,
+            // 0x04 S-ENC, 0x06 S-MAC, 0x07 S-RMAC, 0x08 S-DEK
+            return derivationConstant is 0x00 or 0x01 or 0x02 or 0x04 or 0x06 or 0x07 or 0x08
                 ? UnitResult.Success<SmartCardError>()
                 : UnitResult.Failure(
                     SmartCardError.InvalidArgument(
-                        $"Derivation constant must be 0x01-0x08, got 0x{derivationConstant:X2}"
+                        $"Derivation constant 0x{derivationConstant:X2} not allowed (GP SCP03 Table 4-1)"
                     )
                 );
         }
@@ -168,9 +180,7 @@ public static partial class CryptoService
             return derivationConstant is { Length: 2 }
                 ? UnitResult.Success<SmartCardError>()
                 : UnitResult.Failure(
-                    SmartCardError.InvalidArgument(
-                        "SCP02 derivation constant must be 2 bytes"
-                    )
+                    SmartCardError.InvalidArgument("SCP02 derivation constant must be 2 bytes")
                 );
         }
 
@@ -198,7 +208,10 @@ public static partial class CryptoService
 
                     // Use 3DES-CBC with IV = 0 to match ScpVerification
                     var cipher = new CbcBlockCipher(new DesEdeEngine());
-                    var parameters = new ParametersWithIV(new DesEdeParameters(expandedKey), new byte[8]);
+                    var parameters = new ParametersWithIV(
+                        new DesEdeParameters(expandedKey),
+                        new byte[8]
+                    );
                     cipher.Init(true, parameters);
 
                     // Process two blocks to get 16-byte output
@@ -210,64 +223,6 @@ public static partial class CryptoService
                 },
                 ex =>
                     SmartCardError.CryptographicError($"SCP02 key derivation failed: {ex.Message}")
-            );
-        }
-
-        /// <summary>
-        /// Builds SCP03 derivation data per specification.
-        /// </summary>
-        private static Result<byte[], SmartCardError> BuildScp03DerivationData(
-            byte[] hostChallenge,
-            byte[] cardChallenge,
-            byte derivationConstant
-        )
-        {
-            return Result.Try(
-                () =>
-                {
-                    byte[] derivationData = new byte[32];
-                    derivationData[0] = 0x00;
-                    derivationData[1] = 0x00;
-                    derivationData[2] = 0x00;
-                    derivationData[3] = 0x01;
-                    derivationData[4] = derivationConstant;
-                    derivationData[5] = 0x00;
-                    Array.Copy(hostChallenge, 0, derivationData, 6, 8);
-                    Array.Copy(cardChallenge, 0, derivationData, 14, 8);
-                    derivationData[22] = 0x00;
-                    derivationData[23] = 0x80;
-
-                    return derivationData;
-                },
-                ex =>
-                    SmartCardError.CryptographicError(
-                        $"SCP03 derivation data construction failed: {ex.Message}"
-                    )
-            );
-        }
-
-        /// <summary>
-        /// Performs SCP03 key derivation using AES-CMAC.
-        /// </summary>
-        private static Result<byte[], SmartCardError> DeriveUsingAesCmac(
-            byte[] baseKey,
-            byte[] derivationData
-        )
-        {
-            return Result.Try(
-                () =>
-                {
-                    var cmac = new CMac(new AesEngine(), 128);
-                    cmac.Init(new KeyParameter(baseKey));
-                    cmac.BlockUpdate(derivationData, 0, derivationData.Length);
-
-                    byte[] sessionKey = new byte[baseKey.Length];
-                    cmac.DoFinal(sessionKey, 0);
-
-                    return sessionKey;
-                },
-                ex =>
-                    SmartCardError.CryptographicError($"SCP03 key derivation failed: {ex.Message}")
             );
         }
 
@@ -290,16 +245,17 @@ public static partial class CryptoService
         {
             return Validation
                 .ValidateInputs(key, context)
-                .Bind(() =>
-                    Validation.ValidateKeyLength(
-                        key,
-                        [16, 24, 32],
-                        "KDK must be 16, 24, or 32 bytes"
-                    )
+                .Bind(
+                    () =>
+                        Validation.ValidateKeyLength(
+                            key,
+                            [16, 24, 32],
+                            "KDK must be 16, 24, or 32 bytes"
+                        )
                 )
                 .Bind(() => ValidateOutputLength(outputLengthBits))
-                .Bind(() =>
-                    BuildScp03DerivationInputs(derivationConstant, context, outputLengthBits)
+                .Bind(
+                    () => BuildScp03DerivationInputs(derivationConstant, context, outputLengthBits)
                 )
                 .Bind(inputs =>
                     PerformKdf108Derivation(
@@ -309,6 +265,33 @@ public static partial class CryptoService
                         outputLengthBits
                     )
                 );
+        }
+
+        /// <summary>
+        /// Derives SCP03 data using raw block inputs for the fixed input structure.
+        /// </summary>
+        public static Result<byte[], SmartCardError> DeriveScp03Data(
+            byte[] key,
+            byte[] dataBeforeCounter,
+            byte[] dataAfterCounter,
+            int outputLengthBits
+        )
+        {
+            var before = dataBeforeCounter ?? Array.Empty<byte>();
+            var after = dataAfterCounter ?? Array.Empty<byte>();
+
+            return Validation
+                .ValidateInputs(key, after)
+                .Bind(
+                    () =>
+                        Validation.ValidateKeyLength(
+                            key,
+                            new[] { 16, 24, 32 },
+                            "KDK must be 16, 24, or 32 bytes"
+                        )
+                )
+                .Bind(() => ValidateOutputLength(outputLengthBits))
+                .Bind(() => PerformKdf108Derivation(key, before, after, outputLengthBits));
         }
 
         /// <summary>
@@ -325,9 +308,12 @@ public static partial class CryptoService
             {
                 ScpVersion.Scp02 => DeriveScp02SessionKeysFromContext(context),
                 ScpVersion.Scp03 => DeriveScp03SessionKeysFromContext(context),
-                _ => Result.Failure<SessionKeys, SmartCardError>(
-                    SmartCardError.InvalidArgument($"Unsupported SCP version: {context.Protocol}")
-                ),
+                _
+                    => Result.Failure<SessionKeys, SmartCardError>(
+                        SmartCardError.InvalidArgument(
+                            $"Unsupported SCP version: {context.Protocol}"
+                        )
+                    ),
             };
         }
 
@@ -361,7 +347,7 @@ public static partial class CryptoService
             // Per GP Card Spec v2.3 Amendment D: Label is 11 zeros followed by the derivation constant
             var labelBytes = Enumerable
                 .Repeat((byte)0x00, 11)
-                .Concat(new[] { derivationConstant })
+                .Concat([derivationConstant])
                 .ToArray();
             labelBytes.CopyTo(dataBeforeCounter, offset);
             offset += 12;
@@ -373,9 +359,8 @@ public static partial class CryptoService
             dataBeforeCounter[offset++] = (byte)(outputLengthBits >> 8);
             dataBeforeCounter[offset++] = (byte)outputLengthBits;
 
-            // Context data comes after counter (16 bytes max)
-            byte[] dataAfterCounter = new byte[16];
-            context.CopyTo(dataAfterCounter, 0);
+            // Context data comes after counter - use it directly
+            byte[] dataAfterCounter = context;
 
             return Result.Success<(byte[], byte[]), SmartCardError>(
                 (dataBeforeCounter, dataAfterCounter)
@@ -398,9 +383,12 @@ public static partial class CryptoService
                 16 => Result.Success<PrfType, SmartCardError>(PrfType.CmacAes128),
                 24 => Result.Success<PrfType, SmartCardError>(PrfType.CmacAes192),
                 32 => Result.Success<PrfType, SmartCardError>(PrfType.CmacAes256),
-                _ => Result.Failure<PrfType, SmartCardError>(
-                    SmartCardError.InvalidArgument($"Unsupported key length: {kdk.Length} bytes")
-                ),
+                _
+                    => Result.Failure<PrfType, SmartCardError>(
+                        SmartCardError.InvalidArgument(
+                            $"Unsupported key length: {kdk.Length} bytes"
+                        )
+                    ),
             };
 
             return prfTypeResult.Bind(prfType =>

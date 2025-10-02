@@ -49,7 +49,7 @@ public static partial class TlvService
             }
 
             return TlvParser
-                .ParseMultiple(responseData.ToImmutableArray())
+                .ParseMultiple([.. responseData])
                 .Bind(parseResult =>
                 {
                     var applicationList = parseResult
@@ -91,7 +91,7 @@ public static partial class TlvService
             }
 
             return TlvParser
-                .ParseMultiple(responseData.ToImmutableArray())
+                .ParseMultiple([.. responseData])
                 .Bind(parseResult =>
                 {
                     var loadFileList = parseResult
@@ -181,7 +181,7 @@ public static partial class TlvService
                             var privilegesData =
                                 privilegesTlvs.Length > 0
                                     ? privilegesTlvs[0].TlvData.Bytes.ToArray()
-                                    : Array.Empty<byte>();
+                                    : [];
                             var privileges = ParsePrivileges(privilegesData);
 
                             // Determine application type from privileges
@@ -503,28 +503,51 @@ public static partial class TlvService
                 .From(response)
                 .ToResult(SmartCardError.InvalidArgument("Response data cannot be null"))
                 .Bind(responseValue =>
-                    TlvParser
-                        .ParseMultiple(responseValue.ToImmutableArray())
-                        .MapError(_ =>
-                            SmartCardError.InvalidResponse(
-                                "Failed to parse GET STATUS TLV response"
-                            )
-                        )
-                        .Bind(ParseApplicationStatusEntries)
-                        .Map(entries => entries.ToImmutableList())
-                );
+                {
+                    if (responseValue.Length == 0)
+                    {
+                        return Result.Success<ImmutableList<ApplicationStatusEntry>, SmartCardError>(
+                            ImmutableList<ApplicationStatusEntry>.Empty
+                        );
+                    }
+
+                    var tlvParseResult = TlvParser.ParseMultiple([.. responseValue]);
+
+                    if (tlvParseResult.IsFailure)
+                    {
+                        return Result.Success<ImmutableList<ApplicationStatusEntry>, SmartCardError>(
+                            ImmutableList<ApplicationStatusEntry>.Empty
+                        );
+                    }
+
+                    return ParseApplicationStatusEntries(tlvParseResult.Value)
+                        .Map(entries => entries.ToImmutableList());
+                });
         }
 
         /// <summary>
         /// Parses multiple application status entries from TLV objects.
+        /// Fails if any entry has validation errors (e.g., invalid lifecycle state).
         /// </summary>
         private static Result<
             IEnumerable<ApplicationStatusEntry>,
             SmartCardError
         > ParseApplicationStatusEntries(ParseResult parseResult)
         {
-            var validEntries = parseResult
+            var results = parseResult
                 .Objects.Select(ParseSingleApplicationStatusEntry)
+                .ToImmutableList();
+
+            var failures = results.Where(r => r.IsFailure).ToImmutableList();
+
+            if (failures.Any())
+            {
+                return Result.Failure<IEnumerable<ApplicationStatusEntry>, SmartCardError>(
+                    failures.First().Error
+                );
+            }
+
+            var validEntries = results
                 .Where(result => result.IsSuccess)
                 .Select(result => result.Value)
                 .ToList();

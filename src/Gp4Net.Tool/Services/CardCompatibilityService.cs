@@ -24,59 +24,65 @@ public class CardCompatibilityService : ICardCompatibilityService
     /// <summary>
     /// Known card types and their characteristics.
     /// </summary>
-    private static readonly Dictionary<string, CardTypeInfo> KnownCardTypes = new()
-    {
-        ["3BD518FF8191FE1FC38073C821100A"] = new CardTypeInfo(
-            "NXP",
-            "P71",
-            "SmartMX3",
-            isProduction: true,
-            maxAuthenticationAttempts: 10,
-            supportedProtocols: ["SCP02", "SCP03"],
-            knownLimitations: ["Lockout after 10 failed auth attempts", "Requires GP Pro to reset"]
-        ),
-        ["3B7D94000080318065B08311C0A983009000"] = new CardTypeInfo(
-            "Infineon",
-            "SLE78",
-            "CFlex",
-            isProduction: true,
-            maxAuthenticationAttempts: 10,
-            supportedProtocols: ["SCP02", "SCP03"],
-            knownLimitations: ["Permanent lockout possible", "Production fuses may be blown"]
-        ),
-        ["3B00"] = new CardTypeInfo(
-            "Generic",
-            "Virtual",
-            "Test Card",
-            isProduction: false,
-            maxAuthenticationAttempts: Maybe<int>.None,
-            supportedProtocols: ["SCP02", "SCP03"],
-            knownLimitations: []
-        ),
-        ["3BD518008131FE45004A43"] = new CardTypeInfo(
-            "JCOP",
-            "JCOP3",
-            "Development",
-            isProduction: false,
-            maxAuthenticationAttempts: 10,
-            supportedProtocols: ["SCP02", "SCP03"],
-            knownLimitations: ["Development card - may reset easily"]
-        ),
-    };
+    private static readonly Dictionary<string, CardTypeInfo> KnownCardTypes =
+        new()
+        {
+            ["3BD518FF8191FE1FC38073C821100A"] = new CardTypeInfo(
+                "NXP",
+                "P71",
+                "SmartMX3",
+                isProduction: true,
+                maxAuthenticationAttempts: 10,
+                supportedProtocols: ["SCP02", "SCP03"],
+                knownLimitations:
+                [
+                    "Lockout after 10 failed auth attempts",
+                    "Requires GP Pro to reset"
+                ]
+            ),
+            ["3B7D94000080318065B08311C0A983009000"] = new CardTypeInfo(
+                "Infineon",
+                "SLE78",
+                "CFlex",
+                isProduction: true,
+                maxAuthenticationAttempts: 10,
+                supportedProtocols: ["SCP02", "SCP03"],
+                knownLimitations: ["Permanent lockout possible", "Production fuses may be blown"]
+            ),
+            ["3B00"] = new CardTypeInfo(
+                "Generic",
+                "Virtual",
+                "Test Card",
+                isProduction: false,
+                maxAuthenticationAttempts: Maybe<int>.None,
+                supportedProtocols: ["SCP02", "SCP03"],
+                knownLimitations: []
+            ),
+            ["3BD518008131FE45004A43"] = new CardTypeInfo(
+                "JCOP",
+                "JCOP3",
+                "Development",
+                isProduction: false,
+                maxAuthenticationAttempts: 10,
+                supportedProtocols: ["SCP02", "SCP03"],
+                knownLimitations: ["Development card - may reset easily"]
+            ),
+        };
 
     /// <summary>
     /// CPLC manufacturer codes for identifying card vendors.
     /// </summary>
-    private static readonly Dictionary<ushort, string> CplcManufacturers = new()
-    {
-        [0x4090] = "NXP",
-        [0x4180] = "Infineon",
-        [0x4250] = "Samsung",
-        [0x4350] = "Gemalto",
-        [0x4790] = "STMicroelectronics",
-        [0x4440] = "Oberthur",
-        [0x5353] = "Giesecke+Devrient",
-    };
+    private static readonly Dictionary<ushort, string> CplcManufacturers =
+        new()
+        {
+            [0x4090] = "NXP",
+            [0x4180] = "Infineon",
+            [0x4250] = "Samsung",
+            [0x4350] = "Gemalto",
+            [0x4790] = "STMicroelectronics",
+            [0x4440] = "Oberthur",
+            [0x5353] = "Giesecke+Devrient",
+        };
 
     /// <summary>
     /// Creates a new CardCompatibilityService with validated dependencies.
@@ -129,11 +135,7 @@ public class CardCompatibilityService : ICardCompatibilityService
         try
         {
             // Detect card type
-            var cardTypeResult = await DetectCardTypeAsync(
-                channel,
-                transport,
-                cancellationToken
-            );
+            var cardTypeResult = await DetectCardTypeAsync(channel, transport, cancellationToken);
             if (cardTypeResult.IsFailure)
             {
                 return Result.Failure<CardCompatibilityResult, SmartCardError>(
@@ -144,13 +146,12 @@ public class CardCompatibilityService : ICardCompatibilityService
             var cardType = cardTypeResult.Value;
 
             // Check environment validation
-            var envResult =
-                await _environmentValidation.ValidateEnvironmentAsync(
-                    keySet,
-                    channel,
-                    transport,
-                    cancellationToken
-                );
+            var envResult = await _environmentValidation.ValidateEnvironmentAsync(
+                keySet,
+                channel,
+                transport,
+                cancellationToken
+            );
 
             if (envResult.IsFailure)
             {
@@ -216,11 +217,7 @@ public class CardCompatibilityService : ICardCompatibilityService
             }
 
             // Try to get CPLC data for manufacturer identification
-            var cplcResult = await GetCplcDataAsync(
-                channel,
-                transport,
-                cancellationToken
-            );
+            var cplcResult = await GetCplcDataAsync(channel, transport, cancellationToken);
             if (cplcResult.IsSuccess)
             {
                 var cardType = AnalyzeCplcForCardType(cplcResult.Value);
@@ -409,15 +406,11 @@ public class CardCompatibilityService : ICardCompatibilityService
         // Check operation-specific compatibility
         (bool opCompatible, bool opSafe, string opMessage) = operation switch
         {
-            CardOperation.Authentication => CheckAuthenticationCompatibility(
-                keySet,
-                cardType,
-                envValidation
-            ),
+            CardOperation.Authentication
+                => CheckAuthenticationCompatibility(keySet, cardType, envValidation),
             CardOperation.KeyInstallation => CheckKeyInstallationCompatibility(cardType),
-            CardOperation.ApplicationInstallation => CheckApplicationInstallationCompatibility(
-                cardType
-            ),
+            CardOperation.ApplicationInstallation
+                => CheckApplicationInstallationCompatibility(cardType),
             CardOperation.ApplicationDeletion => CheckApplicationDeletionCompatibility(cardType),
             CardOperation.Personalization => CheckPersonalizationCompatibility(cardType),
             CardOperation.ReadOnly => (true, true, "Read-only operations are always safe"),

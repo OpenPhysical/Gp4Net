@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.CapFile;
@@ -63,7 +64,7 @@ public class LoadCommand : IApduCommand
     /// <summary>
     /// Gets the total CAP file size (only included in first block).
     /// </summary>
-    public uint? TotalCapSize { get; }
+    public Maybe<uint> TotalCapSize { get; }
 
     /// <summary>
     /// Gets a value indicating whether this is the first block.
@@ -146,13 +147,13 @@ public class LoadCommand : IApduCommand
     {
         List<byte> data = [];
 
-        if (IsFirstBlock)
+        if (IsFirstBlock && TotalCapSize.HasValue)
         {
             // First block includes TLV header: C4 <total_length> <data>
             data.Add(CAP_DATA_TAG);
 
             // Encode length (up to 3 bytes for length field)
-            uint totalSize = TotalCapSize!.Value;
+            uint totalSize = TotalCapSize.Value;
             switch (totalSize)
             {
                 case <= 0x7F:
@@ -196,7 +197,7 @@ public class LoadCommand : IApduCommand
     /// <param name="data">The data to load.</param>
     /// <param name="isFinalBlock">Whether this is the final block.</param>
     /// <param name="totalCapSize">The total CAP file size (required for first block).</param>
-    private LoadCommand(byte blockNumber, byte[] data, bool isFinalBlock, uint? totalCapSize = null)
+    private LoadCommand(byte blockNumber, byte[] data, bool isFinalBlock, Maybe<uint> totalCapSize)
     {
         BlockNumber = blockNumber;
         _data = (byte[])data.Clone();
@@ -231,7 +232,8 @@ public class LoadCommand : IApduCommand
             );
         }
 
-        uint? totalCapSize = blockNumber == 0 ? (uint)data.Length : null;
+        var totalCapSize =
+            blockNumber == 0 ? Maybe<uint>.From((uint)data.Length) : Maybe<uint>.None;
 
         var command = new LoadCommand(blockNumber, data, isLastBlock, totalCapSize);
         return Result.Success<LoadCommand, SmartCardError>(command);
@@ -292,7 +294,7 @@ public class LoadCommand : IApduCommand
             Array.Copy(capFileData, offset, blockData, 0, blockSize);
 
             bool isFinalBlock = offset + blockSize >= capFileData.Length;
-            uint? totalCapSize = blockNumber == 0 ? totalSize : null;
+            var totalCapSize = blockNumber == 0 ? Maybe<uint>.From(totalSize) : Maybe<uint>.None;
 
             commands.Add(new LoadCommand(blockNumber, blockData, isFinalBlock, totalCapSize));
 
@@ -348,24 +350,13 @@ public class LoadCommand : IApduCommand
 
         var binaryDataResult = Gp4Net.Core.Functional.ResultExtensions.Try(
             () => capFile.ToBinaryFormat(),
-            ex => SmartCardError.InvalidData(
-                $"Failed to convert CAP file to binary format: {ex.Message}"
-            )
+            ex =>
+                SmartCardError.InvalidData(
+                    $"Failed to convert CAP file to binary format: {ex.Message}"
+                )
         );
 
-        if (binaryDataResult.IsFailure)
-        {
-            return Result.Failure<IList<LoadCommand>, SmartCardError>(binaryDataResult.Error);
-        }
-
-        if (binaryDataResult.IsSuccess)
-        {
-            return CreateFromCapFile(binaryDataResult.Value, maxBlockSize);
-        }
-
-        return Result.Failure<IList<LoadCommand>, SmartCardError>(
-            SmartCardError.InvalidData("Unexpected state in binary data conversion")
-        );
+        return binaryDataResult.Bind(data => CreateFromCapFile(data, maxBlockSize));
     }
 
     /// <summary>
@@ -380,13 +371,107 @@ public class LoadCommand : IApduCommand
     /// <inheritdoc />
     public CommandAPDU ToApdu()
     {
-        return ToCommandApdu().GetValueOrDefault(new CommandAPDU([]));
+        return ToCommandApdu()
+            .Match(onSuccess: apdu => apdu, onFailure: _ => new CommandAPDU(Cla, Ins, P1, P2));
     }
 
     /// <inheritdoc />
     public byte[] ToBytes()
     {
-        return ToCommandApdu().Map(cmd => cmd.ToBytes()).GetValueOrDefault([]);
+        return ToCommandApdu()
+            .Match(
+                onSuccess: cmd => cmd.ToBytes(),
+                onFailure: _ => new CommandAPDU(Cla, Ins, P1, P2).ToBytes()
+            );
+    }
+
+    /// <summary>
+    /// Creates a sequence of LOAD commands from CAP file data with extended length support.
+    /// </summary>
+    /// <param name="capFileData">The complete CAP file data.</param>
+    /// <param name="maxBlockSize">Maximum block size.</param>
+    /// <param name="useExtendedLength">Whether to use extended length APDUs.</param>
+    /// <returns>A Result containing the sequence of LOAD commands or an error.</returns>
+    public static Result<IList<LoadCommand>, SmartCardError> CreateFromCapFileExtended(
+        byte[] capFileData,
+        int maxBlockSize,
+        bool useExtendedLength
+    )
+    {
+        return Maybe<byte[]>
+            .From(capFileData)
+            .ToResult(SmartCardError.InvalidArgument("CAP file data is required"))
+            .Ensure(
+                data => data.Length > 0,
+                SmartCardError.InvalidArgument("CAP file data cannot be empty")
+            )
+            .Ensure(
+                _ => ValidateBlockSize(maxBlockSize, useExtendedLength),
+                SmartCardError.InvalidArgument(
+                    $"Block size must be between 1 and {GetMaxBlockSize(useExtendedLength)} bytes"
+                )
+            )
+            .Map(data => CreateLoadBlocksExtended(data, maxBlockSize));
+    }
+
+    /// <summary>
+    /// Validates the block size based on whether extended length is used.
+    /// </summary>
+    private static bool ValidateBlockSize(int blockSize, bool useExtendedLength)
+    {
+        int maxSize = GetMaxBlockSize(useExtendedLength);
+        return blockSize >= 1 && blockSize <= maxSize;
+    }
+
+    /// <summary>
+    /// Gets the maximum block size based on whether extended length is used.
+    /// </summary>
+    private static int GetMaxBlockSize(bool useExtendedLength)
+    {
+        return useExtendedLength
+            ? Constants.Apdu.Formats.MAX_APDU_DATA_LENGTH // 65535
+            : 255; // Standard short format
+    }
+
+    /// <summary>
+    /// Creates load blocks from CAP file data with extended length support.
+    /// </summary>
+    private static IList<LoadCommand> CreateLoadBlocksExtended(byte[] capFileData, int maxBlockSize)
+    {
+        uint totalSize = (uint)capFileData.Length;
+
+        // Use functional approach to generate blocks
+        return Enumerable
+            .Range(0, int.MaxValue)
+            .Select(blockIndex => new
+            {
+                BlockNumber = (byte)(blockIndex & 0xFF),
+                Offset = blockIndex * maxBlockSize
+            })
+            .TakeWhile(block => block.Offset < capFileData.Length)
+            .Select(block =>
+            {
+                int remainingBytes = capFileData.Length - block.Offset;
+                int effectiveBlockSize = maxBlockSize;
+
+                // For first block, account for TLV header overhead
+                if (block.BlockNumber == 0)
+                {
+                    int tlvHeaderSize = CalculateTlvHeaderSize(totalSize);
+                    effectiveBlockSize = Math.Max(1, maxBlockSize - tlvHeaderSize);
+                }
+
+                int blockSize = Math.Min(remainingBytes, effectiveBlockSize);
+                byte[] blockData = new byte[blockSize];
+                Array.Copy(capFileData, block.Offset, blockData, 0, blockSize);
+
+                bool isFinalBlock = block.Offset + blockSize >= capFileData.Length;
+                var totalCapSize =
+                    block.BlockNumber == 0 ? Maybe<uint>.From(totalSize) : Maybe<uint>.None;
+
+                return new LoadCommand(block.BlockNumber, blockData, isFinalBlock, totalCapSize);
+            })
+            .ToList();
     }
 }
 
@@ -486,23 +571,18 @@ public static class CapFileLoader
 
         // Try to parse the CAP file structure
         var capFileResult = CapFileStructure.Parse(capFileData);
-        
+
         if (capFileResult.IsFailure)
         {
             return false;
         }
 
-        if (capFileResult.IsSuccess)
-        {
-            var capFile = capFileResult.Value;
-            
-            // Basic validation checks
-            return capFile.PackageAid.Length > 0
+        return capFileResult.Match(
+            capFile => capFile.PackageAid.Length > 0
                 && capFile.Components.Count > 0
-                && capFile.TotalSize > 0;
-        }
-
-        return false;
+                && capFile.TotalSize > 0,
+            _ => false
+        );
     }
 
     /// <summary>
@@ -517,8 +597,8 @@ public static class CapFileLoader
             ErrorCodes.SUCCESS => "Success",
             ErrorCodes.INCORRECT_DATA => "Incorrect data (wrong AID or malformed TLV)",
             ErrorCodes.MEMORY_ERROR => "Memory error",
-            ErrorCodes.CONDITIONS_NOT_SATISFIED =>
-                "Conditions not satisfied (missing INSTALL [for load])",
+            ErrorCodes.CONDITIONS_NOT_SATISFIED
+                => "Conditions not satisfied (missing INSTALL [for load])",
             ErrorCodes.GENERIC_FAILURE => "Generic failure (possibly applet exception)",
             _ => $"Unknown error: {statusWord:X4}",
         };

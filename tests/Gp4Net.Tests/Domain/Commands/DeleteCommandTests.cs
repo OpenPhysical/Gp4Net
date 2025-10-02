@@ -192,12 +192,12 @@ public class DeleteCommandTests
     public void CreateForApplications_WithNullAidInList_ReturnsFailure()
     {
         // Arrange
-        byte[][] aids = new[]
-        {
+        byte[][] aids =
+        [
             Convert.FromHexString("A000000003000000"),
             null!,
-            Convert.FromHexString("A000000003000002"),
-        };
+            Convert.FromHexString("A000000003000002")
+        ];
 
         // Act
         Result<DeleteCommand, SmartCardError> result = DeleteCommand.CreateForApplications(
@@ -239,7 +239,8 @@ public class DeleteCommandTests
         byte[] aid = Convert.FromHexString("A000000003000000");
 
         // Act & Assert
-        DeleteCommand.CreateForApplication(aid, deleteRelated: false)
+        DeleteCommand
+            .CreateForApplication(aid, deleteRelated: false)
             .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)))
             .Match(
                 apdu =>
@@ -254,7 +255,11 @@ public class DeleteCommandTests
                     _ = apdu.Skip(7).Take(8).Should().BeEquivalentTo(aid);
                     _ = apdu.Length.Should().Be(15); // 5 header + 10 data
                 },
-                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+                error =>
+                    Result
+                        .Success()
+                        .IsSuccess.Should()
+                        .BeTrue($"Command creation or APDU building failed: {error}")
             );
     }
 
@@ -266,7 +271,8 @@ public class DeleteCommandTests
         byte[] deletionToken = Convert.FromHexString("20EEDD243F094FAD");
 
         // Act & Assert
-        var result = DeleteCommand.CreateForApplication(aid, deleteRelated: true, deletionToken)
+        var result = DeleteCommand
+            .CreateForApplication(aid, deleteRelated: true, deletionToken)
             .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)));
 
         result.Match(
@@ -292,7 +298,11 @@ public class DeleteCommandTests
                     .Should()
                     .BeEquivalentTo(deletionToken);
             },
-            error => Result.Success().IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+            error =>
+                Result
+                    .Success()
+                    .IsSuccess.Should()
+                    .BeTrue($"Command creation or APDU building failed: {error}")
         );
     }
 
@@ -308,7 +318,8 @@ public class DeleteCommandTests
         ];
 
         // Act & Assert
-        DeleteCommand.CreateForApplications(aids)
+        DeleteCommand
+            .CreateForApplications(aids)
             .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)))
             .Match(
                 apdu =>
@@ -321,13 +332,20 @@ public class DeleteCommandTests
                     _ = apdu[6].Should().Be((byte)totalAidLength); // Total length of all AIDs
 
                     // Verify all AIDs are concatenated using functional approach
-                    aids.Aggregate(7, (offset, aid) =>
-                    {
-                        _ = apdu.Skip(offset).Take(aid.Length).Should().BeEquivalentTo(aid);
-                        return offset + aid.Length;
-                    });
+                    aids.Aggregate(
+                        7,
+                        (offset, aid) =>
+                        {
+                            _ = apdu.Skip(offset).Take(aid.Length).Should().BeEquivalentTo(aid);
+                            return offset + aid.Length;
+                        }
+                    );
                 },
-                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+                error =>
+                    Result
+                        .Success()
+                        .IsSuccess.Should()
+                        .BeTrue($"Command creation or APDU building failed: {error}")
             );
     }
 
@@ -338,7 +356,8 @@ public class DeleteCommandTests
         byte[] aid = Convert.FromHexString("A000000003000000");
 
         // Act & Assert
-        DeleteCommand.CreateForApplication(aid)
+        DeleteCommand
+            .CreateForApplication(aid)
             .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)))
             .Match(
                 apdu =>
@@ -348,7 +367,11 @@ public class DeleteCommandTests
                     _ = apdu.Length.Should().Be(expectedLength);
                     // No LE byte at the end
                 },
-                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+                error =>
+                    Result
+                        .Success()
+                        .IsSuccess.Should()
+                        .BeTrue($"Command creation or APDU building failed: {error}")
             );
     }
 

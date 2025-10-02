@@ -2,14 +2,10 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using Gp4Net.Core.ServiceLifetime;
-using Gp4Net.Pipeline;
 using Gp4Net.Services;
-using Gp4Net.Tool.Commands.Card;
 using Gp4Net.Tool.Commands.Packages;
 using Gp4Net.Tool.Commands.Trace;
 using Gp4Net.Tool.Infrastructure;
@@ -23,7 +19,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
 using Spectre.Console.Cli;
-using WSCT.ISO7816;
 
 namespace Gp4Net.Tool;
 
@@ -197,11 +192,11 @@ public class Program
         // Register pipeline services
         _ = services.AddSingleton<IDisplayService>(provider => new DisplayService());
         _ = services.AddSingleton<ISmartCardServiceFactory, SmartCardServiceFactory>();
-        
+
         // Register reader resolution services
         _ = services.AddSingleton<IEnvironmentService, EnvironmentService>();
         _ = services.AddSingleton<IReaderResolutionService, ReaderResolutionService>();
-        
+
         // CliExecutionContext is now created per-command with proper service factory
         _ = services.AddScoped<ICliExecutionContext>(provider =>
         {
@@ -287,4 +282,3 @@ public class Program
             .Bind(service => Maybe.From(service).ToResult($"{serviceType.Name}").Map(s => s));
     }
 }
-

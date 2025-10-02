@@ -65,7 +65,8 @@ public static class OpidValidator
         }
 
         // Check total digit count
-        return format.GetExpectedDigitCount()
+        return format
+            .GetExpectedDigitCount()
             .Match(
                 expectedCount =>
                 {
@@ -153,7 +154,8 @@ public static class OpidValidator
             );
         }
 
-        return format.GetExpectedDigitCount()
+        return format
+            .GetExpectedDigitCount()
             .Match(
                 expectedLength =>
                 {

@@ -5,6 +5,7 @@ using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
+using Gp4Net.Shared;
 using Org.BouncyCastle.Crypto.Digests;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Generators;
@@ -64,97 +65,66 @@ public sealed class SecureKeyStore
     /// </summary>
     public Result<SecureKeyStore, SmartCardError> AddKey(string keyId, byte[] keyData)
     {
-        if (string.IsNullOrEmpty(keyId))
-        {
-            return Result.Failure<SecureKeyStore, SmartCardError>(
-                SmartCardError.InvalidArgument("Key ID cannot be null or empty")
-            );
-        }
+        return ValidateKeyId(keyId)
+            .Bind(_ => ValidateKeyData(keyData))
+            .Ensure(_ => !_keys.ContainsKey(keyId),
+                SmartCardError.InvalidArgument($"Key with ID '{keyId}' already exists"))
+            .Bind(_ => EncryptAndStore(keyId, keyData));
+    }
 
-        if (keyData == null || keyData.Length == 0)
-        {
-            return Result.Failure<SecureKeyStore, SmartCardError>(
-                SmartCardError.InvalidArgument("Key data cannot be null or empty")
-            );
-        }
+    private static Result<string, SmartCardError> ValidateKeyId(string keyId) =>
+        Maybe<string>
+            .From(keyId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToResult(ErrorFactory.EmptyArgument("Key ID"));
 
-        if (_keys.ContainsKey(keyId))
-        {
-            return Result.Failure<SecureKeyStore, SmartCardError>(
-                SmartCardError.InvalidArgument($"Key with ID '{keyId}' already exists")
-            );
-        }
+    private static Result<byte[], SmartCardError> ValidateKeyData(byte[] keyData) =>
+        Maybe<byte[]>
+            .From(keyData)
+            .Where(data => data.Length > 0)
+            .ToResult(ErrorFactory.EmptyArgument("Key data"));
 
-        return Result.Try(
+    private Result<SecureKeyStore, SmartCardError> EncryptAndStore(string keyId, byte[] keyData) =>
+        Result.Try(
             () =>
             {
-                // Encrypt the key before storing
                 var encryptedKey = EncryptKey(keyId, keyData);
-                var newKeys = _keys.Add(keyId, encryptedKey);
-
-                // Clear the original key data
+                var keysBuilder = _keys.ToBuilder();
+                keysBuilder.Add(keyId, encryptedKey);
                 Array.Clear(keyData, 0, keyData.Length);
-
-                return new SecureKeyStore(newKeys, _masterKey, _salt);
+                return new SecureKeyStore(keysBuilder.ToImmutable(), _masterKey, _salt);
             },
             ex => SmartCardError.SecurityError($"Failed to add key: {ex.Message}")
         );
-    }
 
     /// <summary>
     /// Retrieves a key from the store securely.
     /// The returned key should be used immediately and then cleared.
     /// </summary>
-    public Result<SecureKey, SmartCardError> GetKey(string keyId)
-    {
-        if (string.IsNullOrEmpty(keyId))
-        {
-            return Result.Failure<SecureKey, SmartCardError>(
-                SmartCardError.InvalidArgument("Key ID cannot be null or empty")
-            );
-        }
+    public Result<SecureKey, SmartCardError> GetKey(string keyId) =>
+        ValidateKeyId(keyId)
+            .Bind(id => FindEncryptedKey(id)
+                .Bind(encryptedKey => DecryptKeySecurely(id, encryptedKey)));
 
-        if (!_keys.TryGetValue(keyId, out var encryptedKey))
-        {
-            return Result.Failure<SecureKey, SmartCardError>(
-                SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found")
-            );
-        }
+    private Result<EncryptedKey, SmartCardError> FindEncryptedKey(string keyId) =>
+        _keys.ContainsKey(keyId)
+            ? Result.Success<EncryptedKey, SmartCardError>(_keys[keyId])
+            : Result.Failure<EncryptedKey, SmartCardError>(
+                SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found"));
 
-        return Result.Try(
-            () =>
-            {
-                byte[] decryptedKey = DecryptKey(keyId, encryptedKey);
-                return new SecureKey(keyId, decryptedKey);
-            },
-            ex => SmartCardError.SecurityError($"Failed to retrieve key: {ex.Message}")
-        );
-    }
+    private Result<SecureKey, SmartCardError> DecryptKeySecurely(string keyId, EncryptedKey encryptedKey) =>
+        Result.Try(
+            () => new SecureKey(keyId, DecryptKey(keyId, encryptedKey)),
+            ex => SmartCardError.SecurityError($"Failed to retrieve key: {ex.Message}"));
 
     /// <summary>
     /// Removes a key from the store, returning a new immutable store instance.
     /// </summary>
-    public Result<SecureKeyStore, SmartCardError> RemoveKey(string keyId)
-    {
-        if (string.IsNullOrEmpty(keyId))
-        {
-            return Result.Failure<SecureKeyStore, SmartCardError>(
-                SmartCardError.InvalidArgument("Key ID cannot be null or empty")
-            );
-        }
-
-        if (!_keys.ContainsKey(keyId))
-        {
-            return Result.Failure<SecureKeyStore, SmartCardError>(
-                SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found")
-            );
-        }
-
-        var newKeys = _keys.Remove(keyId);
-        return Result.Success<SecureKeyStore, SmartCardError>(
-            new SecureKeyStore(newKeys, _masterKey, _salt)
-        );
-    }
+    public Result<SecureKeyStore, SmartCardError> RemoveKey(string keyId) =>
+        ValidateKeyId(keyId)
+            .Ensure(id => _keys.ContainsKey(id),
+                SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found"))
+            .Map(id => new SecureKeyStore(_keys.Remove(id), _masterKey, _salt));
 
     /// <summary>
     /// Lists all key IDs in the store.
@@ -262,9 +232,7 @@ public sealed class SecureKeyStore
         random.NextBytes(iv);
 
         // Setup AES-CBC cipher
-        var cipher = new PaddedBufferedBlockCipher(
-            new CbcBlockCipher(new AesEngine())
-        );
+        var cipher = new PaddedBufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
         var keyParam = new KeyParameter(keySpecificKey);
         var keyParamWithIv = new ParametersWithIV(keyParam, iv);
 
@@ -290,9 +258,7 @@ public sealed class SecureKeyStore
         byte[] keySpecificKey = DeriveKeySpecificKey(keyId);
 
         // Setup AES-CBC cipher for decryption
-        var cipher = new PaddedBufferedBlockCipher(
-            new CbcBlockCipher(new AesEngine())
-        );
+        var cipher = new PaddedBufferedBlockCipher(new CbcBlockCipher(new AesEngine()));
         var keyParam = new KeyParameter(keySpecificKey);
         var keyParamWithIv = new ParametersWithIV(keyParam, encryptedKey.Iv);
 
@@ -393,11 +359,8 @@ public sealed class SecureKey : IDisposable
     {
         if (!_disposed)
         {
-            if (_keyData != null)
-            {
-                Array.Clear(_keyData, 0, _keyData.Length);
-                _keyData = null!;
-            }
+            Array.Clear(_keyData, 0, _keyData.Length);
+            _keyData = Array.Empty<byte>();
             _disposed = true;
         }
     }

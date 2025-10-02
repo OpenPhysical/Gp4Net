@@ -207,13 +207,32 @@ public class PutKeyCommand : IApduCommand
     /// <inheritdoc />
     public CommandAPDU ToApdu()
     {
-        return ToCommandApdu().GetValueOrDefault(new CommandAPDU([]));
+        return ToCommandApdu()
+            .Match(
+                onSuccess: apdu => apdu,
+                onFailure: _ => new CommandAPDU(
+                    GlobalPlatform.Cla.GP_STANDARD,
+                    GlobalPlatform.Ins.PUT_KEY,
+                    0x00,
+                    0x00
+                )
+            );
     }
 
     /// <inheritdoc />
     public byte[] ToBytes()
     {
-        return ToCommandApdu().Map(cmd => cmd.ToBytes()).GetValueOrDefault([]);
+        return ToCommandApdu()
+            .Match(
+                onSuccess: cmd => cmd.ToBytes(),
+                onFailure: _ =>
+                    new CommandAPDU(
+                        GlobalPlatform.Cla.GP_STANDARD,
+                        GlobalPlatform.Ins.PUT_KEY,
+                        0x00,
+                        0x00
+                    ).ToBytes()
+            );
     }
 
     /// <inheritdoc />

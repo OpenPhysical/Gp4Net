@@ -34,34 +34,35 @@ public static partial class CryptoService
             return Validation
                 .ValidateInputs(key, iv, data)
                 .Bind(() => Validation.ValidateIvLength(iv, 16, "IV must be 16 bytes for AES"))
-                .Bind(() =>
-                    Result.Try(
-                        () =>
-                        {
-                            var cipher = new PaddedBufferedBlockCipher(
-                                new CbcBlockCipher(new AesEngine()),
-                                new ISO7816d4Padding()
-                            );
-                            cipher.Init(true, new ParametersWithIV(new KeyParameter(key), iv));
-
-                            byte[] output = new byte[cipher.GetOutputSize(data.Length)];
-                            int len = cipher.ProcessBytes(data, 0, data.Length, output, 0);
-                            len += cipher.DoFinal(output, len);
-
-                            if (len < output.Length)
+                .Bind(
+                    () =>
+                        Result.Try(
+                            () =>
                             {
-                                byte[] result = new byte[len];
-                                Array.Copy(output, 0, result, 0, len);
-                                return result;
-                            }
+                                var cipher = new PaddedBufferedBlockCipher(
+                                    new CbcBlockCipher(new AesEngine()),
+                                    new ISO7816d4Padding()
+                                );
+                                cipher.Init(true, new ParametersWithIV(new KeyParameter(key), iv));
 
-                            return output;
-                        },
-                        ex =>
-                            SmartCardError.CryptographicError(
-                                $"AES-CBC encryption failed: {ex.Message}"
-                            )
-                    )
+                                byte[] output = new byte[cipher.GetOutputSize(data.Length)];
+                                int len = cipher.ProcessBytes(data, 0, data.Length, output, 0);
+                                len += cipher.DoFinal(output, len);
+
+                                if (len < output.Length)
+                                {
+                                    byte[] result = new byte[len];
+                                    Array.Copy(output, 0, result, 0, len);
+                                    return result;
+                                }
+
+                                return output;
+                            },
+                            ex =>
+                                SmartCardError.CryptographicError(
+                                    $"AES-CBC encryption failed: {ex.Message}"
+                                )
+                        )
                 );
         }
 
@@ -82,35 +83,38 @@ public static partial class CryptoService
             return Validation
                 .ValidateInputs(key, iv, encryptedData)
                 .Bind(() => Validation.ValidateIvLength(iv, 16, "IV must be 16 bytes for AES"))
-                .Bind(() =>
-                    Result.Try(
-                        () =>
-                        {
-                            var cipher = new PaddedBufferedBlockCipher(
-                                new CbcBlockCipher(new AesEngine()),
-                                new ISO7816d4Padding()
-                            );
-                            cipher.Init(false, new ParametersWithIV(new KeyParameter(key), iv));
+                .Bind(
+                    () =>
+                        Result.Try(
+                            () =>
+                            {
+                                var cipher = new PaddedBufferedBlockCipher(
+                                    new CbcBlockCipher(new AesEngine()),
+                                    new ISO7816d4Padding()
+                                );
+                                cipher.Init(false, new ParametersWithIV(new KeyParameter(key), iv));
 
-                            byte[] output = new byte[cipher.GetOutputSize(encryptedData.Length)];
-                            int len = cipher.ProcessBytes(
-                                encryptedData,
-                                0,
-                                encryptedData.Length,
-                                output,
-                                0
-                            );
-                            len += cipher.DoFinal(output, len);
+                                byte[] output = new byte[
+                                    cipher.GetOutputSize(encryptedData.Length)
+                                ];
+                                int len = cipher.ProcessBytes(
+                                    encryptedData,
+                                    0,
+                                    encryptedData.Length,
+                                    output,
+                                    0
+                                );
+                                len += cipher.DoFinal(output, len);
 
-                            byte[] result = new byte[len];
-                            Array.Copy(output, 0, result, 0, len);
-                            return result;
-                        },
-                        ex =>
-                            SmartCardError.CryptographicError(
-                                $"AES-CBC decryption failed: {ex.Message}"
-                            )
-                    )
+                                byte[] result = new byte[len];
+                                Array.Copy(output, 0, result, 0, len);
+                                return result;
+                            },
+                            ex =>
+                                SmartCardError.CryptographicError(
+                                    $"AES-CBC decryption failed: {ex.Message}"
+                                )
+                        )
                 );
         }
 
@@ -132,33 +136,35 @@ public static partial class CryptoService
             return Validation
                 .ValidateInputs(key, iv, data)
                 .Bind(() => Validation.ValidateIvLength(iv, 16, "IV must be 16 bytes for AES"))
-                .Bind(() =>
-                    Validation.ValidateDataPadding(
-                        data,
-                        16,
-                        "Data must be padded to 16-byte blocks"
-                    )
+                .Bind(
+                    () =>
+                        Validation.ValidateDataPadding(
+                            data,
+                            16,
+                            "Data must be padded to 16-byte blocks"
+                        )
                 )
-                .Bind(() =>
-                    Result.Try(
-                        () =>
-                        {
-                            var cipher = new BufferedBlockCipher(
-                                new CbcBlockCipher(new AesEngine())
-                            );
-                            cipher.Init(true, new ParametersWithIV(new KeyParameter(key), iv));
+                .Bind(
+                    () =>
+                        Result.Try(
+                            () =>
+                            {
+                                var cipher = new BufferedBlockCipher(
+                                    new CbcBlockCipher(new AesEngine())
+                                );
+                                cipher.Init(true, new ParametersWithIV(new KeyParameter(key), iv));
 
-                            byte[] encrypted = new byte[data.Length];
-                            int len = cipher.ProcessBytes(data, 0, data.Length, encrypted, 0);
-                            cipher.DoFinal(encrypted, len);
+                                byte[] encrypted = new byte[data.Length];
+                                int len = cipher.ProcessBytes(data, 0, data.Length, encrypted, 0);
+                                cipher.DoFinal(encrypted, len);
 
-                            return encrypted;
-                        },
-                        ex =>
-                            SmartCardError.CryptographicError(
-                                $"AES-CBC encryption failed: {ex.Message}"
-                            )
-                    )
+                                return encrypted;
+                            },
+                            ex =>
+                                SmartCardError.CryptographicError(
+                                    $"AES-CBC encryption failed: {ex.Message}"
+                                )
+                        )
                 );
         }
 
@@ -180,39 +186,41 @@ public static partial class CryptoService
             return Validation
                 .ValidateInputs(key, iv, encryptedData)
                 .Bind(() => Validation.ValidateIvLength(iv, 16, "IV must be 16 bytes for AES"))
-                .Bind(() =>
-                    Validation.ValidateDataPadding(
-                        encryptedData,
-                        16,
-                        "Encrypted data must be in 16-byte blocks"
-                    )
+                .Bind(
+                    () =>
+                        Validation.ValidateDataPadding(
+                            encryptedData,
+                            16,
+                            "Encrypted data must be in 16-byte blocks"
+                        )
                 )
-                .Bind(() =>
-                    Result.Try(
-                        () =>
-                        {
-                            var cipher = new BufferedBlockCipher(
-                                new CbcBlockCipher(new AesEngine())
-                            );
-                            cipher.Init(false, new ParametersWithIV(new KeyParameter(key), iv));
+                .Bind(
+                    () =>
+                        Result.Try(
+                            () =>
+                            {
+                                var cipher = new BufferedBlockCipher(
+                                    new CbcBlockCipher(new AesEngine())
+                                );
+                                cipher.Init(false, new ParametersWithIV(new KeyParameter(key), iv));
 
-                            byte[] decrypted = new byte[encryptedData.Length];
-                            int len = cipher.ProcessBytes(
-                                encryptedData,
-                                0,
-                                encryptedData.Length,
-                                decrypted,
-                                0
-                            );
-                            cipher.DoFinal(decrypted, len);
+                                byte[] decrypted = new byte[encryptedData.Length];
+                                int len = cipher.ProcessBytes(
+                                    encryptedData,
+                                    0,
+                                    encryptedData.Length,
+                                    decrypted,
+                                    0
+                                );
+                                cipher.DoFinal(decrypted, len);
 
-                            return decrypted;
-                        },
-                        ex =>
-                            SmartCardError.CryptographicError(
-                                $"AES-CBC decryption failed: {ex.Message}"
-                            )
-                    )
+                                return decrypted;
+                            },
+                            ex =>
+                                SmartCardError.CryptographicError(
+                                    $"AES-CBC decryption failed: {ex.Message}"
+                                )
+                        )
                 );
         }
 
@@ -339,8 +347,13 @@ public static partial class CryptoService
             return Validation
                 .ValidateInputs(key, iv, data)
                 .Bind(() => Validation.ValidateIvLength(iv, 8, "IV must be 8 bytes for 3DES"))
-                .Bind(() =>
-                    Validation.ValidateDataPadding(data, 8, "Data must be padded to 8-byte blocks")
+                .Bind(
+                    () =>
+                        Validation.ValidateDataPadding(
+                            data,
+                            8,
+                            "Data must be padded to 8-byte blocks"
+                        )
                 )
                 .Bind(() => Utils.ExpandTripleDesKey(key))
                 .Bind(expandedKey =>
@@ -387,12 +400,13 @@ public static partial class CryptoService
             return Validation
                 .ValidateInputs(key, iv, encryptedData)
                 .Bind(() => Validation.ValidateIvLength(iv, 8, "IV must be 8 bytes for 3DES"))
-                .Bind(() =>
-                    Validation.ValidateDataPadding(
-                        encryptedData,
-                        8,
-                        "Encrypted data must be in 8-byte blocks"
-                    )
+                .Bind(
+                    () =>
+                        Validation.ValidateDataPadding(
+                            encryptedData,
+                            8,
+                            "Encrypted data must be in 8-byte blocks"
+                        )
                 )
                 .Bind(() => Utils.ExpandTripleDesKey(key))
                 .Bind(expandedKey =>
@@ -439,38 +453,41 @@ public static partial class CryptoService
         {
             return Validation
                 .ValidateInputs(key, data)
-                .Bind(() =>
-                    Validation.ValidateKeyLength(
-                        key,
-                        [16, 24, 32],
-                        "AES key must be 16, 24, or 32 bytes"
-                    )
+                .Bind(
+                    () =>
+                        Validation.ValidateKeyLength(
+                            key,
+                            [16, 24, 32],
+                            "AES key must be 16, 24, or 32 bytes"
+                        )
                 )
-                .Bind(() =>
-                    Validation.ValidateDataPadding(
-                        data,
-                        16,
-                        "Data must be padded to 16-byte blocks"
-                    )
+                .Bind(
+                    () =>
+                        Validation.ValidateDataPadding(
+                            data,
+                            16,
+                            "Data must be padded to 16-byte blocks"
+                        )
                 )
-                .Bind(() =>
-                    Result.Try(
-                        () =>
-                        {
-                            var cipher = new BufferedBlockCipher(new AesEngine());
-                            cipher.Init(true, new KeyParameter(key));
+                .Bind(
+                    () =>
+                        Result.Try(
+                            () =>
+                            {
+                                var cipher = new BufferedBlockCipher(new AesEngine());
+                                cipher.Init(true, new KeyParameter(key));
 
-                            byte[] encrypted = new byte[data.Length];
-                            int len = cipher.ProcessBytes(data, 0, data.Length, encrypted, 0);
-                            cipher.DoFinal(encrypted, len);
+                                byte[] encrypted = new byte[data.Length];
+                                int len = cipher.ProcessBytes(data, 0, data.Length, encrypted, 0);
+                                cipher.DoFinal(encrypted, len);
 
-                            return encrypted;
-                        },
-                        ex =>
-                            SmartCardError.CryptographicError(
-                                $"AES-ECB encryption failed: {ex.Message}"
-                            )
-                    )
+                                return encrypted;
+                            },
+                            ex =>
+                                SmartCardError.CryptographicError(
+                                    $"AES-ECB encryption failed: {ex.Message}"
+                                )
+                        )
                 );
         }
     }

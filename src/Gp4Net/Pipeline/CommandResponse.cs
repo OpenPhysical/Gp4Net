@@ -73,10 +73,7 @@ public record CommandResponse(
     /// </summary>
     public CommandResponse WithMetadata(string key, object value)
     {
-        var newMetadata = new Dictionary<string, object>(Metadata)
-        {
-            [key] = value,
-        };
+        var newMetadata = new Dictionary<string, object>(Metadata) { [key] = value };
         return this with { Metadata = newMetadata };
     }
 

@@ -40,7 +40,8 @@ public static partial class CryptoService
 
                     return signer.VerifySignature(signature);
                 },
-                ex => SmartCardError.CryptographicError($"RSA-SHA1 verification failed: {ex.Message}")
+                ex =>
+                    SmartCardError.CryptographicError($"RSA-SHA1 verification failed: {ex.Message}")
             );
         }
 
@@ -68,7 +69,10 @@ public static partial class CryptoService
 
                     return signer.VerifySignature(signature);
                 },
-                ex => SmartCardError.CryptographicError($"RSA-SHA256 verification failed: {ex.Message}")
+                ex =>
+                    SmartCardError.CryptographicError(
+                        $"RSA-SHA256 verification failed: {ex.Message}"
+                    )
             );
         }
 
@@ -96,7 +100,10 @@ public static partial class CryptoService
 
                     return signer.VerifySignature(signature);
                 },
-                ex => SmartCardError.CryptographicError($"ECDSA-SHA256 verification failed: {ex.Message}")
+                ex =>
+                    SmartCardError.CryptographicError(
+                        $"ECDSA-SHA256 verification failed: {ex.Message}"
+                    )
             );
         }
 
@@ -165,9 +172,10 @@ public static partial class CryptoService
                                 pair.Current.Verify(pair.Issuer.GetPublicKey());
                                 return true;
                             },
-                            _ => SmartCardError.SecurityError(
-                                $"Certificate {index} signature verification failed"
-                            )
+                            _ =>
+                                SmartCardError.SecurityError(
+                                    $"Certificate {index} signature verification failed"
+                                )
                         )
                 )
                 .ToList();
@@ -194,7 +202,8 @@ public static partial class CryptoService
                         )
                         .GetEncoded();
                 },
-                ex => SmartCardError.CryptographicError($"Public key extraction failed: {ex.Message}")
+                ex =>
+                    SmartCardError.CryptographicError($"Public key extraction failed: {ex.Message}")
             );
         }
     }

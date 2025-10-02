@@ -46,9 +46,7 @@ public static class ReaderNameResolver
     )
     {
         // Get available readers first
-        var readersResult = await cardService.GetReadersAsync(
-            cancellationToken
-        );
+        var readersResult = await cardService.GetReadersAsync(cancellationToken);
         if (readersResult.IsFailure)
         {
             return Result.Failure<string, SmartCardError>(
@@ -150,9 +148,7 @@ public static class ReaderNameResolver
             .. availableReaders.Where(reader => !IsVirtualReader(reader)),
         ];
 
-        var selectedReaders = physicalReaders.IsEmpty
-            ? availableReaders
-            : physicalReaders;
+        var selectedReaders = physicalReaders.IsEmpty ? availableReaders : physicalReaders;
 
         return selectedReaders.IsEmpty
             ? Result.Failure<string, SmartCardError>(

@@ -108,7 +108,8 @@ public class ExternalAuthenticateCommandTests
         byte[] hostCryptogram = Convert.FromHexString("0102030405060708");
 
         // Act & Assert
-        ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram)
+        ExternalAuthenticateCommand
+            .CreateWithoutMac(securityLevel, hostCryptogram)
             .Map(command => command.ToBytes())
             .Match(
                 apdu =>
@@ -122,7 +123,11 @@ public class ExternalAuthenticateCommandTests
                     // No Le byte for EXTERNAL AUTHENTICATE
                     _ = apdu.Length.Should().Be(13); // 5 header + 8 data
                 },
-                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+                error =>
+                    Result
+                        .Success()
+                        .IsSuccess.Should()
+                        .BeTrue($"Command creation or APDU building failed: {error}")
             );
     }
 
@@ -135,7 +140,8 @@ public class ExternalAuthenticateCommandTests
         byte[] mac = Convert.FromHexString("1112131415161718");
 
         // Act & Assert
-        ExternalAuthenticateCommand.CreateWithMac(securityLevel, hostCryptogram, mac)
+        ExternalAuthenticateCommand
+            .CreateWithMac(securityLevel, hostCryptogram, mac)
             .Map(command => command.ToBytes())
             .Match(
                 apdu =>
@@ -149,7 +155,8 @@ public class ExternalAuthenticateCommandTests
                     _ = apdu[13..21].Should().BeEquivalentTo(mac); // MAC
                     _ = apdu.Length.Should().Be(21); // 5 header + 8 cryptogram + 8 MAC
                 },
-                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
+                error =>
+                    Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
             );
     }
 
@@ -166,14 +173,16 @@ public class ExternalAuthenticateCommandTests
         byte[] hostCryptogram = new byte[8];
 
         // Act & Assert
-        ExternalAuthenticateCommand.CreateWithoutMac(securityLevel, hostCryptogram)
+        ExternalAuthenticateCommand
+            .CreateWithoutMac(securityLevel, hostCryptogram)
             .Map(command => command.ToBytes())
             .Match(
                 apdu =>
                 {
                     _ = apdu[2].Should().Be(expectedP1); // P1
                 },
-                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
+                error =>
+                    Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
             );
     }
 
@@ -181,7 +190,8 @@ public class ExternalAuthenticateCommandTests
     public void GetApdu_AlwaysReturnsNewArray()
     {
         // Arrange & Act
-        ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, new byte[8], new byte[8])
+        ExternalAuthenticateCommand
+            .CreateWithMac(SecurityLevel.CMac, new byte[8], new byte[8])
             .Match(
                 command =>
                 {
@@ -192,7 +202,8 @@ public class ExternalAuthenticateCommandTests
                     _ = apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
                     _ = apdu2.Should().BeEquivalentTo(apdu1); // But with same content
                 },
-                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
+                error =>
+                    Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
             );
     }
 
@@ -227,7 +238,8 @@ public class ExternalAuthenticateCommandTests
         // Data: Host Cryptogram [+ MAC]
         // No Le byte
 
-        ExternalAuthenticateCommand.CreateWithMac(SecurityLevel.CMac, new byte[8], new byte[8])
+        ExternalAuthenticateCommand
+            .CreateWithMac(SecurityLevel.CMac, new byte[8], new byte[8])
             .Map(command => command.ToBytes())
             .Match(
                 apdu =>
@@ -238,7 +250,8 @@ public class ExternalAuthenticateCommandTests
                     _ = apdu[3].Should().Be(0x00); // P2
                     _ = apdu[4].Should().Be(0x10); // Lc
                 },
-                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
+                error =>
+                    Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
             );
     }
 
@@ -258,17 +271,20 @@ public class ExternalAuthenticateCommandTests
             (SecurityLevel.CDecryption, 0x03),
         ];
 
-        testCases.Select(testCase =>
-            ExternalAuthenticateCommand.CreateWithoutMac(testCase.Item1, new byte[8])
-                .Map(command => command.ToBytes())
-                .Match(
-                    apdu =>
-                    {
-                        _ = apdu[2].Should().Be(testCase.Item2);
-                        return Result.Success();
-                    },
-                    error => Result.Failure($"Command creation failed: {error}")
-                )
-        ).ToList(); // Execute all tests
+        testCases
+            .Select(testCase =>
+                ExternalAuthenticateCommand
+                    .CreateWithoutMac(testCase.Item1, new byte[8])
+                    .Map(command => command.ToBytes())
+                    .Match(
+                        apdu =>
+                        {
+                            _ = apdu[2].Should().Be(testCase.Item2);
+                            return Result.Success();
+                        },
+                        error => Result.Failure($"Command creation failed: {error}")
+                    )
+            )
+            .ToList(); // Execute all tests
     }
 }

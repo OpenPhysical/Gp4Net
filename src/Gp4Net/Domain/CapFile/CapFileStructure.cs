@@ -94,17 +94,18 @@ public class CapFileStructure
     public static Result<CapFileStructure, SmartCardError> Parse(byte[] capFileData)
     {
         // Only support ZIP/JAR format CAP files
-        return capFileData.Length >= Constants.Constants.FileFormats.Zip.MINIMUM_HEADER_SIZE
+        return
+            capFileData.Length >= Constants.Constants.FileFormats.Zip.MINIMUM_HEADER_SIZE
             && capFileData[0] == Constants.Constants.FileFormats.Zip.LocalFileHeaderSignature.BYTE1
             && capFileData[1] == Constants.Constants.FileFormats.Zip.LocalFileHeaderSignature.BYTE2
             && capFileData[2] == Constants.Constants.FileFormats.Zip.LocalFileHeaderSignature.BYTE3
             && capFileData[3] == Constants.Constants.FileFormats.Zip.LocalFileHeaderSignature.BYTE4
             ? ParseZipFormat(capFileData)
             : Result.Failure<CapFileStructure, SmartCardError>(
-            SmartCardError.Unsupported(
-                "Only ZIP/JAR format CAP files are supported. Raw binary CAP format is not supported."
-            )
-        );
+                SmartCardError.Unsupported(
+                    "Only ZIP/JAR format CAP files are supported. Raw binary CAP format is not supported."
+                )
+            );
     }
 
     /// <summary>
@@ -233,57 +234,63 @@ public class CapFileStructure
 
                 components.Add(component);
 
-                switch (component.Tag)
+                var processingResult = component.Tag switch
                 {
                     // Extract package information from header component
-                    case Constants.Constants.JavaCard.ComponentTags.HEADER:
+                    Constants.Constants.JavaCard.ComponentTags.HEADER =>
+                        Gp4Net.Core.Functional.ResultExtensions.Try(
+                            () => HeaderComponent.Parse(component.Data),
+                            ex => SmartCardError.InvalidData($"Invalid header component: {ex.Message}")
+                        )
+                        .Tap(header =>
                         {
-                            var headerResult = Gp4Net.Core.Functional.ResultExtensions.Try(
-                                () => HeaderComponent.Parse(component.Data),
-                                ex => SmartCardError.InvalidData($"Invalid header component: {ex.Message}")
+                            packageAid = Maybe<byte[]>.From(header.PackageAid);
+                            packageVersion = Maybe<CapVersion>.From(header.PackageVersion);
+                            capFileVersion = Maybe<CapVersion>.From(
+                                new CapVersion(header.CapFileMajorVersion, header.CapFileMinorVersion)
                             );
-                            
-                            if (headerResult.IsFailure)
-                            {
-                                return Result.Failure<CapFileStructure, SmartCardError>(headerResult.Error);
-                            }
-                            
-                            if (headerResult.IsSuccess)
-                            {
-                                var header = headerResult.Value;
-                                packageAid = Maybe<byte[]>.From(header.PackageAid);
-                                packageVersion = Maybe<CapVersion>.From(header.PackageVersion);
-                                capFileVersion = Maybe<CapVersion>.From(new CapVersion(
-                                    header.CapFileMajorVersion,
-                                    header.CapFileMinorVersion
-                                ));
-                                headerFlags = header.Flags;
-                            }
-                            break;
-                        }
+                            headerFlags = header.Flags;
+                        })
+                        .Map(_ => true),
 
                     // Extract applet information from applet component
-                    case Constants.Constants.JavaCard.ComponentTags.APPLET:
-                        {
-                            var appletComponent = AppletComponent.Parse(component.Data);
-                            applets.AddRange(appletComponent.Applets);
-                            break;
-                        }
+                    Constants.Constants.JavaCard.ComponentTags.APPLET =>
+                        Result.Try(
+                            () =>
+                            {
+                                var appletComponent = AppletComponent.Parse(component.Data);
+                                applets.AddRange(appletComponent.Applets);
+                                return true;
+                            },
+                            ex => SmartCardError.InvalidData($"Failed to parse applet component: {ex.Message}")
+                        ),
+
+                    // Other components don't need special processing
+                    _ => Result.Success<bool, SmartCardError>(true)
+                };
+
+                if (processingResult.IsFailure)
+                {
+                    return Result.Failure<CapFileStructure, SmartCardError>(processingResult.Error);
                 }
             }
         }
 
-        return packageAid.ToResult(SmartCardError.InvalidData("CAP file missing package AID"))
-            .Bind(aid => packageVersion.ToResult(SmartCardError.InvalidData("CAP file missing package version"))
-                .Map(version => new CapFileStructure(
-                    aid,
-                    version,
-                    components,
-                    applets,
-                    manifest.GetValueOrDefault(null),
-                    capFileVersion.GetValueOrDefault(new CapVersion(0, 0)),
-                    headerFlags
-                )));
+        return packageAid
+            .ToResult(SmartCardError.InvalidData("CAP file missing package AID"))
+            .Bind(aid =>
+                packageVersion
+                    .ToResult(SmartCardError.InvalidData("CAP file missing package version"))
+                    .Map(version => new CapFileStructure(
+                        aid,
+                        version,
+                        components,
+                        applets,
+                        manifest.GetValueOrDefault(null),
+                        capFileVersion.GetValueOrDefault(new CapVersion(0, 0)),
+                        headerFlags
+                    ))
+            );
     }
 
     /// <summary>
@@ -336,7 +343,7 @@ public class CapFileStructure
             .Concat(
                 [
                     (byte)(component.Size >> 8),
-                    (byte)(component.Size & Constants.Constants.GlobalPlatform.CommonBytes.MAX)
+                    (byte)(component.Size & Constants.Constants.GlobalPlatform.CommonBytes.MAX),
                 ]
             )
             .Concat(component.Data);
@@ -441,9 +448,7 @@ public class CapComponent
         if (stream.Position + 1 >= stream.Length)
         {
             return Result.Failure<CapComponent, SmartCardError>(
-                SmartCardError.InvalidData(
-                    "Unexpected end of stream while reading component size."
-                )
+                SmartCardError.InvalidData("Unexpected end of stream while reading component size.")
             );
         }
 
@@ -452,9 +457,7 @@ public class CapComponent
         if (sizeHighByte == -1 || sizeLowByte == -1)
         {
             return Result.Failure<CapComponent, SmartCardError>(
-                SmartCardError.InvalidData(
-                    "Unexpected end of stream while reading component size."
-                )
+                SmartCardError.InvalidData("Unexpected end of stream while reading component size.")
             );
         }
 
@@ -478,9 +481,7 @@ public class CapComponent
         if (bytesRead != size)
         {
             return Result.Failure<CapComponent, SmartCardError>(
-                SmartCardError.InvalidData(
-                    "Unexpected end of stream while reading component data."
-                )
+                SmartCardError.InvalidData("Unexpected end of stream while reading component data.")
             );
         }
 
@@ -885,7 +886,11 @@ public class ManifestInfo
                 );
                 var versionKey =
                     prefix
-                    + Constants.Constants.JavaCard.ManifestAttributes.IMPORTED_PACKAGE_VERSION_SUFFIX;
+                    + Constants
+                        .Constants
+                        .JavaCard
+                        .ManifestAttributes
+                        .IMPORTED_PACKAGE_VERSION_SUFFIX;
                 return new { AidKey = aidKey, VersionKey = versionKey };
             })
             .Where(keys => properties.ContainsKey(keys.VersionKey))

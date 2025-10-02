@@ -65,8 +65,13 @@ public class GetDataResponseExtensionsTests
     [Test]
     public void ParseAsCardCapabilities_WithValidData_ReturnsCardCapabilities()
     {
-        // Arrange - Sample capabilities data
-        byte[] data = Convert.FromHexString("670A810201820103830101");
+        // Arrange - Sample capabilities data with correct TLV structure
+        // 67 = Card Capabilities container
+        // 09 = length (9 bytes)
+        // 81 01 01 = Application privileges (tag 81, length 1, data 01)
+        // 82 01 03 = Supported algorithms (tag 82, length 1, data 03)
+        // 83 01 01 = LFDB hash algorithms (tag 83, length 1, data 01)
+        byte[] data = Convert.FromHexString("6709810101820103830101");
 
         // Act
         Maybe<CardCapabilities> result = data.ParseAsCardCapabilities();

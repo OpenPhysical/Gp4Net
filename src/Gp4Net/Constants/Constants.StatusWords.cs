@@ -3,10 +3,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // -----------------------------------------------------------------------------
 
-using JetBrains.Annotations;
 using Gp4Net.Core;
+using JetBrains.Annotations;
 
 namespace Gp4Net.Constants;
+
 public static partial class Constants
 {
     /// <summary>

@@ -14,7 +14,6 @@ using Gp4Net.Core;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Pipeline;
-using Gp4Net.Services;
 using JetBrains.Annotations;
 using WSCT.ISO7816;
 
@@ -37,13 +36,20 @@ public static class CardInformationGatherer
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Complete CardInformation object with all available data</returns>
     public static async Task<Result<CardInformation, SmartCardError>> GatherAsync(
-        Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
+        Func<
+            CommandAPDU,
+            CancellationToken,
+            Task<Result<CommandResponse, SmartCardError>>
+        > executeCommand,
         Maybe<SelectResponse> isdInfo,
         CancellationToken cancellationToken = default
     )
     {
         // Start with empty card information
-        var cardInfo = CardInformation.Empty with { IsdInfo = isdInfo };
+        var cardInfo = CardInformation.Empty with
+        {
+            IsdInfo = isdInfo,
+        };
 
         // Gather all data objects in parallel for efficiency
         var cplcTask = GetCplcDataAsync(executeCommand, cancellationToken);
@@ -51,7 +57,10 @@ public static class CardInformationGatherer
         var capabilitiesTask = GetCardCapabilitiesAsync(executeCommand, cancellationToken);
         var keyInfoTask = GetKeyInformationAsync(executeCommand, cancellationToken);
         var securityStatusTask = GetSecurityStatusAsync(executeCommand, cancellationToken);
-        var diversificationDataTask = GetDiversificationDataAsync(executeCommand, cancellationToken);
+        var diversificationDataTask = GetDiversificationDataAsync(
+            executeCommand,
+            cancellationToken
+        );
 
         // Wait for all tasks to complete
         await Task.WhenAll(
@@ -66,22 +75,52 @@ public static class CardInformationGatherer
         // Compose the final result using functional patterns
         var finalCardInfo = cardInfo with
         {
-            Cplc = cplcTask.Result.Match(success => Maybe<CplcData>.From(success), _ => Maybe<CplcData>.None),
-            CardData = cardDataTask.Result.Match(success => Maybe<CardDataInfo>.From(success), _ => Maybe<CardDataInfo>.None),
-            Capabilities = capabilitiesTask.Result.Match(success => Maybe<CardCapabilities>.From(success), _ => Maybe<CardCapabilities>.None),
-            KeyInfo = keyInfoTask.Result.Match(success => Maybe<KeyInformationTemplate>.From(success), _ => Maybe<KeyInformationTemplate>.None),
-            SecurityStatus = securityStatusTask.Result.Match(success => Maybe<SecurityDomainStatus>.From(success), _ => Maybe<SecurityDomainStatus>.None),
-            DiversificationData = diversificationDataTask.Result.Match(success => Maybe<byte[]>.From(success), _ => Maybe<byte[]>.None),
-            
+            Cplc = cplcTask.Result.Match(
+                success => Maybe<CplcData>.From(success),
+                _ => Maybe<CplcData>.None
+            ),
+            CardData = cardDataTask.Result.Match(
+                success => Maybe<CardDataInfo>.From(success),
+                _ => Maybe<CardDataInfo>.None
+            ),
+            Capabilities = capabilitiesTask.Result.Match(
+                success => Maybe<CardCapabilities>.From(success),
+                _ => Maybe<CardCapabilities>.None
+            ),
+            KeyInfo = keyInfoTask.Result.Match(
+                success => Maybe<KeyInformationTemplate>.From(success),
+                _ => Maybe<KeyInformationTemplate>.None
+            ),
+            SecurityStatus = securityStatusTask.Result.Match(
+                success => Maybe<SecurityDomainStatus>.From(success),
+                _ => Maybe<SecurityDomainStatus>.None
+            ),
+            DiversificationData = diversificationDataTask.Result.Match(
+                success => Maybe<byte[]>.From(success),
+                _ => Maybe<byte[]>.None
+            ),
+
             // Derive additional information from gathered data
             ScpInfo = DeriveScpInformation(
-                capabilitiesTask.Result.Match(success => Maybe<CardCapabilities>.From(success), _ => Maybe<CardCapabilities>.None),
-                diversificationDataTask.Result.Match(success => Maybe<byte[]>.From(success), _ => Maybe<byte[]>.None)
+                capabilitiesTask.Result.Match(
+                    success => Maybe<CardCapabilities>.From(success),
+                    _ => Maybe<CardCapabilities>.None
+                ),
+                diversificationDataTask.Result.Match(
+                    success => Maybe<byte[]>.From(success),
+                    _ => Maybe<byte[]>.None
+                )
             ),
             ChipDetails = DeriveChipDetails(
-                cplcTask.Result.Match(success => Maybe<CplcData>.From(success), _ => Maybe<CplcData>.None),
-                cardDataTask.Result.Match(success => Maybe<CardDataInfo>.From(success), _ => Maybe<CardDataInfo>.None)
-            )
+                cplcTask.Result.Match(
+                    success => Maybe<CplcData>.From(success),
+                    _ => Maybe<CplcData>.None
+                ),
+                cardDataTask.Result.Match(
+                    success => Maybe<CardDataInfo>.From(success),
+                    _ => Maybe<CardDataInfo>.None
+                )
+            ),
         };
 
         return Result.Success<CardInformation, SmartCardError>(finalCardInfo);
@@ -92,7 +131,11 @@ public static class CardInformationGatherer
     /// Reference: GlobalPlatform Card Specification v2.3.1 Section E.1.1
     /// </summary>
     private static async Task<Result<CplcData, SmartCardError>> GetCplcDataAsync(
-        Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
+        Func<
+            CommandAPDU,
+            CancellationToken,
+            Task<Result<CommandResponse, SmartCardError>>
+        > executeCommand,
         CancellationToken cancellationToken
     )
     {
@@ -105,11 +148,18 @@ public static class CardInformationGatherer
                         await executeCommand(apdu, cancellationToken)
                             .Bind(response =>
                                 GetDataResponse
-                                    .Parse(GetDataCommand.DataObjects.CardProductionLifeCycle, response.Data)
+                                    .Parse(
+                                        GetDataCommand.DataObjects.CardProductionLifeCycle,
+                                        response.Data
+                                    )
                                     .Bind(getDataResponse =>
                                         getDataResponse
                                             .ParseAsCplc()
-                                            .ToResult(SmartCardError.InvalidResponse("Failed to parse CPLC data"))
+                                            .ToResult(
+                                                SmartCardError.InvalidResponse(
+                                                    "Failed to parse CPLC data"
+                                                )
+                                            )
                                     )
                             )
                     )
@@ -122,7 +172,11 @@ public static class CardInformationGatherer
     /// Reference: GlobalPlatform Card Specification v2.3.1 Section E.2.1.1
     /// </summary>
     private static async Task<Result<CardDataInfo, SmartCardError>> GetCardDataAsync(
-        Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
+        Func<
+            CommandAPDU,
+            CancellationToken,
+            Task<Result<CommandResponse, SmartCardError>>
+        > executeCommand,
         CancellationToken cancellationToken
     )
     {
@@ -139,7 +193,11 @@ public static class CardInformationGatherer
                                     .Bind(getDataResponse =>
                                         getDataResponse
                                             .ParseAsCardData()
-                                            .ToResult(SmartCardError.InvalidResponse("Failed to parse Card Data"))
+                                            .ToResult(
+                                                SmartCardError.InvalidResponse(
+                                                    "Failed to parse Card Data"
+                                                )
+                                            )
                                     )
                             )
                     )
@@ -152,7 +210,11 @@ public static class CardInformationGatherer
     /// Reference: GlobalPlatform Card Specification v2.3.1 Section E.2.1.1
     /// </summary>
     private static async Task<Result<CardCapabilities, SmartCardError>> GetCardCapabilitiesAsync(
-        Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
+        Func<
+            CommandAPDU,
+            CancellationToken,
+            Task<Result<CommandResponse, SmartCardError>>
+        > executeCommand,
         CancellationToken cancellationToken
     )
     {
@@ -165,11 +227,18 @@ public static class CardInformationGatherer
                         await executeCommand(apdu, cancellationToken)
                             .Bind(response =>
                                 GetDataResponse
-                                    .Parse(GetDataCommand.DataObjects.CardCapabilities, response.Data)
+                                    .Parse(
+                                        GetDataCommand.DataObjects.CardCapabilities,
+                                        response.Data
+                                    )
                                     .Bind(getDataResponse =>
                                         getDataResponse
                                             .ParseAsCardCapabilities()
-                                            .ToResult(SmartCardError.InvalidResponse("Failed to parse Card Capabilities"))
+                                            .ToResult(
+                                                SmartCardError.InvalidResponse(
+                                                    "Failed to parse Card Capabilities"
+                                                )
+                                            )
                                     )
                             )
                     )
@@ -181,8 +250,14 @@ public static class CardInformationGatherer
     /// Contains cryptographic key details and versions.
     /// Reference: GlobalPlatform Card Specification v2.3.1 Section E.2.1.1
     /// </summary>
-    private static async Task<Result<KeyInformationTemplate, SmartCardError>> GetKeyInformationAsync(
-        Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
+    private static async Task<
+        Result<KeyInformationTemplate, SmartCardError>
+    > GetKeyInformationAsync(
+        Func<
+            CommandAPDU,
+            CancellationToken,
+            Task<Result<CommandResponse, SmartCardError>>
+        > executeCommand,
         CancellationToken cancellationToken
     )
     {
@@ -195,11 +270,18 @@ public static class CardInformationGatherer
                         await executeCommand(apdu, cancellationToken)
                             .Bind(response =>
                                 GetDataResponse
-                                    .Parse(GetDataCommand.DataObjects.KeyInformationTemplate, response.Data)
+                                    .Parse(
+                                        GetDataCommand.DataObjects.KeyInformationTemplate,
+                                        response.Data
+                                    )
                                     .Bind(getDataResponse =>
                                         getDataResponse
                                             .ParseAsKeyInformation()
-                                            .ToResult(SmartCardError.InvalidResponse("Failed to parse Key Information"))
+                                            .ToResult(
+                                                SmartCardError.InvalidResponse(
+                                                    "Failed to parse Key Information"
+                                                )
+                                            )
                                     )
                             )
                     )
@@ -212,7 +294,11 @@ public static class CardInformationGatherer
     /// Reference: GlobalPlatform Card Specification v2.3.1 Section E.2.1.1
     /// </summary>
     private static async Task<Result<SecurityDomainStatus, SmartCardError>> GetSecurityStatusAsync(
-        Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
+        Func<
+            CommandAPDU,
+            CancellationToken,
+            Task<Result<CommandResponse, SmartCardError>>
+        > executeCommand,
         CancellationToken cancellationToken
     )
     {
@@ -226,7 +312,11 @@ public static class CardInformationGatherer
                             .Bind(response =>
                                 SecurityDomainStatus
                                     .Parse(Maybe<byte[]>.From(response.Data))
-                                    .MapError(error => SmartCardError.InvalidResponse($"Failed to parse Security Status: {error}"))
+                                    .MapError(error =>
+                                        SmartCardError.InvalidResponse(
+                                            $"Failed to parse Security Status: {error}"
+                                        )
+                                    )
                             )
                     )
             );
@@ -238,7 +328,11 @@ public static class CardInformationGatherer
     /// Reference: GlobalPlatform Card Specification v2.3.1 Section E.2.1.1
     /// </summary>
     private static async Task<Result<byte[], SmartCardError>> GetDiversificationDataAsync(
-        Func<CommandAPDU, CancellationToken, Task<Result<CommandResponse, SmartCardError>>> executeCommand,
+        Func<
+            CommandAPDU,
+            CancellationToken,
+            Task<Result<CommandResponse, SmartCardError>>
+        > executeCommand,
         CancellationToken cancellationToken
     )
     {
@@ -248,8 +342,7 @@ public static class CardInformationGatherer
                 await command
                     .ToCommandApdu()
                     .Bind(async apdu =>
-                        await executeCommand(apdu, cancellationToken)
-                            .Map(response => response.Data)
+                        await executeCommand(apdu, cancellationToken).Map(response => response.Data)
                     )
             );
     }
@@ -269,8 +362,8 @@ public static class CardInformationGatherer
             if (cap.ScpOptions.Count == 0)
                 return Maybe<ScpInformation>.None;
 
-            var protocols = cap.ScpOptions
-                .GroupBy(opt => opt.ScpId)
+            var protocols = cap
+                .ScpOptions.GroupBy(opt => opt.ScpId)
                 .Select(group => new ScpProtocolInfo(
                     group.Key,
                     group.Select(opt => (ScpImplementation)opt.Implementation).ToList()
@@ -294,7 +387,7 @@ public static class CardInformationGatherer
 
             // Create basic SCP information from description - this is a simplified approach
             // In a full implementation, we'd parse the diversification data to extract actual protocol info
-            var protocols = new[] { new ScpProtocolInfo(2, new[] { ScpImplementation.Scp02I15 }) };
+            var protocols = new[] { new ScpProtocolInfo(2, [ScpImplementation.Scp02I15]) };
             return Maybe<ScpInformation>.From(new ScpInformation(protocols));
         });
     }
@@ -317,9 +410,10 @@ public static class CardInformationGatherer
             cardData.Match(
                 Some: data =>
                 {
-                    // Update GlobalPlatform version from OID if available and more specific  
+                    // Update GlobalPlatform version from OID if available and more specific
                     data.GlobalPlatformVersionFromOid.Match(
-                        Some: version => chipInfo.GlobalPlatformVersion = Maybe<string>.From(version),
+                        Some: version =>
+                            chipInfo.GlobalPlatformVersion = Maybe<string>.From(version),
                         None: () => { }
                     );
 
@@ -345,7 +439,7 @@ public static class CardInformationGatherer
     {
         // Look for Java Card platform OIDs using functional composition
         var javaCardOids = oids.Where(oid => oid.Contains("1.2.840.114283.3")).ToList();
-        
+
         return javaCardOids.Count > 0
             ? Maybe<string>.From("3.0.5") // Default JC version - would be parsed from actual OID
             : Maybe<string>.None;

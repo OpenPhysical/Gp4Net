@@ -24,9 +24,12 @@ public sealed class TestCardService : ISmartCardService
     /// </summary>
     /// <param name="virtualCardService">The virtual card service to adapt.</param>
     /// <returns>A Result containing the TestCardService or an error.</returns>
-    public static Result<TestCardService, SmartCardError> Create(VirtualCardService virtualCardService)
+    public static Result<TestCardService, SmartCardError> Create(
+        VirtualCardService virtualCardService
+    )
     {
-        return Maybe.From(virtualCardService)
+        return Maybe
+            .From(virtualCardService)
             .ToResult(SmartCardError.InvalidArgument("VirtualCardService cannot be null"))
             .Map(service => new TestCardService(service, ImmutablePipelineContext.Empty));
     }
@@ -48,7 +51,7 @@ public sealed class TestCardService : ISmartCardService
     {
         return await Task.FromResult(
             Result.Success<CommandResponse, SmartCardError>(
-                CommandResponse.Success(new byte[] { 0x90, 0x00 }, _context)
+                CommandResponse.Success([0x90, 0x00], _context)
             )
         );
     }
@@ -81,7 +84,9 @@ public sealed class TestCardService : ISmartCardService
             .ToResult(SmartCardError.InvalidArgument("Context cannot be null"))
             .Bind(validContext =>
                 _virtualCardService
-                    .ToResult(SmartCardError.CommunicationError("Virtual card service not available"))
+                    .ToResult(
+                        SmartCardError.CommunicationError("Virtual card service not available")
+                    )
                     .Map(service => (ISmartCardService)new TestCardService(service, validContext))
             );
     }
@@ -110,9 +115,7 @@ public sealed class TestCardService : ISmartCardService
     {
         // Return a generic ATR for testing
         return await Task.FromResult(
-            Result.Success<byte[], SmartCardError>(
-                new byte[] { 0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }
-            )
+            Result.Success<byte[], SmartCardError>([0x3B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
         );
     }
 
@@ -122,9 +125,7 @@ public sealed class TestCardService : ISmartCardService
     )
     {
         return await Task.FromResult(
-            Result.Success<string[], SmartCardError>(
-                new[] { "Virtual P71 Reader 00 00" }
-            )
+            Result.Success<string[], SmartCardError>(["Virtual P71 Reader 00 00"])
         );
     }
 
@@ -144,7 +145,20 @@ public sealed class TestCardService : ISmartCardService
     {
         return await Task.FromResult(
             Result.Success<CommandResponse, SmartCardError>(
-                CommandResponse.Success(new byte[] { 0x90, 0x00 }, _context)
+                CommandResponse.Success([0x90, 0x00], _context)
+            )
+        );
+    }
+
+    /// <inheritdoc />
+    public async Task<
+        Result<CardTransportCapabilities, SmartCardError>
+    > GetCardTransportCapabilitiesAsync(CancellationToken cancellationToken = default)
+    {
+        // Return default capabilities for testing
+        return await Task.FromResult(
+            Result.Success<CardTransportCapabilities, SmartCardError>(
+                new CardTransportCapabilities(false, 245)
             )
         );
     }

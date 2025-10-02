@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Tool.Services.CardCommunication.Wsct;
 using JetBrains.Annotations;
 using WSCT.Wrapper;
 using WSCT.Wrapper.Desktop.Core;
@@ -16,23 +15,17 @@ namespace Gp4Net.Tool.Services;
 /// Immutable value object for reader state information.
 /// </summary>
 [PublicAPI]
-public record ReaderStatus(
-    string Name,
-    bool HasMediaPresent,
-    Maybe<string> ErrorMessage = default
-)
+public record ReaderStatus(string Name, bool HasMediaPresent, Maybe<string> ErrorMessage = default)
 {
     /// <summary>
     /// Creates a reader status with media present.
     /// </summary>
-    public static ReaderStatus WithMedia(string name) =>
-        new(name, true, Maybe<string>.None);
+    public static ReaderStatus WithMedia(string name) => new(name, true, Maybe<string>.None);
 
     /// <summary>
     /// Creates a reader status without media present.
     /// </summary>
-    public static ReaderStatus WithoutMedia(string name) =>
-        new(name, false, Maybe<string>.None);
+    public static ReaderStatus WithoutMedia(string name) => new(name, false, Maybe<string>.None);
 
     /// <summary>
     /// Creates a reader status with an error.
@@ -57,7 +50,8 @@ public static class ReaderStatusService
     /// <returns>True if media present, false otherwise, or error.</returns>
     public static Task<Result<bool, SmartCardError>> IsMediaPresentAsync(
         string readerName,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         try
         {
@@ -65,15 +59,17 @@ public static class ReaderStatusService
             try
             {
                 var establishResult = context.Establish();
-            
-            if (establishResult != ErrorCode.Success)
-            {
-                return Task.FromResult(
-                    Result.Failure<bool, SmartCardError>(
-                        SmartCardError.CommunicationError($"Failed to establish context: {establishResult}")
-                    )
-                );
-            }
+
+                if (establishResult != ErrorCode.Success)
+                {
+                    return Task.FromResult(
+                        Result.Failure<bool, SmartCardError>(
+                            SmartCardError.CommunicationError(
+                                $"Failed to establish context: {establishResult}"
+                            )
+                        )
+                    );
+                }
 
                 // Try to connect to the reader to check for card presence
                 try
@@ -82,14 +78,14 @@ public static class ReaderStatusService
                     try
                     {
                         var connectResult = channel.Connect(ShareMode.Shared, Protocol.Any);
-                
+
                         if (connectResult == ErrorCode.Success)
                         {
                             // Card is present and we connected successfully
                             channel.Disconnect(Disposition.LeaveCard);
                             return Task.FromResult(Result.Success<bool, SmartCardError>(true));
                         }
-                        
+
                         // Connection failed - likely no card present
                         return Task.FromResult(Result.Success<bool, SmartCardError>(false));
                     }
@@ -113,7 +109,9 @@ public static class ReaderStatusService
         {
             return Task.FromResult(
                 Result.Failure<bool, SmartCardError>(
-                    SmartCardError.CommunicationError($"Failed to check media presence: {ex.Message}")
+                    SmartCardError.CommunicationError(
+                        $"Failed to check media presence: {ex.Message}"
+                    )
                 )
             );
         }
@@ -126,30 +124,33 @@ public static class ReaderStatusService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Array of reader status or error.</returns>
     public static async Task<Result<ReaderStatus[], SmartCardError>> GetAllReaderStatusAsync(
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         // Get all physical readers
-        var readersResult = await ReaderEnumerationService.EnumeratePhysicalReadersAsync(cancellationToken);
-        
+        var readersResult = await ReaderEnumerationService.EnumeratePhysicalReadersAsync(
+            cancellationToken
+        );
+
         return await readersResult.Bind(async readers =>
         {
             if (readers.Length == 0)
             {
-                return Result.Success<ReaderStatus[], SmartCardError>(Array.Empty<ReaderStatus>());
+                return Result.Success<ReaderStatus[], SmartCardError>([]);
             }
 
             // Check media presence for each reader
-            var statusChecks = readers
-                .Select(async reader =>
-                {
-                    var mediaResult = await IsMediaPresentAsync(reader, cancellationToken);
-                    return mediaResult.Match(
-                        hasMedia => hasMedia 
+            var statusChecks = readers.Select(async reader =>
+            {
+                var mediaResult = await IsMediaPresentAsync(reader, cancellationToken);
+                return mediaResult.Match(
+                    hasMedia =>
+                        hasMedia
                             ? ReaderStatus.WithMedia(reader)
                             : ReaderStatus.WithoutMedia(reader),
-                        error => ReaderStatus.WithError(reader, error.Message)
-                    );
-                });
+                    error => ReaderStatus.WithError(reader, error.Message)
+                );
+            });
 
             var statuses = await Task.WhenAll(statusChecks);
             return Result.Success<ReaderStatus[], SmartCardError>(statuses);
@@ -163,10 +164,11 @@ public static class ReaderStatusService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Array of reader names with media present, or error.</returns>
     public static async Task<Result<string[], SmartCardError>> GetReadersWithMediaAsync(
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         var statusResult = await GetAllReaderStatusAsync(cancellationToken);
-        
+
         return statusResult.Map(statuses =>
             statuses
                 .Where(s => s.HasMediaPresent && s.ErrorMessage.HasNoValue)

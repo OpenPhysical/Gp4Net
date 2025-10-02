@@ -11,11 +11,7 @@ namespace Gp4Net.Tool.Services;
 /// Immutable value object ensuring reader resolution traceability.
 /// </summary>
 [PublicAPI]
-public record ReaderResolution(
-    string ReaderName,
-    ResolutionMethod Method,
-    bool IsVirtual
-)
+public record ReaderResolution(string ReaderName, ResolutionMethod Method, bool IsVirtual)
 {
     /// <summary>
     /// Creates a resolution from an explicit --reader flag.
@@ -46,16 +42,16 @@ public enum ResolutionMethod
     /// Reader specified via --reader command line flag.
     /// </summary>
     ExplicitFlag,
-    
+
     /// <summary>
     /// Reader specified via GP4NET_READER environment variable.
     /// </summary>
     Environment,
-    
+
     /// <summary>
     /// Reader auto-detected as single reader with media present.
     /// </summary>
-    AutoDetection
+    AutoDetection,
 }
 
 /// <summary>
@@ -77,5 +73,6 @@ public interface IReaderResolutionService
     /// <returns>Resolved reader specification or detailed error.</returns>
     Task<Result<ReaderResolution, SmartCardError>> ResolveReaderAsync(
         Maybe<string> explicitReader,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default
+    );
 }

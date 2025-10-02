@@ -16,7 +16,8 @@ public static class CommandApduExtensions
     /// </summary>
     /// <param name="command">The CommandAPDU to adapt.</param>
     /// <returns>An IApduCommand adapter.</returns>
-    public static IApduCommand AsApduCommand(this CommandAPDU command) => new CommandApduAdapter(command);
+    public static IApduCommand AsApduCommand(this CommandAPDU command) =>
+        new CommandApduAdapter(command);
 
     /// <summary>
     /// Adapter class that makes CommandAPDU implement IApduCommand.
@@ -35,6 +36,7 @@ public static class CommandApduExtensions
         public byte Ins => _command.Ins;
 
         public CommandAPDU ToApdu() => _command;
+
         public byte[] ToBytes() => _command.BinaryCommand;
 
         /// <summary>

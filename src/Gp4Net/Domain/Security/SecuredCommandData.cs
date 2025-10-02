@@ -28,32 +28,32 @@ public sealed record SecuredCommandData
     /// For MAC-only commands, this contains the plaintext data.
     /// </summary>
     public ImmutableArray<byte> Data { get; }
-    
+
     /// <summary>
     /// The MAC extracted from the secured command (last 8 bytes of Udc).
     /// </summary>
     public ImmutableArray<byte> ExtractedMac { get; }
-    
+
     /// <summary>
     /// Indicates whether the data is encrypted (C-ENC enabled).
     /// </summary>
     public bool IsEncrypted { get; }
-    
+
     /// <summary>
     /// The validated session keys for MAC verification and optional decryption.
     /// </summary>
     public SessionKeys ValidatedKeys { get; }
-    
+
     /// <summary>
     /// The encryption counter for SCP03 (used in counter mode).
     /// </summary>
     public uint EncryptionCounter { get; }
-    
+
     /// <summary>
     /// The protocol version (SCP02 or SCP03).
     /// </summary>
     public ScpVersion ProtocolVersion { get; }
-    
+
     /// <summary>
     /// Private constructor ensures validation through factory method.
     /// </summary>
@@ -63,7 +63,8 @@ public sealed record SecuredCommandData
         bool isEncrypted,
         SessionKeys keys,
         uint encryptionCounter,
-        ScpVersion protocolVersion)
+        ScpVersion protocolVersion
+    )
     {
         Data = data;
         ExtractedMac = extractedMac;
@@ -72,7 +73,7 @@ public sealed record SecuredCommandData
         EncryptionCounter = encryptionCounter;
         ProtocolVersion = protocolVersion;
     }
-    
+
     /// <summary>
     /// Extracts secured command data from a CommandAPDU with a valid session.
     /// </summary>
@@ -81,14 +82,17 @@ public sealed record SecuredCommandData
     /// <returns>Success with SecuredCommandData if the command is secured, failure otherwise.</returns>
     public static Result<SecuredCommandData, SmartCardError> Extract(
         CommandAPDU command,
-        SecureChannelState validSession)
+        SecureChannelState validSession
+    )
     {
         return Maybe<CommandAPDU>
             .From(command)
             .ToResult(SmartCardError.InvalidArgument("Command cannot be null"))
-            .Bind(cmd => Maybe<SecureChannelState>
-                .From(validSession)
-                .ToResult(SmartCardError.InvalidArgument("Session state cannot be null")))
+            .Bind(cmd =>
+                Maybe<SecureChannelState>
+                    .From(validSession)
+                    .ToResult(SmartCardError.InvalidArgument("Session state cannot be null"))
+            )
             .Bind(session =>
             {
                 // Check if command is secured (bit 2 of CLA set)
@@ -96,58 +100,63 @@ public sealed record SecuredCommandData
                 if (!isSecured)
                 {
                     return Result.Failure<SecureChannelState, SmartCardError>(
-                        SmartCardError.SecurityError("Command is not secured"));
+                        SmartCardError.SecurityError("Command is not secured")
+                    );
                 }
-                
+
                 // Session must have at least C-MAC
                 if (!session.SecurityLevel.HasCMac())
                 {
                     return Result.Failure<SecureChannelState, SmartCardError>(
-                        SmartCardError.SecurityError("Session does not have C-MAC enabled"));
+                        SmartCardError.SecurityError("Session does not have C-MAC enabled")
+                    );
                 }
-                
+
                 return Result.Success<SecureChannelState, SmartCardError>(session);
             })
             .Bind(session => ExtractSecuredComponents(command, session))
             .Map(components => new SecuredCommandData(
-                components.data.ToImmutableArray(),
-                components.mac.ToImmutableArray(),
+                [.. components.data],
+                [.. components.mac],
                 validSession.SecurityLevel.HasCEncryption(),
                 validSession.SessionKeys,
                 validSession.EncryptionCounter,
-                validSession.ProtocolVersion));
+                validSession.ProtocolVersion
+            ));
     }
-    
+
     /// <summary>
     /// Extracts MAC and data from a secured command.
     /// </summary>
     private static Result<(byte[] data, byte[] mac), SmartCardError> ExtractSecuredComponents(
         CommandAPDU command,
-        SecureChannelState session)
+        SecureChannelState session
+    )
     {
-        var udc = command.Udc ?? Array.Empty<byte>();
+        var udc = command.Udc ?? [];
         var macSize = 8; // Both SCP02 and SCP03 use 8-byte MACs
-        
+
         if (udc.Length < macSize)
         {
             return Result.Failure<(byte[], byte[]), SmartCardError>(
-                SmartCardError.InvalidData($"Secured command data too short: {udc.Length} bytes"));
+                SmartCardError.InvalidData($"Secured command data too short: {udc.Length} bytes")
+            );
         }
-        
+
         // MAC is the last 'macSize' bytes of Udc
         var extractedMac = new byte[macSize];
         Array.Copy(udc, udc.Length - macSize, extractedMac, 0, macSize);
-        
+
         // Data is Udc without the MAC
         var data = new byte[udc.Length - macSize];
         if (data.Length > 0)
         {
             Array.Copy(udc, 0, data, 0, data.Length);
         }
-        
+
         return Result.Success<(byte[], byte[]), SmartCardError>((data, extractedMac));
     }
-    
+
     /// <summary>
     /// Creates secured command data for building a new secured command.
     /// </summary>
@@ -158,31 +167,37 @@ public sealed record SecuredCommandData
     public static Result<SecuredCommandData, SmartCardError> CreateForBuilding(
         byte[] plaintextData,
         byte[] mac,
-        SecureChannelState validSession)
+        SecureChannelState validSession
+    )
     {
         return Maybe<byte[]>
             .From(mac)
             .Where(m => m.Length == 8)
             .ToResult(SmartCardError.InvalidArgument("MAC must be 8 bytes"))
-            .Bind(_ => Maybe<SecureChannelState>
-                .From(validSession)
-                .ToResult(SmartCardError.InvalidArgument("Session state cannot be null")))
+            .Bind(_ =>
+                Maybe<SecureChannelState>
+                    .From(validSession)
+                    .ToResult(SmartCardError.InvalidArgument("Session state cannot be null"))
+            )
             .Bind(session =>
                 session.SecurityLevel.HasCMac()
                     ? Result.Success<SecureChannelState, SmartCardError>(session)
                     : Result.Failure<SecureChannelState, SmartCardError>(
-                        SmartCardError.SecurityError("C-MAC not enabled in session")))
+                        SmartCardError.SecurityError("C-MAC not enabled in session")
+                    )
+            )
             .Map(session =>
             {
-                var data = plaintextData ?? Array.Empty<byte>();
-                
+                var data = plaintextData ?? [];
+
                 return new SecuredCommandData(
-                    data.ToImmutableArray(),
-                    mac.ToImmutableArray(),
+                    [.. data],
+                    [.. mac],
                     session.SecurityLevel.HasCEncryption(),
                     session.SessionKeys,
                     session.EncryptionCounter,
-                    session.ProtocolVersion);
+                    session.ProtocolVersion
+                );
             });
     }
 }

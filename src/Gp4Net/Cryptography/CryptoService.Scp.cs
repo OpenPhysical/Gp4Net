@@ -49,7 +49,11 @@ public static partial class CryptoService
             {
                 if (baseKey.Length != Scp.Scp02.SESSION_KEY_SIZE)
                     return Result.Failure<byte[], SmartCardError>(
-                        new InvalidLengthError("baseKey", Scp.Scp02.SESSION_KEY_SIZE, baseKey.Length)
+                        new InvalidLengthError(
+                            "baseKey",
+                            Scp.Scp02.SESSION_KEY_SIZE,
+                            baseKey.Length
+                        )
                     );
 
                 if (derivationConstant.Length != 2)
@@ -83,7 +87,7 @@ public static partial class CryptoService
             /// Used only for card/host cryptogram calculation with S-ENC key.
             /// </summary>
             /// <param name="key">The S-ENC session key (16 bytes).</param>
-            /// <param name="data">The cryptogram data (24 bytes, already includes padding).</param>
+            /// <param name="data">The unpadded cryptogram data (typically 16 bytes).</param>
             /// <returns>The cryptogram value (8 bytes).</returns>
             public static Result<byte[], SmartCardError> CalculateCryptogram(
                 byte[] key,
@@ -95,12 +99,8 @@ public static partial class CryptoService
                         new InvalidLengthError("key", Scp.Scp02.SESSION_KEY_SIZE, key.Length)
                     );
 
-                if (data.Length != Scp.Scp02.CRYPTOGRAM_DATA_SIZE)
-                    return Result.Failure<byte[], SmartCardError>(
-                        new InvalidLengthError("data", Scp.Scp02.CRYPTOGRAM_DATA_SIZE, data.Length)
-                    );
-
-                // Use existing cryptogram calculation from CryptoService
+                // Data is now expected to be unpadded (16 bytes typical)
+                // The CalculateScp02Cryptogram method handles padding internally
                 return Cryptogram.CalculateScp02Cryptogram(key, data);
             }
 
@@ -117,8 +117,12 @@ public static partial class CryptoService
                 // Legacy overload for backward compatibility - uses zero ICV
                 return CalculateMac(key, data, new byte[8]);
             }
-            
-            public static Result<byte[], SmartCardError> CalculateMac(byte[] key, byte[] data, byte[] icv)
+
+            public static Result<byte[], SmartCardError> CalculateMac(
+                byte[] key,
+                byte[] data,
+                byte[] icv
+            )
             {
                 if (key.Length != Scp.Scp02.SESSION_KEY_SIZE)
                     return Result.Failure<byte[], SmartCardError>(
@@ -377,8 +381,7 @@ public static partial class CryptoService
                 Array.Copy(chainingValue, 0, macInput, 0, chainingValue.Length);
                 Array.Copy(command, 0, macInput, chainingValue.Length, command.Length);
 
-                return Mac.CalculateScp03CommandMac(macKey, macInput)
-                    .Map(fullMac => fullMac.Take(Scp.Scp03.MAC_SIZE).ToArray()); // Truncate to 8 bytes
+                return Mac.CalculateScp03FullMac(macKey, macInput);
             }
 
             /// <summary>
@@ -409,8 +412,7 @@ public static partial class CryptoService
                 Array.Copy(chainingValue, 0, macInput, 0, chainingValue.Length);
                 Array.Copy(response, 0, macInput, chainingValue.Length, response.Length);
 
-                return Mac.CalculateScp03ResponseMac(rMacKey, macInput)
-                    .Map(fullMac => fullMac.Take(Scp.Scp03.MAC_SIZE).ToArray()); // Truncate to 8 bytes
+                return Mac.CalculateScp03FullMac(rMacKey, macInput);
             }
 
             /// <summary>
@@ -438,11 +440,9 @@ public static partial class CryptoService
                 byte[] dataToEncrypt = new byte[lc];
                 Array.Copy(command, 5, dataToEncrypt, 0, lc);
 
-                // For SCP03 C-ENC, use counter-based IV
-                byte[] iv = BuildScp03Iv(encryptionCounter);
-
-                return Cipher
-                    .EncryptAesCbcWithPadding(sEncKey, iv, dataToEncrypt)
+                // For SCP03 C-ENC, derive IV from counter per GP 2.3.1 E.5.3
+                return BuildScp03Iv(sEncKey, encryptionCounter, isResponse: false)
+                    .Bind(iv => Cipher.EncryptAesCbcWithPadding(sEncKey, iv, dataToEncrypt))
                     .Map(encryptedData =>
                     {
                         // Build new command with encrypted data
@@ -483,11 +483,9 @@ public static partial class CryptoService
                 byte[] responseData = new byte[statusOffset];
                 Array.Copy(response, 0, responseData, 0, statusOffset);
 
-                // For SCP03 R-ENC, use counter-based IV
-                byte[] iv = BuildScp03Iv(encryptionCounter);
-
-                return Cipher
-                    .EncryptAesCbcWithPadding(sEncKey, iv, responseData)
+                // For SCP03 R-ENC, derive IV using response counter variant
+                return BuildScp03Iv(sEncKey, encryptionCounter, isResponse: true)
+                    .Bind(iv => Cipher.EncryptAesCbcWithPadding(sEncKey, iv, responseData))
                     .Map(encryptedData =>
                     {
                         // Combine encrypted data with original status word
@@ -523,11 +521,9 @@ public static partial class CryptoService
                 byte[] encryptedData = new byte[lc];
                 Array.Copy(command, 5, encryptedData, 0, lc);
 
-                // Use counter-based IV for decryption
-                byte[] iv = BuildScp03Iv(encryptionCounter);
-
-                return Cipher
-                    .DecryptAesCbcWithPadding(sEncKey, iv, encryptedData)
+                // Use counter-derived IV for decryption
+                return BuildScp03Iv(sEncKey, encryptionCounter, isResponse: false)
+                    .Bind(iv => Cipher.DecryptAesCbcWithPadding(sEncKey, iv, encryptedData))
                     .Map(decryptedData =>
                     {
                         // Build new command with decrypted data
@@ -560,11 +556,9 @@ public static partial class CryptoService
                 byte[] encryptedData = new byte[statusOffset];
                 Array.Copy(response, 0, encryptedData, 0, statusOffset);
 
-                // Use counter-based IV for decryption
-                byte[] iv = BuildScp03Iv(encryptionCounter);
-
-                return Cipher
-                    .DecryptAesCbcWithPadding(sEncKey, iv, encryptedData)
+                // Use response-specific counter-derived IV for decryption
+                return BuildScp03Iv(sEncKey, encryptionCounter, isResponse: true)
+                    .Bind(iv => Cipher.DecryptAesCbcWithPadding(sEncKey, iv, encryptedData))
                     .Map(decryptedData =>
                     {
                         // Combine decrypted data with original status word
@@ -581,15 +575,75 @@ public static partial class CryptoService
             /// </summary>
             /// <param name="counter">The encryption counter.</param>
             /// <returns>The 16-byte IV for AES operations.</returns>
-            private static byte[] BuildScp03Iv(uint counter)
+            private static Result<byte[], SmartCardError> BuildScp03Iv(
+                byte[] sEncKey,
+                uint counter,
+                bool isResponse
+            )
             {
-                byte[] iv = new byte[Scp.Scp03.BLOCK_SIZE];
-                // Counter in big-endian format in the last 4 bytes
-                iv[12] = (byte)(counter >> 24);
-                iv[13] = (byte)(counter >> 16);
-                iv[14] = (byte)(counter >> 8);
-                iv[15] = (byte)counter;
-                return iv;
+                byte[] counterBlock = new byte[Scp.Scp03.BLOCK_SIZE];
+                counterBlock[12] = (byte)(counter >> 24);
+                counterBlock[13] = (byte)(counter >> 16);
+                counterBlock[14] = (byte)(counter >> 8);
+                counterBlock[15] = (byte)counter;
+
+                if (isResponse)
+                {
+                    counterBlock[0] = 0x80;
+                }
+
+                return Cipher.EncryptAesEcb(sEncKey, counterBlock);
+            }
+
+            /// <summary>
+            /// Calculates SCP03 cryptogram using KDF108 in counter mode.
+            /// Per GP Card Specification v2.3 Amendment D Section 6.2.1.2.
+            /// Uses NIST SP 800-108 KDF in counter mode with AES-CMAC as PRF.
+            /// </summary>
+            /// <param name="macKey">The S-MAC session key (16 bytes).</param>
+            /// <param name="derivationConstant">0x00 for card cryptogram, 0x01 for host cryptogram.</param>
+            /// <param name="context">Host challenge || Card challenge (16 bytes total).</param>
+            /// <returns>The cryptogram value (8 bytes).</returns>
+            public static Result<byte[], SmartCardError> CalculateCryptogram(
+                byte[] macKey,
+                byte derivationConstant,
+                byte[] context
+            )
+            {
+                // Validate MAC key length
+                if (macKey.Length != Scp.Scp03.SESSION_KEY_SIZE)
+                    return Result.Failure<byte[], SmartCardError>(
+                        new InvalidLengthError("macKey", Scp.Scp03.SESSION_KEY_SIZE, macKey.Length)
+                    );
+
+                // Validate context length (8 byte host challenge + 8 byte card challenge)
+                if (context.Length != 16)
+                    return Result.Failure<byte[], SmartCardError>(
+                        new InvalidLengthError("context", 16, context.Length)
+                    );
+
+                // Validate derivation constant
+                if (
+                    derivationConstant
+                        != Constants.Constants.Scp.Scp03.CryptogramDerivation.CardCryptogram
+                    && derivationConstant
+                        != Constants.Constants.Scp.Scp03.CryptogramDerivation.HostCryptogram
+                )
+                    return Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.InvalidArgument(
+                            $"Invalid derivation constant: 0x{derivationConstant:X2}. "
+                                + "Must be 0x00 (card) or 0x01 (host)"
+                        )
+                    );
+
+                // Use KDF108 to derive cryptogram (8 bytes = 64 bits)
+                // This matches GlobalPlatformPro's implementation which uses KDFCounterBytesGenerator
+                return KeyDerivation.DeriveScp03Data(
+                    macKey,
+                    derivationConstant,
+                    context,
+                    64 // 8 bytes output
+                );
             }
         }
 
@@ -632,15 +686,14 @@ public static partial class CryptoService
             ) =>
                 protocol switch
                 {
-                    ScpVersion.Scp02 => Result.Success<byte[], SmartCardError>(
-                        Scp.Common.ZeroChaining8
-                    ),
-                    ScpVersion.Scp03 => Result.Success<byte[], SmartCardError>(
-                        Scp.Common.ZeroChaining16
-                    ),
-                    _ => Result.Failure<byte[], SmartCardError>(
-                        SmartCardError.InvalidArgument($"Unsupported protocol: {protocol}")
-                    ),
+                    ScpVersion.Scp02
+                        => Result.Success<byte[], SmartCardError>(Scp.Common.ZeroChaining8),
+                    ScpVersion.Scp03
+                        => Result.Success<byte[], SmartCardError>(Scp.Common.ZeroChaining16),
+                    _
+                        => Result.Failure<byte[], SmartCardError>(
+                            SmartCardError.InvalidArgument($"Unsupported protocol: {protocol}")
+                        ),
                 };
 
             /// <summary>
@@ -653,9 +706,10 @@ public static partial class CryptoService
                 {
                     ScpVersion.Scp02 => Result.Success<int, SmartCardError>(Scp.Scp02.MAC_SIZE),
                     ScpVersion.Scp03 => Result.Success<int, SmartCardError>(Scp.Scp03.MAC_SIZE),
-                    _ => Result.Failure<int, SmartCardError>(
-                        SmartCardError.InvalidArgument($"Unsupported protocol: {protocol}")
-                    ),
+                    _
+                        => Result.Failure<int, SmartCardError>(
+                            SmartCardError.InvalidArgument($"Unsupported protocol: {protocol}")
+                        ),
                 };
 
             /// <summary>
@@ -666,15 +720,14 @@ public static partial class CryptoService
             public static Result<int, SmartCardError> GetChainingValueSize(ScpVersion protocol) =>
                 protocol switch
                 {
-                    ScpVersion.Scp02 => Result.Success<int, SmartCardError>(
-                        Scp.Scp02.CHAINING_VALUE_SIZE
-                    ),
-                    ScpVersion.Scp03 => Result.Success<int, SmartCardError>(
-                        Scp.Scp03.CHAINING_VALUE_SIZE
-                    ),
-                    _ => Result.Failure<int, SmartCardError>(
-                        SmartCardError.InvalidArgument($"Unsupported protocol: {protocol}")
-                    ),
+                    ScpVersion.Scp02
+                        => Result.Success<int, SmartCardError>(Scp.Scp02.CHAINING_VALUE_SIZE),
+                    ScpVersion.Scp03
+                        => Result.Success<int, SmartCardError>(Scp.Scp03.CHAINING_VALUE_SIZE),
+                    _
+                        => Result.Failure<int, SmartCardError>(
+                            SmartCardError.InvalidArgument($"Unsupported protocol: {protocol}")
+                        ),
                 };
         }
     }

@@ -134,9 +134,7 @@ public class GlobalPlatformOidsTests
     public void AnalyzeOids_ShouldHandleEmptyList()
     {
         // Act
-        var summary = GlobalPlatformOids.AnalyzeOids(
-            new string[0]
-        );
+        var summary = GlobalPlatformOids.AnalyzeOids(new string[0]);
 
         // Assert
         _ = summary.SupportedScpVersions.Should().BeEmpty();

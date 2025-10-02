@@ -55,9 +55,7 @@ public static partial class TlvService
         {
             if (tag.Bytes.Length == 0)
             {
-                return UnitResult.Failure(
-                    SmartCardError.InvalidArgument("Tag cannot be empty")
-                );
+                return UnitResult.Failure(SmartCardError.InvalidArgument("Tag cannot be empty"));
             }
 
             // Check for multi-byte tag structure

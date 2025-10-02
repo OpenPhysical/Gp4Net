@@ -15,8 +15,8 @@ public class EnvironmentService : IEnvironmentService
     public Maybe<string> GetGp4NetReaderVariable()
     {
         var value = Environment.GetEnvironmentVariable("GP4NET_READER");
-        return string.IsNullOrWhiteSpace(value) 
-            ? Maybe<string>.None 
+        return string.IsNullOrWhiteSpace(value)
+            ? Maybe<string>.None
             : Maybe<string>.From(value.Trim());
     }
 }

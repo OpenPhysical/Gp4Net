@@ -356,9 +356,7 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken
     )
     {
-        var type = deleteRelated
-            ? DeleteType.DeleteObjectAndRelated
-            : DeleteType.DeleteObjectOnly;
+        var type = deleteRelated ? DeleteType.DeleteObjectAndRelated : DeleteType.DeleteObjectOnly;
         var target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, [aid], deletionToken);
     }
@@ -377,9 +375,7 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> tokenIdentifier
     )
     {
-        var type = deleteRelated
-            ? DeleteType.DeleteObjectAndRelated
-            : DeleteType.DeleteObjectOnly;
+        var type = deleteRelated ? DeleteType.DeleteObjectAndRelated : DeleteType.DeleteObjectOnly;
         var target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(
             type,
@@ -424,9 +420,7 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken
     )
     {
-        var type = deleteRelated
-            ? DeleteType.DeleteObjectAndRelated
-            : DeleteType.DeleteObjectOnly;
+        var type = deleteRelated ? DeleteType.DeleteObjectAndRelated : DeleteType.DeleteObjectOnly;
         var target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, [aid], deletionToken);
     }
@@ -468,9 +462,7 @@ public class DeleteCommand : IApduCommand
         Maybe<byte[]> deletionToken
     )
     {
-        var type = deleteRelated
-            ? DeleteType.DeleteObjectAndRelated
-            : DeleteType.DeleteObjectOnly;
+        var type = deleteRelated ? DeleteType.DeleteObjectAndRelated : DeleteType.DeleteObjectOnly;
         var target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, [aid], deletionToken);
     }
@@ -537,9 +529,7 @@ public class DeleteCommand : IApduCommand
             return validationErrors.First().Value; // Return first validation error
         }
 
-        var type = deleteRelated
-            ? DeleteType.DeleteObjectAndRelated
-            : DeleteType.DeleteObjectOnly;
+        var type = deleteRelated ? DeleteType.DeleteObjectAndRelated : DeleteType.DeleteObjectOnly;
         var target = deleteRelated ? DeleteTarget.WithRelated : DeleteTarget.ByAid;
         return new DeleteCommand(type, target, aids, deletionToken);
     }
@@ -628,16 +618,22 @@ public class DeleteCommand : IApduCommand
     /// <inheritdoc />
     public CommandAPDU ToApdu()
     {
-        return ToCommandApdu().GetValueOrDefault(new CommandAPDU([]));
+        return ToCommandApdu()
+            .GetValueOrDefault(
+                new CommandAPDU(
+                    GlobalPlatform.Cla.GP_STANDARD,
+                    GlobalPlatform.Ins.DELETE,
+                    0x00,
+                    0x00
+                )
+            );
     }
 
     /// <inheritdoc />
     public byte[] ToBytes()
     {
         // Store the command data when building the APDU
-        return ToCommandApdu()
-            .Map(apdu => GetDeleteData().GetValueOrDefault([]))
-            .GetValueOrDefault([]);
+        return ToCommandApdu().Map(cmd => cmd.ToBytes()).GetValueOrDefault([]);
     }
 }
 
@@ -777,15 +773,15 @@ public class DeleteResponse
         return StatusWord switch
         {
             _ when StatusWord == StatusWords.Legacy.Success => "Deletion successful",
-            _ when StatusWord == StatusWords.Legacy.IncorrectData =>
-                "Incorrect data or AID not found",
+            _ when StatusWord == StatusWords.Legacy.IncorrectData
+                => "Incorrect data or AID not found",
             _ when StatusWord == StatusWords.Legacy.FileNotFound => "Application not found",
-            _ when StatusWord == StatusWords.Legacy.ConditionsNotSatisfied =>
-                "Conditions not satisfied (dependencies exist)",
-            _ when StatusWord == StatusWords.Legacy.ReferencedDataNotFound =>
-                "Referenced data not found",
-            _ when StatusWord == StatusWords.Legacy.GenericFailure =>
-                "Generic failure during deletion",
+            _ when StatusWord == StatusWords.Legacy.ConditionsNotSatisfied
+                => "Conditions not satisfied (dependencies exist)",
+            _ when StatusWord == StatusWords.Legacy.ReferencedDataNotFound
+                => "Referenced data not found",
+            _ when StatusWord == StatusWords.Legacy.GenericFailure
+                => "Generic failure during deletion",
             _ => $"Unknown error: {StatusWord.Value:X}",
         };
     }

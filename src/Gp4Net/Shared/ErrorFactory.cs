@@ -343,21 +343,20 @@ public static class ErrorFactory
         return ex switch
         {
             ArgumentNullException argEx => FailureNullArgument<T>(argEx.ParamName ?? "parameter"),
-            ArgumentException argEx => Result.Failure<T, SmartCardError>(
-                SmartCardError.InvalidArgument(argEx.Message)
-            ),
-            InvalidOperationException => Result.Failure<T, SmartCardError>(
-                SmartCardError.InvalidData(ex.Message)
-            ),
-            UnauthorizedAccessException => Result.Failure<T, SmartCardError>(
-                SmartCardError.SecurityError(ex.Message)
-            ),
-            TimeoutException => Result.Failure<T, SmartCardError>(
-                SmartCardError.CommunicationError($"Operation timed out: {operation}")
-            ),
-            _ => Result.Failure<T, SmartCardError>(
-                SmartCardError.UnexpectedError($"{operation} failed", ex)
-            ),
+            ArgumentException argEx
+                => Result.Failure<T, SmartCardError>(SmartCardError.InvalidArgument(argEx.Message)),
+            InvalidOperationException
+                => Result.Failure<T, SmartCardError>(SmartCardError.InvalidData(ex.Message)),
+            UnauthorizedAccessException
+                => Result.Failure<T, SmartCardError>(SmartCardError.SecurityError(ex.Message)),
+            TimeoutException
+                => Result.Failure<T, SmartCardError>(
+                    SmartCardError.CommunicationError($"Operation timed out: {operation}")
+                ),
+            _
+                => Result.Failure<T, SmartCardError>(
+                    SmartCardError.UnexpectedError($"{operation} failed", ex)
+                ),
         };
     }
 }

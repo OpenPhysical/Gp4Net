@@ -10,6 +10,8 @@ using Gp4Net.Shared;
 using JetBrains.Annotations;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
 using ApduIns = Gp4Net.Constants.Apdu.Instructions;
+using ApplicationApduResponse = Gp4Net.CardEmulator.Applications.ApduResponse;
+using CoreApduResponse = Gp4Net.CardEmulator.Core.ApduResponse;
 using GpConstants = Gp4Net.Constants.Constants;
 using GpIns = Gp4Net.Constants.Constants.GlobalPlatform.Ins;
 
@@ -137,15 +139,17 @@ public sealed record IssuerSecurityDomain : IApplication
     /// Routes to appropriate command handlers based on instruction.
     /// Reference: GP Card Specification v2.3.1 Section 11
     /// </summary>
-    public Result<
-        (IApplication UpdatedApplication, ApduResponse Response),
-        SmartCardError
-    > ProcessCommand(byte[] command, CardState cardState, IRngContext rngContext)
+    public Result<ApplicationCommandResult, SmartCardError> ProcessCommand(
+        byte[] command,
+        CardState cardState,
+        CardConfiguration config,
+        IRngContext rngContext
+    )
     {
         if (command.Length < 4)
         {
-            return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                (this, ApduResponse.WrongLength())
+            return Result.Success<ApplicationCommandResult, SmartCardError>(
+                new ApplicationCommandResult(this, cardState, ApplicationApduResponse.WrongLength())
             );
         }
 
@@ -153,23 +157,26 @@ public sealed record IssuerSecurityDomain : IApplication
 
         return instruction switch
         {
-            GpIns.INITIALIZE_UPDATE => ProcessInitializeUpdate(command, cardState, rngContext),
-            ApduIns.EXTERNAL_AUTHENTICATE => ProcessExternalAuthenticate(
-                command,
-                cardState,
-                rngContext
-            ),
-            GpIns.INSTALL => ProcessInstall(command, cardState, rngContext),
-            GpIns.LOAD => ProcessLoad(command, cardState, rngContext),
-            GpIns.DELETE => ProcessDelete(command, cardState, rngContext),
-            GpIns.GET_STATUS => ProcessGetStatus(command, cardState, rngContext),
-            ApduIns.GET_DATA => ProcessGetData(command, cardState, rngContext),
-            GpIns.PUT_KEY => ProcessPutKey(command, cardState, rngContext),
-            GpIns.STORE_DATA => ProcessStoreData(command, cardState, rngContext),
-            GpIns.SET_STATUS => ProcessSetStatus(command, cardState, rngContext),
-            _ => Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                (this, ApduResponse.InstructionNotSupported())
-            ),
+            GpIns.INITIALIZE_UPDATE
+                => ProcessInitializeUpdate(command, cardState, config, rngContext),
+            ApduIns.EXTERNAL_AUTHENTICATE
+                => ProcessExternalAuthenticate(command, cardState, config, rngContext),
+            GpIns.INSTALL => ProcessInstall(command, cardState, config, rngContext),
+            GpIns.LOAD => ProcessLoad(command, cardState, config, rngContext),
+            GpIns.DELETE => ProcessDelete(command, cardState, config, rngContext),
+            GpIns.GET_STATUS => ProcessGetStatus(command, cardState, config, rngContext),
+            ApduIns.GET_DATA => ProcessGetData(command, cardState, config, rngContext),
+            GpIns.PUT_KEY => ProcessPutKey(command, cardState, config, rngContext),
+            GpIns.STORE_DATA => ProcessStoreData(command, cardState, config, rngContext),
+            GpIns.SET_STATUS => ProcessSetStatus(command, cardState, config, rngContext),
+            _
+                => Result.Success<ApplicationCommandResult, SmartCardError>(
+                    new ApplicationCommandResult(
+                        this,
+                        cardState,
+                        ApplicationApduResponse.InstructionNotSupported()
+                    )
+                ),
         };
     }
 
@@ -196,11 +203,13 @@ public sealed record IssuerSecurityDomain : IApplication
         return instruction switch
         {
             // Secure channel establishment requires no special privileges
-            GpIns.INITIALIZE_UPDATE => Maybe<Privilege>.None,
+            GpIns.INITIALIZE_UPDATE
+                => Maybe<Privilege>.None,
             ApduIns.EXTERNAL_AUTHENTICATE => Maybe<Privilege>.None,
 
             // Card management requires Authorized Management
-            GpIns.INSTALL => Maybe<Privilege>.From(Privilege.AuthorizedManagement),
+            GpIns.INSTALL
+                => Maybe<Privilege>.From(Privilege.AuthorizedManagement),
             GpIns.LOAD => Maybe<Privilege>.From(Privilege.AuthorizedManagement),
             GpIns.DELETE => Maybe<Privilege>.From(Privilege.AuthorizedManagement),
             GpIns.GET_STATUS => Maybe<Privilege>.From(Privilege.AuthorizedManagement),
@@ -209,7 +218,8 @@ public sealed record IssuerSecurityDomain : IApplication
             GpIns.SET_STATUS => Maybe<Privilege>.From(Privilege.AuthorizedManagement),
 
             // GET DATA requires no special privileges
-            ApduIns.GET_DATA => Maybe<Privilege>.None,
+            ApduIns.GET_DATA
+                => Maybe<Privilege>.None,
 
             _ => Maybe<Privilege>.None,
         };
@@ -230,112 +240,64 @@ public sealed record IssuerSecurityDomain : IApplication
 
     #region Command Processors
 
-    private Result<
-        (IApplication UpdatedApplication, ApduResponse Response),
-        SmartCardError
-    > ProcessInitializeUpdate(byte[] command, CardState cardState, IRngContext rngContext)
+    private Result<ApplicationCommandResult, SmartCardError> ProcessInitializeUpdate(
+        byte[] command,
+        CardState cardState,
+        CardConfiguration config,
+        IRngContext rngContext
+    )
     {
-        // Parse INITIALIZE UPDATE command
-        if (command.Length < 13) // CLA INS P1 P2 Lc(8) + 8 bytes host challenge
-        {
-            return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                (this, ApduResponse.WrongLength())
-            );
-        }
-
-        byte keyVersion = command[2]; // P1
-        byte keyId = command[3]; // P2
-        byte[] hostChallenge = command[5..13];
-
-        // Get key set using functional pattern
-        var keySetResult = GetKeySet(keyVersion);
-
-        return keySetResult.Match(
-            keySet =>
-                rngContext
-                    .GenerateBytes(8)
-                    .Bind(cardChallenge =>
-                        BuildInitializeUpdateResponse(
-                                keyVersion,
-                                ScpVersion,
-                                ScpImplementation,
-                                cardChallenge,
-                                hostChallenge,
-                                keySet
-                            )
-                            .Match(
-                                data =>
-                                    Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                                        (this, ApduResponse.Success(data))
-                                    ),
-                                error =>
-                                    Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                                        (
-                                            this,
-                                            ApduResponse.Error(
-                                                GpConstants.StatusWords.Legacy.GenericFailure
-                                            )
-                                        )
-                                    )
-                            )
-                    ),
-            () =>
-                Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                    (
-                        this,
-                        ApduResponse.Error(GpConstants.StatusWords.Legacy.ReferencedDataNotFound)
-                    )
-                )
-        );
+        return CommandProcessors
+            .ProcessInitializeUpdate(command, cardState, config, rngContext, LoggingService.None)
+            .Map(result =>
+            {
+                var (response, updatedState) = result;
+                return new ApplicationCommandResult(
+                    this,
+                    updatedState,
+                    ToApplicationResponse(response)
+                );
+            });
     }
 
-    private Result<
-        (IApplication UpdatedApplication, ApduResponse Response),
-        SmartCardError
-    > ProcessExternalAuthenticate(byte[] command, CardState cardState, IRngContext rngContext)
+    private Result<ApplicationCommandResult, SmartCardError> ProcessExternalAuthenticate(
+        byte[] command,
+        CardState cardState,
+        CardConfiguration config,
+        IRngContext rngContext
+    )
     {
-        // Validate secure channel state exists
-        if (!cardState.IsSecureChannelEstablished)
-        {
-            return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                (this, ApduResponse.ConditionsNotSatisfied())
-            );
-        }
-
-        // P1 contains security level
-        if (command.Length < 5)
-        {
-            return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                (this, ApduResponse.WrongLength())
-            );
-        }
-
-        byte securityLevel = command[2]; // P1
-
-        // Validate host cryptogram using existing patterns
-        return ValidateHostCryptogram(command, cardState)
-            .Match(
-                success =>
-                    Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                        (this, ApduResponse.Success())
-                    ),
-                error =>
-                    Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                        (this, ApduResponse.SecurityStatusNotSatisfied())
-                    )
-            );
+        return CommandProcessors
+            .ProcessExternalAuthenticate(
+                command,
+                cardState,
+                config,
+                rngContext,
+                LoggingService.None
+            )
+            .Map(result =>
+            {
+                var (response, updatedState) = result;
+                return new ApplicationCommandResult(
+                    this,
+                    updatedState,
+                    ToApplicationResponse(response)
+                );
+            });
     }
 
-    private Result<
-        (IApplication UpdatedApplication, ApduResponse Response),
-        SmartCardError
-    > ProcessGetStatus(byte[] command, CardState cardState, IRngContext rngContext)
+    private Result<ApplicationCommandResult, SmartCardError> ProcessGetStatus(
+        byte[] command,
+        CardState cardState,
+        CardConfiguration config,
+        IRngContext rngContext
+    )
     {
         // P1 contains subset indicator
         if (command.Length < 4)
         {
-            return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                (this, ApduResponse.WrongLength())
+            return Result.Success<ApplicationCommandResult, SmartCardError>(
+                new ApplicationCommandResult(this, cardState, ApplicationApduResponse.WrongLength())
             );
         }
 
@@ -345,25 +307,37 @@ public sealed record IssuerSecurityDomain : IApplication
         return GetStatusResponse(p1, p2)
             .Match(
                 data =>
-                    Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                        (this, ApduResponse.Success(data))
+                    Result.Success<ApplicationCommandResult, SmartCardError>(
+                        new ApplicationCommandResult(
+                            this,
+                            cardState,
+                            ApplicationApduResponse.Success(data)
+                        )
                     ),
                 error =>
-                    Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                        (this, ApduResponse.Error(GpConstants.StatusWords.Legacy.GenericFailure))
+                    Result.Success<ApplicationCommandResult, SmartCardError>(
+                        new ApplicationCommandResult(
+                            this,
+                            cardState,
+                            ApplicationApduResponse.Error(
+                                GpConstants.StatusWords.Legacy.GenericFailure
+                            )
+                        )
                     )
             );
     }
 
-    private Result<
-        (IApplication UpdatedApplication, ApduResponse Response),
-        SmartCardError
-    > ProcessGetData(byte[] command, CardState cardState, IRngContext rngContext)
+    private Result<ApplicationCommandResult, SmartCardError> ProcessGetData(
+        byte[] command,
+        CardState cardState,
+        CardConfiguration config,
+        IRngContext rngContext
+    )
     {
         if (command.Length < 5)
         {
-            return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                (this, ApduResponse.WrongLength())
+            return Result.Success<ApplicationCommandResult, SmartCardError>(
+                new ApplicationCommandResult(this, cardState, ApplicationApduResponse.WrongLength())
             );
         }
 
@@ -372,100 +346,160 @@ public sealed record IssuerSecurityDomain : IApplication
 
         // Check if we have this data object using functional pattern
         return DataObjects.TryGetValue(tag, out var data)
-            ? Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                (this, ApduResponse.Success(data))
+            ? Result.Success<ApplicationCommandResult, SmartCardError>(
+                new ApplicationCommandResult(this, cardState, ApplicationApduResponse.Success(data))
             )
-            : Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                (this, ApduResponse.Error(GpConstants.StatusWords.Legacy.ReferencedDataNotFound))
+            : Result.Success<ApplicationCommandResult, SmartCardError>(
+                new ApplicationCommandResult(
+                    this,
+                    cardState,
+                    ApplicationApduResponse.Error(
+                        GpConstants.StatusWords.Legacy.ReferencedDataNotFound
+                    )
+                )
             );
     }
 
-    private Result<
-        (IApplication UpdatedApplication, ApduResponse Response),
-        SmartCardError
-    > ProcessInstall(byte[] command, CardState cardState, IRngContext rngContext)
+    private Result<ApplicationCommandResult, SmartCardError> ProcessInstall(
+        byte[] command,
+        CardState cardState,
+        CardConfiguration config,
+        IRngContext rngContext
+    )
     {
         return ProcessInstallCommand(command, cardState, rngContext)
             .Match(
-                result => Result.Success<(IApplication, ApduResponse), SmartCardError>(result),
+                result =>
+                    Result.Success<ApplicationCommandResult, SmartCardError>(
+                        new ApplicationCommandResult(result.Item1, cardState, result.Item2)
+                    ),
                 error =>
-                    Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                        (this, ApduResponse.ConditionsNotSatisfied())
+                    Result.Success<ApplicationCommandResult, SmartCardError>(
+                        new ApplicationCommandResult(
+                            this,
+                            cardState,
+                            ApplicationApduResponse.ConditionsNotSatisfied()
+                        )
                     )
             );
     }
 
-    private Result<
-        (IApplication UpdatedApplication, ApduResponse Response),
-        SmartCardError
-    > ProcessLoad(byte[] command, CardState cardState, IRngContext rngContext)
+    private Result<ApplicationCommandResult, SmartCardError> ProcessLoad(
+        byte[] command,
+        CardState cardState,
+        CardConfiguration config,
+        IRngContext rngContext
+    )
     {
         return ProcessLoadCommand(command, cardState, rngContext)
             .Match(
-                result => Result.Success<(IApplication, ApduResponse), SmartCardError>(result),
+                result =>
+                    Result.Success<ApplicationCommandResult, SmartCardError>(
+                        new ApplicationCommandResult(result.Item1, cardState, result.Item2)
+                    ),
                 error =>
-                    Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                        (this, ApduResponse.ConditionsNotSatisfied())
+                    Result.Success<ApplicationCommandResult, SmartCardError>(
+                        new ApplicationCommandResult(
+                            this,
+                            cardState,
+                            ApplicationApduResponse.ConditionsNotSatisfied()
+                        )
                     )
             );
     }
 
-    private Result<
-        (IApplication UpdatedApplication, ApduResponse Response),
-        SmartCardError
-    > ProcessDelete(byte[] command, CardState cardState, IRngContext rngContext)
+    private Result<ApplicationCommandResult, SmartCardError> ProcessDelete(
+        byte[] command,
+        CardState cardState,
+        CardConfiguration config,
+        IRngContext rngContext
+    )
     {
         return ProcessDeleteCommand(command, cardState, rngContext)
             .Match(
-                result => Result.Success<(IApplication, ApduResponse), SmartCardError>(result),
+                result =>
+                    Result.Success<ApplicationCommandResult, SmartCardError>(
+                        new ApplicationCommandResult(result.Item1, cardState, result.Item2)
+                    ),
                 error =>
-                    Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                        (this, ApduResponse.ConditionsNotSatisfied())
+                    Result.Success<ApplicationCommandResult, SmartCardError>(
+                        new ApplicationCommandResult(
+                            this,
+                            cardState,
+                            ApplicationApduResponse.ConditionsNotSatisfied()
+                        )
                     )
             );
     }
 
-    private Result<
-        (IApplication UpdatedApplication, ApduResponse Response),
-        SmartCardError
-    > ProcessPutKey(byte[] command, CardState cardState, IRngContext rngContext)
+    private Result<ApplicationCommandResult, SmartCardError> ProcessPutKey(
+        byte[] command,
+        CardState cardState,
+        CardConfiguration config,
+        IRngContext rngContext
+    )
     {
         return ProcessPutKeyCommand(command, cardState, rngContext)
             .Match(
-                result => Result.Success<(IApplication, ApduResponse), SmartCardError>(result),
+                result =>
+                    Result.Success<ApplicationCommandResult, SmartCardError>(
+                        new ApplicationCommandResult(result.Item1, cardState, result.Item2)
+                    ),
                 error =>
-                    Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                        (this, ApduResponse.ConditionsNotSatisfied())
+                    Result.Success<ApplicationCommandResult, SmartCardError>(
+                        new ApplicationCommandResult(
+                            this,
+                            cardState,
+                            ApplicationApduResponse.ConditionsNotSatisfied()
+                        )
                     )
             );
     }
 
-    private Result<
-        (IApplication UpdatedApplication, ApduResponse Response),
-        SmartCardError
-    > ProcessStoreData(byte[] command, CardState cardState, IRngContext rngContext)
+    private Result<ApplicationCommandResult, SmartCardError> ProcessStoreData(
+        byte[] command,
+        CardState cardState,
+        CardConfiguration config,
+        IRngContext rngContext
+    )
     {
         return ProcessStoreDataCommand(command, cardState, rngContext)
             .Match(
-                result => Result.Success<(IApplication, ApduResponse), SmartCardError>(result),
+                result =>
+                    Result.Success<ApplicationCommandResult, SmartCardError>(
+                        new ApplicationCommandResult(result.Item1, cardState, result.Item2)
+                    ),
                 error =>
-                    Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                        (this, ApduResponse.ConditionsNotSatisfied())
+                    Result.Success<ApplicationCommandResult, SmartCardError>(
+                        new ApplicationCommandResult(
+                            this,
+                            cardState,
+                            ApplicationApduResponse.ConditionsNotSatisfied()
+                        )
                     )
             );
     }
 
-    private Result<
-        (IApplication UpdatedApplication, ApduResponse Response),
-        SmartCardError
-    > ProcessSetStatus(byte[] command, CardState cardState, IRngContext rngContext)
+    private Result<ApplicationCommandResult, SmartCardError> ProcessSetStatus(
+        byte[] command,
+        CardState cardState,
+        CardConfiguration config,
+        IRngContext rngContext
+    )
     {
         return ProcessSetStatusCommand(command, cardState, rngContext)
             .Match(
-                result => Result.Success<(IApplication, ApduResponse), SmartCardError>(result),
+                result =>
+                    Result.Success<ApplicationCommandResult, SmartCardError>(
+                        new ApplicationCommandResult(result.Item1, cardState, result.Item2)
+                    ),
                 error =>
-                    Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                        (this, ApduResponse.ConditionsNotSatisfied())
+                    Result.Success<ApplicationCommandResult, SmartCardError>(
+                        new ApplicationCommandResult(
+                            this,
+                            cardState,
+                            ApplicationApduResponse.ConditionsNotSatisfied()
+                        )
                     )
             );
     }
@@ -473,6 +507,11 @@ public sealed record IssuerSecurityDomain : IApplication
     #endregion
 
     #region Helper Methods
+
+    private static ApplicationApduResponse ToApplicationResponse(CoreApduResponse response)
+    {
+        return ApplicationApduResponse.From(response.Data, response.StatusWord);
+    }
 
     private Maybe<IKeySet> GetKeySet(byte keyVersion)
     {
@@ -494,10 +533,10 @@ public sealed record IssuerSecurityDomain : IApplication
     private Result<byte[], SmartCardError> GetStatusResponse(byte p1, byte p2)
     {
         // Return empty GP status response
-        return Result.Success<byte[], SmartCardError>(new byte[] { 0x6F, 0x00 });
+        return Result.Success<byte[], SmartCardError>([0x6F, 0x00]);
     }
 
-    private Result<(IApplication, ApduResponse), SmartCardError> ProcessInstallCommand(
+    private Result<(IApplication, ApplicationApduResponse), SmartCardError> ProcessInstallCommand(
         byte[] command,
         CardState cardState,
         IRngContext rngContext
@@ -506,8 +545,8 @@ public sealed record IssuerSecurityDomain : IApplication
         // GlobalPlatform Card Specification v2.3.1 Section 11.5 INSTALL Command
         if (command.Length < 5)
         {
-            return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                (this, ApduResponse.WrongLength())
+            return Result.Success<(IApplication, ApplicationApduResponse), SmartCardError>(
+                (this, ApplicationApduResponse.WrongLength())
             );
         }
 
@@ -516,8 +555,8 @@ public sealed record IssuerSecurityDomain : IApplication
 
         if (command.Length < 5 + lc)
         {
-            return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                (this, ApduResponse.WrongLength())
+            return Result.Success<(IApplication, ApplicationApduResponse), SmartCardError>(
+                (this, ApplicationApduResponse.WrongLength())
             );
         }
 
@@ -528,25 +567,25 @@ public sealed record IssuerSecurityDomain : IApplication
         // For the virtual card emulator, we accept any well-formed INSTALL command
         // and return success per GP specification
         // Per GlobalPlatform Card Specification v2.3.1 Table 11-13: INSTALL Response
-        byte[] responseData = new byte[] { 0x00 };
+        byte[] responseData = [0x00];
 
-        return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-            (this, ApduResponse.Success(responseData))
+        return Result.Success<(IApplication, ApplicationApduResponse), SmartCardError>(
+            (this, ApplicationApduResponse.Success(responseData))
         );
     }
 
-    private Result<(IApplication, ApduResponse), SmartCardError> ProcessLoadCommand(
+    private Result<(IApplication, ApplicationApduResponse), SmartCardError> ProcessLoadCommand(
         byte[] command,
         CardState cardState,
         IRngContext rngContext
     )
     {
-        return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-            (this, ApduResponse.ConditionsNotSatisfied())
+        return Result.Success<(IApplication, ApplicationApduResponse), SmartCardError>(
+            (this, ApplicationApduResponse.ConditionsNotSatisfied())
         );
     }
 
-    private Result<(IApplication, ApduResponse), SmartCardError> ProcessDeleteCommand(
+    private Result<(IApplication, ApplicationApduResponse), SmartCardError> ProcessDeleteCommand(
         byte[] command,
         CardState cardState,
         IRngContext rngContext
@@ -555,16 +594,16 @@ public sealed record IssuerSecurityDomain : IApplication
         // GlobalPlatform Card Specification v2.3.1 Section 11.2 DELETE Command
         if (command.Length < 5)
         {
-            return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                (this, ApduResponse.WrongLength())
+            return Result.Success<(IApplication, ApplicationApduResponse), SmartCardError>(
+                (this, ApplicationApduResponse.WrongLength())
             );
         }
 
         byte lc = command[4];
         if (command.Length < 5 + lc)
         {
-            return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-                (this, ApduResponse.WrongLength())
+            return Result.Success<(IApplication, ApplicationApduResponse), SmartCardError>(
+                (this, ApplicationApduResponse.WrongLength())
             );
         }
 
@@ -575,43 +614,43 @@ public sealed record IssuerSecurityDomain : IApplication
         // For the virtual card emulator, we accept any well-formed DELETE command
         // and return success per GP specification
         // Per GlobalPlatform Card Specification v2.3.1 Table 11-26: DELETE Response
-        byte[] responseData = new byte[] { 0x00 };
+        byte[] responseData = [0x00];
 
-        return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-            (this, ApduResponse.Success(responseData))
+        return Result.Success<(IApplication, ApplicationApduResponse), SmartCardError>(
+            (this, ApplicationApduResponse.Success(responseData))
         );
     }
 
-    private Result<(IApplication, ApduResponse), SmartCardError> ProcessPutKeyCommand(
+    private Result<(IApplication, ApplicationApduResponse), SmartCardError> ProcessPutKeyCommand(
         byte[] command,
         CardState cardState,
         IRngContext rngContext
     )
     {
-        return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-            (this, ApduResponse.ConditionsNotSatisfied())
+        return Result.Success<(IApplication, ApplicationApduResponse), SmartCardError>(
+            (this, ApplicationApduResponse.ConditionsNotSatisfied())
         );
     }
 
-    private Result<(IApplication, ApduResponse), SmartCardError> ProcessStoreDataCommand(
+    private Result<(IApplication, ApplicationApduResponse), SmartCardError> ProcessStoreDataCommand(
         byte[] command,
         CardState cardState,
         IRngContext rngContext
     )
     {
-        return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-            (this, ApduResponse.ConditionsNotSatisfied())
+        return Result.Success<(IApplication, ApplicationApduResponse), SmartCardError>(
+            (this, ApplicationApduResponse.ConditionsNotSatisfied())
         );
     }
 
-    private Result<(IApplication, ApduResponse), SmartCardError> ProcessSetStatusCommand(
+    private Result<(IApplication, ApplicationApduResponse), SmartCardError> ProcessSetStatusCommand(
         byte[] command,
         CardState cardState,
         IRngContext rngContext
     )
     {
-        return Result.Success<(IApplication, ApduResponse), SmartCardError>(
-            (this, ApduResponse.ConditionsNotSatisfied())
+        return Result.Success<(IApplication, ApplicationApduResponse), SmartCardError>(
+            (this, ApplicationApduResponse.ConditionsNotSatisfied())
         );
     }
 
@@ -667,8 +706,7 @@ public sealed record IssuerSecurityDomain : IApplication
             // Card Production Life Cycle (CPLC)
             .Add(
                 0x9F7F,
-                new byte[]
-                {
+                [
                     0x9F,
                     0x7F,
                     0x2A,
@@ -717,14 +755,11 @@ public sealed record IssuerSecurityDomain : IApplication
                     0x00,
                     0x00, // IC Personalization Date
                     0x00,
-                    0x00, // IC Personalization Equipment ID
-                }
+                    0x00 // IC Personalization Equipment ID
+                ]
             )
             // Card Data
-            .Add(
-                0x0066,
-                new byte[] { 0x00, 0x66, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }
-            );
+            .Add(0x0066, [0x00, 0x66, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
     }
 
     private Result<byte[], SmartCardError> BuildInitializeUpdateResponse(
@@ -784,16 +819,18 @@ public sealed record IssuerSecurityDomain : IApplication
         // Use existing crypto services for cryptogram calculation
         return scpVersion switch
         {
-            0x02 => CalculateScp02CardCryptogram(
-                hostChallenge,
-                cardChallenge,
-                sequenceCounter,
-                keySet
-            ),
+            0x02
+                => CalculateScp02CardCryptogram(
+                    hostChallenge,
+                    cardChallenge,
+                    sequenceCounter,
+                    keySet
+                ),
             0x03 => CalculateScp03CardCryptogram(hostChallenge, cardChallenge, keySet),
-            _ => Result.Failure<byte[], SmartCardError>(
-                ErrorFactory.UnsupportedProtocol($"SCP{scpVersion:X2}")
-            ),
+            _
+                => Result.Failure<byte[], SmartCardError>(
+                    ErrorFactory.UnsupportedProtocol($"SCP{scpVersion:X2}")
+                ),
         };
     }
 

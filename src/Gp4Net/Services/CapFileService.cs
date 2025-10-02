@@ -23,7 +23,7 @@ namespace Gp4Net.Services;
 /// </summary>
 /// <remarks>
 /// This service combines logic extracted from VirtualCard for CAP file processing with existing
-/// CLI-focused functionality. All methods follow functional programming principles using 
+/// CLI-focused functionality. All methods follow functional programming principles using
 /// Result&lt;T, SmartCardError&gt; for explicit error handling.
 /// </remarks>
 [PublicAPI]
@@ -378,13 +378,19 @@ public class CapFileService : ICapFileService
     }
 
     /// <inheritdoc />
-    public Result<bool, SmartCardError> VerifyLoadFileDataBlockHash(byte[] capFileData, byte[] expectedHash)
+    public Result<bool, SmartCardError> VerifyLoadFileDataBlockHash(
+        byte[] capFileData,
+        byte[] expectedHash
+    )
     {
-        return CryptoService.Hash.Sha256(capFileData)
+        return CryptoService
+            .Hash.Sha256(capFileData)
             .Map(actualHash => actualHash.SequenceEqual(expectedHash))
             .Ensure(
                 isMatch => isMatch,
-                SmartCardError.SecurityStatusNotSatisfied("Load File Data Block Hash verification failed")
+                SmartCardError.SecurityStatusNotSatisfied(
+                    "Load File Data Block Hash verification failed"
+                )
             );
     }
 
@@ -437,7 +443,7 @@ public class CapFileService : ICapFileService
         return new DapBlock(
             Algorithm: "RSA_SHA256",
             Signature: signature,
-            CertificateChain: ImmutableArray.Create<byte[]>(certificate)
+            CertificateChain: [certificate]
         );
     }
 
@@ -470,7 +476,10 @@ public class CapFileService : ICapFileService
     /// <summary>
     /// Verifies DAP signature against load file data.
     /// </summary>
-    private static Result<DapBlock, SmartCardError> VerifyDapDataSignature(DapBlock dapBlock, byte[] capFileData)
+    private static Result<DapBlock, SmartCardError> VerifyDapDataSignature(
+        DapBlock dapBlock,
+        byte[] capFileData
+    )
     {
         return ExtractSignedData(capFileData)
             .Bind(signedData => VerifySignature(signedData, dapBlock.Signature))
@@ -499,13 +508,22 @@ public class CapFileService : ICapFileService
         // Production systems would extract public key from certificate chain
 
         return GenerateTestPublicKey()
-            .Bind(publicKey => CryptoService.Hash.Sha256(data)
-                .Bind(hash => CryptoService.Signature.VerifyRsaSha256(hash, signature, publicKey)))
-            .Bind(isValid => isValid
-                ? Result.Success<bool, SmartCardError>(true)
-                : Result.Failure<bool, SmartCardError>(
-                    SmartCardError.SecurityStatusNotSatisfied("DAP signature verification failed - invalid signature")
-                ));
+            .Bind(publicKey =>
+                CryptoService
+                    .Hash.Sha256(data)
+                    .Bind(hash =>
+                        CryptoService.Signature.VerifyRsaSha256(hash, signature, publicKey)
+                    )
+            )
+            .Bind(isValid =>
+                isValid
+                    ? Result.Success<bool, SmartCardError>(true)
+                    : Result.Failure<bool, SmartCardError>(
+                        SmartCardError.SecurityStatusNotSatisfied(
+                            "DAP signature verification failed - invalid signature"
+                        )
+                    )
+            );
     }
 
     /// <summary>
@@ -514,22 +532,27 @@ public class CapFileService : ICapFileService
     private static Result<byte[], SmartCardError> GenerateTestPublicKey()
     {
         // Generate deterministic test RSA public key for virtual card DAP verification
-        byte[] exponent = { 0x01, 0x00, 0x01 }; // 65537
+        byte[] exponent = [0x01, 0x00, 0x01]; // 65537
 
         // Create modulus using functional pattern
-        byte[] modulus = Enumerable.Range(0, 256)
+        byte[] modulus = Enumerable
+            .Range(0, 256)
             .Select(i => (byte)((i * 17 + 53) % 256))
             .Select((b, i) => i == 0 ? (byte)(b | 0x80) : b) // Ensure high bit is set
             .ToArray();
 
         // Encode as SubjectPublicKeyInfo
-        return Result.Try(() =>
-        {
-            using var ms = new MemoryStream();
-            using var writer = new BinaryWriter(ms);
-            writer.Write(modulus);
-            writer.Write(exponent);
-            return ms.ToArray();
-        }, ex => SmartCardError.CryptographicError($"Failed to encode test public key: {ex.Message}"));
+        return Result.Try(
+            () =>
+            {
+                using var ms = new MemoryStream();
+                using var writer = new BinaryWriter(ms);
+                writer.Write(modulus);
+                writer.Write(exponent);
+                return ms.ToArray();
+            },
+            ex =>
+                SmartCardError.CryptographicError($"Failed to encode test public key: {ex.Message}")
+        );
     }
 }

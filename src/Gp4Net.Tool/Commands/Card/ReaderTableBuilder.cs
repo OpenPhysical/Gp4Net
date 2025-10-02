@@ -2,20 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using Gp4Net.Tool.Common;
 
 namespace Gp4Net.Tool.Commands.Card;
 
 /// <summary>
 /// Pure functional table builder for card reader information display.
-/// Uses semantic row types and functional composition per CLAUDE.md patterns.
+/// Uses semantic row types and functional composition per project architecture guidelines.
 /// Eliminates imperative table building and ensures consistent formatting.
 /// </summary>
 public static class ReaderTableBuilder
 {
     /// <summary>
-    /// Base type for all reader display rows, enabling type-safe UI composition.
+    /// Base type for all reader display rows, inheriting from semantic row system.
     /// </summary>
-    public abstract record ReaderRow;
+    public abstract record ReaderRow : SemanticTableBuilder.SemanticRow;
 
     /// <summary>
     /// Row displaying reader information with standard columns.

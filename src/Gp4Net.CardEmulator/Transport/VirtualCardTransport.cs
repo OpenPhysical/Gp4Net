@@ -86,7 +86,10 @@ public sealed class VirtualCardTransport : IApduTransport
         byte[] commandBytes = BuildApduBytes(command);
         var result = _virtualCard.ProcessCommand(commandBytes);
         return result.Match(
-            success => new TransportApduResponse(success.Response.Data, success.Response.StatusWord),
+            success => new TransportApduResponse(
+                success.Response.Data,
+                success.Response.StatusWord
+            ),
             error => new TransportApduResponse([], new StatusWord(0x6F, 0x00))
         );
     }

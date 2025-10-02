@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using OperatingSystemIdEnum = Gp4Net.Domain.CardInfo.OperatingSystemId;
 
 namespace Gp4Net.Domain.CardInfo;
 
@@ -256,8 +257,14 @@ public class CplcData
     /// <returns>Operating system name or hex code if unknown.</returns>
     public string GetOperatingSystemName()
     {
-        return Enum.IsDefined(typeof(OperatingSystemId), OperatingSystemId)
-            ? ((OperatingSystemId)OperatingSystemId).ToString()
-            : $"Unknown (0x{OperatingSystemId:X4})";
+        return (OperatingSystemIdEnum)OperatingSystemId switch
+        {
+            OperatingSystemIdEnum.Jcop4 => "JCOP4",
+            OperatingSystemIdEnum.Jcop3 => "JCOP3",
+            OperatingSystemIdEnum.Jcop242 => "JCOP 2.4.2",
+            OperatingSystemIdEnum.Jcop241 => "JCOP 2.4.1",
+            OperatingSystemIdEnum.Unknown => "Unknown",
+            _ => $"Unknown (0x{OperatingSystemId:X4})",
+        };
     }
 }

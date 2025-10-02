@@ -1,4 +1,3 @@
-using System;
 using CSharpFunctionalExtensions;
 
 namespace Gp4Net.CardEmulator.Domain;
@@ -22,10 +21,10 @@ public record ParsedCommand(byte Cla, byte Ins, byte P1, byte P2, byte[] FullCom
         get
         {
             if (FullCommand.Length <= 4)
-                return Array.Empty<byte>();
+                return [];
 
             if (FullCommand.Length == 5)
-                return Array.Empty<byte>(); // Case 2: CLA INS P1 P2 Le
+                return []; // Case 2: CLA INS P1 P2 Le
 
             // Check for extended APDU (first byte of Lc is 0x00)
             if (FullCommand[4] == 0x00 && FullCommand.Length >= 7)
@@ -43,7 +42,7 @@ public record ParsedCommand(byte Cla, byte Ins, byte P1, byte P2, byte[] FullCom
                     return FullCommand[5..(5 + lc)];
             }
 
-            return Array.Empty<byte>();
+            return [];
         }
     }
 

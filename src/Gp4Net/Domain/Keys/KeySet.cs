@@ -248,11 +248,7 @@ public class Scp03KeySet : KeySet
         if (dekKeyValidation.IsFailure)
             return Result.Failure<Scp03KeySet, SmartCardError>(dekKeyValidation.Error);
 
-        var lengthMatchValidation = ValidateKeyLengthsMatch(
-            encKey,
-            macKey,
-            dekKey
-        );
+        var lengthMatchValidation = ValidateKeyLengthsMatch(encKey, macKey, dekKey);
         if (lengthMatchValidation.IsFailure)
             return Result.Failure<Scp03KeySet, SmartCardError>(lengthMatchValidation.Error);
 

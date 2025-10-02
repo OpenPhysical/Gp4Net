@@ -28,9 +28,12 @@ public sealed record LoadFileDataBlockHash
     public static Result<LoadFileDataBlockHash, SmartCardError> Create(byte[] hashBytes)
     {
         return hashBytes.Length == 32
-            ? Result.Success<LoadFileDataBlockHash, SmartCardError>(new LoadFileDataBlockHash(hashBytes))
+            ? Result.Success<LoadFileDataBlockHash, SmartCardError>(
+                new LoadFileDataBlockHash(hashBytes)
+            )
             : Result.Failure<LoadFileDataBlockHash, SmartCardError>(
-                SmartCardError.InvalidData("LFDBH must be exactly 32 bytes (SHA-256)"));
+                SmartCardError.InvalidData("LFDBH must be exactly 32 bytes (SHA-256)")
+            );
     }
 
     /// <summary>
@@ -39,12 +42,15 @@ public sealed record LoadFileDataBlockHash
     /// </summary>
     /// <param name="capFileData">Complete CAP file data.</param>
     /// <returns>LoadFileDataBlockHash or error.</returns>
-    public static Result<LoadFileDataBlockHash, SmartCardError> ComputeFromCapFile(byte[] capFileData)
+    public static Result<LoadFileDataBlockHash, SmartCardError> ComputeFromCapFile(
+        byte[] capFileData
+    )
     {
         return capFileData.Length > 0
             ? CryptoService.Hash.Sha256(capFileData).Bind(Create)
             : Result.Failure<LoadFileDataBlockHash, SmartCardError>(
-                SmartCardError.InvalidData("CAP file data cannot be empty"));
+                SmartCardError.InvalidData("CAP file data cannot be empty")
+            );
     }
 
     /// <summary>

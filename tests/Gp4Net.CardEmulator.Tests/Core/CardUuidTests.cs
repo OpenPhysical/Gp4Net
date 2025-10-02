@@ -266,9 +266,7 @@ public class CardUuidTests
             originalUuid =>
             {
                 byte[] bytes = originalUuid.ToByteArray();
-                var reconstructedUuidResult = CardUuid.FromBytes(
-                    bytes
-                );
+                var reconstructedUuidResult = CardUuid.FromBytes(bytes);
 
                 reconstructedUuidResult.Match(
                     reconstructedUuid => reconstructedUuid.Should().Be(originalUuid),

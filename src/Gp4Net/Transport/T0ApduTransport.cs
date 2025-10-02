@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
 using Gp4Net.Core;
-using Gp4Net.Core.Functional;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using WSCT.ISO7816;
@@ -72,7 +71,10 @@ public class T0ApduTransport : IApduTransport
         byte[] apduBytes = apduBytesResult.Value;
 
         // T=0 does not support extended length APDUs (check command length)
-        if (apduBytes.Length > Apdu.Formats.APDU_HEADER_LENGTH + Apdu.Formats.MAX_SHORT_LENGTH_LC + 1) // 5 header + 255 data + 1 Le
+        if (
+            apduBytes.Length
+            > Apdu.Formats.APDU_HEADER_LENGTH + Apdu.Formats.MAX_SHORT_LENGTH_LC + 1
+        ) // 5 header + 255 data + 1 Le
         {
             _logger.LogWarning("T=0 does not support extended length APDUs");
             return Result.Failure<ApduResponse, SmartCardError>(
@@ -82,14 +84,19 @@ public class T0ApduTransport : IApduTransport
         _logger.LogDebug("T=0 Transmit: {Apdu}", BitConverter.ToString(apduBytes));
 
         // Send command and handle exceptions functionally
-        var responseResult = await Gp4Net.Core.Functional.ResultExtensions.TryAsync<byte[], SmartCardError>(
-            async () => await channel.TransmitAsync(apduBytes, cancellationToken).ConfigureAwait(false),
-            ex =>
-            {
-                _logger.LogError(ex, "T=0 transmission failed");
-                return SmartCardError.CommunicationFailed($"T=0 transmission failed: {ex.Message}");
-            }
-        ).ConfigureAwait(false);
+        var responseResult = await Gp4Net
+            .Core.Functional.ResultExtensions.TryAsync<byte[], SmartCardError>(
+                async () =>
+                    await channel.TransmitAsync(apduBytes, cancellationToken).ConfigureAwait(false),
+                ex =>
+                {
+                    _logger.LogError(ex, "T=0 transmission failed");
+                    return SmartCardError.CommunicationFailed(
+                        $"T=0 transmission failed: {ex.Message}"
+                    );
+                }
+            )
+            .ConfigureAwait(false);
 
         // If transmission failed, return error
         if (responseResult.IsFailure)
@@ -99,12 +106,13 @@ public class T0ApduTransport : IApduTransport
 
         // Process the response
         return await ProcessResponseAsync(
-            command,
-            responseResult.Value,
-            channel,
-            apduBytes,
-            cancellationToken
-        ).ConfigureAwait(false);
+                command,
+                responseResult.Value,
+                channel,
+                apduBytes,
+                cancellationToken
+            )
+            .ConfigureAwait(false);
     }
 
     private static byte GetLeByte(int expectedLength)
@@ -141,58 +149,58 @@ public class T0ApduTransport : IApduTransport
         {
             // Handle T=0 specific status words
             case 0x61:
-                {
-                    // More data available, send GET RESPONSE
-                    var remainingData = await GetResponseAsync(sw2, channel, cancellationToken)
-                        .ConfigureAwait(false);
+            {
+                // More data available, send GET RESPONSE
+                var remainingData = await GetResponseAsync(sw2, channel, cancellationToken)
+                    .ConfigureAwait(false);
 
-                    // Combine data
-                    int totalLength = data.Length + remainingData.Data.Length;
-                    byte[] combinedData = new byte[totalLength];
-                    Array.Copy(data, 0, combinedData, 0, data.Length);
-                    Array.Copy(
-                        remainingData.Data,
-                        0,
-                        combinedData,
-                        data.Length,
-                        remainingData.Data.Length
-                    );
+                // Combine data
+                int totalLength = data.Length + remainingData.Data.Length;
+                byte[] combinedData = new byte[totalLength];
+                Array.Copy(data, 0, combinedData, 0, data.Length);
+                Array.Copy(
+                    remainingData.Data,
+                    0,
+                    combinedData,
+                    data.Length,
+                    remainingData.Data.Length
+                );
 
-                    return Result.Success<ApduResponse, SmartCardError>(
-                        new ApduResponse(combinedData, remainingData.StatusWord)
-                    );
-                }
+                return Result.Success<ApduResponse, SmartCardError>(
+                    new ApduResponse(combinedData, remainingData.StatusWord)
+                );
+            }
             case 0x6C:
+            {
+                // Wrong Le, retry with correct length
+                _logger.LogDebug("Wrong Le, retrying with Le={Le}", sw2);
+
+                // For T=0 retry, we need to rebuild the command with the correct Le
+                // This is a simplified approach - in practice would need to parse original command
+                if (originalApduBytes.Length >= 4)
                 {
-                    // Wrong Le, retry with correct length
-                    _logger.LogDebug("Wrong Le, retrying with Le={Le}", sw2);
-
-                    // For T=0 retry, we need to rebuild the command with the correct Le
-                    // This is a simplified approach - in practice would need to parse original command
-                    if (originalApduBytes.Length >= 4)
-                    {
-                        var retryBytes = new byte[
-                            originalApduBytes.Length >= 5 ? originalApduBytes.Length : 5
-                        ];
-                        Array.Copy(
-                            originalApduBytes,
-                            retryBytes,
-                            Math.Min(4, originalApduBytes.Length)
-                        );
-                        if (retryBytes.Length == 5)
-                        {
-                            retryBytes[4] = sw2; // Set correct Le
-                        }
-                        var retryCommand = new WrappedApduCommand(new CommandAPDU(retryBytes));
-                        return await TransmitAsync(retryCommand, channel, cancellationToken)
-                            .ConfigureAwait(false);
-                    }
-
-                    // If retry failed, return original response
-                    return Result.Success<ApduResponse, SmartCardError>(
-                        new ApduResponse(data, statusWord)
+                    var retryBytes = new byte[
+                        originalApduBytes.Length >= 5 ? originalApduBytes.Length : 5
+                    ];
+                    Array.Copy(
+                        originalApduBytes,
+                        retryBytes,
+                        Math.Min(4, originalApduBytes.Length)
                     );
+                    if (retryBytes.Length == 5)
+                    {
+                        retryBytes[4] = sw2; // Set correct Le
+                    }
+                    var retryCommand = new WrappedApduCommand(new CommandAPDU(retryBytes));
+                    return await TransmitAsync(retryCommand, channel, cancellationToken)
+                        .ConfigureAwait(false);
                 }
+
+                // If retry failed, return original response
+                return Result.Success<ApduResponse, SmartCardError>(
+                    new ApduResponse(data, statusWord)
+                );
+            }
             default:
                 return Result.Success<ApduResponse, SmartCardError>(
                     new ApduResponse(data, statusWord)

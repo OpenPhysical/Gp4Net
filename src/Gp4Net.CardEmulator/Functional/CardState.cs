@@ -465,8 +465,11 @@ public partial record CardState(
         {
             SecureChannel = SecureChannel.Map(sc =>
             {
-                var macChainingResult =
-                    MacChainingState.Create(macChaining, sc.ProtocolVersion, 0x00);
+                var macChainingResult = MacChainingState.Create(
+                    macChaining,
+                    sc.ProtocolVersion,
+                    0x00
+                );
                 return macChainingResult.Match(
                     macChain => sc with { MacChaining = macChain },
                     _ => sc

@@ -150,7 +150,9 @@ public class GetStatusCommandTests
         Assert.That(result.IsSuccess, Is.True);
         var command = result.Value;
 
-        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(
+            Maybe<IApduCommand>.From(command)
+        );
         _ = apduResult.IsSuccess.Should().BeTrue();
         Assert.That(apduResult.IsSuccess, Is.True);
         byte[] apdu = apduResult.Value;
@@ -177,7 +179,9 @@ public class GetStatusCommandTests
         Assert.That(result.IsSuccess, Is.True);
         var command = result.Value;
 
-        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(
+            Maybe<IApduCommand>.From(command)
+        );
         _ = apduResult.IsSuccess.Should().BeTrue();
         Assert.That(apduResult.IsSuccess, Is.True);
         byte[] apdu = apduResult.Value;
@@ -208,7 +212,9 @@ public class GetStatusCommandTests
         Assert.That(result.IsSuccess, Is.True);
         var command = result.Value;
 
-        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(
+            Maybe<IApduCommand>.From(command)
+        );
         _ = apduResult.IsSuccess.Should().BeTrue();
         Assert.That(apduResult.IsSuccess, Is.True);
         byte[] apdu = apduResult.Value;
@@ -233,7 +239,9 @@ public class GetStatusCommandTests
         Assert.That(result.IsSuccess, Is.True);
         var command = result.Value;
 
-        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
+        Result<byte[], SmartCardError> apduResult = ApduBuilder.BuildApdu(
+            Maybe<IApduCommand>.From(command)
+        );
         _ = apduResult.IsSuccess.Should().BeTrue();
         Assert.That(apduResult.IsSuccess, Is.True);
         byte[] apdu = apduResult.Value;
@@ -251,19 +259,30 @@ public class GetStatusCommandTests
         result.Match(
             command =>
             {
-                Result<byte[], SmartCardError> apduResult1 = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
-                Result<byte[], SmartCardError> apduResult2 = ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command));
+                Result<byte[], SmartCardError> apduResult1 = ApduBuilder.BuildApdu(
+                    Maybe<IApduCommand>.From(command)
+                );
+                Result<byte[], SmartCardError> apduResult2 = ApduBuilder.BuildApdu(
+                    Maybe<IApduCommand>.From(command)
+                );
 
                 apduResult1.Match(
-                    apdu1 => apduResult2.Match(
-                        apdu2 =>
-                        {
-                            _ = apdu1.Should().NotBeSameAs(apdu2);
-                            _ = apdu2.Should().BeEquivalentTo(apdu1);
-                        },
-                        error2 => _ = apduResult2.IsSuccess.Should().BeTrue($"Second APDU build failed: {error2}")
-                    ),
-                    error1 => _ = apduResult1.IsSuccess.Should().BeTrue($"First APDU build failed: {error1}")
+                    apdu1 =>
+                        apduResult2.Match(
+                            apdu2 =>
+                            {
+                                _ = apdu1.Should().NotBeSameAs(apdu2);
+                                _ = apdu2.Should().BeEquivalentTo(apdu1);
+                            },
+                            error2 =>
+                                _ = apduResult2
+                                    .IsSuccess.Should()
+                                    .BeTrue($"Second APDU build failed: {error2}")
+                        ),
+                    error1 =>
+                        _ = apduResult1
+                            .IsSuccess.Should()
+                            .BeTrue($"First APDU build failed: {error1}")
                 );
             },
             error => _ = result.IsSuccess.Should().BeTrue($"Command creation failed: {error}")
@@ -513,7 +532,9 @@ public class GetStatusCommandTests
     [Test]
     public void Constants_HaveCorrectValues()
     {
-        var command = GetStatusCommand.Create(GetStatusCommand.StatusSubset.IssuerSecurityDomain).Value;
+        var command = GetStatusCommand
+            .Create(GetStatusCommand.StatusSubset.IssuerSecurityDomain)
+            .Value;
         _ = command.Cla.Should().Be(0x80);
         _ = command.Ins.Should().Be(0xF2);
     }

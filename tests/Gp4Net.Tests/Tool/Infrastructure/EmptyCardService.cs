@@ -116,6 +116,17 @@ public class EmptyCardService : ISmartCardService
         ); // Generic error response
     }
 
+    public async Task<
+        Result<CardTransportCapabilities, SmartCardError>
+    > GetCardTransportCapabilitiesAsync(CancellationToken cancellationToken = default)
+    {
+        return await Task.FromResult(
+            Result.Success<CardTransportCapabilities, SmartCardError>(
+                new CardTransportCapabilities(false, 245)
+            )
+        );
+    }
+
     public void Dispose()
     {
         // Empty card service has no resources to dispose

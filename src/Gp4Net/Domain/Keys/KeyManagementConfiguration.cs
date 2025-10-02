@@ -180,18 +180,9 @@ public sealed class KeyLifecycleManager
             .AddKey(keyId, keyData)
             .Map(newStore =>
             {
-                var metadata = new KeyMetadata(
-                    keyId,
-                    purpose,
-                    DateTime.UtcNow,
-                    0,
-                    DateTime.UtcNow
-                );
+                var metadata = new KeyMetadata(keyId, purpose, DateTime.UtcNow, 0, DateTime.UtcNow);
 
-                var newMetadata = _metadata.Add(
-                    keyId,
-                    metadata
-                );
+                var newMetadata = _metadata.Add(keyId, metadata);
                 return new KeyLifecycleManager(_config, newStore, newMetadata);
             });
     }
@@ -239,15 +230,8 @@ public sealed class KeyLifecycleManager
                     LastUsedUtc = DateTime.UtcNow,
                 };
 
-                var newMetadata = _metadata.SetItem(
-                    keyId,
-                    updatedMetadata
-                );
-                var newManager = new KeyLifecycleManager(
-                    _config,
-                    _keyStore,
-                    newMetadata
-                );
+                var newMetadata = _metadata.SetItem(keyId, updatedMetadata);
+                var newManager = new KeyLifecycleManager(_config, _keyStore, newMetadata);
 
                 return (result, newManager);
             });

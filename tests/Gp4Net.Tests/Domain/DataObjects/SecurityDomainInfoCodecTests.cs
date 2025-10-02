@@ -14,7 +14,6 @@ using NUnit.Framework;
 namespace Gp4Net.Tests.Domain.DataObjects;
 
 [TestFixture]
-[Ignore("Maybe<T> unwrapping patterns need to be updated for functional programming compliance")]
 public class SecurityDomainInfoCodecTests
 {
     [Test]
@@ -52,10 +51,7 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Encode_MinimalSecurityDomainInfo_ProducesValidFormat()
     {
-        var sdInfo = new SecurityDomainInfo
-        {
-            Oid = Convert.FromHexString("A000000151"),
-        };
+        var sdInfo = new SecurityDomainInfo { Oid = Convert.FromHexString("A000000151") };
 
         Result<byte[], SmartCardError> encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
 
@@ -107,8 +103,8 @@ public class SecurityDomainInfoCodecTests
         var sdInfo = result.Value;
 
         _ = sdInfo.Oid.Should().HaveValue(Convert.FromHexString("A000000151000000"));
-        _ = sdInfo.ImageData.Should().HaveValue(new byte[] { 0x01, 0x02, 0x03 });
-        _ = sdInfo.LifeCycleData.Should().HaveValue(new byte[] { 0x07 });
+        _ = sdInfo.ImageData.Should().HaveValue([0x01, 0x02, 0x03]);
+        _ = sdInfo.LifeCycleData.Should().HaveValue([0x07]);
     }
 
     [Test]
@@ -231,16 +227,20 @@ public class SecurityDomainInfoCodecTests
 
         original.Oid.Match(
             oid => _ = result.Oid.Should().HaveValue(oid),
-            () => _ = result.Oid.Should().HaveNoValue());
+            () => _ = result.Oid.Should().HaveNoValue()
+        );
         original.SecurityDomainAid.Match(
             aid => _ = result.SecurityDomainAid.Should().HaveValue(aid),
-            () => _ = result.SecurityDomainAid.Should().HaveNoValue());
+            () => _ = result.SecurityDomainAid.Should().HaveNoValue()
+        );
         original.ImageData.Match(
             data => _ = result.ImageData.Should().HaveValue(data),
-            () => _ = result.ImageData.Should().HaveNoValue());
+            () => _ = result.ImageData.Should().HaveNoValue()
+        );
         original.LifeCycleData.Match(
             data => _ = result.LifeCycleData.Should().HaveValue(data),
-            () => _ = result.LifeCycleData.Should().HaveNoValue());
+            () => _ = result.LifeCycleData.Should().HaveNoValue()
+        );
     }
 
     [Test]
@@ -335,10 +335,7 @@ public class SecurityDomainInfoCodecTests
     [Test]
     public void Encode_OnlyImageData_ProducesValidStructure()
     {
-        var sdInfo = new SecurityDomainInfo
-        {
-            ImageData = Convert.FromHexString("ABCDEF"),
-        };
+        var sdInfo = new SecurityDomainInfo { ImageData = Convert.FromHexString("ABCDEF") };
 
         Result<byte[], SmartCardError> encodedResult = SecurityDomainInfoCodec.Encode(sdInfo);
 

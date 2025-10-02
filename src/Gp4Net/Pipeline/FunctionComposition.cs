@@ -21,11 +21,7 @@ public static class FunctionComposition
     {
         return async (command, environment, cancellationToken) =>
         {
-            var result = await first(
-                command,
-                environment,
-                cancellationToken
-            );
+            var result = await first(command, environment, cancellationToken);
 
             return await result.Bind(async cmdResult =>
             {
@@ -44,10 +40,9 @@ public static class FunctionComposition
                 if (hasWrappedCommandBytes)
                 {
                     // First processor wrapped the command, create WrappedApduCommand for subsequent processors
-                    var wrappedResult = Result.Success<
-                        WrappedApduCommand,
-                        SmartCardError
-                    >(WrappedApduCommand.Create(cmdResult.Data));
+                    var wrappedResult = Result.Success<WrappedApduCommand, SmartCardError>(
+                        WrappedApduCommand.Create(cmdResult.Data)
+                    );
 
                     if (wrappedResult.IsFailure)
                     {

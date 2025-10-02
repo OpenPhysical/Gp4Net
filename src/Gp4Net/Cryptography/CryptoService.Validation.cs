@@ -1,6 +1,7 @@
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Shared;
 
 namespace Gp4Net.Cryptography;
 
@@ -48,15 +49,9 @@ public static partial class CryptoService
                             .From(data)
                             .Match(
                                 Some: _ => UnitResult.Success<SmartCardError>(),
-                                None: () =>
-                                    UnitResult.Failure(
-                                        SmartCardError.InvalidArgument("Data parameter is required")
-                                    )
+                                None: () => UnitResult.Failure(ErrorFactory.NullArgument("Data"))
                             ),
-                    None: () =>
-                        UnitResult.Failure(
-                            SmartCardError.InvalidArgument("Key parameter is required")
-                        )
+                    None: () => UnitResult.Failure(ErrorFactory.NullArgument("Key"))
                 );
         }
 
@@ -78,22 +73,11 @@ public static partial class CryptoService
                                         .From(data)
                                         .Match(
                                             Some: _ => UnitResult.Success<SmartCardError>(),
-                                            None: () =>
-                                                UnitResult.Failure(
-                                                    SmartCardError.InvalidArgument(
-                                                        "Data parameter is required"
-                                                    )
-                                                )
+                                            None: () => UnitResult.Failure(ErrorFactory.NullArgument("Data"))
                                         ),
-                                None: () =>
-                                    UnitResult.Failure(
-                                        SmartCardError.InvalidArgument("IV parameter is required")
-                                    )
+                                None: () => UnitResult.Failure(ErrorFactory.NullArgument("IV"))
                             ),
-                    None: () =>
-                        UnitResult.Failure(
-                            SmartCardError.InvalidArgument("Key parameter is required")
-                        )
+                    None: () => UnitResult.Failure(ErrorFactory.NullArgument("Key"))
                 );
         }
 
@@ -167,9 +151,7 @@ public static partial class CryptoService
         {
             return Maybe<byte[]>.From(input).HasValue
                 ? UnitResult.Success<SmartCardError>()
-                : UnitResult.Failure(
-                    SmartCardError.InvalidArgument($"{parameterName} cannot be null or empty")
-                );
+                : UnitResult.Failure(ErrorFactory.EmptyArgument(parameterName));
         }
 
         /// <summary>
@@ -188,10 +170,24 @@ public static partial class CryptoService
             return input.Length == expectedLength
                 ? UnitResult.Success<SmartCardError>()
                 : UnitResult.Failure(
-                    SmartCardError.InvalidArgument(
-                        $"{parameterName} must be {expectedLength} bytes, got {input.Length}"
-                    )
+                    ErrorFactory.InvalidLength(parameterName, expectedLength, input.Length)
                 );
+        }
+
+        /// <summary>
+        /// Validates that both host and card challenges are exactly 8 bytes.
+        /// Common validation for SCP protocols.
+        /// </summary>
+        /// <param name="hostChallenge">The host challenge to validate.</param>
+        /// <param name="cardChallenge">The card challenge to validate.</param>
+        /// <returns>Success if both challenges are 8 bytes, failure otherwise.</returns>
+        public static UnitResult<SmartCardError> ValidateChallenges(
+            byte[] hostChallenge,
+            byte[] cardChallenge
+        )
+        {
+            return ValidateExactLength(hostChallenge, 8, "Host challenge")
+                .Bind(() => ValidateExactLength(cardChallenge, 8, "Card challenge"));
         }
     }
 }

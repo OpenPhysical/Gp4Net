@@ -5,6 +5,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Security;
 using Org.BouncyCastle.Crypto.Paddings;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Cryptography;
 
@@ -28,11 +29,12 @@ public static partial class CryptoService
             {
                 16 => Result.Success<byte[], SmartCardError>(ConcatenateArrays(key, key[..8])),
                 24 => Result.Success<byte[], SmartCardError>(key),
-                _ => Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument(
-                        $"3DES key must be 16 or 24 bytes, got {key.Length}"
-                    )
-                ),
+                _
+                    => Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.InvalidArgument(
+                            $"3DES key must be 16 or 24 bytes, got {key.Length}"
+                        )
+                    ),
             };
         }
 
@@ -245,7 +247,9 @@ public static partial class CryptoService
         {
             if (data.Length == 0)
             {
-                return SmartCardError.InvalidArgument("Data cannot be empty for GP padding");
+                return Result.Failure<byte[], SmartCardError>(
+                    SmartCardError.InvalidArgument("Data cannot be empty for GP padding")
+                );
             }
 
             return Result.Try(
@@ -261,13 +265,13 @@ public static partial class CryptoService
                     byte[] paddedData =
                     [
                         .. data,
-                        0x80,
+                        Scp.Common.ISO7816_PADDING_BYTE,
                         .. Enumerable.Repeat((byte)0x00, paddingNeeded - 1),
                     ];
 
                     return paddedData;
                 },
-                ex => SmartCardError.CryptographicError($"GP padding failed: {ex.Message}")
+                static ex => SmartCardError.CryptographicError($"GP padding failed: {ex.Message}")
             );
         }
 
@@ -293,13 +297,27 @@ public static partial class CryptoService
         {
             if (protocolVersion == ScpVersion.Scp03)
             {
-                List<byte> macInput = [0x84, ins, p1, p2, (byte)(data.Length + 8)];
+                List<byte> macInput =
+                [
+                    Scp.Common.SECURE_CLA,
+                    ins,
+                    p1,
+                    p2,
+                    (byte)(data.Length + Scp.Common.MAC_TRUNCATION_SIZE)
+                ];
                 macInput.AddRange(data);
                 return [.. macInput];
             }
             else
             {
-                List<byte> macInput = [cla, ins, p1, p2, (byte)(data.Length + 8)];
+                List<byte> macInput =
+                [
+                    cla,
+                    ins,
+                    p1,
+                    p2,
+                    (byte)(data.Length + Scp.Common.MAC_TRUNCATION_SIZE)
+                ];
                 macInput.AddRange(data);
                 return [.. macInput];
             }

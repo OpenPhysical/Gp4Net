@@ -7,6 +7,7 @@ using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain;
+using Gp4Net.Shared;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
@@ -35,7 +36,8 @@ public sealed class CardStateService : ICardStateService
     /// <inheritdoc />
     public Result<CardState, SmartCardError> CreateInitialState()
     {
-        return CardState.Create()
+        return CardState
+            .Create()
             .Bind(initialState => InitializeApplicationRegistry(initialState))
             .Tap(_ => LogStateTransition("Created initial card state"));
     }
@@ -62,19 +64,25 @@ public sealed class CardStateService : ICardStateService
             .Bind(_ => ValidateCommandPreconditions(currentState, command, config))
             .Bind(_ => ProcessCommand(currentState, command, config, rngContext))
             .Bind(newState => ValidateState(newState).Map(_ => newState))
-            .Tap(newState => LogStateTransition($"Command applied successfully, new security level: 0x{newState.SecurityLevel:X2}"));
+            .Tap(newState =>
+                LogStateTransition(
+                    $"Command applied successfully, new security level: 0x{newState.SecurityLevel:X2}"
+                )
+            );
     }
 
     /// <inheritdoc />
     public Maybe<IApplication> GetSelectedApplication(CardState state)
     {
         return state.ApplicationRegistry.Match(
-            registry => registry.SelectedApplicationAid.Match(
-                selectedAid => registry.Applications.TryGetValue(selectedAid, out var app) 
-                    ? Maybe<IApplication>.From(app) 
-                    : Maybe<IApplication>.None,
-                () => Maybe<IApplication>.None
-            ),
+            registry =>
+                registry.SelectedApplicationAid.Match(
+                    selectedAid =>
+                        registry.Applications.TryGetValue(selectedAid, out var app)
+                            ? Maybe<IApplication>.From(app)
+                            : Maybe<IApplication>.None,
+                    () => Maybe<IApplication>.None
+                ),
             () => Maybe<IApplication>.None
         );
     }
@@ -83,9 +91,10 @@ public sealed class CardStateService : ICardStateService
     public Maybe<IApplication> GetApplicationByAid(CardState state, ImmutableArray<byte> aid)
     {
         return state.ApplicationRegistry.Match(
-            registry => registry.Applications.TryGetValue(aid, out var app) 
-                ? Maybe<IApplication>.From(app) 
-                : Maybe<IApplication>.None,
+            registry =>
+                registry.Applications.TryGetValue(aid, out var app)
+                    ? Maybe<IApplication>.From(app)
+                    : Maybe<IApplication>.None,
             () => Maybe<IApplication>.None
         );
     }
@@ -99,24 +108,26 @@ public sealed class CardStateService : ICardStateService
         LogStateTransition($"Selecting application with AID: {Convert.ToHexString(aid.ToArray())}");
 
         return currentState.ApplicationRegistry.Match(
-            registry => registry.Applications.ContainsKey(aid)
-                ? Result.Success<CardState, SmartCardError>(
-                    currentState with
-                    {
-                        ApplicationRegistry = Maybe<ApplicationRegistry>.From(
-                            registry with
-                            {
-                                SelectedApplicationAid = Maybe<ImmutableArray<byte>>.From(aid)
-                            }
-                        )
-                    }
+            registry =>
+                registry.Applications.ContainsKey(aid)
+                    ? Result.Success<CardState, SmartCardError>(
+                        currentState with
+                        {
+                            ApplicationRegistry = Maybe<ApplicationRegistry>.From(
+                                registry with
+                                {
+                                    SelectedApplicationAid = Maybe<ImmutableArray<byte>>.From(aid),
+                                }
+                            ),
+                        }
+                    )
+                    : Result.Failure<CardState, SmartCardError>(
+                        ErrorFactory.ApplicationNotFound(Convert.ToHexString(aid.ToArray()))
+                    ),
+            () =>
+                Result.Failure<CardState, SmartCardError>(
+                    SmartCardError.UnexpectedError("No application registry available")
                 )
-                : Result.Failure<CardState, SmartCardError>(
-                    SmartCardError.FileNotFound()
-                ),
-            () => Result.Failure<CardState, SmartCardError>(
-                SmartCardError.UnexpectedError("No application registry available")
-            )
         );
     }
 
@@ -126,7 +137,9 @@ public sealed class CardStateService : ICardStateService
         SecureChannelState secureChannelState
     )
     {
-        LogStateTransition($"Updating secure channel to security level 0x{(byte)secureChannelState.SecurityLevel:X2}");
+        LogStateTransition(
+            $"Updating secure channel to security level 0x{(byte)secureChannelState.SecurityLevel:X2}"
+        );
 
         return ValidateSecureChannelState(secureChannelState)
             .Map(_ => currentState.WithSecureChannel(secureChannelState))
@@ -147,14 +160,19 @@ public sealed class CardStateService : ICardStateService
         IApplication application
     )
     {
-        LogStateTransition($"Installing application with AID: {Convert.ToHexString(aid.ToArray())}");
+        LogStateTransition(
+            $"Installing application with AID: {Convert.ToHexString(aid.ToArray())}"
+        );
 
         return currentState.ApplicationRegistry.Match(
-            registry => registry.AddApplication(application)
-                .Map(updatedRegistry => currentState.WithApplicationRegistry(updatedRegistry)),
-            () => Result.Failure<CardState, SmartCardError>(
-                SmartCardError.UnexpectedError("No application registry available")
-            )
+            registry =>
+                registry
+                    .AddApplication(application)
+                    .Map(updatedRegistry => currentState.WithApplicationRegistry(updatedRegistry)),
+            () =>
+                Result.Failure<CardState, SmartCardError>(
+                    SmartCardError.UnexpectedError("No application registry available")
+                )
         );
     }
 
@@ -164,11 +182,13 @@ public sealed class CardStateService : ICardStateService
         LogStateTransition($"Removing application with AID: {Convert.ToHexString(aid.ToArray())}");
 
         return currentState.ApplicationRegistry.Match(
-            registry => registry.RemoveApplication(aid)
-                .Match(
-                    updatedRegistry => currentState.WithApplicationRegistry(updatedRegistry),
-                    _ => currentState // If removal fails, return unchanged state
-                ),
+            registry =>
+                registry
+                    .RemoveApplication(aid)
+                    .Match(
+                        updatedRegistry => currentState.WithApplicationRegistry(updatedRegistry),
+                        _ => currentState // If removal fails, return unchanged state
+                    ),
             () => currentState // If no registry, return unchanged state
         );
     }
@@ -198,21 +218,39 @@ public sealed class CardStateService : ICardStateService
     private static Result<CardState, SmartCardError> InitializeApplicationRegistry(CardState state)
     {
         // Use standard GP ISD AID
-        var isdAid = new byte[] { 0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00 }.ToImmutableArray();
-        
-        return ApplicationRegistry.CreateWithIsd(isdAid, state.ScpVersion, (byte)state.ScpImplementation)
+        var isdAid = new byte[]
+        {
+            0xA0,
+            0x00,
+            0x00,
+            0x00,
+            0x03,
+            0x00,
+            0x00,
+            0x00,
+        }.ToImmutableArray();
+
+        return ApplicationRegistry
+            .CreateWithIsd(isdAid, state.ScpVersion, (byte)state.ScpImplementation)
             .Map(registry => state.WithApplicationRegistry(registry));
     }
-    
+
     /// <summary>
     /// Initializes the application registry with custom ISD AID and data objects.
     /// </summary>
     public static Result<CardState, SmartCardError> InitializeApplicationRegistryWithDataObjects(
         CardState state,
         ImmutableArray<byte> isdAid,
-        ImmutableDictionary<ushort, byte[]> dataObjects)
+        ImmutableDictionary<ushort, byte[]> dataObjects
+    )
     {
-        return ApplicationRegistry.CreateWithIsdAndDataObjects(isdAid, dataObjects, state.ScpVersion, (byte)state.ScpImplementation)
+        return ApplicationRegistry
+            .CreateWithIsdAndDataObjects(
+                isdAid,
+                dataObjects,
+                state.ScpVersion,
+                (byte)state.ScpImplementation
+            )
             .Map(registry => state.WithApplicationRegistry(registry));
     }
 
@@ -227,11 +265,18 @@ public sealed class CardStateService : ICardStateService
         IRngContext rngContext
     )
     {
+        if (command.IsSelect)
+        {
+            return ProcessSelectCommand(currentState, command, config, rngContext);
+        }
+
         return currentState.ApplicationRegistry.Match(
-            registry => ProcessCommandWithRegistry(currentState, command, registry, rngContext),
-            () => Result.Failure<CardState, SmartCardError>(
-                SmartCardError.UnexpectedError("No application registry for command processing")
-            )
+            registry =>
+                ProcessCommandWithRegistry(currentState, command, registry, config, rngContext),
+            () =>
+                Result.Failure<CardState, SmartCardError>(
+                    SmartCardError.UnexpectedError("No application registry for command processing")
+                )
         );
     }
 
@@ -242,14 +287,16 @@ public sealed class CardStateService : ICardStateService
         CardState currentState,
         ApduCommand command,
         ApplicationRegistry registry,
+        CardConfiguration config,
         IRngContext rngContext
     )
     {
-        return registry.RouteCommand(command.RawBytes, currentState, rngContext)
+        return registry
+            .RouteCommand(command.RawBytes, currentState, config, rngContext)
             .Map(result =>
             {
-                var (updatedRegistry, _) = result;
-                return currentState.WithApplicationRegistry(updatedRegistry);
+                var (updatedRegistry, _, updatedState) = result;
+                return updatedState.WithApplicationRegistry(updatedRegistry);
             });
     }
 
@@ -276,7 +323,9 @@ public sealed class CardStateService : ICardStateService
     )
     {
         return config.SupportedInstructions.IsSupported(instruction)
-            ? Result.Success<UnitResult<SmartCardError>, SmartCardError>(UnitResult.Success<SmartCardError>())
+            ? Result.Success<UnitResult<SmartCardError>, SmartCardError>(
+                UnitResult.Success<SmartCardError>()
+            )
             : Result.Failure<UnitResult<SmartCardError>, SmartCardError>(
                 SmartCardError.InstructionNotSupported()
             );
@@ -300,11 +349,13 @@ public sealed class CardStateService : ICardStateService
             Ins.PUT_KEY => true,
             Ins.STORE_DATA => true,
             Ins.SET_STATUS => true,
-            _ => false
+            _ => false,
         };
 
         return !requiresAuthentication || state.SecurityLevel >= 0x01
-            ? Result.Success<UnitResult<SmartCardError>, SmartCardError>(UnitResult.Success<SmartCardError>())
+            ? Result.Success<UnitResult<SmartCardError>, SmartCardError>(
+                UnitResult.Success<SmartCardError>()
+            )
             : Result.Failure<UnitResult<SmartCardError>, SmartCardError>(
                 SmartCardError.SecurityStatusNotSatisfied()
             );
@@ -313,10 +364,16 @@ public sealed class CardStateService : ICardStateService
     /// <summary>
     /// Validates that the card UUID is valid.
     /// </summary>
-    private static Result<UnitResult<SmartCardError>, SmartCardError> ValidateCardUuid(CardState state)
+    private static Result<UnitResult<SmartCardError>, SmartCardError> ValidateCardUuid(
+        CardState state
+    )
     {
-        return state.Uuid.ToByteArray().Length == 16
-            ? Result.Success<UnitResult<SmartCardError>, SmartCardError>(UnitResult.Success<SmartCardError>())
+        var uuidBytes = state.Uuid.ToByteArray();
+
+        return uuidBytes.Length == 16 && !state.Uuid.IsEmpty
+            ? Result.Success<UnitResult<SmartCardError>, SmartCardError>(
+                UnitResult.Success<SmartCardError>()
+            )
             : Result.Failure<UnitResult<SmartCardError>, SmartCardError>(
                 SmartCardError.InvalidData("Card UUID must be 16 bytes")
             );
@@ -325,33 +382,55 @@ public sealed class CardStateService : ICardStateService
     /// <summary>
     /// Validates secure channel state consistency.
     /// </summary>
-    private static Result<UnitResult<SmartCardError>, SmartCardError> ValidateSecureChannelConsistency(CardState state)
+    private static Result<
+        UnitResult<SmartCardError>,
+        SmartCardError
+    > ValidateSecureChannelConsistency(CardState state)
     {
         return state.SecureChannel.Match(
-            sc => sc.SessionKeys.SEnc.Length == 16 && sc.SessionKeys.SMac.Length == 16
-                ? Result.Success<UnitResult<SmartCardError>, SmartCardError>(UnitResult.Success<SmartCardError>())
-                : Result.Failure<UnitResult<SmartCardError>, SmartCardError>(
-                    SmartCardError.InvalidData("Session keys must be 16 bytes each")
-                ),
-            () => Result.Success<UnitResult<SmartCardError>, SmartCardError>(UnitResult.Success<SmartCardError>())
+            sc =>
+                sc.SessionKeys.SEnc.Length == 16 && sc.SessionKeys.SMac.Length == 16
+                    ? Result.Success<UnitResult<SmartCardError>, SmartCardError>(
+                        UnitResult.Success<SmartCardError>()
+                    )
+                    : Result.Failure<UnitResult<SmartCardError>, SmartCardError>(
+                        SmartCardError.InvalidData("Session keys must be 16 bytes each")
+                    ),
+            () =>
+                Result.Success<UnitResult<SmartCardError>, SmartCardError>(
+                    UnitResult.Success<SmartCardError>()
+                )
         );
     }
 
     /// <summary>
     /// Validates application registry consistency.
     /// </summary>
-    private static Result<UnitResult<SmartCardError>, SmartCardError> ValidateApplicationRegistryConsistency(CardState state)
+    private static Result<
+        UnitResult<SmartCardError>,
+        SmartCardError
+    > ValidateApplicationRegistryConsistency(CardState state)
     {
         return state.ApplicationRegistry.Match(
-            registry => registry.SelectedApplicationAid.Match(
-                selectedAid => registry.Applications.ContainsKey(selectedAid)
-                    ? Result.Success<UnitResult<SmartCardError>, SmartCardError>(UnitResult.Success<SmartCardError>())
-                    : Result.Failure<UnitResult<SmartCardError>, SmartCardError>(
-                        SmartCardError.ConditionsNotSatisfied()
-                    ),
-                () => Result.Success<UnitResult<SmartCardError>, SmartCardError>(UnitResult.Success<SmartCardError>())
-            ),
-            () => Result.Success<UnitResult<SmartCardError>, SmartCardError>(UnitResult.Success<SmartCardError>())
+            registry =>
+                registry.SelectedApplicationAid.Match(
+                    selectedAid =>
+                        registry.Applications.ContainsKey(selectedAid)
+                            ? Result.Success<UnitResult<SmartCardError>, SmartCardError>(
+                                UnitResult.Success<SmartCardError>()
+                            )
+                            : Result.Failure<UnitResult<SmartCardError>, SmartCardError>(
+                                SmartCardError.ConditionsNotSatisfied()
+                            ),
+                    () =>
+                        Result.Success<UnitResult<SmartCardError>, SmartCardError>(
+                            UnitResult.Success<SmartCardError>()
+                        )
+                ),
+            () =>
+                Result.Success<UnitResult<SmartCardError>, SmartCardError>(
+                    UnitResult.Success<SmartCardError>()
+                )
         );
     }
 
@@ -359,16 +438,21 @@ public sealed class CardStateService : ICardStateService
     /// Validates sequence counters are within valid ranges.
     /// Uses explicit functional validation without unsafe value access.
     /// </summary>
-    private static Result<UnitResult<SmartCardError>, SmartCardError> ValidateSequenceCounters(CardState state)
+    private static Result<UnitResult<SmartCardError>, SmartCardError> ValidateSequenceCounters(
+        CardState state
+    )
     {
-        var isValidCounter = (byte[] counterBytes) => counterBytes.Length == 2 || counterBytes.Length == 3;
-        
-        var hasInvalidCounters = state.SequenceCounters
-            .Select(kvp => kvp.Value)
+        var isValidCounter = (byte[] counterBytes) =>
+            counterBytes.Length == 2 || counterBytes.Length == 3;
+
+        var hasInvalidCounters = state
+            .SequenceCounters.Select(kvp => kvp.Value)
             .Any(counterBytes => !isValidCounter(counterBytes));
 
         return !hasInvalidCounters
-            ? Result.Success<UnitResult<SmartCardError>, SmartCardError>(UnitResult.Success<SmartCardError>())
+            ? Result.Success<UnitResult<SmartCardError>, SmartCardError>(
+                UnitResult.Success<SmartCardError>()
+            )
             : Result.Failure<UnitResult<SmartCardError>, SmartCardError>(
                 SmartCardError.InvalidData("Sequence counters must be 2 or 3 bytes")
             );
@@ -377,10 +461,58 @@ public sealed class CardStateService : ICardStateService
     /// <summary>
     /// Validates secure channel state before updating.
     /// </summary>
-    private static Result<UnitResult<SmartCardError>, SmartCardError> ValidateSecureChannelState(SecureChannelState state)
+    private static Result<CardState, SmartCardError> ProcessSelectCommand(
+        CardState currentState,
+        ApduCommand command,
+        CardConfiguration config,
+        IRngContext rngContext
+    )
+    {
+        var requestedAid =
+            command.Data.Length == 0
+                ? ImmutableArray<byte>.Empty
+                : ImmutableArray.Create(command.Data);
+
+        var selectResult = ApplicationSelectionProcessor
+            .ProcessSelect(currentState, ImmutableArray.Create(command.RawBytes))
+            .Map(tuple => tuple.NewState)
+            .MapError(error =>
+            {
+                if (requestedAid.Length > 0 && error.Code == "FILE_NOT_FOUND")
+                {
+                    var aidHex = Convert.ToHexString(requestedAid.ToArray());
+                    return ErrorFactory.ApplicationNotFound(aidHex);
+                }
+
+                return error;
+            });
+
+        return selectResult.Bind(newState =>
+            newState.ApplicationRegistry.Match(
+                registry =>
+                    registry
+                        .RouteCommand(command.RawBytes, newState, config, rngContext)
+                        .Map(result =>
+                        {
+                            var (updatedRegistry, _, updatedState) = result;
+                            return updatedState.WithApplicationRegistry(updatedRegistry);
+                        }),
+                () =>
+                    Result.Failure<CardState, SmartCardError>(
+                        SmartCardError.UnexpectedError("No application registry available")
+                    )
+            )
+        );
+    }
+
+    private static Result<UnitResult<SmartCardError>, SmartCardError> ValidateSecureChannelState(
+        SecureChannelState state
+    )
     {
         return state.SessionKeys.SEnc.Length == 16 && state.SessionKeys.SMac.Length == 16
-            ? Result.Success<UnitResult<SmartCardError>, SmartCardError>(UnitResult.Success<SmartCardError>())
+            ? Result.Success<UnitResult<SmartCardError>, SmartCardError>(
+                UnitResult.Success<SmartCardError>()
+            )
             : Result.Failure<UnitResult<SmartCardError>, SmartCardError>(
                 SmartCardError.InvalidArgument("Session keys must be 16 bytes each")
             );

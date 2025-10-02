@@ -32,38 +32,40 @@ public record SupportedInstructions(
     /// <summary>
     /// Standard GP instruction set.
     /// </summary>
-    public static SupportedInstructions Standard => new(
-        Select: true,
-        InitializeUpdate: true,
-        ExternalAuthenticate: true,
-        GetData: true,
-        GetStatus: true,
-        Install: true,
-        Load: true,
-        Delete: true,
-        PutKey: true,
-        StoreData: true,
-        ManageChannel: false
-    );
+    public static SupportedInstructions Standard =>
+        new(
+            Select: true,
+            InitializeUpdate: true,
+            ExternalAuthenticate: true,
+            GetData: true,
+            GetStatus: true,
+            Install: true,
+            Load: true,
+            Delete: true,
+            PutKey: true,
+            StoreData: true,
+            ManageChannel: false
+        );
 
     /// <summary>
     /// Checks if a specific instruction is supported.
     /// </summary>
-    public bool IsSupported(byte instruction) => instruction switch
-    {
-        Apdu.Instructions.SELECT => Select,
-        Ins.INITIALIZE_UPDATE => InitializeUpdate,
-        Apdu.Instructions.EXTERNAL_AUTHENTICATE => ExternalAuthenticate,
-        Apdu.Instructions.GET_DATA => GetData,
-        Ins.GET_STATUS => GetStatus,
-        Ins.INSTALL => Install,
-        Ins.LOAD => Load,
-        Ins.DELETE => Delete,
-        Ins.PUT_KEY => PutKey,
-        Ins.STORE_DATA => StoreData,
-        Apdu.Instructions.MANAGE_CHANNEL => ManageChannel,
-        _ => false
-    };
+    public bool IsSupported(byte instruction) =>
+        instruction switch
+        {
+            Apdu.Instructions.SELECT => Select,
+            Ins.INITIALIZE_UPDATE => InitializeUpdate,
+            Apdu.Instructions.EXTERNAL_AUTHENTICATE => ExternalAuthenticate,
+            Apdu.Instructions.GET_DATA => GetData,
+            Ins.GET_STATUS => GetStatus,
+            Ins.INSTALL => Install,
+            Ins.LOAD => Load,
+            Ins.DELETE => Delete,
+            Ins.PUT_KEY => PutKey,
+            Ins.STORE_DATA => StoreData,
+            Apdu.Instructions.MANAGE_CHANNEL => ManageChannel,
+            _ => false,
+        };
 }
 
 /// <summary>
@@ -97,8 +99,6 @@ public record CardConfiguration(
         return CardProfileLoader.LoadFromFile(profilePath);
     }
 
-
-
     /// <summary>
     /// Creates a dual-protocol card configuration from JSON profile.
     /// </summary>
@@ -127,7 +127,6 @@ public record CardConfiguration(
         return CardProfileLoader.LoadFromFile(profilePath);
     }
 
-
     /// <summary>
     /// Creates a new configuration with an additional data object.
     /// </summary>
@@ -136,7 +135,6 @@ public record CardConfiguration(
         {
             DefaultDataObjects = DefaultDataObjects.SetItem(tag, data),
         };
-
 
     /// <summary>
     /// Creates a new configuration with updated SCP defaults.
@@ -167,8 +165,6 @@ public record CardConfiguration(
     /// </summary>
     public CardConfiguration WithIsdAid(byte[] isdAid) => this with { IsdAid = isdAid };
 
-
-
     /// <summary>
     /// Creates SCP02 key sets using GlobalPlatform Test Keys.
     /// </summary>
@@ -179,7 +175,9 @@ public record CardConfiguration(
         GpTestKeys
             .CreateScp02TestKeySet(0x01)
             .Map(static keySet => ImmutableDictionary.Create<byte, IKeySet>().Add(0x01, keySet))
-            .Match(static success => success, static error => ImmutableDictionary<byte, IKeySet>.Empty
+            .Match(
+                static success => success,
+                static error => ImmutableDictionary<byte, IKeySet>.Empty
             );
 
     /// <summary>
@@ -189,13 +187,5 @@ public record CardConfiguration(
         GpTestKeys
             .CreateScp03TestKeySet(0x01)
             .Map(keySet => ImmutableDictionary.Create<byte, IKeySet>().Add(0x01, keySet))
-            .Match(
-                success => success,
-                error => ImmutableDictionary<byte, IKeySet>.Empty
-            );
-
-
-
-
-
+            .Match(success => success, error => ImmutableDictionary<byte, IKeySet>.Empty);
 }

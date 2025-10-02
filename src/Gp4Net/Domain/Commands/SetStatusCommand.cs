@@ -3,6 +3,7 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Transport;
 using WSCT.ISO7816;
+using static Gp4Net.Constants.Constants;
 
 namespace Gp4Net.Domain.Commands;
 
@@ -19,7 +20,7 @@ public sealed class SetStatusCommand : IApduCommand
     {
         _p1 = p1;
         _p2 = p2;
-        _data = Maybe<byte[]>.From(data).GetValueOrDefault([]);
+        _data = Maybe<byte[]>.From(data).Match(Some: d => d, None: () => []);
     }
 
     /// <inheritdoc />
@@ -135,12 +136,31 @@ public sealed class SetStatusCommand : IApduCommand
     /// <inheritdoc />
     public CommandAPDU ToApdu()
     {
-        return ToCommandApdu().GetValueOrDefault(new CommandAPDU([]));
+        return ToCommandApdu()
+            .Match(
+                onSuccess: apdu => apdu,
+                onFailure: _ => new CommandAPDU(
+                    GlobalPlatform.Cla.GP_STANDARD,
+                    GlobalPlatform.Ins.SET_STATUS,
+                    0x00,
+                    0x00
+                )
+            );
     }
 
     /// <inheritdoc />
     public byte[] ToBytes()
     {
-        return ToCommandApdu().Map(cmd => cmd.ToBytes()).GetValueOrDefault([]);
+        return ToCommandApdu()
+            .Match(
+                onSuccess: cmd => cmd.ToBytes(),
+                onFailure: _ =>
+                    new CommandAPDU(
+                        GlobalPlatform.Cla.GP_STANDARD,
+                        GlobalPlatform.Ins.SET_STATUS,
+                        0x00,
+                        0x00
+                    ).ToBytes()
+            );
     }
 }

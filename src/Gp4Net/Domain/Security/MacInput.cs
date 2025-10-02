@@ -7,11 +7,7 @@ namespace Gp4Net.Domain.Security;
 /// <param name="Bytes">The complete byte array for MAC calculation (CLA|INS|P1|P2|Lc|Data)</param>
 /// <param name="ExtractedMac">MAC bytes extracted from a secured command (empty for unsecured)</param>
 /// <param name="PlaintextData">The plaintext data portion without MAC (for secured commands)</param>
-public record MacInput(
-    byte[] Bytes,
-    byte[] ExtractedMac,
-    byte[] PlaintextData
-)
+public record MacInput(byte[] Bytes, byte[] ExtractedMac, byte[] PlaintextData)
 {
     /// <summary>
     /// Indicates whether this represents a secured command with an extracted MAC.

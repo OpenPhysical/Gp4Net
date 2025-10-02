@@ -36,10 +36,7 @@ public class AnalyzeExpCommand : AsyncCommand<AnalyzeExpCommand.Settings>
                 $"[cyan]Analyzing .exp file: {Markup.Escape(settings.ExpFilePath)}[/]"
             );
 
-            var analysis = await AnalyzeExpFileAsync(
-                settings.ExpFilePath,
-                settings.SdkVersion
-            );
+            var analysis = await AnalyzeExpFileAsync(settings.ExpFilePath, settings.SdkVersion);
 
             DisplayAnalysis(analysis, settings);
 

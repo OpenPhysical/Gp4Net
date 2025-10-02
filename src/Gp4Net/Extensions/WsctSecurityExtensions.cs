@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Security;
@@ -24,7 +23,8 @@ public static class WsctSecurityExtensions
     /// <returns>A MacInput record containing the bytes for MAC calculation and extracted components.</returns>
     public static Result<MacInput, SmartCardError> GetMacInput(
         this CommandAPDU command,
-        int macSize = 8)
+        int macSize = 8
+    )
     {
         return Maybe<CommandAPDU>
             .From(command)
@@ -34,7 +34,8 @@ public static class WsctSecurityExtensions
 
     private static Result<MacInput, SmartCardError> ExtractMacInputInternal(
         CommandAPDU command,
-        int macSize)
+        int macSize
+    )
     {
         var isSecured = (command.Cla & 0x04) != 0;
 
@@ -45,33 +46,34 @@ public static class WsctSecurityExtensions
             .From(fullCommand)
             .Where(bytes => bytes.Length >= 4)
             .ToResult(SmartCardError.InvalidData("Invalid command structure"))
-            .Bind(bytes => BuildMacInput(command, isSecured, macSize));
+            .Bind(_ => BuildMacInput(command, isSecured, macSize));
     }
 
     private static Result<MacInput, SmartCardError> BuildMacInput(
         CommandAPDU command,
         bool isSecured,
-        int macSize)
+        int macSize
+    )
     {
         var udc = Maybe<byte[]>.From(command.Udc);
 
         if (isSecured)
         {
-            return udc
-                .Where(data => data.Length >= macSize)
+            return udc.Where(data => data.Length >= macSize)
                 .Match(
                     Some: data => ExtractSecuredMacInput(command, data, macSize),
-                    None: () => BuildUnsecuredMacInput(command, udc)
+                    None: () => BuildUnsecuredMacInput(command, udc, macSize)
                 );
         }
 
-        return BuildUnsecuredMacInput(command, udc);
+        return BuildUnsecuredMacInput(command, udc, macSize);
     }
 
     private static Result<MacInput, SmartCardError> ExtractSecuredMacInput(
         CommandAPDU command,
         byte[] udcData,
-        int macSize)
+        int macSize
+    )
     {
         // MAC is the last 'macSize' bytes of Udc
         var extractedMac = new byte[macSize];
@@ -114,18 +116,30 @@ public static class WsctSecurityExtensions
         // Copy header and Lc
         Array.Copy(binaryCommand, 0, macInputBytes, 0, dataStartPos);
 
+        // Normalize CLA per GP E.4.4: remove logical channel indication
+        bool isSecured = (command.Cla & 0x04) != 0;
+        macInputBytes[0] = isSecured
+            ? Constants.Constants.Scp.Common.SECURE_CLA
+            : Constants.Constants.Scp.Common.STANDARD_CLA;
+
         // Update Lc value if needed to reflect plaintext data size
+        int secureLc = plaintextData.Length + macSize;
+        if (secureLc < macSize)
+        {
+            secureLc = macSize;
+        }
+
         if (dataStartPos == headerSize + 1)
         {
-            // Short Lc - update with plaintext length
-            macInputBytes[headerSize] = (byte)plaintextData.Length;
+            // Short Lc - update with plaintext length plus MAC
+            macInputBytes[headerSize] = (byte)secureLc;
         }
         else if (dataStartPos == headerSize + 3)
         {
-            // Extended Lc - update with plaintext length
+            // Extended Lc - update with plaintext length plus MAC
             macInputBytes[headerSize] = 0x00;
-            macInputBytes[headerSize + 1] = (byte)(plaintextData.Length >> 8);
-            macInputBytes[headerSize + 2] = (byte)(plaintextData.Length & 0xFF);
+            macInputBytes[headerSize + 1] = (byte)(secureLc >> 8);
+            macInputBytes[headerSize + 2] = (byte)(secureLc & 0xFF);
         }
 
         // Copy plaintext data
@@ -135,51 +149,58 @@ public static class WsctSecurityExtensions
         }
 
         return Result.Success<MacInput, SmartCardError>(
-            new MacInput(macInputBytes, extractedMac, plaintextData));
+            new MacInput(macInputBytes, extractedMac, plaintextData)
+        );
     }
 
     private static Result<MacInput, SmartCardError> BuildUnsecuredMacInput(
         CommandAPDU command,
-        Maybe<byte[]> udc)
+        Maybe<byte[]> udc,
+        int macSize
+    )
     {
-        var udcData = udc.GetValueOrDefault(Array.Empty<byte>());
-
-        // Get the full binary command
-        var binaryCommand = command.BinaryCommand;
-
-        // For MAC calculation, we need CLA|INS|P1|P2|Lc|Data (no Le)
-        // Check if Le is present by examining the command structure
-        var macInputBytes = binaryCommand;
-
-        // Le is present if command has Le property set
-        var le = Maybe<byte>.From((byte)command.Le);
-        if (le.HasValue)
+        var udcData = udc.GetValueOrDefault([]);
+        int dataLength = udcData.Length;
+        int lcWithMac = dataLength + macSize;
+        if (lcWithMac < macSize)
         {
-            // Find where Le bytes start
-            // Structure: Header(4) + Lc(1-3) + Data + Le(1-2)
-            var headerSize = 4;
-            var dataSize = udcData.Length;
+            lcWithMac = macSize;
+        }
 
-            // Determine Lc size
-            var lcSize = 1;
-            if (binaryCommand.Length > headerSize && binaryCommand[headerSize] == 0x00)
+        bool requiresExtendedLc =
+            lcWithMac > byte.MaxValue
+            || (command.BinaryCommand.Length > 5 && command.BinaryCommand[4] == 0x00);
+
+        int headerSize = requiresExtendedLc ? 4 + 3 : 4 + (lcWithMac > 0 ? 1 : 0);
+        int totalSize = headerSize + dataLength;
+        var macInputBytes = new byte[totalSize];
+
+        int offset = 0;
+        macInputBytes[offset++] = Constants.Constants.Scp.Common.SECURE_CLA;
+        macInputBytes[offset++] = command.Ins;
+        macInputBytes[offset++] = command.P1;
+        macInputBytes[offset++] = command.P2;
+
+        if (lcWithMac > 0)
+        {
+            if (requiresExtendedLc)
             {
-                lcSize = 3;
+                macInputBytes[offset++] = 0x00;
+                macInputBytes[offset++] = (byte)(lcWithMac >> 8);
+                macInputBytes[offset++] = (byte)(lcWithMac & 0xFF);
             }
-
-            // Calculate where Le starts
-            var leStartPos = headerSize + lcSize + dataSize;
-
-            // Copy everything except Le
-            if (leStartPos < binaryCommand.Length)
+            else
             {
-                macInputBytes = new byte[leStartPos];
-                Array.Copy(binaryCommand, 0, macInputBytes, 0, leStartPos);
+                macInputBytes[offset++] = (byte)lcWithMac;
             }
         }
 
-        return Result.Success<MacInput, SmartCardError>(
-            new MacInput(macInputBytes, Array.Empty<byte>(), udcData));
+        if (dataLength > 0)
+        {
+            Array.Copy(udcData, 0, macInputBytes, offset, dataLength);
+        }
+
+        return Result.Success<MacInput, SmartCardError>(new MacInput(macInputBytes, [], udcData));
     }
 
     /// <summary>
@@ -190,25 +211,27 @@ public static class WsctSecurityExtensions
     /// <returns>A new CommandAPDU with the MAC appended and secure messaging bit set.</returns>
     public static Result<CommandAPDU, SmartCardError> WithMac(
         this CommandAPDU plaintext,
-        byte[] mac)
+        byte[] mac
+    )
     {
         return Maybe<CommandAPDU>
             .From(plaintext)
             .ToResult(SmartCardError.InvalidArgument("Plaintext command cannot be null"))
-            .Bind(cmd => Maybe<byte[]>
-                .From(mac)
-                .Where(m => m.Length > 0)
-                .ToResult(SmartCardError.InvalidArgument("MAC cannot be null or empty"))
-                .Bind(m => ApplyMacInternal(cmd, m)));
+            .Bind(cmd =>
+                Maybe<byte[]>
+                    .From(mac)
+                    .Where(m => m.Length > 0)
+                    .ToResult(SmartCardError.InvalidArgument("MAC cannot be null or empty"))
+                    .Bind(m => ApplyMacInternal(cmd, m))
+            );
     }
 
     private static Result<CommandAPDU, SmartCardError> ApplyMacInternal(
         CommandAPDU plaintext,
-        byte[] mac)
+        byte[] mac
+    )
     {
-        var plaintextData = Maybe<byte[]>
-            .From(plaintext.Udc)
-            .GetValueOrDefault(Array.Empty<byte>());
+        var plaintextData = Maybe<byte[]>.From(plaintext.Udc).GetValueOrDefault([]);
 
         // Append MAC to existing data
         var securedData = new byte[plaintextData.Length + mac.Length];
@@ -225,7 +248,7 @@ public static class WsctSecurityExtensions
             P1 = plaintext.P1,
             P2 = plaintext.P2,
             Udc = securedData,
-            Le = plaintext.Le  // WSCT preserves and handles Le properly
+            Le = plaintext.Le, // WSCT preserves and handles Le properly
         };
 
         return Result.Success<CommandAPDU, SmartCardError>(secured);
@@ -239,7 +262,8 @@ public static class WsctSecurityExtensions
     /// <returns>A new CommandAPDU without the MAC and with the secure bit cleared.</returns>
     public static Result<CommandAPDU, SmartCardError> WithoutMac(
         this CommandAPDU secured,
-        int macSize = 8)
+        int macSize = 8
+    )
     {
         return Maybe<CommandAPDU>
             .From(secured)
@@ -249,7 +273,8 @@ public static class WsctSecurityExtensions
 
     private static Result<CommandAPDU, SmartCardError> RemoveMacInternal(
         CommandAPDU secured,
-        int macSize)
+        int macSize
+    )
     {
         // If not secured, return as-is
         if ((secured.Cla & 0x04) == 0)
@@ -274,7 +299,7 @@ public static class WsctSecurityExtensions
             Ins = secured.Ins,
             P1 = secured.P1,
             P2 = secured.P2,
-            Udc = plaintextData
+            Udc = plaintextData,
         };
 
         return Result.Success<CommandAPDU, SmartCardError>(plaintext);

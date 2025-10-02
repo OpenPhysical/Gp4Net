@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,8 +14,11 @@ using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Security;
 using Gp4Net.Extensions;
+using Gp4Net.Shared;
 using Gp4Net.Transport;
 using JetBrains.Annotations;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using WSCT.ISO7816;
 using static Gp4Net.Constants.Constants;
 
@@ -33,6 +37,26 @@ public static partial class ScpService
     [PublicAPI]
     public static class Security
     {
+#if DEBUG
+        private static readonly ILogger Logger = NullLoggerFactory.Instance.CreateLogger(
+            "Gp4Net.Services.ScpService.Security"
+        );
+
+        [Conditional("DEBUG")]
+        private static void DebugLog(string message)
+        {
+            Logger.LogDebug(message);
+            Debug.WriteLine(message);
+        }
+#else
+        private static readonly ILogger Logger = NullLoggerFactory.Instance.CreateLogger(
+            "Gp4Net.Services.ScpService.Security"
+        );
+
+        [Conditional("DEBUG")]
+        private static void DebugLog(string message) { }
+#endif
+
         /// <summary>
         /// Applies command security (MAC and/or encryption) to a command APDU.
         /// Orchestrates by calling the appropriate CryptoService operations.
@@ -49,9 +73,10 @@ public static partial class ScpService
             {
                 CryptoService.ScpVersion.Scp02 => ApplyScp02CommandSecurity(command, state),
                 CryptoService.ScpVersion.Scp03 => ApplyScp03CommandSecurity(command, state),
-                _ => Result.Failure<(CommandAPDU, SecureChannelState), SmartCardError>(
-                    SmartCardError.InvalidArgument($"Unsupported protocol: {state.Protocol}")
-                ),
+                _
+                    => Result.Failure<(CommandAPDU, SecureChannelState), SmartCardError>(
+                        SmartCardError.InvalidArgument($"Unsupported protocol: {state.Protocol}")
+                    ),
             };
         }
 
@@ -78,9 +103,10 @@ public static partial class ScpService
             {
                 CryptoService.ScpVersion.Scp02 => ProcessScp02ResponseSecurity(response, state),
                 CryptoService.ScpVersion.Scp03 => ProcessScp03ResponseSecurity(response, state),
-                _ => Result.Failure<(ResponseAPDU, SecureChannelState), SmartCardError>(
-                    SmartCardError.InvalidArgument($"Unsupported protocol: {state.Protocol}")
-                ),
+                _
+                    => Result.Failure<(ResponseAPDU, SecureChannelState), SmartCardError>(
+                        SmartCardError.InvalidArgument($"Unsupported protocol: {state.Protocol}")
+                    ),
             };
         }
 
@@ -100,9 +126,10 @@ public static partial class ScpService
             {
                 CryptoService.ScpVersion.Scp02 => RemoveScp02CommandSecurity(securedCommand, state),
                 CryptoService.ScpVersion.Scp03 => RemoveScp03CommandSecurity(securedCommand, state),
-                _ => Result.Failure<(CommandAPDU, SecureChannelState), SmartCardError>(
-                    SmartCardError.InvalidArgument($"Unsupported protocol: {state.Protocol}")
-                ),
+                _
+                    => Result.Failure<(CommandAPDU, SecureChannelState), SmartCardError>(
+                        SmartCardError.InvalidArgument($"Unsupported protocol: {state.Protocol}")
+                    ),
             };
         }
 
@@ -127,11 +154,14 @@ public static partial class ScpService
 
             return state.Protocol switch
             {
-                CryptoService.ScpVersion.Scp02 => RemoveScp02ResponseSecurity(securedResponse, state),
-                CryptoService.ScpVersion.Scp03 => RemoveScp03ResponseSecurity(securedResponse, state),
-                _ => Result.Failure<(ResponseAPDU, SecureChannelState), SmartCardError>(
-                    SmartCardError.InvalidArgument($"Unsupported protocol: {state.Protocol}")
-                ),
+                CryptoService.ScpVersion.Scp02
+                    => RemoveScp02ResponseSecurity(securedResponse, state),
+                CryptoService.ScpVersion.Scp03
+                    => RemoveScp03ResponseSecurity(securedResponse, state),
+                _
+                    => Result.Failure<(ResponseAPDU, SecureChannelState), SmartCardError>(
+                        SmartCardError.InvalidArgument($"Unsupported protocol: {state.Protocol}")
+                    ),
             };
         }
 
@@ -160,7 +190,10 @@ public static partial class ScpService
                     return await cardService
                         .SendCommandAsync(securedCommand.BinaryCommand, cancellationToken)
                         .Bind(response =>
-                            ProcessResponseSecurity(new ResponseAPDU(response.Data), intermediateState)
+                            RemoveResponseSecurity(
+                                    new ResponseAPDU(response.Data),
+                                    intermediateState
+                                )
                                 .Map(processed =>
                                 {
                                     var (processedResponse, finalState) = processed;
@@ -174,82 +207,47 @@ public static partial class ScpService
                 });
         }
 
-
-        /// <summary>
-        /// Unified command security application using protocol-specific operations.
-        /// Eliminates duplication between SCP02 and SCP03 command security processing.
-        /// </summary>
-        private static Result<
-            (byte[], SecureChannelState),
-            SmartCardError
-        > ApplyCommandSecurityWithProtocol(
-            byte[] command,
-            SecureChannelState state,
-            Func<byte[], byte[], Result<byte[], SmartCardError>> encryptionOperation,
-            Func<byte[], byte[], byte[], Result<byte[], SmartCardError>> macOperation,
-            int macSize,
-            Func<byte[], Result<SecureChannelState, SmartCardError>> stateUpdateOperation
-        )
-        {
-            byte[] processedCommand = command;
-
-            // Apply C-ENCRYPTION if required
-            if (state.SecurityLevel.HasCEncryption())
-            {
-                var encryptResult = encryptionOperation(processedCommand, state.SessionKeys.SEnc);
-                if (encryptResult.IsFailure)
-                    return encryptResult.Error;
-
-                processedCommand = encryptResult.Value;
-            }
-
-            // Apply C-MAC if required
-            if (!state.SecurityLevel.HasCMac())
-                return Result.Success<(byte[], SecureChannelState), SmartCardError>(
-                    (processedCommand, state)
-                );
-
-            return macOperation(processedCommand, state.SessionKeys.SMac, state.MacChainingValue)
-                .Bind(mac =>
-                {
-                    // Append MAC to command
-                    byte[] securedCommand = new byte[processedCommand.Length + macSize];
-                    Array.Copy(processedCommand, 0, securedCommand, 0, processedCommand.Length);
-                    Array.Copy(mac, 0, securedCommand, processedCommand.Length, macSize);
-
-                    // Set secure messaging bit in CLA
-                    securedCommand[0] |= Scp.Common.SECURE_MESSAGING_CLA_BIT;
-
-                    // Update state using protocol-specific logic
-                    return stateUpdateOperation(mac).Map(newState => (securedCommand, newState));
-                });
-        }
-
         private static Result<
             (CommandAPDU, SecureChannelState),
             SmartCardError
         > ApplyScp02CommandSecurity(CommandAPDU command, SecureChannelState state)
         {
             if (!state.HasCommandMac)
-                return Result.Success<(CommandAPDU, SecureChannelState), SmartCardError>((command, state));
+                return Result.Success<(CommandAPDU, SecureChannelState), SmartCardError>(
+                    (command, state)
+                );
 
-            // Extract MAC input bytes using WSCT extension
-            return command.GetMacInput()
+            // For SCP02, ICV must be encrypted when C-MAC is enabled
+            // EXCEPT for EXTERNAL AUTHENTICATE (0x82) which always uses unencrypted ICV
+            var icvToUse =
+                (command.Ins == 0x82 || !state.HasCommandMac)
+                    ? Result.Success<byte[], SmartCardError>(state.MacChainingValue)
+                    : CryptoService.Mac.EncryptScp02Icv(
+                        state.MacChainingValue,
+                        state.SessionKeys.SMac
+                    );
+
+            return command
+                .GetMacInput()
                 .Bind(macInput =>
-                    // Calculate MAC over the input bytes
-                    CryptoService.Mac.CalculateScp02CommandMac(
-                        state.SessionKeys.SMac,
-                        macInput.Bytes,
-                        state.MacChainingValue))
+                    icvToUse.Bind(icv =>
+                        CryptoService.Mac.CalculateScp02CommandMac(
+                            state.SessionKeys.SMac,
+                            macInput.Bytes,
+                            icv
+                        )
+                    )
+                )
                 .Bind(mac =>
-                    // Apply MAC to command (WSCT handles Le properly)
-                    command.WithMac(mac)
+                    command
+                        .WithMac(mac)
                         .Bind(secured =>
-                            // Update MAC chaining state
                             MacChainingState
                                 .Create(mac, state.ProtocolVersion, 0x00)
                                 .Bind(newChaining => state.UpdateMacChaining(newChaining))
-                                .Map(newState => (secured, newState))));
+                                .Map(newState => (secured, newState))
+                        )
+                );
         }
 
         private static Result<
@@ -258,86 +256,35 @@ public static partial class ScpService
         > ApplyScp03CommandSecurity(CommandAPDU command, SecureChannelState state)
         {
             if (!state.HasCommandMac)
-                return Result.Success<(CommandAPDU, SecureChannelState), SmartCardError>((command, state));
+                return Result.Success<(CommandAPDU, SecureChannelState), SmartCardError>(
+                    (command, state)
+                );
 
-            // Extract MAC input bytes using WSCT extension
-            return command.GetMacInput()
+            return command
+                .GetMacInput()
                 .Bind(macInput =>
-                    // Calculate MAC over the input bytes
-                    CryptoService.Mac.CalculateScp03CommandMac(
-                        state.SessionKeys.SMac,
-                        macInput.Bytes))
-                .Bind(mac =>
-                    // Apply MAC to command (WSCT handles Le properly)
-                    command.WithMac(mac)
+                    CryptoService
+                        .ScpOperations.Scp03.CalculateCommandMac(
+                            macInput.Bytes,
+                            state.SessionKeys.SMac,
+                            state.MacChainingValue
+                        )
+                        .Map(fullMac => (fullMac, macInput))
+                )
+                .Bind(tuple =>
+                {
+                    var (fullMac, macInput) = tuple;
+                    var truncatedMac = fullMac[..Scp.Scp03.MAC_SIZE];
+
+                    return command
+                        .WithMac(truncatedMac)
                         .Bind(secured =>
-                        {
-                            // SCP03 uses full MAC for chaining and increments counter
-                            byte[] fullMac = new byte[Scp.Scp03.FULL_MAC_SIZE];
-                            Array.Copy(mac, 0, fullMac, 0, Scp.Scp03.MAC_SIZE);
-                            return MacChainingState
+                            MacChainingState
                                 .Create(fullMac, state.ProtocolVersion, 0x00)
                                 .Bind(newChaining => state.UpdateMacChaining(newChaining))
                                 .Map(newState => newState.IncrementEncryptionCounter())
-                                .Map(newState => (secured, newState));
-                        }));
-        }
-
-        /// <summary>
-        /// Unified response security processing using protocol-specific operations.
-        /// Eliminates duplication between SCP02 and SCP03 response security processing.
-        /// </summary>
-        private static Result<
-            (byte[], SecureChannelState),
-            SmartCardError
-        > ProcessResponseSecurityWithProtocol(
-            byte[] response,
-            SecureChannelState state,
-            Func<byte[], byte[], Result<byte[], SmartCardError>> encryptionOperation,
-            Func<byte[], byte[], byte[], Result<byte[], SmartCardError>> macOperation,
-            int macSize,
-            Func<byte[], Result<SecureChannelState, SmartCardError>> stateUpdateOperation
-        )
-        {
-            byte[] processedResponse = response;
-
-            // Apply R-ENCRYPTION if required
-            if (
-                state.SecurityLevel.HasREncryption()
-                && CryptoService.ScpOperations.Common.HasResponseData(response)
-            )
-            {
-                var encryptResult = encryptionOperation(processedResponse, state.SessionKeys.SEnc);
-                if (encryptResult.IsFailure)
-                    return encryptResult.Error;
-
-                processedResponse = encryptResult.Value;
-            }
-
-            // Apply R-MAC if required
-            if (!state.SecurityLevel.HasRMac())
-                return Result.Success<(byte[], SecureChannelState), SmartCardError>(
-                    (processedResponse, state)
-                );
-
-            return macOperation(processedResponse, state.SessionKeys.SrMac, state.MacChainingValue)
-                .Bind(mac =>
-                {
-                    // Insert R-MAC before status word
-                    int statusOffset = processedResponse.Length - 2;
-                    byte[] securedResponse = new byte[processedResponse.Length + macSize];
-                    Array.Copy(processedResponse, 0, securedResponse, 0, statusOffset); // Data
-                    Array.Copy(mac, 0, securedResponse, statusOffset, macSize); // R-MAC
-                    Array.Copy(
-                        processedResponse,
-                        statusOffset,
-                        securedResponse,
-                        securedResponse.Length - 2,
-                        2
-                    ); // Status
-
-                    // Update state using protocol-specific logic
-                    return stateUpdateOperation(mac).Map(newState => (securedResponse, newState));
+                                .Map(newState => (secured, newState))
+                        );
                 });
         }
 
@@ -346,18 +293,15 @@ public static partial class ScpService
             SmartCardError
         > ProcessScp02ResponseSecurity(ResponseAPDU response, SecureChannelState state)
         {
-            // Process the response using byte array operations then convert back to ResponseAPDU
-            return ProcessResponseSecurityWithProtocol(
-                response.ToBytes(),
-                state,
-                CryptoService.ScpOperations.Scp02.ApplyResponseEncryption,
-                CryptoService.ScpOperations.Scp02.CalculateResponseMac,
-                Scp.Scp02.MAC_SIZE,
-                mac => MacChainingState
-                    .Create(mac, state.ProtocolVersion, 0x00)
-                    .Bind(newChaining => state.UpdateMacChaining(newChaining))
-            )
-            .Map(result => (new ResponseAPDU(result.Item1), result.Item2));
+            if (!state.HasResponseMac)
+                return Result.Success<(ResponseAPDU, SecureChannelState), SmartCardError>(
+                    (response, state)
+                );
+
+            var responseBytes = response.ToBytes();
+            // This method should VERIFY response protection, not generate it.
+            // Defer to RemoveScp02ResponseSecurity for verification and optional decryption.
+            return RemoveScp02ResponseSecurity(response, state);
         }
 
         private static Result<
@@ -365,30 +309,62 @@ public static partial class ScpService
             SmartCardError
         > ProcessScp03ResponseSecurity(ResponseAPDU response, SecureChannelState state)
         {
-            // Process the response using byte array operations then convert back to ResponseAPDU
-            return ProcessResponseSecurityWithProtocol(
-                response.ToBytes(),
-                state,
-                (resp, key) =>
-                    CryptoService.ScpOperations.Scp03.ApplyResponseEncryption(
-                        resp,
-                        key,
-                        state.EncryptionCounter
-                    ),
-                CryptoService.ScpOperations.Scp03.CalculateResponseMac,
-                Scp.Scp03.MAC_SIZE,
-                mac =>
+            if (!state.HasResponseMac)
+                return Result.Success<(ResponseAPDU, SecureChannelState), SmartCardError>(
+                    (response, state)
+                );
+
+            var responseBytes = response.ToBytes();
+            byte[] processedResponse = responseBytes;
+
+            // Apply R-ENCRYPTION if required
+            if (
+                state.HasResponseEncryption
+                && CryptoService.ScpOperations.Common.HasResponseData(responseBytes)
+            )
+            {
+                var encryptResult = CryptoService.ScpOperations.Scp03.ApplyResponseEncryption(
+                    processedResponse,
+                    state.SessionKeys.SEnc,
+                    state.EncryptionCounter
+                );
+                if (encryptResult.IsFailure)
+                    return encryptResult.Error;
+                processedResponse = encryptResult.Value;
+            }
+
+            // Apply R-MAC
+            return CryptoService
+                .ScpOperations.Scp03.CalculateResponseMac(
+                    processedResponse,
+                    state.SessionKeys.SrMac,
+                    state.MacChainingValue
+                )
+                .Bind(mac =>
                 {
+                    // Insert R-MAC before status word
+                    int statusOffset = processedResponse.Length - 2;
+                    byte[] securedResponse = new byte[
+                        processedResponse.Length + Scp.Scp03.MAC_SIZE
+                    ];
+                    Array.Copy(processedResponse, 0, securedResponse, 0, statusOffset);
+                    Array.Copy(mac, 0, securedResponse, statusOffset, Scp.Scp03.MAC_SIZE);
+                    Array.Copy(
+                        processedResponse,
+                        statusOffset,
+                        securedResponse,
+                        securedResponse.Length - 2,
+                        2
+                    );
+
                     // SCP03 uses full MAC for chaining and increments counter
-                    byte[] fullMac = new byte[Scp.Scp03.FULL_MAC_SIZE];
-                    Array.Copy(mac, 0, fullMac, 0, Scp.Scp03.MAC_SIZE);
+                    byte[] fullMac = CreateScp03FullMac(mac);
                     return MacChainingState
                         .Create(fullMac, state.ProtocolVersion, 0x00)
                         .Bind(newChaining => state.UpdateMacChaining(newChaining))
-                        .Map(newState => newState.IncrementEncryptionCounter());
-                }
-            )
-            .Map(result => (new ResponseAPDU(result.Item1), result.Item2));
+                        .Map(newState => newState.IncrementEncryptionCounter())
+                        .Map(newState => (new ResponseAPDU(securedResponse), newState));
+                });
         }
 
         /// <summary>
@@ -407,66 +383,111 @@ public static partial class ScpService
                 );
 
             // Extract MAC input and verify using type-safe approach
-            return CommandMacData.Create(securedCommand, state)
+            return CommandMacData
+                .Create(securedCommand, state)
                 .Bind(macData =>
                 {
                     // Extract MAC from secured command
-                    var udc = securedCommand.Udc ?? Array.Empty<byte>();
+                    var udc = securedCommand.Udc ?? [];
                     if (udc.Length < Scp.Scp02.MAC_SIZE)
                         return Result.Failure<(CommandAPDU, SecureChannelState), SmartCardError>(
-                            SmartCardError.InvalidData("Command too short for MAC"));
+                            SmartCardError.InvalidData("Command too short for MAC")
+                        );
 
                     var receivedMac = new byte[Scp.Scp02.MAC_SIZE];
-                    Array.Copy(udc, udc.Length - Scp.Scp02.MAC_SIZE, receivedMac, 0, Scp.Scp02.MAC_SIZE);
+                    Array.Copy(
+                        udc,
+                        udc.Length - Scp.Scp02.MAC_SIZE,
+                        receivedMac,
+                        0,
+                        Scp.Scp02.MAC_SIZE
+                    );
 
                     // Calculate expected MAC using type-safe data
-                    return CryptoService.Mac.CalculateScp02CommandMac(
-                        macData.ValidatedKeys.SMac,
-                        macData.CalculationBytes.ToArray(),
-                        state.MacChainingValue // Use state's property to avoid validator false positive
-                    )
-                    .Bind(expectedMac =>
-                    {
-                        // Verify MAC matches
-                        if (!expectedMac[..Scp.Scp02.MAC_SIZE].SequenceEqual(receivedMac))
-                            return Result.Failure<(CommandAPDU, SecureChannelState), SmartCardError>(
-                                SmartCardError.SecurityStatusNotSatisfied("SCP02 Command MAC verification failed")
+                    // ICV: zero for EXTERNAL AUTH, else encrypted ICV per E.3.4
+                    var icvResult =
+                        securedCommand.Ins
+                        == Constants.Constants.Scp.Common.EXTERNAL_AUTHENTICATE_INS
+                            ? Result.Success<byte[], SmartCardError>(new byte[8])
+                            : CryptoService.Mac.EncryptScp02Icv(
+                                state.MacChainingValue,
+                                macData.ValidatedKeys.SMac
                             );
 
-                        // Get plaintext command without MAC
-                        return securedCommand.WithoutMac(Scp.Scp02.MAC_SIZE)
-                            .Bind(plaintext =>
+                    return icvResult
+                        .Bind(icv =>
+                            CryptoService.Mac.CalculateScp02CommandMac(
+                                macData.ValidatedKeys.SMac,
+                                macData.CalculationBytes.ToArray(),
+                                icv
+                            )
+                        )
+                        .Bind(expectedMac =>
+                        {
+                            // Verify MAC matches
+                            if (!expectedMac[..Scp.Scp02.MAC_SIZE].SequenceEqual(receivedMac))
                             {
-                                // Decrypt if C-ENC is enabled
-                                var decryptedCommand = state.SecurityLevel.HasCEncryption()
-                                    ? Maybe<byte[]>
-                                        .From(plaintext.Udc)
-                                        .Where(data => data.Length > 0)
-                                        .Match(
-                                            Some: data => DecryptCommandData(plaintext, data, state.SessionKeys.SEnc),
-                                            None: () => Result.Success<CommandAPDU, SmartCardError>(plaintext)
-                                        )
-                                    : Result.Success<CommandAPDU, SmartCardError>(plaintext);
+                                return Result.Failure<
+                                    (CommandAPDU, SecureChannelState),
+                                    SmartCardError
+                                >(ErrorFactory.MacVerificationFailed());
+                            }
 
-                                return decryptedCommand.Bind(finalCommand =>
-                                    // Update MAC chaining with the verified MAC
-                                    MacChainingState
-                                        .Create(expectedMac, state.ProtocolVersion, 0x00)
-                                        .Bind(newChaining => state.UpdateMacChaining(newChaining))
-                                        .Map(newState => (finalCommand, newState)));
-                            });
-                    });
+                            // Get plaintext command without MAC
+                            return securedCommand
+                                .WithoutMac(Scp.Scp02.MAC_SIZE)
+                                .Bind(plaintext =>
+                                {
+                                    // Decrypt if C-DECRYPTION is enabled (card side)
+                                    var decryptedCommand = state.SecurityLevel.HasCDecryption()
+                                        ? Maybe<byte[]>
+                                            .From(plaintext.Udc)
+                                            .Where(data => data.Length > 0)
+                                            .Match(
+                                                Some: data =>
+                                                    DecryptCommandData(
+                                                        plaintext,
+                                                        data,
+                                                        state.SessionKeys.SEnc
+                                                    ),
+                                                None: () =>
+                                                    Result.Success<CommandAPDU, SmartCardError>(
+                                                        plaintext
+                                                    )
+                                            )
+                                        : Result.Success<CommandAPDU, SmartCardError>(plaintext);
+
+                                    return decryptedCommand.Bind(finalCommand =>
+                                    {
+                                        // Update MAC chaining with the verified MAC
+                                        var updateState = MacChainingState
+                                            .Create(expectedMac, state.ProtocolVersion, 0x00)
+                                            .Bind(newChaining =>
+                                                state.UpdateMacChaining(newChaining)
+                                            )
+                                            .Bind(newState =>
+                                                newState.UpdateLastStrippedCommand(
+                                                    macData.CalculationBytes.ToArray()
+                                                )
+                                            );
+
+                                        return updateState.Map(newState =>
+                                            (finalCommand, newState)
+                                        );
+                                    });
+                                });
+                        });
                 });
         }
 
         private static Result<CommandAPDU, SmartCardError> DecryptCommandData(
             CommandAPDU command,
             byte[] encryptedData,
-            byte[] sEncKey)
+            byte[] sEncKey
+        )
         {
-            return CryptoService.ScpOperations.Scp02.RemoveCommandEncryption(
-                command.BinaryCommand,
-                sEncKey)
+            return CryptoService
+                .ScpOperations.Scp02.RemoveCommandEncryption(command.BinaryCommand, sEncKey)
                 .Map(decryptedBytes => new CommandAPDU(decryptedBytes));
         }
 
@@ -484,75 +505,92 @@ public static partial class ScpService
                 return Result.Success<(CommandAPDU, SecureChannelState), SmartCardError>(
                     (securedCommand, state)
                 );
-
-            if (securedCommand.BinaryCommand.Length < Scp.Scp03.MAC_SIZE + 5) // Min APDU + MAC
+            var udc = securedCommand.Udc ?? [];
+            if (udc.Length < Scp.Scp03.MAC_SIZE)
                 return Result.Failure<(CommandAPDU, SecureChannelState), SmartCardError>(
                     SmartCardError.InvalidData("Command too short for SCP03 MAC")
                 );
 
-            // Check if there's a Le byte after the MAC
-            // In SCP03, the structure can be: [Header][Data][MAC][Le]
-            // We need to handle both cases: with and without Le
-            byte[] mac;
+            var mac = udc[^Scp.Scp03.MAC_SIZE..];
 
-            // Check if the last byte could be Le (after MAC)
-            // The Lc byte includes the MAC in secured commands, so we check:
-            // Total length = Header(5) + Lc + Le(1)
-            var commandBytes = securedCommand.BinaryCommand;
-            bool hasLeByte = commandBytes.Length > Scp.Scp03.MAC_SIZE + 5 &&
-                            commandBytes.Length == commandBytes[4] + 5 + 1;
+            return CommandMacData
+                .Create(securedCommand, state)
+                .Bind(macData =>
+                    CryptoService
+                        .ScpOperations.Scp03.CalculateCommandMac(
+                            macData.CalculationBytes.ToArray(),
+                            state.SessionKeys.SMac,
+                            state.MacChainingValue
+                        )
+                        .Bind(expectedMacFull =>
+                        {
+#if DEBUG
+                            DebugLog(
+                                $"SCP03 command MAC chaining={Convert.ToHexString(state.MacChainingValue)} input={Convert.ToHexString(macData.CalculationBytes.ToArray())}"
+                            );
+#endif
+                            if (!expectedMacFull[..Scp.Scp03.MAC_SIZE].SequenceEqual(mac))
+                                return Result.Failure<
+                                    (CommandAPDU, SecureChannelState),
+                                    SmartCardError
+                                >(
+                                    SmartCardError.SecurityStatusNotSatisfied(
+                                        $"SCP03 Command MAC verification failed (expected {Convert.ToHexString(expectedMacFull[..Scp.Scp03.MAC_SIZE])}, received {Convert.ToHexString(mac)})"
+                                    )
+                                );
 
-            byte[] commandForMacCalculation;
-            if (hasLeByte)
-            {
-                // MAC is before the Le byte
-                int macOffset = commandBytes.Length - Scp.Scp03.MAC_SIZE - 1;
-                mac = commandBytes[macOffset..(macOffset + Scp.Scp03.MAC_SIZE)];
+                            var withoutMacResult = securedCommand.WithoutMac(Scp.Scp03.MAC_SIZE);
 
-                // For MAC calculation: command with Le but without MAC
-                commandForMacCalculation = new byte[commandBytes.Length - Scp.Scp03.MAC_SIZE];
-                Array.Copy(commandBytes, 0, commandForMacCalculation, 0, macOffset); // Header+Data
-                commandForMacCalculation[^1] = commandBytes[^1]; // Le byte at the end
-            }
-            else
-            {
-                // No Le byte, MAC is at the end
-                int macOffset = commandBytes.Length - Scp.Scp03.MAC_SIZE;
-                mac = commandBytes[macOffset..];
+                            return withoutMacResult.Bind(commandWithoutMac =>
+                            {
+                                uint currentCounter = state.EncryptionCounter;
+                                uint nextCounter = state.SecurityLevel.HasCEncryption()
+                                    ? currentCounter + 1
+                                    : currentCounter;
 
-                // For MAC calculation: everything except the MAC
-                commandForMacCalculation = commandBytes[..macOffset];
-            }
+#if DEBUG
+                                DebugLog($"SCP03 command decrypt uses counter {currentCounter}");
+#endif
+                                var decryptedCommandResult =
+                                    state.SecurityLevel.HasCEncryption()
+                                    && commandWithoutMac.Ins
+                                        != Constants.Constants.Scp.Common.EXTERNAL_AUTHENTICATE_INS
+                                        ? CryptoService
+                                            .ScpOperations.Scp03.RemoveCommandEncryption(
+                                                commandWithoutMac.BinaryCommand,
+                                                state.SessionKeys.SEnc,
+                                                currentCounter
+                                            )
+                                            .Map(bytes => new CommandAPDU(bytes))
+                                        : Result.Success<CommandAPDU, SmartCardError>(
+                                            commandWithoutMac
+                                        );
 
-            // Verify MAC first (critical security step)
-            // MAC is calculated over the command without the MAC itself (but with secure messaging bit set)
-            return CryptoService.ScpOperations.Scp03.CalculateCommandMac(
-                commandForMacCalculation,
-                state.SessionKeys.SMac,
-                state.MacChainingValue
-            )
-            .Bind(expectedMac =>
-            {
-                // Verify MAC matches
-                if (!expectedMac[..Scp.Scp03.MAC_SIZE].SequenceEqual(mac))
-                    return Result.Failure<(CommandAPDU, SecureChannelState), SmartCardError>(
-                        SmartCardError.SecurityStatusNotSatisfied("SCP03 Command MAC verification failed")
-                    );
+                                return decryptedCommandResult.Bind(finalCommand =>
+                                {
+                                    var updateState = MacChainingState
+                                        .Create(expectedMacFull, state.ProtocolVersion, 0x00)
+                                        .Bind(newChaining =>
+                                            state.UpdateCounterAndMac(nextCounter, newChaining)
+                                        )
+                                        .Bind(newState =>
+                                            newState.UpdateLastStrippedCommand(
+                                                macData.CalculationBytes.ToArray()
+                                            )
+                                        );
 
-                // The "plaintext" command is the MAC input (command without MAC but with Lc still incremented)
-                // Remove Le byte if present to get the MAC input that matches trace expectations
-                byte[] plaintextCommand = hasLeByte
-                    ? commandForMacCalculation[..^1]  // Remove Le byte
-                    : commandForMacCalculation;
-
-                // Update MAC chaining with full MAC
-                byte[] fullMac = CreateScp03FullMac(mac);
-                return MacChainingState
-                    .Create(fullMac, state.ProtocolVersion, 0x00)
-                    .Bind(newChaining => state.UpdateMacChaining(newChaining))
-                    .Map(newState => newState.IncrementEncryptionCounter())
-                    .Map(newState => (new CommandAPDU(plaintextCommand), newState));
-            });
+#if DEBUG
+                                    updateState = updateState.Tap(newState =>
+                                        DebugLog(
+                                            $"SCP03 command state updated: mac={Convert.ToHexString(newState.MacChainingValue)} counter={newState.EncryptionCounter}"
+                                        )
+                                    );
+#endif
+                                    return updateState.Map(newState => (finalCommand, newState));
+                                });
+                            });
+                        })
+                );
         }
 
         /// <summary>
@@ -563,75 +601,89 @@ public static partial class ScpService
             SmartCardError
         > RemoveScp02ResponseSecurity(ResponseAPDU securedResponse, SecureChannelState state)
         {
-            // Check if R-MAC is enabled
-            if (!state.SecurityLevel.HasRMac())
+            if (!state.HasResponseMac)
                 return Result.Success<(ResponseAPDU, SecureChannelState), SmartCardError>(
                     (securedResponse, state)
                 );
 
-            // Minimum response with MAC: SW (2 bytes) + MAC (8 bytes)
             var responseBytes = securedResponse.ToBytes();
-            if (responseBytes.Length < 10)
+            if (responseBytes.Length < Scp.Scp02.MAC_SIZE + 2) // MAC + SW
                 return Result.Failure<(ResponseAPDU, SecureChannelState), SmartCardError>(
                     SmartCardError.InvalidData("Response too short for SCP02 R-MAC")
                 );
 
-            // Extract components
-            int dataLength = responseBytes.Length - 10; // Subtract SW and MAC
-            byte[] responseData = dataLength > 0 ? responseBytes[..dataLength] : [];
-            byte[] mac = responseBytes[dataLength..(dataLength + 8)];
-            byte[] statusWord = responseBytes[(dataLength + 8)..];
+            // Extract MAC (8 bytes before status word)
+            int macOffset = responseBytes.Length - Scp.Scp02.MAC_SIZE - 2;
+            byte[] receivedMac = responseBytes[macOffset..(macOffset + Scp.Scp02.MAC_SIZE)];
 
-            // Construct response for MAC calculation (data + SW)
-            byte[] responseForMac = new byte[responseData.Length + 2];
-            if (responseData.Length > 0)
-                Array.Copy(responseData, 0, responseForMac, 0, responseData.Length);
-            Array.Copy(statusWord, 0, responseForMac, responseData.Length, 2);
+            // Separate response data and SW
+            byte[] statusWord = responseBytes[^2..];
+            byte[] responseDataWithMac = responseBytes[..^2];
+            byte[] responseData = responseDataWithMac[..^Scp.Scp02.MAC_SIZE];
 
-            // Verify R-MAC
-            return CryptoService.ScpOperations.Scp02.CalculateResponseMac(
-                responseForMac,
-                state.SessionKeys.SMac,
-                state.MacChainingValue
-            )
-            .Bind(expectedMac =>
-            {
-                // Verify MAC matches
-                if (!expectedMac[..Scp.Scp02.MAC_SIZE].SequenceEqual(mac))
-                    return Result.Failure<(ResponseAPDU, SecureChannelState), SmartCardError>(
-                        SmartCardError.SecurityStatusNotSatisfied("SCP02 Response MAC verification failed")
-                    );
+            // Decrypt response data first if R-ENC is enabled (E.4.6)
+            var plaintextResponseDataResult =
+                state.HasResponseEncryption && responseData.Length > 0
+                    ? CryptoService.Cipher.Decrypt3DesCbc(
+                        state.SessionKeys.SEnc,
+                        Constants.Constants.Scp.Common.ZeroIv8,
+                        responseData
+                    )
+                    : Result.Success<byte[], SmartCardError>(responseData);
 
-                // Check if R-ENC is enabled
-                byte[] plaintextData = responseData;
-                if (state.SecurityLevel.HasREncryption() && responseData.Length > 0)
+            if (plaintextResponseDataResult.IsFailure)
+                return plaintextResponseDataResult.Error;
+
+            var plaintextResponseData = plaintextResponseDataResult.Value;
+
+            // Build R-MAC input: stripped command || Li || response data (plain) || SW
+            var strippedCmd = state.LastStrippedCommand.IsDefaultOrEmpty
+                ? Array.Empty<byte>()
+                : state.LastStrippedCommand.ToArray();
+
+            byte li = (byte)(plaintextResponseData.Length % 256);
+            byte[] rmacInput = new byte[strippedCmd.Length + 1 + plaintextResponseData.Length + 2];
+            int pos = 0;
+            Array.Copy(strippedCmd, 0, rmacInput, pos, strippedCmd.Length);
+            pos += strippedCmd.Length;
+            rmacInput[pos++] = li;
+            Array.Copy(plaintextResponseData, 0, rmacInput, pos, plaintextResponseData.Length);
+            pos += plaintextResponseData.Length;
+            Array.Copy(statusWord, 0, rmacInput, pos, 2);
+
+            // Verify MAC
+            return CryptoService
+                .Mac.CalculateScp02ResponseMac(
+                    state.SessionKeys.SrMac,
+                    rmacInput,
+                    state.MacChainingValue
+                )
+                .Bind(expectedMac =>
                 {
-                    // Decrypt response data
-                    var decryptResult = CryptoService.ScpOperations.Scp02.RemoveResponseEncryption(
-                        responseData,
-                        state.SessionKeys.SEnc
-                    );
-
-                    if (decryptResult.IsFailure)
+                    if (!expectedMac[..Scp.Scp02.MAC_SIZE].SequenceEqual(receivedMac))
                         return Result.Failure<(ResponseAPDU, SecureChannelState), SmartCardError>(
-                            decryptResult.Error
+                            ErrorFactory.MacVerificationFailed()
                         );
 
-                    plaintextData = decryptResult.Value;
-                }
+                    // Combine plaintext response data with SW for return
+                    byte[] plaintextFull = new byte[plaintextResponseData.Length + 2];
+                    Array.Copy(
+                        plaintextResponseData,
+                        0,
+                        plaintextFull,
+                        0,
+                        plaintextResponseData.Length
+                    );
+                    Array.Copy(statusWord, 0, plaintextFull, plaintextResponseData.Length, 2);
 
-                // Reconstruct plaintext response (decrypted data + SW)
-                byte[] plaintextResponse = new byte[plaintextData.Length + 2];
-                if (plaintextData.Length > 0)
-                    Array.Copy(plaintextData, 0, plaintextResponse, 0, plaintextData.Length);
-                Array.Copy(statusWord, 0, plaintextResponse, plaintextData.Length, 2);
+                    var updateResult = MacChainingState
+                        .Create(expectedMac, state.ProtocolVersion, 0x00)
+                        .Bind(newChaining => UpdateResponseMacChaining(state, newChaining));
 
-                // Update MAC chaining value
-                return MacChainingState
-                    .Create(mac, state.ProtocolVersion, 0x00)
-                    .Bind(newChaining => state.UpdateMacChaining(newChaining))
-                    .Map(newState => (new ResponseAPDU(plaintextResponse), newState));
-            });
+                    return updateResult.Map(newState =>
+                        (new ResponseAPDU(plaintextFull), newState)
+                    );
+                });
         }
 
         /// <summary>
@@ -642,75 +694,66 @@ public static partial class ScpService
             SmartCardError
         > RemoveScp03ResponseSecurity(ResponseAPDU securedResponse, SecureChannelState state)
         {
-            // SCP03 always has R-MAC (8 bytes)
-            // Minimum response: SW (2 bytes) + MAC (8 bytes)
+            if (!state.HasResponseMac)
+                return Result.Success<(ResponseAPDU, SecureChannelState), SmartCardError>(
+                    (securedResponse, state)
+                );
+
             var responseBytes = securedResponse.ToBytes();
-            if (responseBytes.Length < 10)
+            if (responseBytes.Length < Scp.Scp03.MAC_SIZE + 2) // MAC + SW
                 return Result.Failure<(ResponseAPDU, SecureChannelState), SmartCardError>(
                     SmartCardError.InvalidData("Response too short for SCP03 R-MAC")
                 );
 
-            // Extract components
-            int dataLength = responseBytes.Length - 10; // Subtract SW and MAC
-            byte[] responseData = dataLength > 0 ? responseBytes[..dataLength] : [];
-            byte[] mac = responseBytes[dataLength..(dataLength + 8)];
-            byte[] statusWord = responseBytes[(dataLength + 8)..];
+            // Extract MAC (8 bytes before status word)
+            int macOffset = responseBytes.Length - Scp.Scp03.MAC_SIZE - 2;
+            byte[] receivedMac = responseBytes[macOffset..(macOffset + Scp.Scp03.MAC_SIZE)];
 
-            // Construct response for MAC calculation (data + SW)
-            byte[] responseForMac = new byte[responseData.Length + 2];
-            if (responseData.Length > 0)
-                Array.Copy(responseData, 0, responseForMac, 0, responseData.Length);
-            Array.Copy(statusWord, 0, responseForMac, responseData.Length, 2);
+            // Response without MAC for verification/decryption
+            byte[] responseWithoutMac = new byte[responseBytes.Length - Scp.Scp03.MAC_SIZE];
+            Array.Copy(responseBytes, 0, responseWithoutMac, 0, macOffset);
+            Array.Copy(responseBytes, responseBytes.Length - 2, responseWithoutMac, macOffset, 2);
 
-            // Verify R-MAC
-            return CryptoService.ScpOperations.Scp03.CalculateResponseMac(
-                responseForMac,
-                state.SessionKeys.SMac,
-                state.MacChainingValue
-            )
-            .Bind(expectedMac =>
-            {
-                // Verify MAC matches (truncated to 8 bytes)
-                if (!expectedMac[..Scp.Scp03.MAC_SIZE].SequenceEqual(mac))
-                    return Result.Failure<(ResponseAPDU, SecureChannelState), SmartCardError>(
-                        SmartCardError.SecurityStatusNotSatisfied("SCP03 Response MAC verification failed")
-                    );
+            var macCalculationResult = CryptoService
+                .ScpOperations.Scp03.CalculateResponseMac(
+                    responseWithoutMac,
+                    state.SessionKeys.SrMac,
+                    state.MacChainingValue
+                )
+#if DEBUG
+                .Tap(expected =>
+                    DebugLog(
+                        $"SCP03 response MAC chaining={Convert.ToHexString(state.MacChainingValue)} expected={Convert.ToHexString(expected[..Scp.Scp03.MAC_SIZE])} actual={Convert.ToHexString(receivedMac)} input={Convert.ToHexString(responseWithoutMac)} srmac={Convert.ToHexString(state.SessionKeys.SrMac)}"
+                    )
+                )
+#endif
+            ;
 
-                // Check if R-ENC is enabled
-                byte[] plaintextData = responseData;
-                if (state.SecurityLevel.HasREncryption() && responseData.Length > 0)
-                {
-                    // Decrypt response data using counter-based IV
-                    var decryptResult = CryptoService.ScpOperations.Scp03.RemoveResponseEncryption(
-                        responseData,
+            var plaintextResult =
+                state.HasResponseEncryption
+                && CryptoService.ScpOperations.Common.HasResponseData(responseWithoutMac)
+                    ? CryptoService.ScpOperations.Scp03.RemoveResponseEncryption(
+                        responseWithoutMac,
                         state.SessionKeys.SEnc,
                         state.EncryptionCounter
+                    )
+                    : Result.Success<byte[], SmartCardError>(responseWithoutMac);
+
+            return macCalculationResult.Bind(expectedMacFull =>
+            {
+                if (!expectedMacFull[..Scp.Scp03.MAC_SIZE].SequenceEqual(receivedMac))
+                    return Result.Failure<(ResponseAPDU, SecureChannelState), SmartCardError>(
+                        SmartCardError.SecurityStatusNotSatisfied(
+                            $"SCP03 Response MAC verification failed (expected {Convert.ToHexString(expectedMacFull[..Scp.Scp03.MAC_SIZE])}, received {Convert.ToHexString(receivedMac)})"
+                        )
                     );
 
-                    if (decryptResult.IsFailure)
-                        return Result.Failure<(ResponseAPDU, SecureChannelState), SmartCardError>(
-                            decryptResult.Error
-                        );
-
-                    plaintextData = decryptResult.Value;
-                }
-
-                // Reconstruct plaintext response (decrypted data + SW)
-                byte[] plaintextResponse = new byte[plaintextData.Length + 2];
-                if (plaintextData.Length > 0)
-                    Array.Copy(plaintextData, 0, plaintextResponse, 0, plaintextData.Length);
-                Array.Copy(statusWord, 0, plaintextResponse, plaintextData.Length, 2);
-
-                // Update MAC chaining value with full MAC (16 bytes)
-                byte[] fullMac = new byte[Scp.Scp03.FULL_MAC_SIZE];
-                Array.Copy(mac, 0, fullMac, 0, Scp.Scp03.MAC_SIZE);
-
-                // Update state with full MAC and increment counter
-                return MacChainingState
-                    .Create(fullMac, state.ProtocolVersion, 0x00)
-                    .Bind(newChaining => state.UpdateMacChaining(newChaining))
-                    .Map(newState => newState.IncrementEncryptionCounter())
-                    .Map(newState => (new ResponseAPDU(plaintextResponse), newState));
+                return plaintextResult.Bind(plaintext =>
+                    MacChainingState
+                        .Create(expectedMacFull, state.ProtocolVersion, 0x00)
+                        .Bind(newChaining => UpdateResponseMacChaining(state, newChaining))
+                        .Map(newState => (new ResponseAPDU(plaintext), newState))
+                );
             });
         }
 
@@ -722,6 +765,16 @@ public static partial class ScpService
             byte[] fullMac = new byte[Scp.Scp03.FULL_MAC_SIZE];
             Array.Copy(truncatedMac, 0, fullMac, 0, Scp.Scp03.MAC_SIZE);
             return fullMac;
+        }
+
+        private static Result<SecureChannelState, SmartCardError> UpdateResponseMacChaining(
+            SecureChannelState state,
+            MacChainingState newChaining
+        )
+        {
+            return state.MacChaining.ShouldUpdateChainingAfterRMac()
+                ? state.UpdateMacChaining(newChaining)
+                : Result.Success<SecureChannelState, SmartCardError>(state);
         }
     }
 
@@ -741,16 +794,12 @@ public static partial class ScpService
         public static UnitResult<SmartCardError> ValidateHostChallenge(byte[] hostChallenge)
         {
             if (hostChallenge is null)
-                return UnitResult.Failure(
-                    SmartCardError.InvalidData("Host challenge cannot be null")
-                );
+                return UnitResult.Failure(ErrorFactory.NullArgument("Host challenge"));
 
             return hostChallenge.Length == 8
                 ? UnitResult.Success<SmartCardError>()
                 : UnitResult.Failure(
-                    SmartCardError.InvalidData(
-                        $"Host challenge must be 8 bytes, got {hostChallenge.Length}"
-                    )
+                    ErrorFactory.InvalidLength("Host challenge", 8, hostChallenge.Length)
                 );
         }
 
@@ -766,9 +815,7 @@ public static partial class ScpService
         )
         {
             if (cardChallenge is null)
-                return UnitResult.Failure(
-                    SmartCardError.InvalidResponse("Card challenge cannot be null")
-                );
+                return UnitResult.Failure(ErrorFactory.NullArgument("Card challenge"));
 
             return cardChallenge.Length >= expectedLength
                 ? UnitResult.Success<SmartCardError>()
@@ -791,9 +838,7 @@ public static partial class ScpService
         )
         {
             if (sequenceCounter is null)
-                return UnitResult.Failure(
-                    SmartCardError.InvalidResponse("Sequence counter cannot be null")
-                );
+                return UnitResult.Failure(ErrorFactory.NullArgument("Sequence counter"));
 
             return sequenceCounter.Length >= expectedLength
                 ? UnitResult.Success<SmartCardError>()
@@ -841,7 +886,7 @@ public static partial class ScpService
         )
         {
             if (keySet is null)
-                return UnitResult.Failure(SmartCardError.InvalidArgument("Key set cannot be null"));
+                return UnitResult.Failure(ErrorFactory.NullArgument("Key set"));
 
             return keySet.GetType() == expectedType
                 ? UnitResult.Success<SmartCardError>()

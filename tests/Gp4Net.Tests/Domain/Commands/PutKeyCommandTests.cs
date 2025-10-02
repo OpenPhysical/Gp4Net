@@ -568,9 +568,7 @@ public class PutKeyCommandTests
     [Test]
     public void ToBytes_WithKeyCheckValue_ReturnsCorrectBytes()
     {
-        var keyDataBlock = KeyDataBlock
-            .CreateDesKey(ValidDesKey, ValidKeyCheckValue)
-            .Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey, ValidKeyCheckValue).Value;
 
         byte[]? bytes = keyDataBlock.ToBytes();
 
@@ -717,10 +715,7 @@ public class PutKeyCommandTests
     public void KeyDataBlock_ValidateAllKeyTypesHaveCorrectEnumValues()
     {
         // Comprehensive validation of all key type enum values
-        var expectedKeyTypes = new Dictionary<
-            KeyDataBlock.KeyType,
-            byte
-        >
+        var expectedKeyTypes = new Dictionary<KeyDataBlock.KeyType, byte>
         {
             { KeyDataBlock.KeyType.Des, 0x80 },
             { KeyDataBlock.KeyType.TripleDes2Key, 0x81 },
@@ -794,9 +789,7 @@ public class PutKeyCommandTests
     [Test]
     public void ToApdu_WithKeyCheckValue_IncludesCheckValueInData()
     {
-        var keyDataBlock = KeyDataBlock
-            .CreateDesKey(ValidDesKey, ValidKeyCheckValue)
-            .Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey, ValidKeyCheckValue).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
         var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
@@ -951,9 +944,7 @@ public class PutKeyCommandTests
     public void ToApdu_Structure_FollowsGlobalPlatformSpecification()
     {
         // Test that APDU structure follows GlobalPlatform specification exactly
-        var keyDataBlock = KeyDataBlock
-            .CreateDesKey(ValidDesKey, ValidKeyCheckValue)
-            .Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey, ValidKeyCheckValue).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
         var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
@@ -983,9 +974,7 @@ public class PutKeyCommandTests
     public void ToApdu_WithLargeKeyData_HandlesCorrectly()
     {
         // Test with the largest supported key (AES-256)
-        var keyDataBlock = KeyDataBlock
-            .CreateAes256Key(ValidAes256Key, ValidKeyCheckValue)
-            .Value;
+        var keyDataBlock = KeyDataBlock.CreateAes256Key(ValidAes256Key, ValidKeyCheckValue).Value;
         List<KeyDataBlock> keyDataBlocks = [keyDataBlock];
         var command = PutKeyCommand.Create(0x01, keyDataBlocks).Value;
 
@@ -1051,9 +1040,7 @@ public class PutKeyCommandTests
     [Test]
     public void ToBytes_ImmutabilityGuarantees_ArePreserved()
     {
-        var keyDataBlock = KeyDataBlock
-            .CreateDesKey(ValidDesKey, ValidKeyCheckValue)
-            .Value;
+        var keyDataBlock = KeyDataBlock.CreateDesKey(ValidDesKey, ValidKeyCheckValue).Value;
         byte[]? bytes1 = keyDataBlock.ToBytes();
         byte[]? bytes2 = keyDataBlock.ToBytes();
 

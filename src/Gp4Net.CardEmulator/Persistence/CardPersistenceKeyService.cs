@@ -35,21 +35,14 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
     /// Per SP 800-108r1: K1 (KIN) = ENC key, K2 and K3 encoded in context as secret inputs.
     /// Supports all SCP02/SCP03 key set variations including single keys and missing DEK.
     /// </summary>
-    public Result<byte[], SmartCardError> DeriveStorageKey(IKeySet keySet, CardUuid cardUuid)
-    {
-        var validationResult = ValidateInputs(keySet, cardUuid);
-        if (validationResult.IsFailure)
-            return Result.Failure<byte[], SmartCardError>(validationResult.Error);
-
-        var kdfParamsResult = BuildKdfParameters(
-            keySet,
-            cardUuid
+    public Result<byte[], SmartCardError> DeriveStorageKey(IKeySet keySet, CardUuid cardUuid) =>
+        ResultExtensions.Bind(
+            ResultExtensions.Bind(
+                ValidateInputs(keySet, cardUuid),
+                _ => BuildKdfParameters(keySet, cardUuid)
+            ),
+            ExecuteKeyDerivation
         );
-        if (kdfParamsResult.IsFailure)
-            return Result.Failure<byte[], SmartCardError>(kdfParamsResult.Error);
-
-        return ExecuteKeyDerivation(kdfParamsResult.Value);
-    }
 
     /// <summary>
     /// Generates cryptographically secure card UUID.
@@ -70,18 +63,14 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
     /// <summary>
     /// Computes SHA-256 fingerprint of key set for integrity verification.
     /// </summary>
-    public Result<byte[], SmartCardError> ComputeKeyFingerprint(IKeySet keySet)
-    {
-        var validationResult = ValidateKeySet(keySet);
-        if (validationResult.IsFailure)
-            return Result.Failure<byte[], SmartCardError>(validationResult.Error);
-
-        var fingerprintDataResult = BuildFingerprintData(keySet);
-        if (fingerprintDataResult.IsFailure)
-            return Result.Failure<byte[], SmartCardError>(fingerprintDataResult.Error);
-
-        return ComputeSha256Hash(fingerprintDataResult.Value);
-    }
+    public Result<byte[], SmartCardError> ComputeKeyFingerprint(IKeySet keySet) =>
+        ResultExtensions.Bind(
+            ResultExtensions.Bind(
+                ValidateKeySet(keySet),
+                _ => BuildFingerprintData(keySet)
+            ),
+            ComputeSha256Hash
+        );
 
     private static Result<bool, SmartCardError> ValidateInputs(IKeySet keySet, CardUuid cardUuid)
     {
@@ -196,8 +185,8 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
     private static string GetScpVersionString(IKeySet keySet) =>
         keySet switch
         {
-            Scp02KeySet scp02 =>
-                $"scp02-{(scp02.EncKey.SequenceEqual(scp02.MacKey) ? "single" : "triple")}",
+            Scp02KeySet scp02
+                => $"scp02-{(scp02.EncKey.SequenceEqual(scp02.MacKey) ? "single" : "triple")}",
             Scp03KeySet scp03 => $"scp03-aes{scp03.EncKey.Length * 8}",
             _ => $"unknown-{keySet.GetType().Name}",
         };

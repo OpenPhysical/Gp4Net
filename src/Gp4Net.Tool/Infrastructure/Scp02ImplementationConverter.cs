@@ -19,49 +19,50 @@ public class Scp02ImplementationConverter : TypeConverter
     /// Dictionary mapping user input strings to ScpImplementation enum values.
     /// Includes all hex values and specific aliases for common modes.
     /// </summary>
-    private static readonly Dictionary<string, ScpImplementation> ValidValues = new()
-    {
-        // All SCP02 hex values (comprehensive support)
-        { "00", ScpImplementation.Scp02I00 },
-        { "02", ScpImplementation.Scp02I02 },
-        { "04", ScpImplementation.Scp02I04 },
-        { "05", ScpImplementation.Scp02I05 },
-        { "0A", ScpImplementation.Scp02I0A },
-        { "14", ScpImplementation.Scp02I14 },
-        { "15", ScpImplementation.Scp02I15 },
-        { "1A", ScpImplementation.Scp02I1A },
-        { "24", ScpImplementation.Scp02I24 },
-        { "25", ScpImplementation.Scp02I25 },
-        { "2A", ScpImplementation.Scp02I2A },
-        { "34", ScpImplementation.Scp02I34 },
-        { "35", ScpImplementation.Scp02I35 },
-        { "3A", ScpImplementation.Scp02I3A },
-        { "44", ScpImplementation.Scp02I44 },
-        { "45", ScpImplementation.Scp02I45 },
-        { "4A", ScpImplementation.Scp02I4A },
-        { "54", ScpImplementation.Scp02I54 },
-        { "55", ScpImplementation.Scp02I55 },
-        { "64", ScpImplementation.Scp02I64 },
-        { "65", ScpImplementation.Scp02I65 },
-        { "6A", ScpImplementation.Scp02I6A },
-        { "74", ScpImplementation.Scp02I74 },
-        { "75", ScpImplementation.Scp02I75 },
-        { "7A", ScpImplementation.Scp02I7A },
-        // SCP03 hex values
-        { "10", ScpImplementation.Scp03I10 },
-        { "11", ScpImplementation.Scp03I11 },
-        { "20", ScpImplementation.Scp03I20 },
-        { "30", ScpImplementation.Scp03I30 },
-        { "60", ScpImplementation.Scp03I60 },
-        { "70", ScpImplementation.Scp03I70 },
-        // Specific aliases based on exact features (no ambiguity)
-        { "CLR", ScpImplementation.Scp02I15 }, // Most common SCP02 mode (i=15)
-        { "MAC", ScpImplementation.Scp02I35 }, // CLR + R-MAC support (i=35)
-        { "ENC", ScpImplementation.Scp02I55 }, // CLR + well-known challenge (i=55)
-        { "RENC", ScpImplementation.Scp02I75 }, // Full security: CLR + well-known + R-MAC (i=75)
-        { "IMPLICIT", ScpImplementation.Scp02I1A }, // Implicit initiation mode (i=1A)
-        { "BASE_KEY", ScpImplementation.Scp02I14 }, // Single base key variant of CLR (i=14)
-    };
+    private static readonly Dictionary<string, ScpImplementation> ValidValues =
+        new()
+        {
+            // All SCP02 hex values (comprehensive support)
+            { "00", ScpImplementation.Scp02I00 },
+            { "02", ScpImplementation.Scp02I02 },
+            { "04", ScpImplementation.Scp02I04 },
+            { "05", ScpImplementation.Scp02I05 },
+            { "0A", ScpImplementation.Scp02I0A },
+            { "14", ScpImplementation.Scp02I14 },
+            { "15", ScpImplementation.Scp02I15 },
+            { "1A", ScpImplementation.Scp02I1A },
+            { "24", ScpImplementation.Scp02I24 },
+            { "25", ScpImplementation.Scp02I25 },
+            { "2A", ScpImplementation.Scp02I2A },
+            { "34", ScpImplementation.Scp02I34 },
+            { "35", ScpImplementation.Scp02I35 },
+            { "3A", ScpImplementation.Scp02I3A },
+            { "44", ScpImplementation.Scp02I44 },
+            { "45", ScpImplementation.Scp02I45 },
+            { "4A", ScpImplementation.Scp02I4A },
+            { "54", ScpImplementation.Scp02I54 },
+            { "55", ScpImplementation.Scp02I55 },
+            { "64", ScpImplementation.Scp02I64 },
+            { "65", ScpImplementation.Scp02I65 },
+            { "6A", ScpImplementation.Scp02I6A },
+            { "74", ScpImplementation.Scp02I74 },
+            { "75", ScpImplementation.Scp02I75 },
+            { "7A", ScpImplementation.Scp02I7A },
+            // SCP03 hex values
+            { "10", ScpImplementation.Scp03I10 },
+            { "11", ScpImplementation.Scp03I11 },
+            { "20", ScpImplementation.Scp03I20 },
+            { "30", ScpImplementation.Scp03I30 },
+            { "60", ScpImplementation.Scp03I60 },
+            { "70", ScpImplementation.Scp03I70 },
+            // Specific aliases based on exact features (no ambiguity)
+            { "CLR", ScpImplementation.Scp02I15 }, // Most common SCP02 mode (i=15)
+            { "MAC", ScpImplementation.Scp02I35 }, // CLR + R-MAC support (i=35)
+            { "ENC", ScpImplementation.Scp02I55 }, // CLR + well-known challenge (i=55)
+            { "RENC", ScpImplementation.Scp02I75 }, // Full security: CLR + well-known + R-MAC (i=75)
+            { "IMPLICIT", ScpImplementation.Scp02I1A }, // Implicit initiation mode (i=1A)
+            { "BASE_KEY", ScpImplementation.Scp02I14 }, // Single base key variant of CLR (i=14)
+        };
 
     /// <summary>
     /// Determines whether this converter can convert from the given source type.

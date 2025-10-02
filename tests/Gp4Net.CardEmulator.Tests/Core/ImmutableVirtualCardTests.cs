@@ -1,4 +1,5 @@
 using System;
+using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
@@ -7,7 +8,6 @@ using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
-using AwesomeAssertions;
 
 namespace Gp4Net.CardEmulator.Tests.Core;
 
@@ -66,11 +66,7 @@ public class ImmutableVirtualCardTests
     [Test]
     public void Create_WithoutStateService_Success_CreatesDefaultStateService()
     {
-        var result = VirtualCard.Create(
-            _config,
-            _rngContext,
-            Maybe<ILogger>.From(_logger)
-        );
+        var result = VirtualCard.Create(_config, _rngContext, Maybe<ILogger>.From(_logger));
 
         result.IsSuccess.Should().BeTrue();
         result.Match(
@@ -213,14 +209,25 @@ public class ImmutableVirtualCardTests
     private class TestLogger : ILogger
     {
         public IDisposable BeginScope<TState>(TState state) => null!;
+
         public bool IsEnabled(LogLevel logLevel) => true;
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) { }
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception exception,
+            Func<TState, Exception, string> formatter
+        ) { }
     }
 
     private class TestRngContext : IRngContext
     {
-        public Result<byte[], SmartCardError> GenerateBytes(int length) => Result.Success<byte[], SmartCardError>(new byte[length]);
+        public Result<byte[], SmartCardError> GenerateBytes(int length) =>
+            Result.Success<byte[], SmartCardError>(new byte[length]);
+
         public bool HasEnoughEntropy(int requiredBytes) => true;
+
         public Maybe<int> RemainingEntropy => Maybe<int>.None;
     }
 

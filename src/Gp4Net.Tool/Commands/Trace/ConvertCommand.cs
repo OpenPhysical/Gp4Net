@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -9,6 +10,8 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
+using Gp4Net.Domain.Keys;
 using Gp4Net.Domain.Trace;
 using Gp4Net.Tool.Commands.Common;
 using JetBrains.Annotations;
@@ -37,9 +40,10 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
         public string OutputFile { get; set; } = string.Empty;
 
         [CommandOption("-f|--format <FORMAT>")]
-        [Description("Trace format (gp_pro, gpshell)")]
-        [DefaultValue("gp_pro")]
-        public string Format { get; set; } = "gp_pro";
+        [Description(
+            "Trace format (gp_pro for GlobalPlatformPro, gpshell for GPShell/GlobalPlatform library)"
+        )]
+        public string Format { get; set; } = string.Empty;
 
         [CommandOption("--detect-operations")]
         [Description("Automatically detect operations in trace")]
@@ -51,11 +55,6 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
         [DefaultValue(false)]
         public bool Verbose { get; set; }
 
-        [CommandOption("--validate")]
-        [Description("Validate cryptographic operations in the trace")]
-        [DefaultValue(false)]
-        public new bool Validate { get; set; }
-
         [CommandOption("-k|--keyset <KEYSET>")]
         [Description("Keyset for validation (gp_test, hex key, or ENC:MAC:DEK)")]
         [DefaultValue("gp_test")]
@@ -66,8 +65,15 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
     {
         try
         {
-            await ConvertTraceAsync(settings);
-            return 0;
+            var result = await ConvertTraceAsync(settings);
+            return result.Match(
+                onSuccess: () => 0,
+                onFailure: error =>
+                {
+                    AnsiConsole.MarkupLine($"[red]Error: {error.Message}[/]");
+                    return 1;
+                }
+            );
         }
         catch (Exception ex)
         {
@@ -76,31 +82,48 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
         }
     }
 
-    private async Task ConvertTraceAsync(Settings settings)
+    private async Task<UnitResult<SmartCardError>> ConvertTraceAsync(Settings settings)
     {
         if (!File.Exists(settings.InputFile))
         {
-            AnsiConsole.MarkupLine($"[red]Error: Input file not found: {settings.InputFile}[/]");
-            return;
+            return UnitResult.Failure(
+                SmartCardError.InvalidArgument($"Input file not found: {settings.InputFile}")
+            );
         }
+
+        if (string.IsNullOrEmpty(settings.Format))
+        {
+            return UnitResult.Failure(
+                SmartCardError.InvalidArgument(
+                    "Format must be specified. Use --format with either 'gp_pro' or 'gpshell'"
+                )
+            );
+        }
+
+        // Validation is always performed for security
+        const bool shouldValidate = true;
 
         AnsiConsole.MarkupLine(
             $"[green]Converting {settings.Format} trace:[/] {settings.InputFile}"
         );
 
+        AnsiConsole.MarkupLine(
+            "[yellow]Cryptographic validation: [bold]MANDATORY[/] (always enabled for security)[/]"
+        );
+
         var converter = new TraceConverter();
+
         var convertResult = await converter.ConvertAsync(
             settings.InputFile,
             settings.Format,
             settings.Verbose,
-            settings.Validate,
+            shouldValidate,
             settings.Keyset
         );
 
         if (convertResult.IsFailure)
         {
-            AnsiConsole.MarkupLine($"[red]Conversion failed: {convertResult.Error.Message}[/]");
-            return;
+            return UnitResult.Failure(convertResult.Error);
         }
 
         // Safe value access after success check
@@ -132,6 +155,8 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
             AnsiConsole.MarkupLine($"[green]✓ Generated JSON trace:[/] {settings.OutputFile}");
             DisplaySummary(traceData);
         }
+
+        return UnitResult.Success<SmartCardError>();
     }
 
     private static void DisplaySummary(TraceData traceData)
@@ -212,7 +237,7 @@ public class CardInfo
     public string Atr { get; set; } = "3BD518FF8191FE1FC38073C821100A";
     public string IsdAid { get; set; } = "A000000151000000";
     public string CardType { get; set; } = "UNKNOWN";
-    public CplcData Cplc { get; set; }
+    public Maybe<CplcData> Cplc { get; set; } = Maybe<CplcData>.None;
 }
 
 /// <summary>
@@ -290,12 +315,15 @@ public class Exchange
     public string SessionId { get; set; } = string.Empty;
     public int StepInOperation { get; set; }
     public string Command { get; set; } = string.Empty;
+    public string CommandPlaintext { get; set; } = string.Empty;
     public string Response { get; set; } = string.Empty;
+    public string ResponsePlaintext { get; set; } = string.Empty;
     public int ResponseTimeMs { get; set; }
     public string Description { get; set; } = string.Empty;
     public int SourceLine { get; set; }
     public bool SecureMessaging { get; set; }
-    public ScpData ScpData { get; set; }
+    public string SecurityLevel { get; set; } = "None"; // Track actual security level at this exchange
+    public Maybe<ScpData> ScpData { get; set; }
     public ValidationInfo Validation { get; set; }
 }
 
@@ -307,18 +335,18 @@ public class ScpData
     public string HostChallenge { get; set; }
     public string CardChallenge { get; set; }
     public string CardCryptogram { get; set; }
-    
+
     [JsonIgnore]
     public Maybe<int> KeyVersionMaybe { get; set; } = Maybe<int>.None;
-    
+
     public int KeyVersion => KeyVersionMaybe.GetValueOrDefault(0);
-    
+
     public string ScpId { get; set; }
     public string HostCryptogram { get; set; }
-    
+
     [JsonIgnore]
     public Maybe<bool> SessionEstablishedMaybe { get; set; } = Maybe<bool>.None;
-    
+
     public bool SessionEstablished => SessionEstablishedMaybe.GetValueOrDefault(false);
 }
 
@@ -355,15 +383,18 @@ public class TraceConverter
         // Parse trace based on format
         var parseResult = format.ToLower() switch
         {
-            "gp_pro" => Result.Success<List<Exchange>, SmartCardError>(
-                await ParseGpProTraceAsync(inputFile, verbose)
-            ),
-            "gpshell" => Result.Success<List<Exchange>, SmartCardError>(
-                await ParseGpShellTraceAsync(inputFile, verbose)
-            ),
-            _ => Result.Failure<List<Exchange>, SmartCardError>(
-                SmartCardError.Unsupported($"Unsupported format: {format}")
-            ),
+            "gp_pro"
+                => Result.Success<List<Exchange>, SmartCardError>(
+                    await ParseGpProTraceAsync(inputFile, verbose)
+                ),
+            "gpshell"
+                => Result.Success<List<Exchange>, SmartCardError>(
+                    await ParseGpShellTraceAsync(inputFile, verbose)
+                ),
+            _
+                => Result.Failure<List<Exchange>, SmartCardError>(
+                    SmartCardError.Unsupported($"Unsupported format: {format}")
+                ),
         };
 
         if (parseResult.IsFailure)
@@ -373,16 +404,23 @@ public class TraceConverter
 
         var exchanges = parseResult.Value;
 
+        // Check if any exchanges were found
+        if (exchanges.Count == 0)
+        {
+            return Result.Failure<TraceData, SmartCardError>(
+                SmartCardError.InvalidArgument(
+                    $"No APDU exchanges found in trace file. Verify the format '{format}' matches the file content. Try 'gp_pro' for GlobalPlatformPro or 'gpshell' for GPShell/GlobalPlatform library traces."
+                )
+            );
+        }
+
         // Validate if requested
         if (validate)
         {
             var validationResult = await ValidateTraceAsync(exchanges, keysetSpec, verbose);
             if (validationResult.IsFailure)
             {
-                if (verbose)
-                {
-                    AnsiConsole.MarkupLine($"[yellow]Warning: Validation failed: {validationResult.Error.Message}[/]");
-                }
+                return Result.Failure<TraceData, SmartCardError>(validationResult.Error);
             }
         }
 
@@ -430,106 +468,171 @@ public class TraceConverter
 
     private async Task<List<Exchange>> ParseGpProTraceAsync(string filename, bool verbose)
     {
-        List<Exchange> exchanges = [];
         var commandPattern = new Regex(@"^A>> T=\d+ \([\d+]+\) ([0-9A-F\s]+)$");
         var responsePattern = new Regex(@"^A<< \([\d+]+\) \((\d+)ms\) ([0-9A-F\s]+)$");
 
-        string currentCommand = null;
-        int currentLine = 0;
-
         string[] lines = await File.ReadAllLinesAsync(filename);
-        for (int lineNum = 0; lineNum < lines.Length; lineNum++)
-        {
-            string line = lines[lineNum].Trim();
 
-            // Skip empty lines and comments
-            if (
-                string.IsNullOrEmpty(line)
-                || line.StartsWith('#')
-                || line.StartsWith('[')
-                || line.StartsWith("WARNING:")
+        var result = lines
+            .Select((line, index) => new { Line = line.Trim(), LineNum = index + 1 })
+            .Where(x =>
+                !string.IsNullOrEmpty(x.Line)
+                && !x.Line.StartsWith('#')
+                && !x.Line.StartsWith('[')
+                && !x.Line.StartsWith("WARNING:")
             )
-            {
-                continue;
-            }
+            .Aggregate(
+                new
+                {
+                    Builder = ImmutableArray.CreateBuilder<Exchange>(),
+                    CurrentCommand = Maybe<string>.None,
+                    CurrentLine = 0,
+                    SecurityLevel = "None"
+                },
+                (state, item) =>
+                {
+                    // Try to match command
+                    var cmdMatch = commandPattern.Match(item.Line);
+                    if (cmdMatch.Success)
+                    {
+                        return new
+                        {
+                            state.Builder,
+                            CurrentCommand = Maybe<string>.From(
+                                cmdMatch.Groups[1].Value.Trim().Replace(" ", "").ToUpper()
+                            ),
+                            CurrentLine = item.LineNum,
+                            state.SecurityLevel
+                        };
+                    }
 
-            // Try to match command
-            var cmdMatch = commandPattern.Match(line);
-            if (cmdMatch.Success)
-            {
-                currentCommand = cmdMatch.Groups[1].Value.Trim().Replace(" ", "").ToUpper();
-                currentLine = lineNum + 1;
-                continue;
-            }
+                    // Try to match response
+                    var respMatch = responsePattern.Match(item.Line);
+                    return state.CurrentCommand.Match(
+                        cmd =>
+                        {
+                            if (!respMatch.Success)
+                                return state;
 
-            // Try to match response
-            var respMatch = responsePattern.Match(line);
-            if (respMatch.Success && currentCommand != null)
-            {
-                int responseTime = int.Parse(respMatch.Groups[1].Value);
-                string responseData = respMatch.Groups[2].Value.Trim().Replace(" ", "").ToUpper();
+                            var responseTime = int.Parse(respMatch.Groups[1].Value);
+                            var responseData = respMatch
+                                .Groups[2]
+                                .Value.Trim()
+                                .Replace(" ", "")
+                                .ToUpper();
 
-                var exchange = CreateExchange(
-                    exchanges.Count + 1,
-                    currentCommand,
-                    responseData,
-                    responseTime,
-                    currentLine
-                );
-                exchanges.Add(exchange);
+                            var exchange = CreateExchange(
+                                state.Builder.Count + 1,
+                                cmd,
+                                responseData,
+                                responseTime,
+                                state.CurrentLine,
+                                state.SecurityLevel
+                            );
 
-                currentCommand = null;
-                currentLine = 0;
-            }
-        }
+                            // Update security level if this is EXTERNAL AUTHENTICATE
+                            var newSecurityLevel = UpdateSecurityLevel(
+                                exchange,
+                                state.SecurityLevel
+                            );
 
-        return exchanges;
+                            state.Builder.Add(exchange);
+
+                            return new
+                            {
+                                state.Builder,
+                                CurrentCommand = Maybe<string>.None,
+                                CurrentLine = 0,
+                                SecurityLevel = newSecurityLevel
+                            };
+                        },
+                        () => state
+                    );
+                }
+            );
+
+        return result.Builder.ToImmutable().ToList();
     }
 
     private async Task<List<Exchange>> ParseGpShellTraceAsync(string filename, bool verbose)
     {
-        List<Exchange> exchanges = [];
         var sendPattern = new Regex(@"Command --> ([0-9A-F\s]+)");
         var recvPattern = new Regex(@"Response <-- ([0-9A-F\s]+)");
 
-        string currentCommand = null;
-        int currentLine = 0;
-
         string[] lines = await File.ReadAllLinesAsync(filename);
-        for (int lineNum = 0; lineNum < lines.Length; lineNum++)
-        {
-            string line = lines[lineNum].Trim();
 
-            // Try to match command
-            var sendMatch = sendPattern.Match(line);
-            if (sendMatch.Success)
-            {
-                currentCommand = sendMatch.Groups[1].Value.Trim().Replace(" ", "").ToUpper();
-                currentLine = lineNum + 1;
-                continue;
-            }
+        var result = lines
+            .Select((line, index) => new { Line = line.Trim(), LineNum = index + 1 })
+            .Aggregate(
+                new
+                {
+                    Builder = ImmutableArray.CreateBuilder<Exchange>(),
+                    CurrentCommand = Maybe<string>.None,
+                    CurrentLine = 0,
+                    SecurityLevel = "None"
+                },
+                (state, item) =>
+                {
+                    // Try to match command
+                    var sendMatch = sendPattern.Match(item.Line);
+                    if (sendMatch.Success)
+                    {
+                        return new
+                        {
+                            state.Builder,
+                            CurrentCommand = Maybe<string>.From(
+                                sendMatch.Groups[1].Value.Trim().Replace(" ", "").ToUpper()
+                            ),
+                            CurrentLine = item.LineNum,
+                            state.SecurityLevel
+                        };
+                    }
 
-            // Try to match response
-            var recvMatch = recvPattern.Match(line);
-            if (recvMatch.Success && currentCommand != null)
-            {
-                string responseData = recvMatch.Groups[1].Value.Trim().Replace(" ", "").ToUpper();
+                    // Try to match response
+                    var recvMatch = recvPattern.Match(item.Line);
+                    return state.CurrentCommand.Match(
+                        cmd =>
+                        {
+                            if (!recvMatch.Success)
+                                return state;
 
-                var exchange = CreateExchange(
-                    exchanges.Count + 1,
-                    currentCommand,
-                    responseData,
-                    20,
-                    currentLine
-                );
-                exchanges.Add(exchange);
+                            var responseData = recvMatch
+                                .Groups[1]
+                                .Value.Trim()
+                                .Replace(" ", "")
+                                .ToUpper();
 
-                currentCommand = null;
-                currentLine = 0;
-            }
-        }
+                            var exchange = CreateExchange(
+                                state.Builder.Count + 1,
+                                cmd,
+                                responseData,
+                                20,
+                                state.CurrentLine,
+                                state.SecurityLevel
+                            );
 
-        return exchanges;
+                            // Update security level if this is EXTERNAL AUTHENTICATE
+                            var newSecurityLevel = UpdateSecurityLevel(
+                                exchange,
+                                state.SecurityLevel
+                            );
+
+                            state.Builder.Add(exchange);
+
+                            return new
+                            {
+                                state.Builder,
+                                CurrentCommand = Maybe<string>.None,
+                                CurrentLine = 0,
+                                SecurityLevel = newSecurityLevel
+                            };
+                        },
+                        () => state
+                    );
+                }
+            );
+
+        return result.Builder.ToImmutable().ToList();
     }
 
     private Exchange CreateExchange(
@@ -537,7 +640,8 @@ public class TraceConverter
         string command,
         string response,
         int responseTime,
-        int sourceLine
+        int sourceLine,
+        string securityLevel = "None"
     )
     {
         string description = ApduAnalyzer.GetCommandDescription(command);
@@ -556,8 +660,35 @@ public class TraceConverter
             Description = description,
             SourceLine = sourceLine,
             SecureMessaging = secureMessaging,
+            SecurityLevel = securityLevel,
             ScpData = scpData,
         };
+    }
+
+    private string UpdateSecurityLevel(Exchange exchange, string currentLevel)
+    {
+        // Check if this is EXTERNAL AUTHENTICATE
+        if (exchange.Description.Contains("EXTERNAL AUTHENTICATE") && exchange.Command.Length >= 10)
+        {
+            // Extract P1 parameter (security level)
+            var p1 = exchange.Command.Substring(4, 2);
+
+            return p1 switch
+            {
+                "00" => "None",
+                "01" => "C_MAC",
+                "03" => "C_MAC|C_DECRYPTION",
+                "10" => "R_MAC",
+                "11" => "C_MAC|R_MAC",
+                "13" => "C_MAC|C_DECRYPTION|R_MAC",
+                "30" => "R_MAC|R_ENCRYPTION",
+                "31" => "C_MAC|R_MAC|R_ENCRYPTION",
+                "33" => "C_MAC|C_DECRYPTION|R_MAC|R_ENCRYPTION",
+                _ => currentLevel // Keep current if unknown
+            };
+        }
+
+        return currentLevel;
     }
 
     private async Task<UnitResult<SmartCardError>> ValidateTraceAsync(
@@ -573,104 +704,201 @@ public class TraceConverter
             return UnitResult.Failure(keysetResult.Error);
         }
 
-        // Convert RawKeyset to IKeySet (default to SCP02 which will be updated when we parse INITIALIZE UPDATE)
-        var keysetConversionResult = keysetResult.Value.ToScp02KeySet();
+        // Detect SCP version from trace exchanges
+        var scpVersion = DetectScpVersionFromTrace(exchanges);
+
+        // Convert RawKeyset to appropriate IKeySet based on detected SCP version
+        var keysetConversionResult =
+            scpVersion == CryptoService.ScpVersion.Scp03
+                ? keysetResult.Value.ToScp03KeySet().Map(ks => (IKeySet)ks)
+                : keysetResult.Value.ToScp02KeySet().Map(ks => (IKeySet)ks);
+
         if (keysetConversionResult.IsFailure)
         {
             return UnitResult.Failure(keysetConversionResult.Error);
         }
 
-        // Create initial validation state  
-        var initialState = TraceValidationState.Create(keysetConversionResult.Value);
+        // Diagnostics removed during refactoring
+
+        // Create initial validation state
+        var initialState = TraceValidationState.Create(
+            keysetConversionResult.Value,
+            keysetResult.Value.Diversification
+        );
 
         // Validate all exchanges using functional composition
         var finalStateResult = exchanges.Aggregate(
             Result.Success<TraceValidationState, SmartCardError>(initialState),
-            (stateResult, exchange) => stateResult.Bind(state =>
-            {
-                // Convert hex strings to byte arrays for the library
-                var commandBytes = Result.Try(
-                    () => Convert.FromHexString(exchange.Command.Replace(" ", "")),
-                    ex => SmartCardError.InvalidArgument($"Invalid command hex at exchange {exchange.Index}: {ex.Message}")
-                );
-                
-                var responseBytes = Result.Try(
-                    () => Convert.FromHexString(exchange.Response.Replace(" ", "")),
-                    ex => SmartCardError.InvalidArgument($"Invalid response hex at exchange {exchange.Index}: {ex.Message}")
-                );
-                
-                return commandBytes.Bind(cmd =>
-                    responseBytes.Bind(resp =>
-                    {
-                        var validationResult = TraceValidation.ValidateExchange(
-                            state,
-                            cmd,
-                            resp,
-                            exchange.Index
-                        );
-                        
-                        return validationResult.Map(newState =>
+            (stateResult, exchange) =>
+                stateResult.Bind(state =>
                 {
-                    // Extract the latest validation result for this exchange
-                    var latestResult = newState.Results
-                        .Where(r => r.ExchangeIndex == exchange.Index)
-                        .LastOrDefault();
-
-                    Maybe<Gp4Net.Domain.Trace.ValidationResult>.From(latestResult).Match(
-                        Some: result =>
-                        {
-                            exchange.Validation = new ValidationInfo
-                            {
-                                Type = result.ValidationType,
-                                IsValid = result.IsValid,
-                                Details = result.Details,
-                                Error = result.Error.GetValueOrDefault()
-                            };
-
-                            if (verbose)
-                            {
-                                var status = result.IsValid ? "[green]✓[/]" : "[red]✗[/]";
-                                AnsiConsole.MarkupLine(
-                                    $"{status} Exchange {exchange.Index}: {result.ValidationType} - {result.Details}"
-                                );
-                            }
-                        },
-                        None: () => { }
+                    // Convert hex strings to byte arrays for the library
+                    var commandBytes = Result.Try(
+                        () => Convert.FromHexString(exchange.Command.Replace(" ", "")),
+                        ex =>
+                            SmartCardError.InvalidArgument(
+                                $"Invalid command hex at exchange {exchange.Index}: {ex.Message}"
+                            )
                     );
 
-                    return newState;
-                });
-                    })
-                );
-            })
+                    var responseBytes = Result.Try(
+                        () => Convert.FromHexString(exchange.Response.Replace(" ", "")),
+                        ex =>
+                            SmartCardError.InvalidArgument(
+                                $"Invalid response hex at exchange {exchange.Index}: {ex.Message}"
+                            )
+                    );
+
+                    return commandBytes.Bind(cmd =>
+                        responseBytes.Bind(resp =>
+                        {
+                            var validationResult = TraceValidation.ValidateExchange(
+                                state,
+                                cmd,
+                                resp,
+                                exchange.Index
+                            );
+
+                            return validationResult.Map(newState =>
+                            {
+                                // Extract the latest validation result for this exchange
+                                var latestResult = newState
+                                    .Results.Where(r => r.ExchangeIndex == exchange.Index)
+                                    .LastOrDefault();
+
+                                Maybe<Gp4Net.Domain.Trace.ValidationResult>
+                                    .From(latestResult)
+                                    .Match(
+                                        Some: result =>
+                                        {
+                                            exchange.Validation = new ValidationInfo
+                                            {
+                                                Type = result.ValidationType,
+                                                IsValid = result.IsValid,
+                                                Details = result.Details,
+                                                Error = result.Error.GetValueOrDefault()
+                                            };
+
+                                            if (verbose)
+                                            {
+                                                var status = result.IsValid
+                                                    ? "[green]✓[/]"
+                                                    : "[red]✗[/]";
+                                                AnsiConsole.MarkupLine(
+                                                    $"{status} Exchange {exchange.Index}: {result.ValidationType} - {result.Details}"
+                                                );
+                                            }
+                                        },
+                                        None: () => { }
+                                    );
+
+                                // Extract plaintext from secure messaging if session keys are available
+                                newState.SessionKeys.Execute(sessionKeys =>
+                                {
+                                    // Check if command has secure messaging bit set (CLA bit 2)
+                                    bool hasSecureMessaging = cmd.Length > 0 && (cmd[0] & 0x04) != 0;
+
+                                    if (hasSecureMessaging && newState.SecurityLevel != 0)
+                                    {
+                                        var plaintextCmd = TraceConverter.ExtractPlaintextCommand(
+                                            cmd,
+                                            sessionKeys,
+                                            newState.SecurityLevel,
+                                            newState.ScpVersion,
+                                            newState.CommandIcv
+                                        );
+                                        exchange.CommandPlaintext = plaintextCmd.Match(
+                                            pt => Convert.ToHexString(pt),
+                                            () => exchange.Command
+                                        );
+
+                                        var plaintextResp = TraceConverter.ExtractPlaintextResponse(
+                                            resp,
+                                            sessionKeys,
+                                            newState.SecurityLevel,
+                                            newState.ScpVersion,
+                                            newState.ResponseIcv
+                                        );
+                                        exchange.ResponsePlaintext = plaintextResp.Match(
+                                            pt => Convert.ToHexString(pt),
+                                            () => exchange.Response
+                                        );
+                                    }
+                                    else
+                                    {
+                                        // No secure messaging - plaintext equals encrypted
+                                        exchange.CommandPlaintext = exchange.Command;
+                                        exchange.ResponsePlaintext = exchange.Response;
+                                    }
+                                });
+
+                                // If no session keys yet, plaintext equals encrypted
+                                if (newState.SessionKeys.HasNoValue)
+                                {
+                                    exchange.CommandPlaintext = exchange.Command;
+                                    exchange.ResponsePlaintext = exchange.Response;
+                                }
+
+                                return newState;
+                            });
+                        })
+                    );
+                })
         );
 
-        // Report summary
-        finalStateResult.Match(
+        // Check if validation succeeded
+        var validationResult = finalStateResult.Match(
             state =>
             {
-                if (verbose && state.Results.Any())
+                if (state.Results.Any())
                 {
                     var validCount = state.Results.Count(r => r.IsValid);
                     var totalCount = state.Results.Count;
-                    var color = validCount == totalCount ? "green" : validCount > 0 ? "yellow" : "red";
-                    AnsiConsole.MarkupLine(
-                        $"[{color}]Validation Summary: {validCount}/{totalCount} checks passed[/]"
-                    );
+
+                    if (verbose)
+                    {
+                        var color =
+                            validCount == totalCount
+                                ? "green"
+                                : validCount > 0
+                                    ? "yellow"
+                                    : "red";
+                        AnsiConsole.MarkupLine(
+                            $"[{color}]Validation Summary: {validCount}/{totalCount} checks passed[/]"
+                        );
+                    }
+
+                    // Fail if any validation check failed
+                    if (validCount < totalCount)
+                    {
+                        var failedChecks = state.Results.Where(r => !r.IsValid).ToList();
+                        var firstFailure = failedChecks.First();
+                        var errorDetail = firstFailure.Error.Match(
+                            value => $" ({value})",
+                            () => string.Empty
+                        );
+
+                        return UnitResult.Failure<SmartCardError>(
+                            SmartCardError.SecurityError(
+                                $"Validation failed: {failedChecks.Count} of {totalCount} checks failed. First failure at exchange {firstFailure.ExchangeIndex}: {firstFailure.ValidationType} - {firstFailure.Details}{errorDetail}"
+                            )
+                        );
+                    }
                 }
+
+                return UnitResult.Success<SmartCardError>();
             },
             error =>
             {
                 if (verbose)
                 {
-                    AnsiConsole.MarkupLine(
-                        $"[yellow]Warning: Validation failed: {error.Message}[/]"
-                    );
+                    AnsiConsole.MarkupLine($"[red]Validation error: {error}[/]");
                 }
+                return UnitResult.Failure(error);
             }
         );
 
-        return await Task.FromResult(UnitResult.Success<SmartCardError>());
+        return await Task.FromResult(validationResult);
     }
 
     private static void LinkOperationsToSessions(
@@ -694,6 +922,204 @@ public class TraceConverter
             }
         }
     }
+
+    private static CryptoService.ScpVersion DetectScpVersionFromTrace(List<Exchange> exchanges)
+    {
+        // Find INITIALIZE UPDATE response to determine SCP version
+        var initUpdateList = exchanges
+            .Where(e => e.Description.Contains("INITIALIZE UPDATE") && e.Response.Length >= 66)
+            .ToList();
+
+        if (!initUpdateList.Any())
+            return CryptoService.ScpVersion.Scp02; // Default if no INITIALIZE UPDATE found
+
+        var initUpdate = initUpdateList.First();
+        var responseData = initUpdate.Response.Replace(" ", "");
+
+        if (responseData.Length >= 28 && responseData.EndsWith("9000"))
+        {
+            // SCP identifier is at byte 11 (position 22-23 in hex string)
+            var scpId = responseData.Substring(22, 2);
+            return scpId == "03" ? CryptoService.ScpVersion.Scp03 : CryptoService.ScpVersion.Scp02;
+        }
+
+        return CryptoService.ScpVersion.Scp02;
+    }
+
+    /// <summary>
+    /// Extracts plaintext command from secure messaging wrapper.
+    /// Handles C-MAC and C-ENC unwrapping based on security level.
+    /// </summary>
+    private static Maybe<byte[]> ExtractPlaintextCommand(
+        byte[] wrappedCommand,
+        SessionKeys sessionKeys,
+        byte securityLevel,
+        CryptoService.ScpVersion scpVersion,
+        Maybe<byte[]> commandIcv
+    )
+    {
+        if (wrappedCommand.Length < 5)
+            return Maybe<byte[]>.None;
+
+        byte cla = wrappedCommand[0];
+        if ((cla & 0x04) == 0)
+            return Maybe<byte[]>.From(wrappedCommand);
+
+        byte plaintextCla = (byte)(cla & ~0x04);
+        byte ins = wrappedCommand[1];
+        byte p1 = wrappedCommand[2];
+        byte p2 = wrappedCommand[3];
+
+        if (wrappedCommand.Length == 4)
+            return Maybe<byte[]>.From(new byte[] { plaintextCla, ins, p1, p2 });
+
+        byte lc = wrappedCommand[4];
+        if (wrappedCommand.Length < 5 + lc)
+            return Maybe<byte[]>.None;
+
+        bool hasCMac = (securityLevel & 0x01) != 0;
+        bool hasCEnc = (securityLevel & 0x02) != 0;
+
+        int macLength = hasCMac ? 8 : 0;
+        int dataLength = lc - macLength;
+
+        if (dataLength < 0)
+            return Maybe<byte[]>.None;
+
+        var data = wrappedCommand.Skip(5).Take(dataLength).ToArray();
+
+        var decryptedData = hasCEnc && data.Length > 0
+            ? scpVersion switch
+            {
+                CryptoService.ScpVersion.Scp02
+                    => CryptoService
+                        .Cipher.Decrypt3DesCbc(
+                            sessionKeys.SEnc,
+                            new byte[8], // Always zero IV for SCP02 command encryption per GP spec E.3.1
+                            data
+                        )
+                        .Map(RemovePadding)
+                        .Match(
+                            success => Maybe<byte[]>.From(success),
+                            failure => Maybe<byte[]>.None
+                        ),
+                CryptoService.ScpVersion.Scp03
+                    => CryptoService
+                        .Cipher.DecryptAesCbc(sessionKeys.SEnc, new byte[16], data)
+                        .Map(RemovePadding)
+                        .Match(
+                            success => Maybe<byte[]>.From(success),
+                            failure => Maybe<byte[]>.None
+                        ),
+                _ => Maybe<byte[]>.None
+            }
+            : Maybe<byte[]>.From(data);
+
+        return decryptedData.Map(plainData =>
+        {
+            var builder = ImmutableList.CreateBuilder<byte>();
+            builder.Add(plaintextCla);
+            builder.Add(ins);
+            builder.Add(p1);
+            builder.Add(p2);
+
+            if (plainData.Length > 0)
+            {
+                builder.Add((byte)plainData.Length);
+                builder.AddRange(plainData);
+            }
+
+            bool hasLe = wrappedCommand.Length > (5 + lc);
+            if (hasLe)
+                builder.Add(wrappedCommand[5 + lc]);
+
+            return builder.ToArray();
+        });
+    }
+
+    /// <summary>
+    /// Extracts plaintext response from secure messaging wrapper.
+    /// </summary>
+    private static Maybe<byte[]> ExtractPlaintextResponse(
+        byte[] wrappedResponse,
+        SessionKeys sessionKeys,
+        byte securityLevel,
+        CryptoService.ScpVersion scpVersion,
+        Maybe<byte[]> responseIcv
+    )
+    {
+        if (wrappedResponse.Length < 2)
+            return Maybe<byte[]>.None;
+
+        var sw = wrappedResponse.Skip(wrappedResponse.Length - 2).Take(2).ToArray();
+
+        bool hasRMac = (securityLevel & 0x10) != 0;
+        bool hasREnc = (securityLevel & 0x20) != 0;
+
+        int macLength = hasRMac ? 8 : 0;
+        int dataEndIndex = wrappedResponse.Length - 2 - macLength;
+
+        if (dataEndIndex < 0)
+            return Maybe<byte[]>.None;
+
+        var data = wrappedResponse.Take(dataEndIndex).ToArray();
+
+        var decryptedData = hasREnc && data.Length > 0
+            ? scpVersion switch
+            {
+                CryptoService.ScpVersion.Scp02
+                    => CryptoService
+                        .Cipher.Decrypt3DesCbc(
+                            sessionKeys.SEnc,
+                            new byte[8], // Always zero IV for SCP02 response encryption per GP spec E.3.1
+                            data
+                        )
+                        .Map(RemovePadding)
+                        .Match(
+                            success => Maybe<byte[]>.From(success),
+                            failure => Maybe<byte[]>.None
+                        ),
+                CryptoService.ScpVersion.Scp03
+                    => CryptoService
+                        .Cipher.DecryptAesCbc(sessionKeys.SEnc, new byte[16], data)
+                        .Map(RemovePadding)
+                        .Match(
+                            success => Maybe<byte[]>.From(success),
+                            failure => Maybe<byte[]>.None
+                        ),
+                _ => Maybe<byte[]>.None
+            }
+            : Maybe<byte[]>.From(data);
+
+        return decryptedData.Map(plainData => plainData.Concat(sw).ToArray());
+    }
+
+    /// <summary>
+    /// Removes ISO 9797-1 Method 2 padding from decrypted data.
+    /// Padding format: data || 0x80 || 0x00*
+    /// </summary>
+    private static byte[] RemovePadding(byte[] paddedData)
+    {
+        if (paddedData.Length == 0)
+            return paddedData;
+
+        // Find index of last non-zero byte from the end
+        var nonZeroIndices = Enumerable
+            .Range(0, paddedData.Length)
+            .Reverse()
+            .SkipWhile(i => paddedData[i] == 0x00)
+            .ToList();
+
+        if (nonZeroIndices.Count == 0)
+            return paddedData;
+
+        var lastNonZeroIndex = nonZeroIndices.First();
+
+        // Check if it's the 0x80 padding marker
+        return paddedData[lastNonZeroIndex] == 0x80
+            ? paddedData.Take(lastNonZeroIndex).ToArray()
+            : paddedData;
+    }
 }
 
 /// <summary>
@@ -701,29 +1127,31 @@ public class TraceConverter
 /// </summary>
 public class ApduAnalyzer
 {
-    private static readonly Dictionary<string, string> CommandDescriptions = new()
-    {
-        { "A4", "SELECT" },
-        { "CA", "GET DATA" },
-        { "F2", "GET STATUS" },
-        { "50", "INITIALIZE UPDATE" },
-        { "82", "EXTERNAL AUTHENTICATE" },
-        { "E6", "INSTALL" },
-        { "E8", "LOAD" },
-        { "E4", "DELETE" },
-    };
+    private static readonly Dictionary<string, string> CommandDescriptions =
+        new()
+        {
+            { "A4", "SELECT" },
+            { "CA", "GET DATA" },
+            { "F2", "GET STATUS" },
+            { "50", "INITIALIZE UPDATE" },
+            { "82", "EXTERNAL AUTHENTICATE" },
+            { "E6", "INSTALL" },
+            { "E8", "LOAD" },
+            { "E4", "DELETE" },
+        };
 
-    private static readonly Dictionary<string, string> GetDataTags = new()
-    {
-        { "9F7F", "CPLC" },
-        { "0042", "IIN" },
-        { "0045", "CIN" },
-        { "00CF", "KDD" },
-        { "00C1", "SSC" },
-        { "0066", "CARD DATA" },
-        { "0067", "CARD CAPABILITIES" },
-        { "00E0", "KEY INFORMATION" },
-    };
+    private static readonly Dictionary<string, string> GetDataTags =
+        new()
+        {
+            { "9F7F", "CPLC" },
+            { "0042", "IIN" },
+            { "0045", "CIN" },
+            { "00CF", "KDD" },
+            { "00C1", "SSC" },
+            { "0066", "CARD DATA" },
+            { "0067", "CARD CAPABILITIES" },
+            { "00E0", "KEY INFORMATION" },
+        };
 
     public static string GetCommandDescription(string commandHex)
     {
@@ -781,7 +1209,11 @@ public class ApduAnalyzer
         return (cla & 0x04) != 0;
     }
 
-    public static ScpData ExtractScpData(string commandHex, string responseHex, string description)
+    public static Maybe<ScpData> ExtractScpData(
+        string commandHex,
+        string responseHex,
+        string description
+    )
     {
         var scpData = new ScpData();
         bool hasData = false;
@@ -801,7 +1233,9 @@ public class ApduAnalyzer
                 string responseData = responseHex.Substring(0, responseHex.Length - 4);
                 if (responseData.Length >= 64)
                 {
-                    scpData.KeyVersionMaybe = Maybe<int>.From(Convert.ToInt32(responseData.Substring(20, 2), 16));
+                    scpData.KeyVersionMaybe = Maybe<int>.From(
+                        Convert.ToInt32(responseData.Substring(20, 2), 16)
+                    );
                     scpData.ScpId = responseData.Substring(22, 2);
                     scpData.CardChallenge = responseData.Substring(30, 16);
                     scpData.CardCryptogram = responseData.Substring(46, 16);
@@ -820,7 +1254,7 @@ public class ApduAnalyzer
             }
         }
 
-        return hasData ? scpData : null;
+        return hasData ? Maybe<ScpData>.From(scpData) : Maybe<ScpData>.None;
     }
 }
 
@@ -829,83 +1263,84 @@ public class ApduAnalyzer
 /// </summary>
 public class OperationDetector
 {
-    private static readonly Dictionary<string, OperationPattern> OperationPatterns = new()
-    {
+    private static readonly Dictionary<string, OperationPattern> OperationPatterns =
+        new()
         {
-            "select_isd",
-            new OperationPattern
             {
-                Indicators = ["SELECT"],
-                RequiredSequence = false,
-                CliTemplate = "gp4net card info",
-            }
-        },
-        {
-            "get_data",
-            new OperationPattern
+                "select_isd",
+                new OperationPattern
+                {
+                    Indicators = ["SELECT"],
+                    RequiredSequence = false,
+                    CliTemplate = "gp4net card info",
+                }
+            },
             {
-                Indicators =
-                [
-                    "GET DATA",
-                    "GET CPLC",
-                    "GET CARD DATA",
-                    "GET CARD CAPABILITIES",
-                    "GET IIN",
-                    "GET CIN",
-                    "GET KDD",
-                    "GET SSC",
-                    "GET KEY INFORMATION",
-                ],
-                RequiredSequence = false,
-                CliTemplate = "gp4net card info",
-            }
-        },
-        {
-            "list",
-            new OperationPattern
+                "get_data",
+                new OperationPattern
+                {
+                    Indicators =
+                    [
+                        "GET DATA",
+                        "GET CPLC",
+                        "GET CARD DATA",
+                        "GET CARD CAPABILITIES",
+                        "GET IIN",
+                        "GET CIN",
+                        "GET KDD",
+                        "GET SSC",
+                        "GET KEY INFORMATION",
+                    ],
+                    RequiredSequence = false,
+                    CliTemplate = "gp4net card info",
+                }
+            },
             {
-                Indicators = ["GET STATUS"],
-                RequiredSequence = false,
-                CliTemplate = "gp4net applet list",
-            }
-        },
-        {
-            "secure_channel_establish",
-            new OperationPattern
+                "list",
+                new OperationPattern
+                {
+                    Indicators = ["GET STATUS"],
+                    RequiredSequence = false,
+                    CliTemplate = "gp4net applet list",
+                }
+            },
             {
-                Indicators = ["INITIALIZE UPDATE", "EXTERNAL AUTHENTICATE"],
-                RequiredSequence = true,
-                CliTemplate = "gp4net card test-sc -k gp_test_keys",
-            }
-        },
-        {
-            "install_applet",
-            new OperationPattern
+                "secure_channel_establish",
+                new OperationPattern
+                {
+                    Indicators = ["INITIALIZE UPDATE", "EXTERNAL AUTHENTICATE"],
+                    RequiredSequence = true,
+                    CliTemplate = "gp4net card test-sc -k gp_test_keys",
+                }
+            },
             {
-                Indicators = ["INSTALL [for load]"],
-                RequiredSequence = false,
-                CliTemplate = "gp4net applet install {package}.cap",
-            }
-        },
-        {
-            "load_blocks",
-            new OperationPattern
+                "install_applet",
+                new OperationPattern
+                {
+                    Indicators = ["INSTALL [for load]"],
+                    RequiredSequence = false,
+                    CliTemplate = "gp4net applet install {package}.cap",
+                }
+            },
             {
-                Indicators = ["LOAD"],
-                RequiredSequence = false,
-                CliTemplate = "gp4net applet load",
-            }
-        },
-        {
-            "uninstall",
-            new OperationPattern
+                "load_blocks",
+                new OperationPattern
+                {
+                    Indicators = ["LOAD"],
+                    RequiredSequence = false,
+                    CliTemplate = "gp4net applet load",
+                }
+            },
             {
-                Indicators = ["DELETE"],
-                RequiredSequence = false,
-                CliTemplate = "gp4net applet delete {aid}",
-            }
-        },
-    };
+                "uninstall",
+                new OperationPattern
+                {
+                    Indicators = ["DELETE"],
+                    RequiredSequence = false,
+                    CliTemplate = "gp4net applet delete {aid}",
+                }
+            },
+        };
 
     private readonly Dictionary<string, int> _operationCounter = new();
     private readonly List<DetectedOperation> _detectedOperations = [];
@@ -967,46 +1402,47 @@ public class OperationDetector
 
     private Dictionary<string, Operation> MergeOperations()
     {
-        var operations = new Dictionary<string, Operation>();
-
         // Handle operations that require specific sequences
         MergeSequentialOperations(
             "secure_channel_establish",
             ["INITIALIZE UPDATE", "EXTERNAL AUTHENTICATE"]
         );
 
-        // Create operations from detected operations
-        for (int i = 0; i < _detectedOperations.Count; i++)
-        {
-            var detectedOp = _detectedOperations[i];
+        // Create operations from detected operations using functional composition
+        return _detectedOperations
+            .Aggregate(
+                new Dictionary<string, Operation>(),
+                (operations, detectedOp) =>
+                {
+                    // Check if this operation overlaps with any existing operation
+                    var hasOverlap = operations.Values.Any(op =>
+                        op.StartExchange - 1 <= detectedOp.EndIndex
+                        && op.EndExchange - 1 >= detectedOp.StartIndex
+                    );
 
-            // Check if this operation is part of an existing operation (by checking overlap)
-            var existingOp = operations.Values.FirstOrDefault(op =>
-                op.StartExchange - 1 <= detectedOp.EndIndex
-                && op.EndExchange - 1 >= detectedOp.StartIndex
+                    if (hasOverlap)
+                    {
+                        return operations; // Skip if already part of another operation
+                    }
+
+                    // Create operation
+                    string opName = GetUniqueOperationName(detectedOp.Type);
+                    var operation = new Operation
+                    {
+                        Description = GetOperationDescription(detectedOp.Type),
+                        SessionId = "session_1",
+                        StartExchange = detectedOp.StartIndex + 1,
+                        EndExchange = detectedOp.EndIndex + 1,
+                        Commands = [.. detectedOp.Commands.Distinct()],
+                        ExpectedCli =
+                            OperationPatterns.GetValueOrDefault(detectedOp.Type)?.CliTemplate
+                            ?? "gp4net unknown",
+                    };
+
+                    operations[opName] = operation;
+                    return operations;
+                }
             );
-
-            if (existingOp != null)
-            {
-                continue; // Skip if already part of another operation
-            }
-
-            // Create operation
-            string opName = GetUniqueOperationName(detectedOp.Type);
-            operations[opName] = new Operation
-            {
-                Description = GetOperationDescription(detectedOp.Type),
-                SessionId = "session_1",
-                StartExchange = detectedOp.StartIndex + 1,
-                EndExchange = detectedOp.EndIndex + 1,
-                Commands = [.. detectedOp.Commands.Distinct()],
-                ExpectedCli =
-                    OperationPatterns.GetValueOrDefault(detectedOp.Type)?.CliTemplate
-                    ?? "gp4net unknown",
-            };
-        }
-
-        return operations;
     }
 
     private void MergeSequentialOperations(string operationType, string[] requiredCommands)
@@ -1157,38 +1593,97 @@ public class SessionAnalyzer
 {
     private int _sessionCounter = 1;
 
+    /// <summary>
+    /// Detects secure channel sessions from APDU exchanges using functional composition.
+    /// </summary>
+    /// <param name="exchanges">List of APDU exchanges to analyze.</param>
+    /// <returns>List of detected session metadata.</returns>
     public List<SessionMetadata> DetectSessions(List<Exchange> exchanges)
     {
-        List<SessionMetadata> sessions = [];
-        SessionMetadata currentSession = null;
-
-        foreach (var exchange in exchanges)
-        {
-            // Detect new session start
-            if (exchange.Description.Contains("INITIALIZE UPDATE"))
+        var result = exchanges.Aggregate(
+            new
             {
-                if (currentSession != null)
+                CompletedSessions = ImmutableList<SessionMetadata>.Empty,
+                CurrentSession = Maybe<SessionMetadata>.None,
+            },
+            (state, exchange) =>
+            {
+                // Detect new session start
+                if (exchange.Description.Contains("INITIALIZE UPDATE"))
                 {
-                    sessions.Add(currentSession);
+                    // Add previous session to completed sessions if exists
+                    var updatedCompletedSessions = state.CurrentSession.Match(
+                        Some: session => state.CompletedSessions.Concat(new[] { session }).ToImmutableList(),
+                        None: () => state.CompletedSessions
+                    );
+
+                    // Create new session
+                    var newSession = CreateSessionFromInitUpdate(exchange);
+                    return new
+                    {
+                        CompletedSessions = updatedCompletedSessions,
+                        CurrentSession = Maybe<SessionMetadata>.From(newSession),
+                    };
                 }
 
-                currentSession = CreateSessionFromInitUpdate(exchange);
+                // Update current session with additional data
+                return new
+                {
+                    state.CompletedSessions,
+                    CurrentSession = state.CurrentSession.Map(session =>
+                    {
+                        UpdateSessionData(session, exchange);
+                        return session;
+                    }),
+                };
             }
+        );
 
-            // Update session with additional data
-            if (currentSession != null)
+        // Add final session if exists and return all sessions
+        var finalSessionsList = result.CurrentSession.Match(
+            Some: session => result.CompletedSessions.Concat(new[] { session }).ToImmutableList(),
+            None: () => result.CompletedSessions
+        );
+
+        return finalSessionsList.ToList();
+    }
+
+    private static (int scpVersion, string scpImplementation) ParseScpInfoFromResponse(
+        string response
+    )
+    {
+        // Default values
+        int scpVersion = 2;
+        string scpImplementation = "i=00";
+
+        var maybeResponse = Maybe<string>.From(response);
+
+        return maybeResponse
+            .Where(r => r.Length >= 28)
+            .Map(r => r.EndsWith("9000") ? r.Substring(0, r.Length - 4) : r)
+            .Where(r => r.Length >= 26)
+            .Map(responseData =>
             {
-                UpdateSessionData(currentSession, exchange);
-            }
-        }
+                // Parse SCP identifier from byte 11 (chars 22-23)
+                var scpIdResult = Result.Try(() =>
+                {
+                    string scpIdHex = responseData.Substring(22, 2);
+                    return int.Parse(scpIdHex, System.Globalization.NumberStyles.HexNumber);
+                });
 
-        // Add final session
-        if (currentSession != null)
-        {
-            sessions.Add(currentSession);
-        }
+                // Parse i-parameter from byte 12 (chars 24-25)
+                var iParamResult = Result.Try(() =>
+                {
+                    string iParamHex = responseData.Substring(24, 2);
+                    return int.Parse(iParamHex, System.Globalization.NumberStyles.HexNumber);
+                });
 
-        return sessions;
+                int version = scpIdResult.GetValueOrDefault(2);
+                string impl = iParamResult.Match(value => $"i={value:X2}", _ => "i=00");
+
+                return (version, impl);
+            })
+            .GetValueOrDefault((scpVersion, scpImplementation));
     }
 
     private SessionMetadata CreateSessionFromInitUpdate(Exchange exchange)
@@ -1197,35 +1692,41 @@ public class SessionAnalyzer
         _sessionCounter++;
 
         var scpData = exchange.ScpData;
-        DerivationData derivationData = null;
 
-        if (scpData != null)
-        {
-            derivationData = new DerivationData
+        // Parse SCP version and i-parameter from INITIALIZE UPDATE response
+        var (scpVersion, scpImplementation) = ParseScpInfoFromResponse(exchange.Response);
+
+        var derivationData = scpData.Match(
+            Some: sd => new DerivationData
             {
                 Kdd = "0370000000000000000001", // Default, should be extracted
-                HostChallenge = scpData.HostChallenge ?? "",
-                CardChallenge = scpData.CardChallenge ?? "",
-                CardCryptogram = scpData.CardCryptogram ?? "",
-            };
-        }
+                HostChallenge = sd.HostChallenge,
+                CardChallenge = sd.CardChallenge,
+                CardCryptogram = sd.CardCryptogram,
+            },
+            None: () =>
+                new DerivationData
+                {
+                    Kdd = "",
+                    HostChallenge = "",
+                    CardChallenge = "",
+                    CardCryptogram = "",
+                }
+        );
 
         return new SessionMetadata
         {
             SessionId = sessionId,
-            ScpVersion = 3,
-            ScpImplementation = "i=70",
-            KeyVersion = Maybe<ScpData>.From(scpData).Match(
+            ScpVersion = scpVersion,
+            ScpImplementation = scpImplementation,
+            KeyVersion = scpData.Match(
                 Some: sd => sd.KeyVersionMaybe.Match(Some: v => v, None: () => 1),
-                None: () => 1),
+                None: () => 1
+            ),
             SecurityLevel = "C_MAC|R_MAC|C_ENC|R_ENC",
             KeyDiversification = "none",
-            HostChallenge = Maybe<ScpData>.From(scpData).Match(
-                Some: sd => sd.HostChallenge,
-                None: () => ""),
-            CardChallenge = Maybe<ScpData>.From(scpData).Match(
-                Some: sd => sd.CardChallenge,
-                None: () => ""),
+            HostChallenge = scpData.Match(Some: sd => sd.HostChallenge, None: () => ""),
+            CardChallenge = scpData.Match(Some: sd => sd.CardChallenge, None: () => ""),
             SequenceCounter = "000001",
             DerivationData = derivationData,
             Operations = [],
@@ -1300,40 +1801,61 @@ public class MetadataExtractor
         return "A000000151000000"; // Default ISD AID
     }
 
-    private static CplcData FindCplcData(List<Exchange> exchanges)
+    /// <summary>
+    /// Finds and parses CPLC data from GET CPLC command exchanges.
+    /// </summary>
+    /// <param name="exchanges">List of APDU exchanges to search.</param>
+    /// <returns>Maybe containing CPLC data if found and valid.</returns>
+    private static Maybe<CplcData> FindCplcData(List<Exchange> exchanges)
     {
-        foreach (var exchange in exchanges)
-        {
-            if (exchange.Description.Contains("GET CPLC") && exchange.Response.Length > 20)
-            {
-                string responseData = exchange.Response;
-                if (responseData.StartsWith("9F7F") && responseData.EndsWith("9000"))
-                {
-                    // Parse CPLC data
-                    string cplcHex = responseData.Substring(6, responseData.Length - 10); // Remove tag+length and SW
-                    if (cplcHex.Length >= 42) // Minimum CPLC length
-                    {
-                        return new CplcData
-                        {
-                            IcFabricator = cplcHex.Substring(0, 4),
-                            IcType = cplcHex.Substring(4, 4),
-                            OsId = cplcHex.Substring(8, 4),
-                            IcSerial = cplcHex.Substring(24, 8),
-                        };
-                    }
-                }
-            }
-        }
-        return null;
+        var validCplcExchanges = exchanges
+            .Where(e =>
+                e.Description.Contains("GET CPLC")
+                && e.Response.Length > 20
+                && e.Response.StartsWith("9F7F")
+                && e.Response.EndsWith("9000")
+            )
+            .ToList();
+
+        return validCplcExchanges.Any()
+            ? ParseCplcFromResponse(validCplcExchanges.First().Response)
+            : Maybe<CplcData>.None;
     }
 
-    private static string DetectCardType(CplcData cplcData)
+    /// <summary>
+    /// Parses CPLC data from a valid GET CPLC response.
+    /// </summary>
+    /// <param name="response">Response hex string containing CPLC data.</param>
+    /// <returns>Maybe containing parsed CPLC data if valid length.</returns>
+    private static Maybe<CplcData> ParseCplcFromResponse(string response)
     {
-        if (cplcData?.IcFabricator == "4790")
-        {
-            return "NXP_P71";
-        }
-        return "UNKNOWN";
+        // Parse CPLC data: Remove tag+length (6 chars) and SW (4 chars)
+        string cplcHex = response.Substring(6, response.Length - 10);
+
+        return cplcHex.Length >= 42
+            ? Maybe<CplcData>.From(
+                new CplcData
+                {
+                    IcFabricator = cplcHex.Substring(0, 4),
+                    IcType = cplcHex.Substring(4, 4),
+                    OsId = cplcHex.Substring(8, 4),
+                    IcSerial = cplcHex.Substring(24, 8),
+                }
+            )
+            : Maybe<CplcData>.None;
+    }
+
+    /// <summary>
+    /// Detects card type from CPLC data IC fabricator code.
+    /// </summary>
+    /// <param name="cplcData">Maybe containing CPLC data.</param>
+    /// <returns>Card type string based on IC fabricator.</returns>
+    private static string DetectCardType(Maybe<CplcData> cplcData)
+    {
+        return cplcData.Match(
+            Some: data => data.IcFabricator == "4790" ? "NXP_P71" : "UNKNOWN",
+            None: () => "UNKNOWN"
+        );
     }
 }
 
@@ -1344,55 +1866,48 @@ public class UsageExampleGenerator
 {
     public static List<UsageExample> GenerateExamples(Dictionary<string, Operation> operations)
     {
-        List<UsageExample> examples = [];
-
         // Single operation examples
-        foreach (var kvp in operations)
+        var singleOpExamples = operations.Select(kvp => new UsageExample
         {
-            examples.Add(
-                new UsageExample
-                {
-                    Description = $"{kvp.Value.Description} only",
-                    Command = $"{kvp.Value.ExpectedCli} -r 'lua:trace.lua?operations={kvp.Key}'",
-                }
-            );
-        }
+            Description = $"{kvp.Value.Description} only",
+            Command = $"{kvp.Value.ExpectedCli} -r 'virtual:trace.json?operations={kvp.Key}'",
+        });
 
         // Workflow examples
-        List<string> opNames = [.. operations.Keys];
+        var opNames = operations.Keys.ToList();
 
         // Install workflow
-        List<string> installOps =
-        [
-            .. opNames.Where(op =>
-                op.Contains("install") || op.Contains("secure_channel") || op == "info"
-            ),
-        ];
-        if (installOps.Count > 1)
-        {
-            examples.Add(
-                new UsageExample
+        var installOps = opNames
+            .Where(op => op.Contains("install") || op.Contains("secure_channel") || op == "info")
+            .ToList();
+
+        var installWorkflow =
+            installOps.Count > 1
+                ? new[]
                 {
-                    Description = "Install workflow",
-                    Command =
-                        $"gp4net applet install app.cap -r 'lua:trace.lua?operations={string.Join(",", installOps)}'",
+                    new UsageExample
+                    {
+                        Description = "Install workflow",
+                        Command =
+                            $"gp4net applet install app.cap -r 'virtual:trace.json?operations={string.Join(",", installOps)}'",
+                    }
                 }
-            );
-        }
+                : Array.Empty<UsageExample>();
 
         // Full workflow
-        if (opNames.Count > 2)
-        {
-            examples.Add(
-                new UsageExample
+        var fullWorkflow =
+            opNames.Count > 2
+                ? new[]
                 {
-                    Description = "Complete workflow",
-                    Command =
-                        $"gp4net script eval 'full_workflow()' -r 'lua:trace.lua?operations={string.Join(",", opNames)}'",
+                    new UsageExample
+                    {
+                        Description = "Complete workflow",
+                        Command =
+                            $"gp4net script eval 'full_workflow()' -r 'virtual:trace.json?operations={string.Join(",", opNames)}'",
+                    }
                 }
-            );
-        }
+                : Array.Empty<UsageExample>();
 
-        return examples;
+        return singleOpExamples.Concat(installWorkflow).Concat(fullWorkflow).ToList();
     }
 }

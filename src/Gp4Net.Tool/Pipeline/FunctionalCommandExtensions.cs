@@ -35,11 +35,10 @@ public static class FunctionalCommandExtensions
     /// </summary>
     public static async Task<Result<ICliExecutionContext, string>> RequireCardConnectionFunctional(
         this ICliExecutionContext context,
-        string readerName = null
+        Maybe<string> readerName = default
     )
     {
-        var connectionResult =
-            await context.CardService.IsConnectedAsync();
+        var connectionResult = await context.CardService.IsConnectedAsync();
         return await connectionResult.Match(
             isConnected =>
                 isConnected
@@ -51,12 +50,13 @@ public static class FunctionalCommandExtensions
 
     private static async Task<Result<ICliExecutionContext, string>> EstablishConnection(
         ICliExecutionContext context,
-        string readerName
+        Maybe<string> readerName
     )
     {
         try
         {
-            _ = await context.RequireCardConnection(readerName);
+            var readerToUse = readerName.Match(Some: name => name, None: () => null);
+            _ = await context.RequireCardConnection(readerToUse);
             return Result.Success<ICliExecutionContext, string>(context);
         }
         catch (Exception ex)
@@ -71,12 +71,13 @@ public static class FunctionalCommandExtensions
     public static async Task<Result<ICliExecutionContext, string>> RequireSecureChannelFunctional(
         this ICliExecutionContext context,
         byte securityLevel = 1,
-        string keyset = null
+        Maybe<string> keyset = default
     )
     {
         try
         {
-            _ = await context.RequireSecureChannel(securityLevel, keyset);
+            var keysetToUse = keyset.Match(Some: k => k, None: () => null);
+            _ = await context.RequireSecureChannel(securityLevel, keysetToUse);
             return Result.Success<ICliExecutionContext, string>(context);
         }
         catch (Exception ex)
@@ -130,8 +131,7 @@ public static class FunctionalCommandExtensions
         Func<ICliExecutionContext, Task<Result<bool, string>>> commandLogic
     )
     {
-        var connectionResult =
-            await context.RequireCardConnectionFunctional();
+        var connectionResult = await context.RequireCardConnectionFunctional();
         var commandResult = await connectionResult.Match(
             async ctx => await commandLogic(ctx),
             error => Task.FromResult(Result.Failure<bool, string>(error))

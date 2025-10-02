@@ -39,7 +39,9 @@ public sealed class CapFileServiceAdapter
     {
         return _coreService
             .ParseCapFile(capFileData)
-            .Bind(capStructure => _coreService.ValidateCapStructure(capStructure).Map(_ => capStructure))
+            .Bind(capStructure =>
+                _coreService.ValidateCapStructure(capStructure).Map(_ => capStructure)
+            )
             .Bind(capStructure => VerifyLfdbhIfProvided(capFileData, expectedHash, capStructure))
             .Bind(capStructure => ExtractExecutableModuleFromStructure(capStructure));
     }
@@ -65,7 +67,10 @@ public sealed class CapFileServiceAdapter
     )
     {
         return expectedHash.Match(
-            hash => _coreService.VerifyLoadFileDataBlockHash(capFileData, hash.Value).Map(_ => capStructure),
+            hash =>
+                _coreService
+                    .VerifyLoadFileDataBlockHash(capFileData, hash.Value)
+                    .Map(_ => capStructure),
             () => Result.Success<CapFileStructure, SmartCardError>(capStructure)
         );
     }

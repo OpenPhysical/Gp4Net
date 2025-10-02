@@ -1,5 +1,8 @@
+using System;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
@@ -55,27 +58,100 @@ public class InstallCliCommand : IPipelineCommand<InstallCliCommand.Settings>
             );
     }
 
-    private static Task<Result<bool, SmartCardError>> PerformInstall(
+    private static async Task<Result<bool, SmartCardError>> PerformInstall(
         ICliExecutionContext context,
         Settings settings
     )
     {
-        context.Display.Info($"Installing CAP file: {settings.CapFile}");
+        byte[] capFileData = await File.ReadAllBytesAsync(settings.CapFile);
 
-        context.Display.Error("CAP file installation not yet implemented with static services.");
-        return Task.FromResult(
-            Result.Failure<bool, SmartCardError>(
-                SmartCardError.Unsupported(
-                    "CAP file installation functionality needs to be implemented using static GlobalPlatformService methods"
-                )
-            )
+        var connectionResult = await context.RequireCardConnection(settings.GetReaderName());
+        return await connectionResult.Match(
+            async connectedCtx =>
+            {
+                var secureChannelResult = await connectedCtx.RequireSecureChannel();
+                return await secureChannelResult.Match(
+                    async secureCtx =>
+                    {
+                        context.Display.Info($"Installing CAP file: {settings.CapFile}");
+                        context.Display.Info("Step 1: INSTALL [for load]");
+                        context.Display.Info("Step 2: LOAD");
+                        context.Display.Info(
+                            $"Step 3: INSTALL [for install] {(settings.InstallApplets ? "(enabled)" : "(skipped)")}"
+                        );
+
+                        var installResult =
+                            await Gp4Net.Services.GlobalPlatform.CardManagement.InstallCapFileAsync(
+                                capFileData,
+                                securityDomainAid: CSharpFunctionalExtensions.Maybe<byte[]>.None,
+                                settings.InstallApplets,
+                                settings.MakeSelectable,
+                                (command, ct) =>
+                                    secureCtx.CardService.ExecuteCommandAsync(command, ct),
+                                CancellationToken.None
+                            );
+
+                        return installResult.Match(
+                            result =>
+                            {
+                                context.Display.Success("Installation completed successfully");
+                                context.Display.Info(
+                                    $"Package AID: {Convert.ToHexString(result.PackageAid)}"
+                                );
+                                if (result.AppletsInstalled && result.InstalledAppletAids.Count > 0)
+                                {
+                                    DisplayInstalledApplets(context, result.InstalledAppletAids);
+                                }
+                                return Result.Success<bool, SmartCardError>(true);
+                            },
+                            error =>
+                            {
+                                context.Display.Error($"Installation failed: {error.Message}");
+                                return Result.Failure<bool, SmartCardError>(error);
+                            }
+                        );
+                    },
+                    async secureChannelError =>
+                    {
+                        context.Display.Error(
+                            $"Secure channel error: {secureChannelError.Message}"
+                        );
+                        return await Task.FromResult(
+                            Result.Failure<bool, SmartCardError>(secureChannelError)
+                        );
+                    }
+                );
+            },
+            async connectionError =>
+            {
+                context.Display.Error($"Connection error: {connectionError.Message}");
+                return await Task.FromResult(Result.Failure<bool, SmartCardError>(connectionError));
+            }
         );
+    }
+
+    private static bool DisplayInstalledApplets(
+        ICliExecutionContext context,
+        System.Collections.Generic.IReadOnlyList<byte[]> appletAids
+    )
+    {
+        context.Display.Info("Installed applets:");
+        appletAids
+            .Select(aid => $"  - {Convert.ToHexString(aid)}")
+            .Select(line =>
+            {
+                context.Display.Info(line);
+                return true;
+            })
+            .ToList();
+
+        return true;
     }
 
     /// <summary>
     /// Settings for the install command.
     /// </summary>
-    public class Settings : CommandSettings
+    public class Settings : SecureCommandSettings
     {
         /// <summary>
         /// Gets or sets the CAP file path.
@@ -113,8 +189,6 @@ public class InstallCliCommand : IPipelineCommand<InstallCliCommand.Settings>
         {
             get { return !NoMakeSelectable; }
         }
-
-        // Note: This command requires secure channel - handled in the command implementation
 
         /// <summary>
         /// Validates the command settings.

@@ -1,6 +1,3 @@
-using CSharpFunctionalExtensions;
-using Gp4Net.CardEmulator.Applications;
-
 namespace Gp4Net.CardEmulator.Functional;
 
 /// <summary>
@@ -8,8 +5,6 @@ namespace Gp4Net.CardEmulator.Functional;
 /// </summary>
 public partial record CardState
 {
-
-
     /// <summary>
     /// Checks if the card has a secure channel established.
     /// Convenience property for applications to check security status.

@@ -42,31 +42,17 @@ public class CardContentRetriever
         CancellationToken cancellationToken = default
     )
     {
-        // Select ISD
-        var selectResult =
-            await Discovery.DetectAndSelectIsdAsync(
+        // Select ISD, establish secure channel, and retrieve complete card content
+        return await Discovery
+            .DetectAndSelectIsdAsync(
                 async (cmd, ct) => await _cardService.ExecuteCommandAsync(cmd, ct),
                 cancellationToken
-            );
-
-        if (selectResult.IsFailure)
-        {
-            return Result.Failure<CardContent, SmartCardError>(selectResult.Error);
-        }
-
-        // Establish secure channel
-        var secureChannelResult =
-            await EstablishSecureChannelWithAutoDetection(keySet);
-        if (secureChannelResult.IsFailure)
-        {
-            return Result.Failure<CardContent, SmartCardError>(secureChannelResult.Error);
-        }
-
-        // Retrieve complete card content
-        return await Applications.RetrieveCompleteCardContentAsync(
-            async (cmd, ct) => await _cardService.ExecuteCommandAsync(cmd, ct),
-            cancellationToken
-        );
+            )
+            .Bind(async _ => await EstablishSecureChannelWithAutoDetection(keySet))
+            .Bind(async _ => await Applications.RetrieveCompleteCardContentAsync(
+                async (cmd, ct) => await _cardService.ExecuteCommandAsync(cmd, ct),
+                cancellationToken
+            ));
     }
 
     /// <summary>
@@ -83,25 +69,19 @@ public class CardContentRetriever
 
                 return await ConvertToKeySet(ks)
                     .Bind(async keySetForGp =>
-                    {
-                        var secureChannelResult = await ScpService.Establishment.EstablishAsync(
+                        await ScpService.Establishment.EstablishAsync(
                             _cardService,
                             keySetForGp,
                             SecurityLevel.CMac,
                             CancellationToken.None
-                        );
-
-                        if (secureChannelResult.IsSuccess)
-                        {
-                            _logger.LogInformation("Secure channel established successfully");
-                            return Result.Success<bool, SmartCardError>(true);
-                        }
-                        _logger.LogWarning(
+                        )
+                        .Tap(_ => _logger.LogInformation("Secure channel established successfully"))
+                        .TapError(error => _logger.LogWarning(
                             "Failed to establish secure channel: {Error}",
-                            secureChannelResult.Error.Message
-                        );
-                        return Result.Failure<bool, SmartCardError>(secureChannelResult.Error);
-                    });
+                            error.Message
+                        ))
+                        .Map(_ => true)
+                    );
             },
             () =>
                 Task.FromResult(

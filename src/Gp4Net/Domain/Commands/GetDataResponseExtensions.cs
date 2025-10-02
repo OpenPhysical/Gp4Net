@@ -65,9 +65,7 @@ public static class GetDataResponseExtensions
             return Maybe<CardCapabilities>.None;
         }
 
-        var result = CardCapabilities.TryParse(
-            Maybe<byte[]>.From(data)
-        );
+        var result = CardCapabilities.TryParse(Maybe<byte[]>.From(data));
         return result.Match(
             onSuccess: capabilities =>
             {

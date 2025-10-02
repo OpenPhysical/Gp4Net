@@ -43,9 +43,7 @@ public class ApplicationStatusParsingTests
         var list = parsed.Value;
 
         // Should include ISD AID with lifecycle (0x01) and privileges (C5: 03 9E FE)
-        var isd = list.FirstOrDefault(static x =>
-            Convert.ToHexString(x.Aid) == "A000000151000000"
-        );
+        var isd = list.FirstOrDefault(static x => Convert.ToHexString(x.Aid) == "A000000151000000");
         _ = isd.Should().NotBeNull();
         _ = isd!.LifecycleState.Should().Be(LifecycleState.Loaded);
         _ = isd.Privileges.Should().NotBeEmpty();

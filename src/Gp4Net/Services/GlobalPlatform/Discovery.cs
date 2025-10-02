@@ -49,36 +49,17 @@ public static class Discovery
         CancellationToken cancellationToken = default
     )
     {
-        // First try SELECT with empty AID (standard method)
-        var selectIsdResult = Commands.CreateSelectIsdCommand();
-        if (selectIsdResult.IsFailure)
-        {
-            return Result.Failure<SelectResponse, SmartCardError>(selectIsdResult.Error);
-        }
-
-        var response = await selectIsdResult
+        // First try SELECT with empty AID (standard method), fallback to known AIDs if needed
+        var directSelectResult = await Commands
+            .CreateSelectIsdCommand()
             .Bind(selectCommand => selectCommand.ToCommandApdu())
-            .Bind(async commandApdu => await executeCommand(commandApdu, cancellationToken));
+            .Bind(async commandApdu => await executeCommand(commandApdu, cancellationToken))
+            .Bind(Responses.ParseSelectResponse);
 
-        // If the transport/card returned an error, don't keep probing; propagate the failure
-        if (response.IsFailure)
-        {
-            return Result.Failure<SelectResponse, SmartCardError>(response.Error);
-        }
-
-        if (response.IsSuccess)
-        {
-            var parseResult = Responses.ParseSelectResponse(
-                response.Value
-            );
-            if (parseResult.IsSuccess)
-            {
-                return parseResult;
-            }
-        }
-
-        // If direct ISD selection fails, try known ISD AIDs
-        return await TryKnownIsdAidsAsync(executeCommand, cancellationToken);
+        return await directSelectResult.Match(
+            selectResponse => Task.FromResult(Result.Success<SelectResponse, SmartCardError>(selectResponse)),
+            async _ => await TryKnownIsdAidsAsync(executeCommand, cancellationToken)
+        );
     }
 
     /// <summary>
@@ -176,9 +157,7 @@ public static class Discovery
             );
         }
 
-        var selectResult = Commands.CreateSelectCommand(
-            aids[index]
-        );
+        var selectResult = Commands.CreateSelectCommand(aids[index]);
         if (selectResult.IsFailure)
         {
             return await TryAidsRecursively(aids, index + 1, executeCommand, cancellationToken);
@@ -222,8 +201,11 @@ public static class Discovery
         }
 
         var keySet = keySets[index];
-        var cmdResult =
-            Commands.CreateInitializeUpdateCommand(keySet.KeyVersion, keySet.KeyId, hostChallenge);
+        var cmdResult = Commands.CreateInitializeUpdateCommand(
+            keySet.KeyVersion,
+            keySet.KeyId,
+            hostChallenge
+        );
 
         if (cmdResult.IsFailure)
         {
@@ -254,13 +236,15 @@ public static class Discovery
                 );
             }
 
-            var parseResult =
-                Responses.ParseInitializeUpdateResponse(responseValue);
+            var parseResult = Responses.ParseInitializeUpdateResponse(responseValue);
 
-            return parseResult
-                .Bind(response => response.ScpVersion
-                    .ToResult(SmartCardError.InvalidArgument("Could not determine SCP protocol version"))
-                    .Map(version => (keySet, version)));
+            return parseResult.Bind(response =>
+                response
+                    .ScpVersion.ToResult(
+                        SmartCardError.InvalidArgument("Could not determine SCP protocol version")
+                    )
+                    .Map(version => (keySet, version))
+            );
         }
 
         return await TryKeySetsRecursively(

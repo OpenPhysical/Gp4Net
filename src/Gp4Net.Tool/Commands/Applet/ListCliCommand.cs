@@ -76,9 +76,7 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
     /// <summary>
     /// Establishes secure channel from settings with functional patterns.
     /// </summary>
-    private Task<
-        Result<SecureChannelState, SmartCardError>
-    > EstablishSecureChannelFromSettings(
+    private Task<Result<SecureChannelState, SmartCardError>> EstablishSecureChannelFromSettings(
         object service, // OBSOLETE: Need to refactor to static services
         Settings settings,
         CancellationToken cancellationToken
@@ -89,45 +87,51 @@ public class ListCliCommand : AsyncCommand<ListCliCommand.Settings>
             settings.KeyEnc.HasValue && settings.KeyMac.HasValue && settings.KeyDek.HasValue
         ) switch
         {
-            true =>
-            // All keys provided - extract them using pattern matching
-            Task.FromResult(
-                settings.KeyEnc.Match(
-                    encKey =>
-                        settings.KeyMac.Match(
-                            macKey =>
-                                settings.KeyDek.Match(
-                                    dekKey =>
-                                        Result.Failure<SecureChannelState, SmartCardError>(
-                                            SmartCardError.Unsupported("Service integration pending")
-                                        ),
-                                    () =>
-                                        Result.Failure<SecureChannelState, SmartCardError>(
-                                            SmartCardError.InvalidData(
-                                                "DEK key is required when using explicit keys"
+            true
+                =>
+                // All keys provided - extract them using pattern matching
+                Task.FromResult(
+                    settings.KeyEnc.Match(
+                        encKey =>
+                            settings.KeyMac.Match(
+                                macKey =>
+                                    settings.KeyDek.Match(
+                                        dekKey =>
+                                            Result.Failure<SecureChannelState, SmartCardError>(
+                                                SmartCardError.Unsupported(
+                                                    "Service integration pending"
+                                                )
+                                            ),
+                                        () =>
+                                            Result.Failure<SecureChannelState, SmartCardError>(
+                                                SmartCardError.InvalidData(
+                                                    "DEK key is required when using explicit keys"
+                                                )
                                             )
+                                    ),
+                                () =>
+                                    Result.Failure<SecureChannelState, SmartCardError>(
+                                        SmartCardError.InvalidData(
+                                            "MAC key is required when using explicit keys"
                                         )
-                                ),
-                            () =>
-                                Result.Failure<SecureChannelState, SmartCardError>(
-                                    SmartCardError.InvalidData(
-                                        "MAC key is required when using explicit keys"
                                     )
+                            ),
+                        () =>
+                            Result.Failure<SecureChannelState, SmartCardError>(
+                                SmartCardError.InvalidData(
+                                    "ENC key is required when using explicit keys"
                                 )
-                        ),
-                    () =>
-                        Result.Failure<SecureChannelState, SmartCardError>(
-                            SmartCardError.InvalidData("ENC key is required when using explicit keys")
-                        )
-                )
-            ),
-            false =>
-            // Use keyset specification (placeholder implementation)
-            Task.FromResult(
-                Result.Failure<SecureChannelState, SmartCardError>(
-                    SmartCardError.Unsupported("Service integration pending")
-                )
-            ),
+                            )
+                    )
+                ),
+            false
+                =>
+                // Use keyset specification (placeholder implementation)
+                Task.FromResult(
+                    Result.Failure<SecureChannelState, SmartCardError>(
+                        SmartCardError.Unsupported("Service integration pending")
+                    )
+                ),
         };
     }
 

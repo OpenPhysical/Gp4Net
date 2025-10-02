@@ -24,37 +24,26 @@ namespace Gp4Net.Tests.Infrastructure;
 public static class VirtualCardServiceExtensions
 {
     /// <summary>
-    /// Sets up a comprehensive test environment with multiple virtual readers.
-    /// Creates test readers compatible with existing test infrastructure.
+    /// Sets up a test environment with multiple virtual readers.
+    /// Creates test readers for use in test scenarios.
     /// </summary>
     /// <param name="service">The virtual card service to configure.</param>
     /// <returns>The configured service for method chaining.</returns>
-    public static VirtualCardService SetupComprehensiveTestEnvironment(
+    public static VirtualCardService SetupTestEnvironment(
         this VirtualCardService service
     )
     {
-        var manager = service.GetReaderManager();
+        var manager = new VirtualReaderManagerBuilder()
+            .WithP71Reader("Virtual P71 Reader 00 00")
+            .Value.WithP71Reader("Virtual Test Reader 01 00")
+            .Value.WithP71Reader("Virtual Debug Reader 02 00")
+            .Value.Build();
 
-        // Create standard test readers that tests expect
-        // Note: Since VirtualReaderManager is now immutable, these operations don't modify the manager
-        // This method needs to be refactored to return a new service with updated manager
-        CreateTestReader(manager, "Virtual P71 Reader 00 00");
-        CreateTestReader(manager, "Virtual Test Reader 01 00");
-        CreateTestReader(manager, "Virtual Debug Reader 02 00");
-
-        return service;
-    }
-
-    /// <summary>
-    /// Creates a test reader and adds it to the manager.
-    /// Note: Since VirtualReaderManager is immutable, this method doesn't actually modify the manager.
-    /// </summary>
-    private static void CreateTestReader(VirtualReaderManager manager, string readerName)
-    {
-        // This no longer modifies the manager since it's immutable
-        // The AddReader method now returns a new manager instance
-        VirtualCardReader.Create(readerName)
-            .Bind(reader => manager.AddReader(reader));
+        return new VirtualCardService(
+            manager,
+            Maybe<VirtualCardReader>.None,
+            false
+        );
     }
 
     /// <summary>
@@ -220,7 +209,6 @@ public class TestKeysetResolver : IKeysetResolver
                 Maybe<IKeySet>
                     .From(_keysets.TryGetValue(id, out var keyset) ? keyset : default)
                     .ToResult(SmartCardError.InvalidArgument($"Keyset '{id}' not found"))
-                    .OnFailureCompensate(() => CreateDefaultScp02KeySet())
             );
     }
 
@@ -239,12 +227,7 @@ public class TestKeysetResolver : IKeysetResolver
             .Match(
                 id =>
                 {
-                    var newKeysets = new Dictionary<string, IKeySet>(
-                        _keysets
-                    )
-                    {
-                        [id] = keyset,
-                    };
+                    var newKeysets = new Dictionary<string, IKeySet>(_keysets) { [id] = keyset };
                     return new TestKeysetResolver(newKeysets);
                 },
                 () => this // Return unchanged if invalid identifier
@@ -302,38 +285,28 @@ public static class TestContextHelper
     /// <returns>The path to the project root directory.</returns>
     public static string GetProjectRootDirectory()
     {
-        // Use the current working directory as a starting point
-        // This assumes tests are run from the project root
-        string currentDir = Directory.GetCurrentDirectory();
+        var current = Directory.GetCurrentDirectory();
+        return FindRoot(current).GetValueOrDefault(current);
 
-        // Check if we're already in the project root (has src directory)
-        if (Directory.Exists(Path.Combine(currentDir, "src")))
+        static Maybe<string> FindRoot(string start)
         {
-            return currentDir;
-        }
+            var candidate = new DirectoryInfo(start);
 
-        // If not, try going up one level (common when running from bin/Debug)
-        string parentDir = Directory.GetParent(currentDir)?.FullName ?? currentDir;
-        string grandParentDir = Directory.GetParent(parentDir)?.FullName ?? parentDir;
-        string greatGrandParentDir =
-            Directory.GetParent(grandParentDir)?.FullName ?? grandParentDir;
+            while (candidate is not null)
+            {
+                if (
+                    Directory.Exists(Path.Combine(candidate.FullName, "src"))
+                    && File.Exists(Path.Combine(candidate.FullName, "Gp4Net.sln"))
+                )
+                {
+                    return candidate.FullName;
+                }
 
-        // Check each level for project root indicators
-        if (Directory.Exists(Path.Combine(parentDir, "src")))
-        {
-            return parentDir;
-        }
-        if (Directory.Exists(Path.Combine(grandParentDir, "src")))
-        {
-            return grandParentDir;
-        }
-        if (Directory.Exists(Path.Combine(greatGrandParentDir, "src")))
-        {
-            return greatGrandParentDir;
-        }
+                candidate = candidate.Parent;
+            }
 
-        // Fallback to current directory
-        return currentDir;
+            return Maybe<string>.None;
+        }
     }
 
     /// <summary>

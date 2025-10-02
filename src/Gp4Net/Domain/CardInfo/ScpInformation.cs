@@ -95,7 +95,9 @@ public record ScpProtocolInfo
         var header = $"{FormatScpVersion(Version)}:";
         var options = ImplementationOptions
             .OrderBy(opt => (byte)opt)
-            .Select(option => $"  - i={(byte)option:X2}: {GetImplementationDescription(Version, option)}");
+            .Select(option =>
+                $"  - i={(byte)option:X2}: {GetImplementationDescription(Version, option)}"
+            );
 
         return string.Join("\n", new[] { header }.Concat(options));
     }
@@ -103,7 +105,10 @@ public record ScpProtocolInfo
     /// <summary>
     /// Gets a human-readable description for an SCP implementation option.
     /// </summary>
-    private static string GetImplementationDescription(byte scpVersion, ScpImplementation implementation)
+    private static string GetImplementationDescription(
+        byte scpVersion,
+        ScpImplementation implementation
+    )
     {
         // For SCP02, use the bitmap-based description system from extension methods
         if (scpVersion == 0x02)

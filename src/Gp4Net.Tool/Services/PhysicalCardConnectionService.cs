@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Immutable;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
@@ -54,7 +52,10 @@ public static class PhysicalCardConnectionService
     )
     {
         // Delegate to unified ReaderEnumerationService for consistent matching logic
-        return ReaderEnumerationService.SelectReaderByPartialMatch(requestedReader, availableReaders);
+        return ReaderEnumerationService.SelectReaderByPartialMatch(
+            requestedReader,
+            availableReaders
+        );
     }
 
     /// <summary>
@@ -110,9 +111,9 @@ public static class PhysicalCardConnectionService
             Options: new CommandOptions(
                 UseSecureChannel: false,
                 CaptureMetrics: true,
-                EnableLogging: true,     // Enable logging infrastructure
-                VerboseLogging: false,   // CLI will override if --verbose
-                DebugLogging: false      // CLI will override if --debug
+                EnableLogging: true, // Enable logging infrastructure
+                VerboseLogging: false, // CLI will override if --verbose
+                DebugLogging: false // CLI will override if --debug
             ),
             Logger: logger
         );
@@ -213,13 +214,10 @@ internal class WsctApduTransport : IApduTransport
 
                 // Create ApduResponse from WSCT ResponseAPDU
                 var udr = Maybe<byte[]>.From(rsp.Udr);
-                var data = udr.GetValueOrDefault(Array.Empty<byte>());
+                var data = udr.GetValueOrDefault([]);
                 var statusWord = (ushort)((rsp.Sw1 << 8) | rsp.Sw2);
 
-                var response = new ApduResponse(
-                    data: data,
-                    statusWord: statusWord
-                );
+                var response = new ApduResponse(data: data, statusWord: statusWord);
                 return Result.Success<ApduResponse, SmartCardError>(response);
             });
 

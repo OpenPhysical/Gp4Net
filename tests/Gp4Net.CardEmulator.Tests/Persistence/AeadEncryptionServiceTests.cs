@@ -82,11 +82,7 @@ public class AeadEncryptionServiceTests
     public void Encrypt_WithValidInputs_ReturnsSuccessResult()
     {
         // Act
-        var result = _service.Encrypt(
-            _validKey,
-            _testPlaintext,
-            _validUuid
-        );
+        var result = _service.Encrypt(_validKey, _testPlaintext, _validUuid);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -107,11 +103,7 @@ public class AeadEncryptionServiceTests
     public void Encrypt_ProducesValidEncryptedPayload()
     {
         // Act
-        var result = _service.Encrypt(
-            _validKey,
-            _testPlaintext,
-            _validUuid
-        );
+        var result = _service.Encrypt(_validKey, _testPlaintext, _validUuid);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -134,16 +126,8 @@ public class AeadEncryptionServiceTests
     public void Encrypt_MultipleTimes_ProducesDifferentCiphertexts()
     {
         // Act - encrypt same plaintext twice
-        var result1 = _service.Encrypt(
-            _validKey,
-            _testPlaintext,
-            _validUuid
-        );
-        var result2 = _service.Encrypt(
-            _validKey,
-            _testPlaintext,
-            _validUuid
-        );
+        var result1 = _service.Encrypt(_validKey, _testPlaintext, _validUuid);
+        var result2 = _service.Encrypt(_validKey, _testPlaintext, _validUuid);
 
         // Assert
         result1.IsSuccess.Should().BeTrue();
@@ -172,11 +156,7 @@ public class AeadEncryptionServiceTests
         byte[] emptyPlaintext = [];
 
         // Act
-        var result = _service.Encrypt(
-            _validKey,
-            emptyPlaintext,
-            _validUuid
-        );
+        var result = _service.Encrypt(_validKey, emptyPlaintext, _validUuid);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
@@ -194,22 +174,14 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithValidEncryptedPayload_ReturnsOriginalPlaintext()
     {
         // Arrange - first encrypt some data
-        var encryptResult = _service.Encrypt(
-            _validKey,
-            _testPlaintext,
-            _validUuid
-        );
+        var encryptResult = _service.Encrypt(_validKey, _testPlaintext, _validUuid);
         encryptResult.IsSuccess.Should().BeTrue();
 
         encryptResult.Match(
             encryptedPayload =>
             {
                 // Act - decrypt the payload
-                var decryptResult = _service.Decrypt(
-                    _validKey,
-                    encryptedPayload,
-                    _validUuid
-                );
+                var decryptResult = _service.Decrypt(_validKey, encryptedPayload, _validUuid);
 
                 // Assert
                 decryptResult.IsSuccess.Should().BeTrue();
@@ -226,11 +198,7 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithWrongKey_ReturnsFailure()
     {
         // Arrange - encrypt with one key
-        var encryptResult = _service.Encrypt(
-            _validKey,
-            _testPlaintext,
-            _validUuid
-        );
+        var encryptResult = _service.Encrypt(_validKey, _testPlaintext, _validUuid);
         encryptResult.IsSuccess.Should().BeTrue();
 
         // Create wrong key
@@ -240,11 +208,7 @@ public class AeadEncryptionServiceTests
             encryptedPayload =>
             {
                 // Act - try to decrypt with wrong key
-                var decryptResult = _service.Decrypt(
-                    wrongKey,
-                    encryptedPayload,
-                    _validUuid
-                );
+                var decryptResult = _service.Decrypt(wrongKey, encryptedPayload, _validUuid);
 
                 // Assert
                 decryptResult.IsFailure.Should().BeTrue();
@@ -258,11 +222,7 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithWrongUuid_ReturnsFailure()
     {
         // Arrange - encrypt with one UUID
-        var encryptResult = _service.Encrypt(
-            _validKey,
-            _testPlaintext,
-            _validUuid
-        );
+        var encryptResult = _service.Encrypt(_validKey, _testPlaintext, _validUuid);
         encryptResult.IsSuccess.Should().BeTrue();
 
         // Create different UUID
@@ -295,11 +255,7 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithTamperedCiphertext_ReturnsFailure()
     {
         // Arrange - encrypt some data
-        var encryptResult = _service.Encrypt(
-            _validKey,
-            _testPlaintext,
-            _validUuid
-        );
+        var encryptResult = _service.Encrypt(_validKey, _testPlaintext, _validUuid);
         encryptResult.IsSuccess.Should().BeTrue();
 
         encryptResult.Match(
@@ -309,17 +265,10 @@ public class AeadEncryptionServiceTests
                 byte[] tamperedCiphertext = [.. originalPayload.Ciphertext];
                 tamperedCiphertext[0] ^= 0xFF; // Flip all bits in first byte
 
-                var tamperedPayload = originalPayload with
-                {
-                    Ciphertext = tamperedCiphertext,
-                };
+                var tamperedPayload = originalPayload with { Ciphertext = tamperedCiphertext };
 
                 // Act - try to decrypt tampered data
-                var decryptResult = _service.Decrypt(
-                    _validKey,
-                    tamperedPayload,
-                    _validUuid
-                );
+                var decryptResult = _service.Decrypt(_validKey, tamperedPayload, _validUuid);
 
                 // Assert
                 decryptResult.IsFailure.Should().BeTrue();
@@ -333,11 +282,7 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithTamperedAuthTag_ReturnsFailure()
     {
         // Arrange - encrypt some data
-        var encryptResult = _service.Encrypt(
-            _validKey,
-            _testPlaintext,
-            _validUuid
-        );
+        var encryptResult = _service.Encrypt(_validKey, _testPlaintext, _validUuid);
         encryptResult.IsSuccess.Should().BeTrue();
 
         encryptResult.Match(
@@ -347,17 +292,10 @@ public class AeadEncryptionServiceTests
                 byte[] tamperedAuthTag = [.. originalPayload.AuthTag];
                 tamperedAuthTag[0] ^= 0xFF; // Flip all bits in first byte
 
-                var tamperedPayload = originalPayload with
-                {
-                    AuthTag = tamperedAuthTag,
-                };
+                var tamperedPayload = originalPayload with { AuthTag = tamperedAuthTag };
 
                 // Act - try to decrypt tampered data
-                var decryptResult = _service.Decrypt(
-                    _validKey,
-                    tamperedPayload,
-                    _validUuid
-                );
+                var decryptResult = _service.Decrypt(_validKey, tamperedPayload, _validUuid);
 
                 // Assert
                 decryptResult.IsFailure.Should().BeTrue();
@@ -371,11 +309,7 @@ public class AeadEncryptionServiceTests
     public void Decrypt_WithTamperedIV_ReturnsFailure()
     {
         // Arrange - encrypt some data
-        var encryptResult = _service.Encrypt(
-            _validKey,
-            _testPlaintext,
-            _validUuid
-        );
+        var encryptResult = _service.Encrypt(_validKey, _testPlaintext, _validUuid);
         encryptResult.IsSuccess.Should().BeTrue();
 
         encryptResult.Match(
@@ -388,11 +322,7 @@ public class AeadEncryptionServiceTests
                 var tamperedPayload = originalPayload with { Iv = tamperedIv };
 
                 // Act - try to decrypt tampered data
-                var decryptResult = _service.Decrypt(
-                    _validKey,
-                    tamperedPayload,
-                    _validUuid
-                );
+                var decryptResult = _service.Decrypt(_validKey, tamperedPayload, _validUuid);
 
                 // Assert
                 decryptResult.IsFailure.Should().BeTrue();
@@ -411,21 +341,13 @@ public class AeadEncryptionServiceTests
         );
 
         // Act - encrypt then decrypt
-        var encryptResult = _service.Encrypt(
-            _validKey,
-            originalData,
-            _validUuid
-        );
+        var encryptResult = _service.Encrypt(_validKey, originalData, _validUuid);
         encryptResult.IsSuccess.Should().BeTrue();
 
         encryptResult.Match(
             encryptedPayload =>
             {
-                var decryptResult = _service.Decrypt(
-                    _validKey,
-                    encryptedPayload,
-                    _validUuid
-                );
+                var decryptResult = _service.Decrypt(_validKey, encryptedPayload, _validUuid);
                 decryptResult.IsSuccess.Should().BeTrue();
 
                 decryptResult.Match(
@@ -444,21 +366,13 @@ public class AeadEncryptionServiceTests
         byte[] largeData = [.. Enumerable.Range(0, 10000).Select(i => (byte)(i % 256))];
 
         // Act - encrypt then decrypt
-        var encryptResult = _service.Encrypt(
-            _validKey,
-            largeData,
-            _validUuid
-        );
+        var encryptResult = _service.Encrypt(_validKey, largeData, _validUuid);
         encryptResult.IsSuccess.Should().BeTrue();
 
         encryptResult.Match(
             encryptedPayload =>
             {
-                var decryptResult = _service.Decrypt(
-                    _validKey,
-                    encryptedPayload,
-                    _validUuid
-                );
+                var decryptResult = _service.Decrypt(_validKey, encryptedPayload, _validUuid);
                 decryptResult.IsSuccess.Should().BeTrue();
 
                 decryptResult.Match(
@@ -474,16 +388,13 @@ public class AeadEncryptionServiceTests
     public void Encrypt_WithNullKey_ReturnsFailure()
     {
         // Act
-        var result = _service.Encrypt(
-            null!,
-            _testPlaintext,
-            _validUuid
-        );
+        var result = _service.Encrypt(null!, _testPlaintext, _validUuid);
 
         // Assert
         result.IsFailure.Should().BeTrue();
         _ = result.Error.Code.Should().Be("INVALID_ARGUMENT");
-        _ = result.Error.ToString().Should().StartWith("Encryption key must be 32 bytes");
+        _ = result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        _ = result.Error.Message.Should().StartWith("Encryption key must be 32 bytes");
     }
 
     [Test]
@@ -493,32 +404,26 @@ public class AeadEncryptionServiceTests
         byte[] wrongSizeKey = new byte[16]; // AES-128, not AES-256
 
         // Act
-        var result = _service.Encrypt(
-            wrongSizeKey,
-            _testPlaintext,
-            _validUuid
-        );
+        var result = _service.Encrypt(wrongSizeKey, _testPlaintext, _validUuid);
 
         // Assert
         result.IsFailure.Should().BeTrue();
         _ = result.Error.Code.Should().Be("INVALID_ARGUMENT");
-        _ = result.Error.ToString().Should().StartWith("Encryption key must be 32 bytes");
+        _ = result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        _ = result.Error.Message.Should().StartWith("Encryption key must be 32 bytes");
     }
 
     [Test]
     public void Encrypt_WithNullPlaintext_ReturnsFailure()
     {
         // Act
-        var result = _service.Encrypt(
-            _validKey,
-            null!,
-            _validUuid
-        );
+        var result = _service.Encrypt(_validKey, null!, _validUuid);
 
         // Assert
         result.IsFailure.Should().BeTrue();
         _ = result.Error.Code.Should().Be("INVALID_ARGUMENT");
-        _ = result.Error.ToString().Should().StartWith("Plaintext cannot be null");
+        _ = result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        _ = result.Error.Message.Should().StartWith("Plaintext cannot be null");
     }
 
     [Test]
@@ -528,16 +433,13 @@ public class AeadEncryptionServiceTests
         var emptyUuid = CardUuid.Empty;
 
         // Act
-        var result = _service.Encrypt(
-            _validKey,
-            _testPlaintext,
-            emptyUuid
-        );
+        var result = _service.Encrypt(_validKey, _testPlaintext, emptyUuid);
 
         // Assert
         result.IsFailure.Should().BeTrue();
         _ = result.Error.Code.Should().Be("INVALID_ARGUMENT");
-        _ = result.Error.ToString().Should().StartWith("Card UUID cannot be empty");
+        _ = result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        _ = result.Error.Message.Should().StartWith("Card UUID cannot be empty");
     }
 
     [Test]
@@ -557,7 +459,8 @@ public class AeadEncryptionServiceTests
         // Assert
         result.IsFailure.Should().BeTrue();
         _ = result.Error.Code.Should().Be("INVALID_ARGUMENT");
-        _ = result.Error.ToString().Should().StartWith("Encryption key must be 32 bytes");
+        _ = result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        _ = result.Error.Message.Should().StartWith("Encryption key must be 32 bytes");
     }
 
     [Test]
@@ -572,16 +475,13 @@ public class AeadEncryptionServiceTests
         );
 
         // Act
-        var result = _service.Decrypt(
-            _validKey,
-            invalidPayload,
-            _validUuid
-        );
+        var result = _service.Decrypt(_validKey, invalidPayload, _validUuid);
 
         // Assert
         result.IsFailure.Should().BeTrue();
         _ = result.Error.Code.Should().Be("INVALID_ARGUMENT");
-        _ = result.Error.ToString().Should().StartWith("Invalid encrypted payload structure");
+        _ = result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        _ = result.Error.Message.Should().StartWith("Invalid encrypted payload structure");
     }
 
     [Test]
@@ -593,7 +493,8 @@ public class AeadEncryptionServiceTests
         // Assert
         result.IsFailure.Should().BeTrue();
         _ = result.Error.Code.Should().Be("INVALID_ARGUMENT");
-        _ = result.Error.ToString().Should().StartWith("Invalid encrypted payload structure");
+        _ = result.Error.Code.Should().Be("INVALID_ARGUMENT");
+        _ = result.Error.Message.Should().StartWith("Invalid encrypted payload structure");
     }
 
     [Test]
@@ -603,16 +504,13 @@ public class AeadEncryptionServiceTests
         _service.Dispose();
 
         // Act
-        var result = _service.Encrypt(
-            _validKey,
-            _testPlaintext,
-            _validUuid
-        );
+        var result = _service.Encrypt(_validKey, _testPlaintext, _validUuid);
 
         // Assert
         result.IsFailure.Should().BeTrue();
         _ = result.Error.Code.Should().Be("COMMUNICATION_ERROR");
-        _ = result.Error.ToString().Should().StartWith("AEAD service has been disposed");
+        _ = result.Error.Code.Should().Be("COMMUNICATION_ERROR");
+        _ = result.Error.Message.Should().StartWith("AEAD service has been disposed");
     }
 
     [Test]
@@ -628,16 +526,13 @@ public class AeadEncryptionServiceTests
         _service.Dispose();
 
         // Act
-        var result = _service.Decrypt(
-            _validKey,
-            validPayload,
-            _validUuid
-        );
+        var result = _service.Decrypt(_validKey, validPayload, _validUuid);
 
         // Assert
         result.IsFailure.Should().BeTrue();
         _ = result.Error.Code.Should().Be("COMMUNICATION_ERROR");
-        _ = result.Error.ToString().Should().StartWith("AEAD service has been disposed");
+        _ = result.Error.Code.Should().Be("COMMUNICATION_ERROR");
+        _ = result.Error.Message.Should().StartWith("AEAD service has been disposed");
     }
 
     [Test]
@@ -753,16 +648,8 @@ public class AeadEncryptionServiceTests
                     uuid2 =>
                     {
                         // Act - encrypt same data with different UUIDs
-                        var result1 = _service.Encrypt(
-                            _validKey,
-                            _testPlaintext,
-                            uuid1
-                        );
-                        var result2 = _service.Encrypt(
-                            _validKey,
-                            _testPlaintext,
-                            uuid2
-                        );
+                        var result1 = _service.Encrypt(_validKey, _testPlaintext, uuid1);
+                        var result2 = _service.Encrypt(_validKey, _testPlaintext, uuid2);
 
                         // Assert
                         result1.IsSuccess.Should().BeTrue();
@@ -805,11 +692,7 @@ public class AeadEncryptionServiceTests
                     uuid2 =>
                     {
                         // Encrypt with uuid1
-                        var encryptResult = _service.Encrypt(
-                            _validKey,
-                            _testPlaintext,
-                            uuid1
-                        );
+                        var encryptResult = _service.Encrypt(_validKey, _testPlaintext, uuid1);
                         encryptResult.IsSuccess.Should().BeTrue();
 
                         encryptResult.Match(

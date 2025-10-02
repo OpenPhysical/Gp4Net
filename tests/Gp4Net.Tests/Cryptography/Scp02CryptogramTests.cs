@@ -3,8 +3,6 @@ using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain.Commands;
-using Gp4Net.Domain.Keys;
-using Gp4Net.Tests.Infrastructure;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Cryptography;
@@ -46,12 +44,12 @@ public class Scp02CryptogramTests
 
         var calculatedCryptogram = result.Value;
 
-        TestContext.WriteLine($"Input data (16 bytes): {Convert.ToHexString(cryptogramData)}");
-        TestContext.WriteLine($"S-ENC Key: {Convert.ToHexString(SEncKey)}");
-        TestContext.WriteLine(
+        TestContext.Out.WriteLine($"Input data (16 bytes): {Convert.ToHexString(cryptogramData)}");
+        TestContext.Out.WriteLine($"S-ENC Key: {Convert.ToHexString(SEncKey)}");
+        TestContext.Out.WriteLine(
             $"Expected cryptogram: {Convert.ToHexString(ExpectedCardCryptogram)}"
         );
-        TestContext.WriteLine(
+        TestContext.Out.WriteLine(
             $"Calculated cryptogram: {Convert.ToHexString(calculatedCryptogram)}"
         );
 
@@ -101,14 +99,14 @@ public class Scp02CryptogramTests
             response.SequenceCounter.Length > 0
                 ? Convert.ToHexString(response.SequenceCounter)
                 : "None";
-        TestContext.WriteLine($"Response sequence counter: {seqCounterHex}");
-        TestContext.WriteLine(
+        TestContext.Out.WriteLine($"Response sequence counter: {seqCounterHex}");
+        TestContext.Out.WriteLine(
             $"Response card challenge: {Convert.ToHexString(response.CardChallenge)}"
         );
-        TestContext.WriteLine(
+        TestContext.Out.WriteLine(
             $"Expected cryptogram: {Convert.ToHexString(ExpectedCardCryptogram)}"
         );
-        TestContext.WriteLine(
+        TestContext.Out.WriteLine(
             $"Calculated cryptogram: {Convert.ToHexString(calculatedCryptogram)}"
         );
 

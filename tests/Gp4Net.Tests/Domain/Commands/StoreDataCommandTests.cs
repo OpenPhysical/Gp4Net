@@ -26,7 +26,6 @@ public class StoreDataCommandTests
         _ = command.StoreData.Should().BeEquivalentTo(data);
     }
 
-
     [Test]
     public void ToApdu_WithPlainData_ReturnsCorrectApdu()
     {

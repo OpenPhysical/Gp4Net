@@ -28,7 +28,8 @@ public static class DataOperations
     /// <returns>The parsed TLV elements or an error.</returns>
     public static Result<ImmutableList<TlvObject>, SmartCardError> ParseTlvData(byte[] data)
     {
-        return TlvParser.ParseMultiple(data.ToImmutableArray())
+        return TlvParser
+            .ParseMultiple([.. data])
             .Map(parseResult => parseResult.Objects.ToImmutableList());
     }
 
@@ -112,61 +113,39 @@ public static class DataOperations
     /// </summary>
     /// <param name="fciData">The FCI template data.</param>
     /// <returns>Parsed FCI elements or an error.</returns>
-    public static Result<FciTemplate, SmartCardError> ParseFciTemplate(byte[] fciData)
-    {
-        var parseResult = ParseTlvData(fciData);
+    public static Result<FciTemplate, SmartCardError> ParseFciTemplate(byte[] fciData) =>
+        ParseTlvData(fciData)
+            .Bind(elements =>
+            {
+                // Look for FCI template tag
+                var fciElements = elements
+                    .Where(e =>
+                        e.Tag.ToNumber()
+                            .Map(tagNum => tagNum == Tlv.Iso7816Tags.FCI_TEMPLATE)
+                            .GetValueOrDefault(false)
+                    )
+                    .ToImmutableArray();
 
-        if (parseResult.IsFailure)
-        {
-            return Result.Failure<FciTemplate, SmartCardError>(parseResult.Error);
-        }
+                return fciElements.Length == 0
+                    ? Result.Failure<TlvObject, SmartCardError>(
+                        SmartCardError.InvalidResponse("No FCI template found"))
+                    : Result.Success<TlvObject, SmartCardError>(fciElements[0]);
+            })
+            .Bind(fciElement => ParseTlvData(fciElement.TlvData.Bytes.ToArray()))
+            .Map(fciContents =>
+            {
+                // Extract common FCI elements
+                var aid = FindElementValue(fciContents, 0x84);
+                var proprietaryInfo = FindElementValue(fciContents, 0xA5);
+                var applicationLabel = FindElementValue(fciContents, 0x50);
 
-        var elements = parseResult.Value;
-
-        // Look for FCI template tag
-        var fciElements = elements
-            .Where(e =>
-                e.Tag.ToNumber()
-                    .Map(tagNum => tagNum == Tlv.Iso7816Tags.FCI_TEMPLATE)
-                    .GetValueOrDefault(false)
-            )
-            .ToImmutableArray();
-
-        if (fciElements.Length == 0)
-        {
-            return Result.Failure<FciTemplate, SmartCardError>(
-                SmartCardError.InvalidResponse("No FCI template found")
-            );
-        }
-
-        var fciElement = fciElements[0];
-
-        // Parse the FCI template contents
-        var fciContentsResult = ParseTlvData(
-            fciElement.TlvData.Bytes.ToArray()
-        );
-
-        if (fciContentsResult.IsFailure)
-        {
-            return Result.Failure<FciTemplate, SmartCardError>(fciContentsResult.Error);
-        }
-
-        var fciContents = fciContentsResult.Value;
-
-        // Extract common FCI elements
-        var aid = FindElementValue(fciContents, 0x84);
-        var proprietaryInfo = FindElementValue(fciContents, 0xA5);
-        var applicationLabel = FindElementValue(fciContents, 0x50);
-
-        return Result.Success<FciTemplate, SmartCardError>(
-            new FciTemplate(
-                Aid: aid,
-                ProprietaryInfo: proprietaryInfo,
-                ApplicationLabel: applicationLabel,
-                RawElements: fciContents
-            )
-        );
-    }
+                return new FciTemplate(
+                    Aid: aid,
+                    ProprietaryInfo: proprietaryInfo,
+                    ApplicationLabel: applicationLabel,
+                    RawElements: fciContents
+                );
+            });
 
     /// <summary>
     /// Constructs a status template for GET STATUS response.

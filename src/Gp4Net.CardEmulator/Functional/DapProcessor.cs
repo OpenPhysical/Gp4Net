@@ -121,11 +121,12 @@ public static class DapProcessor
             0x01 => Result.Success<DapBlock, SmartCardError>(dapBlock), // RSA-SHA1
             0x02 => Result.Success<DapBlock, SmartCardError>(dapBlock), // RSA-SHA256
             0x03 => Result.Success<DapBlock, SmartCardError>(dapBlock), // ECDSA-SHA256
-            _ => Result.Failure<DapBlock, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied(
-                    $"Unsupported DAP algorithm: {dapBlock.SignatureAlgorithm:X2}"
-                )
-            ),
+            _
+                => Result.Failure<DapBlock, SmartCardError>(
+                    SmartCardError.SecurityStatusNotSatisfied(
+                        $"Unsupported DAP algorithm: {dapBlock.SignatureAlgorithm:X2}"
+                    )
+                ),
         };
     }
 

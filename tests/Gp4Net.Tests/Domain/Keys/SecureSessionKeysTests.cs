@@ -7,8 +7,8 @@ using System;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Tests.Infrastructure;
 using Gp4Net.Domain.Keys;
+using Gp4Net.Tests.Infrastructure;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Domain.Keys;
@@ -18,7 +18,6 @@ namespace Gp4Net.Tests.Domain.Keys;
 /// </summary>
 [TestFixture]
 [Category("Unit")]
-[Ignore("Result<T>/Maybe<T> unwrapping patterns need functional programming updates")]
 public class SecureSessionKeysTests
 {
     private byte[] _testSEnc;
@@ -45,14 +44,7 @@ public class SecureSessionKeysTests
     public void Constructor_WithValidKeys_CreatesInstance()
     {
         // Act
-        using (
-            var sessionKeys = new SecureSessionKeys(
-                _testSEnc,
-                _testSMac,
-                _testSrMac,
-                _testDek
-            )
-        )
+        using (var sessionKeys = new SecureSessionKeys(_testSEnc, _testSMac, _testSrMac, _testDek))
         {
             // Assert
             _ = sessionKeys.Should().NotBeNull();
@@ -66,14 +58,7 @@ public class SecureSessionKeysTests
     public void Constructor_WithoutDek_CreatesInstance()
     {
         // Act
-        using (
-            var sessionKeys = new SecureSessionKeys(
-                _testSEnc,
-                _testSMac,
-                _testSrMac,
-                dek: null
-            )
-        )
+        using (var sessionKeys = new SecureSessionKeys(_testSEnc, _testSMac, _testSrMac, dek: null))
         {
             // Assert
             _ = sessionKeys.Should().NotBeNull();
@@ -87,14 +72,7 @@ public class SecureSessionKeysTests
     public void UseSEnc_ExecutesActionWithKey()
     {
         // Arrange
-        using (
-            var sessionKeys = new SecureSessionKeys(
-                _testSEnc,
-                _testSMac,
-                _testSrMac,
-                _testDek
-            )
-        )
+        using (var sessionKeys = new SecureSessionKeys(_testSEnc, _testSMac, _testSrMac, _testDek))
         {
             bool executed = false;
             byte[]? receivedKey = null;
@@ -120,14 +98,7 @@ public class SecureSessionKeysTests
     public void UseSMac_FunctionReturnsResult()
     {
         // Arrange
-        using (
-            var sessionKeys = new SecureSessionKeys(
-                _testSEnc,
-                _testSMac,
-                _testSrMac,
-                _testDek
-            )
-        )
+        using (var sessionKeys = new SecureSessionKeys(_testSEnc, _testSMac, _testSrMac, _testDek))
         {
             // Act
             Result<int, SmartCardError> result = sessionKeys.UseSMac(key => key.Length);
@@ -148,9 +119,7 @@ public class SecureSessionKeysTests
     public void UseDek_WithNullDek_PassesNull()
     {
         // Arrange
-        using (
-            var sessionKeys = new SecureSessionKeys(_testSEnc, _testSMac, _testSrMac)
-        )
+        using (var sessionKeys = new SecureSessionKeys(_testSEnc, _testSMac, _testSrMac))
         {
             bool executed = false;
             byte[]? receivedKey = null;
@@ -175,14 +144,7 @@ public class SecureSessionKeysTests
     public void ToSessionKeys_CreatesLegacyObject()
     {
         // Arrange
-        using (
-            var secureKeys = new SecureSessionKeys(
-                _testSEnc,
-                _testSMac,
-                _testSrMac,
-                _testDek
-            )
-        )
+        using (var secureKeys = new SecureSessionKeys(_testSEnc, _testSMac, _testSrMac, _testDek))
         {
             // Act
             Result<SessionKeys, SmartCardError> legacyKeysResult = secureKeys.ToSessionKeys();
@@ -202,35 +164,35 @@ public class SecureSessionKeysTests
     }
 
     /// <summary>
-    /// Tests that operations throw after disposal.
+    /// Tests that operations return failure results after disposal.
     /// </summary>
     [Test]
     public void AfterDispose_OperationsThrow()
     {
         // Arrange
-        var sessionKeys = new SecureSessionKeys(
-            _testSEnc,
-            _testSMac,
-            _testSrMac,
-            _testDek
-        );
+        var sessionKeys = new SecureSessionKeys(_testSEnc, _testSMac, _testSrMac, _testDek);
         sessionKeys.Dispose();
 
-        // Act & Assert
-        Action act1 = () => sessionKeys.UseSEnc(k => { });
-        _ = act1.Should().ThrowExactly<ObjectDisposedException>();
+        // Act & Assert - Disposed object should return Result.Failure
+        Result<bool, SmartCardError> result1 = sessionKeys.UseSEnc(k => { });
+        result1.Should().BeFailure();
+        _ = result1.Error.Message.Should().Contain("disposed");
 
-        Action act2 = () => sessionKeys.UseSMac(k => { });
-        _ = act2.Should().ThrowExactly<ObjectDisposedException>();
+        Result<int, SmartCardError> result2 = sessionKeys.UseSMac(k => k.Length);
+        result2.Should().BeFailure();
+        _ = result2.Error.Message.Should().Contain("disposed");
 
-        Action act3 = () => sessionKeys.UseSrMac(k => { });
-        _ = act3.Should().ThrowExactly<ObjectDisposedException>();
+        Result<bool, SmartCardError> result3 = sessionKeys.UseSrMac(k => { });
+        result3.Should().BeFailure();
+        _ = result3.Error.Message.Should().Contain("disposed");
 
-        Action act4 = () => sessionKeys.UseDek(k => { });
-        _ = act4.Should().ThrowExactly<ObjectDisposedException>();
+        Result<bool, SmartCardError> result4 = sessionKeys.UseDek(k => { });
+        result4.Should().BeFailure();
+        _ = result4.Error.Message.Should().Contain("disposed");
 
-        Action act5 = () => sessionKeys.ToSessionKeys();
-        _ = act5.Should().ThrowExactly<ObjectDisposedException>();
+        Result<SessionKeys, SmartCardError> result5 = sessionKeys.ToSessionKeys();
+        result5.Should().BeFailure();
+        _ = result5.Error.Message.Should().Contain("disposed");
     }
 
     /// <summary>

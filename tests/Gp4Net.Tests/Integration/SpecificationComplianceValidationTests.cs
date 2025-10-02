@@ -16,7 +16,6 @@ namespace Gp4Net.Tests.Integration;
 [TestFixture]
 [Category("Integration")]
 [Category("Compliance")]
-[Ignore("DeleteTokenCalculator moved to CryptoService.Keys - tests need to be updated")]
 public class SpecificationComplianceValidationTests
 {
     [Test]
@@ -136,22 +135,22 @@ public class SpecificationComplianceValidationTests
     {
         // Arrange: Test the variable length support (28+ bytes) that was added
 
-        // Factory unlock trace - 29 bytes (real trace data)
+        // Factory unlock trace - 29 bytes (reference trace data)
         byte[] factoryResponse = Convert.FromHexString(
             "00002345558083204839FF020003A33DFDBFFADF57EB6A4A52CFB3E9"
         );
 
-        // SCP02 lock trace - 28 bytes (real trace data)
+        // SCP02 lock trace - 28 bytes (reference trace data)
         byte[] scp02Response = Convert.FromHexString(
             "000023455580832048390102000303D2C0BAFBF0D31B42E57648A0C5"
         );
 
-        // SCP03 trace - 32 bytes (real trace data)
+        // SCP03 trace - 32 bytes (reference trace data)
         byte[] scp03Response = Convert.FromHexString(
             "0370000000000000000001037083FA042C5C10F778148C0CAF84B0E110000002"
         );
 
-        // Act & Assert: All real traces should parse successfully
+        // Act & Assert: All reference traces should parse successfully
         Result<InitializeUpdateResponse, SmartCardError> factoryResult =
             InitializeUpdateResponse.Parse(factoryResponse);
         _ = factoryResult

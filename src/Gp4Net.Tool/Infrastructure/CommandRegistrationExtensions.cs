@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using CSharpFunctionalExtensions;
 using Gp4Net.Tool.Pipeline;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console.Cli;
@@ -29,8 +28,7 @@ public static class CommandRegistrationExtensions
         ];
 
         // Group commands by branch
-        var branches =
-            new Dictionary<string, List<(Type Type, CliCommandAttribute Attr)>>();
+        var branches = new Dictionary<string, List<(Type Type, CliCommandAttribute Attr)>>();
         List<(Type Type, CliCommandAttribute Attr)> rootCommands = [];
 
         foreach (var commandType in commandTypes)
@@ -65,9 +63,7 @@ public static class CommandRegistrationExtensions
         }
 
         // Register branches with their commands
-        foreach (
-            (string branchName, var commands) in branches
-        )
+        foreach ((string branchName, var commands) in branches)
         {
             _ = config.AddBranch(
                 branchName,
@@ -131,9 +127,7 @@ public static class CommandRegistrationExtensions
             object commandConfig = genericMethod.Invoke(config, [attr.Name]);
 
             // Set description
-            var withDescriptionMethod = commandConfig
-                ?.GetType()
-                .GetMethod("WithDescription");
+            var withDescriptionMethod = commandConfig?.GetType().GetMethod("WithDescription");
             _ = withDescriptionMethod?.Invoke(commandConfig, [attr.Description]);
         }
     }

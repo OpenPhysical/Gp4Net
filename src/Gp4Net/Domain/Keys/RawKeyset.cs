@@ -9,15 +9,16 @@ namespace Gp4Net.Domain.Keys;
 
 /// <summary>
 /// Protocol-agnostic keyset data that can be converted to SCP02 or SCP03 keysets
-/// after protocol negotiation. This allows deferring the keyset type decision
-/// until after INITIALIZE UPDATE tells us which SCP version to use.
+/// after protocol negotiation. Supports optional diversification that is applied
+/// once card diversification data is available from INITIALIZE UPDATE.
 /// </summary>
 [PublicAPI]
 public sealed record RawKeyset(
     ImmutableArray<byte> EncKey,
     ImmutableArray<byte> MacKey,
     ImmutableArray<byte> DekKey,
-    byte KeyVersion
+    byte KeyVersion,
+    Maybe<KeyDiversificationSpec> Diversification
 )
 {
     /// <summary>
@@ -27,7 +28,8 @@ public sealed record RawKeyset(
         byte[] encKey,
         byte[] macKey,
         byte[] dekKey,
-        byte keyVersion
+        byte keyVersion,
+        Maybe<KeyDiversificationSpec> diversification = default
     )
     {
         return Maybe<byte[]>
@@ -42,10 +44,11 @@ public sealed record RawKeyset(
                             .From(dekKey)
                             .ToResult(SmartCardError.InvalidArgument("DEK key cannot be null"))
                             .Map(dek => new RawKeyset(
-                                ImmutableArray.Create(enc),
-                                ImmutableArray.Create(mac),
-                                ImmutableArray.Create(dek),
-                                keyVersion
+                                [.. enc],
+                                [.. mac],
+                                [.. dek],
+                                keyVersion,
+                                diversification
                             ))
                     )
             );
@@ -76,9 +79,19 @@ public sealed record RawKeyset(
         {
             CryptoService.ScpVersion.Scp02 => ToScp02KeySet().Map(ks => (IKeySet)ks),
             CryptoService.ScpVersion.Scp03 => ToScp03KeySet().Map(ks => (IKeySet)ks),
-            _ => Result.Failure<IKeySet, SmartCardError>(
-                SmartCardError.InvalidArgument($"Unsupported SCP version: {negotiatedVersion}")
-            ),
+            _
+                => Result.Failure<IKeySet, SmartCardError>(
+                    SmartCardError.InvalidArgument($"Unsupported SCP version: {negotiatedVersion}")
+                ),
         };
     }
+
+    /// <summary>
+    /// Returns a new raw keyset with the specified diversification spec applied.
+    /// </summary>
+    public RawKeyset WithDiversification(KeyDiversificationSpec spec) =>
+        this with
+        {
+            Diversification = Maybe<KeyDiversificationSpec>.From(spec)
+        };
 }

@@ -53,7 +53,7 @@ public class CapLoadingIntegrationTests
     [Test]
     public void CapFileLoading_EndToEndWorkflow_GeneratesCorrectWrappedCommands()
     {
-        // Arrange - Load the CAP file used in the real trace
+        // Arrange - Load the CAP file used in the reference trace
         byte[] capFileData = File.ReadAllBytes(_capFilePath);
 
         // Parse CAP file structure
@@ -226,31 +226,35 @@ public class CapLoadingIntegrationTests
         byte[]? loadData = loadCommands[0].Data;
         Assert.That(loadData, Is.Not.Null);
 
-        // Should start with TLV tag C4 (load file data block) - but actual might be different
-        // The important thing is that we have valid load data structure
-        byte[] validTlvTags = [0xC4, 0x50, 0x80, 0x81, 0x82, 0x83];
+        // LOAD block is wrapped in TLV (tag 'C4') as defined by GP 2.3.1 (§10.3.2).
+        // Decode the TLV so we can assert against the actual CAP payload (ZIP header "PK").
+        var tlv = ParseTlv(loadData);
+
+        Assert.That(tlv.Tag, Is.EqualTo(0xC4), "LOAD block should be encoded with tag 'C4'.");
+        Assert.That(
+            tlv.AvailableValueLength,
+            Is.GreaterThan(2),
+            "LOAD block value should be large enough to contain CAP data."
+        );
+
+        // CAP files are ZIP archives, so the payload must begin with the ZIP magic "PK" (0x504B).
         Assert.Multiple(() =>
         {
-            Assert.That(
-                validTlvTags,
-                Does.Contain(loadData[0]),
-                $"Unexpected TLV tag: 0x{loadData[0]:X2}"
-            );
-
-            // CAP files are ZIP files, so they start with ZIP magic "PK" (0x504B), not CAP magic
-            // The first LOAD command should contain the ZIP header
-            Assert.That(loadData[0], Is.EqualTo(0x50)); // 'P' from "PK"
-            Assert.That(loadData[1], Is.EqualTo(0x4B)); // 'K' from "PK"
+            Assert.That(loadData[tlv.ValueOffset], Is.EqualTo(0x50)); // 'P'
+            Assert.That(loadData[tlv.ValueOffset + 1], Is.EqualTo(0x4B)); // 'K'
         });
 
         // Look for CAP magic "DECAFFED" across all LOAD commands
         List<byte> allLoadData = [];
         foreach (var cmd in loadCommands)
         {
-            if (cmd.Data != null)
-            {
-                allLoadData.AddRange(cmd.Data);
-            }
+            if (cmd.Data is null)
+                continue;
+
+            var payload = ParseTlv(cmd.Data);
+            allLoadData.AddRange(
+                cmd.Data.Skip(payload.ValueOffset).Take(payload.AvailableValueLength)
+            );
         }
 
         byte[] capMagicPattern = [0xDE, 0xCA, 0xFF, 0xED];
@@ -260,6 +264,52 @@ public class CapLoadingIntegrationTests
             Is.GreaterThanOrEqualTo(0),
             "Should contain CAP file magic number DECAFFED somewhere in the load data"
         );
+    }
+
+    private static (
+        byte Tag,
+        int ValueOffset,
+        int DeclaredValueLength,
+        int AvailableValueLength
+    ) ParseTlv(byte[] buffer)
+    {
+        if (buffer.Length < 2)
+        {
+            throw new ArgumentException("TLV buffer too short", nameof(buffer));
+        }
+
+        byte tag = buffer[0];
+        byte lengthDescriptor = buffer[1];
+        int valueOffset;
+        int valueLength;
+
+        if ((lengthDescriptor & 0x80) == 0)
+        {
+            valueLength = lengthDescriptor;
+            valueOffset = 2;
+        }
+        else
+        {
+            int lengthOfLength = lengthDescriptor & 0x7F;
+            if (buffer.Length < 2 + lengthOfLength)
+            {
+                throw new ArgumentException(
+                    "TLV length descriptor exceeds buffer size",
+                    nameof(buffer)
+                );
+            }
+
+            valueLength = 0;
+            for (int i = 0; i < lengthOfLength; i++)
+            {
+                valueLength = (valueLength << 8) | buffer[2 + i];
+            }
+
+            valueOffset = 2 + lengthOfLength;
+        }
+
+        int available = Math.Max(0, buffer.Length - valueOffset);
+        return (tag, valueOffset, valueLength, Math.Min(valueLength, available));
     }
 
     // REMOVED: FluentInterface_SecureChannelWorkflow_DemonstratesUsability test

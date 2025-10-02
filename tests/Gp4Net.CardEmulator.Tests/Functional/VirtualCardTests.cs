@@ -5,12 +5,12 @@ using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
 using Gp4Net.CardEmulator.Services;
+using Gp4Net.CardEmulator.Tests.TestHelpers;
 using Gp4Net.Constants;
 using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Commands;
 using Gp4Net.Domain.Keys;
-using Gp4Net.CardEmulator.Tests.TestHelpers;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using static Gp4Net.Constants.Constants;
@@ -96,7 +96,7 @@ public class VirtualCardTests
         byte[] unsupportedCommand =
         [
             0x80,
-            0xFF,  // Invalid instruction - not in GP spec
+            0xFF, // Invalid instruction - not in GP spec
             0x00,
             0x00,
             0x00,
@@ -127,7 +127,14 @@ public class VirtualCardTests
 
         // Test both implicit and explicit select - ISD should be implicitly selected per GP spec
         // but we can also explicitly select it
-        byte[] selectCommand = new byte[] { 0x00, Gp4Net.Constants.Apdu.Instructions.SELECT, 0x04, 0x00, (byte)config.IsdAid.Length }
+        byte[] selectCommand = new byte[]
+        {
+            0x00,
+            Gp4Net.Constants.Apdu.Instructions.SELECT,
+            0x04,
+            0x00,
+            (byte)config.IsdAid.Length,
+        }
             .Concat(config.IsdAid)
             .Concat(new byte[] { 0x00 })
             .ToArray();
@@ -138,16 +145,18 @@ public class VirtualCardTests
         // The P1P2 combination (0x00FE) specifies the data object to retrieve
         byte[] identifyCommand =
         [
-            0x80,  // GlobalPlatform CLA
+            0x80, // GlobalPlatform CLA
             Gp4Net.Constants.Apdu.Instructions.GET_DATA,
-            0x00,  // P1 - high byte of data object identifier
-            Constants.Constants.Tlv.VendorSpecific.NXP_P71_IDENTIFY,  // P2 - low byte (0xFE)
-            0x00   // Le - expect any length response
+            0x00, // P1 - high byte of data object identifier
+            Constants.Constants.Tlv.VendorSpecific.NXP_P71_IDENTIFY, // P2 - low byte (0xFE)
+            0x00, // Le - expect any length response
         ];
 
         // Debug: Check configuration
         TestContext.Out.WriteLine($"Config DataObjects count: {config.DefaultDataObjects.Count}");
-        TestContext.Out.WriteLine($"Config has 0x00FE: {config.DefaultDataObjects.ContainsKey(0x00FE)}");
+        TestContext.Out.WriteLine(
+            $"Config has 0x00FE: {config.DefaultDataObjects.ContainsKey(0x00FE)}"
+        );
         if (config.DefaultDataObjects.ContainsKey(0x00FE))
         {
             var identifyData = config.DefaultDataObjects[0x00FE];
@@ -166,16 +175,18 @@ public class VirtualCardTests
                 TestContext.Out.WriteLine($"Response Data Length: {response.Data.Length}");
                 if (response.Data.Length > 0)
                 {
-                    TestContext.Out.WriteLine($"Response Data: {Convert.ToHexString(response.Data)}");
+                    TestContext.Out.WriteLine(
+                        $"Response Data: {Convert.ToHexString(response.Data)}"
+                    );
                 }
 
                 _ = response.StatusWord.Should().Be(StatusWords.Success);
                 _ = response.Data.Should().NotBeEmpty();
                 // GET DATA returns complete TLV structure: FE (tag) + length + DF28 (inner tag) + data
-                _ = response.Data[0].Should().Be(0xFE);  // Outer tag (P71 IDENTIFY)
-                _ = response.Data[1].Should().Be(0x45);  // Length (69 bytes)
-                _ = response.Data[2].Should().Be(0xDF);  // Inner tag high byte
-                _ = response.Data[3].Should().Be(0x28);  // Inner tag low byte
+                _ = response.Data[0].Should().Be(0xFE); // Outer tag (P71 IDENTIFY)
+                _ = response.Data[1].Should().Be(0x45); // Length (69 bytes)
+                _ = response.Data[2].Should().Be(0xDF); // Inner tag high byte
+                _ = response.Data[3].Should().Be(0x28); // Inner tag low byte
                 return UnitResult.Success<SmartCardError>();
             },
             error =>
@@ -307,8 +318,9 @@ public class VirtualCardTests
         byte[] selectCommand = [0x00, 0xA4, 0x04, 0x00, 0x00];
 
         // Act
-        _ = card.ProcessCommand(selectCommand);
-        var newState = card.CurrentState;
+        var result = card.ProcessCommand(selectCommand);
+        var updatedCard = result.IsSuccess ? (VirtualCard)result.Value.UpdatedCard : card;
+        var newState = updatedCard.CurrentState;
 
         // Assert
         // Per GP Card Spec v2.3.1 Section 6.4.1: ISD is implicitly selected initially
@@ -322,6 +334,11 @@ public class VirtualCardTests
         _ = ReferenceEquals(initialState, newState)
             .Should()
             .BeFalse("Card should create new state instances to ensure immutability");
+
+        // Test immutability: original card's state should be unchanged
+        _ = ReferenceEquals(card.CurrentState, initialState)
+            .Should()
+            .BeTrue("Original card's state should never be mutated");
 
         // Values can be equal, but objects must be different instances
         _ = initialState
@@ -441,7 +458,8 @@ public class VirtualCardTests
                 newState,
                 new LoggingService(Maybe<ILogger>.None),
                 new CapFileServiceAdapter(),
-                new CardStateService(Maybe<ILogger>.None)
+                new CardStateService(Maybe<ILogger>.None),
+                Maybe<CardState>.From(currentState)
             );
         }
 

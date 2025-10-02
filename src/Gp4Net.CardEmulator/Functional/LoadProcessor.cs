@@ -40,9 +40,10 @@ public static class LoadProcessor
             0x00 => ProcessFirstLoad(command, state, config),
             0x01 => ProcessSubsequentLoad(command, state, config),
             0x80 => ProcessLastLoad(command, state, config),
-            _ => Result.Failure<(ApduResponse, CardState), SmartCardError>(
-                SmartCardError.IncorrectP1P2($"Invalid P1 parameter: {command.P1:X2}")
-            ),
+            _
+                => Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                    SmartCardError.IncorrectP1P2($"Invalid P1 parameter: {command.P1:X2}")
+                ),
         };
     }
 
@@ -58,7 +59,7 @@ public static class LoadProcessor
         return GetOrCreateLoadContext(state, command.P2)
             .Bind(loadContext => ValidateFirstLoadData(command.Data))
             .Bind(validData => InitializeLoadContext(validData, state, command.P2))
-            .Map(newState => (ApduResponse.Success(Array.Empty<byte>()), newState));
+            .Map(newState => (ApduResponse.Success([]), newState));
     }
 
     /// <summary>
@@ -73,7 +74,7 @@ public static class LoadProcessor
         return GetLoadContext(state, command.P2)
             .Bind(loadContext => AccumulateLoadData(loadContext, command.Data))
             .Bind(updatedContext => UpdateLoadContext(state, updatedContext, command.P2))
-            .Map(newState => (ApduResponse.Success(Array.Empty<byte>()), newState));
+            .Map(newState => (ApduResponse.Success([]), newState));
     }
 
     /// <summary>
@@ -88,7 +89,7 @@ public static class LoadProcessor
         return GetLoadContext(state, command.P2)
             .Bind(loadContext => AccumulateLoadData(loadContext, command.Data))
             .Bind(finalContext => ProcessCompleteCapFile(finalContext, state, config))
-            .Map(newState => (ApduResponse.Success(Array.Empty<byte>()), newState));
+            .Map(newState => (ApduResponse.Success([]), newState));
     }
 
     /// <summary>
@@ -266,7 +267,8 @@ public static class LoadProcessor
     {
         return ExtractExpectedLfdbhFromState(state)
             .Bind(expectedLfdbh =>
-                LoadFileDataBlockHash.ComputeFromCapFile(capFileData)
+                LoadFileDataBlockHash
+                    .ComputeFromCapFile(capFileData)
                     .Bind(actualLfdbh => expectedLfdbh.VerifyMatch(actualLfdbh))
             );
     }
@@ -288,7 +290,6 @@ public static class LoadProcessor
                 )
             );
     }
-
 
     /// <summary>
     /// Verifies the DAP (Data Authentication Pattern) signature if present.
@@ -312,7 +313,7 @@ public static class LoadProcessor
         return Result.Success<LoadFile, SmartCardError>(
             new LoadFile(
                 capInfo.PackageAid,
-                new byte[] { 0xA0, 0x00, 0x00, 0x01, 0x51 }, // Default ISD AID
+                [0xA0, 0x00, 0x00, 0x01, 0x51], // Default ISD AID
                 0x01, // LOADED state
                 ImmutableList<ExecutableModule>.Empty
             )

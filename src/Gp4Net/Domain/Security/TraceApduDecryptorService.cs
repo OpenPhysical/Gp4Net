@@ -130,15 +130,13 @@ public sealed class TraceApduDecryptorService
         return DecryptApdu(exchange.Command, ApduDirection.Command, sessionState)
             .Bind(commandResult =>
             {
-                (var decryptedCommand, var stateAfterCommand) =
-                    commandResult;
+                (var decryptedCommand, var stateAfterCommand) = commandResult;
 
                 // Decrypt response using updated state
                 return DecryptApdu(exchange.Response, ApduDirection.Response, stateAfterCommand)
                     .Map(responseResult =>
                     {
-                        (var decryptedResponse, var finalState) =
-                            responseResult;
+                        (var decryptedResponse, var finalState) = responseResult;
                         var decryptedExchange = new DecryptedExchange(
                             exchange.Id,
                             decryptedCommand,
@@ -324,10 +322,7 @@ public sealed class TraceApduDecryptorService
         }
 
         // Reconstruct the command data that was used for MAC calculation
-        byte[] macInput = Utils.BuildMacInput(
-            parsedCommand,
-            sessionState.ProtocolVersion
-        );
+        byte[] macInput = Utils.BuildMacInput(parsedCommand, sessionState.ProtocolVersion);
 
         // Calculate expected MAC using CryptoService
         var commandMacChainingBytes = sessionState.MacChainingValue;
@@ -347,8 +342,13 @@ public sealed class TraceApduDecryptorService
 
         return expectedMacResult.Map(expectedMac =>
         {
+            var expectedToCompare =
+                sessionState.ProtocolVersion == ScpVersion.Scp03
+                    ? expectedMac[..Scp.Scp03.MAC_SIZE]
+                    : expectedMac;
+
             // Verify MAC matches using constant-time comparison
-            bool isValid = Utils.CompareBytes(expectedMac, parsedCommand.Mac);
+            bool isValid = Utils.CompareBytes(expectedToCompare, parsedCommand.Mac);
             return isValid;
         });
     }
@@ -376,13 +376,7 @@ public sealed class TraceApduDecryptorService
                 sessionState.EncryptionCounter,
                 ScpVersion.Scp03
             )
-            .Bind(icv =>
-                Cipher.DecryptAesCbc(
-                    sessionState.SessionKeys.SEnc,
-                    icv,
-                    encryptedData
-                )
-            )
+            .Bind(icv => Cipher.DecryptAesCbc(sessionState.SessionKeys.SEnc, icv, encryptedData))
             .Bind(decryptedData => Utils.RemovePkcs7Padding(decryptedData));
     }
 
@@ -392,7 +386,8 @@ public sealed class TraceApduDecryptorService
     )
     {
         byte[] zeroIv = new byte[8];
-        return Cipher.Decrypt3DesCbc(sessionState.SessionKeys.SEnc, zeroIv, encryptedData)
+        return Cipher
+            .Decrypt3DesCbc(sessionState.SessionKeys.SEnc, zeroIv, encryptedData)
             .Bind(decryptedData => Utils.RemoveIso7816Padding(decryptedData));
     }
 
@@ -451,7 +446,7 @@ public sealed class TraceApduDecryptorService
         SecurityLevel securityLevel
     )
     {
-        return securityLevel == SecurityLevel.None 
+        return securityLevel == SecurityLevel.None
             ? UnitResult.Success<SmartCardError>()
             : ValidateKeyLengths(sessionKeys);
     }
@@ -463,16 +458,17 @@ public sealed class TraceApduDecryptorService
     {
         // SCP02 uses 3DES (16 bytes), SCP03 uses AES (16 bytes minimum)
         const int minKeyLength = 16;
-        
-        return sessionKeys.SEnc?.Length >= minKeyLength
+
+        return
+            sessionKeys.SEnc?.Length >= minKeyLength
             && sessionKeys.SMac?.Length >= minKeyLength
             && sessionKeys.SrMac?.Length >= minKeyLength
-                ? UnitResult.Success<SmartCardError>()
-                : UnitResult.Failure(
-                    SmartCardError.InvalidArgument(
-                        $"Invalid session keys: keys must be at least {minKeyLength} bytes for cryptographic operations"
-                    )
-                );
+            ? UnitResult.Success<SmartCardError>()
+            : UnitResult.Failure(
+                SmartCardError.InvalidArgument(
+                    $"Invalid session keys: keys must be at least {minKeyLength} bytes for cryptographic operations"
+                )
+            );
     }
 
     /// <summary>
@@ -492,18 +488,12 @@ public sealed class TraceApduDecryptorService
                 (accumResult, exchange) =>
                     accumResult.Bind(accum =>
                     {
-                        (
-                            var decryptedExchanges,
-                            var currentState
-                        ) = accum;
+                        (var decryptedExchanges, var currentState) = accum;
                         return DecryptExchange(exchange, currentState)
                             .Match(
                                 success =>
                                 {
-                                    (
-                                        var decryptedExchange,
-                                        var updatedState
-                                    ) = success;
+                                    (var decryptedExchange, var updatedState) = success;
                                     List<DecryptedExchange> newList =
                                     [
                                         .. decryptedExchanges,
@@ -588,7 +578,8 @@ public sealed class TraceApduDecryptorService
         // Check if security is actually established
         if (sessionState.SecurityLevel == SecurityLevel.None)
         {
-            string metadata = $"Secure {direction.ToString().ToLower()} received but decryption failed: no security established";
+            string metadata =
+                $"Secure {direction.ToString().ToLower()} received but decryption failed: no security established";
             var failedApdu = new DecryptedApdu(
                 apduBytes,
                 direction,
@@ -604,20 +595,25 @@ public sealed class TraceApduDecryptorService
         // Convert byte array to WSCT types
         var decryptionResult =
             direction == ApduDirection.Command
-                ? apduBytes.ParseCommandApdu()
+                ? apduBytes
+                    .ParseCommandApdu()
                     .Bind(cmd => ScpService.Security.RemoveCommandSecurity(cmd, sessionState))
                     .Map(result => (result.plaintextCommand.BinaryCommand, result.newState))
-                : apduBytes.ParseResponseApdu()
+                : apduBytes
+                    .ParseResponseApdu()
                     .Bind(resp => ScpService.Security.RemoveResponseSecurity(resp, sessionState))
-                    .Map(result => (result.plaintextResponse.CombineResponseBytes(), result.newState));
+                    .Map(result =>
+                        (result.plaintextResponse.CombineResponseBytes(), result.newState)
+                    );
 
         return decryptionResult.Match(
             success =>
             {
                 (byte[] plaintextBytes, var newState) = success;
-                string metadata = direction == ApduDirection.Command 
-                    ? "Command MAC verified and decrypted"
-                    : "Response MAC verified and decrypted";
+                string metadata =
+                    direction == ApduDirection.Command
+                        ? "Command MAC verified and decrypted"
+                        : "Response MAC verified and decrypted";
                 var decryptedApdu = new DecryptedApdu(
                     apduBytes, // original bytes
                     direction,
@@ -658,19 +654,19 @@ public sealed class TraceApduDecryptorService
     {
         // Implement actual R-MAC verification and R-ENC decryption using functional operations
         return sessionState.SecurityLevel.HasRMac()
-                ? VerifyResponseMac(responseBytes, sessionState)
-                    .Bind(verifiedBytes =>
-                        sessionState.SecurityLevel.HasREncryption()
-                            ? DecryptResponseData(verifiedBytes, sessionState)
-                            : Result.Success<(byte[], SecureChannelState), SmartCardError>(
-                                (verifiedBytes, sessionState)
-                            )
-                    )
+            ? VerifyResponseMac(responseBytes, sessionState)
+                .Bind(verifiedBytes =>
+                    sessionState.SecurityLevel.HasREncryption()
+                        ? DecryptResponseData(verifiedBytes, sessionState)
+                        : Result.Success<(byte[], SecureChannelState), SmartCardError>(
+                            (verifiedBytes, sessionState)
+                        )
+                )
             : sessionState.SecurityLevel.HasREncryption()
                 ? DecryptResponseData(responseBytes, sessionState)
-            : Result.Success<(byte[], SecureChannelState), SmartCardError>(
-                (responseBytes, sessionState)
-            );
+                : Result.Success<(byte[], SecureChannelState), SmartCardError>(
+                    (responseBytes, sessionState)
+                );
     }
 
     /// <summary>
@@ -682,16 +678,15 @@ public sealed class TraceApduDecryptorService
     )
     {
         // Determine MAC size based on protocol version
-        int macSize = sessionState.ProtocolVersion == ScpVersion.Scp03
-            ? Scp.Scp03.MAC_SIZE
-            : Scp.Scp02.MAC_SIZE;
+        int macSize =
+            sessionState.ProtocolVersion == ScpVersion.Scp03
+                ? Scp.Scp03.MAC_SIZE
+                : Scp.Scp02.MAC_SIZE;
 
         // Response must have at least MAC + status word (2 bytes)
         if (responseBytes.Length < macSize + 2)
         {
-            return SmartCardError.InvalidData(
-                "Response too short to contain MAC and status word"
-            );
+            return SmartCardError.InvalidData("Response too short to contain MAC and status word");
         }
 
         // Extract components: [data][MAC][SW1][SW2]
@@ -715,30 +710,38 @@ public sealed class TraceApduDecryptorService
 
         // Calculate expected MAC based on protocol version using CryptoService
         var macChainingBytes = sessionState.MacChainingValue;
-            
+
         var macResult = sessionState.ProtocolVersion switch
         {
-            ScpVersion.Scp02 => CryptoService.ScpOperations.Scp02.CalculateResponseMac(
-                responseData.Concat(statusWord).ToArray(),
-                sessionState.SessionKeys.SrMac,
-                macChainingBytes
-            ),
-            ScpVersion.Scp03 => CryptoService.ScpOperations.Scp03.CalculateResponseMac(
-                responseData.Concat(statusWord).ToArray(),
-                sessionState.SessionKeys.SrMac,
-                macChainingBytes
-            ),
-            _ => Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidArgument(
-                    $"Unsupported protocol version: {sessionState.ProtocolVersion}"
-                )
-            ),
+            ScpVersion.Scp02
+                => CryptoService.ScpOperations.Scp02.CalculateResponseMac(
+                    responseData.Concat(statusWord).ToArray(),
+                    sessionState.SessionKeys.SrMac,
+                    macChainingBytes
+                ),
+            ScpVersion.Scp03
+                => CryptoService.ScpOperations.Scp03.CalculateResponseMac(
+                    responseData.Concat(statusWord).ToArray(),
+                    sessionState.SessionKeys.SrMac,
+                    macChainingBytes
+                ),
+            _
+                => Result.Failure<byte[], SmartCardError>(
+                    SmartCardError.InvalidArgument(
+                        $"Unsupported protocol version: {sessionState.ProtocolVersion}"
+                    )
+                ),
         };
 
         return macResult.Bind(expectedMac =>
         {
             // Verify MAC matches
-            bool macValid = expectedMac[..macSize].SequenceEqual(receivedMac);
+            var expectedToCompare =
+                sessionState.ProtocolVersion == ScpVersion.Scp03
+                    ? expectedMac[..Scp.Scp03.MAC_SIZE]
+                    : expectedMac[..macSize];
+
+            bool macValid = expectedToCompare.SequenceEqual(receivedMac);
 
             if (!macValid)
             {
@@ -789,11 +792,12 @@ public sealed class TraceApduDecryptorService
         {
             ScpVersion.Scp02 => DecryptScp02Response(encryptedData, sessionState),
             ScpVersion.Scp03 => DecryptScp03Response(encryptedData, sessionState),
-            _ => Result.Failure<byte[], SmartCardError>(
-                new UnsupportedProtocolError(
-                    $"Unsupported protocol version for decryption: {sessionState.ProtocolVersion}"
-                )
-            ),
+            _
+                => Result.Failure<byte[], SmartCardError>(
+                    new UnsupportedProtocolError(
+                        $"Unsupported protocol version for decryption: {sessionState.ProtocolVersion}"
+                    )
+                ),
         };
 
         return decryptResult.Map(decryptedData =>
@@ -802,9 +806,10 @@ public sealed class TraceApduDecryptorService
             byte[] decryptedResponse = decryptedData.Concat(statusWord).ToArray();
 
             // Update state for SCP03 (increment encryption counter)
-            var newState = sessionState.ProtocolVersion == ScpVersion.Scp03
-                ? sessionState.IncrementEncryptionCounter()
-                : sessionState;
+            var newState =
+                sessionState.ProtocolVersion == ScpVersion.Scp03
+                    ? sessionState.IncrementEncryptionCounter()
+                    : sessionState;
 
             return (decryptedResponse, newState);
         });
@@ -850,11 +855,7 @@ public sealed class TraceApduDecryptorService
         // Copy counter to beginning of IV
         Array.Copy(counterBytes, 0, iv, 0, 4);
 
-        return Cipher.DecryptAesCbcWithPadding(
-            sessionState.SessionKeys.SEnc,
-            iv,
-            encryptedData
-        );
+        return Cipher.DecryptAesCbcWithPadding(sessionState.SessionKeys.SEnc, iv, encryptedData);
     }
 
     /// <summary>
@@ -880,10 +881,11 @@ public sealed class TraceApduDecryptorService
             && direction switch
             {
                 ApduDirection.Command => (apduBytes[0] & 0x04) != 0, // Check CLA byte for secure messaging indicator
-                ApduDirection.Response => apduBytes.Length > 2
-                    && apduBytes
-                        .Take(apduBytes.Length - 2) // Exclude status word
-                        .Any(tag => tag is 0x87 or 0x8E or 0x99), // Check for secure messaging tags
+                ApduDirection.Response
+                    => apduBytes.Length > 2
+                        && apduBytes
+                            .Take(apduBytes.Length - 2) // Exclude status word
+                            .Any(tag => tag is 0x87 or 0x8E or 0x99), // Check for secure messaging tags
                 _ => false,
             };
     }
@@ -933,11 +935,12 @@ public record DecryptedApdu(
     /// Gets the decrypted APDU bytes. Returns actual decrypted data when available.
     /// For failed decryption, returns empty array to prevent leaking encrypted data.
     /// </summary>
-    public byte[] DecryptedBytes => Status switch
-    {
-        DecryptionStatus.Failed => Array.Empty<byte>(),  // Never expose failed encrypted data
-        _ => DecryptedBytesInternal ?? OriginalBytes
-    };
+    public byte[] DecryptedBytes =>
+        Status switch
+        {
+            DecryptionStatus.Failed => [], // Never expose failed encrypted data
+            _ => DecryptedBytesInternal ?? OriginalBytes,
+        };
 
     /// <summary>
     /// Gets a human-readable description of the APDU including status word if it's a response.
@@ -1001,7 +1004,7 @@ internal static class TraceApduDecryptorServiceExtensions
             ex => SmartCardError.InvalidData($"Failed to parse command APDU: {ex.Message}")
         );
     }
-    
+
     internal static Result<ResponseAPDU, SmartCardError> ParseResponseApdu(this byte[] bytes)
     {
         return Gp4Net.Core.Functional.ResultExtensions.Try(
@@ -1009,10 +1012,10 @@ internal static class TraceApduDecryptorServiceExtensions
             ex => SmartCardError.InvalidData($"Failed to parse response APDU: {ex.Message}")
         );
     }
-    
+
     internal static byte[] CombineResponseBytes(this ResponseAPDU response)
     {
-        var udr = response.Udr ?? Array.Empty<byte>();
+        var udr = response.Udr ?? [];
         var result = new byte[udr.Length + 2];
         if (udr.Length > 0)
             Array.Copy(udr, 0, result, 0, udr.Length);

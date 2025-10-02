@@ -44,30 +44,34 @@ public static partial class CryptoService
 
             return aid.Length switch
             {
-                0 => Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("AID cannot be empty.")
-                ),
-                < 5 or > 16 => Result.Failure<byte[], SmartCardError>(
-                    SmartCardError.InvalidArgument("AID length must be 5-16 bytes per GP spec.")
-                ),
-                _ => BuildDeleteTokenInput(p1, p2, aid, optionalTlv)
-                    .Bind(input =>
-                        Result.Try(
-                            () =>
-                            {
-                                var cmac = new CMac(new AesEngine(), 128);
-                                cmac.Init(new KeyParameter(macKey));
-                                byte[] mac = new byte[16];
-                                cmac.BlockUpdate(input, 0, input.Length);
-                                cmac.DoFinal(mac, 0);
-                                return mac;
-                            },
-                            ex =>
-                                SmartCardError.CryptographicError(
-                                    $"Delete token calculation failed: {ex.Message}"
-                                )
-                        )
+                0
+                    => Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.InvalidArgument("AID cannot be empty.")
                     ),
+                < 5
+                or > 16
+                    => Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.InvalidArgument("AID length must be 5-16 bytes per GP spec.")
+                    ),
+                _
+                    => BuildDeleteTokenInput(p1, p2, aid, optionalTlv)
+                        .Bind(input =>
+                            Result.Try(
+                                () =>
+                                {
+                                    var cmac = new CMac(new AesEngine(), 128);
+                                    cmac.Init(new KeyParameter(macKey));
+                                    byte[] mac = new byte[16];
+                                    cmac.BlockUpdate(input, 0, input.Length);
+                                    cmac.DoFinal(mac, 0);
+                                    return mac;
+                                },
+                                ex =>
+                                    SmartCardError.CryptographicError(
+                                        $"Delete token calculation failed: {ex.Message}"
+                                    )
+                            )
+                        ),
             };
         }
 

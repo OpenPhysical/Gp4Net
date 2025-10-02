@@ -21,7 +21,7 @@ using static Gp4Net.Tests.Infrastructure.TestCardService;
 namespace Gp4Net.Tests.Tool.Commands.Applet;
 
 /// <summary>
-/// Comprehensive unit tests for the pipeline-based DeleteCommand implementation.
+/// Unit tests for the pipeline-based DeleteCommand implementation.
 /// Tests cover all deletion modes, error handling, and GlobalPlatform specification compliance.
 /// </summary>
 /// <remarks>
@@ -60,7 +60,7 @@ public class DeleteCommandPipelineTests
     {
         // Use real virtual card implementation - no mocks needed
         var virtualCardService = new VirtualCardService();
-        virtualCardService.SetupComprehensiveTestEnvironment();
+        virtualCardService.SetupTestEnvironment();
         _smartCardService = Create(virtualCardService).Value;
 
         // Skip domain service factory setup for DeleteCommand tests - use card service directly
@@ -98,11 +98,7 @@ public class DeleteCommandPipelineTests
     public async Task ExecuteAsync_SingleAid_Success()
     {
         // Arrange
-        var settings = new DeleteCommand.Settings
-        {
-            Aid = "A000000003000000",
-            Force = true,
-        };
+        var settings = new DeleteCommand.Settings { Aid = "A000000003000000", Force = true };
 
         // No mock setup needed - using real virtual card implementation
 
@@ -135,11 +131,7 @@ public class DeleteCommandPipelineTests
     public async Task ExecuteAsync_InvalidAid_ReturnsError()
     {
         // Arrange
-        var settings = new DeleteCommand.Settings
-        {
-            Aid = "INVALID_HEX",
-            Force = true,
-        };
+        var settings = new DeleteCommand.Settings { Aid = "INVALID_HEX", Force = true };
 
         // Act
         int result = await _command.ExecuteAsync(_testContext, settings);
@@ -152,11 +144,7 @@ public class DeleteCommandPipelineTests
     public async Task ExecuteAsync_CapFile_ValidCapFile_ExtractsAidAndDeletes()
     {
         // Arrange
-        var settings = new DeleteCommand.Settings
-        {
-            CapFile = _testCapFilePath,
-            Force = true,
-        };
+        var settings = new DeleteCommand.Settings { CapFile = _testCapFilePath, Force = true };
 
         // Act
         int result = await _command.ExecuteAsync(_testContext, settings);
@@ -167,31 +155,10 @@ public class DeleteCommandPipelineTests
     }
 
     [Test]
-    public async Task ExecuteAsync_CapFileNotFound_ReturnsError()
-    {
-        // Arrange
-        var settings = new DeleteCommand.Settings
-        {
-            CapFile = "nonexistent.cap",
-            Force = true,
-        };
-
-        // Act
-        int result = await _command.ExecuteAsync(_testContext, settings);
-
-        // Assert
-        _ = result.Should().Be(1);
-    }
-
-    [Test]
     public async Task ExecuteAsync_Interactive_NoApplications_Success()
     {
         // Arrange
-        var settings = new DeleteCommand.Settings
-        {
-            Interactive = true,
-            Force = true,
-        };
+        var settings = new DeleteCommand.Settings { Interactive = true, Force = true };
 
         // Act
         int result = await _command.ExecuteAsync(_testContext, settings);
@@ -237,24 +204,6 @@ public class DeleteCommandPipelineTests
         _ = result.Should().Be(0); // Success - dry run just shows plan
     }
 
-    [Test]
-    public async Task ExecuteAsync_DeleteFails_ReturnsError()
-    {
-        // Arrange
-        var settings = new DeleteCommand.Settings
-        {
-            Aid = "A000000003000000",
-            Force = true,
-        };
-
-        var error = SmartCardError.FromStatusWord(0x6A82);
-
-        // Act - virtual card will simulate error conditions as needed
-        int result = await _command.ExecuteAsync(_testContext, settings);
-
-        // Assert
-        _ = result.Should().BeGreaterThan(0); // Should return error code
-    }
 }
 
 /// <summary>

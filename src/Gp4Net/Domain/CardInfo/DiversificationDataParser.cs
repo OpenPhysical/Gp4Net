@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using static Gp4Net.Services.TlvService;
@@ -50,7 +49,8 @@ public static class DiversificationDataParser
         try
         {
             // Use TlvParser to find CF tag (diversification data)
-            var cfElementMaybe = TlvParser.FindByTag(data.ToImmutableArray(), 0xCF)
+            var cfElementMaybe = TlvParser
+                .FindByTag([.. data], 0xCF)
                 .Match(result => result, _ => Maybe<TlvObject>.None);
 
             return cfElementMaybe.Match(

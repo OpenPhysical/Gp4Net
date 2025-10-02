@@ -2,6 +2,7 @@ using System;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
+using Gp4Net.Shared;
 using JetBrains.Annotations;
 using static Gp4Net.Constants.Constants;
 
@@ -29,9 +30,12 @@ public class VirtualCardService : IDisposable
     }
 
     /// <summary>
-    /// Private constructor for creating new instances with state.
+    /// Initializes a new instance with specific state.
     /// </summary>
-    private VirtualCardService(
+    /// <param name="readerManager">The reader manager instance.</param>
+    /// <param name="connectedReader">The connected reader, if any.</param>
+    /// <param name="disposed">Whether the service is disposed.</param>
+    public VirtualCardService(
         VirtualReaderManager readerManager,
         Maybe<VirtualCardReader> connectedReader,
         bool disposed
@@ -70,7 +74,7 @@ public class VirtualCardService : IDisposable
         return Maybe<string>
             .From(readerName)
             .Where(name => !string.IsNullOrEmpty(name))
-            .ToResult(SmartCardError.InvalidArgument("Reader name cannot be null or empty"))
+            .ToResult(ErrorFactory.EmptyArgument("Reader name"))
             .Bind(name => FindAndConnectToReader(name));
     }
 
@@ -118,7 +122,7 @@ public class VirtualCardService : IDisposable
         return Maybe<byte[]>
             .From(command)
             .Where(cmd => cmd.Length > 0)
-            .ToResult(SmartCardError.InvalidArgument("Command cannot be null or empty"))
+            .ToResult(ErrorFactory.EmptyArgument("Command"))
             .Bind(cmd =>
                 _connectedReader
                     .ToResult(SmartCardError.CommunicationError("No reader is connected"))
@@ -152,8 +156,11 @@ public class VirtualCardService : IDisposable
     public VirtualCardService MarkDisposed()
     {
         var disconnectedService = Disconnect();
-        disconnectedService._readerManager.Clear();
-        return new VirtualCardService(_readerManager, Maybe<VirtualCardReader>.None, true);
+        return new VirtualCardService(
+            new VirtualReaderManager(),
+            Maybe<VirtualCardReader>.None,
+            true
+        );
     }
 
     /// <summary>

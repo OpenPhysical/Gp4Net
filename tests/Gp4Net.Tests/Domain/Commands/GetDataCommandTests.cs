@@ -34,7 +34,8 @@ public class GetDataCommandTests
         ushort dataObject = GetDataCommand.DataObjects.CardData;
 
         // Act & Assert
-        var result = GetDataCommand.Create(dataObject)
+        var result = GetDataCommand
+            .Create(dataObject)
             .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)));
 
         result.Match(
@@ -47,7 +48,10 @@ public class GetDataCommandTests
                 _ = apdu[4].Should().Be(0x00); // Le - Receive all available
                 _ = apdu.Length.Should().Be(5); // No command data for GET DATA
             },
-            error => result.IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+            error =>
+                result
+                    .IsSuccess.Should()
+                    .BeTrue($"Command creation or APDU building failed: {error}")
         );
     }
 
@@ -61,7 +65,8 @@ public class GetDataCommandTests
     public void GetApdu_SplitsTagCorrectly(ushort tag, byte expectedP1, byte expectedP2)
     {
         // Act & Assert
-        var result = GetDataCommand.Create(tag)
+        var result = GetDataCommand
+            .Create(tag)
             .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)));
 
         result.Match(
@@ -70,7 +75,10 @@ public class GetDataCommandTests
                 _ = apdu[2].Should().Be(expectedP1); // P1
                 _ = apdu[3].Should().Be(expectedP2); // P2
             },
-            error => result.IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+            error =>
+                result
+                    .IsSuccess.Should()
+                    .BeTrue($"Command creation or APDU building failed: {error}")
         );
     }
 
@@ -78,7 +86,8 @@ public class GetDataCommandTests
     public void GetApdu_AlwaysReturnsNewArray()
     {
         // Act & Assert
-        GetDataCommand.Create(GetDataCommand.DataObjects.CardData)
+        GetDataCommand
+            .Create(GetDataCommand.DataObjects.CardData)
             .Match(
                 command =>
                 {
@@ -90,7 +99,8 @@ public class GetDataCommandTests
                     _ = apdu1.Should().NotBeSameAs(apdu2); // Should be different array instances
                     _ = apdu2.Should().BeEquivalentTo(apdu1); // But with same content
                 },
-                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
+                error =>
+                    Result.Success().IsSuccess.Should().BeTrue($"Command creation failed: {error}")
             );
     }
 
@@ -138,7 +148,8 @@ public class GetDataCommandTests
         // Lc: Not present (no command data)
         // Le: 0x00 (receive all available bytes)
 
-        GetDataCommand.Create(GetDataCommand.DataObjects.CardData)
+        GetDataCommand
+            .Create(GetDataCommand.DataObjects.CardData)
             .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)))
             .Match(
                 apdu =>
@@ -148,7 +159,11 @@ public class GetDataCommandTests
                     _ = apdu[1].Should().Be(0xCA); // INS
                     _ = apdu[4].Should().Be(0x00); // Le
                 },
-                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+                error =>
+                    Result
+                        .Success()
+                        .IsSuccess.Should()
+                        .BeTrue($"Command creation or APDU building failed: {error}")
             );
     }
 
@@ -181,7 +196,8 @@ public class GetDataCommandTests
         // for certain data objects or when used outside secure channel.
         // Our implementation uses 0x80 (GlobalPlatform class) consistently.
 
-        GetDataCommand.Create(0x9F7F) // CPLC
+        GetDataCommand
+            .Create(0x9F7F) // CPLC
             .Bind(command => ApduBuilder.BuildApdu(Maybe<IApduCommand>.From(command)))
             .Match(
                 apdu =>
@@ -189,7 +205,11 @@ public class GetDataCommandTests
                     // We use GP class
                     _ = apdu[0].Should().Be(0x80);
                 },
-                error => Result.Success().IsSuccess.Should().BeTrue($"Command creation or APDU building failed: {error}")
+                error =>
+                    Result
+                        .Success()
+                        .IsSuccess.Should()
+                        .BeTrue($"Command creation or APDU building failed: {error}")
             );
     }
 

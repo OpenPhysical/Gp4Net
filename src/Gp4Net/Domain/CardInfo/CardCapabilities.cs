@@ -105,7 +105,7 @@ public class CardCapabilities
         var capabilities = new CardCapabilities(data);
 
         return TlvParser
-            .ParseMultiple(data.ToImmutableArray())
+            .ParseMultiple([.. data])
             .Bind(parseResult =>
             {
                 // Process all TLV objects functionally
@@ -131,6 +131,24 @@ public class CardCapabilities
                 {
                     switch (tagNumber)
                     {
+                        case 0x67: // Card Capabilities container - recursively parse inner TLVs
+                            return TlvParser
+                                .ParseMultiple([.. element.TlvData.Bytes])
+                                .Match(
+                                    parseResult =>
+                                    {
+                                        return parseResult
+                                            .Objects.Select(innerElement =>
+                                                ProcessTlvObject(capabilities, innerElement)
+                                            )
+                                            .Aggregate(
+                                                seed: UnitResult.Success<SmartCardError>(),
+                                                func: (acc, current) =>
+                                                    acc.IsSuccess ? current : acc
+                                            );
+                                    },
+                                    error => UnitResult.Failure(error)
+                                );
                         case 0xA0: // SCP options
                             capabilities.ParseScpOptions(element.TlvData.Bytes.ToArray());
                             break;
@@ -191,7 +209,7 @@ public class CardCapabilities
     {
         // Parse according to Table H-6: SCP Information
         TlvParser
-            .ParseMultiple(data.ToImmutableArray())
+            .ParseMultiple([.. data])
             .Match(
                 parseResult =>
                 {
@@ -343,8 +361,7 @@ public class CardCapabilities
             return;
         }
 
-        var allSuites = data
-            .SelectMany<byte, CipherSuite>(dataByte =>
+        var allSuites = data.SelectMany<byte, CipherSuite>(dataByte =>
             {
                 // Try individual cipher suite byte first
                 var individualSuite = ParseCipherSuiteByte(dataByte);
@@ -352,7 +369,7 @@ public class CardCapabilities
                 {
                     return ImmutableList.Create(individualSuite);
                 }
-                
+
                 // Handle multi-cipher bitmask values
                 return ParseCipherSuiteBitmask(dataByte);
             })
@@ -397,13 +414,12 @@ public class CardCapabilities
         // Handle known composite values observed in real cards
         return value switch
         {
-            0x7B => // Receipt Generation: DES_MAC + CMAC_AES128
-                ImmutableList.Create(
-                    CipherSuite.Des3Mac,
-                    CipherSuite.AesCmac128
-                ),
-                
-            0x0C => // DAP Verification: Multiple RSA and ECDSA algorithms
+            0x7B
+                => // Receipt Generation: DES_MAC + CMAC_AES128
+                ImmutableList.Create(CipherSuite.Des3Mac, CipherSuite.AesCmac128),
+
+            0x0C
+                => // DAP Verification: Multiple RSA and ECDSA algorithms
                 ImmutableList.Create(
                     CipherSuite.Rsa1024Sha1,
                     CipherSuite.RsaPssSha256,
@@ -412,9 +428,9 @@ public class CardCapabilities
                     CipherSuite.AesCmac256,
                     CipherSuite.EcdsaP256Sha256
                 ),
-                
+
             // Add more composite values as discovered from other cards
-            _ => ImmutableList<CipherSuite>.Empty
+            _ => ImmutableList<CipherSuite>.Empty,
         };
     }
 
@@ -435,10 +451,7 @@ public class CardCapabilities
 
             // Get key lengths from the dedicated dictionary if available
             string keyLengthStr = "";
-            if (
-                SupportedKeyLengths.TryGetValue(scpId, out var lengths)
-                && lengths.Count > 0
-            )
+            if (SupportedKeyLengths.TryGetValue(scpId, out var lengths) && lengths.Count > 0)
             {
                 keyLengthStr = " with " + string.Join(" ", lengths.Select(k => $"AES-{k}"));
             }
@@ -453,7 +466,10 @@ public class CardCapabilities
         }
 
         _ = AppPrivileges.Match(
-            privileges => sb.AppendLine($"Supported APP privileges: {Services.Helpers.PrivilegeHelpers.ToHumanReadableString(privileges)}"),
+            privileges =>
+                sb.AppendLine(
+                    $"Supported APP privileges: {Services.Helpers.PrivilegeHelpers.ToHumanReadableString(privileges)}"
+                ),
             () => sb
         );
 
@@ -464,11 +480,7 @@ public class CardCapabilities
         }
 
         // Cipher suites
-        foreach (
-            var kvp in CipherSuites.OrderBy(x =>
-                x.Key
-            )
-        )
+        foreach (var kvp in CipherSuites.OrderBy(x => x.Key))
         {
             string cipherNames = string.Join(", ", kvp.Value.Select(c => c.ToFriendlyString()));
             _ = sb.AppendLine(

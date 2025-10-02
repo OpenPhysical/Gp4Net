@@ -19,14 +19,23 @@ public static class CardInfoDisplayService
     /// <param name="title">Panel title</param>
     /// <param name="borderColor">Panel border color</param>
     public static void DisplayCardInfoTable(
-        IEnumerable<CardInfoTableBuilder.TableRow> rows,
+        IEnumerable<CardInfoTableBuilder.CardInfoRow> rows,
         string title = "Card Information",
         Maybe<Color> borderColor = default
     )
     {
-        var table = new Table()
-            .AddColumn(new TableColumn("Property").NoWrap())
-            .AddColumn(new TableColumn("Value"));
+        // Check if we have any FourColumnRow items to determine table structure
+        bool hasFourColumnRows = rows.Any(r => r is CardInfoTableBuilder.FourColumnRow);
+
+        var table = hasFourColumnRows
+            ? new Table()
+                .AddColumn(new TableColumn("Tag").NoWrap())
+                .AddColumn(new TableColumn("Tag Description"))
+                .AddColumn(new TableColumn("Value").NoWrap())
+                .AddColumn(new TableColumn("Value Description"))
+            : new Table()
+                .AddColumn(new TableColumn("Property").NoWrap())
+                .AddColumn(new TableColumn("Value"));
 
         // Render semantic rows using functional composition
         RenderSemanticRows(table, rows);
@@ -60,7 +69,7 @@ public static class CardInfoDisplayService
     /// </summary>
     private static void RenderSemanticRows(
         Table table,
-        IEnumerable<CardInfoTableBuilder.TableRow> rows
+        IEnumerable<CardInfoTableBuilder.CardInfoRow> rows
     )
     {
         // Use functional composition with Select to transform rows to side effects, then execute
@@ -70,29 +79,34 @@ public static class CardInfoDisplayService
     /// <summary>
     /// Renders a single semantic row to the table using pattern matching.
     /// </summary>
-    private static Table RenderSingleRow(Table table, CardInfoTableBuilder.TableRow row)
+    private static Table RenderSingleRow(Table table, CardInfoTableBuilder.CardInfoRow row)
     {
         return row switch
         {
             CardInfoTableBuilder.PropertyRow(var name, var value) => table.AddRow(name, value),
 
-            CardInfoTableBuilder.SectionHeader(var title) => table
-                .AddEmptyRow()
-                .AddRow($"[bold]{title}[/]", ""),
+            CardInfoTableBuilder.SectionHeader(var title)
+                => table.AddEmptyRow().AddRow($"[bold]{title}[/]", ""),
 
-            CardInfoTableBuilder.StatusRow(var name, var isAvailable, var details) => table.AddRow(
-                $"{(isAvailable ? "[green]✓[/]" : "[red]✗[/]")} {name}",
-                details.Length > 0 ? details
-                    : isAvailable ? "Available"
-                    : "Not Available"
-            ),
+            CardInfoTableBuilder.StatusRow(var name, var isAvailable, var details)
+                => table.AddRow(
+                    $"{(isAvailable ? "[green]✓[/]" : "[red]✗[/]")} {name}",
+                    details.Length > 0
+                        ? details
+                        : isAvailable
+                            ? "Available"
+                            : "Not Available"
+                ),
 
-            CardInfoTableBuilder.ErrorRow(var name, var message) => table.AddRow(
-                $"[red]{name}[/]",
-                $"[red]{message}[/]"
-            ),
+            CardInfoTableBuilder.ErrorRow(var name, var message)
+                => table.AddRow($"[red]{name}[/]", $"[red]{message}[/]"),
 
             CardInfoTableBuilder.InfoRow(var message) => table.AddRow("", $"[dim]{message}[/]"),
+
+            CardInfoTableBuilder.FourColumnRow(var tag, var tagDesc, var value, var valueDesc)
+                => table.Columns.Count == 4
+                    ? table.AddRow(tag, tagDesc, value, valueDesc)
+                    : table.AddRow($"{tag} {tagDesc}", $"{value} {valueDesc}"),
 
             _ => table,
         };

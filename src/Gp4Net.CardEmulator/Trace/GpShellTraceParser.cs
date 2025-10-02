@@ -71,12 +71,14 @@ public class GpShellTraceParser
     {
         if (string.IsNullOrWhiteSpace(filePath))
             return Result.Failure<ApduTrace, SmartCardError>(
-                SmartCardError.InvalidArgument("File path cannot be empty"));
-            
+                SmartCardError.InvalidArgument("File path cannot be empty")
+            );
+
         if (!File.Exists(filePath))
             return Result.Failure<ApduTrace, SmartCardError>(
-                SmartCardError.InvalidArgument("Trace file not found"));
-            
+                SmartCardError.InvalidArgument("Trace file not found")
+            );
+
         string content = File.ReadAllText(filePath);
         return ParseString(content);
     }
@@ -89,8 +91,9 @@ public class GpShellTraceParser
         var trimmedContent = traceContent?.Trim();
         if (string.IsNullOrEmpty(trimmedContent))
             return Result.Failure<ApduTrace, SmartCardError>(
-                SmartCardError.InvalidArgument("Trace content cannot be empty"));
-                
+                SmartCardError.InvalidArgument("Trace content cannot be empty")
+            );
+
         string content = trimmedContent;
         string[] lines = content.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
         var initialState = ParserState.Empty;
@@ -102,9 +105,7 @@ public class GpShellTraceParser
                     (initialTrace, initialState)
                 ),
                 (accumResult, line) =>
-                    accumResult.Bind(accum =>
-                        ProcessLineFunctional(line, accum.trace, accum.state)
-                    )
+                    accumResult.Bind(accum => ProcessLineFunctional(line, accum.trace, accum.state))
             )
             .Bind(final =>
                 // Handle pending command if any

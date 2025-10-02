@@ -5,7 +5,6 @@ using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Cryptography;
 using Gp4Net.Domain;
-using Gp4Net.Domain.Commands;
 using Gp4Net.Services;
 using Gp4Net.Transport;
 using Microsoft.Extensions.Logging;
@@ -54,7 +53,7 @@ public static class CommandProcessors
                 commandName,
                 Convert.ToHexString(commandBytes)
             );
-            
+
             // Parse and display APDU structure for verbose mode
             LogApduStructure(environment.Logger, commandBytes, "Pre-wrap");
         }
@@ -125,7 +124,10 @@ public static class CommandProcessors
                 .Success<byte[], SmartCardError>(command.ToBytes())
                 .Bind(commandBytes =>
                     ScpService
-                        .Security.ApplyCommandSecurity(new WSCT.ISO7816.CommandAPDU(commandBytes), secureChannelState)
+                        .Security.ApplyCommandSecurity(
+                            new WSCT.ISO7816.CommandAPDU(commandBytes),
+                            secureChannelState
+                        )
                         .Bind(wrapResult =>
                         {
                             (WSCT.ISO7816.CommandAPDU wrappedCommand, var newState) = wrapResult;
@@ -139,7 +141,11 @@ public static class CommandProcessors
                                     secureChannelState.ProtocolVersion,
                                     Convert.ToHexString(wrappedBytes)
                                 );
-                                LogApduStructure(environment.Logger, wrappedBytes, "Post-wrap (Secured)");
+                                LogApduStructure(
+                                    environment.Logger,
+                                    wrappedBytes,
+                                    "Post-wrap (Secured)"
+                                );
                             }
                             else if (environment.Options.DebugLogging)
                             {
@@ -157,8 +163,7 @@ public static class CommandProcessors
                                 .Map(wrappedCommand =>
                                 {
                                     // Update environment with new secure channel state and wrapped command
-                                    var newEnvironment =
-                                        environment.WithSecureChannel(newState);
+                                    var newEnvironment = environment.WithSecureChannel(newState);
 
                                     // Log the transformation
                                     if (environment.Options.EnableLogging)
@@ -171,9 +176,7 @@ public static class CommandProcessors
                                     }
 
                                     // Create metadata indicating secure channel wrapping was applied
-                                    var metadata = new CommandMetadata(
-                                        SecureChannelWrapped: true
-                                    );
+                                    var metadata = new CommandMetadata(SecureChannelWrapped: true);
 
                                     // Return wrapped bytes in Data field as expected by pipeline architecture
                                     // FunctionComposition will create WrappedApduCommand from this data
@@ -205,154 +208,141 @@ public static class CommandProcessors
     {
         var stopwatch = Stopwatch.StartNew();
 
-        // Check if we have a wrapped command from secure channel processing
-        var commandToSend = command;
-        byte[] commandBytes;
-
         // Get command bytes - use wrapped bytes if available
-        if (command is WrappedApduCommand wrapped)
-            {
-                commandBytes = wrapped.WrappedBytes;
-                commandToSend = wrapped; // WrappedApduCommand implements ICompleteApduCommand
+        var commandBytesResult = command is WrappedApduCommand wrapped
+            ? Result.Success<(byte[] bytes, IApduCommand cmd), SmartCardError>((wrapped.WrappedBytes, wrapped))
+            : GetCommandBytes(command).Map(bytes => (bytes, command));
 
-                if (environment.Options.DebugLogging)
-                {
-                    environment.Logger.LogInformation(
-                        "[DEBUG] Wire-level APDU (wrapped): {CommandHex}",
-                        Convert.ToHexString(commandBytes)
-                    );
-                    LogApduStructure(environment.Logger, commandBytes, "Wire-level (Secured)");
-                }
-                else if (environment.Options.EnableLogging)
-                {
-                    environment.Logger.LogDebug(
-                        "Using wrapped command: {ByteCount} bytes - {CommandHex}",
-                        commandBytes.Length,
-                        Convert.ToHexString(commandBytes)
-                    );
-                }
-            }
-            else
+        return await commandBytesResult.Match(
+            async commandData =>
             {
-                var commandBytesResult = GetCommandBytes(command);
-                if (commandBytesResult.IsFailure)
+                var (commandBytes, commandToSend) = commandData;
+
+                // Log command details
+                if (command is WrappedApduCommand)
                 {
-                    stopwatch.Stop();
-                    return Result.Failure<CommandResult, SmartCardError>(commandBytesResult.Error);
-                }
-                
-                // Explicit success check for the validator
-                if (commandBytesResult.IsSuccess)
-                {
-                    commandBytes = commandBytesResult.Value;
+                    if (environment.Options.DebugLogging)
+                    {
+                        environment.Logger.LogInformation(
+                            "[DEBUG] Wire-level APDU (wrapped): {CommandHex}",
+                            Convert.ToHexString(commandBytes)
+                        );
+                        LogApduStructure(environment.Logger, commandBytes, "Wire-level (Secured)");
+                    }
+                    else if (environment.Options.EnableLogging)
+                    {
+                        environment.Logger.LogDebug(
+                            "Using wrapped command: {ByteCount} bytes - {CommandHex}",
+                            commandBytes.Length,
+                            Convert.ToHexString(commandBytes)
+                        );
+                    }
                 }
                 else
                 {
-                    // Unreachable due to IsFailure check above, but needed for definite assignment
-                    stopwatch.Stop();
-                    return Result.Failure<CommandResult, SmartCardError>(
-                        SmartCardError.InvalidData("Unexpected result state"));
+                    if (environment.Options.DebugLogging)
+                    {
+                        environment.Logger.LogInformation(
+                            "[DEBUG] Wire-level APDU (unwrapped): {CommandHex}",
+                            Convert.ToHexString(commandBytes)
+                        );
+                        LogApduStructure(environment.Logger, commandBytes, "Wire-level (Plaintext)");
+                    }
+                    else if (environment.Options.EnableLogging)
+                    {
+                        environment.Logger.LogDebug(
+                            "Using unwrapped command: {ByteCount} bytes - {CommandHex}",
+                            commandBytes.Length,
+                            Convert.ToHexString(commandBytes)
+                        );
+                    }
                 }
-                
-                if (environment.Options.DebugLogging)
-                {
-                    environment.Logger.LogInformation(
-                        "[DEBUG] Wire-level APDU (unwrapped): {CommandHex}",
-                        Convert.ToHexString(commandBytes)
-                    );
-                    LogApduStructure(environment.Logger, commandBytes, "Wire-level (Plaintext)");
-                }
-                else if (environment.Options.EnableLogging)
+
+                // Log the actual command being sent
+                if (environment.Options.EnableLogging)
                 {
                     environment.Logger.LogDebug(
-                        "Using unwrapped command: {ByteCount} bytes - {CommandHex}",
-                        commandBytes.Length,
+                        "Transmitting command: {CommandHex}",
                         Convert.ToHexString(commandBytes)
                     );
                 }
-            }
 
-            // Log the actual command being sent
-            if (environment.Options.EnableLogging)
-            {
-                environment.Logger.LogDebug(
-                    "Transmitting command: {CommandHex}",
-                    Convert.ToHexString(commandBytes)
+                // Execute via transport
+                var transmitResult = await environment.Transport.TransmitAsync(
+                    commandToSend,
+                    environment.Channel,
+                    cancellationToken
                 );
-            }
 
-            // Execute via transport
-            var transmitResult = await environment.Transport.TransmitAsync(
-                commandToSend,
-                environment.Channel,
-                cancellationToken
-            );
+                return await transmitResult.Match(
+                    response =>
+                    {
+                        stopwatch.Stop();
 
-            if (transmitResult.IsFailure)
+                        // Combine response bytes for metadata
+                        byte[] responseBytes = CombineResponseBytes(response.Data, response.StatusWord);
+
+                        // Log response details
+                        if (environment.Options.DebugLogging)
+                        {
+                            environment.Logger.LogInformation(
+                                "[DEBUG] Wire-level Response: {ResponseHex} (SW={StatusWord:X4})",
+                                Convert.ToHexString(responseBytes),
+                                response.StatusWord
+                            );
+                            LogResponseStructure(
+                                environment.Logger,
+                                response.Data,
+                                response.StatusWord,
+                                "Wire-level Response"
+                            );
+                        }
+                        else if (environment.Options.VerboseLogging)
+                        {
+                            environment.Logger.LogInformation(
+                                "[VERBOSE] Response: {DataLength} bytes + SW={StatusWord:X4}",
+                                response.Data.Length,
+                                response.StatusWord
+                            );
+                        }
+
+                        var metadata = new CommandMetadata(
+                            ExecutionTime: stopwatch.Elapsed,
+                            TransmittedBytes: commandBytes,
+                            ReceivedBytes: responseBytes
+                        );
+
+                        var transportResult = CommandResult.Success(
+                            response.Data,
+                            response.StatusWord,
+                            environment,
+                            metadata
+                        );
+
+                        // Apply secure channel response unwrapping if needed
+                        if (environment.SecureChannel.HasValue)
+                        {
+                            var unwrapper = CreateSecureChannelResponseUnwrapper(environment);
+                            return Task.FromResult(unwrapper(transportResult));
+                        }
+
+                        return Task.FromResult(
+                            Result.Success<CommandResult, SmartCardError>(transportResult)
+                        );
+                    },
+                    error =>
+                    {
+                        stopwatch.Stop();
+                        return Task.FromResult(Result.Failure<CommandResult, SmartCardError>(error));
+                    }
+                );
+            },
+            error =>
             {
                 stopwatch.Stop();
-                return Result.Failure<CommandResult, SmartCardError>(transmitResult.Error);
+                return Task.FromResult(Result.Failure<CommandResult, SmartCardError>(error));
             }
-
-            ApduResponse response;
-            if (transmitResult.IsSuccess)
-            {
-                response = transmitResult.Value;
-            }
-            else
-            {
-                // This branch should never execute since we checked IsFailure above
-                stopwatch.Stop();
-                return Result.Failure<CommandResult, SmartCardError>(
-                    SmartCardError.InvalidData("Unexpected state in transport result"));
-            }
-
-            stopwatch.Stop();
-
-            // Combine response bytes for metadata
-            byte[] responseBytes = CombineResponseBytes(response.Data, response.StatusWord);
-
-            // Log response details
-            if (environment.Options.DebugLogging)
-            {
-                environment.Logger.LogInformation(
-                    "[DEBUG] Wire-level Response: {ResponseHex} (SW={StatusWord:X4})",
-                    Convert.ToHexString(responseBytes),
-                    response.StatusWord
-                );
-                LogResponseStructure(environment.Logger, response.Data, response.StatusWord, "Wire-level Response");
-            }
-            else if (environment.Options.VerboseLogging)
-            {
-                environment.Logger.LogInformation(
-                    "[VERBOSE] Response: {DataLength} bytes + SW={StatusWord:X4}",
-                    response.Data.Length,
-                    response.StatusWord
-                );
-            }
-
-            var metadata = new CommandMetadata(
-                ExecutionTime: stopwatch.Elapsed,
-                TransmittedBytes: commandBytes,
-                ReceivedBytes: responseBytes
-            );
-
-            var transportResult = CommandResult.Success(
-                response.Data,
-                response.StatusWord,
-                environment,
-                metadata
-            );
-
-            // Apply secure channel response unwrapping if needed
-            if (environment.SecureChannel.HasValue)
-            {
-                var unwrapper =
-                    CreateSecureChannelResponseUnwrapper(environment);
-                return unwrapper(transportResult);
-            }
-
-            return Result.Success<CommandResult, SmartCardError>(transportResult);
+        );
     };
 
     /// <summary>
@@ -402,10 +392,7 @@ public static class CommandProcessors
             byte[] responseBytes = CombineResponseBytes(result.Data, result.StatusWord);
 
             // Unwrap the complete response
-            var unwrapResult = UnwrapSecureChannelResponse(
-                responseBytes,
-                channelState
-            );
+            var unwrapResult = UnwrapSecureChannelResponse(responseBytes, channelState);
 
             return unwrapResult.Match(
                 unwrappedData =>
@@ -648,8 +635,9 @@ public static class CommandProcessors
             )
             .Map(calculatedMac =>
             {
-                // Compare MACs using constant-time comparison
-                return CryptoService.Utils.CompareBytes(calculatedMac, receivedMac);
+                // Compare MACs using constant-time comparison (truncate to 8 bytes)
+                var truncated = calculatedMac[..Constants.Constants.Scp.Scp03.MAC_SIZE];
+                return CryptoService.Utils.CompareBytes(truncated, receivedMac);
             });
     }
 
@@ -778,7 +766,6 @@ public static class CommandProcessors
         return FunctionComposition.ComposeMany(processors);
     }
 
-
     /// <summary>
     /// Gets the byte representation of a command.
     /// </summary>
@@ -806,7 +793,11 @@ public static class CommandProcessors
     {
         if (apduBytes.Length < 4)
         {
-            logger.LogInformation("  {Context}: Invalid APDU length ({Length} bytes)", context, apduBytes.Length);
+            logger.LogInformation(
+                "  {Context}: Invalid APDU length ({Length} bytes)",
+                context,
+                apduBytes.Length
+            );
             return;
         }
 
@@ -828,7 +819,7 @@ public static class CommandProcessors
             {
                 byte lc = apduBytes[4];
                 structure += $" Lc={lc:X2} ({lc} data bytes)";
-                
+
                 if (apduBytes.Length > 5 + lc)
                 {
                     byte le = apduBytes[5 + lc];
@@ -843,10 +834,16 @@ public static class CommandProcessors
     /// <summary>
     /// Logs response structure details for verbose and debug output.
     /// </summary>
-    private static void LogResponseStructure(ILogger logger, byte[] responseData, ushort statusWord, string context)
+    private static void LogResponseStructure(
+        ILogger logger,
+        byte[] responseData,
+        ushort statusWord,
+        string context
+    )
     {
-        string structure = $"  {context}: {responseData.Length} data bytes + Status Word {statusWord:X4}";
-        
+        string structure =
+            $"  {context}: {responseData.Length} data bytes + Status Word {statusWord:X4}";
+
         // Interpret common status words
         string swMeaning = statusWord switch
         {
@@ -860,9 +857,10 @@ public static class CommandProcessors
             0x6B00 => "Wrong Parameters P1-P2",
             0x6D00 => "Instruction Not Supported",
             0x6E00 => "Class Not Supported",
-            _ when (statusWord & 0xFF00) == 0x6100 => $"More Data Available ({statusWord & 0xFF} bytes)",
+            _ when (statusWord & 0xFF00) == 0x6100
+                => $"More Data Available ({statusWord & 0xFF} bytes)",
             _ when (statusWord & 0xFF00) == 0x6C00 => $"Wrong Le ({statusWord & 0xFF} expected)",
-            _ => "Unknown"
+            _ => "Unknown",
         };
 
         structure += $" ({swMeaning})";

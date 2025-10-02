@@ -82,10 +82,9 @@ public sealed record TraceReplayCard : IVirtualCard
     /// </summary>
     /// <param name="command">The APDU command bytes.</param>
     /// <returns>The APDU response and updated card instance, or an error.</returns>
-    public Result<
-        (ApduResponse Response, IVirtualCard UpdatedCard),
-        SmartCardError
-    > ProcessCommand(byte[] command)
+    public Result<(ApduResponse Response, IVirtualCard UpdatedCard), SmartCardError> ProcessCommand(
+        byte[] command
+    )
     {
         return ValidateCommand(command)
             .Bind(cmd =>
@@ -104,13 +103,14 @@ public sealed record TraceReplayCard : IVirtualCard
     /// <returns>A new card instance in reset state.</returns>
     public Result<IVirtualCard, SmartCardError> Reset()
     {
-        TraceReplayCard resetCard = new(
-            _trace,
-            isSelected: false,
-            isSecureChannelEstablished: false,
-            executedExchanges: ImmutableList<ApduExchange>.Empty,
-            nextExchangeIndex: 0
-        );
+        TraceReplayCard resetCard =
+            new(
+                _trace,
+                isSelected: false,
+                isSecureChannelEstablished: false,
+                executedExchanges: ImmutableList<ApduExchange>.Empty,
+                nextExchangeIndex: 0
+            );
 
         return Result.Success<IVirtualCard, SmartCardError>(resetCard);
     }
@@ -245,8 +245,7 @@ public sealed record TraceReplayCard : IVirtualCard
             .Create(command, Maybe.From(response))
             .Map(exchange =>
             {
-                var exchangeBuilder =
-                    _executedExchanges.ToBuilder();
+                var exchangeBuilder = _executedExchanges.ToBuilder();
                 exchangeBuilder.Add(exchange);
                 var newExecutedExchanges = exchangeBuilder.ToImmutable();
 

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using CSharpFunctionalExtensions;
+using Gp4Net.Constants;
 using Gp4Net.Domain.Keys;
 using JetBrains.Annotations;
 using static Gp4Net.Cryptography.CryptoService;
@@ -7,11 +8,33 @@ using static Gp4Net.Cryptography.CryptoService;
 namespace Gp4Net.Domain.Trace;
 
 /// <summary>
+/// Holds master and derived key material for trace validation.
+/// </summary>
+[PublicAPI]
+public record TraceKeyMaterial(
+    IKeySet MasterKeys,
+    IKeySet CurrentKeys,
+    Maybe<KeyDiversificationSpec> Diversification,
+    Maybe<byte[]> LastDiversificationData
+)
+{
+    public TraceKeyMaterial WithCurrentKeys(IKeySet newKeys, byte[] appliedKdd)
+    {
+        var cloned = (byte[])appliedKdd.Clone();
+        return this with
+        {
+            CurrentKeys = newKeys,
+            LastDiversificationData = Maybe<byte[]>.From(cloned)
+        };
+    }
+}
+
+/// <summary>
 /// Immutable state for trace validation, tracking session keys and cryptographic state.
 /// </summary>
 [PublicAPI]
 public record TraceValidationState(
-    IKeySet BaseKeys,
+    TraceKeyMaterial KeyMaterial,
     Maybe<SessionKeys> SessionKeys,
     Maybe<byte[]> CommandIcv,
     Maybe<byte[]> ResponseIcv,
@@ -19,90 +42,110 @@ public record TraceValidationState(
     byte[] CardChallenge,
     byte[] HostChallenge,
     ScpVersion ScpVersion,
-    ImmutableList<ValidationResult> Results
+    ScpImplementation ScpImplementation,
+    byte SecurityLevel,
+    ImmutableList<ValidationResult> Results,
+    Maybe<MacChainingState> MacChainingState,
+    uint EncryptionCounter
 )
 {
     /// <summary>
     /// Creates an initial validation state with base keys.
     /// </summary>
     /// <param name="baseKeys">The master keys for validation.</param>
+    /// <param name="diversification">Optional diversification scheme.</param>
     /// <returns>A new validation state initialized with the base keys.</returns>
-    public static TraceValidationState Create(IKeySet baseKeys) =>
+    public static TraceValidationState Create(
+        IKeySet baseKeys,
+        Maybe<KeyDiversificationSpec> diversification = default
+    ) =>
         new(
-            baseKeys,
+            new TraceKeyMaterial(baseKeys, baseKeys, diversification, Maybe<byte[]>.None),
             Maybe<SessionKeys>.None,
             Maybe<byte[]>.None,
             Maybe<byte[]>.None,
-            new byte[2] { 0x00, 0x00 },
-            new byte[0],
-            new byte[0],
+            [0x00, 0x00],
+            [],
+            [],
             ScpVersion.Scp02,
-            ImmutableList<ValidationResult>.Empty
+            ScpImplementation.Scp02I00,
+            0x00,
+            ImmutableList<ValidationResult>.Empty,
+            Maybe<MacChainingState>.None,
+            0
         );
 
-    /// <summary>
-    /// Updates the state with derived session keys.
-    /// </summary>
-    /// <param name="keys">The session keys to set.</param>
-    /// <returns>A new state with the session keys.</returns>
     public TraceValidationState WithSessionKeys(SessionKeys keys) =>
-        this with { SessionKeys = Maybe<SessionKeys>.From(keys) };
+        this with
+        {
+            SessionKeys = Maybe<SessionKeys>.From(keys)
+        };
 
-    /// <summary>
-    /// Updates the command ICV for MAC chaining.
-    /// </summary>
-    /// <param name="icv">The new command ICV.</param>
-    /// <returns>A new state with the updated command ICV.</returns>
     public TraceValidationState WithCommandIcv(byte[] icv) =>
-        this with { CommandIcv = Maybe<byte[]>.From(icv) };
+        this with
+        {
+            CommandIcv = Maybe<byte[]>.From(icv)
+        };
 
-    /// <summary>
-    /// Updates the response ICV for R-MAC verification.
-    /// </summary>
-    /// <param name="icv">The new response ICV.</param>
-    /// <returns>A new state with the updated response ICV.</returns>
     public TraceValidationState WithResponseIcv(byte[] icv) =>
-        this with { ResponseIcv = Maybe<byte[]>.From(icv) };
+        this with
+        {
+            ResponseIcv = Maybe<byte[]>.From(icv)
+        };
 
-    /// <summary>
-    /// Updates the sequence counter.
-    /// </summary>
-    /// <param name="counter">The new sequence counter.</param>
-    /// <returns>A new state with the updated sequence counter.</returns>
     public TraceValidationState WithSequenceCounter(byte[] counter) =>
-        this with { SequenceCounter = (byte[])counter.Clone() };
+        this with
+        {
+            SequenceCounter = (byte[])counter.Clone()
+        };
 
-    /// <summary>
-    /// Updates the SCP version.
-    /// </summary>
-    /// <param name="version">The SCP version.</param>
-    /// <returns>A new state with the updated version.</returns>
     public TraceValidationState WithScpVersion(ScpVersion version) =>
-        this with { ScpVersion = version };
+        this with
+        {
+            ScpVersion = version
+        };
 
-    /// <summary>
-    /// Updates the card challenge.
-    /// </summary>
-    /// <param name="challenge">The card challenge.</param>
-    /// <returns>A new state with the updated card challenge.</returns>
+    public TraceValidationState WithScpImplementation(ScpImplementation implementation) =>
+        this with
+        {
+            ScpImplementation = implementation
+        };
+
+    public TraceValidationState WithSecurityLevel(byte level) =>
+        this with
+        {
+            SecurityLevel = level
+        };
+
     public TraceValidationState WithCardChallenge(byte[] challenge) =>
-        this with { CardChallenge = (byte[])challenge.Clone() };
+        this with
+        {
+            CardChallenge = (byte[])challenge.Clone()
+        };
 
-    /// <summary>
-    /// Updates the host challenge.
-    /// </summary>
-    /// <param name="challenge">The host challenge.</param>
-    /// <returns>A new state with the updated host challenge.</returns>
     public TraceValidationState WithHostChallenge(byte[] challenge) =>
-        this with { HostChallenge = (byte[])challenge.Clone() };
+        this with
+        {
+            HostChallenge = (byte[])challenge.Clone()
+        };
 
-    /// <summary>
-    /// Adds a validation result to the state.
-    /// </summary>
-    /// <param name="result">The validation result to add.</param>
-    /// <returns>A new state with the added result.</returns>
     public TraceValidationState AddResult(ValidationResult result) =>
-        this with { Results = Results.Add(result) };
+        this with
+        {
+            Results = Results.Add(result)
+        };
+
+    public TraceValidationState WithEncryptionCounter(uint counter) =>
+        this with
+        {
+            EncryptionCounter = counter
+        };
+
+    public TraceValidationState WithKeyMaterial(TraceKeyMaterial material) =>
+        this with
+        {
+            KeyMaterial = material
+        };
 }
 
 /// <summary>
@@ -117,15 +160,16 @@ public record ValidationResult(
     Maybe<string> Error = default
 )
 {
-    /// <summary>
-    /// Creates a successful validation result.
-    /// </summary>
-    public static ValidationResult Success(int exchangeIndex, string validationType, string details) =>
-        new(exchangeIndex, validationType, true, details, Maybe<string>.None);
+    public static ValidationResult Success(
+        int exchangeIndex,
+        string validationType,
+        string details
+    ) => new(exchangeIndex, validationType, true, details, Maybe<string>.None);
 
-    /// <summary>
-    /// Creates a failed validation result.
-    /// </summary>
-    public static ValidationResult Failure(int exchangeIndex, string validationType, string details, string error) =>
-        new(exchangeIndex, validationType, false, details, Maybe<string>.From(error));
+    public static ValidationResult Failure(
+        int exchangeIndex,
+        string validationType,
+        string details,
+        string error
+    ) => new(exchangeIndex, validationType, false, details, Maybe<string>.From(error));
 }

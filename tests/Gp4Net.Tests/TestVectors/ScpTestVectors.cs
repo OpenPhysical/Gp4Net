@@ -196,17 +196,14 @@ public record Scp02CMacTestVector
 [PublicAPI]
 public static class ScpTestVectors
 {
-    private static readonly Lazy<IReadOnlyList<Scp02TestVector>> _scp02Vectors = new(() =>
-        LoadScp02Vectors().AsReadOnly()
-    );
+    private static readonly Lazy<IReadOnlyList<Scp02TestVector>> _scp02Vectors =
+        new(() => LoadScp02Vectors().AsReadOnly());
 
-    private static readonly Lazy<IReadOnlyList<Scp03TestVector>> _scp03Vectors = new(() =>
-        LoadScp03Vectors().AsReadOnly()
-    );
+    private static readonly Lazy<IReadOnlyList<Scp03TestVector>> _scp03Vectors =
+        new(() => LoadScp03Vectors().AsReadOnly());
 
-    private static readonly Lazy<IReadOnlyList<Scp02CMacTestVector>> _scp02CMacVectors = new(() =>
-        LoadScp02CMacVectors().AsReadOnly()
-    );
+    private static readonly Lazy<IReadOnlyList<Scp02CMacTestVector>> _scp02CMacVectors =
+        new(() => LoadScp02CMacVectors().AsReadOnly());
 
     /// <summary>
     /// All SCP02 test vectors from scripts/scp02_test_vectors.json.

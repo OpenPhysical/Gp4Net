@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading;
@@ -10,7 +9,6 @@ using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.CardInfo;
 using Gp4Net.Domain.Commands;
-using Gp4Net.Domain.Keys;
 using Gp4Net.Services;
 using Gp4Net.Services.GlobalPlatform;
 using Gp4Net.Tool.Commands.Common;
@@ -163,8 +161,6 @@ public class InfoCommand : AsyncCommand<InfoCommand.Settings>
         });
     }
 
-
-
     /// <summary>
     /// Gets comprehensive card information using the CardInformationGatherer service.
     /// </summary>
@@ -252,81 +248,83 @@ public class InfoCommand : AsyncCommand<InfoCommand.Settings>
             (acc, row) =>
                 row switch
                 {
-                    CardInfoTableBuilder.SectionHeader { Title: var title } => acc.CurrentRows.Any()
-                        ? new
-                        {
-                            Sections = acc
-                                .Sections.Concat(
-                                    new[] { (acc.CurrentTitle, acc.CurrentRows.ToList()) }
-                                )
-                                .ToList(),
-                            CurrentTitle = title,
-                            CurrentRows = new System.Collections.Generic.List<(
-                                string,
-                                string,
-                                string
-                            )>(),
-                        }
-                        : new
+                    CardInfoTableBuilder.SectionHeader { Title: var title }
+                        => acc.CurrentRows.Any()
+                            ? new
+                            {
+                                Sections = acc
+                                    .Sections.Concat([(acc.CurrentTitle, acc.CurrentRows.ToList())])
+                                    .ToList(),
+                                CurrentTitle = title,
+                                CurrentRows = new System.Collections.Generic.List<(
+                                    string,
+                                    string,
+                                    string
+                                )>(),
+                            }
+                            : new
+                            {
+                                acc.Sections,
+                                CurrentTitle = title,
+                                CurrentRows = new System.Collections.Generic.List<(
+                                    string,
+                                    string,
+                                    string
+                                )>(),
+                            },
+
+                    CardInfoTableBuilder.PropertyRow { Name: var name, Value: var value }
+                        => new
                         {
                             acc.Sections,
-                            CurrentTitle = title,
-                            CurrentRows = new System.Collections.Generic.List<(
-                                string,
-                                string,
-                                string
-                            )>(),
+                            acc.CurrentTitle,
+                            CurrentRows = acc
+                                .CurrentRows.Concat([(name, value, "property")])
+                                .ToList(),
                         },
-
-                    CardInfoTableBuilder.PropertyRow { Name: var name, Value: var value } => new
-                    {
-                        acc.Sections,
-                        acc.CurrentTitle,
-                        CurrentRows = acc
-                            .CurrentRows.Concat(new[] { (name, value, "property") })
-                            .ToList(),
-                    },
 
                     CardInfoTableBuilder.StatusRow
                     {
                         Name: var name,
                         IsAvailable: var available,
                         Details: var details
-                    } => new
-                    {
-                        acc.Sections,
-                        acc.CurrentTitle,
-                        CurrentRows = acc
-                            .CurrentRows.Concat(
-                                new[]
-                                {
-                                    (
-                                        name,
-                                        $"[{(available ? "green" : "dim")}]{details}[/]",
-                                        "status"
-                                    ),
-                                }
-                            )
-                            .ToList(),
-                    },
+                    }
+                        => new
+                        {
+                            acc.Sections,
+                            acc.CurrentTitle,
+                            CurrentRows = acc
+                                .CurrentRows.Concat(
+                                    [
+                                        (
+                                            name,
+                                            $"[{(available ? "green" : "dim")}]{details}[/]",
+                                            "status"
+                                        )
+                                    ]
+                                )
+                                .ToList(),
+                        },
 
-                    CardInfoTableBuilder.ErrorRow { Name: var name, Message: var message } => new
-                    {
-                        acc.Sections,
-                        acc.CurrentTitle,
-                        CurrentRows = acc
-                            .CurrentRows.Concat(new[] { (name, $"[red]{message}[/]", "error") })
-                            .ToList(),
-                    },
+                    CardInfoTableBuilder.ErrorRow { Name: var name, Message: var message }
+                        => new
+                        {
+                            acc.Sections,
+                            acc.CurrentTitle,
+                            CurrentRows = acc
+                                .CurrentRows.Concat([(name, $"[red]{message}[/]", "error")])
+                                .ToList(),
+                        },
 
-                    CardInfoTableBuilder.InfoRow { Message: var message } => new
-                    {
-                        acc.Sections,
-                        acc.CurrentTitle,
-                        CurrentRows = acc
-                            .CurrentRows.Concat(new[] { ("", $"[dim]{message}[/]", "info") })
-                            .ToList(),
-                    },
+                    CardInfoTableBuilder.InfoRow { Message: var message }
+                        => new
+                        {
+                            acc.Sections,
+                            acc.CurrentTitle,
+                            CurrentRows = acc
+                                .CurrentRows.Concat([("", $"[dim]{message}[/]", "info")])
+                                .ToList(),
+                        },
 
                     CardInfoTableBuilder.FourColumnRow
                     {
@@ -334,25 +332,24 @@ public class InfoCommand : AsyncCommand<InfoCommand.Settings>
                         TagDescription: var desc,
                         Value: var val,
                         ValueDescription: var valDesc
-                    } => new
-                    {
-                        acc.Sections,
-                        acc.CurrentTitle,
-                        CurrentRows = acc
-                            .CurrentRows.Concat(
-                                new[] { ($"{tag}|{desc}", $"{val}|{valDesc}", "fourcolumn") }
-                            )
-                            .ToList(),
-                    },
+                    }
+                        => new
+                        {
+                            acc.Sections,
+                            acc.CurrentTitle,
+                            CurrentRows = acc
+                                .CurrentRows.Concat(
+                                    [($"{tag}|{desc}", $"{val}|{valDesc}", "fourcolumn")]
+                                )
+                                .ToList(),
+                        },
 
                     _ => acc,
                 },
             acc =>
             {
                 var finalSections = acc.CurrentRows.Any()
-                    ? acc
-                        .Sections.Concat(new[] { (acc.CurrentTitle, acc.CurrentRows.ToList()) })
-                        .ToList()
+                    ? acc.Sections.Concat([(acc.CurrentTitle, acc.CurrentRows.ToList())]).ToList()
                     : acc.Sections;
                 return finalSections.Select(s => (s.Item1, s.Item2.AsEnumerable()));
             }

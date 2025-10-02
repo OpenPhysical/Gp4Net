@@ -104,9 +104,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
 
     public override string ToString()
     {
-        var items = _values.Select(kvp =>
-            $"{kvp.Key}: {kvp.Value?.GetType().Name ?? "null"}"
-        );
+        var items = _values.Select(kvp => $"{kvp.Key}: {kvp.Value?.GetType().Name ?? "null"}");
         return $"PipelineContext[{string.Join(", ", items)}]";
     }
 

@@ -7,7 +7,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
-using Gp4Net.Core;
 using Gp4Net.Domain;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Services;
@@ -99,8 +98,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
             var ctx = context.WithVerbose(settings.Verbose);
 
             // Determine AIDs to delete
-            var aidsToDelete =
-                await DetermineAidsToDelete(ctx, settings);
+            var aidsToDelete = await DetermineAidsToDelete(ctx, settings);
             if (aidsToDelete.Count == 0)
             {
                 AnsiConsole.MarkupLine("[yellow]No AIDs to delete[/]");
@@ -125,13 +123,11 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
             }
 
             // Connect to card and establish secure channel
-            var connectionResult =
-                await ctx.RequireCardConnection(settings.GetReaderName());
+            var connectionResult = await ctx.RequireCardConnection(settings.GetReaderName());
             return await connectionResult.Match(
                 async connectedCtx =>
                 {
-                    var secureChannelResult =
-                        await connectedCtx.RequireSecureChannel();
+                    var secureChannelResult = await connectedCtx.RequireSecureChannel();
                     return await secureChannelResult.Match(
                         async secureCtx =>
                         {
@@ -271,13 +267,11 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
     > GetInteractiveAids(ICliExecutionContext context, Settings settings)
     {
         // Need to establish secure channel first for GET STATUS
-        var connectionResult =
-            await context.RequireCardConnection(settings.GetReaderName());
+        var connectionResult = await context.RequireCardConnection(settings.GetReaderName());
         return await connectionResult.Match(
             async connectedCtx =>
             {
-                var secureChannelResult =
-                    await connectedCtx.RequireSecureChannel();
+                var secureChannelResult = await connectedCtx.RequireSecureChannel();
                 return await secureChannelResult.Match(
                     async secureCtx =>
                     {
@@ -310,21 +304,20 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
                         }
 
                         // Create multi-selection prompt
-                        var prompt =
-                            new MultiSelectionPrompt<ApplicationInfo>()
-                                .Title("Select applications to delete:")
-                                .PageSize(10)
-                                .MoreChoicesText(
-                                    "[grey](Move up and down to reveal more applications)[/]"
-                                )
-                                .InstructionsText(
-                                    "[grey](Press [blue]<space>[/] to toggle, "
-                                        + "[green]<enter>[/] to accept)[/]"
-                                )
-                                .AddChoices(applications)
-                                .UseConverter(app =>
-                                    $"{Convert.ToHexString(app.Aid)} ({app.Type}) - {app.LifecycleState}"
-                                );
+                        var prompt = new MultiSelectionPrompt<ApplicationInfo>()
+                            .Title("Select applications to delete:")
+                            .PageSize(10)
+                            .MoreChoicesText(
+                                "[grey](Move up and down to reveal more applications)[/]"
+                            )
+                            .InstructionsText(
+                                "[grey](Press [blue]<space>[/] to toggle, "
+                                    + "[green]<enter>[/] to accept)[/]"
+                            )
+                            .AddChoices(applications)
+                            .UseConverter(app =>
+                                $"{Convert.ToHexString(app.Aid)} ({app.Type}) - {app.LifecycleState}"
+                            );
 
                         var selected = AnsiConsole.Prompt(prompt);
 
@@ -441,10 +434,7 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
             .Progress()
             .StartAsync(async ctx =>
             {
-                var task = ctx.AddTask(
-                    "[green]Deleting objects[/]",
-                    maxValue: aidsToDelete.Count
-                );
+                var task = ctx.AddTask("[green]Deleting objects[/]", maxValue: aidsToDelete.Count);
 
                 foreach ((byte[] aid, string description, string _) in aidsToDelete)
                 {
@@ -456,13 +446,12 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
                         Logger.Debug($"  Delete related: {settings.DeleteRelated}");
                     }
 
-                    var result =
-                        await CardManagement.DeleteApplicationAsync(
-                            aid,
-                            settings.DeleteRelated,
-                            (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
-                            CancellationToken.None
-                        );
+                    var result = await CardManagement.DeleteApplicationAsync(
+                        aid,
+                        settings.DeleteRelated,
+                        (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
+                        CancellationToken.None
+                    );
 
                     if (result.IsSuccess)
                     {
@@ -472,7 +461,9 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
                     else
                     {
                         failureCount++;
-                        string errorMessage = ErrorTranslationService.TranslateStatusWord(result.Error);
+                        string errorMessage = ErrorTranslationService.TranslateStatusWord(
+                            result.Error
+                        );
                         AnsiConsole.MarkupLine(
                             $"[red]✗ Failed to delete {description}: {errorMessage}[/]"
                         );
@@ -501,16 +492,14 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
         return failureCount > 0 ? 1 : 0;
     }
 
-
     private static async Task DisplayCardInfo(ICliExecutionContext context)
     {
         try
         {
-            var selectResult =
-                await Discovery.DetectAndSelectIsdAsync(
-                    (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
-                    CancellationToken.None
-                );
+            var selectResult = await Discovery.DetectAndSelectIsdAsync(
+                (command, ct) => context.CardService.ExecuteCommandAsync(command, ct),
+                CancellationToken.None
+            );
             if (selectResult.IsSuccess)
             {
                 var response = selectResult.Value;
@@ -661,6 +650,5 @@ public class DeleteCommand : IPipelineCommand<DeleteCommand.Settings>
         /// </summary>
         [Description("Don't display card information")]
         public bool NoCardInfo { get; set; }
-
     }
 }

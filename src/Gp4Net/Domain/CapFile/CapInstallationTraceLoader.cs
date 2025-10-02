@@ -155,8 +155,7 @@ public static class CapInstallationTraceLoader
             );
         }
 
-        var exchanges =
-            ImmutableArray.CreateBuilder<TraceExchange>();
+        var exchanges = ImmutableArray.CreateBuilder<TraceExchange>();
 
         return exchangesElement
             .EnumerateArray()
@@ -184,17 +183,11 @@ public static class CapInstallationTraceLoader
                     ? indexElement.GetInt32()
                     : 0;
 
-                string command = exchangeElement.TryGetProperty(
-                    "command",
-                    out var cmdElement
-                )
+                string command = exchangeElement.TryGetProperty("command", out var cmdElement)
                     ? cmdElement.GetString() ?? ""
                     : "";
 
-                string response = exchangeElement.TryGetProperty(
-                    "response",
-                    out var respElement
-                )
+                string response = exchangeElement.TryGetProperty("response", out var respElement)
                     ? respElement.GetString() ?? ""
                     : "";
 

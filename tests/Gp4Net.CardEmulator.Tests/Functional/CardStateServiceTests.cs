@@ -1,16 +1,16 @@
 using System;
 using System.Collections.Immutable;
+using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.CardEmulator.Functional;
 using Gp4Net.Constants;
 using Gp4Net.Core;
+using Gp4Net.Cryptography;
 using Gp4Net.Domain;
 using Gp4Net.Domain.Keys;
-using Gp4Net.Cryptography;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
-using AwesomeAssertions;
 using static Gp4Net.Constants.Constants.GlobalPlatform;
 using ScpVersion = Gp4Net.Cryptography.CryptoService.ScpVersion;
 
@@ -78,10 +78,12 @@ public class CardStateServiceTests
         var rngContext = new TestRngContext();
 
         var result = initialStateResult.Bind(initialState =>
-            selectCommandResult
-                .Bind(selectCommand =>
-                    configResult.Bind(config =>
-                        _stateService.ApplyCommand(initialState, selectCommand, config, rngContext))));
+            selectCommandResult.Bind(selectCommand =>
+                configResult.Bind(config =>
+                    _stateService.ApplyCommand(initialState, selectCommand, config, rngContext)
+                )
+            )
+        );
 
         _ = result.IsSuccess.Should().BeTrue();
         if (result.IsFailure)
@@ -113,10 +115,12 @@ public class CardStateServiceTests
         var rngContext = new TestRngContext();
 
         var result = initialStateResult.Bind(initialState =>
-            invalidCommandResult
-                .Bind(invalidCommand =>
-                    configResult.Bind(config =>
-                        _stateService.ApplyCommand(initialState, invalidCommand, config, rngContext))));
+            invalidCommandResult.Bind(invalidCommand =>
+                configResult.Bind(config =>
+                    _stateService.ApplyCommand(initialState, invalidCommand, config, rngContext)
+                )
+            )
+        );
 
         result.IsFailure.Should().BeTrue();
     }
@@ -249,22 +253,26 @@ public class CardStateServiceTests
 
         var result = initialStateResult.Bind(initialState =>
             secureChannelStateResult.Bind(secureChannelState =>
-                _stateService.UpdateSecureChannel(initialState, secureChannelState)));
+                _stateService.UpdateSecureChannel(initialState, secureChannelState)
+            )
+        );
 
         result.IsSuccess.Should().BeTrue();
         result.Match(
-            newState => initialStateResult.Match(
-                originalState =>
-                {
-                    Assert.That(newState, Is.Not.EqualTo(originalState));
-                    newState.IsSecureChannelEstablished.Should().BeTrue();
-                    secureChannelStateResult.Match(
-                        scState => newState.SecurityLevel.Should().Be((byte)scState.SecurityLevel),
-                        error => Assert.Fail($"Expected valid secure channel state: {error}")
-                    );
-                },
-                error => Assert.Fail($"Expected valid initial state: {error}")
-            ),
+            newState =>
+                initialStateResult.Match(
+                    originalState =>
+                    {
+                        Assert.That(newState, Is.Not.EqualTo(originalState));
+                        newState.IsSecureChannelEstablished.Should().BeTrue();
+                        secureChannelStateResult.Match(
+                            scState =>
+                                newState.SecurityLevel.Should().Be((byte)scState.SecurityLevel),
+                            error => Assert.Fail($"Expected valid secure channel state: {error}")
+                        );
+                    },
+                    error => Assert.Fail($"Expected valid initial state: {error}")
+                ),
             error => Assert.Fail($"Expected success but got error: {error}")
         );
     }
@@ -277,7 +285,9 @@ public class CardStateServiceTests
 
         var result = initialStateResult.Bind(initialState =>
             invalidSecureChannelStateResult.Bind(invalidSecureChannelState =>
-                _stateService.UpdateSecureChannel(initialState, invalidSecureChannelState)));
+                _stateService.UpdateSecureChannel(initialState, invalidSecureChannelState)
+            )
+        );
 
         result.IsFailure.Should().BeTrue();
         result.Match(
@@ -373,7 +383,8 @@ public class CardStateServiceTests
                 result.IsFailure.Should().BeTrue();
                 result.Match(
                     _ => Assert.Fail("Expected failure"),
-                    error => error.Message.Should().Contain("Sequence counters must be 2 or 3 bytes")
+                    error =>
+                        error.Message.Should().Contain("Sequence counters must be 2 or 3 bytes")
                 );
             },
             error => Assert.Fail($"Expected state with invalid counters: {error}")
@@ -418,13 +429,17 @@ public class CardStateServiceTests
     private Result<CardState, SmartCardError> CreateStateWithoutSelectedApplication()
     {
         return CreateValidInitialState()
-            .Map(state => state with
-            {
-                ApplicationRegistry = state.ApplicationRegistry.Map(registry => registry with
+            .Map(state =>
+                state with
                 {
-                    SelectedApplicationAid = Maybe<ImmutableArray<byte>>.None
-                })
-            });
+                    ApplicationRegistry = state.ApplicationRegistry.Map(registry =>
+                        registry with
+                        {
+                            SelectedApplicationAid = Maybe<ImmutableArray<byte>>.None,
+                        }
+                    ),
+                }
+            );
     }
 
     private Result<CardState, SmartCardError> CreateStateWithKnownApplication()
@@ -435,8 +450,12 @@ public class CardStateServiceTests
     private Result<CardState, SmartCardError> CreateStateWithSecureChannel()
     {
         return CreateValidInitialState()
-            .Bind(state => CreateTestSecureChannelState()
-                .Bind(secureChannelState => _stateService.UpdateSecureChannel(state, secureChannelState)));
+            .Bind(state =>
+                CreateTestSecureChannelState()
+                    .Bind(secureChannelState =>
+                        _stateService.UpdateSecureChannel(state, secureChannelState)
+                    )
+            );
     }
 
     private Result<CardState, SmartCardError> CreateStateWithInvalidUuid()
@@ -463,7 +482,7 @@ public class CardStateServiceTests
 
     private ImmutableArray<byte> GetKnownApplicationAid()
     {
-        return new byte[] { 0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00 }.ToImmutableArray(); // ISD AID
+        return [.. new byte[] { 0xA0, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00 }]; // ISD AID
     }
 
     private Result<ApduCommand, SmartCardError> CreateSelectCommand()
@@ -478,53 +497,63 @@ public class CardStateServiceTests
         return ApduCommand.Create(invalidBytes);
     }
 
-
-
     private Result<SecureChannelState, SmartCardError> CreateTestSecureChannelState()
     {
-        return SessionKeys.Create(
-                sEnc: new byte[16],
-                sMac: new byte[16],
-                sRMac: new byte[16],
-                dek: new byte[16]
-            )
-            .Bind(sessionKeys => SecureChannelState.Create(
-                sessionKeys: sessionKeys,
-                securityLevel: SecurityLevel.CMac | SecurityLevel.CEncryption,
-                protocolVersion: ScpVersion.Scp02,
-                initialMacChainingValue: new byte[8],
-                implementationParameter: 0x15
-            ));
+        return SessionKeys
+            .Create(sEnc: new byte[16], sMac: new byte[16], sRMac: new byte[16], dek: new byte[16])
+            .Bind(sessionKeys =>
+                SecureChannelState.Create(
+                    sessionKeys: sessionKeys,
+                    securityLevel: SecurityLevel.CMac | SecurityLevel.CEncryption,
+                    protocolVersion: ScpVersion.Scp02,
+                    initialMacChainingValue: new byte[8],
+                    implementationParameter: 0x15
+                )
+            );
     }
 
     private Result<SecureChannelState, SmartCardError> CreateInvalidSecureChannelState()
     {
-        return SessionKeys.Create(
+        return SessionKeys
+            .Create(
                 sEnc: new byte[8], // Invalid length
                 sMac: new byte[8], // Invalid length
                 sRMac: new byte[8], // Invalid length
                 dek: new byte[8] // Invalid length
             )
-            .Bind(invalidSessionKeys => SecureChannelState.Create(
-                sessionKeys: invalidSessionKeys,
-                securityLevel: SecurityLevel.CMac,
-                protocolVersion: ScpVersion.Scp02,
-                initialMacChainingValue: new byte[8],
-                implementationParameter: 0x15
-            ));
+            .Bind(invalidSessionKeys =>
+                SecureChannelState.Create(
+                    sessionKeys: invalidSessionKeys,
+                    securityLevel: SecurityLevel.CMac,
+                    protocolVersion: ScpVersion.Scp02,
+                    initialMacChainingValue: new byte[8],
+                    implementationParameter: 0x15
+                )
+            );
     }
 
     private class TestLogger : ILogger
     {
         public IDisposable BeginScope<TState>(TState state) => null!;
+
         public bool IsEnabled(LogLevel logLevel) => true;
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter) { }
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception exception,
+            Func<TState, Exception, string> formatter
+        ) { }
     }
 
     private class TestRngContext : IRngContext
     {
-        public Result<byte[], SmartCardError> GenerateBytes(int length) => Result.Success<byte[], SmartCardError>(new byte[length]);
+        public Result<byte[], SmartCardError> GenerateBytes(int length) =>
+            Result.Success<byte[], SmartCardError>(new byte[length]);
+
         public bool HasEnoughEntropy(int requiredBytes) => true;
+
         public Maybe<int> RemainingEntropy => Maybe<int>.None;
     }
 

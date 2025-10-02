@@ -215,36 +215,40 @@ public static class Commands
     {
         return installType switch
         {
-            InstallType.ForLoad => InstallCommand
-                .InstallForLoadCommand.Create(
-                    packageAid,
-                    null, // maxDataBlockSize
-                    null, // securityDomainAid
-                    null, // hash
-                    installParameters.GetValueOrDefault([])
-                )
-                .Map(cmd => (InstallCommand)cmd),
-            InstallType.ForInstall => InstallCommand
-                .InstallForInstallCommand.Create(
-                    packageAid,
-                    instanceAid.GetValueOrDefault(packageAid), // moduleAid
-                    appletAid.GetValueOrDefault(packageAid), // applicationAid
-                    privileges.GetValueOrDefault([0x00]),
-                    installParameters.GetValueOrDefault([])
-                )
-                .Map(cmd => (InstallCommand)cmd),
-            InstallType.ForInstallAndMakeSelectable => InstallCommand
-                .InstallForInstallCommand.CreateAndMakeSelectable(
-                    packageAid,
-                    instanceAid.GetValueOrDefault(packageAid), // moduleAid
-                    appletAid.GetValueOrDefault(packageAid), // applicationAid
-                    privileges.GetValueOrDefault([0x00]),
-                    installParameters.GetValueOrDefault([])
-                )
-                .Map(cmd => (InstallCommand)cmd),
-            _ => Result.Failure<InstallCommand, SmartCardError>(
-                SmartCardError.InvalidArgument($"Unsupported install type: {installType}")
-            ),
+            InstallType.ForLoad
+                => InstallCommand
+                    .InstallForLoadCommand.Create(
+                        packageAid,
+                        null, // maxDataBlockSize
+                        null, // securityDomainAid
+                        null, // hash
+                        installParameters.GetValueOrDefault([])
+                    )
+                    .Map(cmd => (InstallCommand)cmd),
+            InstallType.ForInstall
+                => InstallCommand
+                    .InstallForInstallCommand.Create(
+                        packageAid,
+                        instanceAid.GetValueOrDefault(packageAid), // moduleAid
+                        appletAid.GetValueOrDefault(packageAid), // applicationAid
+                        privileges.GetValueOrDefault([0x00]),
+                        installParameters.GetValueOrDefault([])
+                    )
+                    .Map(cmd => (InstallCommand)cmd),
+            InstallType.ForInstallAndMakeSelectable
+                => InstallCommand
+                    .InstallForInstallCommand.CreateAndMakeSelectable(
+                        packageAid,
+                        instanceAid.GetValueOrDefault(packageAid), // moduleAid
+                        appletAid.GetValueOrDefault(packageAid), // applicationAid
+                        privileges.GetValueOrDefault([0x00]),
+                        installParameters.GetValueOrDefault([])
+                    )
+                    .Map(cmd => (InstallCommand)cmd),
+            _
+                => Result.Failure<InstallCommand, SmartCardError>(
+                    SmartCardError.InvalidArgument($"Unsupported install type: {installType}")
+                ),
         };
     }
 }

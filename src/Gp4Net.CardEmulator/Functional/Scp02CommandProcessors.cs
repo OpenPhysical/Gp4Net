@@ -45,9 +45,7 @@ public static class Scp02CommandProcessors
         );
 
         logging.LogDebug("About to parse INITIALIZE UPDATE command");
-        var result = ParseInitializeUpdateCommand(
-                command
-            )
+        var result = ParseInitializeUpdateCommand(command)
             .TapError(error => logging.LogError("Failed to parse command: {Error}", error.Message))
             .Tap(_ => logging.LogDebug("Command parsed successfully"))
             .Tap(request =>
@@ -159,7 +157,6 @@ public static class Scp02CommandProcessors
 
     // Helper methods and data structures
 
-
     private record Scp02ChallengeData(
         CommandRequests.InitializeUpdateRequest Request,
         byte[] CardChallenge,
@@ -175,7 +172,6 @@ public static class Scp02CommandProcessors
         byte[] CardCryptogram,
         IKeySet Keys
     );
-
 
     private static Result<InitializeUpdateRequest, SmartCardError> ParseInitializeUpdateCommand(
         byte[] command
@@ -265,6 +261,14 @@ public static class Scp02CommandProcessors
             Convert.ToHexString(sequenceCounter)
         );
 
+        if (!rngContext.HasEnoughEntropy(16))
+        {
+            logger.LogError("Insufficient entropy available for SCP02 card challenge generation");
+            return Result.Failure<Scp02ChallengeData, SmartCardError>(
+                SmartCardError.SecurityError("Insufficient entropy for card challenge")
+            );
+        }
+
         // SCP02 card challenge is 6 random bytes (sequence counter is separate)
         logger.LogDebug("Calling rngContext.GenerateBytes(6)");
         var challengeResult = rngContext.GenerateBytes(6);
@@ -276,11 +280,7 @@ public static class Scp02CommandProcessors
                     "Generated card challenge: {Challenge}",
                     Convert.ToHexString(cardChallenge)
                 );
-                var result = new Scp02ChallengeData(
-                    request,
-                    cardChallenge,
-                    sequenceCounter
-                );
+                var result = new Scp02ChallengeData(request, cardChallenge, sequenceCounter);
                 logger.LogDebug("=== GenerateScp02CardChallenge completed successfully ===");
                 return Result.Success<Scp02ChallengeData, SmartCardError>(result);
             },
@@ -390,15 +390,14 @@ public static class Scp02CommandProcessors
 
         // Calculate card cryptogram using unified crypto service
         // Per GP Card Spec v2.3.1 Section E.4.2
-        var cryptogramResult =
-            CryptoService.Cryptogram.CalculateCardCryptogram(
-                data.Request.HostChallenge,
-                data.CardChallenge,
-                keys,
-                0x02,
-                (byte)state.ScpImplementation,
-                Maybe<byte[]>.From(data.SequenceCounter)
-            );
+        var cryptogramResult = CryptoService.Cryptogram.CalculateCardCryptogram(
+            data.Request.HostChallenge,
+            data.CardChallenge,
+            keys,
+            0x02,
+            (byte)state.ScpImplementation,
+            Maybe<byte[]>.From(data.SequenceCounter)
+        );
 
         return cryptogramResult.Match(
             cryptogram =>
@@ -506,10 +505,7 @@ public static class Scp02CommandProcessors
         );
         logger.LogDebug("=== CreateScp02InitializeUpdateResponse completed ===");
         logger.LogDebug("Returning SCP02 response with SW 9000");
-        return (
-            new ApduResponse(response, StatusWords.Success),
-            newState
-        );
+        return (new ApduResponse(response, StatusWords.Success), newState);
     }
 
     private static Result<
@@ -843,15 +839,13 @@ public static class Scp02CommandProcessors
     {
         // Create functional secure channel state for SCP02
         var securityLevel = (SecurityLevel)0x01; // Basic C-MAC
-        var secureChannelStateResult =
-            SecureChannelState.Create(
-                sessionKeys: sessionKeys,
-                securityLevel: securityLevel,
-                protocolVersion: (CryptoService.ScpVersion)
-                    GlobalPlatform.Protocols.SCP02,
-                initialMacChainingValue: new byte[8], // Initialize with zeros for SCP02
-                implementationParameter: (byte)state.ScpImplementation
-            );
+        var secureChannelStateResult = SecureChannelState.Create(
+            sessionKeys: sessionKeys,
+            securityLevel: securityLevel,
+            protocolVersion: (CryptoService.ScpVersion)GlobalPlatform.Protocols.SCP02,
+            initialMacChainingValue: new byte[8], // Initialize with zeros for SCP02
+            implementationParameter: (byte)state.ScpImplementation
+        );
 
         return secureChannelStateResult.Match(
             secureChannelState =>
@@ -863,19 +857,11 @@ public static class Scp02CommandProcessors
                     .WithSessionKeys(sessionKeys); // Store session keys for pipeline integration
 
                 // SCP02 EXTERNAL AUTHENTICATE response is typically empty on success
-                return (
-                    new ApduResponse([], StatusWords.Success),
-                    newState
-                );
+                return (new ApduResponse([], StatusWords.Success), newState);
             },
             error =>
                 (
-                    new ApduResponse(
-                        [],
-                        StatusWords
-                            .CheckingErrors
-                            .AuthenticationMethodBlocked
-                    ),
+                    new ApduResponse([], StatusWords.CheckingErrors.AuthenticationMethodBlocked),
                     state
                 )
         );

@@ -127,10 +127,7 @@ public static class IseImporter
         foreach (var entry in entries)
         {
             string keyId = GenerateKeyId(entry);
-            var addResult = currentStore.AddKey(
-                keyId,
-                entry.KeyValue
-            );
+            var addResult = currentStore.AddKey(keyId, entry.KeyValue);
 
             if (addResult.IsFailure)
             {
@@ -181,10 +178,7 @@ public static class IseImporter
         foreach (var keyType in keyTypes)
         {
             string keyId = $"{keySetName}_{protocol}_{keyType}_{keyVersion:X2}";
-            var addResult = currentStore.AddKey(
-                keyId,
-                GpTestKeys.GpTestKey
-            );
+            var addResult = currentStore.AddKey(keyId, GpTestKeys.GpTestKey);
 
             if (addResult.IsFailure)
             {
@@ -439,9 +433,10 @@ public static class IseImporter
             "MAC" or "MACKEY" or "MAC_KEY" => Result.Success<KeyType, SmartCardError>(KeyType.Mac),
             "DEK" or "DEKKEY" or "DEK_KEY" => Result.Success<KeyType, SmartCardError>(KeyType.Dek),
             "KEK" or "KEKKEY" or "KEK_KEY" => Result.Success<KeyType, SmartCardError>(KeyType.Kek),
-            _ => Result.Failure<KeyType, SmartCardError>(
-                SmartCardError.InvalidArgument($"Unknown key type: {keyName}")
-            ),
+            _
+                => Result.Failure<KeyType, SmartCardError>(
+                    SmartCardError.InvalidArgument($"Unknown key type: {keyName}")
+                ),
         };
     }
 

@@ -151,9 +151,10 @@ public static class SecureChannelOperations
         return keysetName switch
         {
             "gp_test_keys" => GpTestKeys.CreateRawTestKeyset(keyVersion),
-            _ => Result.Failure<RawKeyset, SmartCardError>(
-                SmartCardError.InvalidArgument($"Unknown keyset: {keysetName}")
-            ),
+            _
+                => Result.Failure<RawKeyset, SmartCardError>(
+                    SmartCardError.InvalidArgument($"Unknown keyset: {keysetName}")
+                ),
         };
     }
 }

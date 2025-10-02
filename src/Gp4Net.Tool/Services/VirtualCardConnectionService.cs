@@ -119,9 +119,9 @@ public static class VirtualCardConnectionService
                     Options: new CommandOptions(
                         UseSecureChannel: false,
                         CaptureMetrics: true,
-                        EnableLogging: true,     // Enable logging infrastructure
-                        VerboseLogging: false,   // CLI will override if --verbose
-                        DebugLogging: false      // CLI will override if --debug
+                        EnableLogging: true, // Enable logging infrastructure
+                        VerboseLogging: false, // CLI will override if --verbose
+                        DebugLogging: false // CLI will override if --debug
                     )
                 );
 

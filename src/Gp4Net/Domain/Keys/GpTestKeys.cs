@@ -38,27 +38,30 @@ public static partial class GpTestKeys
     {
         return protocolVersion switch
         {
-            0x02 => Scp02KeySet
-                .Create(
-                    (byte[])GpTestKey.Clone(),
-                    (byte[])GpTestKey.Clone(),
-                    (byte[])GpTestKey.Clone(),
-                    keyVersion
-                )
-                .Map(ks => (IKeySet)ks),
-            0x03 => Scp03KeySet
-                .Create(
-                    (byte[])GpTestKey.Clone(),
-                    (byte[])GpTestKey.Clone(),
-                    (byte[])GpTestKey.Clone(),
-                    keyVersion
-                )
-                .Map(ks => (IKeySet)ks),
-            _ => Result.Failure<IKeySet, SmartCardError>(
-                SmartCardError.InvalidArgument(
-                    $"Unsupported protocol version: {protocolVersion:X2}"
-                )
-            ),
+            0x02
+                => Scp02KeySet
+                    .Create(
+                        (byte[])GpTestKey.Clone(),
+                        (byte[])GpTestKey.Clone(),
+                        (byte[])GpTestKey.Clone(),
+                        keyVersion
+                    )
+                    .Map(ks => (IKeySet)ks),
+            0x03
+                => Scp03KeySet
+                    .Create(
+                        (byte[])GpTestKey.Clone(),
+                        (byte[])GpTestKey.Clone(),
+                        (byte[])GpTestKey.Clone(),
+                        keyVersion
+                    )
+                    .Map(ks => (IKeySet)ks),
+            _
+                => Result.Failure<IKeySet, SmartCardError>(
+                    SmartCardError.InvalidArgument(
+                        $"Unsupported protocol version: {protocolVersion:X2}"
+                    )
+                ),
         };
     }
 
@@ -76,25 +79,30 @@ public static partial class GpTestKeys
     {
         return protocolVersion switch
         {
-            ScpVersion.Scp02 => Scp02KeySet
-                .Create(
-                    (byte[])GpTestKey.Clone(),
-                    (byte[])GpTestKey.Clone(),
-                    (byte[])GpTestKey.Clone(),
-                    keyVersion
-                )
-                .Map(ks => (IKeySet)ks),
-            ScpVersion.Scp03 => Scp03KeySet
-                .Create(
-                    (byte[])GpTestKey.Clone(),
-                    (byte[])GpTestKey.Clone(),
-                    (byte[])GpTestKey.Clone(),
-                    keyVersion
-                )
-                .Map(ks => (IKeySet)ks),
-            _ => Result.Failure<IKeySet, SmartCardError>(
-                SmartCardError.InvalidArgument($"Unsupported protocol version: {protocolVersion}")
-            ),
+            ScpVersion.Scp02
+                => Scp02KeySet
+                    .Create(
+                        (byte[])GpTestKey.Clone(),
+                        (byte[])GpTestKey.Clone(),
+                        (byte[])GpTestKey.Clone(),
+                        keyVersion
+                    )
+                    .Map(ks => (IKeySet)ks),
+            ScpVersion.Scp03
+                => Scp03KeySet
+                    .Create(
+                        (byte[])GpTestKey.Clone(),
+                        (byte[])GpTestKey.Clone(),
+                        (byte[])GpTestKey.Clone(),
+                        keyVersion
+                    )
+                    .Map(ks => (IKeySet)ks),
+            _
+                => Result.Failure<IKeySet, SmartCardError>(
+                    SmartCardError.InvalidArgument(
+                        $"Unsupported protocol version: {protocolVersion}"
+                    )
+                ),
         };
     }
 

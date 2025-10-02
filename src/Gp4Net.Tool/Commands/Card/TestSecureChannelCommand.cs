@@ -16,7 +16,6 @@ using Gp4Net.Transport;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Spectre.Console.Cli;
-using WSCT.Wrapper;
 
 namespace Gp4Net.Tool.Commands.Card;
 

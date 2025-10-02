@@ -159,9 +159,7 @@ public class CardCapabilitiesTests
 
         // Assert
         _ = capabilities.CipherSuites.ContainsKey(CipherUsage.DapVerification).Should().BeTrue();
-        var ciphers = capabilities.CipherSuites[
-            CipherUsage.DapVerification
-        ];
+        var ciphers = capabilities.CipherSuites[CipherUsage.DapVerification];
         _ = ciphers.Should().Contain(CipherSuite.Des3Mac);
         _ = ciphers.Should().Contain(CipherSuite.AesCmac128);
     }

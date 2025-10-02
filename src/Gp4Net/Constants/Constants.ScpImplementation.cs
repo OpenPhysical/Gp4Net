@@ -353,7 +353,8 @@ public static class ScpImplementationExtensions
             0x10 => 128, // SCP03 AES-128
             0x20 => 192, // SCP03 AES-192
             0x30 => 256, // SCP03 AES-256
-            0x70 => 128, // SCP03 pseudo-random uses AES-128
+            0x60 => 128, // SCP03 AES-128 with random challenge
+            0x70 => 128, // SCP03 AES-128 with pseudo-random challenge
             _ => 0, // Not an SCP03 implementation
         };
     }

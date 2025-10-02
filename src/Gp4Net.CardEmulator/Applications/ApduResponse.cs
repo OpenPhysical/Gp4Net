@@ -63,6 +63,14 @@ public sealed record ApduResponse
     }
 
     /// <summary>
+    /// Creates a response with explicit data and status word.
+    /// </summary>
+    public static ApduResponse From(byte[] data, StatusWord statusWord)
+    {
+        return new ApduResponse([.. data], statusWord);
+    }
+
+    /// <summary>
     /// Creates an error response for wrong length.
     /// </summary>
     public static ApduResponse WrongLength()

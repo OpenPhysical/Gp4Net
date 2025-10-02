@@ -44,17 +44,18 @@ public class ApduTransportFactory : IApduTransportFactory
     {
         return protocol switch
         {
-            TransportProtocol.T0 => new T0ApduTransport(
-                _loggerFactory.CreateLogger<T0ApduTransport>()
-            ),
-            TransportProtocol.T1 => new T1ApduTransport(
-                _loggerFactory.CreateLogger<T1ApduTransport>(),
-                supportsExtendedLength
-            ),
-            TransportProtocol.Tcl => new ClApduTransport(
-                _loggerFactory.CreateLogger<ClApduTransport>(),
-                _loggerFactory.CreateLogger<T1ApduTransport>()
-            ),
+            TransportProtocol.T0
+                => new T0ApduTransport(_loggerFactory.CreateLogger<T0ApduTransport>()),
+            TransportProtocol.T1
+                => new T1ApduTransport(
+                    _loggerFactory.CreateLogger<T1ApduTransport>(),
+                    supportsExtendedLength
+                ),
+            TransportProtocol.Tcl
+                => new ClApduTransport(
+                    _loggerFactory.CreateLogger<ClApduTransport>(),
+                    _loggerFactory.CreateLogger<T1ApduTransport>()
+                ),
             _ => throw new NotSupportedException($"Transport protocol {protocol} is not supported"),
         };
     }

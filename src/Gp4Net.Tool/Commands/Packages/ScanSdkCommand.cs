@@ -35,9 +35,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
                 $"[cyan]Scanning Oracle Java Card SDKs at: {Markup.Escape(settings.SdkPath)}[/]"
             );
 
-            var mappings = await ScanForPackageMappingsAsync(
-                settings.SdkPath
-            );
+            var mappings = await ScanForPackageMappingsAsync(settings.SdkPath);
 
             AnsiConsole.MarkupLine($"[green]Found {mappings.Count} package mappings[/]");
 
@@ -401,11 +399,7 @@ public class ScanSdkCommand : AsyncCommand<ScanSdkCommand.Settings>
             .AddColumn("SDK Version")
             .AddColumn("Source File");
 
-        foreach (
-            var mapping in mappings
-                .OrderBy(m => m.Value.SdkVersion)
-                .ThenBy(m => m.Value.Name)
-        )
+        foreach (var mapping in mappings.OrderBy(m => m.Value.SdkVersion).ThenBy(m => m.Value.Name))
         {
             _ = table.AddRow(
                 $"[dim]{mapping.Key}[/]",

@@ -31,7 +31,8 @@ public static class VirtualCardTestExtensions
     /// </summary>
     public static (ApduResponse Response, IVirtualCard UpdatedCard) ExecuteCommandWithCard(
         this IVirtualCard card,
-        byte[] command)
+        byte[] command
+    )
     {
         var result = card.ProcessCommand(command);
         return result.Match(
@@ -49,7 +50,8 @@ public static class VirtualCardTestExtensions
     /// </summary>
     public static void AssertCommandSucceeds(
         this Result<(ApduResponse Response, IVirtualCard UpdatedCard), SmartCardError> result,
-        System.Action<ApduResponse> assertions)
+        System.Action<ApduResponse> assertions
+    )
     {
         result.Match(
             success =>

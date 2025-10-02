@@ -36,7 +36,7 @@ public static class CommandProcessors
             state.IsSelected
         );
 
-        Result<(ApduResponse, CardState), SmartCardError> result = ParseSelectCommand(command)
+        return ParseSelectCommand(command)
             .Bind(aid =>
             {
                 logging.LogDebug("Virtual card SELECT parsed AID: {Aid}", Convert.ToHexString(aid));
@@ -48,14 +48,8 @@ public static class CommandProcessors
                 var newState = state.WithSelected();
                 logging.LogDebug("Virtual card SELECT success, setting IsSelected to true");
                 return (response, newState);
-            });
-
-        if (result.IsFailure)
-        {
-            logging.LogDebug("Virtual card SELECT failed: {Error}", result.Error.Message);
-        }
-
-        return result;
+            })
+            .TapError(error => logging.LogDebug("Virtual card SELECT failed: {Error}", error.Message));
     }
 
     /// <summary>
@@ -186,10 +180,7 @@ public static class CommandProcessors
             .Bind(tag => ValidateGetDataAccess(tag, state))
             .Bind(tag => RetrieveDataObject(tag, state, config))
             .Map(data =>
-                (
-                    new ApduResponse(data, Gp4Net.Constants.Constants.StatusWords.Success),
-                    state
-                )
+                (new ApduResponse(data, Gp4Net.Constants.Constants.StatusWords.Success), state)
             );
     }
 
@@ -208,10 +199,7 @@ public static class CommandProcessors
             .Bind(request => ValidateGetStatusAccess(request, state))
             .Bind(request => RetrieveStatusData(request, state, config))
             .Map(data =>
-                (
-                    new ApduResponse(data, Gp4Net.Constants.Constants.StatusWords.Success),
-                    state
-                )
+                (new ApduResponse(data, Gp4Net.Constants.Constants.StatusWords.Success), state)
             );
     }
 
@@ -322,7 +310,7 @@ public static class CommandProcessors
         fciData[offset++] = 0x01;
         fciData[offset++] = 0x00; // Maximum length of data field in command message
 
-    return new ApduResponse(fciData, Gp4Net.Constants.Constants.StatusWords.Success);
+        return new ApduResponse(fciData, Gp4Net.Constants.Constants.StatusWords.Success);
     }
 
     private static Result<InitializeUpdateRequest, SmartCardError> ParseInitializeUpdateCommand(
@@ -384,6 +372,13 @@ public static class CommandProcessors
         IRngContext rngContext
     )
     {
+        if (!rngContext.HasEnoughEntropy(16))
+        {
+            return Result.Failure<(InitializeUpdateRequest, byte[]), SmartCardError>(
+                SmartCardError.SecurityError("Insufficient entropy for card challenge")
+            );
+        }
+
         switch (state.ScpVersion)
         {
             // Check if pseudo-random challenge generation is required (SCP03 i=70)
@@ -394,7 +389,8 @@ public static class CommandProcessors
             {
                 // SCP02: Generate 6-byte random challenge and combine with 2-byte sequence counter
                 byte[] sequenceCounter = state.GetSequenceCounter(request.KeyVersion);
-                return Rng.GenerateBytes(6)
+                return rngContext
+                    .GenerateBytes(6)
                     .Map(randomChallenge =>
                     {
                         // Combine sequence counter + random challenge for 8-byte total
@@ -421,11 +417,11 @@ public static class CommandProcessors
     )
     {
         // Get the keyset for the requested key version
-        var keySet =
-            state.InstalledKeys.TryGetValue(request.KeyVersion, out var keys) ? keys
+        var keySet = state.InstalledKeys.TryGetValue(request.KeyVersion, out var keys)
+            ? keys
             : config.StaticKeys.TryGetValue(request.KeyVersion, out var staticKeys)
                 ? staticKeys
-            : config.StaticKeys.Values.FirstOrDefault();
+                : config.StaticKeys.Values.FirstOrDefault();
 
         if (keySet is not Scp03KeySet scp03Keys)
         {
@@ -440,11 +436,12 @@ public static class CommandProcessors
         // Use the ISD AID for challenge generation
         byte[] aid = config.IsdAid;
 
-        // SCP03 pseudo-random generation using AES encryption
-        // Per GP SCP03 Amendment D: Use AES encryption with sequence counter and AID for predictable challenges
-        byte[] input = sequenceCounter.Concat(aid).ToArray();
-        return Cipher.EncryptAesEcb(scp03Keys.EncKey, input)
-            .Map(encrypted => encrypted.Take(8).ToArray())
+        // SCP03 pseudo-random challenge derivation per GP SCP03 Amendment D
+        // KDF context: sequence counter || ISD AID, derived using S-ENC and derivation constant 0x02
+        byte[] context = sequenceCounter.Concat(aid).ToArray();
+
+        return CryptoService
+            .KeyDerivation.DeriveScp03Data(scp03Keys.EncKey, 0x02, context, 64)
             .Map(challenge => (request, challenge));
     }
 
@@ -517,7 +514,8 @@ public static class CommandProcessors
                 byte[] randomPart = cardChallenge.Skip(2).Take(6).ToArray();
 
                 // Calculate card cryptogram using unified crypto service
-                return Cryptogram.CalculateCardCryptogram(
+                return Cryptogram
+                    .CalculateCardCryptogram(
                         request.HostChallenge,
                         randomPart,
                         keys,
@@ -542,7 +540,8 @@ public static class CommandProcessors
 
         // SCP03: cardChallenge is 8 bytes of random data
         // Calculate card cryptogram using unified crypto service
-        return Cryptogram.CalculateCardCryptogram(
+        return Cryptogram
+            .CalculateCardCryptogram(
                 request.HostChallenge,
                 cardChallenge,
                 keys,
@@ -772,7 +771,8 @@ public static class CommandProcessors
                 )
             );
 
-        return Cryptogram.CalculateHostCryptogram(
+        return Cryptogram
+            .CalculateHostCryptogram(
                 hostChallenge,
                 cardChallengeForCrypto,
                 currentKeys,
@@ -869,14 +869,13 @@ public static class CommandProcessors
     {
         // Create functional secure channel state
         var securityLevel = (SecurityLevel)0x01; // Basic security level
-        var secureChannelStateResult =
-            SecureChannelState.Create(
-                sessionKeys: sessionKeys,
-                securityLevel: securityLevel,
-                protocolVersion: ScpVersion.Scp02, // Default to SCP02
-                initialMacChainingValue: new byte[8], // Initialize with zeros
-                implementationParameter: 0x00
-            );
+        var secureChannelStateResult = SecureChannelState.Create(
+            sessionKeys: sessionKeys,
+            securityLevel: securityLevel,
+            protocolVersion: ScpVersion.Scp02, // Default to SCP02
+            initialMacChainingValue: new byte[8], // Initialize with zeros
+            implementationParameter: 0x00
+        );
 
         if (secureChannelStateResult.IsFailure)
         {
@@ -900,10 +899,7 @@ public static class CommandProcessors
         var newState = state.WithSecureChannel(secureChannelState);
 
         // EXTERNAL AUTHENTICATE response is typically empty on success
-        return (
-            new ApduResponse([], Gp4Net.Constants.Constants.StatusWords.Success),
-            newState
-        );
+        return (new ApduResponse([], Gp4Net.Constants.Constants.StatusWords.Success), newState);
     }
 
     // Placeholder implementations for other commands
@@ -1103,7 +1099,6 @@ public static class CommandProcessors
 
         return false;
     }
-
 
     /// <summary>
     /// Status request types per GlobalPlatform Card Specification v2.3.1 Table 11-33.

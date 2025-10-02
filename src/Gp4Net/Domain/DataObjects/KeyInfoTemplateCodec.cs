@@ -110,7 +110,8 @@ public static class KeyInfoTemplateCodec
             );
 
         // Parse the outer TLV structure using functional composition
-        return TlvParser.Parse(data.ToImmutableArray())
+        return TlvParser
+            .Parse([.. data])
             .Bind(outerTlv =>
                 outerTlv
                     .Tag.ToNumber()
@@ -134,7 +135,8 @@ public static class KeyInfoTemplateCodec
     /// <returns>A Result containing the decoded key information template.</returns>
     private static Result<KeyInfoTemplate, SmartCardError> ProcessKeyInfoContent(TlvObject outerTlv)
     {
-        return TlvParser.ParseMultiple(outerTlv.TlvData.Bytes)
+        return TlvParser
+            .ParseMultiple(outerTlv.TlvData.Bytes)
             .Map(parseResult =>
                 parseResult.Objects.Aggregate(
                     new KeyInfoTemplate(),
@@ -158,20 +160,23 @@ public static class KeyInfoTemplateCodec
                 tagNumber =>
                     tagNumber switch
                     {
-                        0xC0 when element.Length.LengthValue == 1 => // Key version number
-                        keyInfo with
-                        {
-                            KeyVersionNumber = Maybe<byte>.From(element.TlvData.Bytes[0]),
-                        },
+                        0xC0 when element.Length.LengthValue == 1
+                            => // Key version number
+                            keyInfo with
+                            {
+                                KeyVersionNumber = Maybe<byte>.From(element.TlvData.Bytes[0]),
+                            },
 
-                        0xC1 when element.Length.LengthValue == 1 => // Key identifier
-                        keyInfo with
-                        {
-                            KeyIdentifier = Maybe<byte>.From(element.TlvData.Bytes[0]),
-                        },
+                        0xC1 when element.Length.LengthValue == 1
+                            => // Key identifier
+                            keyInfo with
+                            {
+                                KeyIdentifier = Maybe<byte>.From(element.TlvData.Bytes[0]),
+                            },
 
-                        0xC2 when element.TlvData.Bytes.Length >= 2 => // Key types and lengths
-                        ProcessKeyTypesAndLengths(keyInfo, element.TlvData.Bytes),
+                        0xC2 when element.TlvData.Bytes.Length >= 2
+                            => // Key types and lengths
+                            ProcessKeyTypesAndLengths(keyInfo, element.TlvData.Bytes),
 
                         _ => keyInfo, // Ignore unrecognized or malformed elements
                     },
@@ -206,7 +211,9 @@ public static class KeyInfoTemplateCodec
         if (value.Length > 255)
         {
             return Result.Failure(
-                SmartCardError.InvalidData($"Value too long for simple TLV encoding: {value.Length} bytes").Message
+                SmartCardError
+                    .InvalidData($"Value too long for simple TLV encoding: {value.Length} bytes")
+                    .Message
             );
         }
 

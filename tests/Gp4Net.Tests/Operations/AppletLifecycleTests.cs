@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using AwesomeAssertions;
 using CSharpFunctionalExtensions;
+using Gp4Net.Tests.TestInfrastructure;
 using NUnit.Framework;
 
 namespace Gp4Net.Tests.Operations;
@@ -28,27 +29,26 @@ public class AppletLifecycleTests
     /// <returns>Result containing the JsonDocument or error message</returns>
     private static Result<JsonDocument, string> LoadInstallationTraceFile(string traceFile)
     {
-        string tracePath = Path.Combine(
-            TestContext.CurrentContext.TestDirectory,
-            InstallationTracePath,
-            traceFile
-        );
-
-        if (!File.Exists(tracePath))
-            return Result.Failure<JsonDocument, string>($"Trace file not found: {tracePath}");
-
-        try
+        var relativePath = Path.Combine("Traces/Operations/Installation", traceFile);
+        var ensureResult = TraceTestDataRepository.EnsureTraceFile(relativePath);
+        if (ensureResult.IsFailure)
         {
-            string jsonContent = File.ReadAllText(tracePath);
-            var testData = JsonDocument.Parse(jsonContent);
-            return Result.Success<JsonDocument, string>(testData);
+            return Result.Failure<JsonDocument, string>(ensureResult.Error);
         }
-        catch (Exception ex)
+
+        return TraceTestDataRepository.LoadTraceDocument(relativePath);
+    }
+
+    private static Result<JsonDocument, string> LoadDeletionTraceFile(string traceFile)
+    {
+        var relativePath = Path.Combine("Traces/Operations/Deletion", traceFile);
+        var ensureResult = TraceTestDataRepository.EnsureTraceFile(relativePath);
+        if (ensureResult.IsFailure)
         {
-            return Result.Failure<JsonDocument, string>(
-                $"Failed to parse trace file {traceFile}: {ex.Message}"
-            );
+            return Result.Failure<JsonDocument, string>(ensureResult.Error);
         }
+
+        return TraceTestDataRepository.LoadTraceDocument(relativePath);
     }
 
     /// <summary>
@@ -224,20 +224,14 @@ public class AppletLifecycleTests
     [TestCase("gp_pro_applet_uninstall.json", "Standard applet uninstallation")]
     public void AppletLifecycle_Should_Uninstall_Applets(string traceFile, string description)
     {
-        string tracePath = Path.Combine(
-            TestContext.CurrentContext.TestDirectory,
-            DeletionTracePath,
-            traceFile
-        );
-
-        if (!File.Exists(tracePath))
+        var traceResult = LoadDeletionTraceFile(traceFile);
+        if (traceResult.IsFailure)
         {
-            Assert.Inconclusive($"Trace file not found: {tracePath}");
+            Assert.Inconclusive(traceResult.Error);
             return;
         }
 
-        string jsonContent = File.ReadAllText(tracePath);
-        var testData = JsonDocument.Parse(jsonContent);
+        var testData = traceResult.Value;
 
         TestContext.Out.WriteLine($"Testing {description}");
 
@@ -307,20 +301,14 @@ public class AppletLifecycleTests
         string description
     )
     {
-        string tracePath = Path.Combine(
-            TestContext.CurrentContext.TestDirectory,
-            DeletionTracePath,
-            traceFile
-        );
-
-        if (!File.Exists(tracePath))
+        var traceResult = LoadDeletionTraceFile(traceFile);
+        if (traceResult.IsFailure)
         {
-            Assert.Inconclusive($"Trace file not found: {tracePath}");
+            Assert.Inconclusive(traceResult.Error);
             return;
         }
 
-        string jsonContent = File.ReadAllText(tracePath);
-        var testData = JsonDocument.Parse(jsonContent);
+        var testData = traceResult.Value;
 
         TestContext.Out.WriteLine($"Testing {description}");
 
@@ -423,20 +411,27 @@ public class AppletLifecycleTests
     [TestCase("gp_pro_applet_uninstall.json", DeletionTracePath)]
     public void AppletLifecycle_Should_Follow_Command_Sequence(string traceFile, string basePath)
     {
-        string tracePath = Path.Combine(
-            TestContext.CurrentContext.TestDirectory,
-            basePath,
-            traceFile
+        var relativeDirectory = Path.GetRelativePath(
+            Path.Combine(TestContext.CurrentContext.TestDirectory, "TestData"),
+            Path.Combine(TestContext.CurrentContext.TestDirectory, basePath)
         );
 
-        if (!File.Exists(tracePath))
+        var relativePath = Path.Combine(relativeDirectory, traceFile);
+        var ensureResult = TraceTestDataRepository.EnsureTraceFile(relativePath);
+        if (ensureResult.IsFailure)
         {
-            Assert.Inconclusive($"Trace file not found: {tracePath}");
+            Assert.Inconclusive(ensureResult.Error);
             return;
         }
 
-        string jsonContent = File.ReadAllText(tracePath);
-        var testData = JsonDocument.Parse(jsonContent);
+        var traceResult = TraceTestDataRepository.LoadTraceDocument(relativePath);
+        if (traceResult.IsFailure)
+        {
+            Assert.Inconclusive(traceResult.Error);
+            return;
+        }
+
+        var testData = traceResult.Value;
 
         if (!testData.RootElement.TryGetProperty("exchanges", out var exchangesElement))
         {

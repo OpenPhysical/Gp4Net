@@ -101,9 +101,7 @@ public class PackageRegistry
         var assembly = Assembly.GetExecutingAssembly();
         string resourceName = "Gp4Net.Data.known-packages.json";
 
-        var streamMaybe = Maybe<Stream>.From(
-            assembly.GetManifestResourceStream(resourceName)
-        );
+        var streamMaybe = Maybe<Stream>.From(assembly.GetManifestResourceStream(resourceName));
         if (streamMaybe.HasNoValue)
         {
             return Result.Failure<

@@ -116,7 +116,7 @@ public class CapFileLoadingWorkflow
         }
 
         var capFileResult = CapFileStructure.Parse(capFileData);
-        
+
         if (capFileResult.IsFailure)
         {
             return new CapFileValidationResult(
@@ -189,7 +189,7 @@ public class CapFileLoadingWorkflow
                 Maybe<CapFileStructure>.From(capFile)
             );
         }
-        
+
         // If we get here without success, return failure
         return new CapFileValidationResult(
             false,
@@ -237,9 +237,7 @@ public class CapFileLoadingWorkflow
     /// <returns>The estimated memory requirements in bytes.</returns>
     public static MemoryRequirements EstimateMemoryRequirements(byte[] capFileData)
     {
-        var capFileResult = CapFileStructure.Parse(
-            capFileData
-        );
+        var capFileResult = CapFileStructure.Parse(capFileData);
         if (capFileResult.IsFailure)
         {
             // Return default requirements on parse failure

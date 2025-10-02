@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Constants;
@@ -232,18 +231,21 @@ public class GetDataCommand : IApduCommand
     /// <returns>A Result containing the CommandAPDU.</returns>
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
-        // GET DATA always expects response data, use Le=0 (which means 256 in short APDU)
-        return Result.Success<CommandAPDU, SmartCardError>(
-            new CommandAPDU(Cla, Ins, P1, P2, 0u)
-        );
+        // GET DATA is Case 2 APDU: CLA INS P1 P2 Le (5 bytes)
+        // Le=0 means expect up to 256 bytes in short APDU format
+        // Use byte array constructor to ensure correct Case 2 format
+        byte[] apduBytes = new byte[] { Cla, Ins, P1, P2, 0x00 };
+        return Result.Success<CommandAPDU, SmartCardError>(new CommandAPDU(apduBytes));
     }
 
     /// <inheritdoc/>
     public CommandAPDU ToApdu()
     {
+        // GET DATA is Case 2 APDU with no command data, only Le
+        // Use byte array constructor to ensure correct format
         return ExpectedResponseLength.Match(
-            Some: le => new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data, (uint)le),
-            None: () => new CommandAPDU(Cla, Ins, P1, P2, (uint)Data.Length, Data)
+            Some: le => new CommandAPDU(new byte[] { Cla, Ins, P1, P2, (byte)(le == 256 ? 0 : le) }),
+            None: () => new CommandAPDU(new byte[] { Cla, Ins, P1, P2 })
         );
     }
 
@@ -252,7 +254,7 @@ public class GetDataCommand : IApduCommand
     {
         // Create APDU bytes: CLA INS P1 P2 [Lc Data] [Le]
         return ExpectedResponseLength.Match(
-            Some: le => new byte[] { Cla, Ins, P1, P2, (byte)(le == 256 ? 0 : le) },
+            Some: le => [Cla, Ins, P1, P2, (byte)(le == 256 ? 0 : le)],
             None: () => new byte[] { Cla, Ins, P1, P2 }
         );
     }
@@ -346,7 +348,8 @@ public class GetDataResponse
         byte[] response
     )
     {
-        return TlvParser.Parse(response.ToImmutableArray())
+        return TlvParser
+            .Parse([.. response])
             .Match(
                 tlvObject =>
                     Result.Success<GetDataResponse, SmartCardError>(
@@ -462,8 +465,7 @@ public class GetDataResponse
                 : Data;
         return Maybe<byte[]>
             .From(dataToUse)
-            .Map(data => Convert.ToHexString(data))
-            .GetValueOrDefault(string.Empty);
+            .Match(Some: data => Convert.ToHexString(data), None: () => string.Empty);
     }
 
     /// <summary>

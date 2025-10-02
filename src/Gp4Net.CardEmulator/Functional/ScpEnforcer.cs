@@ -21,13 +21,12 @@ public static partial class ScpEnforcer
     public static class SecurityRequirements
     {
         /// <summary>Commands that can be executed without secure channel establishment.</summary>
-        public static readonly ImmutableHashSet<byte> OpenAccessCommands =
-            ImmutableHashSet.Create(
-                Apdu.Instructions.SELECT, // SELECT
-                Ins.INITIALIZE_UPDATE, // INITIALIZE UPDATE
-                Apdu.Instructions.EXTERNAL_AUTHENTICATE, // EXTERNAL AUTHENTICATE (completes secure channel establishment)
-                Apdu.Instructions.GET_DATA // GET DATA per GP spec - no special security requirements
-            );
+        public static readonly ImmutableHashSet<byte> OpenAccessCommands = ImmutableHashSet.Create(
+            Apdu.Instructions.SELECT, // SELECT
+            Ins.INITIALIZE_UPDATE, // INITIALIZE UPDATE
+            Apdu.Instructions.EXTERNAL_AUTHENTICATE, // EXTERNAL AUTHENTICATE (completes secure channel establishment)
+            Apdu.Instructions.GET_DATA // GET DATA per GP spec - no special security requirements
+        );
 
         /// <summary>Commands that require secure channel establishment but no additional security.</summary>
         public static readonly ImmutableHashSet<byte> AuthenticatedCommands =
@@ -129,18 +128,19 @@ public static partial class ScpEnforcer
     {
         return context.SecurityRequirements.RequiresSecureChannel switch
         {
-            true when !context.CardState.IsSecureChannelEstablished => Result.Failure<
-                CommandSecurityContext,
-                SmartCardError
-            >(SmartCardError.SecurityStatusNotSatisfied()),
+            true when !context.CardState.IsSecureChannelEstablished
+                => Result.Failure<CommandSecurityContext, SmartCardError>(
+                    SmartCardError.SecurityStatusNotSatisfied()
+                ),
 
             true
                 when !IsSecurityLevelSufficient(
                     context.CardState.SecurityLevel,
                     context.SecurityRequirements
-                ) => Result.Failure<CommandSecurityContext, SmartCardError>(
-                SmartCardError.SecurityStatusNotSatisfied()
-            ),
+                )
+                => Result.Failure<CommandSecurityContext, SmartCardError>(
+                    SmartCardError.SecurityStatusNotSatisfied()
+                ),
 
             _ => Result.Success<CommandSecurityContext, SmartCardError>(context),
         };
@@ -158,25 +158,26 @@ public static partial class ScpEnforcer
         return instruction switch
         {
             // INSTALL - All variants require C-MAC and R-MAC
-            Ins.INSTALL => baseRequirements with
-            {
-                RequiresCommandMac = true,
-                RequiresResponseMac = true,
-            },
+            Ins.INSTALL
+                => baseRequirements with
+                {
+                    RequiresCommandMac = true,
+                    RequiresResponseMac = true,
+                },
 
             // PUT KEY - Always requires encryption for key data
-            Ins.PUT_KEY => baseRequirements with
-            {
-                RequiresCommandEncryption = true,
-                RequiresCommandMac = true,
-                RequiresResponseMac = true,
-            },
+            Ins.PUT_KEY
+                => baseRequirements with
+                {
+                    RequiresCommandEncryption = true,
+                    RequiresCommandMac = true,
+                    RequiresResponseMac = true,
+                },
 
             // Default: return base requirements
             _ => baseRequirements,
         };
     }
-
 
     /// <summary>
     /// Creates command security context for validation processing.

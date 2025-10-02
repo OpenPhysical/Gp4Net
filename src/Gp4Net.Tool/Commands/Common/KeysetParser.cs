@@ -28,20 +28,36 @@ public static class KeysetParser
     /// <returns>A Result containing the parsed RawKeyset or an error.</returns>
     public static Result<RawKeyset, SmartCardError> ParseRawKeysetSpecification(
         string keysetSpec,
-        byte keyVersion = 0x00)
+        byte keyVersion = 0x00
+    )
     {
         // Use existing GP test keys from library
-        if (string.IsNullOrWhiteSpace(keysetSpec) || keysetSpec.Equals("gp_test", StringComparison.OrdinalIgnoreCase))
+        if (
+            string.IsNullOrWhiteSpace(keysetSpec)
+            || keysetSpec.Equals("gp_test", StringComparison.OrdinalIgnoreCase)
+        )
             return GpTestKeys.CreateRawTestKeyset(keyVersion);
-        
+
+        // Detect diversification-based specification (scheme:first[:second...])
+        var diversificationParsed = TryParseDiversifiedRawKeyset(keysetSpec, keyVersion);
+        if (diversificationParsed.IsFailure)
+        {
+            if (diversificationParsed.Error.HasValue)
+                return Result.Failure<RawKeyset, SmartCardError>(diversificationParsed.Error.Value);
+        }
+        else if (diversificationParsed.Value.HasValue)
+        {
+            return Result.Success<RawKeyset, SmartCardError>(diversificationParsed.Value.Value);
+        }
+
         // Check for three-key format (ENC:MAC:DEK)
         if (keysetSpec.Contains(':'))
             return ParseRawThreeKeyFormat(keysetSpec, keyVersion);
-        
+
         // Single hex key
         return ParseRawSingleKeyFormat(keysetSpec, keyVersion);
     }
-    
+
     /// <summary>
     /// Parses a keyset specification string into a protocol-specific keyset.
     /// Use this when you know the protocol in advance.
@@ -57,81 +73,164 @@ public static class KeysetParser
     public static Result<IKeySet, SmartCardError> ParseKeysetSpecification(
         string keysetSpec,
         ScpVersion scpVersion,
-        byte keyVersion = 0x00)
+        byte keyVersion = 0x00
+    )
     {
         // Use existing GP test keys from library
-        if (string.IsNullOrWhiteSpace(keysetSpec) || keysetSpec.Equals("gp_test", StringComparison.OrdinalIgnoreCase))
+        if (
+            string.IsNullOrWhiteSpace(keysetSpec)
+            || keysetSpec.Equals("gp_test", StringComparison.OrdinalIgnoreCase)
+        )
             return GpTestKeys.GetTestKeySet(scpVersion, keyVersion);
-        
+
+        // Diversification-based specification support
+        var diversificationParsed = TryParseDiversifiedRawKeyset(keysetSpec, keyVersion);
+        if (diversificationParsed.IsFailure)
+        {
+            if (diversificationParsed.Error.HasValue)
+                return Result.Failure<IKeySet, SmartCardError>(diversificationParsed.Error.Value);
+        }
+        else if (diversificationParsed.Value.HasValue)
+        {
+            return diversificationParsed.Value.Value.ToTypedKeyset(scpVersion);
+        }
+
         // Check for three-key format (ENC:MAC:DEK)
         if (keysetSpec.Contains(':'))
             return ParseThreeKeyFormat(keysetSpec, scpVersion, keyVersion);
-        
+
         // Single hex key
         return ParseSingleKeyFormat(keysetSpec, scpVersion, keyVersion);
     }
-    
+
+    private static Result<Maybe<RawKeyset>, Maybe<SmartCardError>> TryParseDiversifiedRawKeyset(
+        string spec,
+        byte keyVersion
+    )
+    {
+        var firstColon = spec.IndexOf(':');
+        if (firstColon <= 0)
+        {
+            return Result.Success<Maybe<RawKeyset>, Maybe<SmartCardError>>(Maybe<RawKeyset>.None);
+        }
+
+        var schemeCandidate = spec[..firstColon];
+        var rest = spec[(firstColon + 1)..];
+
+        var specResult = KeyDiversificationService.CreateSpec(schemeCandidate);
+        if (specResult.IsFailure)
+        {
+            // Not a recognized diversification scheme - fall back to standard parsing
+            return Result.Success<Maybe<RawKeyset>, Maybe<SmartCardError>>(Maybe<RawKeyset>.None);
+        }
+
+        // Parse the remainder using existing helpers (single or three key formats)
+        Result<RawKeyset, SmartCardError> baseKeysResult = rest.Contains(':')
+            ? ParseRawThreeKeyFormat(rest, keyVersion)
+            : ParseRawSingleKeyFormat(rest, keyVersion);
+
+        if (baseKeysResult.IsFailure)
+        {
+            return Result.Failure<Maybe<RawKeyset>, Maybe<SmartCardError>>(
+                Maybe<SmartCardError>.From(baseKeysResult.Error)
+            );
+        }
+
+        var diversified = baseKeysResult.Value.WithDiversification(specResult.Value);
+        return Result.Success<Maybe<RawKeyset>, Maybe<SmartCardError>>(
+            Maybe<RawKeyset>.From(diversified)
+        );
+    }
+
     private static Result<RawKeyset, SmartCardError> ParseRawThreeKeyFormat(
         string spec,
-        byte keyVersion)
+        byte keyVersion
+    )
     {
         var parts = spec.Split(':');
         if (parts.Length != 3)
             return Result.Failure<RawKeyset, SmartCardError>(
                 SmartCardError.InvalidArgument(
-                    "Three-key format must be ENC:MAC:DEK (e.g., 404142...:505152...:606162...)"));
-        
-        return Result.Try(() => new
-            {
-                Enc = Convert.FromHexString(parts[0]),
-                Mac = Convert.FromHexString(parts[1]),
-                Dek = Convert.FromHexString(parts[2])
-            },
-            ex => SmartCardError.InvalidArgument($"Invalid hex in keyset: {ex.Message}"))
-            .Bind(keys => KeysetFactory.CreateRawFromThreeKeys(
-                keys.Enc, keys.Mac, keys.Dek, keyVersion));
+                    "Three-key format must be ENC:MAC:DEK (e.g., 404142...:505152...:606162...)"
+                )
+            );
+
+        return Result
+            .Try(
+                () =>
+                    new
+                    {
+                        Enc = Convert.FromHexString(parts[0]),
+                        Mac = Convert.FromHexString(parts[1]),
+                        Dek = Convert.FromHexString(parts[2])
+                    },
+                ex => SmartCardError.InvalidArgument($"Invalid hex in keyset: {ex.Message}")
+            )
+            .Bind(keys =>
+                KeysetFactory.CreateRawFromThreeKeys(keys.Enc, keys.Mac, keys.Dek, keyVersion)
+            );
     }
-    
+
     private static Result<RawKeyset, SmartCardError> ParseRawSingleKeyFormat(
         string hexKey,
-        byte keyVersion)
+        byte keyVersion
+    )
     {
-        return Result.Try(
-            () => Convert.FromHexString(hexKey),
-            ex => SmartCardError.InvalidArgument($"Invalid hex key: {ex.Message}"))
+        return Result
+            .Try(
+                () => Convert.FromHexString(hexKey),
+                ex => SmartCardError.InvalidArgument($"Invalid hex key: {ex.Message}")
+            )
             .Bind(key => KeysetFactory.CreateRawFromSingleKey(key, keyVersion));
     }
-    
+
     private static Result<IKeySet, SmartCardError> ParseThreeKeyFormat(
-        string spec, 
+        string spec,
         ScpVersion scpVersion,
-        byte keyVersion)
+        byte keyVersion
+    )
     {
         var parts = spec.Split(':');
         if (parts.Length != 3)
             return Result.Failure<IKeySet, SmartCardError>(
                 SmartCardError.InvalidArgument(
-                    "Three-key format must be ENC:MAC:DEK (e.g., 404142...:505152...:606162...)"));
-        
-        return Result.Try(() => new
-            {
-                Enc = Convert.FromHexString(parts[0]),
-                Mac = Convert.FromHexString(parts[1]),
-                Dek = Convert.FromHexString(parts[2])
-            },
-            ex => SmartCardError.InvalidArgument($"Invalid hex in keyset: {ex.Message}"))
-            .Bind(keys => KeysetFactory.CreateFromThreeKeys(
-                keys.Enc, keys.Mac, keys.Dek, scpVersion, keyVersion));
+                    "Three-key format must be ENC:MAC:DEK (e.g., 404142...:505152...:606162...)"
+                )
+            );
+
+        return Result
+            .Try(
+                () =>
+                    new
+                    {
+                        Enc = Convert.FromHexString(parts[0]),
+                        Mac = Convert.FromHexString(parts[1]),
+                        Dek = Convert.FromHexString(parts[2])
+                    },
+                ex => SmartCardError.InvalidArgument($"Invalid hex in keyset: {ex.Message}")
+            )
+            .Bind(keys =>
+                KeysetFactory.CreateFromThreeKeys(
+                    keys.Enc,
+                    keys.Mac,
+                    keys.Dek,
+                    scpVersion,
+                    keyVersion
+                )
+            );
     }
-    
+
     private static Result<IKeySet, SmartCardError> ParseSingleKeyFormat(
         string hexKey,
         ScpVersion scpVersion,
-        byte keyVersion)
+        byte keyVersion
+    )
     {
-        return Result.Try(
-            () => Convert.FromHexString(hexKey),
-            ex => SmartCardError.InvalidArgument($"Invalid hex key: {ex.Message}"))
+        return Result
+            .Try(
+                () => Convert.FromHexString(hexKey),
+                ex => SmartCardError.InvalidArgument($"Invalid hex key: {ex.Message}")
+            )
             .Bind(key => KeysetFactory.CreateFromSingleKey(key, scpVersion, keyVersion));
     }
 }

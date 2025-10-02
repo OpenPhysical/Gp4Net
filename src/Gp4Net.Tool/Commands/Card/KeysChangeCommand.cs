@@ -16,7 +16,11 @@ namespace Gp4Net.Tool.Commands.Card;
 /// Command to change keys on a smart card.
 /// </summary>
 [PublicAPI]
-[CliCommand("change-keys", "Change cryptographic keys on the card (WARNING: This permanently modifies card keys)", "card")]
+[CliCommand(
+    "change-keys",
+    "Change cryptographic keys on the card (WARNING: This permanently modifies card keys)",
+    "card"
+)]
 [CommandHandler]
 public class KeysChangeCommand : IPipelineCommand<KeysChangeCommand.Settings>
 {

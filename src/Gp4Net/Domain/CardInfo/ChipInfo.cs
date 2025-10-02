@@ -170,14 +170,39 @@ public class ChipInfo
     {
         var parts = new[]
         {
-            Manufacturer != IcFabricator.Unknown ? Manufacturer.ToString() : null,
-            Platform != ChipPlatform.Unknown ? Platform.ToString() : null,
+            Manufacturer != IcFabricator.Unknown ? GetManufacturerName(Manufacturer) : null,
+            Platform != ChipPlatform.Unknown ? GetPlatformName(Platform) : null,
             ChipType != IcType.Unknown ? ChipType.ToString() : null,
             MemoryConfig.HasValue ? GetMemoryDescription() : null,
         }.Where(p => !string.IsNullOrEmpty(p));
 
         return string.Join(" ", parts);
     }
+
+    private static string GetManufacturerName(IcFabricator manufacturer) =>
+        manufacturer switch
+        {
+            IcFabricator.NXP => "NXP",
+            IcFabricator.Infineon => "Infineon",
+            IcFabricator.StMicroelectronics => "STMicroelectronics",
+            IcFabricator.Samsung => "Samsung",
+            IcFabricator.Gemalto => "Gemalto",
+            IcFabricator.Atmel => "Atmel",
+            _ => manufacturer.ToString(),
+        };
+
+    private static string GetPlatformName(ChipPlatform platform) =>
+        platform switch
+        {
+            ChipPlatform.SmartMx3 => "SmartMX3",
+            ChipPlatform.SmartMx2 => "SmartMX2",
+            ChipPlatform.SmartMx => "SmartMX",
+            ChipPlatform.Sle66 => "SLE66",
+            ChipPlatform.Sle78 => "SLE78",
+            ChipPlatform.St31 => "ST31",
+            ChipPlatform.St33 => "ST33",
+            _ => platform.ToString(),
+        };
 
     /// <summary>
     /// Gets a description of the memory configuration.
@@ -251,17 +276,25 @@ public class ChipInfo
         var capabilities = new[]
         {
             CryptoCapabilities.HasFlag(CryptoCapabilities.TripleDes) ? "3DES" : null,
-            CryptoCapabilities.HasFlag(CryptoCapabilities.Aes256) ? "AES-128/192/256"
-            : CryptoCapabilities.HasFlag(CryptoCapabilities.Aes192) ? "AES-128/192"
-            : CryptoCapabilities.HasFlag(CryptoCapabilities.Aes128) ? "AES-128"
-            : null,
-            CryptoCapabilities.HasFlag(CryptoCapabilities.Rsa4096) ? "RSA-2048/4096"
-            : CryptoCapabilities.HasFlag(CryptoCapabilities.Rsa2048) ? "RSA-2048"
-            : null,
-            CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc544) ? "ECC P-256/384/521/544"
-            : CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc521) ? "ECC P-256/384/521"
-            : CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc256) ? "ECC P-256"
-            : null,
+            CryptoCapabilities.HasFlag(CryptoCapabilities.Aes256)
+                ? "AES-128/192/256"
+                : CryptoCapabilities.HasFlag(CryptoCapabilities.Aes192)
+                    ? "AES-128/192"
+                    : CryptoCapabilities.HasFlag(CryptoCapabilities.Aes128)
+                        ? "AES-128"
+                        : null,
+            CryptoCapabilities.HasFlag(CryptoCapabilities.Rsa4096)
+                ? "RSA-2048/4096"
+                : CryptoCapabilities.HasFlag(CryptoCapabilities.Rsa2048)
+                    ? "RSA-2048"
+                    : null,
+            CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc544)
+                ? "ECC P-256/384/521/544"
+                : CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc521)
+                    ? "ECC P-256/384/521"
+                    : CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc256)
+                        ? "ECC P-256"
+                        : null,
         }.Where(c => c != null);
 
         return string.Join(", ", capabilities);

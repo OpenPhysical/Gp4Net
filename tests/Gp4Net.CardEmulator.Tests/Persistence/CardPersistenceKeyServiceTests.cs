@@ -536,14 +536,8 @@ public class CardPersistenceKeyServiceTests
                     uuid2 =>
                     {
                         // Act
-                        var result1 = _service.DeriveStorageKey(
-                            keySet,
-                            uuid1
-                        );
-                        var result2 = _service.DeriveStorageKey(
-                            keySet,
-                            uuid2
-                        );
+                        var result1 = _service.DeriveStorageKey(keySet, uuid1);
+                        var result2 = _service.DeriveStorageKey(keySet, uuid2);
 
                         // Assert
                         result1.IsSuccess.Should().BeTrue();
@@ -867,10 +861,7 @@ public class CardPersistenceKeyServiceTests
             expectedFingerprint =>
             {
                 // Act
-                var result = _service.ValidateKeyFingerprint(
-                    keySet,
-                    expectedFingerprint
-                );
+                var result = _service.ValidateKeyFingerprint(keySet, expectedFingerprint);
 
                 // Assert
                 result.IsSuccess.Should().BeTrue();
@@ -910,10 +901,7 @@ public class CardPersistenceKeyServiceTests
         byte[] wrongFingerprint = new byte[32]; // All zeros
 
         // Act
-        var result = _service.ValidateKeyFingerprint(
-            keySet,
-            wrongFingerprint
-        );
+        var result = _service.ValidateKeyFingerprint(keySet, wrongFingerprint);
 
         // Assert
         result.IsSuccess.Should().BeTrue();

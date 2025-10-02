@@ -122,13 +122,14 @@ public record MacChainingState(
         return ProtocolVersion switch
         {
             ScpVersion.Scp03 => false, // SCP03 never updates on R-MAC
-            ScpVersion.Scp02 => ImplementationParameter switch
-            {
-                0x05 => true, // i=05: R-MAC updates chaining value
-                0x15 => false, // i=15: R-MAC does not update chaining value
-                0x55 => false, // i=55: R-MAC does not update chaining value
-                _ => false, // Default: no update
-            },
+            ScpVersion.Scp02
+                => ImplementationParameter switch
+                {
+                    0x05 => true, // i=05: R-MAC updates chaining value
+                    0x15 => false, // i=15: R-MAC does not update chaining value
+                    0x55 => false, // i=55: R-MAC does not update chaining value
+                    _ => false, // Default: no update
+                },
             _ => false,
         };
     }

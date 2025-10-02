@@ -28,6 +28,7 @@ namespace Gp4Net.CardEmulator.Core;
 public partial class VirtualCard : IVirtualCard
 {
     private readonly CardState _currentState;
+    private readonly CardState _initialState;
     private readonly CardConfiguration _config;
     private readonly IRngContext _rngContext;
     private readonly LoggingService _logging;
@@ -43,18 +44,21 @@ public partial class VirtualCard : IVirtualCard
     /// <param name="logger">Optional logger for debugging.</param>
     /// <param name="capFileService">The CAP file processing service for load operations.</param>
     /// <param name="stateService">The immutable card state management service.</param>
+    /// <param name="initialState">Optional baseline state used for reset operations.</param>
     public VirtualCard(
         CardConfiguration config,
         IRngContext rngContext,
         CardState currentState,
         LoggingService logger,
         CapFileServiceAdapter capFileService,
-        ICardStateService stateService
+        ICardStateService stateService,
+        Maybe<CardState> initialState = default
     )
     {
         _config = config;
         _rngContext = rngContext;
         _currentState = currentState;
+        _initialState = initialState.Match(state => state, () => currentState);
         _logging = logger;
         _capFileService = capFileService;
         _stateService = stateService;
@@ -87,31 +91,34 @@ public partial class VirtualCard : IVirtualCard
     {
         var cardStateService = stateService.GetValueOrDefault(new CardStateService(logger));
 
-        return CardState.Create()
+        return CardState
+            .Create()
             .Bind(baseState =>
             {
                 var stateWithConfig = baseState with
                 {
                     ScpVersion = config.DefaultScpVersion,
-                    ScpImplementation = config.DefaultScpImplementation
+                    ScpImplementation = config.DefaultScpImplementation,
                 };
 
                 // Initialize with configuration's ISD AID and data objects
                 var isdAid = config.IsdAid.ToImmutableArray();
-                
-                return CardStateService.InitializeApplicationRegistryWithDataObjects(
-                    stateWithConfig,
-                    isdAid,
-                    config.DefaultDataObjects
-                )
-                .Map(finalState => new VirtualCard(
-                    config,
-                    rngContext,
-                    finalState,
-                    new LoggingService(logger),
-                    capFileService.GetValueOrDefault(new CapFileServiceAdapter()),
-                    cardStateService
-                ));
+
+                return CardStateService
+                    .InitializeApplicationRegistryWithDataObjects(
+                        stateWithConfig,
+                        isdAid,
+                        config.DefaultDataObjects
+                    )
+                    .Map(finalState => new VirtualCard(
+                        config,
+                        rngContext,
+                        finalState,
+                        new LoggingService(logger),
+                        capFileService.GetValueOrDefault(new CapFileServiceAdapter()),
+                        cardStateService,
+                        Maybe<CardState>.From(finalState)
+                    ));
             });
     }
 
@@ -127,40 +134,47 @@ public partial class VirtualCard : IVirtualCard
     /// <inheritdoc />
     public Result<IVirtualCard, SmartCardError> Reset()
     {
-        var resetState = _stateService.ResetCard(_currentState);
         return Result.Success<IVirtualCard, SmartCardError>(
             new VirtualCard(
                 _config,
                 _rngContext,
-                resetState,
+                _initialState,
                 new LoggingService(Maybe<ILogger>.None),
                 _capFileService,
-                _stateService
+                _stateService,
+                Maybe<CardState>.From(_initialState)
             )
         );
     }
 
     /// <inheritdoc />
-    public Result<
-        (ApduResponse Response, IVirtualCard UpdatedCard),
-        SmartCardError
-    > ProcessCommand(byte[] command)
+    public Result<(ApduResponse Response, IVirtualCard UpdatedCard), SmartCardError> ProcessCommand(
+        byte[] command
+    )
     {
-        return ProcessCommandFunctionally(command, _currentState, _config, _rngContext, new LoggingService(Maybe<ILogger>.None))
+        return ProcessCommandFunctionally(
+                command,
+                _currentState,
+                _config,
+                _rngContext,
+                new LoggingService(Maybe<ILogger>.None)
+            )
             .Map(result =>
-                (
-                    result.Item1,
-                    (IVirtualCard)
-                        new VirtualCard(
-                            _config,
-                            _rngContext,
-                            result.Item2,
-                            new LoggingService(Maybe<ILogger>.None),
-                            _capFileService,
-                            _stateService
-                        )
-                )
-            );
+            {
+                var (response, updatedState) = result;
+
+                var updatedCard = new VirtualCard(
+                    _config,
+                    _rngContext,
+                    updatedState,
+                    new LoggingService(Maybe<ILogger>.None),
+                    _capFileService,
+                    _stateService,
+                    Maybe<CardState>.From(_initialState)
+                );
+
+                return (response, (IVirtualCard)updatedCard);
+            });
     }
 
     /// <summary>
@@ -176,7 +190,6 @@ public partial class VirtualCard : IVirtualCard
         get { return _config; }
     }
 
-
     /// <summary>
     /// Pure functional command processing that returns new state without side effects.
     /// This method can be tested independently of the stateful card instance.
@@ -189,10 +202,21 @@ public partial class VirtualCard : IVirtualCard
         LoggingService logging
     )
     {
-        return ValidateCommand(command)
-            .Bind(cmd => ValidateInstructionSupported(cmd, config))
-            .Bind(cmd => ApplyScpSecurity(cmd, state, logging))
-            .Bind(cmd => RouteToApplications(cmd.FullCommand, state, rngContext, logging))
+        return EnsureApplicationRegistry(state, config)
+            .Bind(initializedState =>
+                ValidateCommand(command)
+                    .Bind(cmd => ValidateInstructionSupported(cmd, config))
+                    .Bind(cmd => ApplyScpSecurity(cmd, initializedState, logging))
+                    .Bind(cmd =>
+                        RouteToApplications(
+                            cmd.FullCommand,
+                            initializedState,
+                            config,
+                            rngContext,
+                            logging
+                        )
+                    )
+            )
             .Bind(result => ApplyResponseSecurity(result, rngContext, logging));
     }
 
@@ -322,7 +346,7 @@ public partial class VirtualCard : IVirtualCard
     /// </summary>
     private static bool ShouldApplyResponseSecurity(ushort statusWord)
     {
-    return statusWord == Constants.Constants.StatusWords.Success
+        return statusWord == Constants.Constants.StatusWords.Success
             || (statusWord & 0xFF00)
                 == Constants.Constants.StatusWords.Information.WarningNoInformation
             || (statusWord & 0xFF00) == 0x6300;
@@ -458,10 +482,7 @@ public partial class VirtualCard : IVirtualCard
 
                             // GlobalPlatform Card Specification v2.3.1 Table 11-13: INSTALL Response
                             return (
-                                new ApduResponse(
-                                    [0x00],
-                                    Constants.Constants.StatusWords.Success
-                                ),
+                                new ApduResponse([0x00], Constants.Constants.StatusWords.Success),
                                 newState
                             );
                         });
@@ -769,10 +790,7 @@ public partial class VirtualCard : IVirtualCard
                 byte[] responseData = loadComplete ? [0x00] : [];
 
                 return (
-                    new ApduResponse(
-                        responseData,
-                        Constants.Constants.StatusWords.Success
-                    ),
+                    new ApduResponse(responseData, Constants.Constants.StatusWords.Success),
                     newState
                 );
             });
@@ -883,17 +901,17 @@ public partial class VirtualCard : IVirtualCard
     {
         byte[] capBytes = capFileData.ToArray();
         var capFileService = new CapFileServiceAdapter();
-        var expectedHashMaybe = ExtractExpectedLfdbhFromState(state).Match(
-            success => Maybe<LoadFileDataBlockHash>.From(success),
-            error => Maybe<LoadFileDataBlockHash>.None
-        );
+        var expectedHashMaybe = ExtractExpectedLfdbhFromState(state)
+            .Match(
+                success => Maybe<LoadFileDataBlockHash>.From(success),
+                error => Maybe<LoadFileDataBlockHash>.None
+            );
 
         return capFileService
             .ProcessCapFileForLoading(capBytes, expectedHashMaybe)
             .Bind(module => CreateLoadFileFromModule(module, capBytes, config))
             .Map(loadFile => state.WithLoadFile(loadFile));
     }
-
 
     /// <summary>
     /// Creates a LoadFile from an extracted ExecutableModule and CAP file data.
@@ -918,7 +936,6 @@ public partial class VirtualCard : IVirtualCard
             )
         );
     }
-
 
     /// <summary>
     /// Validates install token according to GlobalPlatform Card Specification v2.3.1 Section 11.5.2.1.
@@ -971,7 +988,8 @@ public partial class VirtualCard : IVirtualCard
 
         // Get token key from configuration (or use test key for virtual card)
         return GetTokenVerificationKey(config, token.KeyIdentifier)
-            .Bind(key => {
+            .Bind(key =>
+            {
                 // Construct data to verify: loadFileHash + keyIdentifier + authLevel
                 byte[] dataToVerify = loadFileHash
                     .Concat(token.KeyIdentifier)
@@ -979,17 +997,24 @@ public partial class VirtualCard : IVirtualCard
                     .ToArray();
 
                 // Compute HMAC-SHA256 using BouncyCastle directly
-                return Result.Try(() =>
-                {
-                    var hmac = new Org.BouncyCastle.Crypto.Macs.HMac(new Org.BouncyCastle.Crypto.Digests.Sha256Digest());
-                    hmac.Init(new Org.BouncyCastle.Crypto.Parameters.KeyParameter(key));
-                    hmac.BlockUpdate(dataToVerify, 0, dataToVerify.Length);
-                    byte[] result = new byte[hmac.GetMacSize()];
-                    hmac.DoFinal(result, 0);
-                    return result.Take(8).ToArray(); // Take first 8 bytes as token MAC
-                }, ex => SmartCardError.CryptographicError($"HMAC calculation failed: {ex.Message}"));
+                return Result.Try(
+                    () =>
+                    {
+                        var hmac = new Org.BouncyCastle.Crypto.Macs.HMac(
+                            new Org.BouncyCastle.Crypto.Digests.Sha256Digest()
+                        );
+                        hmac.Init(new Org.BouncyCastle.Crypto.Parameters.KeyParameter(key));
+                        hmac.BlockUpdate(dataToVerify, 0, dataToVerify.Length);
+                        byte[] result = new byte[hmac.GetMacSize()];
+                        hmac.DoFinal(result, 0);
+                        return result.Take(8).ToArray(); // Take first 8 bytes as token MAC
+                    },
+                    ex =>
+                        SmartCardError.CryptographicError($"HMAC calculation failed: {ex.Message}")
+                );
             })
-            .Bind(expectedMac => {
+            .Bind(expectedMac =>
+            {
                 // Verify signature matches (use first 8 bytes of HMAC for token)
                 byte[] truncatedMac = expectedMac.Take(8).ToArray();
                 bool isValid = truncatedMac.SequenceEqual(token.Signature);
@@ -1011,7 +1036,8 @@ public partial class VirtualCard : IVirtualCard
     {
         // In virtual card, use deterministic test key based on key identifier
         // Production would look up actual key from secure storage
-        byte[] testKey = Enumerable.Range(0, 32)  // 256-bit HMAC key
+        byte[] testKey = Enumerable
+            .Range(0, 32) // 256-bit HMAC key
             .Select(i => (byte)((keyIdentifier[0] + i * 13 + 97) % 256))
             .ToArray();
 
@@ -1100,7 +1126,8 @@ public partial class VirtualCard : IVirtualCard
         // Hash verification shall compare actual load file data against expected hash
         return ExtractExpectedLfdbhFromState(state)
             .Bind(expectedHash =>
-                LoadFileDataBlockHash.ComputeFromCapFile(completeCapFileData)
+                LoadFileDataBlockHash
+                    .ComputeFromCapFile(completeCapFileData)
                     .Bind(actualHash => expectedHash.VerifyMatch(actualHash))
             );
     }
@@ -1122,8 +1149,6 @@ public partial class VirtualCard : IVirtualCard
                 )
             );
     }
-
-
 
     /// <summary>
     /// Updates the load context in card state data objects.
@@ -1260,7 +1285,7 @@ public partial class VirtualCard : IVirtualCard
         );
 
         return TlvParser
-            .ParseMultiple(tlvData.ToImmutableArray())
+            .ParseMultiple([.. tlvData])
             .Bind(parseResult =>
                 parseResult.Objects.Length > 0
                     ? Result.Success<ImmutableArray<TlvObject>, SmartCardError>(parseResult.Objects)
@@ -1472,10 +1497,7 @@ public partial class VirtualCard : IVirtualCard
                 Array.Copy(keyData.DekKcv, 0, response, 7, 3);
 
                 return (
-                    new ApduResponse(
-                        response,
-                        Constants.Constants.StatusWords.Success
-                    ),
+                    new ApduResponse(response, Constants.Constants.StatusWords.Success),
                     newState
                 );
             });
@@ -1588,23 +1610,26 @@ public partial class VirtualCard : IVirtualCard
         // Use SCP-specific processors for GP compliance
         return state.ScpVersion switch
         {
-            0x02 => Scp02CommandProcessors.ProcessScp02InitializeUpdate(
-                command,
-                state,
-                config,
-                rngContext,
-                logging
-            ),
-            0x03 => Scp03CommandProcessors.ProcessScp03InitializeUpdate(
-                command,
-                state,
-                config,
-                rngContext,
-                logging.Logger
-            ),
-            _ => Result.Failure<(ApduResponse, CardState), SmartCardError>(
-                SmartCardError.ConditionsNotSatisfied()
-            ),
+            0x02
+                => Scp02CommandProcessors.ProcessScp02InitializeUpdate(
+                    command,
+                    state,
+                    config,
+                    rngContext,
+                    logging
+                ),
+            0x03
+                => Scp03CommandProcessors.ProcessScp03InitializeUpdate(
+                    command,
+                    state,
+                    config,
+                    rngContext,
+                    logging.Logger
+                ),
+            _
+                => Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                    SmartCardError.ConditionsNotSatisfied()
+                ),
         };
     }
 
@@ -1626,23 +1651,26 @@ public partial class VirtualCard : IVirtualCard
         // Use SCP-specific processors for better error handling and GP compliance
         return state.ScpVersion switch
         {
-            0x02 => Scp02CommandProcessors.ProcessScp02ExternalAuthenticate(
-                command,
-                state,
-                config,
-                rngContext,
-                logging
-            ),
-            0x03 => Scp03CommandProcessors.ProcessScp03ExternalAuthenticate(
-                command,
-                state,
-                config,
-                rngContext,
-                logging
-            ),
-            _ => Result.Failure<(ApduResponse, CardState), SmartCardError>(
-                SmartCardError.ConditionsNotSatisfied()
-            ),
+            0x02
+                => Scp02CommandProcessors.ProcessScp02ExternalAuthenticate(
+                    command,
+                    state,
+                    config,
+                    rngContext,
+                    logging
+                ),
+            0x03
+                => Scp03CommandProcessors.ProcessScp03ExternalAuthenticate(
+                    command,
+                    state,
+                    config,
+                    rngContext,
+                    logging
+                ),
+            _
+                => Result.Failure<(ApduResponse, CardState), SmartCardError>(
+                    SmartCardError.ConditionsNotSatisfied()
+                ),
         };
     }
 
@@ -1744,13 +1772,7 @@ public partial class VirtualCard : IVirtualCard
 
         logging.LogDebug("DELETE command processed successfully");
         return Result.Success<(ApduResponse, CardState), SmartCardError>(
-            (
-                new ApduResponse(
-                    responseData,
-                    Constants.Constants.StatusWords.Success
-                ),
-                newState
-            )
+            (new ApduResponse(responseData, Constants.Constants.StatusWords.Success), newState)
         );
     }
 
@@ -1842,6 +1864,7 @@ public partial class VirtualCard : IVirtualCard
     private static Result<(ApduResponse, CardState), SmartCardError> RouteToApplications(
         byte[] command,
         CardState state,
+        CardConfiguration config,
         IRngContext rngContext,
         LoggingService logging
     )
@@ -1855,20 +1878,15 @@ public partial class VirtualCard : IVirtualCard
                 );
 
                 return registry
-                    .RouteCommand(command, state, rngContext)
+                    .RouteCommand(command, state, config, rngContext)
                     .Map(result =>
                     {
-                        var (updatedRegistry, apduResponse) = result;
-                        var newState = state with
-                        {
-                            ApplicationRegistry = Maybe<ApplicationRegistry>.From(updatedRegistry),
-                        };
+                        var (updatedRegistry, apduResponse, updatedState) = result;
+                        var newState = updatedState.WithApplicationRegistry(updatedRegistry);
 
                         // Convert to Core.ApduResponse format
                         var coreResponse = new ApduResponse(
-                            apduResponse.Data.IsDefaultOrEmpty
-                                ? Array.Empty<byte>()
-                                : apduResponse.Data.ToArray(),
+                            apduResponse.Data.IsDefaultOrEmpty ? [] : apduResponse.Data.ToArray(),
                             apduResponse.StatusWord
                         );
 
@@ -1933,8 +1951,27 @@ public partial class VirtualCard : IVirtualCard
     /// </summary>
     /// <param name="state">The card state to include in the response.</param>
     /// <returns>A successful result with an empty APDU response and the provided state.</returns>
-    private static Result<(ApduResponse, CardState), SmartCardError> CreateSuccessResponse(CardState state) =>
+    private static Result<(ApduResponse, CardState), SmartCardError> CreateSuccessResponse(
+        CardState state
+    ) =>
         Result.Success<(ApduResponse, CardState), SmartCardError>(
             (new ApduResponse([], Constants.Constants.StatusWords.Success), state)
         );
+
+    private static Result<CardState, SmartCardError> EnsureApplicationRegistry(
+        CardState state,
+        CardConfiguration config
+    )
+    {
+        if (state.ApplicationRegistry.HasValue)
+        {
+            return Result.Success<CardState, SmartCardError>(state);
+        }
+
+        return CardStateService.InitializeApplicationRegistryWithDataObjects(
+            state,
+            config.IsdAid.ToImmutableArray(),
+            config.DefaultDataObjects
+        );
+    }
 }

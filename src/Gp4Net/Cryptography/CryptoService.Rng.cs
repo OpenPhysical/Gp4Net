@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
+using Gp4Net.Shared;
 using Org.BouncyCastle.Security;
 
 namespace Gp4Net.Cryptography;
@@ -190,7 +191,7 @@ public static partial class CryptoService
         {
             return Maybe
                 .From(challenges)
-                .ToResult(SmartCardError.InvalidArgument("Challenges cannot be null"))
+                .ToResult(ErrorFactory.NullArgument("Challenges"))
                 .Map(c => c.SelectMany(chunk => chunk).ToArray())
                 .Bind(CreateDeterministicContext);
         }
@@ -208,11 +209,8 @@ public static partial class CryptoService
         {
             return Maybe
                 .From(pattern)
-                .ToResult(SmartCardError.InvalidArgument("Pattern cannot be null"))
-                .Ensure(
-                    p => p.Length > 0,
-                    SmartCardError.InvalidArgument("Pattern cannot be empty")
-                )
+                .ToResult(ErrorFactory.NullArgument("Pattern"))
+                .Ensure(p => p.Length > 0, ErrorFactory.EmptyArgument("Pattern"))
                 .Ensure(
                     _ => repetitions > 0,
                     SmartCardError.InvalidArgument($"Repetitions must be positive: {repetitions}")
@@ -246,7 +244,7 @@ public static partial class CryptoService
         {
             return Maybe
                 .From(entropyChunks)
-                .ToResult(SmartCardError.InvalidArgument("Entropy chunks cannot be null"))
+                .ToResult(ErrorFactory.NullArgument("Entropy chunks"))
                 .Map(chunks => chunks.SelectMany(chunk => chunk).ToArray())
                 .Bind(CreatePreloadedContext);
         }
@@ -369,11 +367,8 @@ public static partial class CryptoService
             {
                 return Maybe
                     .From(entropy)
-                    .ToResult(SmartCardError.InvalidArgument("Entropy cannot be null"))
-                    .Ensure(
-                        e => e.Length > 0,
-                        SmartCardError.InvalidArgument("Entropy buffer cannot be empty")
-                    )
+                    .ToResult(ErrorFactory.NullArgument("Entropy"))
+                    .Ensure(e => e.Length > 0, ErrorFactory.EmptyArgument("Entropy buffer"))
                     .Map(e => new DeterministicRngMode((byte[])e.Clone()));
             }
 
@@ -424,11 +419,8 @@ public static partial class CryptoService
             public static Result<IPreloadedRngContext, SmartCardError> Create(byte[] entropy) =>
                 Maybe
                     .From(entropy)
-                    .ToResult(SmartCardError.InvalidArgument("Entropy cannot be null"))
-                    .Ensure(
-                        e => e.Length > 0,
-                        SmartCardError.InvalidArgument("Entropy buffer cannot be empty")
-                    )
+                    .ToResult(ErrorFactory.NullArgument("Entropy"))
+                    .Ensure(e => e.Length > 0, ErrorFactory.EmptyArgument("Entropy buffer"))
                     .Map(e => (IPreloadedRngContext)new PreloadedRngContext(e.ToImmutableList()));
 
             /// <inheritdoc />
@@ -445,7 +437,7 @@ public static partial class CryptoService
                     return SmartCardError.InvalidArgument($"Length cannot be negative: {length}");
 
                 if (length == 0)
-                    return (Array.Empty<byte>(), this);
+                    return ([], this);
 
                 if (Position + length > EntropyBuffer.Count)
                     return SmartCardError.CryptographicError(

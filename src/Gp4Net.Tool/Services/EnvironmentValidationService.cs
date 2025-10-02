@@ -93,8 +93,11 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         try
         {
             // Detect card environment
-            var cardEnvResult =
-                await DetectCardEnvironmentAsync(channel, transport, cancellationToken);
+            var cardEnvResult = await DetectCardEnvironmentAsync(
+                channel,
+                transport,
+                cancellationToken
+            );
             if (cardEnvResult.IsFailure)
             {
                 return Result.Failure<EnvironmentValidationResult, SmartCardError>(
@@ -175,11 +178,7 @@ public class EnvironmentValidationService : IEnvironmentValidationService
             }
 
             // Try to get CPLC data to identify card type
-            var cplcResult = await GetCplcDataAsync(
-                channel,
-                transport,
-                cancellationToken
-            );
+            var cplcResult = await GetCplcDataAsync(channel, transport, cancellationToken);
             if (cplcResult.IsSuccess)
             {
                 var environment = AnalyzeCplcData(cplcResult.Value);
@@ -316,40 +315,41 @@ public class EnvironmentValidationService : IEnvironmentValidationService
             // Safe combinations
             (CardEnvironment.Test, true) => (true, "Safe: Test keys with test card", []),
             (CardEnvironment.Virtual, true) => (true, "Safe: Test keys with virtual card", []),
-            (CardEnvironment.Production, false) => (
-                true,
-                "Safe: Production keys with production card",
-                []
-            ),
+            (CardEnvironment.Production, false)
+                => (true, "Safe: Production keys with production card", []),
 
             // Dangerous combinations
-            (CardEnvironment.Production, true) => (
-                false,
-                "DANGEROUS: Test keys should not be used with production cards",
-                [
-                    "Using test keys on production cards may cause lockout",
-                    "Verify card type before proceeding",
-                ]
-            ),
+            (CardEnvironment.Production, true)
+                => (
+                    false,
+                    "DANGEROUS: Test keys should not be used with production cards",
+                    [
+                        "Using test keys on production cards may cause lockout",
+                        "Verify card type before proceeding",
+                    ]
+                ),
 
             // Questionable combinations
-            (CardEnvironment.Test, false) => (
-                true,
-                "Questionable: Production keys with test card",
-                ["Using production keys on test cards may reveal sensitive information"]
-            ),
+            (CardEnvironment.Test, false)
+                => (
+                    true,
+                    "Questionable: Production keys with test card",
+                    ["Using production keys on test cards may reveal sensitive information"]
+                ),
 
             // Unknown combinations - err on the side of caution
-            (CardEnvironment.Unknown, true) => (
-                true,
-                "Caution: Test keys with unknown card type",
-                ["Card type could not be determined", "Test keys are generally safer"]
-            ),
-            (CardEnvironment.Unknown, false) => (
-                false,
-                "CAUTION: Production keys with unknown card type",
-                ["Card type could not be determined", "Production keys may be risky"]
-            ),
+            (CardEnvironment.Unknown, true)
+                => (
+                    true,
+                    "Caution: Test keys with unknown card type",
+                    ["Card type could not be determined", "Test keys are generally safer"]
+                ),
+            (CardEnvironment.Unknown, false)
+                => (
+                    false,
+                    "CAUTION: Production keys with unknown card type",
+                    ["Card type could not be determined", "Production keys may be risky"]
+                ),
 
             _ => (false, "Unknown combination", new[] { "Unable to assess safety" }),
         };

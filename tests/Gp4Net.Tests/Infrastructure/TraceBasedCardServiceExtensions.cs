@@ -72,9 +72,10 @@ public static class TraceBasedCardServiceExtensions
             .ToResult("Trace path cannot be null or empty");
 
         return pathResult.Match(
-            path => File.Exists(path)
-                ? Result.Success<string, string>(path)
-                : Result.Failure<string, string>($"Trace file not found: {path}"),
+            path =>
+                File.Exists(path)
+                    ? Result.Success<string, string>(path)
+                    : Result.Failure<string, string>($"Trace file not found: {path}"),
             error => Result.Failure<string, string>(error)
         );
     }

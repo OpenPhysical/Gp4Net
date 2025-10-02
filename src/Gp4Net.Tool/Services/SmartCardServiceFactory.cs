@@ -1,9 +1,7 @@
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
-using Gp4Net.Domain;
 using Gp4Net.Pipeline;
 using Gp4Net.Services;
 using Gp4Net.Transport;
@@ -67,11 +65,7 @@ public class SmartCardServiceFactory : ISmartCardServiceFactory
     )
     {
         var logger = _loggerFactory.CreateLogger<SmartCardService>();
-        return await ConnectionFactory.CreateConnectionAsync(
-            readerSpec,
-            logger,
-            cancellationToken
-        );
+        return await ConnectionFactory.CreateConnectionAsync(readerSpec, logger, cancellationToken);
     }
 }
 
@@ -219,6 +213,20 @@ internal class EnumerationSmartCardService : ISmartCardService
     {
         return Task.FromResult(
             Result.Failure<CommandResponse, SmartCardError>(
+                SmartCardError.CommunicationError(
+                    "No card connection established. This service is for enumeration only."
+                )
+            )
+        );
+    }
+
+    /// <inheritdoc/>
+    public Task<
+        Result<CardTransportCapabilities, SmartCardError>
+    > GetCardTransportCapabilitiesAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(
+            Result.Failure<CardTransportCapabilities, SmartCardError>(
                 SmartCardError.CommunicationError(
                     "No card connection established. This service is for enumeration only."
                 )

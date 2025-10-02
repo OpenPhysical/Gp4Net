@@ -196,12 +196,7 @@ public static class SecureChannelLifecycleTransitions
                 new AuthenticationFailedError($"Cannot authenticate from phase {current.Phase}")
             );
 
-        var authState = new AuthenticatedState(
-            keys,
-            level,
-            externalAuthMac,
-            implementation
-        );
+        var authState = new AuthenticatedState(keys, level, externalAuthMac, implementation);
 
         return authState
             .Validate()
@@ -277,7 +272,8 @@ public static class SecureChannelLifecycleTransitions
                                 MacChaining: macChaining,
                                 EncryptionCounter: 0,
                                 SessionId: GenerateSecureSessionId(),
-                                ImplementationParameter: (byte)authState.Implementation
+                                ImplementationParameter: (byte)authState.Implementation,
+                                LastStrippedCommand: ImmutableArray<byte>.Empty
                             ))
                     )
             );

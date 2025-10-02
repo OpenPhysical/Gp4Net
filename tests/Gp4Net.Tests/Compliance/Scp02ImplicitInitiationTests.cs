@@ -116,8 +116,11 @@ public class Scp02ImplicitInitiationTests
         var commandWithCMac = CreateCommandWithCMac();
 
         // Act - Process first C-MAC command (should initiate secure channel)
-        var result =
-            ProcessImplicitSecureChannelInitiation(sessionState, commandWithCMac, implementation);
+        var result = ProcessImplicitSecureChannelInitiation(
+            sessionState,
+            commandWithCMac,
+            implementation
+        );
 
         // Assert
         _ = result.IsSuccess.Should().BeTrue("Implicit secure channel initiation should succeed");
@@ -173,17 +176,14 @@ public class Scp02ImplicitInitiationTests
         var validationResults = testCases.Select(testCase =>
         {
             var sessionState = CreateImplicitSessionState();
-            var command = testCase.HasCMac
-                ? CreateCommandWithCMac()
-                : CreateCommandWithoutCMac();
+            var command = testCase.HasCMac ? CreateCommandWithCMac() : CreateCommandWithoutCMac();
 
             // Act
-            var result =
-                ProcessImplicitSecureChannelInitiation(
-                    sessionState,
-                    command,
-                    ScpImplementation.Scp02I0A
-                );
+            var result = ProcessImplicitSecureChannelInitiation(
+                sessionState,
+                command,
+                ScpImplementation.Scp02I0A
+            );
 
             return result.Match(
                 state =>

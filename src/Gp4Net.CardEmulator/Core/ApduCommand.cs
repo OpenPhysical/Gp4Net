@@ -84,15 +84,14 @@ public sealed record ApduCommand
         {
             4 => Result.Success<byte[], SmartCardError>(rawBytes), // Case 1: No Lc, no Le
             5 => Result.Success<byte[], SmartCardError>(rawBytes), // Case 2: No Lc, Le present
-            >= 6 when rawBytes.Length == 5 + rawBytes[4] => Result.Success<byte[], SmartCardError>(
-                rawBytes
-            ), // Case 3: Lc present, data, no Le
-            >= 7 when rawBytes.Length == 6 + rawBytes[4] => Result.Success<byte[], SmartCardError>(
-                rawBytes
-            ), // Case 4: Lc present, data, Le present
-            _ => Result.Failure<byte[], SmartCardError>(
-                SmartCardError.InvalidArgument("Invalid APDU format")
-            ),
+            >= 6 when rawBytes.Length == 5 + rawBytes[4]
+                => Result.Success<byte[], SmartCardError>(rawBytes), // Case 3: Lc present, data, no Le
+            >= 7 when rawBytes.Length == 6 + rawBytes[4]
+                => Result.Success<byte[], SmartCardError>(rawBytes), // Case 4: Lc present, data, Le present
+            _
+                => Result.Failure<byte[], SmartCardError>(
+                    SmartCardError.InvalidArgument("Invalid APDU format")
+                ),
         };
     }
 
@@ -107,26 +106,28 @@ public sealed record ApduCommand
     private static ApduCommand ParseApduBytes(byte[] rawBytes) =>
         rawBytes.Length switch
         {
-            4 => new ApduCommand
-            {
-                Cla = rawBytes[0],
-                Ins = rawBytes[1],
-                P1 = rawBytes[2],
-                P2 = rawBytes[3],
-                Data = [],
-                Le = Maybe<byte>.None,
-                RawBytes = (byte[])rawBytes.Clone(),
-            },
-            5 => new ApduCommand
-            {
-                Cla = rawBytes[0],
-                Ins = rawBytes[1],
-                P1 = rawBytes[2],
-                P2 = rawBytes[3],
-                Data = [],
-                Le = Maybe<byte>.From(rawBytes[4]),
-                RawBytes = (byte[])rawBytes.Clone(),
-            },
+            4
+                => new ApduCommand
+                {
+                    Cla = rawBytes[0],
+                    Ins = rawBytes[1],
+                    P1 = rawBytes[2],
+                    P2 = rawBytes[3],
+                    Data = [],
+                    Le = Maybe<byte>.None,
+                    RawBytes = (byte[])rawBytes.Clone(),
+                },
+            5
+                => new ApduCommand
+                {
+                    Cla = rawBytes[0],
+                    Ins = rawBytes[1],
+                    P1 = rawBytes[2],
+                    P2 = rawBytes[3],
+                    Data = [],
+                    Le = Maybe<byte>.From(rawBytes[4]),
+                    RawBytes = (byte[])rawBytes.Clone(),
+                },
             _ => ParseApduWithData(rawBytes),
         };
 

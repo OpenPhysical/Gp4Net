@@ -291,8 +291,10 @@ public record ApplicationSelectionContext(
         var isd = VirtualSecurityDomain.CreateIsd();
         string isdKey = Convert.ToHexString(Apdu.WellKnownIdentifiers.StandardGpIsdAid); // Standard GP ISD AID per GlobalPlatform specification
 
-        var securityDomainsBuilder =
-            ImmutableDictionary.CreateBuilder<string, VirtualSecurityDomain>();
+        var securityDomainsBuilder = ImmutableDictionary.CreateBuilder<
+            string,
+            VirtualSecurityDomain
+        >();
         securityDomainsBuilder.Add(isdKey, isd);
 
         var historyBuilder = ImmutableList.CreateBuilder<string>();
@@ -367,8 +369,7 @@ public record ApplicationSelectionContext(
             associatedSecurityDomainAid,
             privileges
         );
-        var applicationsBuilder =
-            Applications.ToBuilder();
+        var applicationsBuilder = Applications.ToBuilder();
         applicationsBuilder.Add(aidString, application);
 
         return Result.Success<ApplicationSelectionContext, SmartCardError>(
@@ -473,10 +474,7 @@ public record ApplicationSelectionContext(
         var application = Applications[aidString];
 
         var updatedApplication = application.WithState(newState);
-        var newApplications = Applications.SetItem(
-            aidString,
-            updatedApplication
-        );
+        var newApplications = Applications.SetItem(aidString, updatedApplication);
 
         return Result.Success<ApplicationSelectionContext, SmartCardError>(
             this with
@@ -510,9 +508,7 @@ public record ApplicationSelectionContext(
             );
         }
 
-        var newApplications = Applications.Remove(
-            aidString
-        );
+        var newApplications = Applications.Remove(aidString);
         var newSelectedKey = SelectedEntityKey.Match(
             selected => selected == aidString ? Maybe<string>.None : SelectedEntityKey,
             () => Maybe<string>.None
