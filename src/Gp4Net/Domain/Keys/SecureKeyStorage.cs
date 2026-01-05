@@ -310,12 +310,21 @@ public sealed class SecureSessionKeys : IDisposable
             .GetKeyCopy()
             .Bind(sEnc => _sMac.GetKeyCopy().Map(sMac => (sEnc, sMac)))
             .Bind(keys => _sRMac.GetKeyCopy().Map(sRMac => (keys.sEnc, keys.sMac, sRMac)))
-            .Map(keys =>
+            .Bind(keys =>
             {
-                byte[] dekKey = default;
-                _dek.Execute(d => d.GetKeyCopy().Tap(key => dekKey = key));
-                return new SessionKeys(keys.sEnc, keys.sMac, keys.sRMac, dekKey);
-            });
+                Maybe<byte[]> dekKey = Maybe<byte[]>.None;
+                Result<bool, SmartCardError> dekResult = _dek.Match(
+                    dekStorage =>
+                        dekStorage
+                            .GetKeyCopy()
+                            .Tap(key => dekKey = Maybe<byte[]>.From(key))
+                            .Map(_ => true),
+                    () => Result.Success<bool, SmartCardError>(true)
+                );
+
+                return dekResult.Map(_ => new { keys.sEnc, keys.sMac, keys.sRMac, dekKey });
+            })
+            .Map(payload => new SessionKeys(payload.sEnc, payload.sMac, payload.sRMac, payload.dekKey));
     }
 
     /// <summary>

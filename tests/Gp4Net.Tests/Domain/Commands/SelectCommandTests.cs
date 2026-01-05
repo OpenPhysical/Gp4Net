@@ -3,6 +3,7 @@ using AwesomeAssertions;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.Commands;
+using Gp4Net.Services.GlobalPlatform;
 using Gp4Net.Transport;
 using NUnit.Framework;
 
@@ -232,7 +233,7 @@ public class SelectCommandTests
     [Test]
     public void CreateEmptySelect_IsObsolete_ButWorks()
     {
-        var command = Services.GlobalPlatform.Commands.CreateSelectIsdCommand().Value;
+        var command = Gp4Net.Services.GlobalPlatform.Commands.CreateSelectIsdCommand().Value;
 
         _ = command.Aid.Should().BeEmpty();
         _ = command.Control.Should().Be(SelectCommand.SelectionControl.SelectByName);
@@ -416,7 +417,9 @@ public class SelectCommandTests
 
         foreach (var option in options)
         {
-            var command = Services.GlobalPlatform.Commands.CreateSelectIsdCommand(option).Value;
+            var command = Gp4Net
+                .Services.GlobalPlatform.Commands.CreateSelectIsdCommand(option)
+                .Value;
 
             _ = command
                 .ControlInfo.Should()

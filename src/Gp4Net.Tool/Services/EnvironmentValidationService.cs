@@ -14,8 +14,13 @@ using Microsoft.Extensions.Logging;
 namespace Gp4Net.Tool.Services;
 
 /// <summary>
-/// Implementation of environment validation service that prevents dangerous key/card combinations.
+/// Validates that secure channel operations occur in a safe environment.
 /// </summary>
+/// <remarks>
+/// The service cross-references key material with card provenance (ATR, CPLC, behavior heuristics)
+/// to prevent production hardware from being used with well-known test keys, fulfilling GP 2.3.1
+/// safety requirements.
+/// </remarks>
 [PublicAPI]
 public class EnvironmentValidationService : IEnvironmentValidationService
 {
@@ -78,7 +83,23 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Validates that the provided keyset and card environment satisfy safety rules.
+    /// </summary>
+    /// <param name="keySet">Secure channel keyset under evaluation.</param>
+    /// <param name="channel">Logical card channel used for discovery.</param>
+    /// <param name="transport">Transport responsible for APDU exchange.</param>
+    /// <param name="cancellationToken">Token used to cancel the validation.</param>
+    /// <returns>
+    /// A <see cref="Result{TValue,TError}"/> containing an <see cref="EnvironmentValidationResult"/>
+    /// that flags unsafe combinations, or a <see cref="SmartCardError"/> detailing why validation
+    /// could not be completed.
+    /// </returns>
+    /// <remarks>
+    /// Validation combines <see cref="IsTestKeySet"/> analysis with <see cref="DetectCardEnvironmentAsync"/>
+    /// so that known test keys are never used against production hardware. The result embeds both
+    /// warning messages and the inferred environment classification.
+    /// </remarks>
     public async Task<Result<EnvironmentValidationResult, SmartCardError>> ValidateEnvironmentAsync(
         IKeySet keySet,
         ICardChannel channel,
@@ -140,17 +161,36 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Determines whether the supplied keyset matches well-known test patterns.
+    /// </summary>
+    /// <param name="keySet">Keyset to evaluate.</param>
+    /// <returns>
+    /// <see langword="true"/> when any component matches GP Appendix D defaults or other forbidden
+    /// patterns (zero, all-<c>FF</c>, sequential, or <c>DEADBEEF</c>); otherwise
+    /// <see langword="false"/>.
+    /// </returns>
+    /// <remarks>
+    /// The detection list is restricted to the officially supported test patterns defined in
+    /// <c>docs/coverage/coverage-playbook.md</c>, ensuring vendor-specific secrets are never
+    /// hard-coded into the service.
+    /// </remarks>
     public bool IsTestKeySet(IKeySet keySet)
     {
         ArgumentNullException.ThrowIfNull(keySet);
 
-        // Check if any of the keys match well-known test keys
+        // Check if any of the keys match well-known test keys using GpTestKeys.IsTestKey()
         byte[][] keyBytes = [keySet.EncKey, keySet.MacKey, keySet.DekKey];
 
         foreach (byte[] key in keyBytes)
         {
-            if (key != null && WellKnownTestKeys.Any(testKey => testKey.SequenceEqual(key)))
+            if (
+                key != null
+                && (
+                    GpTestKeys.IsTestKey(key)
+                    || WellKnownTestKeys.Any(testKey => testKey.SequenceEqual(key))
+                )
+            )
             {
                 return true;
             }
@@ -159,7 +199,20 @@ public class EnvironmentValidationService : IEnvironmentValidationService
         return false;
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Detects the card environment (production, test, or virtual) using ATR, CPLC, and heuristics.
+    /// </summary>
+    /// <param name="channel">Logical card channel used for discovery.</param>
+    /// <param name="transport">Transport responsible for APDU exchange.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    /// <returns>
+    /// A <see cref="Result{TValue,TError}"/> containing the detected <see cref="CardEnvironment"/>
+    /// or a <see cref="SmartCardError"/> describing why detection failed.
+    /// </returns>
+    /// <remarks>
+    /// Detection first checks for virtual channels, then reads CPLC data, and finally inspects card
+    /// behavior patterns, mirroring the safety sequence outlined in GP 2.3.1.
+    /// </remarks>
     public async Task<Result<CardEnvironment, SmartCardError>> DetectCardEnvironmentAsync(
         ICardChannel channel,
         IApduTransport transport,

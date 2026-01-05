@@ -171,4 +171,21 @@ public static partial class GpTestKeys
             keyVersion
         );
     }
+
+    /// <summary>
+    /// Determines whether the specified key is a known test key.
+    /// Checks against the standard GlobalPlatform test key (404142434445464748494A4B4C4D4E4F).
+    /// SECURITY CRITICAL: Production systems MUST validate keys are not test keys before deployment.
+    /// </summary>
+    /// <param name="key">The key to validate.</param>
+    /// <returns>true if the key matches the known GP test key; otherwise, false.</returns>
+    public static bool IsTestKey(ReadOnlySpan<byte> key)
+    {
+        if (key.Length != 16)
+        {
+            return false;
+        }
+
+        return key.SequenceEqual(GpTestKey);
+    }
 }

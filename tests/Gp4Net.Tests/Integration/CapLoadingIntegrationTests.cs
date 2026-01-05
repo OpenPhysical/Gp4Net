@@ -188,7 +188,7 @@ public class CapLoadingIntegrationTests
         Result<InstallCommand.InstallForLoadCommand, SmartCardError> installForLoadResult =
             InstallCommandBuilder.CreateForLoad(
                 packageAid: capFile.PackageAid,
-                securityDomainAid: Convert.FromHexString("A000000151000000") // Card Manager AID from trace
+                securityDomainAid: Maybe<byte[]>.From(Convert.FromHexString("A000000151000000")) // Card Manager AID from trace
             );
 
         Assert.That(installForLoadResult.IsSuccess, Is.True, "CreateForLoad should succeed");
@@ -334,8 +334,8 @@ public static class ByteArrayHelpers
     public static int FindBytePattern(byte[] source, byte[] pattern)
     {
         if (
-            source == null
-            || pattern == null
+            source == null!
+            || pattern == null!
             || pattern.Length == 0
             || source.Length < pattern.Length
         )

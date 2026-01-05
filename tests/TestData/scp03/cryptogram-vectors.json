@@ -1,0 +1,48 @@
+{
+  "description": "SCP03 card and host cryptogram fixtures aligned with NIST SP 800-108",
+  "reference": "scripts/scp03_test_vectors.json",
+  "vectors": [
+    {
+      "name": "Sequential Pattern Keys",
+      "staticKeys": {
+        "enc": "000102030405060708090A0B0C0D0E0F",
+        "mac": "101112131415161718191A1B1C1D1E1F",
+        "dek": "202122232425262728292A2B2C2D2E2F"
+      },
+      "sessionKeys": {
+        "enc": "3619112820D79FF81146E6862151F521",
+        "mac": "E2B6C0D5DC55B27602375D7A983A2B3C",
+        "rmac": "35210536E8D79B6574FC6F8B6049630D"
+      },
+      "challenges": {
+        "host": "0001020304050607",
+        "card": "08090A0B0C0D0E0F"
+      },
+      "expectedCryptograms": {
+        "card": "6E3E560916763FAA",
+        "host": "C44D56DED351F5A4"
+      }
+    },
+    {
+      "name": "All-Zeros Baseline",
+      "staticKeys": {
+        "enc": "00000000000000000000000000000000",
+        "mac": "00000000000000000000000000000000",
+        "dek": "00000000000000000000000000000000"
+      },
+      "sessionKeys": {
+        "enc": "D119A7CCA75F050B4F306C8E1E5CC554",
+        "mac": "78C41DD9D3CCFA9814C3B128FB0BB166",
+        "rmac": "B7698E3A4E8C6AE05E8D8C9A533CA83E"
+      },
+      "challenges": {
+        "host": "0000000000000000",
+        "card": "0000000000000000"
+      },
+      "expectedCryptograms": {
+        "card": "D2119C5615BCA32C",
+        "host": "A6C824ACA566F3FD"
+      }
+    }
+  ]
+}

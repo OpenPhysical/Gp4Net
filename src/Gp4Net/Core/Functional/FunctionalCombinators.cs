@@ -139,23 +139,6 @@ public static class FunctionalCombinators
     }
 
     /// <summary>
-    /// Helper to get first matching result from async sequence.
-    /// </summary>
-    private static async Task<T> FirstOrDefaultAsync<T>(
-        this IEnumerable<Task<T>> tasks,
-        Func<Task<T>, Task<bool>> predicate
-    )
-    {
-        foreach (var task in tasks)
-        {
-            var result = await task;
-            if (await predicate(Task.FromResult(result)))
-                return result;
-        }
-        return default;
-    }
-
-    /// <summary>
     /// Maps a value in a task.
     /// </summary>
     private static async Task<T2> Map<T1, T2>(this Task<T1> task, Func<T1, T2> mapper)

@@ -29,9 +29,7 @@ public static class VirtualCardServiceExtensions
     /// </summary>
     /// <param name="service">The virtual card service to configure.</param>
     /// <returns>The configured service for method chaining.</returns>
-    public static VirtualCardService SetupTestEnvironment(
-        this VirtualCardService service
-    )
+    public static VirtualCardService SetupTestEnvironment(this VirtualCardService service)
     {
         var manager = new VirtualReaderManagerBuilder()
             .WithP71Reader("Virtual P71 Reader 00 00")
@@ -39,11 +37,7 @@ public static class VirtualCardServiceExtensions
             .Value.WithP71Reader("Virtual Debug Reader 02 00")
             .Value.Build();
 
-        return new VirtualCardService(
-            manager,
-            Maybe<VirtualCardReader>.None,
-            false
-        );
+        return new VirtualCardService(manager, Maybe<VirtualCardReader>.None, false);
     }
 
     /// <summary>
@@ -52,7 +46,7 @@ public static class VirtualCardServiceExtensions
     /// </summary>
     /// <param name="service">The virtual card service.</param>
     /// <returns>Collection of available reader names.</returns>
-    public static IReadOnlyList<string> GetReaders(this VirtualCardService service)
+    public static IReadOnlyList<string> GetReadersLegacy(this VirtualCardService service)
     {
         return service.GetReaderManager().GetReaderNames();
     }
@@ -63,13 +57,15 @@ public static class VirtualCardServiceExtensions
     /// </summary>
     /// <param name="service">The virtual card service.</param>
     /// <param name="cancellationToken">Cancellation token for the operation.</param>
-    /// <returns>Task containing collection of available reader names.</returns>
-    public static Task<IReadOnlyList<string>> GetReadersAsync(
+    /// <returns>Task containing result with collection of available reader names.</returns>
+    public static Task<Result<string[], SmartCardError>> GetReadersAsync(
         this VirtualCardService service,
         CancellationToken cancellationToken = default
     )
     {
-        return Task.FromResult(service.GetReaders());
+        return service
+            .ConnectAsync(string.Empty)
+            .ContinueWith(_ => service.GetReaders(), cancellationToken);
     }
 
     /// <summary>

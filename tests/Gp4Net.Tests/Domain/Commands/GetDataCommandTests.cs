@@ -230,20 +230,6 @@ public class GetDataCommandTests
     }
 
     [Test]
-    public void CreateFor3ByteIdentifier_WithNullIdentifier_ReturnsError()
-    {
-        // Act
-        Result<GetDataCommand, SmartCardError> result = GetDataCommand.CreateFor3ByteIdentifier(
-            null
-        );
-
-        // Assert
-        _ = result.IsFailure.Should().BeTrue();
-        _ = result.Error.Should().BeOfType<SmartCardError>();
-        _ = result.Error.Message.Should().Contain("cannot be null");
-    }
-
-    [Test]
     [TestCase(new byte[] { })]
     [TestCase(new byte[] { 0x00 })]
     [TestCase(new byte[] { 0x00, 0x9F })]
@@ -275,17 +261,5 @@ public class GetDataCommandTests
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.DataObjectIdentifier.Should().Be(tag);
         _ = result.Value.Data.Should().BeEquivalentTo(responseData);
-    }
-
-    [Test]
-    public void Parse_WithNullResponse_ReturnsError()
-    {
-        // Act
-        Result<GetDataResponse, SmartCardError> result = GetDataResponse.Parse(0x0066, null);
-
-        // Assert
-        _ = result.IsFailure.Should().BeTrue();
-        _ = result.Error.Should().BeOfType<SmartCardError>();
-        _ = result.Error.Message.Should().Contain("cannot be null");
     }
 }

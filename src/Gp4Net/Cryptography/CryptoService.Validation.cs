@@ -73,7 +73,10 @@ public static partial class CryptoService
                                         .From(data)
                                         .Match(
                                             Some: _ => UnitResult.Success<SmartCardError>(),
-                                            None: () => UnitResult.Failure(ErrorFactory.NullArgument("Data"))
+                                            None: () =>
+                                                UnitResult.Failure(
+                                                    ErrorFactory.NullArgument("Data")
+                                                )
                                         ),
                                 None: () => UnitResult.Failure(ErrorFactory.NullArgument("IV"))
                             ),

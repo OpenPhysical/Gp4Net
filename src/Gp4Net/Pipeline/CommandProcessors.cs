@@ -210,7 +210,9 @@ public static class CommandProcessors
 
         // Get command bytes - use wrapped bytes if available
         var commandBytesResult = command is WrappedApduCommand wrapped
-            ? Result.Success<(byte[] bytes, IApduCommand cmd), SmartCardError>((wrapped.WrappedBytes, wrapped))
+            ? Result.Success<(byte[] bytes, IApduCommand cmd), SmartCardError>(
+                (wrapped.WrappedBytes, wrapped)
+            )
             : GetCommandBytes(command).Map(bytes => (bytes, command));
 
         return await commandBytesResult.Match(
@@ -246,7 +248,11 @@ public static class CommandProcessors
                             "[DEBUG] Wire-level APDU (unwrapped): {CommandHex}",
                             Convert.ToHexString(commandBytes)
                         );
-                        LogApduStructure(environment.Logger, commandBytes, "Wire-level (Plaintext)");
+                        LogApduStructure(
+                            environment.Logger,
+                            commandBytes,
+                            "Wire-level (Plaintext)"
+                        );
                     }
                     else if (environment.Options.EnableLogging)
                     {
@@ -280,7 +286,10 @@ public static class CommandProcessors
                         stopwatch.Stop();
 
                         // Combine response bytes for metadata
-                        byte[] responseBytes = CombineResponseBytes(response.Data, response.StatusWord);
+                        byte[] responseBytes = CombineResponseBytes(
+                            response.Data,
+                            response.StatusWord
+                        );
 
                         // Log response details
                         if (environment.Options.DebugLogging)
@@ -333,7 +342,9 @@ public static class CommandProcessors
                     error =>
                     {
                         stopwatch.Stop();
-                        return Task.FromResult(Result.Failure<CommandResult, SmartCardError>(error));
+                        return Task.FromResult(
+                            Result.Failure<CommandResult, SmartCardError>(error)
+                        );
                     }
                 );
             },

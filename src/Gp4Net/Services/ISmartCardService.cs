@@ -151,7 +151,7 @@ public record SmartCardServiceOptions
     /// <summary>
     /// Initial context values.
     /// </summary>
-    public IPipelineContext InitialContext { get; init; }
+    public IPipelineContext InitialContext { get; init; } = ImmutablePipelineContext.Empty;
 }
 
 /// <summary>

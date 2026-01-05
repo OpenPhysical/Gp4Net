@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using CSharpFunctionalExtensions;
 using JetBrains.Annotations;
 
@@ -31,11 +33,15 @@ public static class KnownOids
     /// </summary>
     /// <param name="oid">The OID in dotted notation.</param>
     /// <returns>The description if known, otherwise None.</returns>
-    public static Maybe<string> GetDescription(string oid)
+    public static string? GetDescription(string? oid)
     {
-        return OidDescriptions.TryGetValue(oid, out string description)
-            ? Maybe<string>.From(description)
-            : Maybe<string>.None;
+        if (string.IsNullOrWhiteSpace(oid))
+        {
+            return null;
+        }
+
+        string normalizedOid = oid.Trim();
+        return OidDescriptions.TryGetValue(normalizedOid, out var description) ? description : null;
     }
 
     /// <summary>
@@ -43,9 +49,14 @@ public static class KnownOids
     /// </summary>
     /// <param name="oid">The OID in dotted notation.</param>
     /// <returns>True if the OID is in the known registry.</returns>
-    public static bool IsKnown(string oid)
+    public static bool IsKnown(string? oid)
     {
-        return OidDescriptions.ContainsKey(oid);
+        if (string.IsNullOrWhiteSpace(oid))
+        {
+            return false;
+        }
+
+        return OidDescriptions.ContainsKey(oid.Trim());
     }
 
     /// <summary>
@@ -54,6 +65,6 @@ public static class KnownOids
     /// <returns>A read-only collection of all known OIDs.</returns>
     public static IReadOnlyCollection<string> GetAllKnownOids()
     {
-        return OidDescriptions.Keys;
+        return OidDescriptions.Keys.ToList();
     }
 }

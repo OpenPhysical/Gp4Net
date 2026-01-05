@@ -573,7 +573,9 @@ public static partial class CryptoService
             /// Builds SCP03 IV from encryption counter.
             /// Per GP Card Specification v2.3.1 Section E.5.3.
             /// </summary>
+            /// <param name="sEncKey">The S-ENC session key (16 bytes).</param>
             /// <param name="counter">The encryption counter.</param>
+            /// <param name="isResponse">True when building a response IV.</param>
             /// <returns>The 16-byte IV for AES operations.</returns>
             private static Result<byte[], SmartCardError> BuildScp03Iv(
                 byte[] sEncKey,

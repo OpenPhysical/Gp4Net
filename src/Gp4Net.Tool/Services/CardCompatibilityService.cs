@@ -13,8 +13,13 @@ using Microsoft.Extensions.Logging;
 namespace Gp4Net.Tool.Services;
 
 /// <summary>
-/// Implementation of card compatibility service for safe real card testing.
+/// Implementation of the compatibility evaluation service used by the CLI.
 /// </summary>
+/// <remarks>
+/// The service coordinates card discovery, environment validation, and rules analysis to ensure
+/// production cards are never paired with test key material. Documentation mirrors the safety
+/// guidance in <c>docs/coverage/coverage-playbook.md</c>.
+/// </remarks>
 [PublicAPI]
 public class CardCompatibilityService : ICardCompatibilityService
 {
@@ -85,8 +90,14 @@ public class CardCompatibilityService : ICardCompatibilityService
         };
 
     /// <summary>
-    /// Creates a new CardCompatibilityService with validated dependencies.
+    /// Creates a compatibility service instance with validated dependencies.
     /// </summary>
+    /// <param name="logger">Structured logger used for telemetry.</param>
+    /// <param name="environmentValidation">Environment validation service dependency.</param>
+    /// <returns>
+    /// A <see cref="Result{TValue,TError}"/> containing an initialized service instance or a
+    /// <see cref="SmartCardError"/> indicating the dependency contract failure.
+    /// </returns>
     public static Result<CardCompatibilityService, SmartCardError> Create(
         ILogger<CardCompatibilityService> logger,
         IEnvironmentValidationService environmentValidation
@@ -119,7 +130,23 @@ public class CardCompatibilityService : ICardCompatibilityService
         _environmentValidation = environmentValidation;
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Evaluates whether an operation can be executed safely on the connected card.
+    /// </summary>
+    /// <param name="operation">Target GlobalPlatform operation.</param>
+    /// <param name="keySet">Keyset that will be used to establish secure channels.</param>
+    /// <param name="channel">Logical card channel used for I/O.</param>
+    /// <param name="transport">Transport responsible for APDU exchange.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    /// <returns>
+    /// A <see cref="CardCompatibilityResult"/> containing compatibility, safety, warnings, and
+    /// recommendations when evaluation succeeds; otherwise a <see cref="SmartCardError"/>.
+    /// </returns>
+    /// <remarks>
+    /// The analysis enforces the same rules outlined in <c>coverage-playbook.md</c> and always
+    /// biases toward safety: any ambiguity returns <see cref="CardCompatibilityResult.IsSafe"/> as
+    /// <see langword="false"/> with explicit recommendations.
+    /// </remarks>
     public async Task<Result<CardCompatibilityResult, SmartCardError>> CheckCompatibilityAsync(
         CardOperation operation,
         IKeySet keySet,
@@ -197,7 +224,20 @@ public class CardCompatibilityService : ICardCompatibilityService
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Detects the card type using ATR and CPLC heuristics.
+    /// </summary>
+    /// <param name="channel">Logical card channel used for I/O.</param>
+    /// <param name="transport">Transport responsible for APDU exchange.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    /// <returns>
+    /// A <see cref="CardTypeInfo"/> describing manufacturer, production status, and known limits
+    /// when detection succeeds; otherwise a <see cref="SmartCardError"/>.
+    /// </returns>
+    /// <remarks>
+    /// Detection uses ATR lookups first, then CPLC manufacturer codes, and finally defaults to a
+    /// conservative production-safe profile when the card cannot be identified.
+    /// </remarks>
     public async Task<Result<CardTypeInfo, SmartCardError>> DetectCardTypeAsync(
         ICardChannel channel,
         IApduTransport transport,
@@ -249,7 +289,22 @@ public class CardCompatibilityService : ICardCompatibilityService
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Retrieves the remaining authentication attempt counter when exposed by the card.
+    /// </summary>
+    /// <param name="channel">Logical card channel used for I/O.</param>
+    /// <param name="transport">Transport responsible for APDU exchange.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    /// <returns>
+    /// A <see cref="Result{TValue,TError}"/> containing the remaining attempt count, or
+    /// <see langword="null"/> when the card does not expose the metric, or a
+    /// <see cref="SmartCardError"/> if the command cannot be issued safely.
+    /// </returns>
+    /// <remarks>
+    /// The method issues the GlobalPlatform GET DATA (Confirmation Counter) command and tolerates
+    /// failures by returning <see langword="null"/> so that compatibility checks remain resilient
+    /// across vendor-specific implementations.
+    /// </remarks>
     public async Task<Result<int?, SmartCardError>> GetAuthenticationAttemptCountAsync(
         ICardChannel channel,
         IApduTransport transport,

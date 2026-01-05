@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using CSharpFunctionalExtensions;
@@ -177,13 +178,19 @@ public class SecurityDomainStatus
     /// </summary>
     public string GetShortDescription()
     {
-        var parts = new[]
+        var parts = new List<string> { GetIsdState().ToString() };
+
+        if (IsPersonalized())
         {
-            GetIsdState().ToString(),
-            IsPersonalized() ? "Personalized" : null,
-            IsLocked() ? "Locked" : null,
-            GetSequenceCounter().Match(c => $"Seq:0x{c:X4}", () => null),
-        }.Where(p => p != null);
+            parts.Add("Personalized");
+        }
+
+        if (IsLocked())
+        {
+            parts.Add("Locked");
+        }
+
+        GetSequenceCounter().Execute(counter => parts.Add($"Seq:0x{counter:X4}"));
 
         return string.Join(", ", parts);
     }

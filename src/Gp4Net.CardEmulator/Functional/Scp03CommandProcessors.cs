@@ -383,7 +383,10 @@ public static class Scp03CommandProcessors
 
         // Update state
         var newState = state
-            .WithChallenges(data.HostChallenge, data.CardChallenge)
+            .WithChallenges(
+                Maybe<byte[]>.From(data.HostChallenge),
+                Maybe<byte[]>.From(data.CardChallenge)
+            )
             .WithKeys(data.Keys);
 
         // Increment sequence counter if pseudo-random challenges are used (i=70)
@@ -661,11 +664,19 @@ public static class Scp03CommandProcessors
                                 if (currentKeys is not Scp03KeySet scp03Keys)
                                 {
                                     logger.Match(
-                                        l => l.LogError("SCP03 EXTERNAL AUTHENTICATE: Current keys are not SCP03 keys"),
+                                        l =>
+                                            l.LogError(
+                                                "SCP03 EXTERNAL AUTHENTICATE: Current keys are not SCP03 keys"
+                                            ),
                                         () => { }
                                     );
-                                    return Result.Failure<ExternalAuthenticateRequest, SmartCardError>(
-                                        SmartCardError.InvalidArgument("SCP03 requires SCP03 key set")
+                                    return Result.Failure<
+                                        ExternalAuthenticateRequest,
+                                        SmartCardError
+                                    >(
+                                        SmartCardError.InvalidArgument(
+                                            "SCP03 requires SCP03 key set"
+                                        )
                                     );
                                 }
 
@@ -679,7 +690,9 @@ public static class Scp03CommandProcessors
                                         cardChallenge,
                                         Maybe<ScpImplementation>.From(state.ScpImplementation)
                                     )
-                                    .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context))
+                                    .Bind(context =>
+                                        CryptoService.KeyDerivation.DeriveSessionKeys(context)
+                                    )
                                     .Bind(sessionKeys =>
                                         // Calculate expected cryptogram using SESSION S-MAC key
                                         CryptoService
@@ -702,7 +715,9 @@ public static class Scp03CommandProcessors
                                                     l =>
                                                         l.LogDebug(
                                                             "Received Host Cryptogram: {Received}",
-                                                            Convert.ToHexString(request.HostCryptogram)
+                                                            Convert.ToHexString(
+                                                                request.HostCryptogram
+                                                            )
                                                         ),
                                                     () => { }
                                                 );
@@ -976,20 +991,20 @@ public static class Scp03CommandProcessors
         byte keyVersion,
         CardState state,
         CardConfiguration config,
-        out IKeySet keySet
+        out IKeySet? keySet
     )
     {
         keySet = null;
 
         // Check installed keys first
-        if (state.InstalledKeys.TryGetValue(keyVersion, out var installedKeys))
+        if (state.InstalledKeys.TryGetValue(keyVersion, out IKeySet? installedKeys) && installedKeys is not null)
         {
             keySet = installedKeys;
             return true;
         }
 
         // Then check static keys
-        if (config.StaticKeys.TryGetValue(keyVersion, out var staticKeys))
+        if (config.StaticKeys.TryGetValue(keyVersion, out IKeySet? staticKeys) && staticKeys is not null)
         {
             keySet = staticKeys;
             return true;

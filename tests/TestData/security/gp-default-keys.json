@@ -1,0 +1,22 @@
+{
+  "description": "GlobalPlatform 2.3.1 Appendix D - Default Test Keys",
+  "reference": "GP 2.3.1 Specification Appendix D",
+  "keys": [
+    {
+      "name": "GP Default Test Key",
+      "hex": "404142434445464748494A4B4C4D4E4F",
+      "description": "Standard GlobalPlatform default test key - MUST NOT be used in production",
+      "keyVersionNumber": 0,
+      "keyId": 1,
+      "usage": "Key Encryption Key (KEK), MAC Key, DEK"
+    },
+    {
+      "name": "GP Alternative Default",
+      "hex": "40414243444546474849404142434445",
+      "description": "Alternative default pattern found in some implementations",
+      "keyVersionNumber": 0,
+      "keyId": 2,
+      "usage": "Test key variant"
+    }
+  ]
+}

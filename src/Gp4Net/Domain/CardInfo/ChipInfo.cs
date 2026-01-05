@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -257,14 +258,13 @@ public class ChipInfo
     /// <returns>Operating system description.</returns>
     public string GetOperatingSystemDescription()
     {
-        var parts = new[]
-        {
-            JcopVersion.Match(v => $"JCOP {v}", () => null),
-            JavaCardVersion.Match(v => $"Java Card {v}", () => null),
-            GlobalPlatformVersion.Match(v => $"GP {v}", () => null),
-        }.Where(p => p != null);
+        var parts = new List<string>();
 
-        return string.Join(" / ", parts);
+        JcopVersion.Execute(v => parts.Add($"JCOP {v}"));
+        JavaCardVersion.Execute(v => parts.Add($"Java Card {v}"));
+        GlobalPlatformVersion.Execute(v => parts.Add($"GP {v}"));
+
+        return parts.Count > 0 ? string.Join(" / ", parts) : "Unknown";
     }
 
     /// <summary>
@@ -273,30 +273,48 @@ public class ChipInfo
     /// <returns>Crypto capabilities summary.</returns>
     public string GetCryptoSummary()
     {
-        var capabilities = new[]
-        {
-            CryptoCapabilities.HasFlag(CryptoCapabilities.TripleDes) ? "3DES" : null,
-            CryptoCapabilities.HasFlag(CryptoCapabilities.Aes256)
-                ? "AES-128/192/256"
-                : CryptoCapabilities.HasFlag(CryptoCapabilities.Aes192)
-                    ? "AES-128/192"
-                    : CryptoCapabilities.HasFlag(CryptoCapabilities.Aes128)
-                        ? "AES-128"
-                        : null,
-            CryptoCapabilities.HasFlag(CryptoCapabilities.Rsa4096)
-                ? "RSA-2048/4096"
-                : CryptoCapabilities.HasFlag(CryptoCapabilities.Rsa2048)
-                    ? "RSA-2048"
-                    : null,
-            CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc544)
-                ? "ECC P-256/384/521/544"
-                : CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc521)
-                    ? "ECC P-256/384/521"
-                    : CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc256)
-                        ? "ECC P-256"
-                        : null,
-        }.Where(c => c != null);
+        var capabilities = new List<string>();
 
-        return string.Join(", ", capabilities);
+        if (CryptoCapabilities.HasFlag(CryptoCapabilities.TripleDes))
+        {
+            capabilities.Add("3DES");
+        }
+
+        if (CryptoCapabilities.HasFlag(CryptoCapabilities.Aes256))
+        {
+            capabilities.Add("AES-128/192/256");
+        }
+        else if (CryptoCapabilities.HasFlag(CryptoCapabilities.Aes192))
+        {
+            capabilities.Add("AES-128/192");
+        }
+        else if (CryptoCapabilities.HasFlag(CryptoCapabilities.Aes128))
+        {
+            capabilities.Add("AES-128");
+        }
+
+        if (CryptoCapabilities.HasFlag(CryptoCapabilities.Rsa4096))
+        {
+            capabilities.Add("RSA-2048/4096");
+        }
+        else if (CryptoCapabilities.HasFlag(CryptoCapabilities.Rsa2048))
+        {
+            capabilities.Add("RSA-2048");
+        }
+
+        if (CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc544))
+        {
+            capabilities.Add("ECC P-256/384/521/544");
+        }
+        else if (CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc521))
+        {
+            capabilities.Add("ECC P-256/384/521");
+        }
+        else if (CryptoCapabilities.HasFlag(CryptoCapabilities.Ecc256))
+        {
+            capabilities.Add("ECC P-256");
+        }
+
+        return capabilities.Count > 0 ? string.Join(", ", capabilities) : "Unknown";
     }
 }

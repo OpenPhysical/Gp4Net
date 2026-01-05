@@ -16,34 +16,63 @@ using JetBrains.Annotations;
 namespace Gp4Net.CardEmulator.Profiles;
 
 /// <summary>
-/// Loads card profiles from JSON files.
+/// Loads card emulator profiles from declarative JSON documents.
 /// </summary>
+/// <remarks>
+/// Profile documents define ATR, static keys, data objects, and capability metadata used by the
+/// virtual card emulator. See <c>specs/002-coverage-docs-enhancement/quickstart.md</c> for the JSON
+/// schema conventions mirrored by the nested model types in this file.
+/// </remarks>
 [PublicAPI]
 public static class CardProfileLoader
 {
     /// <summary>
-    /// Loads a card configuration from a JSON file.
+    /// Loads a card configuration from a JSON file on disk.
     /// </summary>
-    /// <param name="jsonPath">Path to the JSON profile file.</param>
-    /// <returns>Result containing the card configuration or error.</returns>
+    /// <param name="jsonPath">Absolute or relative path to the JSON profile file.</param>
+    /// <returns>
+    /// A <see cref="Result{TValue,TError}"/> that yields a fully validated
+    /// <see cref="CardConfiguration"/> on success, or a <see cref="SmartCardError"/> describing why
+    /// the profile could not be consumed (missing file, invalid JSON, or semantic validation error).
+    /// </returns>
+    /// <example>
+    /// var configuration = CardProfileLoader.LoadFromFile(\"profiles/p71.json\");
+    /// configuration.Should().BeSuccess();
+    /// </example>
     public static Result<CardConfiguration, SmartCardError> LoadFromFile(string jsonPath) =>
         Maybe<string>
             .From(jsonPath)
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .ToResult(ErrorFactory.EmptyArgument("JSON path"))
-            .Ensure(File.Exists, SmartCardError.InvalidArgument($"Profile file not found: {jsonPath}"))
+            .Ensure(
+                File.Exists,
+                SmartCardError.InvalidArgument($"Profile file not found: {jsonPath}")
+            )
             .Bind(path =>
                 Result.Try(
                     () => File.ReadAllText(path),
                     ex => SmartCardError.InvalidData($"Failed to read profile file: {ex.Message}")
-                ))
+                )
+            )
             .Bind(LoadFromJson);
 
     /// <summary>
-    /// Loads a card configuration from a JSON string.
+    /// Loads a card configuration from an in-memory JSON string.
     /// </summary>
-    /// <param name="json">JSON content.</param>
-    /// <returns>Result containing the card configuration or error.</returns>
+    /// <param name="json">Raw JSON content that follows the card profile schema.</param>
+    /// <returns>
+    /// A <see cref="Result{TValue,TError}"/> describing whether deserialization and semantic
+    /// validation were successful.
+    /// </returns>
+    /// <example>
+    /// const string profileJson = """
+    /// {
+    ///   \"cardProfile\": { \"name\": \"Virtual Test\", \"description\": \"Integration demo\" },
+    ///   \"cardData\": { \"atr\": \"3B00\", \"isdAid\": \"A000000151000000\" }
+    /// }
+    /// """;
+    /// var configuration = CardProfileLoader.LoadFromJson(profileJson);
+    /// </example>
     public static Result<CardConfiguration, SmartCardError> LoadFromJson(string json) =>
         Maybe<string>
             .From(json)
@@ -297,13 +326,17 @@ public static class CardProfileLoader
             .Where(h => !string.IsNullOrWhiteSpace(h))
             .ToResult(ErrorFactory.EmptyArgument(fieldName))
             .Map(h => h.Replace(" ", "").Replace("-", ""))
-            .Ensure(cleaned => cleaned.Length % 2 == 0,
-                SmartCardError.InvalidData($"{fieldName} must have even number of hex digits"))
+            .Ensure(
+                cleaned => cleaned.Length % 2 == 0,
+                SmartCardError.InvalidData($"{fieldName} must have even number of hex digits")
+            )
             .Bind(cleaned => ConvertHexToBytes(cleaned, fieldName));
 
-    private static Result<byte[], SmartCardError> ConvertHexToBytes(string cleaned, string fieldName)
+    private static Result<byte[], SmartCardError> ConvertHexToBytes(
+        string cleaned,
+        string fieldName
+    )
     {
-
         return Result.Try(
             () => Convert.FromHexString(cleaned),
             ex => SmartCardError.InvalidData($"Failed to parse {fieldName}: {ex.Message}")
@@ -312,76 +345,265 @@ public static class CardProfileLoader
 }
 
 // JSON deserialization classes - All external data, so we handle nulls at boundaries
+/// <summary>
+/// Strongly typed representation of the top-level card profile JSON document.
+/// </summary>
+/// <remarks>
+/// Mirrors the schema documented in <c>specs/002-coverage-docs-enhancement/quickstart.md</c>.
+/// Each property targets a JSON object that describes a facet of the virtual card.
+/// </remarks>
 internal class CardProfile
 {
+    /// <summary>
+    /// Gets or sets human-readable profile information metadata.
+    /// </summary>
+    /// <value>Maps the <c>cardProfile</c> JSON object.</value>
     [JsonPropertyName("cardProfile")]
     public CardProfileInfo ProfileInfo { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets chip-level manufacturing information.
+    /// </summary>
+    /// <value>Maps the <c>chipInfo</c> JSON object.</value>
     public ChipInfoProfile ChipInfo { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets card data that influences secure channel defaults.
+    /// </summary>
+    /// <value>Maps the <c>cardData</c> JSON object.</value>
     public CardDataProfile CardData { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the static key sets keyed by version number.
+    /// </summary>
+    /// <value>Maps the <c>staticKeys</c> JSON object.</value>
     public Dictionary<string, KeySetProfile> StaticKeys { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets default data objects that should be seeded on the card.
+    /// </summary>
+    /// <value>Maps the <c>dataObjects</c> JSON object using tag/value pairs.</value>
     public Dictionary<string, string> DataObjects { get; set; } = new();
 }
 
+/// <summary>
+/// Describes the <c>cardProfile</c> JSON object.
+/// </summary>
 internal class CardProfileInfo
 {
+    /// <summary>
+    /// Gets or sets the internal identifier for the profile.
+    /// </summary>
+    /// <value>Matches the <c>name</c> field in JSON.</value>
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a human-readable description of the profile's purpose.
+    /// </summary>
+    /// <value>Matches the <c>description</c> field in JSON.</value>
     public string Description { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Represents the <c>chipInfo</c> section of the card profile.
+/// </summary>
 internal class ChipInfoProfile
 {
+    /// <summary>
+    /// Gets or sets the silicon manufacturer name.
+    /// </summary>
+    /// <value>Maps the <c>manufacturer</c> field.</value>
     public string Manufacturer { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the target platform identifier.
+    /// </summary>
+    /// <value>Maps the <c>platform</c> field.</value>
     public string Platform { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the chipset model identifier.
+    /// </summary>
+    /// <value>Maps the <c>model</c> field.</value>
     public string Model { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the memory configuration summary.
+    /// </summary>
+    /// <value>Maps the <c>memoryConfig</c> field.</value>
     public string MemoryConfig { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the CPU architecture description.
+    /// </summary>
+    /// <value>Maps the <c>architecture</c> field.</value>
     public string Architecture { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Represents the <c>cardData</c> section of the JSON profile.
+/// </summary>
 internal class CardDataProfile
 {
+    /// <summary>
+    /// Gets or sets the ATR string encoded in the profile.
+    /// </summary>
+    /// <value>Maps the <c>atr</c> field.</value>
     public string Atr { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the ISD AID string encoded in the profile.
+    /// </summary>
+    /// <value>Maps the <c>isdAid</c> field.</value>
     public string IsdAid { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets optional CPLC data used to tag production cards.
+    /// </summary>
+    /// <value>Maps the <c>cplc</c> object.</value>
     public CplcProfile Cplc { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets capability declarations that drive secure channel detection.
+    /// </summary>
+    /// <value>Maps the <c>capabilities</c> object.</value>
     public CapabilitiesProfile Capabilities { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets known key metadata for the physical card.
+    /// </summary>
+    /// <value>Maps the <c>keyInfo</c> array.</value>
     public List<KeyInfoProfile> KeyInfo { get; set; } = [];
 }
 
+/// <summary>
+/// Represents the <c>cplc</c> subsection of the card profile.
+/// </summary>
 internal class CplcProfile
 {
+    /// <summary>
+    /// Gets or sets the IC fabricator identifier in hexadecimal form.
+    /// </summary>
+    /// <value>Maps the <c>icFabricator</c> field.</value>
     public string IcFabricator { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the IC type identifier in hexadecimal form.
+    /// </summary>
+    /// <value>Maps the <c>icType</c> field.</value>
     public string IcType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the operating system identifier.
+    /// </summary>
+    /// <value>Maps the <c>operatingSystemId</c> field.</value>
     public string OperatingSystemId { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Represents the <c>capabilities</c> subsection of the card profile.
+/// </summary>
 internal class CapabilitiesProfile
 {
+    /// <summary>
+    /// Gets or sets the collection of secure channel protocol declarations.
+    /// </summary>
+    /// <value>Maps the <c>scpSupport</c> array.</value>
     public List<ScpSupportProfile> ScpSupport { get; set; } = [];
 }
 
+/// <summary>
+/// Represents an entry in the <c>scpSupport</c> array.
+/// </summary>
 internal class ScpSupportProfile
 {
+    /// <summary>
+    /// Gets or sets the secure channel protocol identifier (for example <c>0x03</c>).
+    /// </summary>
+    /// <value>Maps the <c>protocol</c> field.</value>
     public string Protocol { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the supported implementation values for the protocol.
+    /// </summary>
+    /// <value>Maps the <c>implementations</c> array.</value>
     public List<string> Implementations { get; set; } = [];
 }
 
+/// <summary>
+/// Represents an entry in the <c>keyInfo</c> array.
+/// </summary>
 internal class KeyInfoProfile
 {
+    /// <summary>
+    /// Gets or sets the key version number.
+    /// </summary>
+    /// <value>Maps the <c>version</c> field.</value>
     public int Version { get; set; }
+
+    /// <summary>
+    /// Gets or sets the key identifier.
+    /// </summary>
+    /// <value>Maps the <c>id</c> field.</value>
     public int Id { get; set; }
+
+    /// <summary>
+    /// Gets or sets the key type (for example <c>AES</c> or <c>DES</c>).
+    /// </summary>
+    /// <value>Maps the <c>type</c> field.</value>
     public string Type { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the key length in bits.
+    /// </summary>
+    /// <value>Maps the <c>length</c> field.</value>
     public int Length { get; set; }
 }
 
+/// <summary>
+/// Represents the <c>staticKeys</c> subsection for a single key version.
+/// </summary>
 internal class KeySetProfile
 {
+    /// <summary>
+    /// Gets or sets the key version that the static keys belong to.
+    /// </summary>
+    /// <value>Maps the <c>version</c> field.</value>
     public int Version { get; set; }
+
+    /// <summary>
+    /// Gets or sets the secure channel protocol identifier expected by the key set.
+    /// </summary>
+    /// <value>Maps the <c>type</c> field (for example <c>SCP02</c>).</value>
     public string Type { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the ENC/MAC/DEK key values for the key set.
+    /// </summary>
+    /// <value>Maps the <c>keys</c> object.</value>
     public KeysProfile Keys { get; set; } = new();
 }
 
+/// <summary>
+/// Represents the <c>keys</c> object attached to a static key set.
+/// </summary>
 internal class KeysProfile
 {
+    /// <summary>
+    /// Gets or sets the ENC (encryption) key encoded as hexadecimal.
+    /// </summary>
+    /// <value>Maps the <c>enc</c> field.</value>
     public string Enc { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the MAC key encoded as hexadecimal.
+    /// </summary>
+    /// <value>Maps the <c>mac</c> field.</value>
     public string Mac { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the DEK (data encryption) key encoded as hexadecimal.
+    /// </summary>
+    /// <value>Maps the <c>dek</c> field.</value>
     public string Dek { get; set; } = string.Empty;
 }

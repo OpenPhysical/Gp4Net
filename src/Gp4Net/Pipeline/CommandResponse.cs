@@ -25,35 +25,85 @@ public record CommandResponse(
     /// <summary>
     /// Creates a successful response.
     /// </summary>
-    public static CommandResponse Success(
-        byte[] data = null,
-        IPipelineContext context = null,
-        IReadOnlyDictionary<string, object> metadata = null
-    )
+    public static CommandResponse Success()
     {
         return new(
-            data ?? [],
+            [],
             Constants.Constants.StatusWords.Legacy.Success,
-            context ?? ImmutablePipelineContext.Empty,
-            metadata ?? new Dictionary<string, object>()
+            ImmutablePipelineContext.Empty,
+            new Dictionary<string, object>()
         );
+    }
+
+    /// <summary>
+    /// Creates a successful response with explicit data.
+    /// </summary>
+    public static CommandResponse Success(byte[] data)
+    {
+        return new(
+            data,
+            Constants.Constants.StatusWords.Legacy.Success,
+            ImmutablePipelineContext.Empty,
+            new Dictionary<string, object>()
+        );
+    }
+
+    /// <summary>
+    /// Creates a successful response with explicit data and context.
+    /// </summary>
+    public static CommandResponse Success(byte[] data, IPipelineContext context)
+    {
+        return new(
+            data,
+            Constants.Constants.StatusWords.Legacy.Success,
+            context,
+            new Dictionary<string, object>()
+        );
+    }
+
+    /// <summary>
+    /// Creates a successful response with explicit data, context, and metadata.
+    /// </summary>
+    public static CommandResponse Success(
+        byte[] data,
+        IPipelineContext context,
+        IReadOnlyDictionary<string, object> metadata
+    )
+    {
+        return new(data, Constants.Constants.StatusWords.Legacy.Success, context, metadata);
     }
 
     /// <summary>
     /// Creates a failed response.
     /// </summary>
-    public static CommandResponse Failure(
-        StatusWord statusWord,
-        IPipelineContext context = null,
-        IReadOnlyDictionary<string, object> metadata = null
-    )
+    public static CommandResponse Failure(StatusWord statusWord)
     {
         return new(
             [],
             statusWord,
-            context ?? ImmutablePipelineContext.Empty,
-            metadata ?? new Dictionary<string, object>()
+            ImmutablePipelineContext.Empty,
+            new Dictionary<string, object>()
         );
+    }
+
+    /// <summary>
+    /// Creates a failed response with explicit context and default metadata.
+    /// </summary>
+    public static CommandResponse Failure(StatusWord statusWord, IPipelineContext context)
+    {
+        return new([], statusWord, context, new Dictionary<string, object>());
+    }
+
+    /// <summary>
+    /// Creates a failed response with explicit context and metadata.
+    /// </summary>
+    public static CommandResponse Failure(
+        StatusWord statusWord,
+        IPipelineContext context,
+        IReadOnlyDictionary<string, object> metadata
+    )
+    {
+        return new([], statusWord, context, metadata);
     }
 
     /// <summary>

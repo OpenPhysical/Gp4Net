@@ -59,20 +59,32 @@ public static class CommandProcessing
         byte[] Data,
         StatusWord StatusWord,
         CommandEnvironment UpdatedEnvironment,
-        CommandMetadata Metadata = null
+        CommandMetadata Metadata
     )
     {
         /// <summary>
-        /// Creates a successful result.
+        /// Creates a successful result with explicit metadata.
         /// </summary>
         public static CommandResult Success(
             byte[] data,
             StatusWord statusWord,
             CommandEnvironment environment,
-            CommandMetadata metadata = null
+            CommandMetadata metadata
         )
         {
-            return new(data, statusWord, environment, metadata ?? new CommandMetadata());
+            return new(data, statusWord, environment, metadata);
+        }
+
+        /// <summary>
+        /// Creates a successful result with default metadata.
+        /// </summary>
+        public static CommandResult Success(
+            byte[] data,
+            StatusWord statusWord,
+            CommandEnvironment environment
+        )
+        {
+            return new(data, statusWord, environment, CommandMetadata.Empty);
         }
 
         /// <summary>
@@ -94,5 +106,11 @@ public static class CommandProcessing
         bool SecureChannelUnwrapped = false,
         bool ResponseLogged = false,
         Maybe<InitializeUpdateResponse> InitializeUpdateResponse = default
-    );
+    )
+    {
+        /// <summary>
+        /// Gets an instance with default metadata values.
+        /// </summary>
+        public static CommandMetadata Empty { get; } = new();
+    }
 }

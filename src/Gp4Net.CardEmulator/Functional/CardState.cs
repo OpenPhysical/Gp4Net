@@ -317,7 +317,7 @@ public partial record CardState(
     /// </summary>
     public byte[] GetSequenceCounter(byte keyVersion)
     {
-        if (SequenceCounters.TryGetValue(keyVersion, out byte[] counter) && counter is not null)
+        if (SequenceCounters.TryGetValue(keyVersion, out byte[]? counter) && counter is not null)
             return counter;
 
         // Return appropriate default counter based on SCP version

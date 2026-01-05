@@ -1,0 +1,46 @@
+{
+  "description": "SCP02 card and host cryptogram fixtures for regression testing",
+  "reference": "scripts/scp02_test_vectors.json",
+  "vectors": [
+    {
+      "name": "SCP02 i=15 Derived MAC with GP Test Keys",
+      "staticKeys": {
+        "enc": "404142434445464748494A4B4C4D4E4F",
+        "mac": "404142434445464748494A4B4C4D4E4F",
+        "dek": "404142434445464748494A4B4C4D4E4F"
+      },
+      "sessionKeys": {
+        "enc": "25C9794A1205FF244F5FA0378D2F8D59",
+        "mac": "9BED98891580C3B245FE9EC58BFA8D2A"
+      },
+      "cryptogramData": {
+        "card": "11223344556677880001AABBCCDDEE118000000000000000",
+        "host": "0001AABBCCDDEE1111223344556677888000000000000000"
+      },
+      "expectedCryptograms": {
+        "card": "9FB4A9227081E1D0",
+        "host": "774051B32E61E046"
+      }
+    },
+    {
+      "name": "SCP02 i=04 Dynamic MAC",
+      "staticKeys": {
+        "enc": "0123456789ABCDEF1234567890ABCDEF",
+        "mac": "FEDCBA9876543210ABCDEF0987654321",
+        "dek": "1122334455667788AABBCCDDEEFF1122"
+      },
+      "sessionKeys": {
+        "enc": "B1B1E3A7B4FBD9F6BDA5FDDB703C5D47",
+        "mac": "82D6C3CC4FE50FC6C4DF470744514496"
+      },
+      "cryptogramData": {
+        "card": "FEDCBA987654321000A5123456789ABC8000000000000000",
+        "host": "00A5123456789ABCFEDCBA98765432108000000000000000"
+      },
+      "expectedCryptograms": {
+        "card": "1D172744A5C66F2C",
+        "host": "D6715F0A0D67E3B4"
+      }
+    }
+  ]
+}

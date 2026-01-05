@@ -24,23 +24,33 @@ public sealed class ImmutablePipelineContext : IPipelineContext
     /// </summary>
     public ImmutablePipelineContext(ImmutableDictionary<string, object> initialValues)
     {
-        _values = initialValues;
+        ArgumentNullException.ThrowIfNull(initialValues);
+
+        _values = initialValues
+            .Where(kvp => kvp.Value is not null)
+            .ToImmutableDictionary(kvp => kvp.Key, kvp => kvp.Value!);
     }
 
     /// <inheritdoc/>
     public Maybe<T> Get<T>(string key)
     {
-        if (_values.TryGetValue(key, out object value) && value is T typedValue)
+        if (!_values.TryGetValue(key, out var value) || value is not T typedValue)
         {
-            return Maybe<T>.From(typedValue);
+            return Maybe<T>.None;
         }
-        return Maybe<T>.None;
+
+        return Maybe<T>.From(typedValue);
     }
 
     /// <inheritdoc/>
     public IPipelineContext With<T>(string key, T value)
     {
-        return new ImmutablePipelineContext(_values.SetItem(key, value));
+        if (value is null)
+        {
+            throw new ArgumentNullException(nameof(value), "Pipeline context cannot store null values.");
+        }
+
+        return new ImmutablePipelineContext(_values.SetItem(key, value!));
     }
 
     /// <inheritdoc/>
@@ -66,7 +76,12 @@ public sealed class ImmutablePipelineContext : IPipelineContext
         var builder = _values.ToBuilder();
         foreach (var kvp in values)
         {
-            builder[kvp.Key] = kvp.Value;
+            if (kvp.Value is null)
+            {
+                continue;
+            }
+
+            builder[kvp.Key] = kvp.Value!;
         }
 
         return new ImmutablePipelineContext(builder.ToImmutable());
@@ -108,7 +123,7 @@ public sealed class ImmutablePipelineContext : IPipelineContext
         return $"PipelineContext[{string.Join(", ", items)}]";
     }
 
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
         return obj is ImmutablePipelineContext other && _values.SequenceEqual(other._values);
     }

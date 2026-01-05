@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -71,7 +72,7 @@ public class GetStatusCommand : IApduCommand
     /// <summary>
     /// Gets the search criteria (optional AID).
     /// </summary>
-    public byte[] SearchCriteria { get; }
+    public Maybe<byte[]> SearchCriteria { get; }
 
     /// <inheritdoc />
     public byte Cla => GlobalPlatform.Cla.GP_STANDARD;
@@ -92,7 +93,7 @@ public class GetStatusCommand : IApduCommand
     /// <summary>
     /// Gets the command data (search criteria).
     /// </summary>
-    public byte[] Data => SearchCriteria;
+    public byte[] Data => SearchCriteria.GetValueOrDefault([]);
 
     /// <summary>
     /// Gets the expected response length.
@@ -111,8 +112,7 @@ public class GetStatusCommand : IApduCommand
     public Result<CommandAPDU, SmartCardError> ToCommandApdu()
     {
         // Only pass search criteria if it's non-empty
-        var data =
-            SearchCriteria.Length > 0 ? Maybe<byte[]>.From(SearchCriteria) : Maybe<byte[]>.None;
+        var data = SearchCriteria;
 
         return ApduBuilder.CreateCommand(
             GlobalPlatform.Cla.GP_STANDARD,
@@ -132,13 +132,13 @@ public class GetStatusCommand : IApduCommand
     /// <param name="searchCriteria">Optional search criteria (AID).</param>
     private GetStatusCommand(
         StatusSubset subset,
-        ResponseFormat format = ResponseFormat.None,
-        byte[] searchCriteria = null
+        ResponseFormat format,
+        Maybe<byte[]> searchCriteria
     )
     {
         Subset = subset;
         Format = format;
-        SearchCriteria = searchCriteria != null ? (byte[])searchCriteria.Clone() : [];
+        SearchCriteria = searchCriteria.Map(criteria => (byte[])criteria.Clone());
     }
 
     /// <summary>
@@ -151,7 +151,7 @@ public class GetStatusCommand : IApduCommand
     public static Result<GetStatusCommand, SmartCardError> Create(
         StatusSubset subset,
         ResponseFormat format = ResponseFormat.None,
-        byte[] searchCriteria = null
+        Maybe<byte[]> searchCriteria = default
     )
     {
         // Validate StatusSubset enum
@@ -169,15 +169,10 @@ public class GetStatusCommand : IApduCommand
         // Validate search criteria if provided
         // Note: Search criteria can be a TLV structure (e.g., 4F00 for empty search)
         // or an AID (5-16 bytes). We allow both.
-        if (searchCriteria is { Length: > 0 })
+        var validationResult = ValidateSearchCriteria(searchCriteria);
+        if (validationResult.HasValue)
         {
-            // If it looks like a raw AID (not TLV), validate length
-            if (searchCriteria[0] != 0x4F && searchCriteria.Length is < 5 or > 16)
-            {
-                return SmartCardError.InvalidArgument(
-                    "Search criteria AID must be between 5 and 16 bytes."
-                );
-            }
+            return validationResult.Value;
         }
 
         return new GetStatusCommand(subset, format, searchCriteria);
@@ -225,18 +220,26 @@ public class GetStatusCommand : IApduCommand
     /// </summary>
     /// <param name="searchCriteria">The search criteria to validate.</param>
     /// <returns>Maybe containing SmartCardError if validation fails, or None if valid.</returns>
-    private static Maybe<SmartCardError> ValidateSearchCriteria(byte[] searchCriteria)
+    private static Maybe<SmartCardError> ValidateSearchCriteria(Maybe<byte[]> searchCriteria)
     {
-        // If it looks like a raw AID (not TLV), validate length
-        if (searchCriteria[0] != 0x4F && searchCriteria.Length is < 5 or > 16)
+        return searchCriteria.Bind(criteria =>
         {
-            return Maybe<SmartCardError>.From(
-                SmartCardError.InvalidArgument(
-                    "Search criteria AID must be between 5 and 16 bytes."
-                )
-            );
-        }
-        return Maybe<SmartCardError>.None;
+            if (criteria.Length == 0)
+            {
+                return Maybe<SmartCardError>.None;
+            }
+
+            if (criteria[0] != 0x4F && criteria.Length is < 5 or > 16)
+            {
+                return Maybe<SmartCardError>.From(
+                    SmartCardError.InvalidArgument(
+                        "Search criteria AID must be between 5 and 16 bytes."
+                    )
+                );
+            }
+
+            return Maybe<SmartCardError>.None;
+        });
     }
 
     /// <inheritdoc />
@@ -257,8 +260,7 @@ public class GetStatusCommand : IApduCommand
     public byte[] ToBytes()
     {
         // Only pass search criteria if it's non-empty
-        var data =
-            SearchCriteria.Length > 0 ? Maybe<byte[]>.From(SearchCriteria) : Maybe<byte[]>.None;
+        var data = SearchCriteria;
 
         // Build APDU bytes directly to avoid WSCT reconstruction issues
         return ApduBuilder
@@ -332,9 +334,9 @@ public class ApplicationStatusEntry
     public byte[] Privileges { get; }
 
     /// <summary>
-    /// Gets the Executable Load File AID associated with this application (TLV C4), if provided.
+    /// Gets the optional Executable Load File AID associated with this application (TLV C4).
     /// </summary>
-    public byte[] ExecutableLoadFileAid { get; }
+    public Maybe<byte[]> ExecutableLoadFileAid { get; }
 
     /// <summary>
     /// Initializes a new instance of the ApplicationStatusEntry class.
@@ -347,14 +349,18 @@ public class ApplicationStatusEntry
         byte[] aid,
         LifecycleState state,
         byte[] privileges,
-        byte[] executableLoadFileAid = null
+        Maybe<byte[]> executableLoadFileAid = default
     )
     {
-        Aid = (byte[])aid.Clone();
+        ArgumentNullException.ThrowIfNull(aid);
+        ArgumentNullException.ThrowIfNull(privileges);
+
+        Aid = aid.Length == 0 ? Array.Empty<byte>() : (byte[])aid.Clone();
         State = state;
-        Privileges = (byte[])privileges.Clone();
-        ExecutableLoadFileAid =
-            executableLoadFileAid != null ? (byte[])executableLoadFileAid.Clone() : [];
+        Privileges = privileges.Length == 0 ? Array.Empty<byte>() : (byte[])privileges.Clone();
+        ExecutableLoadFileAid = executableLoadFileAid.Map(value =>
+            value.Length == 0 ? Array.Empty<byte>() : (byte[])value.Clone()
+        );
     }
 }
 

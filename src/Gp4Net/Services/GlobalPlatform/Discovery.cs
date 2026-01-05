@@ -57,7 +57,8 @@ public static class Discovery
             .Bind(Responses.ParseSelectResponse);
 
         return await directSelectResult.Match(
-            selectResponse => Task.FromResult(Result.Success<SelectResponse, SmartCardError>(selectResponse)),
+            selectResponse =>
+                Task.FromResult(Result.Success<SelectResponse, SmartCardError>(selectResponse)),
             async _ => await TryKnownIsdAidsAsync(executeCommand, cancellationToken)
         );
     }

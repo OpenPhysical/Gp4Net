@@ -383,7 +383,7 @@ public class LoadCommandTests
     public void LoadResponse_ParseNullData_HandlesGracefully()
     {
         // Act
-        var response = LoadResponse.Parse(null, 0x9000);
+        var response = LoadResponse.Parse(null!, 0x9000);
 
         // Assert
         _ = response.Data.Should().NotBeNull();
@@ -394,7 +394,7 @@ public class LoadCommandTests
     public void ValidateCapFile_NullData_ReturnsFalse()
     {
         // Act
-        bool isValid = CapFileLoader.ValidateCapFile(null);
+        bool isValid = CapFileLoader.ValidateCapFile(null!);
 
         // Assert
         _ = isValid.Should().BeFalse();

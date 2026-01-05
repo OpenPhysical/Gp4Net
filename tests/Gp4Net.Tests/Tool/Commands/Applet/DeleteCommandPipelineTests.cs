@@ -203,7 +203,6 @@ public class DeleteCommandPipelineTests
         // Assert
         _ = result.Should().Be(0); // Success - dry run just shows plan
     }
-
 }
 
 /// <summary>

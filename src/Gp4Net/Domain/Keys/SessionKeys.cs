@@ -33,7 +33,7 @@ public class SessionKeys : IDisposable
     /// <summary>
     /// Gets the data encryption key (DEK) if applicable.
     /// </summary>
-    public byte[] Dek { get; }
+    public Maybe<byte[]> Dek { get; }
 
     private bool _disposed;
 
@@ -44,12 +44,16 @@ public class SessionKeys : IDisposable
     /// <param name="sMac">The session MAC key.</param>
     /// <param name="sRMac">The session R-MAC key.</param>
     /// <param name="dek">The data encryption key (optional).</param>
-    public SessionKeys(byte[] sEnc, byte[] sMac, byte[] sRMac, byte[] dek = null)
+    public SessionKeys(byte[] sEnc, byte[] sMac, byte[] sRMac, Maybe<byte[]> dek = default)
     {
-        SEnc = sEnc;
-        SMac = sMac;
-        SrMac = sRMac;
-        Dek = dek;
+        ArgumentNullException.ThrowIfNull(sEnc);
+        ArgumentNullException.ThrowIfNull(sMac);
+        ArgumentNullException.ThrowIfNull(sRMac);
+
+        SEnc = (byte[])sEnc.Clone();
+        SMac = (byte[])sMac.Clone();
+        SrMac = (byte[])sRMac.Clone();
+        Dek = dek.Map(value => (byte[])value.Clone());
     }
 
     /// <summary>
@@ -64,44 +68,26 @@ public class SessionKeys : IDisposable
         byte[] sEnc,
         byte[] sMac,
         byte[] sRMac,
-        byte[] dek = null
+        Maybe<byte[]> dek = default
     )
     {
-        return Maybe<byte[]>
-            .From(sEnc)
-            .ToResult(SmartCardError.InvalidArgument("S-ENC key cannot be null"))
-            .Bind(encKey =>
-                encKey.Length > 0
-                    ? Result.Success<byte[], SmartCardError>(encKey)
-                    : Result.Failure<byte[], SmartCardError>(
-                        SmartCardError.InvalidArgument("S-ENC key cannot be empty")
-                    )
-            )
-            .Bind(_ =>
-                Maybe<byte[]>
-                    .From(sMac)
-                    .ToResult(SmartCardError.InvalidArgument("S-MAC key cannot be null"))
-            )
-            .Bind(macKey =>
-                macKey.Length > 0
-                    ? Result.Success<byte[], SmartCardError>(macKey)
-                    : Result.Failure<byte[], SmartCardError>(
-                        SmartCardError.InvalidArgument("S-MAC key cannot be empty")
-                    )
-            )
-            .Bind(_ =>
-                Maybe<byte[]>
-                    .From(sRMac)
-                    .ToResult(SmartCardError.InvalidArgument("S-RMAC key cannot be null"))
-            )
-            .Bind(rMacKey =>
-                rMacKey.Length > 0
-                    ? Result.Success<byte[], SmartCardError>(rMacKey)
-                    : Result.Failure<byte[], SmartCardError>(
-                        SmartCardError.InvalidArgument("S-RMAC key cannot be empty")
-                    )
-            )
+        return ValidateKey(sEnc, "S-ENC")
+            .Bind(_ => ValidateKey(sMac, "S-MAC"))
+            .Bind(_ => ValidateKey(sRMac, "S-RMAC"))
             .Map(_ => new SessionKeys(sEnc, sMac, sRMac, dek));
+    }
+
+    private static Result<byte[], SmartCardError> ValidateKey(byte[] key, string name)
+    {
+        return Maybe<byte[]>.From(key)
+            .ToResult(SmartCardError.InvalidArgument($"{name} key cannot be null"))
+            .Bind(bytes =>
+                bytes.Length > 0
+                    ? Result.Success<byte[], SmartCardError>(bytes)
+                    : Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.InvalidArgument($"{name} key cannot be empty")
+                    )
+            );
     }
 
     /// <summary>
@@ -112,17 +98,8 @@ public class SessionKeys : IDisposable
         Arrays.Fill(SEnc, 0);
         Arrays.Fill(SMac, 0);
         Arrays.Fill(SrMac, 0);
-
-        return Maybe<byte[]>
-            .From(Dek)
-            .Match(
-                Some: dekKey =>
-                {
-                    Arrays.Fill(dekKey, 0);
-                    return UnitResult.Success<SmartCardError>();
-                },
-                None: () => UnitResult.Success<SmartCardError>()
-            );
+        Dek.Execute(dekKey => Arrays.Fill(dekKey, 0));
+        return UnitResult.Success<SmartCardError>();
     }
 
     /// <summary>

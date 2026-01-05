@@ -385,7 +385,7 @@ public class VirtualCardTests
         byte[] packageAid = Convert.FromHexString("A000000308000010");
         var installForLoadResult = InstallCommandBuilder.CreateForLoad(
             packageAid: packageAid,
-            securityDomainAid: card.Configuration.IsdAid
+            securityDomainAid: Maybe<byte[]>.From(card.Configuration.IsdAid)
         );
 
         // Act

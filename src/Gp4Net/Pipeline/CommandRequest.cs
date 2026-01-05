@@ -5,18 +5,36 @@ namespace Gp4Net.Pipeline;
 /// <summary>
 /// Represents a request to execute a command through the pipeline.
 /// </summary>
-public record CommandRequest(
-    CommandAPDU Command,
-    IPipelineContext Context,
-    CommandOptions Options = null
-)
+public record CommandRequest
 {
+    /// <summary>
+    /// Gets the command to execute.
+    /// </summary>
+    public CommandAPDU Command { get; init; }
+
+    /// <summary>
+    /// Gets the pipeline context used for execution.
+    /// </summary>
+    public IPipelineContext Context { get; init; }
+
+    /// <summary>
+    /// Gets the execution options to apply.
+    /// </summary>
+    public CommandOptions Options { get; init; }
+
+    private CommandRequest(CommandAPDU command, IPipelineContext context, CommandOptions options)
+    {
+        Command = command;
+        Context = context;
+        Options = options;
+    }
+
     /// <summary>
     /// Creates a simple request with just a command.
     /// </summary>
     public static CommandRequest Create(CommandAPDU command)
     {
-        return new(command, ImmutablePipelineContext.Empty);
+        return new(command, ImmutablePipelineContext.Empty, CommandOptions.Default);
     }
 
     /// <summary>
@@ -24,7 +42,19 @@ public record CommandRequest(
     /// </summary>
     public static CommandRequest Create(CommandAPDU command, IPipelineContext context)
     {
-        return new(command, context);
+        return new(command, context, CommandOptions.Default);
+    }
+
+    /// <summary>
+    /// Creates a request with a command, context, and options.
+    /// </summary>
+    public static CommandRequest Create(
+        CommandAPDU command,
+        IPipelineContext context,
+        CommandOptions options
+    )
+    {
+        return new(command, context, options);
     }
 
     /// <summary>
@@ -32,7 +62,7 @@ public record CommandRequest(
     /// </summary>
     public CommandRequest WithContext(IPipelineContext context)
     {
-        return this with { Context = context };
+        return new(Command, context, Options);
     }
 
     /// <summary>
@@ -40,7 +70,7 @@ public record CommandRequest(
     /// </summary>
     public CommandRequest WithOptions(CommandOptions options)
     {
-        return this with { Options = options };
+        return new(Command, Context, options);
     }
 
     /// <summary>
@@ -49,7 +79,7 @@ public record CommandRequest(
     public CommandRequest WithContextValue<T>(string key, T value)
         where T : class
     {
-        return this with { Context = Context.With(key, value) };
+        return new(Command, Context.With(key, value), Options);
     }
 }
 
@@ -62,4 +92,10 @@ public record CommandOptions(
     bool EnableLogging = true,
     bool VerboseLogging = false,
     bool DebugLogging = false
-);
+)
+{
+    /// <summary>
+    /// Gets the default command options (no secure channel, metrics and logging enabled).
+    /// </summary>
+    public static CommandOptions Default { get; } = new(false);
+}

@@ -49,10 +49,12 @@ public class CardContentRetriever
                 cancellationToken
             )
             .Bind(async _ => await EstablishSecureChannelWithAutoDetection(keySet))
-            .Bind(async _ => await Applications.RetrieveCompleteCardContentAsync(
-                async (cmd, ct) => await _cardService.ExecuteCommandAsync(cmd, ct),
-                cancellationToken
-            ));
+            .Bind(async _ =>
+                await Applications.RetrieveCompleteCardContentAsync(
+                    async (cmd, ct) => await _cardService.ExecuteCommandAsync(cmd, ct),
+                    cancellationToken
+                )
+            );
     }
 
     /// <summary>
@@ -69,18 +71,23 @@ public class CardContentRetriever
 
                 return await ConvertToKeySet(ks)
                     .Bind(async keySetForGp =>
-                        await ScpService.Establishment.EstablishAsync(
-                            _cardService,
-                            keySetForGp,
-                            SecurityLevel.CMac,
-                            CancellationToken.None
-                        )
-                        .Tap(_ => _logger.LogInformation("Secure channel established successfully"))
-                        .TapError(error => _logger.LogWarning(
-                            "Failed to establish secure channel: {Error}",
-                            error.Message
-                        ))
-                        .Map(_ => true)
+                        await ScpService
+                            .Establishment.EstablishAsync(
+                                _cardService,
+                                keySetForGp,
+                                SecurityLevel.CMac,
+                                CancellationToken.None
+                            )
+                            .Tap(_ =>
+                                _logger.LogInformation("Secure channel established successfully")
+                            )
+                            .TapError(error =>
+                                _logger.LogWarning(
+                                    "Failed to establish secure channel: {Error}",
+                                    error.Message
+                                )
+                            )
+                            .Map(_ => true)
                     );
             },
             () =>

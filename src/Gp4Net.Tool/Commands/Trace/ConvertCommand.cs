@@ -21,46 +21,118 @@ using Spectre.Console.Cli;
 namespace Gp4Net.Tool.Commands.Trace;
 
 /// <summary>
-/// Command to convert trace files to structured JSON format with rich metadata.
+/// Converts GlobalPlatform trace transcripts into structured JSON with validation metadata.
 /// </summary>
+/// <remarks>
+/// The command runs the full trace ingestion pipeline: it parses GPPro/GPShell transcripts,
+/// optionally validates every APDU exchange with secure-channel session keys, and emits a
+/// documentation-friendly JSON artifact that mirrors the coverage workflows documented in
+/// <see href="https://github.com/OpenPhysical/Gp4Net/docs/coverage/coverage-playbook.md">
+/// the coverage playbook</see>. Output always includes conversion diagnostics so callers can
+/// reason about the derived security posture before replaying commands.
+/// </remarks>
 [PublicAPI]
 public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
 {
     /// <summary>
-    /// Settings for the convert command.
+    /// Declarative settings bound to CLI arguments for <see cref="ConvertCommand"/>.
     /// </summary>
+    /// <remarks>
+    /// Spectre.Console automatically populates these properties from the command line. Each
+    /// property maps to the contracts documented in <c>contracts/xml-documentation.md</c> and is
+    /// validated before conversion starts so that invalid traces never reach the analyzer.
+    /// </remarks>
+    /// <example>
+    /// gp4net trace convert traces/gppro.log traces/gppro.json --format gp_pro --keyset gp_test
+    /// </example>
     public class Settings : CommandSettings
     {
+        /// <summary>
+        /// Gets or sets the path to the trace transcript that should be converted.
+        /// </summary>
+        /// <value>
+        /// Either an absolute or relative path to a GPPro (<c>.log</c>) or GPShell (<c>.txt</c>)
+        /// trace file. The command will fail fast with <c>SmartCardError.InvalidArgument</c> if
+        /// the file does not exist.
+        /// </value>
         [CommandArgument(0, "<INPUT>")]
         [Description("Input trace file path")]
         public string InputFile { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Gets or sets the location where the JSON export should be written.
+        /// </summary>
+        /// <value>
+        /// A file path that may target a new or existing directory. Parent directories are created
+        /// automatically when missing so the command can run in clean workspaces.
+        /// </value>
         [CommandArgument(1, "<OUTPUT>")]
         [Description("Output JSON file path")]
         public string OutputFile { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Gets or sets the trace dialect the parser should expect.
+        /// </summary>
+        /// <value>
+        /// Accepts <c>gp_pro</c> for GlobalPlatformPro exports or <c>gpshell</c> for GPShell /
+        /// GlobalPlatform library traces. Any other value is rejected with a descriptive validation
+        /// error so that automation scripts surface actionable feedback.
+        /// </value>
         [CommandOption("-f|--format <FORMAT>")]
         [Description(
             "Trace format (gp_pro for GlobalPlatformPro, gpshell for GPShell/GlobalPlatform library)"
         )]
         public string Format { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Gets or sets a value indicating whether high-level card operations should be detected.
+        /// </summary>
+        /// <value>
+        /// Defaults to <see langword="true"/>. When enabled, the converter groups exchanges into
+        /// logical operations (install, load, manage channel, and so on) so the resulting JSON can
+        /// drive documentation and regression analysis dashboards.
+        /// </value>
         [CommandOption("--detect-operations")]
         [Description("Automatically detect operations in trace")]
         [DefaultValue(true)]
         public bool DetectOperations { get; set; } = true;
 
+        /// <summary>
+        /// Gets or sets a value indicating whether verbose parser diagnostics should be emitted.
+        /// </summary>
+        /// <value>
+        /// Defaults to <see langword="false"/>. When <see langword="true"/>, the converter prints
+        /// per-exchange parsing details to the console, mirroring the troubleshooting workflow
+        /// described in <c>quickstart.md</c>.
+        /// </value>
         [CommandOption("--verbose")]
         [Description("Enable verbose output")]
         [DefaultValue(false)]
         public bool Verbose { get; set; }
 
+        /// <summary>
+        /// Gets or sets the keyset used to validate secure-channel MACs during conversion.
+        /// </summary>
+        /// <value>
+        /// Accepts a named keyset such as <c>gp_test</c>, a raw hex tuple formatted as
+        /// <c>ENC:MAC:DEK</c>, or a single 16-byte hex string. Defaults to the GlobalPlatform test
+        /// keyset so that security checks remain enabled during quickstart scenarios.
+        /// </value>
         [CommandOption("-k|--keyset <KEYSET>")]
         [Description("Keyset for validation (gp_test, hex key, or ENC:MAC:DEK)")]
         [DefaultValue("gp_test")]
         public string Keyset { get; set; } = "gp_test";
     }
 
+    /// <summary>
+    /// Executes the convert command by orchestrating trace parsing, validation, and export.
+    /// </summary>
+    /// <param name="context">Spectre command context describing the current invocation.</param>
+    /// <param name="settings">Resolved command-line arguments and options.</param>
+    /// <returns>
+    /// <c>0</c> when conversion succeeds; otherwise <c>1</c> after printing the error surfaced by
+    /// the functional pipeline so scripts can react to the failure.
+    /// </returns>
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
     {
         try
@@ -82,6 +154,18 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
         }
     }
 
+    /// <summary>
+    /// Performs the functional trace conversion workflow used by the CLI command and tests.
+    /// </summary>
+    /// <param name="settings">User-supplied conversion parameters.</param>
+    /// <returns>
+    /// A <see cref="UnitResult{TError}"/> that is successful when the JSON file is emitted, or
+    /// contains a <see cref="SmartCardError"/> describing why the conversion aborted early.
+    /// </returns>
+    /// <remarks>
+    /// The method enforces security validation by default and mirrors the quickstart instructions
+    /// so downstream tooling (coverage verification scripts) can reuse the same pipeline.
+    /// </remarks>
     private async Task<UnitResult<SmartCardError>> ConvertTraceAsync(Settings settings)
     {
         if (!File.Exists(settings.InputFile))
@@ -159,6 +243,15 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
         return UnitResult.Success<SmartCardError>();
     }
 
+    /// <summary>
+    /// Writes a human-readable summary of the generated trace to the console.
+    /// </summary>
+    /// <param name="traceData">The structured trace produced by <see cref="TraceConverter"/>.</param>
+    /// <remarks>
+    /// This mirrors the manual verification steps outlined in <c>quickstart.md</c> so that users
+    /// receive immediate feedback about the detected sessions, operations, and usage examples when
+    /// running the command interactively.
+    /// </remarks>
     private static void DisplaySummary(TraceData traceData)
     {
         var table = new Table();
@@ -198,172 +291,585 @@ public class ConvertCommand : AsyncCommand<ConvertCommand.Settings>
 }
 
 /// <summary>
-/// Main trace data structure for JSON output.
+/// Structured representation of a GlobalPlatform trace used for JSON export and validation.
 /// </summary>
+/// <remarks>
+/// The structure mirrors the schema documented in <c>quickstart.md</c>. It decomposes traces into
+/// metadata, high-level operations, usage examples, and the raw exchange list so coverage tooling
+/// can reason about both human-readable summaries and low-level APDUs.
+/// </remarks>
+/// <example>
+/// {
+///   "metadata": { "source": { "file": "traces/gppro.log", "type": "gp_pro" } },
+///   "operations": { "secure_channel_establish": { "description": "SCP authentication" } }
+/// }
+/// </example>
 public class TraceData
 {
+    /// <summary>
+    /// Gets or sets descriptive metadata extracted from the input trace.
+    /// </summary>
+    /// <value>
+    /// Includes source file information, detected card characteristics, and secure-channel session
+    /// summaries that help analysts correlate validation output with card capabilities.
+    /// </value>
     public TraceMetadata Metadata { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the operations derived from the trace.
+    /// </summary>
+    /// <value>
+    /// Keys represent human-friendly operation identifiers (for example <c>load-applet</c>),
+    /// while values capture the detected exchanges, command names, and derived metadata.
+    /// </value>
     public Dictionary<string, Operation> Operations { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets usage examples that demonstrate how to replay the trace via CLI commands.
+    /// </summary>
+    /// <value>
+    /// Each example pairs a descriptive caption with a CLI command, allowing quickstart
+    /// documentation to surface curated reproduction steps.
+    /// </value>
     public List<UsageExample> UsageExamples { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the ordered list of APDU exchanges that were parsed from the transcript.
+    /// </summary>
+    /// <value>
+    /// Each exchange retains command/response payloads, derived plaintext, validation metadata,
+    /// and linkage to detected operations so downstream processors can reconstruct the timeline.
+    /// </value>
     public List<Exchange> Exchanges { get; set; } = [];
 }
 
 /// <summary>
-/// Metadata about the trace file and card.
+/// Metadata captured during conversion to contextualize the trace.
 /// </summary>
+/// <remarks>
+/// Metadata aggregates provenance (input file, tool version), detected card identity, and secure
+/// channel sessions. It enables coverage automation to reason about trace authenticity and
+/// security posture without reprocessing the underlying exchanges.
+/// </remarks>
 public class TraceMetadata
 {
+    /// <summary>
+    /// Gets or sets the source trace information.
+    /// </summary>
+    /// <value>
+    /// Contains file path, format, generation timestamp, and converter version so analysts can
+    /// trace how the JSON artifact was produced.
+    /// </value>
     public SourceInfo Source { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the detected card information derived from the trace.
+    /// </summary>
+    /// <value>
+    /// Includes ATR, ISD AID, inferred card type, and optional CPLC details to document where the
+    /// trace originated and whether it represents a production or development device.
+    /// </value>
     public CardInfo Card { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the collection of secure-channel sessions observed in the trace.
+    /// </summary>
+    /// <value>
+    /// Each entry records derived session identifiers, negotiated security levels, and diversifier
+    /// data so auditors can verify that validation logic covered every secure messaging exchange.
+    /// </value>
     public List<SessionMetadata> Sessions { get; set; } = [];
 }
 
 /// <summary>
-/// Information about the source trace file.
+/// Describes the provenance of the processed trace file.
 /// </summary>
+/// <remarks>
+/// Values are populated during conversion so exported JSON can be audited and reproduced. The
+/// <see cref="Generated"/> value uses UTC timestamps to provide stable automated reporting.
+/// </remarks>
 public class SourceInfo
 {
+    /// <summary>
+    /// Gets or sets the original trace file path supplied by the user.
+    /// </summary>
+    /// <value>
+    /// Captures the path exactly as parsed, enabling downstream tooling to reprocess the same
+    /// transcript if additional validation is required.
+    /// </value>
     public string File { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the trace dialect that was parsed.
+    /// </summary>
+    /// <value>
+    /// Common values are <c>gp_pro</c> or <c>gpshell</c>, mirroring the options exposed on the
+    /// command line.
+    /// </value>
     public string Type { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the UTC timestamp indicating when the JSON artifact was generated.
+    /// </summary>
+    /// <value>
+    /// Populated with ISO-8601 format (<c>yyyy-MM-ddTHH:mm:ssZ</c>) to support lexicographic
+    /// sorting in dashboards.
+    /// </value>
     public string Generated { get; set; } = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+    /// <summary>
+    /// Gets or sets the converter version that produced the output.
+    /// </summary>
+    /// <value>
+    /// Defaults to <c>gp4net-1.0</c> but should be overridden when the CLI version changes so that
+    /// analysts can correlate artifacts with specific builds.
+    /// </value>
     public string ToolVersion { get; set; } = "gp4net-1.0";
 }
 
 /// <summary>
-/// Information about the card.
+/// Summarizes card identity inferred from the trace.
 /// </summary>
+/// <remarks>
+/// The information is derived from the first SELECT commands and CPLC data contained in the trace,
+/// enabling compatibility checks to run without contacting the card again.
+/// </remarks>
 public class CardInfo
 {
+    /// <summary>
+    /// Gets or sets the Answer-To-Reset (ATR) reported by the card.
+    /// </summary>
+    /// <value>Stored as a hex string without spaces to simplify comparisons.</value>
     public string Atr { get; set; } = "3BD518FF8191FE1FC38073C821100A";
+
+    /// <summary>
+    /// Gets or sets the ISD (Issuer Security Domain) AID discovered in the trace.
+    /// </summary>
+    /// <value>
+    /// Used by compatibility analysis when replaying management operations against the card.
+    /// </value>
     public string IsdAid { get; set; } = "A000000151000000";
+
+    /// <summary>
+    /// Gets or sets an inferred card classification (for example production or development).
+    /// </summary>
+    /// <value>
+    /// Derived from ATR heuristics and defaults to <c>UNKNOWN</c> when the classification cannot
+    /// be determined.
+    /// </value>
     public string CardType { get; set; } = "UNKNOWN";
+
+    /// <summary>
+    /// Gets or sets raw CPLC data when it was captured in the trace.
+    /// </summary>
+    /// <value>
+    /// A <see cref="Maybe{T}"/> containing <see cref="CplcData"/> so consumers can access optional
+    /// life-cycle information without introducing <see langword="null"/>s.
+    /// </value>
     public Maybe<CplcData> Cplc { get; set; } = Maybe<CplcData>.None;
 }
 
 /// <summary>
-/// CPLC (Card Production Life Cycle) data.
+/// Card Production Life Cycle (CPLC) metadata extracted from the trace.
 /// </summary>
+/// <remarks>
+/// Values follow GlobalPlatform 2.3.1 Appendix A encoding rules and are represented as uppercase
+/// hex strings to preserve fidelity with the original trace.
+/// </remarks>
 public class CplcData
 {
+    /// <summary>
+    /// Gets or sets the integrated circuit fabricator identifier.
+    /// </summary>
+    /// <value>Two-byte hex string identifying the silicon manufacturer.</value>
     public string IcFabricator { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the integrated circuit type identifier.
+    /// </summary>
+    /// <value>
+    /// Two-byte hex string detailing the chip family so compatibility rules can be applied.
+    /// </value>
     public string IcType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the operating system identifier.
+    /// </summary>
+    /// <value>Two-byte hex string corresponding to the card OS release.</value>
     public string OsId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the integrated circuit serial number.
+    /// </summary>
+    /// <value>Four-byte hex string uniquely identifying the physical chip.</value>
     public string IcSerial { get; set; } = string.Empty;
 }
 
 /// <summary>
-/// Session metadata for secure channel sessions.
+/// Captures secure channel session characteristics derived from the trace.
 /// </summary>
+/// <remarks>
+/// Each session corresponds to a distinct INITIALIZE UPDATE / EXTERNAL AUTHENTICATE pair and
+/// aggregates the information needed to replay or audit the secure channel negotiation.
+/// </remarks>
 public class SessionMetadata
 {
+    /// <summary>
+    /// Gets or sets the unique identifier assigned to the session within the JSON output.
+    /// </summary>
+    /// <value>Stable identifier used to link operations and exchanges to this session.</value>
     public string SessionId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the detected secure channel protocol version.
+    /// </summary>
+    /// <value>
+    /// Uses numeric constants defined by GlobalPlatform (for example <c>2</c> for SCP02,
+    /// <c>3</c> for SCP03).
+    /// </value>
     public int ScpVersion { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets the implementation variant identifier.
+    /// </summary>
+    /// <value>
+    /// Matches the <c>i=</c> codes documented in GP 2.3.1 (for example <c>i=70</c>) so engineers
+    /// can identify diversification algorithms.
+    /// </value>
     public string ScpImplementation { get; set; } = "i=70";
+
+    /// <summary>
+    /// Gets or sets the static key version number that initiated the session.
+    /// </summary>
     public int KeyVersion { get; set; } = 1;
+
+    /// <summary>
+    /// Gets or sets the negotiated security level flags.
+    /// </summary>
+    /// <value>
+    /// A pipe-delimited string (<c>C_MAC|R_MAC</c>, etc.) describing which cryptographic services
+    /// are active for the session.
+    /// </value>
     public string SecurityLevel { get; set; } = "C_MAC|R_MAC|C_ENC|R_ENC";
+
+    /// <summary>
+    /// Gets or sets the diversification method applied to derive session keys.
+    /// </summary>
     public string KeyDiversification { get; set; } = "none";
+
+    /// <summary>
+    /// Gets or sets the 8-byte host challenge echoed in the trace.
+    /// </summary>
     public string HostChallenge { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the 8-byte card challenge echoed in the trace.
+    /// </summary>
     public string CardChallenge { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the sequence counter observed during secure messaging.
+    /// </summary>
     public string SequenceCounter { get; set; } = "000001";
+
+    /// <summary>
+    /// Gets or sets the raw derivation inputs used to construct session keys.
+    /// </summary>
     public DerivationData DerivationData { get; set; }
+
+    /// <summary>
+    /// Gets or sets the operations that occurred within the session.
+    /// </summary>
+    /// <value>Contains operation identifiers that reference <see cref="TraceData.Operations"/>.</value>
     public List<string> Operations { get; set; } = [];
 }
 
 /// <summary>
-/// Key derivation data for secure channel.
+/// Records diversification inputs used when deriving session keys.
 /// </summary>
+/// <remarks>
+/// Values mirror the intermediate artifacts produced by <c>TraceValidationState</c> so that
+/// coverage scripts can assert security-critical fields were populated.
+/// </remarks>
 public class DerivationData
 {
+    /// <summary>
+    /// Gets or sets the key diversification data (KDD) extracted from the trace.
+    /// </summary>
     public string Kdd { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the host challenge used in session key derivation.
+    /// </summary>
     public string HostChallenge { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the card challenge used in session key derivation.
+    /// </summary>
     public string CardChallenge { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the card cryptogram validated during EXTERNAL AUTHENTICATE.
+    /// </summary>
     public string CardCryptogram { get; set; } = string.Empty;
 }
 
 /// <summary>
-/// Operation within a trace.
+/// Describes a high-level card operation detected in the trace.
 /// </summary>
+/// <remarks>
+/// Operations group contiguous exchanges that implement a workflow, such as loading an applet or
+/// opening a secure channel. They underpin the usage examples surfaced by the quickstart guide.
+/// </remarks>
 public class Operation
 {
+    /// <summary>
+    /// Gets or sets the human-readable description of the operation.
+    /// </summary>
     public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the session identifier associated with the operation.
+    /// </summary>
     public string SessionId { get; set; } = "session_1";
+
+    /// <summary>
+    /// Gets or sets the first exchange index that belongs to the operation.
+    /// </summary>
     public int StartExchange { get; set; }
+
+    /// <summary>
+    /// Gets or sets the last exchange index that belongs to the operation.
+    /// </summary>
     public int EndExchange { get; set; }
+
+    /// <summary>
+    /// Gets or sets the APDU commands that make up the operation.
+    /// </summary>
     public List<string> Commands { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the expected CLI command used to reproduce the operation.
+    /// </summary>
     public string ExpectedCli { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the GlobalPlatform package AID referenced by the operation.
+    /// </summary>
     public string PackageAid { get; set; }
+
+    /// <summary>
+    /// Gets or sets the application AID referenced by the operation.
+    /// </summary>
     public string AppletAid { get; set; }
+
+    /// <summary>
+    /// Gets or sets the target AID when an operation acts on a deployed artifact.
+    /// </summary>
     public string TargetAid { get; set; }
 }
 
 /// <summary>
-/// Usage example for trace replay.
+/// Provides a ready-to-run replay command for the converted trace.
 /// </summary>
+/// <remarks>
+/// Examples connect the coverage workflow to real CLI invocations so new contributors can verify
+/// behavior quickly.
+/// </remarks>
 public class UsageExample
 {
+    /// <summary>
+    /// Gets or sets the descriptive caption for the example.
+    /// </summary>
     public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the CLI command that replays the operation or full trace.
+    /// </summary>
     public string Command { get; set; } = string.Empty;
 }
 
 /// <summary>
-/// Individual APDU exchange.
+/// Represents a single APDU command/response pair in the trace timeline.
 /// </summary>
+/// <remarks>
+/// Exchanges retain both raw and decrypted payloads so verification tooling can assert secure
+/// messaging coverage while still presenting human-readable summaries.
+/// </remarks>
 public class Exchange
 {
+    /// <summary>
+    /// Gets or sets the 1-based position of the exchange within the trace.
+    /// </summary>
     public int Index { get; set; }
+
+    /// <summary>
+    /// Gets or sets the operation identifier this exchange belongs to.
+    /// </summary>
     public string Operation { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the secure-channel session identifier this exchange belongs to.
+    /// </summary>
     public string SessionId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the step number within the containing operation.
+    /// </summary>
     public int StepInOperation { get; set; }
+
+    /// <summary>
+    /// Gets or sets the APDU command in hexadecimal representation.
+    /// </summary>
     public string Command { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the decrypted APDU command when secure messaging is active.
+    /// </summary>
     public string CommandPlaintext { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the APDU response in hexadecimal representation.
+    /// </summary>
     public string Response { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the decrypted APDU response when secure messaging is active.
+    /// </summary>
     public string ResponsePlaintext { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the card processing time in milliseconds.
+    /// </summary>
     public int ResponseTimeMs { get; set; }
+
+    /// <summary>
+    /// Gets or sets a descriptive message tying the exchange to a higher-level action.
+    /// </summary>
     public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the original line number from the transcript.
+    /// </summary>
     public int SourceLine { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether secure messaging bits were present.
+    /// </summary>
     public bool SecureMessaging { get; set; }
+
+    /// <summary>
+    /// Gets or sets the evaluated security level for the exchange.
+    /// </summary>
     public string SecurityLevel { get; set; } = "None"; // Track actual security level at this exchange
+
+    /// <summary>
+    /// Gets or sets secure-channel artifacts associated with this exchange.
+    /// </summary>
     public Maybe<ScpData> ScpData { get; set; }
+
+    /// <summary>
+    /// Gets or sets the validation outcome derived from <see cref="TraceValidation"/>.
+    /// </summary>
     public ValidationInfo Validation { get; set; }
 }
 
 /// <summary>
-/// SCP-specific data extracted from exchanges.
+/// Captures secure-channel specific details extracted while validating exchanges.
 /// </summary>
+/// <remarks>
+/// Values help auditors confirm that derived session keys and cryptograms align with expectations.
+/// Optional fields use <see cref="Maybe{T}"/> to avoid introducing <see langword="null"/> into the
+/// JSON serialization pipeline.
+/// </remarks>
 public class ScpData
 {
+    /// <summary>
+    /// Gets or sets the host challenge observed for the exchange.
+    /// </summary>
     public string HostChallenge { get; set; }
+
+    /// <summary>
+    /// Gets or sets the card challenge observed for the exchange.
+    /// </summary>
     public string CardChallenge { get; set; }
+
+    /// <summary>
+    /// Gets or sets the card cryptogram validated for the exchange.
+    /// </summary>
     public string CardCryptogram { get; set; }
 
+    /// <summary>
+    /// Gets or sets the optional key version detected alongside the secure-channel data.
+    /// </summary>
     [JsonIgnore]
     public Maybe<int> KeyVersionMaybe { get; set; } = Maybe<int>.None;
 
+    /// <summary>
+    /// Gets the resolved key version if it was identified during validation.
+    /// </summary>
     public int KeyVersion => KeyVersionMaybe.GetValueOrDefault(0);
 
+    /// <summary>
+    /// Gets or sets the secure-channel identifier assigned by validation logic.
+    /// </summary>
     public string ScpId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the host cryptogram computed for the exchange.
+    /// </summary>
     public string HostCryptogram { get; set; }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the secure-channel establishment result is known.
+    /// </summary>
     [JsonIgnore]
     public Maybe<bool> SessionEstablishedMaybe { get; set; } = Maybe<bool>.None;
 
+    /// <summary>
+    /// Gets a value indicating whether the secure channel was successfully established.
+    /// </summary>
     public bool SessionEstablished => SessionEstablishedMaybe.GetValueOrDefault(false);
 }
 
 /// <summary>
-/// Validation information for an exchange.
+/// Reports validation results for an individual exchange.
 /// </summary>
+/// <remarks>
+/// Populated when cryptographic verification succeeds or fails so coverage gates can assert both
+/// positive and negative paths were exercised.
+/// </remarks>
 public class ValidationInfo
 {
+    /// <summary>
+    /// Gets or sets the validation primitive that produced the result (for example <c>C-MAC</c>).
+    /// </summary>
     public string Type { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the validation succeeded.
+    /// </summary>
     public bool IsValid { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional contextual details describing the validation outcome.
+    /// </summary>
     public string Details { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the error message when validation fails.
+    /// </summary>
     public string Error { get; set; }
 }
 
 /// <summary>
-/// Main trace converter class.
+/// Provides the functional pipeline that converts trace transcripts into structured data.
 /// </summary>
+/// <remarks>
+/// The converter is reused by the CLI command and unit tests. It parses supported trace dialects,
+/// detects operations, enriches metadata, and optionally validates secure messaging using the key
+/// parsing rules described in <c>contracts/coverage-analysis.md</c>.
+/// </remarks>
 public class TraceConverter
 {
     private readonly ApduAnalyzer _apduAnalyzer = new();
@@ -372,6 +878,25 @@ public class TraceConverter
     private readonly MetadataExtractor _metadataExtractor = new();
     private readonly UsageExampleGenerator _usageGenerator = new();
 
+    /// <summary>
+    /// Converts a trace transcript into <see cref="TraceData"/> while optionally validating it.
+    /// </summary>
+    /// <param name="inputFile">Path to the transcript that should be processed.</param>
+    /// <param name="format">Trace dialect (<c>gp_pro</c> or <c>gpshell</c>).</param>
+    /// <param name="verbose">
+    /// When set to <see langword="true"/>, emits diagnostic output describing parsing progress.
+    /// </param>
+    /// <param name="validate">
+    /// When set to <see langword="true"/>, runs cryptographic validation for every exchange using
+    /// the supplied <paramref name="keysetSpec"/>.
+    /// </param>
+    /// <param name="keysetSpec">
+    /// Named or raw keyset specification understood by <see cref="KeysetParser"/>.
+    /// </param>
+    /// <returns>
+    /// A <see cref="Result{TValue,TError}"/> containing populated <see cref="TraceData"/> when the
+    /// conversion succeeds or a <see cref="SmartCardError"/> describing the failure.
+    /// </returns>
     public async Task<Result<TraceData, SmartCardError>> ConvertAsync(
         string inputFile,
         string format,
@@ -796,7 +1321,8 @@ public class TraceConverter
                                 newState.SessionKeys.Execute(sessionKeys =>
                                 {
                                     // Check if command has secure messaging bit set (CLA bit 2)
-                                    bool hasSecureMessaging = cmd.Length > 0 && (cmd[0] & 0x04) != 0;
+                                    bool hasSecureMessaging =
+                                        cmd.Length > 0 && (cmd[0] & 0x04) != 0;
 
                                     if (hasSecureMessaging && newState.SecurityLevel != 0)
                                     {
@@ -988,32 +1514,33 @@ public class TraceConverter
 
         var data = wrappedCommand.Skip(5).Take(dataLength).ToArray();
 
-        var decryptedData = hasCEnc && data.Length > 0
-            ? scpVersion switch
-            {
-                CryptoService.ScpVersion.Scp02
-                    => CryptoService
-                        .Cipher.Decrypt3DesCbc(
-                            sessionKeys.SEnc,
-                            new byte[8], // Always zero IV for SCP02 command encryption per GP spec E.3.1
-                            data
-                        )
-                        .Map(RemovePadding)
-                        .Match(
-                            success => Maybe<byte[]>.From(success),
-                            failure => Maybe<byte[]>.None
-                        ),
-                CryptoService.ScpVersion.Scp03
-                    => CryptoService
-                        .Cipher.DecryptAesCbc(sessionKeys.SEnc, new byte[16], data)
-                        .Map(RemovePadding)
-                        .Match(
-                            success => Maybe<byte[]>.From(success),
-                            failure => Maybe<byte[]>.None
-                        ),
-                _ => Maybe<byte[]>.None
-            }
-            : Maybe<byte[]>.From(data);
+        var decryptedData =
+            hasCEnc && data.Length > 0
+                ? scpVersion switch
+                {
+                    CryptoService.ScpVersion.Scp02
+                        => CryptoService
+                            .Cipher.Decrypt3DesCbc(
+                                sessionKeys.SEnc,
+                                new byte[8], // Always zero IV for SCP02 command encryption per GP spec E.3.1
+                                data
+                            )
+                            .Map(RemovePadding)
+                            .Match(
+                                success => Maybe<byte[]>.From(success),
+                                failure => Maybe<byte[]>.None
+                            ),
+                    CryptoService.ScpVersion.Scp03
+                        => CryptoService
+                            .Cipher.DecryptAesCbc(sessionKeys.SEnc, new byte[16], data)
+                            .Map(RemovePadding)
+                            .Match(
+                                success => Maybe<byte[]>.From(success),
+                                failure => Maybe<byte[]>.None
+                            ),
+                    _ => Maybe<byte[]>.None
+                }
+                : Maybe<byte[]>.From(data);
 
         return decryptedData.Map(plainData =>
         {
@@ -1064,32 +1591,33 @@ public class TraceConverter
 
         var data = wrappedResponse.Take(dataEndIndex).ToArray();
 
-        var decryptedData = hasREnc && data.Length > 0
-            ? scpVersion switch
-            {
-                CryptoService.ScpVersion.Scp02
-                    => CryptoService
-                        .Cipher.Decrypt3DesCbc(
-                            sessionKeys.SEnc,
-                            new byte[8], // Always zero IV for SCP02 response encryption per GP spec E.3.1
-                            data
-                        )
-                        .Map(RemovePadding)
-                        .Match(
-                            success => Maybe<byte[]>.From(success),
-                            failure => Maybe<byte[]>.None
-                        ),
-                CryptoService.ScpVersion.Scp03
-                    => CryptoService
-                        .Cipher.DecryptAesCbc(sessionKeys.SEnc, new byte[16], data)
-                        .Map(RemovePadding)
-                        .Match(
-                            success => Maybe<byte[]>.From(success),
-                            failure => Maybe<byte[]>.None
-                        ),
-                _ => Maybe<byte[]>.None
-            }
-            : Maybe<byte[]>.From(data);
+        var decryptedData =
+            hasREnc && data.Length > 0
+                ? scpVersion switch
+                {
+                    CryptoService.ScpVersion.Scp02
+                        => CryptoService
+                            .Cipher.Decrypt3DesCbc(
+                                sessionKeys.SEnc,
+                                new byte[8], // Always zero IV for SCP02 response encryption per GP spec E.3.1
+                                data
+                            )
+                            .Map(RemovePadding)
+                            .Match(
+                                success => Maybe<byte[]>.From(success),
+                                failure => Maybe<byte[]>.None
+                            ),
+                    CryptoService.ScpVersion.Scp03
+                        => CryptoService
+                            .Cipher.DecryptAesCbc(sessionKeys.SEnc, new byte[16], data)
+                            .Map(RemovePadding)
+                            .Match(
+                                success => Maybe<byte[]>.From(success),
+                                failure => Maybe<byte[]>.None
+                            ),
+                    _ => Maybe<byte[]>.None
+                }
+                : Maybe<byte[]>.From(data);
 
         return decryptedData.Map(plainData => plainData.Concat(sw).ToArray());
     }
@@ -1153,6 +1681,14 @@ public class ApduAnalyzer
             { "00E0", "KEY INFORMATION" },
         };
 
+    /// <summary>
+    /// Derives a descriptive label for an APDU command.
+    /// </summary>
+    /// <param name="commandHex">Command APDU represented as a hexadecimal string.</param>
+    /// <returns>
+    /// Human-readable command description (for example <c>INSTALL [for load]</c>) or an
+    /// <c>UNKNOWN</c> placeholder when the instruction cannot be mapped.
+    /// </returns>
     public static string GetCommandDescription(string commandHex)
     {
         if (commandHex.Length < 4)
@@ -1198,6 +1734,14 @@ public class ApduAnalyzer
         return $"UNKNOWN (INS={ins})";
     }
 
+    /// <summary>
+    /// Determines whether an APDU command uses secure messaging.
+    /// </summary>
+    /// <param name="commandHex">Command APDU represented as a hexadecimal string.</param>
+    /// <returns>
+    /// <see langword="true"/> when the CLA secure messaging bit is set; otherwise
+    /// <see langword="false"/>.
+    /// </returns>
     public static bool IsSecureMessaging(string commandHex)
     {
         if (commandHex.Length < 2)
@@ -1209,6 +1753,16 @@ public class ApduAnalyzer
         return (cla & 0x04) != 0;
     }
 
+    /// <summary>
+    /// Extracts secure-channel artifacts from an APDU pair.
+    /// </summary>
+    /// <param name="commandHex">Command APDU in hexadecimal form.</param>
+    /// <param name="responseHex">Response APDU in hexadecimal form.</param>
+    /// <param name="description">Previously derived description for the command.</param>
+    /// <returns>
+    /// A <see cref="Maybe{T}"/> containing <see cref="ScpData"/> when secure-channel markers are
+    /// present; otherwise <see cref="Maybe{T}.None"/>.
+    /// </returns>
     public static Maybe<ScpData> ExtractScpData(
         string commandHex,
         string responseHex,
@@ -1259,8 +1813,13 @@ public class ApduAnalyzer
 }
 
 /// <summary>
-/// Detects and categorizes operations within traces.
+/// Detects and categorizes high-level operations within a trace.
 /// </summary>
+/// <remarks>
+/// Pattern detection powers the usage examples documented in the coverage playbook by grouping
+/// related exchanges into semantic operations such as secure-channel establishment or applet
+/// deployment.
+/// </remarks>
 public class OperationDetector
 {
     private static readonly Dictionary<string, OperationPattern> OperationPatterns =
@@ -1345,6 +1904,13 @@ public class OperationDetector
     private readonly Dictionary<string, int> _operationCounter = new();
     private readonly List<DetectedOperation> _detectedOperations = [];
 
+    /// <summary>
+    /// Analyzes a list of exchanges and produces labeled operations with CLI guidance.
+    /// </summary>
+    /// <param name="exchanges">Ordered exchanges parsed from the trace transcript.</param>
+    /// <returns>
+    /// Dictionary keyed by operation identifier with enriched <see cref="Operation"/> payloads.
+    /// </returns>
     public Dictionary<string, Operation> AnalyzeTrace(List<Exchange> exchanges)
     {
         // First pass: detect all operations
@@ -1409,40 +1975,39 @@ public class OperationDetector
         );
 
         // Create operations from detected operations using functional composition
-        return _detectedOperations
-            .Aggregate(
-                new Dictionary<string, Operation>(),
-                (operations, detectedOp) =>
+        return _detectedOperations.Aggregate(
+            new Dictionary<string, Operation>(),
+            (operations, detectedOp) =>
+            {
+                // Check if this operation overlaps with any existing operation
+                var hasOverlap = operations.Values.Any(op =>
+                    op.StartExchange - 1 <= detectedOp.EndIndex
+                    && op.EndExchange - 1 >= detectedOp.StartIndex
+                );
+
+                if (hasOverlap)
                 {
-                    // Check if this operation overlaps with any existing operation
-                    var hasOverlap = operations.Values.Any(op =>
-                        op.StartExchange - 1 <= detectedOp.EndIndex
-                        && op.EndExchange - 1 >= detectedOp.StartIndex
-                    );
-
-                    if (hasOverlap)
-                    {
-                        return operations; // Skip if already part of another operation
-                    }
-
-                    // Create operation
-                    string opName = GetUniqueOperationName(detectedOp.Type);
-                    var operation = new Operation
-                    {
-                        Description = GetOperationDescription(detectedOp.Type),
-                        SessionId = "session_1",
-                        StartExchange = detectedOp.StartIndex + 1,
-                        EndExchange = detectedOp.EndIndex + 1,
-                        Commands = [.. detectedOp.Commands.Distinct()],
-                        ExpectedCli =
-                            OperationPatterns.GetValueOrDefault(detectedOp.Type)?.CliTemplate
-                            ?? "gp4net unknown",
-                    };
-
-                    operations[opName] = operation;
-                    return operations;
+                    return operations; // Skip if already part of another operation
                 }
-            );
+
+                // Create operation
+                string opName = GetUniqueOperationName(detectedOp.Type);
+                var operation = new Operation
+                {
+                    Description = GetOperationDescription(detectedOp.Type),
+                    SessionId = "session_1",
+                    StartExchange = detectedOp.StartIndex + 1,
+                    EndExchange = detectedOp.EndIndex + 1,
+                    Commands = [.. detectedOp.Commands.Distinct()],
+                    ExpectedCli =
+                        OperationPatterns.GetValueOrDefault(detectedOp.Type)?.CliTemplate
+                        ?? "gp4net unknown",
+                };
+
+                operations[opName] = operation;
+                return operations;
+            }
+        );
     }
 
     private void MergeSequentialOperations(string operationType, string[] requiredCommands)
@@ -1613,7 +2178,8 @@ public class SessionAnalyzer
                 {
                     // Add previous session to completed sessions if exists
                     var updatedCompletedSessions = state.CurrentSession.Match(
-                        Some: session => state.CompletedSessions.Concat(new[] { session }).ToImmutableList(),
+                        Some: session =>
+                            state.CompletedSessions.Concat(new[] { session }).ToImmutableList(),
                         None: () => state.CompletedSessions
                     );
 
@@ -1754,6 +2320,15 @@ public class SessionAnalyzer
 /// </summary>
 public class MetadataExtractor
 {
+    /// <summary>
+    /// Builds <see cref="TraceMetadata"/> from the parsed exchanges and conversion context.
+    /// </summary>
+    /// <param name="exchanges">Exchanges parsed from the trace transcript.</param>
+    /// <param name="sourceFile">Original source file path.</param>
+    /// <param name="formatType">Trace format (for example <c>gp_pro</c>).</param>
+    /// <returns>
+    /// Metadata object populated with provenance details and detected card information.
+    /// </returns>
     public TraceMetadata ExtractAll(List<Exchange> exchanges, string sourceFile, string formatType)
     {
         return new TraceMetadata

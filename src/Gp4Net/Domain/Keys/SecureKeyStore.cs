@@ -67,8 +67,10 @@ public sealed class SecureKeyStore
     {
         return ValidateKeyId(keyId)
             .Bind(_ => ValidateKeyData(keyData))
-            .Ensure(_ => !_keys.ContainsKey(keyId),
-                SmartCardError.InvalidArgument($"Key with ID '{keyId}' already exists"))
+            .Ensure(
+                _ => !_keys.ContainsKey(keyId),
+                SmartCardError.InvalidArgument($"Key with ID '{keyId}' already exists")
+            )
             .Bind(_ => EncryptAndStore(keyId, keyData));
     }
 
@@ -103,27 +105,35 @@ public sealed class SecureKeyStore
     /// </summary>
     public Result<SecureKey, SmartCardError> GetKey(string keyId) =>
         ValidateKeyId(keyId)
-            .Bind(id => FindEncryptedKey(id)
-                .Bind(encryptedKey => DecryptKeySecurely(id, encryptedKey)));
+            .Bind(id =>
+                FindEncryptedKey(id).Bind(encryptedKey => DecryptKeySecurely(id, encryptedKey))
+            );
 
     private Result<EncryptedKey, SmartCardError> FindEncryptedKey(string keyId) =>
         _keys.ContainsKey(keyId)
             ? Result.Success<EncryptedKey, SmartCardError>(_keys[keyId])
             : Result.Failure<EncryptedKey, SmartCardError>(
-                SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found"));
+                SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found")
+            );
 
-    private Result<SecureKey, SmartCardError> DecryptKeySecurely(string keyId, EncryptedKey encryptedKey) =>
+    private Result<SecureKey, SmartCardError> DecryptKeySecurely(
+        string keyId,
+        EncryptedKey encryptedKey
+    ) =>
         Result.Try(
             () => new SecureKey(keyId, DecryptKey(keyId, encryptedKey)),
-            ex => SmartCardError.SecurityError($"Failed to retrieve key: {ex.Message}"));
+            ex => SmartCardError.SecurityError($"Failed to retrieve key: {ex.Message}")
+        );
 
     /// <summary>
     /// Removes a key from the store, returning a new immutable store instance.
     /// </summary>
     public Result<SecureKeyStore, SmartCardError> RemoveKey(string keyId) =>
         ValidateKeyId(keyId)
-            .Ensure(id => _keys.ContainsKey(id),
-                SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found"))
+            .Ensure(
+                id => _keys.ContainsKey(id),
+                SmartCardError.InvalidArgument($"Key with ID '{keyId}' not found")
+            )
             .Map(id => new SecureKeyStore(_keys.Remove(id), _masterKey, _salt));
 
     /// <summary>

@@ -44,7 +44,7 @@ public class CapFileStructure
     /// <summary>
     /// Gets the manifest information (if available from ZIP format).
     /// </summary>
-    public ManifestInfo Manifest { get; }
+    public Maybe<ManifestInfo> Manifest { get; }
 
     /// <summary>
     /// Gets the Java Card CAP file format version.
@@ -69,20 +69,24 @@ public class CapFileStructure
     public CapFileStructure(
         byte[] packageAid,
         CapVersion packageVersion,
-        IList<CapComponent> components,
-        IList<AppletInfo> applets,
-        ManifestInfo manifest = null,
-        CapVersion? capFileVersion = null,
-        byte headerFlags = 0
+        IReadOnlyCollection<CapComponent> components,
+        IReadOnlyCollection<AppletInfo> applets,
+        Maybe<ManifestInfo> manifest,
+        CapVersion capFileVersion,
+        byte headerFlags
     )
     {
+        ArgumentNullException.ThrowIfNull(packageAid);
+        ArgumentNullException.ThrowIfNull(components);
+        ArgumentNullException.ThrowIfNull(applets);
+
         PackageAid = (byte[])packageAid.Clone();
         PackageVersion = packageVersion;
-        Components = new List<CapComponent>(components);
-        Applets = new List<AppletInfo>(applets);
-        TotalSize = components.Sum(c => c.Data.Length);
+        Components = components.ToList();
+        Applets = applets.ToList();
+        TotalSize = Components.Sum(c => c.Data.Length);
         Manifest = manifest;
-        CapFileVersion = capFileVersion ?? new CapVersion(0, 0);
+        CapFileVersion = capFileVersion;
         HeaderFlags = headerFlags;
     }
 
@@ -237,32 +241,42 @@ public class CapFileStructure
                 var processingResult = component.Tag switch
                 {
                     // Extract package information from header component
-                    Constants.Constants.JavaCard.ComponentTags.HEADER =>
-                        Gp4Net.Core.Functional.ResultExtensions.Try(
-                            () => HeaderComponent.Parse(component.Data),
-                            ex => SmartCardError.InvalidData($"Invalid header component: {ex.Message}")
-                        )
-                        .Tap(header =>
-                        {
-                            packageAid = Maybe<byte[]>.From(header.PackageAid);
-                            packageVersion = Maybe<CapVersion>.From(header.PackageVersion);
-                            capFileVersion = Maybe<CapVersion>.From(
-                                new CapVersion(header.CapFileMajorVersion, header.CapFileMinorVersion)
-                            );
-                            headerFlags = header.Flags;
-                        })
-                        .Map(_ => true),
+                    Constants.Constants.JavaCard.ComponentTags.HEADER
+                        => Gp4Net
+                            .Core.Functional.ResultExtensions.Try(
+                                () => HeaderComponent.Parse(component.Data),
+                                ex =>
+                                    SmartCardError.InvalidData(
+                                        $"Invalid header component: {ex.Message}"
+                                    )
+                            )
+                            .Tap(header =>
+                            {
+                                packageAid = Maybe<byte[]>.From(header.PackageAid);
+                                packageVersion = Maybe<CapVersion>.From(header.PackageVersion);
+                                capFileVersion = Maybe<CapVersion>.From(
+                                    new CapVersion(
+                                        header.CapFileMajorVersion,
+                                        header.CapFileMinorVersion
+                                    )
+                                );
+                                headerFlags = header.Flags;
+                            })
+                            .Map(_ => true),
 
                     // Extract applet information from applet component
-                    Constants.Constants.JavaCard.ComponentTags.APPLET =>
-                        Result.Try(
+                    Constants.Constants.JavaCard.ComponentTags.APPLET
+                        => Result.Try(
                             () =>
                             {
                                 var appletComponent = AppletComponent.Parse(component.Data);
                                 applets.AddRange(appletComponent.Applets);
                                 return true;
                             },
-                            ex => SmartCardError.InvalidData($"Failed to parse applet component: {ex.Message}")
+                            ex =>
+                                SmartCardError.InvalidData(
+                                    $"Failed to parse applet component: {ex.Message}"
+                                )
                         ),
 
                     // Other components don't need special processing
@@ -286,7 +300,7 @@ public class CapFileStructure
                         version,
                         components,
                         applets,
-                        manifest.GetValueOrDefault(null),
+                        manifest,
                         capFileVersion.GetValueOrDefault(new CapVersion(0, 0)),
                         headerFlags
                     ))
@@ -744,67 +758,42 @@ internal class AppletComponent
 /// Represents manifest information from ZIP/JAR CAP files.
 /// </summary>
 [PublicAPI]
-public class ManifestInfo
+public sealed class ManifestInfo
 {
-    /// <summary>
-    /// Gets the Java Card CAP file version.
-    /// </summary>
-    public string CapFileVersion { get; }
-
-    /// <summary>
-    /// Gets the Java Card converter version.
-    /// </summary>
-    public string ConverterVersion { get; }
-
-    /// <summary>
-    /// Gets the converter provider.
-    /// </summary>
-    public string ConverterProvider { get; }
-
-    /// <summary>
-    /// Gets the creation time.
-    /// </summary>
-    public string CreationTime { get; }
-
-    /// <summary>
-    /// Gets the package name.
-    /// </summary>
-    public string PackageName { get; }
-
-    /// <summary>
-    /// Gets the imported packages.
-    /// </summary>
-    public IReadOnlyList<ImportedPackage> ImportedPackages { get; }
-
-    /// <summary>
-    /// Gets whether integer support is required.
-    /// </summary>
-    public bool? IntegerSupportRequired { get; }
-
-    /// <summary>
-    /// Initializes a new instance of the ManifestInfo class.
-    /// </summary>
     public ManifestInfo(
-        string capFileVersion = null,
-        string converterVersion = null,
-        string converterProvider = null,
-        string creationTime = null,
-        string packageName = null,
-        IList<ImportedPackage> importedPackages = null,
-        bool? integerSupportRequired = null
+        Maybe<string> capFileVersion,
+        Maybe<string> converterVersion,
+        Maybe<string> converterProvider,
+        Maybe<string> creationTime,
+        Maybe<string> packageName,
+        IReadOnlyCollection<ImportedPackage> importedPackages,
+        Maybe<bool> integerSupportRequired
     )
     {
+        ArgumentNullException.ThrowIfNull(importedPackages);
+
         CapFileVersion = capFileVersion;
         ConverterVersion = converterVersion;
         ConverterProvider = converterProvider;
         CreationTime = creationTime;
         PackageName = packageName;
-        ImportedPackages =
-            importedPackages != null
-                ? new List<ImportedPackage>(importedPackages)
-                : Array.Empty<ImportedPackage>();
+        ImportedPackages = importedPackages.ToList();
         IntegerSupportRequired = integerSupportRequired;
     }
+
+    public Maybe<string> CapFileVersion { get; }
+
+    public Maybe<string> ConverterVersion { get; }
+
+    public Maybe<string> ConverterProvider { get; }
+
+    public Maybe<string> CreationTime { get; }
+
+    public Maybe<string> PackageName { get; }
+
+    public IReadOnlyList<ImportedPackage> ImportedPackages { get; }
+
+    public Maybe<bool> IntegerSupportRequired { get; }
 
     /// <summary>
     /// Parses manifest data from text content.
@@ -816,8 +805,8 @@ public class ManifestInfo
         string[] lines = manifestContent.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         var properties = new Dictionary<string, string>();
 
-        string currentKey = null;
-        string currentValue = null;
+        string? currentKey = null;
+        string? currentValue = null;
 
         foreach (string line in lines)
         {
@@ -836,7 +825,7 @@ public class ManifestInfo
             if (trimmedLine.StartsWith(' ') && currentKey != null)
             {
                 // Continuation line
-                currentValue += trimmedLine.Trim();
+                currentValue = string.Concat(currentValue ?? string.Empty, trimmedLine.Trim());
             }
             else
             {
@@ -900,26 +889,48 @@ public class ManifestInfo
             ))
             .ToList();
 
+        static Maybe<string> GetProperty(IDictionary<string, string> props, string key)
+        {
+            return props.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+                ? Maybe<string>.From(value)
+                : Maybe<string>.None;
+        }
+
+        Maybe<bool> integerSupport = GetProperty(
+                properties,
+                Constants.Constants.JavaCard.ManifestAttributes.INTEGER_SUPPORT_REQUIRED
+            )
+            .Map(value =>
+                string.Equals(
+                    value,
+                    Constants.Constants.JavaCard.ManifestAttributes.TRUE_VALUE,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            );
+
         return new ManifestInfo(
-            capFileVersion: properties.GetValueOrDefault(
+            capFileVersion: GetProperty(
+                properties,
                 Constants.Constants.JavaCard.ManifestAttributes.CAP_FILE_VERSION
             ),
-            converterVersion: properties.GetValueOrDefault(
+            converterVersion: GetProperty(
+                properties,
                 Constants.Constants.JavaCard.ManifestAttributes.CONVERTER_VERSION
             ),
-            converterProvider: properties.GetValueOrDefault(
+            converterProvider: GetProperty(
+                properties,
                 Constants.Constants.JavaCard.ManifestAttributes.CONVERTER_PROVIDER
             ),
-            creationTime: properties.GetValueOrDefault(
+            creationTime: GetProperty(
+                properties,
                 Constants.Constants.JavaCard.ManifestAttributes.CREATION_TIME
             ),
-            packageName: properties.GetValueOrDefault(
+            packageName: GetProperty(
+                properties,
                 Constants.Constants.JavaCard.ManifestAttributes.PACKAGE_NAME
             ),
             importedPackages: importedPackages,
-            integerSupportRequired: properties.GetValueOrDefault(
-                Constants.Constants.JavaCard.ManifestAttributes.INTEGER_SUPPORT_REQUIRED
-            ) == Constants.Constants.JavaCard.ManifestAttributes.TRUE_VALUE
+            integerSupportRequired: integerSupport
         );
     }
 }

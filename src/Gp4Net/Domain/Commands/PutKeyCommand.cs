@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -322,7 +323,7 @@ public class KeyDataBlock
     /// <summary>
     /// Gets the key check value (optional).
     /// </summary>
-    public byte[] KeyCheckValue { get; }
+    public Maybe<byte[]> KeyCheckValue { get; }
 
     /// <summary>
     /// Initializes a new instance of the KeyDataBlock class.
@@ -330,12 +331,13 @@ public class KeyDataBlock
     /// <param name="type">The key type.</param>
     /// <param name="value">The key value.</param>
     /// <param name="keyCheckValue">The key check value (optional, 3 bytes).</param>
-    private KeyDataBlock(KeyType type, byte[] value, byte[] keyCheckValue = null)
+    private KeyDataBlock(KeyType type, byte[] value, Maybe<byte[]> keyCheckValue = default)
     {
+        ArgumentNullException.ThrowIfNull(value);
         Type = type;
         Length = (byte)value.Length;
         Value = (byte[])value.Clone();
-        KeyCheckValue = keyCheckValue != null ? (byte[])keyCheckValue.Clone() : [];
+        KeyCheckValue = keyCheckValue.Map(kcv => (byte[])kcv.Clone());
     }
 
     /// <summary>
@@ -348,12 +350,72 @@ public class KeyDataBlock
 
         result.AddRange(Value);
 
-        if (KeyCheckValue.Length > 0)
+        KeyCheckValue.Execute(kcv =>
         {
-            result.AddRange(KeyCheckValue);
-        }
+            if (kcv.Length > 0)
+            {
+                result.AddRange(kcv);
+            }
+        });
 
         return [.. result];
+    }
+
+    private static Result<KeyDataBlock, SmartCardError> CreateKeyBlock(
+        KeyType keyType,
+        string keyName,
+        byte[]? keyValue,
+        int expectedLength,
+        Maybe<byte[]> keyCheckValue = default
+    )
+    {
+        return ValidateKeyValue(keyValue, expectedLength, keyName)
+            .Bind(validKey =>
+                ValidateKeyCheckValue(keyCheckValue, keyName)
+                    .Bind(validCheck => Result.Success<KeyDataBlock, SmartCardError>(
+                        new KeyDataBlock(keyType, validKey, validCheck)
+                    ))
+            );
+    }
+
+    private static Result<byte[], SmartCardError> ValidateKeyValue(
+        byte[]? keyValue,
+        int expectedLength,
+        string keyName
+    )
+    {
+        return Maybe<byte[]>
+            .From(keyValue)
+            .ToResult(SmartCardError.InvalidArgument($"{keyName} key value cannot be null."))
+            .Bind(value =>
+                value.Length == expectedLength
+                    ? Result.Success<byte[], SmartCardError>((byte[])value.Clone())
+                    : Result.Failure<byte[], SmartCardError>(
+                        SmartCardError.InvalidArgument(
+                            $"{keyName} key must be {expectedLength} bytes, got {value.Length} bytes."
+                        )
+                    )
+            );
+    }
+
+    private static Result<Maybe<byte[]>, SmartCardError> ValidateKeyCheckValue(
+        Maybe<byte[]> keyCheckValue,
+        string keyName
+    )
+    {
+        return keyCheckValue.Match(
+            value =>
+                value.Length == 3
+                    ? Result.Success<Maybe<byte[]>, SmartCardError>(
+                        Maybe<byte[]>.From((byte[])value.Clone())
+                    )
+                    : Result.Failure<Maybe<byte[]>, SmartCardError>(
+                        SmartCardError.InvalidArgument(
+                            $"Key check value must be 3 bytes for {keyName}, got {value.Length} bytes."
+                        )
+                    ),
+            () => Result.Success<Maybe<byte[]>, SmartCardError>(Maybe<byte[]>.None)
+        );
     }
 
     /// <summary>
@@ -363,30 +425,17 @@ public class KeyDataBlock
     /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
     /// <returns>A Result containing the KeyDataBlock for DES or an error.</returns>
     public static Result<KeyDataBlock, SmartCardError> CreateDesKey(
-        byte[] keyValue,
-        byte[] keyCheckValue = null
+        byte[]? keyValue,
+        byte[]? keyCheckValue = null
     )
     {
-        if (keyValue == null)
-        {
-            return SmartCardError.InvalidArgument("DES key value cannot be null.");
-        }
-
-        if (keyValue.Length != 8)
-        {
-            return SmartCardError.InvalidArgument(
-                $"DES key must be 8 bytes, got {keyValue.Length} bytes."
-            );
-        }
-
-        if (keyCheckValue != null && keyCheckValue.Length != 3)
-        {
-            return SmartCardError.InvalidArgument(
-                $"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes."
-            );
-        }
-
-        return new KeyDataBlock(KeyType.Des, keyValue, keyCheckValue);
+        return CreateKeyBlock(
+            KeyType.Des,
+            "DES",
+            keyValue,
+            expectedLength: 8,
+            keyCheckValue: Maybe<byte[]>.From(keyCheckValue)
+        );
     }
 
     /// <summary>
@@ -396,30 +445,17 @@ public class KeyDataBlock
     /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
     /// <returns>A Result containing the KeyDataBlock for 3DES (double length) or an error.</returns>
     public static Result<KeyDataBlock, SmartCardError> CreateTripleDes2Key(
-        byte[] keyValue,
-        byte[] keyCheckValue = null
+        byte[]? keyValue,
+        byte[]? keyCheckValue = null
     )
     {
-        if (keyValue == null)
-        {
-            return SmartCardError.InvalidArgument("3DES double-length key value cannot be null.");
-        }
-
-        if (keyValue.Length != 16)
-        {
-            return SmartCardError.InvalidArgument(
-                $"3DES double-length key must be 16 bytes, got {keyValue.Length} bytes."
-            );
-        }
-
-        if (keyCheckValue != null && keyCheckValue.Length != 3)
-        {
-            return SmartCardError.InvalidArgument(
-                $"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes."
-            );
-        }
-
-        return new KeyDataBlock(KeyType.TripleDes2Key, keyValue, keyCheckValue);
+        return CreateKeyBlock(
+            KeyType.TripleDes2Key,
+            "3DES double-length",
+            keyValue,
+            expectedLength: 16,
+            keyCheckValue: Maybe<byte[]>.From(keyCheckValue)
+        );
     }
 
     /// <summary>
@@ -429,30 +465,17 @@ public class KeyDataBlock
     /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
     /// <returns>A Result containing the KeyDataBlock for 3DES (triple length) or an error.</returns>
     public static Result<KeyDataBlock, SmartCardError> CreateTripleDes3Key(
-        byte[] keyValue,
-        byte[] keyCheckValue = null
+        byte[]? keyValue,
+        byte[]? keyCheckValue = null
     )
     {
-        if (keyValue == null)
-        {
-            return SmartCardError.InvalidArgument("3DES triple-length key value cannot be null.");
-        }
-
-        if (keyValue.Length != 24)
-        {
-            return SmartCardError.InvalidArgument(
-                $"3DES triple-length key must be 24 bytes, got {keyValue.Length} bytes."
-            );
-        }
-
-        if (keyCheckValue != null && keyCheckValue.Length != 3)
-        {
-            return SmartCardError.InvalidArgument(
-                $"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes."
-            );
-        }
-
-        return new KeyDataBlock(KeyType.TripleDes3Key, keyValue, keyCheckValue);
+        return CreateKeyBlock(
+            KeyType.TripleDes3Key,
+            "3DES triple-length",
+            keyValue,
+            expectedLength: 24,
+            keyCheckValue: Maybe<byte[]>.From(keyCheckValue)
+        );
     }
 
     /// <summary>
@@ -462,30 +485,17 @@ public class KeyDataBlock
     /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
     /// <returns>A Result containing the KeyDataBlock for AES-128 or an error.</returns>
     public static Result<KeyDataBlock, SmartCardError> CreateAes128Key(
-        byte[] keyValue,
-        byte[] keyCheckValue = null
+        byte[]? keyValue,
+        byte[]? keyCheckValue = null
     )
     {
-        if (keyValue == null)
-        {
-            return SmartCardError.InvalidArgument("AES-128 key value cannot be null.");
-        }
-
-        if (keyValue.Length != 16)
-        {
-            return SmartCardError.InvalidArgument(
-                $"AES-128 key must be 16 bytes, got {keyValue.Length} bytes."
-            );
-        }
-
-        if (keyCheckValue != null && keyCheckValue.Length != 3)
-        {
-            return SmartCardError.InvalidArgument(
-                $"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes."
-            );
-        }
-
-        return new KeyDataBlock(KeyType.Aes128, keyValue, keyCheckValue);
+        return CreateKeyBlock(
+            KeyType.Aes128,
+            "AES-128",
+            keyValue,
+            expectedLength: 16,
+            keyCheckValue: Maybe<byte[]>.From(keyCheckValue)
+        );
     }
 
     /// <summary>
@@ -495,30 +505,17 @@ public class KeyDataBlock
     /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
     /// <returns>A Result containing the KeyDataBlock for AES-192 or an error.</returns>
     public static Result<KeyDataBlock, SmartCardError> CreateAes192Key(
-        byte[] keyValue,
-        byte[] keyCheckValue = null
+        byte[]? keyValue,
+        byte[]? keyCheckValue = null
     )
     {
-        if (keyValue == null)
-        {
-            return SmartCardError.InvalidArgument("AES-192 key value cannot be null.");
-        }
-
-        if (keyValue.Length != 24)
-        {
-            return SmartCardError.InvalidArgument(
-                $"AES-192 key must be 24 bytes, got {keyValue.Length} bytes."
-            );
-        }
-
-        if (keyCheckValue != null && keyCheckValue.Length != 3)
-        {
-            return SmartCardError.InvalidArgument(
-                $"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes."
-            );
-        }
-
-        return new KeyDataBlock(KeyType.Aes192, keyValue, keyCheckValue);
+        return CreateKeyBlock(
+            KeyType.Aes192,
+            "AES-192",
+            keyValue,
+            expectedLength: 24,
+            keyCheckValue: Maybe<byte[]>.From(keyCheckValue)
+        );
     }
 
     /// <summary>
@@ -528,30 +525,17 @@ public class KeyDataBlock
     /// <param name="keyCheckValue">The 3-byte key check value (optional).</param>
     /// <returns>A Result containing the KeyDataBlock for AES-256 or an error.</returns>
     public static Result<KeyDataBlock, SmartCardError> CreateAes256Key(
-        byte[] keyValue,
-        byte[] keyCheckValue = null
+        byte[]? keyValue,
+        byte[]? keyCheckValue = null
     )
     {
-        if (keyValue == null)
-        {
-            return SmartCardError.InvalidArgument("AES-256 key value cannot be null.");
-        }
-
-        if (keyValue.Length != 32)
-        {
-            return SmartCardError.InvalidArgument(
-                $"AES-256 key must be 32 bytes, got {keyValue.Length} bytes."
-            );
-        }
-
-        if (keyCheckValue != null && keyCheckValue.Length != 3)
-        {
-            return SmartCardError.InvalidArgument(
-                $"Key check value must be 3 bytes, got {keyCheckValue.Length} bytes."
-            );
-        }
-
-        return new KeyDataBlock(KeyType.Aes256, keyValue, keyCheckValue);
+        return CreateKeyBlock(
+            KeyType.Aes256,
+            "AES-256",
+            keyValue,
+            expectedLength: 32,
+            keyCheckValue: Maybe<byte[]>.From(keyCheckValue)
+        );
     }
 }
 

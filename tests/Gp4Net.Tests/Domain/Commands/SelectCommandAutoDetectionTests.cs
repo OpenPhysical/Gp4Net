@@ -222,7 +222,7 @@ public class SelectCommandAutoDetectionTests
     public void SelectCommand_Create_WithNullAid_ReturnsFailure()
     {
         // Act
-        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(null);
+        Result<SelectCommand, SmartCardError> result = SelectCommand.Create(null!);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();
@@ -291,7 +291,7 @@ public class SelectCommandAutoDetectionTests
     public void SelectResponse_Parse_WithNullData_ReturnsFailure()
     {
         // Act
-        Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(null);
+        Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(null!);
 
         // Assert
         _ = result.IsFailure.Should().BeTrue();

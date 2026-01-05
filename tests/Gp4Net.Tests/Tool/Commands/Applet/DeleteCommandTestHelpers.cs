@@ -19,7 +19,7 @@ internal static class DeleteCommandTestHelpers
 
         // Create CommandContext with minimal required parameters
         List<string> args = [];
-        return new CommandContext(args, remaining, "test", null);
+        return new CommandContext(args, remaining, "test", null!);
     }
 
     /// <summary>

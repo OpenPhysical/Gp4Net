@@ -121,36 +121,38 @@ public static class FunctionComposition
     /// <summary>
     /// Merges two metadata instances, preferring values from the second if both present.
     /// </summary>
-    private static CommandMetadata MergeMetadata(CommandMetadata first, CommandMetadata second)
+    private static CommandMetadata MergeMetadata(CommandMetadata? first, CommandMetadata? second)
     {
-        return Maybe<CommandMetadata>
-            .From(first)
-            .Match(
-                Some: firstMeta =>
-                    Maybe<CommandMetadata>
-                        .From(second)
-                        .Match(
-                            Some: secondMeta => new CommandMetadata(
-                                ExecutionTime: secondMeta.ExecutionTime.HasValue
-                                    ? secondMeta.ExecutionTime
-                                    : firstMeta.ExecutionTime,
-                                TransmittedBytes: secondMeta.TransmittedBytes.HasValue
-                                    ? secondMeta.TransmittedBytes
-                                    : firstMeta.TransmittedBytes,
-                                ReceivedBytes: secondMeta.ReceivedBytes.HasValue
-                                    ? secondMeta.ReceivedBytes
-                                    : firstMeta.ReceivedBytes,
-                                SecureChannelWrapped: secondMeta.SecureChannelWrapped
-                                    || firstMeta.SecureChannelWrapped,
-                                SecureChannelUnwrapped: secondMeta.SecureChannelUnwrapped
-                                    || firstMeta.SecureChannelUnwrapped,
-                                ResponseLogged: secondMeta.ResponseLogged
-                                    || firstMeta.ResponseLogged
-                            ),
-                            None: () => firstMeta
-                        ),
-                None: () => second
-            );
+        if (first is null && second is null)
+        {
+            return CommandMetadata.Empty;
+        }
+
+        if (first is null)
+        {
+            return second!;
+        }
+
+        if (second is null)
+        {
+            return first;
+        }
+
+        return new CommandMetadata(
+            ExecutionTime: second.ExecutionTime.HasValue ? second.ExecutionTime : first.ExecutionTime,
+            TransmittedBytes: second.TransmittedBytes.HasValue
+                ? second.TransmittedBytes
+                : first.TransmittedBytes,
+            ReceivedBytes: second.ReceivedBytes.HasValue
+                ? second.ReceivedBytes
+                : first.ReceivedBytes,
+            SecureChannelWrapped: second.SecureChannelWrapped || first.SecureChannelWrapped,
+            SecureChannelUnwrapped: second.SecureChannelUnwrapped || first.SecureChannelUnwrapped,
+            ResponseLogged: second.ResponseLogged || first.ResponseLogged,
+            InitializeUpdateResponse: second.InitializeUpdateResponse.HasValue
+                ? second.InitializeUpdateResponse
+                : first.InitializeUpdateResponse
+        );
     }
 
     /// <summary>

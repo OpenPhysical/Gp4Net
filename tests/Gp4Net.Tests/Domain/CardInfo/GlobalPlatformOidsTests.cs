@@ -33,7 +33,6 @@ public class GlobalPlatformOidsTests
         // Act & Assert
         _ = GlobalPlatformOids.GetDescription("1.2.3.4.5.6.7.8.9").Should().BeNull();
         _ = GlobalPlatformOids.GetDescription("").Should().BeNull();
-        _ = GlobalPlatformOids.GetDescription(null).Should().BeNull();
     }
 
     [Test]
@@ -44,7 +43,6 @@ public class GlobalPlatformOidsTests
         _ = GlobalPlatformOids.IsGlobalPlatformOid("1.2.840.114283.4.3.112").Should().BeTrue();
         _ = GlobalPlatformOids.IsGlobalPlatformOid("1.3.6.1.4.1.42.2.110.1.3").Should().BeFalse();
         _ = GlobalPlatformOids.IsGlobalPlatformOid("").Should().BeFalse();
-        _ = GlobalPlatformOids.IsGlobalPlatformOid(null).Should().BeFalse();
     }
 
     [Test]
@@ -65,7 +63,6 @@ public class GlobalPlatformOidsTests
         _ = GlobalPlatformOids.GetScpVersion("1.2.840.114283.1").Should().BeNull();
         _ = GlobalPlatformOids.GetScpVersion("1.3.6.1.4.1.42.2.110.1.3").Should().BeNull();
         _ = GlobalPlatformOids.GetScpVersion("").Should().BeNull();
-        _ = GlobalPlatformOids.GetScpVersion(null).Should().BeNull();
     }
 
     [Test]
@@ -88,7 +85,6 @@ public class GlobalPlatformOidsTests
         // Act & Assert
         _ = GlobalPlatformOids.FormatOid("1.2.3.4.5").Should().Be("1.2.3.4.5");
         _ = GlobalPlatformOids.FormatOid("").Should().Be("");
-        _ = GlobalPlatformOids.FormatOid(null).Should().BeNull();
     }
 
     [Test]

@@ -143,10 +143,10 @@ public sealed class KeyLifecycleManager
     /// Creates a new key lifecycle manager.
     /// </summary>
     public static Result<KeyLifecycleManager, SmartCardError> Create(
-        KeyManagementConfiguration config = null
+        Maybe<KeyManagementConfiguration> config = default
     )
     {
-        var configuration = config ?? KeyManagementConfiguration.Default;
+        var configuration = config.GetValueOrDefault(KeyManagementConfiguration.Default);
 
         return SecureKeyStore
             .Create()

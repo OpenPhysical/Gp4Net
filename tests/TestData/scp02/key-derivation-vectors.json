@@ -1,0 +1,42 @@
+{
+  "description": "Subset of SCP02 key derivation fixtures derived from scripts/scp02_test_vectors.json",
+  "reference": "GlobalPlatform Card Specification E.4.2.1",
+  "vectors": [
+    {
+      "name": "SCP02 i=15 Derived MAC with GP Test Keys",
+      "staticKeys": {
+        "enc": "404142434445464748494A4B4C4D4E4F",
+        "mac": "404142434445464748494A4B4C4D4E4F",
+        "dek": "404142434445464748494A4B4C4D4E4F"
+      },
+      "challenges": {
+        "host": "1122334455667788",
+        "card": "AABBCCDDEE11",
+        "sequenceCounter": "0001"
+      },
+      "expectedSessionKeys": {
+        "enc": "25C9794A1205FF244F5FA0378D2F8D59",
+        "mac": "9BED98891580C3B245FE9EC58BFA8D2A",
+        "dek": "0E51FDF196141F227A57BD154012FD39"
+      }
+    },
+    {
+      "name": "SCP02 i=04 Dynamic MAC",
+      "staticKeys": {
+        "enc": "0123456789ABCDEF1234567890ABCDEF",
+        "mac": "FEDCBA9876543210ABCDEF0987654321",
+        "dek": "1122334455667788AABBCCDDEEFF1122"
+      },
+      "challenges": {
+        "host": "FEDCBA9876543210",
+        "card": "123456789ABC",
+        "sequenceCounter": "00A5"
+      },
+      "expectedSessionKeys": {
+        "enc": "B1B1E3A7B4FBD9F6BDA5FDDB703C5D47",
+        "mac": "82D6C3CC4FE50FC6C4DF470744514496",
+        "dek": "CAF3D972A7E964D2BCBF868561574637"
+      }
+    }
+  ]
+}

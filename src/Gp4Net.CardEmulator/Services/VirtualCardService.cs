@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using CSharpFunctionalExtensions;
 using Gp4Net.CardEmulator.Core;
 using Gp4Net.Core;
@@ -76,6 +77,33 @@ public class VirtualCardService : IDisposable
             .Where(name => !string.IsNullOrEmpty(name))
             .ToResult(ErrorFactory.EmptyArgument("Reader name"))
             .Bind(name => FindAndConnectToReader(name));
+    }
+
+    /// <summary>
+    /// Asynchronously connects to a virtual card reader by name.
+    /// Functional async wrapper around the synchronous Connect operation.
+    /// </summary>
+    /// <param name="readerName">The name of the reader to connect to.</param>
+    /// <returns>A task containing a result indicating whether the connection was successful.</returns>
+    public System.Threading.Tasks.Task<Result<bool, SmartCardError>> ConnectAsync(string readerName)
+    {
+        return System.Threading.Tasks.Task.FromResult(Connect(readerName));
+    }
+
+    /// <summary>
+    /// Gets the list of available virtual card readers.
+    /// </summary>
+    /// <returns>A result containing the array of reader names.</returns>
+    public Result<string[], SmartCardError> GetReaders()
+    {
+        if (_disposed)
+        {
+            return Result.Failure<string[], SmartCardError>(
+                SmartCardError.CommunicationError("Service has been disposed")
+            );
+        }
+
+        return Result.Success<string[], SmartCardError>(_readerManager.GetReaderNames().ToArray());
     }
 
     /// <summary>

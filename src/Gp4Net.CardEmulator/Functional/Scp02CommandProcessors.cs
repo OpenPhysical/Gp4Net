@@ -145,12 +145,18 @@ public static class Scp02CommandProcessors
             .Bind(request => VerifyScp02HostCryptogram(request, state, rngContext, command))
             .Tap(request => logging.LogDebug("SCP02 VerifyScp02HostCryptogram: SUCCESS"))
             .TapError(error =>
-                logging.LogDebug("SCP02 VerifyScp02HostCryptogram: FAILED - {Error}", error.Message)
+                logging.LogDebug(
+                    "SCP02 VerifyScp02HostCryptogram: FAILED - {Error}",
+                    error.Message
+                )
             )
             .Bind(request => DeriveScp02SessionKeys(request, state, rngContext))
             .Tap(sessionKeys => logging.LogDebug("SCP02 DeriveScp02SessionKeys: SUCCESS"))
             .TapError(error =>
-                logging.LogDebug("SCP02 DeriveScp02SessionKeys: FAILED - {Error}", error.Message)
+                logging.LogDebug(
+                    "SCP02 DeriveScp02SessionKeys: FAILED - {Error}",
+                    error.Message
+                )
             )
             .Map(sessionKeys => CreateScp02ExternalAuthResponse(sessionKeys, state));
     }
@@ -496,7 +502,10 @@ public static class Scp02CommandProcessors
             data.CardChallenge
         );
         var newState = state
-            .WithChallenges(data.HostChallenge, fullCardChallenge)
+            .WithChallenges(
+                Maybe<byte[]>.From(data.HostChallenge),
+                Maybe<byte[]>.From(fullCardChallenge)
+            )
             .WithKeys(data.Keys)
             .WithIncrementedSequenceCounter(data.KeyVersion); // Increment for next use
 
@@ -703,21 +712,16 @@ public static class Scp02CommandProcessors
         // Per GP Card Spec v2.3.1 Section E.3.2: Use the same session key derivation as during INITIALIZE UPDATE
         return ValidateScp02SessionKeyDerivationPreconditions(state)
             .Bind(validatedData =>
-            {
-                // Per GP Card Spec v2.3.1 Section E.2.2: Derive session keys using the same parameters as INITIALIZE UPDATE
-                // Extract sequence counter from card challenge (first 2 bytes)
-                byte[] sequenceCounter = validatedData.cardChallenge.Take(2).ToArray();
-
-                return KeyDerivationContext
+                KeyDerivationContext
                     .CreateForScp02(
                         validatedData.currentKeys,
                         validatedData.hostChallenge,
-                        validatedData.cardChallenge,
-                        sequenceCounter,
+                        validatedData.cardRandom,
+                        validatedData.sequenceCounter,
                         ScpImplementation.Scp02I15
                     )
-                    .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context));
-            })
+                    .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context))
+            )
             .Bind(sessionKeys =>
             {
                 // Per GP Card Spec v2.3.1 Section E.3.2: Construct the command data that was MACed
@@ -780,17 +784,12 @@ public static class Scp02CommandProcessors
                         SmartCardError.InvalidArgument("SCP02 requires SCP02 key set")
                     );
 
-                // Per GP Card Spec v2.3.1 Section E.3.2: Session keys are always used for EXTERNAL AUTHENTICATE MAC verification
-                // The ICV encryption implementation option affects subsequent command MAC chaining, not EXTERNAL AUTHENTICATE itself
-                // Extract sequence counter from card challenge (first 2 bytes)
-                byte[] sequenceCounter = validatedData.cardChallenge.Take(2).ToArray();
-
                 return KeyDerivationContext
                     .CreateForScp02(
                         validatedData.currentKeys,
                         validatedData.hostChallenge,
-                        validatedData.cardChallenge,
-                        sequenceCounter,
+                        validatedData.cardRandom,
+                        validatedData.sequenceCounter,
                         ScpImplementation.Scp02I15
                     )
                     .Bind(context => CryptoService.KeyDerivation.DeriveSessionKeys(context));
@@ -803,7 +802,7 @@ public static class Scp02CommandProcessors
     /// Per CryptographicService interface: SCP02 requires 6-byte card challenge (random part only).
     /// </summary>
     private static Result<
-        (IKeySet currentKeys, byte[] hostChallenge, byte[] cardChallenge),
+        (IKeySet currentKeys, byte[] hostChallenge, byte[] sequenceCounter, byte[] cardRandom),
         SmartCardError
     > ValidateScp02SessionKeyDerivationPreconditions(CardState state)
     {
@@ -823,11 +822,31 @@ public static class Scp02CommandProcessors
                     .ToResult(SmartCardError.ConditionsNotSatisfied())
                     .Map(keys =>
                     {
-                        // Per GP Card Spec v2.3.1 Section E.2.2: Extract 6-byte random part for session key derivation
-                        // state.CardChallenge is 8-byte combined (sequence counter + random), but session key derivation
-                        // requires only the 6-byte random part per CryptographicService interface specification
-                        byte[] cardChallengeRandom = challenges.card.Skip(2).Take(6).ToArray();
-                        return (keys, challenges.host, cardChallengeRandom);
+                        byte[] fullCardChallenge = challenges.card;
+                        byte[] sequenceCounter;
+                        byte[] cardChallengeRandom;
+
+                        if (fullCardChallenge.Length >= 8)
+                        {
+                            sequenceCounter = fullCardChallenge[..2];
+                            cardChallengeRandom = fullCardChallenge[2..8];
+                        }
+                        else
+                        {
+                            sequenceCounter = fullCardChallenge.Length >= 2
+                                ? fullCardChallenge[..2]
+                                : fullCardChallenge;
+                            cardChallengeRandom = fullCardChallenge.Length > 2
+                                ? fullCardChallenge[2..]
+                                : Array.Empty<byte>();
+                        }
+
+                        return (
+                            currentKeys: keys,
+                            hostChallenge: challenges.host,
+                            sequenceCounter,
+                            cardRandom: cardChallengeRandom
+                        );
                     })
             );
     }

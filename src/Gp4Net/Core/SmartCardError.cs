@@ -44,16 +44,24 @@ public record SmartCardError(
     }
 
     /// <summary>
-    /// Creates an error from a status word.
+    /// Creates an error from a card status word.
     /// </summary>
+    /// <param name="sw">Status word returned by the card.</param>
+    /// <returns>
+    /// A <see cref="SmartCardError"/> with code <c>SW_xxxx</c> and a message resolved via GlobalPlatform
+    /// status word descriptions.
+    /// </returns>
     public static SmartCardError FromStatusWord(ushort sw)
     {
         return WithStatus($"SW_{sw:X4}", GetStatusWordDescription(sw), sw);
     }
 
     /// <summary>
-    /// Creates an error for a communication failure.
+    /// Creates an error that describes a transport or reader communication failure.
     /// </summary>
+    /// <param name="message">Human-readable description of the failure.</param>
+    /// <param name="ex">Optional exception captured from the transport layer.</param>
+    /// <returns>A <see cref="SmartCardError"/> with code <c>COMMUNICATION_ERROR</c>.</returns>
     public static SmartCardError CommunicationError(string message, Maybe<Exception> ex = default)
     {
         return new(
@@ -66,8 +74,13 @@ public record SmartCardError(
     }
 
     /// <summary>
-    /// Creates an error for a security failure.
+    /// Creates an error representing a security policy violation.
     /// </summary>
+    /// <param name="message">Details about the violation.</param>
+    /// <param name="sw">
+    /// Optional status word associated with the failure (for example <c>6982</c>).
+    /// </param>
+    /// <returns>A <see cref="SmartCardError"/> with code <c>SECURITY_ERROR</c>.</returns>
     public static SmartCardError SecurityError(string message, Maybe<ushort> sw = default)
     {
         return new(
@@ -80,112 +93,134 @@ public record SmartCardError(
     }
 
     /// <summary>
-    /// Creates an error for invalid data.
+    /// Creates an error indicating that provided data was malformed or out of range.
     /// </summary>
+    /// <param name="message">Detailed reason describing the invalid data.</param>
+    /// <returns>A <see cref="SmartCardError"/> with code <c>INVALID_DATA</c>.</returns>
     public static SmartCardError InvalidData(string message)
     {
         return Simple("INVALID_DATA", message);
     }
 
     /// <summary>
-    /// Creates an error for invalid arguments.
+    /// Creates an error indicating that a caller supplied an invalid argument value.
     /// </summary>
+    /// <param name="message">Detailed reason describing the invalid argument.</param>
+    /// <returns>A <see cref="SmartCardError"/> with code <c>INVALID_ARGUMENT</c>.</returns>
     public static SmartCardError InvalidArgument(string message)
     {
         return Simple("INVALID_ARGUMENT", message);
     }
 
     /// <summary>
-    /// Creates an error for unsupported operations.
+    /// Creates an error indicating that a requested operation is not supported.
     /// </summary>
+    /// <param name="message">Description of the unsupported capability.</param>
+    /// <returns>A <see cref="SmartCardError"/> with code <c>UNSUPPORTED</c>.</returns>
     public static SmartCardError Unsupported(string message)
     {
         return Simple("UNSUPPORTED", message);
     }
 
     /// <summary>
-    /// Creates an error for operations that are not yet implemented.
+    /// Creates an error indicating that a feature has not been implemented yet.
     /// </summary>
+    /// <param name="message">Description of the pending functionality.</param>
+    /// <returns>A <see cref="SmartCardError"/> with code <c>NOT_IMPLEMENTED</c>.</returns>
     public static SmartCardError NotImplemented(string message)
     {
         return Simple("NOT_IMPLEMENTED", message);
     }
 
     /// <summary>
-    /// Creates an error for invalid response data.
+    /// Creates an error indicating that a card response payload was invalid.
     /// </summary>
+    /// <param name="message">Description of the parsing or validation issue.</param>
+    /// <returns>A <see cref="SmartCardError"/> with code <c>INVALID_RESPONSE</c>.</returns>
     public static SmartCardError InvalidResponse(string message)
     {
         return Simple("INVALID_RESPONSE", message);
     }
 
     /// <summary>
-    /// Creates an error for card-specific errors.
+    /// Creates an error representing a card-side failure that is not mapped to a status word.
     /// </summary>
+    /// <param name="message">Description of the card failure.</param>
+    /// <returns>A <see cref="SmartCardError"/> with code <c>CARD_ERROR</c>.</returns>
     public static SmartCardError CardError(string message)
     {
         return Simple("CARD_ERROR", message);
     }
 
     /// <summary>
-    /// Creates an error for unsupported instructions (6D00).
+    /// Creates an error indicating that the requested instruction is not supported (SW 6D00).
     /// </summary>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>INSTRUCTION_NOT_SUPPORTED</c>.</returns>
     public static SmartCardError InstructionNotSupported()
     {
         return WithStatus("INSTRUCTION_NOT_SUPPORTED", "Invalid instruction", 0x6D00);
     }
 
     /// <summary>
-    /// Creates an error for wrong length (6700).
+    /// Creates an error indicating that the APDU length was incorrect (SW 6700).
     /// </summary>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>WRONG_LENGTH</c>.</returns>
     public static SmartCardError WrongLength()
     {
         return WithStatus("WRONG_LENGTH", "Wrong length", 0x6700);
     }
 
     /// <summary>
-    /// Creates an error for wrong length with custom message (6700).
+    /// Creates an error indicating that the APDU length was incorrect (SW 6700) with a custom message.
     /// </summary>
+    /// <param name="message">Detailed explanation of the violation.</param>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>WRONG_LENGTH</c>.</returns>
     public static SmartCardError WrongLength(string message)
     {
         return WithStatus("WRONG_LENGTH", message, 0x6700);
     }
 
     /// <summary>
-    /// Creates an error for incorrect data (6A80).
+    /// Creates an error indicating that the APDU data field was incorrect (SW 6A80).
     /// </summary>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>INCORRECT_DATA</c>.</returns>
     public static SmartCardError IncorrectData()
     {
         return WithStatus("INCORRECT_DATA", "Wrong data", 0x6A80);
     }
 
     /// <summary>
-    /// Creates an error for security status not satisfied (6982).
+    /// Creates an error indicating that the security status was not satisfied (SW 6982).
     /// </summary>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>SECURITY_STATUS_NOT_SATISFIED</c>.</returns>
     public static SmartCardError SecurityStatusNotSatisfied()
     {
         return WithStatus("SECURITY_STATUS_NOT_SATISFIED", "Security status not satisfied", 0x6982);
     }
 
     /// <summary>
-    /// Creates an error for security status not satisfied with custom message (6982).
+    /// Creates an error indicating that the security status was not satisfied (SW 6982) with a custom message.
     /// </summary>
+    /// <param name="message">Detailed explanation of the security failure.</param>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>SECURITY_STATUS_NOT_SATISFIED</c>.</returns>
     public static SmartCardError SecurityStatusNotSatisfied(string message)
     {
         return WithStatus("SECURITY_STATUS_NOT_SATISFIED", message, 0x6982);
     }
 
     /// <summary>
-    /// Creates an error for algorithm not supported (6A81).
+    /// Creates an error indicating that the requested algorithm is not supported (SW 6A81).
     /// </summary>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>ALGORITHM_NOT_SUPPORTED</c>.</returns>
     public static SmartCardError AlgorithmNotSupported()
     {
         return WithStatus("ALGORITHM_NOT_SUPPORTED", "Algorithm not supported", 0x6A81);
     }
 
     /// <summary>
-    /// Creates an error for conditions of use not satisfied (6985).
+    /// Creates an error indicating that the conditions of use were not satisfied (SW 6985).
     /// </summary>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>CONDITIONS_OF_USE_NOT_SATISFIED</c>.</returns>
     public static SmartCardError ConditionsOfUseNotSatisfied()
     {
         return WithStatus(
@@ -196,64 +231,79 @@ public record SmartCardError(
     }
 
     /// <summary>
-    /// Creates an error for referenced data not found (6A88).
+    /// Creates an error indicating that referenced data was not found (SW 6A88).
     /// </summary>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>REFERENCED_DATA_NOT_FOUND</c>.</returns>
     public static SmartCardError ReferencedDataNotFound()
     {
         return WithStatus("REFERENCED_DATA_NOT_FOUND", "Referenced data not found", 0x6A88);
     }
 
     /// <summary>
-    /// Creates an error for cryptographic operations.
+    /// Creates an error indicating that a cryptographic operation failed.
     /// </summary>
+    /// <param name="message">Description of the failure (for example, MAC mismatch).</param>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>CRYPTOGRAPHIC_ERROR</c>.</returns>
     public static SmartCardError CryptographicError(string message)
     {
         return Simple("CRYPTOGRAPHIC_ERROR", message);
     }
 
     /// <summary>
-    /// Creates an error for data integrity failures.
+    /// Creates an error indicating that data integrity validation failed.
     /// </summary>
+    /// <param name="message">Description of the integrity violation.</param>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>INTEGRITY_ERROR</c>.</returns>
     public static SmartCardError IntegrityError(string message)
     {
         return Simple("INTEGRITY_ERROR", message);
     }
 
     /// <summary>
-    /// Creates an error for file not found (6A82).
+    /// Creates an error indicating that a referenced file or object was not found (SW 6A82).
     /// </summary>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>FILE_NOT_FOUND</c>.</returns>
     public static SmartCardError FileNotFound()
     {
         return WithStatus("FILE_NOT_FOUND", "File not found", 0x6A82);
     }
 
     /// <summary>
-    /// Creates an error for authentication failures.
+    /// Creates an error indicating that authentication failed (SW 6300).
     /// </summary>
+    /// <param name="message">Description of the authentication failure.</param>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>AUTHENTICATION_FAILED</c>.</returns>
     public static SmartCardError AuthenticationFailed(string message)
     {
         return WithStatus("AUTHENTICATION_FAILED", message, 0x6300);
     }
 
     /// <summary>
-    /// Creates an error for blocked authentication due to too many attempts.
+    /// Creates an error indicating that authentication attempts are blocked.
     /// </summary>
+    /// <param name="message">Description of the block condition.</param>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>AUTHENTICATION_BLOCKED</c>.</returns>
     public static SmartCardError AuthenticationBlocked(string message)
     {
         return Simple("AUTHENTICATION_BLOCKED", message);
     }
 
     /// <summary>
-    /// Creates an error for initialization failures.
+    /// Creates an error indicating that component initialization failed.
     /// </summary>
+    /// <param name="message">Description of the component failure.</param>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>INITIALIZATION_FAILED</c>.</returns>
     public static SmartCardError InitializationFailed(string message)
     {
         return Simple("INITIALIZATION_FAILED", message);
     }
 
     /// <summary>
-    /// Creates an error for unexpected errors.
+    /// Creates an error that captures an unexpected execution path.
     /// </summary>
+    /// <param name="message">Summary of the unexpected failure.</param>
+    /// <param name="ex">Optional exception detailing the cause.</param>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>UNEXPECTED_ERROR</c>.</returns>
     public static SmartCardError UnexpectedError(string message, Maybe<Exception> ex = default)
     {
         return new(
@@ -266,48 +316,58 @@ public record SmartCardError(
     }
 
     /// <summary>
-    /// Creates an error for conditions not satisfied (6985).
+    /// Creates an error indicating that general conditions of use were not satisfied (SW 6985).
     /// </summary>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>CONDITIONS_NOT_SATISFIED</c>.</returns>
     public static SmartCardError ConditionsNotSatisfied()
     {
         return WithStatus("CONDITIONS_NOT_SATISFIED", "Conditions of use not satisfied", 0x6985);
     }
 
     /// <summary>
-    /// Creates an error for incorrect P1 P2 parameters (6A86).
+    /// Creates an error indicating that the P1/P2 parameters were incorrect (SW 6A86).
     /// </summary>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>INCORRECT_P1P2</c>.</returns>
     public static SmartCardError IncorrectP1P2()
     {
         return WithStatus("INCORRECT_P1P2", "Incorrect P1 P2", 0x6A86);
     }
 
     /// <summary>
-    /// Creates an error for incorrect P1 P2 parameters with custom message (6A86).
+    /// Creates an error indicating that the P1/P2 parameters were incorrect (SW 6A86) with a custom message.
     /// </summary>
+    /// <param name="message">Detailed explanation of the incorrect parameters.</param>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>INCORRECT_P1P2</c>.</returns>
     public static SmartCardError IncorrectP1P2(string message)
     {
         return WithStatus("INCORRECT_P1P2", message, 0x6A86);
     }
 
     /// <summary>
-    /// Creates an error for cancelled operations.
+    /// Creates an error indicating that the operation was cancelled by the caller.
     /// </summary>
+    /// <param name="message">Description of the cancellation reason.</param>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>OPERATION_CANCELLED</c>.</returns>
     public static SmartCardError OperationCancelled(string message)
     {
         return Simple("OPERATION_CANCELLED", message);
     }
 
     /// <summary>
-    /// Creates an error for invalid length.
+    /// Creates an error indicating that a provided value had an invalid length.
     /// </summary>
+    /// <param name="message">Description of the invalid length condition.</param>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>INVALID_LENGTH</c>.</returns>
     public static SmartCardError InvalidLength(string message)
     {
         return Simple("INVALID_LENGTH", message);
     }
 
     /// <summary>
-    /// Creates an error for communication failures.
+    /// Creates an error indicating that communication with the card failed unexpectedly.
     /// </summary>
+    /// <param name="message">Description of the communication failure.</param>
+    /// <returns>A <see cref="SmartCardError"/> whose <see cref="Code"/> is <c>COMMUNICATION_FAILED</c>.</returns>
     public static SmartCardError CommunicationFailed(string message)
     {
         return Simple("COMMUNICATION_FAILED", message);

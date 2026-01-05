@@ -58,7 +58,7 @@ public class OpenPhysicalId
     /// <param name="opid">The OPID string to parse (e.g., "1234-567-890").</param>
     /// <param name="result">The parsed OpenPhysicalId if successful.</param>
     /// <returns>True if parsing was successful, false otherwise.</returns>
-    public static bool TryParse(string opid, out OpenPhysicalId result)
+    public static bool TryParse(string? opid, out OpenPhysicalId? result)
     {
         result = null;
 
@@ -118,10 +118,10 @@ public class OpenPhysicalId
     /// <param name="result">The reconstructed OpenPhysicalId if valid.</param>
     /// <returns>True if the card data represents a valid OPID.</returns>
     public static bool TryFromCardData(
-        string iin,
-        string cin,
-        string managerUrl,
-        out OpenPhysicalId result
+        string? iin,
+        string? cin,
+        string? managerUrl,
+        out OpenPhysicalId? result
     )
     {
         result = null;
@@ -226,7 +226,7 @@ public class OpenPhysicalId
     /// </summary>
     /// <param name="obj">The object to compare with the current OPID.</param>
     /// <returns>True if the specified object is equal to the current OPID.</returns>
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
         return obj is OpenPhysicalId other
             && Iin == other.Iin

@@ -16,7 +16,7 @@ namespace Gp4Net.CardEmulator.Transport;
 [PublicAPI]
 public sealed class VirtualCardTransport : IApduTransport
 {
-    private readonly IVirtualCard _virtualCard;
+    private IVirtualCard _virtualCard;
 
     /// <summary>
     /// Gets the transport protocol type (always T=1 for virtual cards).
@@ -86,10 +86,14 @@ public sealed class VirtualCardTransport : IApduTransport
         byte[] commandBytes = BuildApduBytes(command);
         var result = _virtualCard.ProcessCommand(commandBytes);
         return result.Match(
-            success => new TransportApduResponse(
-                success.Response.Data,
-                success.Response.StatusWord
-            ),
+            success =>
+            {
+                _virtualCard = success.UpdatedCard;
+                return new TransportApduResponse(
+                    success.Response.Data,
+                    success.Response.StatusWord
+                );
+            },
             error => new TransportApduResponse([], new StatusWord(0x6F, 0x00))
         );
     }

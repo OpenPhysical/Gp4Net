@@ -128,7 +128,8 @@ public static class DataOperations
 
                 return fciElements.Length == 0
                     ? Result.Failure<TlvObject, SmartCardError>(
-                        SmartCardError.InvalidResponse("No FCI template found"))
+                        SmartCardError.InvalidResponse("No FCI template found")
+                    )
                     : Result.Success<TlvObject, SmartCardError>(fciElements[0]);
             })
             .Bind(fciElement => ParseTlvData(fciElement.TlvData.Bytes.ToArray()))

@@ -65,6 +65,8 @@ public record CardDataInfo(
     /// <returns>Result containing parsed CardDataInfo or SmartCardError</returns>
     public static Result<CardDataInfo, SmartCardError> Parse(byte[] data)
     {
+        ArgumentNullException.ThrowIfNull(data);
+
         // Eliminate null by requiring non-null data at system boundary
         return data.Length == 0
             ? Result.Success<CardDataInfo, SmartCardError>(Empty)
@@ -90,13 +92,13 @@ public record CardDataInfo(
                     data,
                     tags,
                     gpVersion,
-                    tags.TryGetValue(0x64, out byte[] scpInfo)
+                    tags.TryGetValue(0x64, out var scpInfo)
                         ? Maybe<byte[]>.From(scpInfo)
                         : Maybe<byte[]>.None,
-                    tags.TryGetValue(0x65, out byte[] configDetails)
+                    tags.TryGetValue(0x65, out var configDetails)
                         ? Maybe<byte[]>.From(configDetails)
                         : Maybe<byte[]>.None,
-                    tags.TryGetValue(0x66, out byte[] chipDetails)
+                    tags.TryGetValue(0x66, out var chipDetails)
                         ? Maybe<byte[]>.From(chipDetails)
                         : Maybe<byte[]>.None,
                     oids,
@@ -211,9 +213,10 @@ public record CardDataInfo(
     /// </summary>
     private static Maybe<string> ExtractGpVersionFromOids(IReadOnlyList<string> oids)
     {
-        string result = oids.Where(oid =>
-                oid.StartsWith("1.2.840.114283.2.") && oid != "1.2.840.114283.2"
-            )
+        string? result = oids
+            .Where(oid => !string.IsNullOrWhiteSpace(oid))
+            .Select(oid => oid!)
+            .Where(oid => oid.StartsWith("1.2.840.114283.2.") && oid != "1.2.840.114283.2")
             .Select(oid => oid.Split('.'))
             .Where(parts => parts.Length >= 7)
             .Select(parts => string.Join(".", parts.Skip(4)))
@@ -227,7 +230,7 @@ public record CardDataInfo(
     /// </summary>
     private static Maybe<Version> ExtractGpVersionFromTags(IReadOnlyDictionary<ushort, byte[]> tags)
     {
-        return tags.TryGetValue(0x73, out byte[] gpVersionData)
+        return tags.TryGetValue(0x73, out var gpVersionData)
             ? ParseGlobalPlatformVersion(gpVersionData)
             : Maybe<Version>.None;
     }
@@ -293,7 +296,7 @@ public record CardDataInfo(
         IReadOnlyDictionary<ushort, byte[]> tags
     )
     {
-        return tags.TryGetValue(0x73, out byte[] tag73Data)
+        return tags.TryGetValue(0x73, out var tag73Data)
             ? CardDataParser
                 .ParseCardRecognitionData(tag73Data)
                 .Match(

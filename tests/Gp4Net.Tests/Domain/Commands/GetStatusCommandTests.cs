@@ -27,7 +27,7 @@ public class GetStatusCommandTests
         _ = result.IsSuccess.Should().BeTrue();
         _ = result.Value.Subset.Should().Be(subset);
         _ = result.Value.Format.Should().Be(GetStatusCommand.ResponseFormat.None);
-        _ = result.Value.SearchCriteria.Should().BeEmpty();
+        _ = result.Value.SearchCriteria.HasNoValue.Should().BeTrue();
     }
 
     [Test]
@@ -54,11 +54,12 @@ public class GetStatusCommandTests
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             GetStatusCommand.ResponseFormat.None,
-            aid
+            Maybe<byte[]>.From(aid)
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        _ = result.Value.SearchCriteria.Should().BeEquivalentTo(aid);
+        _ = result.Value.SearchCriteria.HasValue.Should().BeTrue();
+        _ = result.Value.SearchCriteria.Value.Should().BeEquivalentTo(aid);
     }
 
     [Test]
@@ -71,7 +72,7 @@ public class GetStatusCommandTests
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             GetStatusCommand.ResponseFormat.None,
-            aid
+            Maybe<byte[]>.From(aid)
         );
 
         _ = result.IsFailure.Should().BeTrue();
@@ -91,11 +92,12 @@ public class GetStatusCommandTests
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             GetStatusCommand.ResponseFormat.None,
-            aid
+            Maybe<byte[]>.From(aid)
         );
 
         _ = result.IsSuccess.Should().BeTrue();
-        _ = result.Value.SearchCriteria!.Length.Should().Be(length);
+        _ = result.Value.SearchCriteria.HasValue.Should().BeTrue();
+        _ = result.Value.SearchCriteria.Value.Length.Should().Be(length);
     }
 
     [Test]
@@ -130,13 +132,16 @@ public class GetStatusCommandTests
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             GetStatusCommand.ResponseFormat.None,
-            originalAid
+            Maybe<byte[]>.From(originalAid)
         );
         var command = result.Value;
 
         originalAid[0] = 0xFF;
 
-        _ = command.SearchCriteria![0].Should().Be(0xA0);
+        command.SearchCriteria.Match(
+            criteria => criteria[0].Should().Be(0xA0),
+            () => Assert.Fail("Search criteria should be present")
+        );
     }
 
     [Test]
@@ -172,7 +177,7 @@ public class GetStatusCommandTests
         Result<GetStatusCommand, SmartCardError> result = GetStatusCommand.Create(
             GetStatusCommand.StatusSubset.ApplicationsAndSupplementaryDomains,
             GetStatusCommand.ResponseFormat.None,
-            aid
+            Maybe<byte[]>.From(aid)
         );
 
         _ = result.IsSuccess.Should().BeTrue();
@@ -422,7 +427,7 @@ public class GetStatusCommandTests
     [Test]
     public void GetStatusResponse_Parse_WithNullResponse_ReturnsFailure()
     {
-        Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(null);
+        Result<GetStatusResponse, SmartCardError> result = GetStatusResponse.Parse(null!);
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Message.Should().Contain("Response data cannot be null");

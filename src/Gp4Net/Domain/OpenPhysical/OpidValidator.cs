@@ -204,9 +204,9 @@ public class OpidValidationResult
     /// <summary>
     /// Gets the error message if validation failed.
     /// </summary>
-    public string ErrorMessage { get; }
+    public string? ErrorMessage { get; }
 
-    private OpidValidationResult(bool isValid, string errorMessage)
+    private OpidValidationResult(bool isValid, string? errorMessage)
     {
         IsValid = isValid;
         ErrorMessage = errorMessage;
@@ -218,7 +218,7 @@ public class OpidValidationResult
     /// <returns>A successful validation result.</returns>
     public static OpidValidationResult Success()
     {
-        return new(true, null);
+        return new(true, string.Empty);
     }
 
     /// <summary>
@@ -228,7 +228,7 @@ public class OpidValidationResult
     /// <returns>A failed validation result.</returns>
     public static OpidValidationResult Failure(string errorMessage)
     {
-        return new(false, errorMessage);
+        return new(false, string.IsNullOrWhiteSpace(errorMessage) ? "Unknown validation error" : errorMessage);
     }
 
     /// <summary>

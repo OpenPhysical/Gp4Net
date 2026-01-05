@@ -31,7 +31,7 @@ public sealed class TraceApduDecryptorService
     /// Initializes a new instance of the <see cref="TraceApduDecryptorService"/> class.
     /// </summary>
     /// <param name="logger">The logger instance. If null, uses NullLogger.</param>
-    public TraceApduDecryptorService(ILogger<TraceApduDecryptorService> logger = null)
+    public TraceApduDecryptorService(ILogger<TraceApduDecryptorService>? logger = null)
     {
         _logger = logger ?? NullLogger<TraceApduDecryptorService>.Instance;
     }
@@ -231,7 +231,9 @@ public sealed class TraceApduDecryptorService
                                 parsedCommand.P1,
                                 parsedCommand.P2,
                                 Maybe<byte[]>.From(originalData),
-                                Maybe.From(parsedCommand.Le).Map(le => (int)le)
+                                parsedCommand.Le.HasValue
+                                    ? Maybe<int>.From(parsedCommand.Le.Value)
+                                    : Maybe<int>.None
                             )
                             .Map(originalCommand => originalCommand.ToBytes())
                             .Bind(originalBytes =>
@@ -258,7 +260,7 @@ public sealed class TraceApduDecryptorService
     )
     {
         return
-            sessionState.SecurityLevel.HasCMac() && Maybe<byte[]>.From(parsedCommand.Mac).HasValue
+            sessionState.SecurityLevel.HasCMac() && parsedCommand.Mac.Length > 0
             ? VerifyCommandMac(parsedCommand, sessionState)
                 .Map(_ => UnitResult.Success<SmartCardError>())
             : UnitResult.Success<SmartCardError>();
@@ -300,7 +302,7 @@ public sealed class TraceApduDecryptorService
     {
         var currentChaining = sessionState.MacChaining;
         return
-            sessionState.SecurityLevel.HasCMac() && Maybe<byte[]>.From(parsedCommand.Mac).HasValue
+            sessionState.SecurityLevel.HasCMac() && parsedCommand.Mac.Length > 0
             ? Result.Success<ImmutableArray<byte>, SmartCardError>(
                 UpdateMacChaining(
                     [.. currentChaining.ToArray()],
@@ -619,7 +621,7 @@ public sealed class TraceApduDecryptorService
                     direction,
                     DecryptionStatus.Decrypted,
                     metadata,
-                    plaintextBytes // actual plaintext bytes
+                    Maybe<byte[]>.From(plaintextBytes) // actual plaintext bytes
                 );
                 return Result.Success<(DecryptedApdu, SecureChannelState), SmartCardError>(
                     (decryptedApdu, newState)
@@ -928,7 +930,7 @@ public record DecryptedApdu(
     ApduDirection Direction,
     DecryptionStatus Status,
     string Metadata,
-    byte[] DecryptedBytesInternal = null
+    Maybe<byte[]> DecryptedBytesOverride = default
 )
 {
     /// <summary>
@@ -938,8 +940,8 @@ public record DecryptedApdu(
     public byte[] DecryptedBytes =>
         Status switch
         {
-            DecryptionStatus.Failed => [], // Never expose failed encrypted data
-            _ => DecryptedBytesInternal ?? OriginalBytes,
+            DecryptionStatus.Failed => Array.Empty<byte>(), // Never expose failed encrypted data
+            _ => DecryptedBytesOverride.GetValueOrDefault(OriginalBytes),
         };
 
     /// <summary>

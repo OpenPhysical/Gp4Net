@@ -17,7 +17,7 @@ public class SelectResponseTests
     [Test]
     public void Parse_WithNullData_ReturnsFailure()
     {
-        Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(null);
+        Result<SelectResponse, SmartCardError> result = SelectResponse.Parse(null!);
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Should().BeOfType<InvalidDataError>();

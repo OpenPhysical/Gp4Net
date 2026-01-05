@@ -118,7 +118,7 @@ public class TraceMetadata
     /// <summary>
     /// Gets or sets the reader name if known.
     /// </summary>
-    public string ReaderName { get; set; }
+    public string ReaderName { get; set; } = "unknown";
 
     /// <summary>
     /// Gets additional properties.

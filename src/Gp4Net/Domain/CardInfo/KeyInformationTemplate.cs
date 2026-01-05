@@ -25,13 +25,15 @@ public class KeyInformationTemplate
     /// <summary>
     /// Gets the list of key entries.
     /// </summary>
-    public IReadOnlyList<KeyEntry> Keys { get; init; } = [];
+    public IReadOnlyList<KeyEntry> Keys { get; }
 
-    private KeyInformationTemplate(byte[] rawData, IReadOnlyList<KeyEntry> keys = null)
+    private KeyInformationTemplate(byte[] rawData, IReadOnlyList<KeyEntry> keys)
     {
-        // rawData is guaranteed to be non-null by static factory methods
+        ArgumentNullException.ThrowIfNull(rawData);
+        ArgumentNullException.ThrowIfNull(keys);
+
         Data = rawData;
-        Keys = keys ?? [];
+        Keys = keys;
     }
 
     /// <summary>
@@ -43,8 +45,6 @@ public class KeyInformationTemplate
         {
             return SmartCardError.InvalidArgument("Key information data cannot be null or empty");
         }
-
-        var template = new KeyInformationTemplate(data, []);
 
         // Check if data starts with E0 tag and extract the content
         byte[] contentToParse = data;
@@ -113,12 +113,14 @@ public class KeyInformationTemplate
             .Where(keyType => keyType != KeyType.Unknown)
             .ToImmutableList();
 
-        return Maybe<KeyEntry>.From(new KeyEntry
-        {
-            KeyId = data[0],
-            KeyVersion = data[1],
-            KeyTypes = keyTypes,
-        });
+        return Maybe<KeyEntry>.From(
+            new KeyEntry
+            {
+                KeyId = data[0],
+                KeyVersion = data[1],
+                KeyTypes = keyTypes,
+            }
+        );
     }
 
     private static KeyType ParseKeyType(byte value)

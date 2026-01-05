@@ -104,8 +104,9 @@ public static class CommandRegistrationService
         }
 
         return string.Concat(
-            className.Select((c, i) =>
-                i > 0 && char.IsUpper(c) ? $"-{char.ToLower(c)}" : char.ToLower(c).ToString()
+            className.Select(
+                (c, i) =>
+                    i > 0 && char.IsUpper(c) ? $"-{char.ToLower(c)}" : char.ToLower(c).ToString()
             )
         );
     }

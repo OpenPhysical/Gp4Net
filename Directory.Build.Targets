@@ -2,4 +2,22 @@
   <PropertyGroup>
     <ImplicitUsings>false</ImplicitUsings>
   </PropertyGroup>
+
+  <!-- Apply coverage thresholds to every test project by default -->
+  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj' and '$(IsTestProject)' == 'true'">
+    <CollectCoverage>true</CollectCoverage>
+    <CoverletOutputFormat>cobertura</CoverletOutputFormat>
+    <CoverletOutput>$(MSBuildProjectDirectory)/../coverage/$(MSBuildProjectName)</CoverletOutput>
+    <Threshold>60</Threshold>
+    <ThresholdType>line,branch</ThresholdType>
+    <ThresholdStat>total</ThresholdStat>
+  </PropertyGroup>
+
+  <!-- Hook scripts that enforce higher guarantees for security-critical and business logic coverage -->
+  <Target Name="VerifyCoverageThresholds" AfterTargets="Test" Condition="'$(RunCoverageVerification)' != 'false'">
+    <Message Text="Skipping security-critical coverage enforcement; scripts/coverage/verify-security-critical.sh not present." Importance="low" Condition="!Exists('scripts/coverage/verify-security-critical.sh')" />
+    <Message Text="Skipping business-logic coverage enforcement; scripts/coverage/verify-business-logic.sh not present." Importance="low" Condition="!Exists('scripts/coverage/verify-business-logic.sh')" />
+    <Exec Command="bash ./scripts/coverage/verify-security-critical.sh" Condition="Exists('scripts/coverage/verify-security-critical.sh')" />
+    <Exec Command="bash ./scripts/coverage/verify-business-logic.sh" Condition="Exists('scripts/coverage/verify-business-logic.sh')" />
+  </Target>
 </Project>

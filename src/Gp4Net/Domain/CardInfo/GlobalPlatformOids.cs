@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
@@ -58,14 +59,14 @@ public static class GlobalPlatformOids
     /// </summary>
     /// <param name="oid">The OID in dotted notation.</param>
     /// <returns>The description if known, otherwise null.</returns>
-    public static string GetDescription(string oid)
+    public static string? GetDescription(string? oid)
     {
-        if (string.IsNullOrEmpty(oid))
+        if (string.IsNullOrWhiteSpace(oid))
         {
             return null;
         }
 
-        return KnownOids.TryGetValue(oid, out string description) ? description : null;
+        return KnownOids.TryGetValue(oid, out var description) ? description : null;
     }
 
     /// <summary>
@@ -73,9 +74,9 @@ public static class GlobalPlatformOids
     /// </summary>
     /// <param name="oid">The OID in dotted notation.</param>
     /// <returns>True if the OID is a GlobalPlatform OID.</returns>
-    public static bool IsGlobalPlatformOid(string oid)
+    public static bool IsGlobalPlatformOid(string? oid)
     {
-        return !string.IsNullOrEmpty(oid) && oid.StartsWith(GLOBAL_PLATFORM_PREFIX);
+        return !string.IsNullOrWhiteSpace(oid) && oid.StartsWith(GLOBAL_PLATFORM_PREFIX);
     }
 
     /// <summary>
@@ -83,33 +84,27 @@ public static class GlobalPlatformOids
     /// </summary>
     /// <param name="oid">The OID in dotted notation.</param>
     /// <returns>The SCP version (e.g., "SCP03") or null if not an SCP OID.</returns>
-    public static string GetScpVersion(string oid)
+    public static string? GetScpVersion(string? oid)
     {
-        if (string.IsNullOrEmpty(oid))
+        if (string.IsNullOrWhiteSpace(oid) || !oid.StartsWith("1.2.840.114283.4."))
         {
             return null;
         }
 
-        if (oid.StartsWith("1.2.840.114283.4."))
+        string[] parts = oid.Split('.');
+        if (parts.Length < 6)
         {
-            string[] parts = oid.Split('.');
-            if (parts.Length >= 6)
-            {
-                switch (parts[5])
-                {
-                    case "0":
-                        return "SCP00";
-                    case "1":
-                        return "SCP01";
-                    case "2":
-                        return "SCP02";
-                    case "3":
-                        return "SCP03";
-                }
-            }
+            return null;
         }
 
-        return null;
+        return parts[5] switch
+        {
+            "0" => "SCP00",
+            "1" => "SCP01",
+            "2" => "SCP02",
+            "3" => "SCP03",
+            _ => null,
+        };
     }
 
     /// <summary>
@@ -117,15 +112,15 @@ public static class GlobalPlatformOids
     /// </summary>
     /// <param name="oid">The OID in dotted notation.</param>
     /// <returns>A formatted string with OID and description.</returns>
-    public static string FormatOid(string oid)
+    public static string FormatOid(string? oid)
     {
-        if (string.IsNullOrEmpty(oid))
+        if (string.IsNullOrWhiteSpace(oid))
         {
-            return oid;
+            return string.Empty;
         }
 
-        string description = GetDescription(oid);
-        return description != null ? $"{oid} ({description})" : oid;
+        string? description = GetDescription(oid);
+        return description != null ? $"{oid} ({description})" : oid!;
     }
 
     /// <summary>
@@ -146,15 +141,15 @@ public static class GlobalPlatformOids
     {
         var summary = new CapabilitiesSummary();
 
-        foreach (string oid in oids)
+        foreach (string? oid in oids ?? Array.Empty<string>())
         {
-            if (string.IsNullOrEmpty(oid))
+            if (string.IsNullOrWhiteSpace(oid))
             {
                 continue;
             }
 
             // Check for SCP support
-            string scpVersion = GetScpVersion(oid);
+            string? scpVersion = GetScpVersion(oid);
             if (scpVersion != null)
             {
                 _ = summary.SupportedScpVersions.Add(scpVersion);
@@ -169,8 +164,8 @@ public static class GlobalPlatformOids
             // Check for specification version
             if (oid.StartsWith("1.2.840.114283.2."))
             {
-                string description = GetDescription(oid);
-                if (description != null && description.Contains("Card Specification"))
+                string? description = GetDescription(oid);
+                if (!string.IsNullOrEmpty(description) && description.Contains("Card Specification"))
                 {
                     _ = summary.SpecificationVersions.Add(description);
                 }

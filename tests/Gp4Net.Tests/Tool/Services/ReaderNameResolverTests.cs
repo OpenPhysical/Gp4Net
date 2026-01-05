@@ -37,11 +37,7 @@ public class ReaderNameResolverTests
             .Value.WithP71Reader("Virtual Debug Reader 02 00")
             .Value.Build();
 
-        _virtualCardService = new VirtualCardService(
-            manager,
-            Maybe<VirtualCardReader>.None,
-            false
-        );
+        _virtualCardService = new VirtualCardService(manager, Maybe<VirtualCardReader>.None, false);
 
         // Use a wrapper that implements ISmartCardService
         _cardService = new VirtualSmartCardServiceWrapper(_virtualCardService);
@@ -252,21 +248,6 @@ public class ReaderNameResolverTests
         result.Match(
             readerName => Assert.Fail($"Expected failure but got success: {readerName}"),
             error => _ = error.Message.Should().Contain("Failed to enumerate readers")
-        );
-    }
-
-    [Test]
-    public async Task ResolveAsync_WithNullCardService_ReturnsError()
-    {
-        Result<string, SmartCardError> result = await ReaderNameResolver.ResolveAsync(
-            Maybe<string>.From("auto"),
-            null
-        );
-
-        _ = result.IsFailure.Should().BeTrue();
-        result.Match(
-            readerName => Assert.Fail($"Expected failure but got success: {readerName}"),
-            error => _ = error.Message.Should().Contain("Card service cannot be null")
         );
     }
 

@@ -123,7 +123,7 @@ public class SecurityDomainDataParserTests
     public void Decode_WithNullData_ReturnsEmptyString()
     {
         // Act
-        string? result = SecurityDomainDataParser.Decode(null);
+        string? result = SecurityDomainDataParser.Decode(null!);
 
         // Assert
         _ = result.Should().BeEquivalentTo(string.Empty);

@@ -435,7 +435,6 @@ public class CardManagementOperationTests
         return UnitResult.Success<string>();
     }
 
-
     /// <summary>
     /// Functional helper to analyze authentication sequence.
     /// </summary>

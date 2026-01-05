@@ -36,6 +36,16 @@ public static class PhysicalCardConnectionService
         CancellationToken cancellationToken = default
     )
     {
+        if (ReaderEnumerationService.IsVirtualReader(readerName))
+        {
+            // Delegate to virtual card connection service when a virtual reader is requested.
+            return VirtualCardConnectionService.CreateServiceAsync(
+                readerName,
+                logger,
+                cancellationToken
+            );
+        }
+
         // Use unified ReaderEnumerationService instead of duplicating logic
         return ReaderEnumerationService
             .EnumeratePhysicalReadersAsync(cancellationToken)

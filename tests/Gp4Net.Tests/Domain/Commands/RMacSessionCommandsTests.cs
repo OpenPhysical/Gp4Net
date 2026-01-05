@@ -128,7 +128,7 @@ public class RMacSessionCommandsTests
     [Test]
     public void EndRMacSessionResponse_Parse_WithNull_ReturnsFailure()
     {
-        Result<EndRMacSessionResponse, SmartCardError> result = EndRMacSessionResponse.Parse(null);
+        Result<EndRMacSessionResponse, SmartCardError> result = EndRMacSessionResponse.Parse(null!);
 
         _ = result.IsFailure.Should().BeTrue();
         _ = result.Error.Message.Should().Contain("Response data is required");

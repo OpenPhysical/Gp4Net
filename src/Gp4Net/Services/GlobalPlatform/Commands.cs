@@ -115,11 +115,7 @@ public static class Commands
         Maybe<byte[]> searchCriteria = default
     )
     {
-        return GetStatusCommand.Create(
-            subset,
-            GetStatusCommand.ResponseFormat.Tlv,
-            searchCriteria.GetValueOrDefault([])
-        );
+        return GetStatusCommand.Create(subset, GetStatusCommand.ResponseFormat.Tlv, searchCriteria);
     }
 
     /// <summary>
@@ -219,10 +215,10 @@ public static class Commands
                 => InstallCommand
                     .InstallForLoadCommand.Create(
                         packageAid,
-                        null, // maxDataBlockSize
-                        null, // securityDomainAid
-                        null, // hash
-                        installParameters.GetValueOrDefault([])
+                        maxDataBlockSize: Maybe<ushort>.None,
+                        securityDomainAid: Maybe<byte[]>.None,
+                        hash: Maybe<byte[]>.None,
+                        installToken: Maybe<byte[]>.None
                     )
                     .Map(cmd => (InstallCommand)cmd),
             InstallType.ForInstall
@@ -231,8 +227,8 @@ public static class Commands
                         packageAid,
                         instanceAid.GetValueOrDefault(packageAid), // moduleAid
                         appletAid.GetValueOrDefault(packageAid), // applicationAid
-                        privileges.GetValueOrDefault([0x00]),
-                        installParameters.GetValueOrDefault([])
+                        privileges.GetValueOrDefault(new byte[] { 0x00 }),
+                        installParameters
                     )
                     .Map(cmd => (InstallCommand)cmd),
             InstallType.ForInstallAndMakeSelectable
@@ -241,8 +237,8 @@ public static class Commands
                         packageAid,
                         instanceAid.GetValueOrDefault(packageAid), // moduleAid
                         appletAid.GetValueOrDefault(packageAid), // applicationAid
-                        privileges.GetValueOrDefault([0x00]),
-                        installParameters.GetValueOrDefault([])
+                        privileges.GetValueOrDefault(new byte[] { 0x00 }),
+                        installParameters
                     )
                     .Map(cmd => (InstallCommand)cmd),
             _

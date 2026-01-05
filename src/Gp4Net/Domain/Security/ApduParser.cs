@@ -49,7 +49,7 @@ public static class ApduParser
 
         // Parse data field to separate original data from MAC
         byte[] originalData;
-        byte[] mac = null;
+        byte[] mac = Array.Empty<byte>();
         byte? le = null;
 
         if (lc >= 8) // Minimum MAC size
@@ -98,6 +98,8 @@ public static class ApduParser
         Maybe<byte> le
     )
     {
+        ArgumentNullException.ThrowIfNull(data);
+
         var expectedLength = le.Map(value => (int)value);
         return ApduBuilder
             .CreateCommand(cla, ins, p1, p2, Maybe<byte[]>.From(data), expectedLength)

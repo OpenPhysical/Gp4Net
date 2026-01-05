@@ -12,52 +12,57 @@ namespace Gp4Net.Tool.Pipeline;
 public class DisplayService : IDisplayService
 {
     private readonly bool _verboseMode;
+    private readonly IAnsiConsole _console;
 
     public DisplayService(bool verboseMode = false)
+        : this(AnsiConsole.Console, verboseMode) { }
+
+    public DisplayService(IAnsiConsole console, bool verboseMode = false)
     {
+        _console = console;
         _verboseMode = verboseMode;
     }
 
     public void Success(string message)
     {
-        AnsiConsole.MarkupLine($"[green]✓ {message}[/]");
+        _console.MarkupLine($"[green]✓ {message}[/]");
     }
 
     public void Error(string message)
     {
-        AnsiConsole.MarkupLine($"[red]✗ {message}[/]");
+        _console.MarkupLine($"[red]✗ {message}[/]");
     }
 
     public void Warning(string message)
     {
-        AnsiConsole.MarkupLine($"[yellow]⚠ {message}[/]");
+        _console.MarkupLine($"[yellow]⚠ {message}[/]");
     }
 
     public void Info(string message)
     {
-        AnsiConsole.MarkupLine($"[blue]ℹ {message}[/]");
+        _console.MarkupLine($"[blue]ℹ {message}[/]");
     }
 
     public void Verbose(string message)
     {
         if (_verboseMode)
         {
-            AnsiConsole.MarkupLine($"[dim]🔍 {message}[/]");
+            _console.MarkupLine($"[dim]🔍 {message}[/]");
         }
     }
 
     public void Exception(Exception exception)
     {
-        AnsiConsole.WriteException(exception);
+        _console.WriteException(exception);
     }
 
     public void CardInfo(Atr atr)
     {
-        AnsiConsole.MarkupLine($"[green]Card ATR:[/] {atr}");
+        _console.MarkupLine($"[green]Card ATR:[/] {atr}");
     }
 
     public void Markup(string markup)
     {
-        AnsiConsole.MarkupLine(markup);
+        _console.MarkupLine(markup);
     }
 }

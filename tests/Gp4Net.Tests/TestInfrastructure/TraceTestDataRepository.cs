@@ -36,7 +36,7 @@ public static class TraceTestDataRepository
 
     public static Result<JsonDocument, string> LoadTraceDocument(
         string relativeTracePath,
-        string? formatHint = null
+        string? formatHint = null!
     )
     {
         var ensureResult = EnsureTraceFile(relativeTracePath, formatHint);
@@ -62,7 +62,7 @@ public static class TraceTestDataRepository
 
     public static UnitResult<string> EnsureTraceFile(
         string relativeTracePath,
-        string? formatHint = null
+        string? formatHint = null!
     )
     {
         if (relativeTracePath.StartsWith("TestData", StringComparison.OrdinalIgnoreCase))

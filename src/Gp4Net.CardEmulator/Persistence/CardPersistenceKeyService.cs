@@ -65,10 +65,7 @@ public class CardPersistenceKeyService : ICardPersistenceKeyService
     /// </summary>
     public Result<byte[], SmartCardError> ComputeKeyFingerprint(IKeySet keySet) =>
         ResultExtensions.Bind(
-            ResultExtensions.Bind(
-                ValidateKeySet(keySet),
-                _ => BuildFingerprintData(keySet)
-            ),
+            ResultExtensions.Bind(ValidateKeySet(keySet), _ => BuildFingerprintData(keySet)),
             ComputeSha256Hash
         );
 

@@ -49,7 +49,9 @@ public static class CommandProcessors
                 logging.LogDebug("Virtual card SELECT success, setting IsSelected to true");
                 return (response, newState);
             })
-            .TapError(error => logging.LogDebug("Virtual card SELECT failed: {Error}", error.Message));
+            .TapError(error =>
+                logging.LogDebug("Virtual card SELECT failed: {Error}", error.Message)
+            );
     }
 
     /// <summary>
@@ -617,7 +619,10 @@ public static class CommandProcessors
         Array.Copy(response, actualResponse, offset);
 
         newState = newState
-            .WithChallenges(data.HostChallenge, data.CardChallenge)
+            .WithChallenges(
+                Maybe<byte[]>.From(data.HostChallenge),
+                Maybe<byte[]>.From(data.CardChallenge)
+            )
             .WithKeys(data.Keys);
 
         return (
@@ -928,13 +933,13 @@ public static class CommandProcessors
     )
     {
         // Check if this tag exists in the card configuration
-        if (config.DefaultDataObjects.TryGetValue(tag, out byte[] data))
+        if (config.DefaultDataObjects.TryGetValue(tag, out byte[]? data) && data is not null)
         {
             return Result.Success<byte[], SmartCardError>(data);
         }
 
         // Check if this tag exists in the card state
-        if (state.DataObjects.TryGetValue(tag, out byte[] stateData))
+        if (state.DataObjects.TryGetValue(tag, out byte[]? stateData) && stateData is not null)
         {
             return Result.Success<byte[], SmartCardError>(stateData);
         }

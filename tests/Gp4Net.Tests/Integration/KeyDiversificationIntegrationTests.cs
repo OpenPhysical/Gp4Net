@@ -108,7 +108,7 @@ public class KeyDiversificationIntegrationTests
         // Arrange - Create response without diversification data using factory function
         Result<InitializeUpdateResponse, SmartCardError> cardResponseResult =
             InitializeUpdateResponse.Create(
-                keyDiversificationData: null, // No diversification data
+                keyDiversificationData: [],
                 keyVersion: 0x00,
                 scpId: 0x02,
                 sequenceCounter: Convert.FromHexString("0001"),
@@ -174,7 +174,7 @@ public class KeyDiversificationIntegrationTests
                 keyDiversificationData: TestVectors.TestKdd,
                 keyVersion: 0x00,
                 scpId: 0x02,
-                sequenceCounter: null, // Missing sequence counter
+                sequenceCounter: [],
                 cardChallenge: Convert.FromHexString("1234567890AB"), // 6 bytes for SCP02
                 cardCryptogram: Convert.FromHexString("1234567890ABCDEF")
             );

@@ -855,7 +855,7 @@ public partial class VirtualCard : IVirtualCard
     {
         const ushort loadContextTag = 0xFFFF; // Internal tag for load context storage
 
-        if (state.DataObjects.TryGetValue(loadContextTag, out byte[] contextData))
+        if (state.DataObjects.TryGetValue(loadContextTag, out byte[]? contextData) && contextData is not null)
         {
             // Deserialize existing context
             return DeserializeLoadContext(contextData);

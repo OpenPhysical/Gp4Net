@@ -244,7 +244,9 @@ public class GetDataCommand : IApduCommand
         // GET DATA is Case 2 APDU with no command data, only Le
         // Use byte array constructor to ensure correct format
         return ExpectedResponseLength.Match(
-            Some: le => new CommandAPDU(new byte[] { Cla, Ins, P1, P2, (byte)(le == 256 ? 0 : le) }),
+            Some: le => new CommandAPDU(
+                new byte[] { Cla, Ins, P1, P2, (byte)(le == 256 ? 0 : le) }
+            ),
             None: () => new CommandAPDU(new byte[] { Cla, Ins, P1, P2 })
         );
     }

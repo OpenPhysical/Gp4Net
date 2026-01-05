@@ -39,35 +39,109 @@ public static partial class Constants
         /// </summary>
         public static class Templates
         {
-            // Argument validation templates
+            /// <summary>
+            /// Template for null argument errors. Format: "{0} cannot be null" where {0} is the argument name.
+            /// </summary>
             public const string NULL_ARGUMENT = "{0} cannot be null";
+
+            /// <summary>
+            /// Template for empty argument errors. Format: "{0} cannot be empty" where {0} is the argument name.
+            /// </summary>
             public const string EMPTY_ARGUMENT = "{0} cannot be empty";
+
+            /// <summary>
+            /// Template for invalid field errors. Format: "Invalid {0}: {1}" where {0} is field name, {1} is value.
+            /// </summary>
             public const string INVALID_FIELD = "Invalid {0}: {1}";
+
+            /// <summary>
+            /// Template for unsupported value errors. Format: "Unsupported {0}: {1}" where {0} is field name, {1} is value.
+            /// </summary>
             public const string UNSUPPORTED_VALUE = "Unsupported {0}: {1}";
 
-            // Length validation templates
+            /// <summary>
+            /// Template for invalid length errors. Format: "Invalid length: expected {0}, got {1}".
+            /// </summary>
             public const string INVALID_LENGTH = "Invalid length: expected {0}, got {1}";
+
+            /// <summary>
+            /// Template for field length errors. Format: "{0} must be {1} bytes, got {2}" where {0} is field name.
+            /// </summary>
             public const string INVALID_LENGTH_FIELD = "{0} must be {1} bytes, got {2}";
+
+            /// <summary>
+            /// Template for range validation errors. Format: "{0} must be between {1} and {2}, got {3}".
+            /// </summary>
             public const string INVALID_RANGE = "{0} must be between {1} and {2}, got {3}";
+
+            /// <summary>
+            /// Template for data size errors. Format: "{0} too large: {1} > {2}" where {0} is data type.
+            /// </summary>
             public const string DATA_TOO_LARGE = "{0} too large: {1} > {2}";
 
-            // Operation failure templates
+            /// <summary>
+            /// Template for operation failures. Format: "Failed to {0}: {1}" where {0} is operation, {1} is error message.
+            /// </summary>
             public const string OPERATION_FAILED = "Failed to {0}: {1}";
+
+            /// <summary>
+            /// Template for timeout errors. Format: "Operation timed out after {0}ms" where {0} is timeout in milliseconds.
+            /// </summary>
             public const string OPERATION_TIMEOUT = "Operation timed out after {0}ms";
+
+            /// <summary>
+            /// Template for initialization failures. Format: "{0} initialization failed: {1}" where {0} is component name.
+            /// </summary>
             public const string INITIALIZATION_FAILED = "{0} initialization failed: {1}";
 
-            // Comparison and expectation templates
+            /// <summary>
+            /// Template for expectation mismatches. Format: "Expected {0} but got {1}".
+            /// </summary>
             public const string EXPECTED_BUT_GOT = "Expected {0} but got {1}";
+
+            /// <summary>
+            /// Template for unexpected values. Format: "Unexpected {0}: {1}" where {0} is field name, {1} is value.
+            /// </summary>
             public const string UNEXPECTED_VALUE = "Unexpected {0}: {1}";
+
+            /// <summary>
+            /// Template for value mismatches. Format: "{0} mismatch: expected {1}, got {2}".
+            /// </summary>
             public const string MISMATCH = "{0} mismatch: expected {1}, got {2}";
 
-            // Data format templates
+            /// <summary>
+            /// Template for format errors. Format: "Invalid {0} format" where {0} is data type.
+            /// </summary>
             public const string INVALID_FORMAT = "Invalid {0} format";
+
+            /// <summary>
+            /// Template for detailed format errors. Format: "Invalid {0} format: {1}" with details.
+            /// </summary>
             public const string INVALID_FORMAT_DETAILS = "Invalid {0} format: {1}";
+
+            /// <summary>
+            /// Template for malformed data. Format: "Malformed {0}: {1}" where {0} is data type, {1} is details.
+            /// </summary>
             public const string MALFORMED_DATA = "Malformed {0}: {1}";
+
+            /// <summary>
+            /// Template for insufficient data errors. Format: "Insufficient data for {0}" where {0} is operation.
+            /// </summary>
             public const string INSUFFICIENT_DATA = "Insufficient data for {0}";
+
+            /// <summary>
+            /// Template for missing required fields. Format: "Missing required {0}" where {0} is field name.
+            /// </summary>
             public const string MISSING_REQUIRED = "Missing required {0}";
+
+            /// <summary>
+            /// Template for not found errors. Format: "{0} not found" where {0} is item type.
+            /// </summary>
             public const string NOT_FOUND = "{0} not found";
+
+            /// <summary>
+            /// Template for detailed not found errors. Format: "{0} not found: {1}" with details.
+            /// </summary>
             public const string NOT_FOUND_DETAILS = "{0} not found: {1}";
         }
 
@@ -76,14 +150,49 @@ public static partial class Constants
         /// </summary>
         public static class Communication
         {
+            /// <summary>
+            /// Error message indicating no smart card is present in the reader.
+            /// </summary>
             public const string NO_CARD_PRESENT = "No card present in reader";
+
+            /// <summary>
+            /// Error template for reader not found. Format: "Reader not found: {0}" where {0} is reader name.
+            /// </summary>
             public const string READER_NOT_FOUND = "Reader not found: {0}";
+
+            /// <summary>
+            /// Error template for APDU transmission failures. Format: "APDU transmission failed: {0}" with details.
+            /// </summary>
             public const string TRANSMISSION_FAILED = "APDU transmission failed: {0}";
+
+            /// <summary>
+            /// Error message indicating the smart card service has been disposed and cannot be used.
+            /// </summary>
             public const string SERVICE_DISPOSED = "Service has been disposed";
+
+            /// <summary>
+            /// Error message indicating no card readers were detected on the system.
+            /// </summary>
             public const string NO_READERS_FOUND = "No card readers found";
+
+            /// <summary>
+            /// Error template for reader connection failures. Format: "Failed to connect to reader: {0}" with details.
+            /// </summary>
             public const string CONNECTION_FAILED = "Failed to connect to reader: {0}";
+
+            /// <summary>
+            /// Error message indicating sending command to card failed.
+            /// </summary>
             public const string SEND_COMMAND_FAILED = "Send command failed";
+
+            /// <summary>
+            /// Error message indicating failure to enumerate card readers.
+            /// </summary>
             public const string GET_READERS_FAILED = "Failed to get readers";
+
+            /// <summary>
+            /// Error message indicating command execution on card failed.
+            /// </summary>
             public const string COMMAND_EXECUTION_FAILED = "Command execution failed";
         }
 
@@ -92,15 +201,54 @@ public static partial class Constants
         /// </summary>
         public static class Cryptography
         {
+            /// <summary>
+            /// Error message indicating MAC (Message Authentication Code) verification failed.
+            /// </summary>
             public const string MAC_VERIFICATION_FAILED = "MAC verification failed";
+
+            /// <summary>
+            /// Error message indicating cryptogram verification failed during secure channel authentication.
+            /// </summary>
             public const string CRYPTOGRAM_VERIFICATION_FAILED = "Cryptogram verification failed";
+
+            /// <summary>
+            /// Error template for encryption failures. Format: "Encryption failed: {0}" with details.
+            /// </summary>
             public const string ENCRYPTION_FAILED = "Encryption failed: {0}";
+
+            /// <summary>
+            /// Error template for decryption failures. Format: "Decryption failed: {0}" with details.
+            /// </summary>
             public const string DECRYPTION_FAILED = "Decryption failed: {0}";
+
+            /// <summary>
+            /// Error template for key derivation failures. Format: "Key derivation failed: {0}" with details.
+            /// </summary>
             public const string KEY_DERIVATION_FAILED = "Key derivation failed: {0}";
+
+            /// <summary>
+            /// Error template for invalid keys. Format: "Invalid {0} key: {1}" where {0} is key type.
+            /// </summary>
             public const string INVALID_KEY = "Invalid {0} key: {1}";
+
+            /// <summary>
+            /// Error template for key generation failures. Format: "Failed to generate {0} key: {1}".
+            /// </summary>
             public const string KEY_GENERATION_FAILED = "Failed to generate {0} key: {1}";
+
+            /// <summary>
+            /// Error template for invalid key length. Format: "Invalid key length: expected {0}, got {1}".
+            /// </summary>
             public const string INVALID_KEY_LENGTH = "Invalid key length: expected {0}, got {1}";
+
+            /// <summary>
+            /// Error template for unsupported algorithms. Format: "Unsupported algorithm: {0}".
+            /// </summary>
             public const string UNSUPPORTED_ALGORITHM = "Unsupported algorithm: {0}";
+
+            /// <summary>
+            /// Error template for general crypto operation failures. Format: "{0} operation failed: {1}".
+            /// </summary>
             public const string CRYPTO_OPERATION_FAILED = "{0} operation failed: {1}";
         }
 
@@ -109,14 +257,49 @@ public static partial class Constants
         /// </summary>
         public static class Protocol
         {
+            /// <summary>
+            /// Error template for unsupported SCP protocols. Format: "Unsupported SCP protocol: {0}".
+            /// </summary>
             public const string UNSUPPORTED_PROTOCOL = "Unsupported SCP protocol: {0}";
+
+            /// <summary>
+            /// Error template for protocol mismatches. Format: "Protocol mismatch: expected {0}, got {1}".
+            /// </summary>
             public const string PROTOCOL_MISMATCH = "Protocol mismatch: expected {0}, got {1}";
+
+            /// <summary>
+            /// Error template for invalid protocol state. Format: "Invalid protocol state for {0}".
+            /// </summary>
             public const string INVALID_PROTOCOL_STATE = "Invalid protocol state for {0}";
+
+            /// <summary>
+            /// Error template for invalid implementation parameter. Format: "Invalid {0} implementation: {1:X2}".
+            /// </summary>
             public const string INVALID_IMPLEMENTATION = "Invalid {0} implementation: {1:X2}";
+
+            /// <summary>
+            /// Error template for invalid security level. Format: "Invalid security level for {0}: {1:X2}".
+            /// </summary>
             public const string INVALID_SECURITY_LEVEL = "Invalid security level for {0}: {1:X2}";
+
+            /// <summary>
+            /// Error template for invalid protocol version. Format: "Invalid protocol version: 0x{0:X2}".
+            /// </summary>
             public const string PROTOCOL_VERSION_INVALID = "Invalid protocol version: 0x{0:X2}";
+
+            /// <summary>
+            /// Error message indicating authentication to card failed.
+            /// </summary>
             public const string AUTHENTICATION_FAILED = "Authentication failed";
+
+            /// <summary>
+            /// Error template for secure channel establishment failures. Format: "Secure channel establishment failed: {0}".
+            /// </summary>
             public const string SECURE_CHANNEL_FAILED = "Secure channel establishment failed: {0}";
+
+            /// <summary>
+            /// Error template for unsupported SCP version. Format: "Unsupported SCP version: {0}".
+            /// </summary>
             public const string UNSUPPORTED_SCP_VERSION = "Unsupported SCP version: {0}";
         }
 
@@ -125,11 +308,34 @@ public static partial class Constants
         /// </summary>
         public static class Apdu
         {
+            /// <summary>
+            /// Error template for invalid APDU format. Format: "Invalid APDU format: {0}" with details.
+            /// </summary>
             public const string INVALID_APDU_FORMAT = "Invalid APDU format: {0}";
+
+            /// <summary>
+            /// Error template for oversized APDUs. Format: "APDU too large: {0} bytes".
+            /// </summary>
             public const string APDU_TOO_LARGE = "APDU too large: {0} bytes";
+
+            /// <summary>
+            /// Error template for short responses. Format: "Response too short: expected {0}, got {1}".
+            /// </summary>
             public const string RESPONSE_TOO_SHORT = "Response too short: expected {0}, got {1}";
+
+            /// <summary>
+            /// Error template for malformed responses. Format: "Malformed response: {0}" with details.
+            /// </summary>
             public const string MALFORMED_RESPONSE = "Malformed response: {0}";
+
+            /// <summary>
+            /// Error template for unexpected status words. Format: "Unexpected status word: {0:X4}".
+            /// </summary>
             public const string UNEXPECTED_STATUS_WORD = "Unexpected status word: {0:X4}";
+
+            /// <summary>
+            /// Error message indicating no response is configured for virtual card emulation.
+            /// </summary>
             public const string NO_RESPONSE_CONFIGURED = "No response configured";
         }
 
@@ -138,12 +344,39 @@ public static partial class Constants
         /// </summary>
         public static class Tlv
         {
+            /// <summary>
+            /// Error template for TLV parsing failures. Format: "TLV parsing failed: {0}" with details.
+            /// </summary>
             public const string PARSING_FAILED = "TLV parsing failed: {0}";
+
+            /// <summary>
+            /// Error template for TLV tag not found. Format: "{0} TLV (tag 0x{1:X2}) not found".
+            /// </summary>
             public const string TAG_NOT_FOUND = "{0} TLV (tag 0x{1:X2}) not found";
+
+            /// <summary>
+            /// Error template for TLV invalid length. Format: "{0} TLV invalid length: expected {1}, got {2}".
+            /// </summary>
             public const string INVALID_LENGTH = "{0} TLV invalid length: expected {1}, got {2}";
+
+            /// <summary>
+            /// Error template for invalid TLV structure. Format: "Invalid TLV structure: {0}" with details.
+            /// </summary>
             public const string STRUCTURE_INVALID = "Invalid TLV structure: {0}";
+
+            /// <summary>
+            /// Error message indicating TLV has excessive length encoding bytes (potential attack or corruption).
+            /// </summary>
             public const string EXCESSIVE_LENGTH_BYTES = "Excessive length bytes in TLV";
+
+            /// <summary>
+            /// Error template for invalid TLV tag. Format: "Invalid TLV tag: {0}".
+            /// </summary>
             public const string INVALID_TAG = "Invalid TLV tag: {0}";
+
+            /// <summary>
+            /// Error message indicating TLV data ended unexpectedly during parsing.
+            /// </summary>
             public const string UNEXPECTED_END_OF_DATA = "Unexpected end of TLV data";
         }
 
@@ -152,14 +385,49 @@ public static partial class Constants
         /// </summary>
         public static class Applications
         {
+            /// <summary>
+            /// Error template for application not found. Format: "Application not found: {0}" where {0} is AID.
+            /// </summary>
             public const string NOT_FOUND = "Application not found: {0}";
+
+            /// <summary>
+            /// Error template for installation failures. Format: "Application installation failed: {0}" with details.
+            /// </summary>
             public const string INSTALLATION_FAILED = "Application installation failed: {0}";
+
+            /// <summary>
+            /// Error template for deletion failures. Format: "Application deletion failed: {0}" with details.
+            /// </summary>
             public const string DELETION_FAILED = "Application deletion failed: {0}";
+
+            /// <summary>
+            /// Error template for oversized load files. Format: "Load file too large: {0} bytes".
+            /// </summary>
             public const string LOAD_FILE_TOO_LARGE = "Load file too large: {0} bytes";
+
+            /// <summary>
+            /// Error template for invalid AIDs. Format: "Invalid AID: {0}".
+            /// </summary>
             public const string INVALID_AID = "Invalid AID: {0}";
+
+            /// <summary>
+            /// Error template for AID conflicts. Format: "AID conflict: {0}" where application already exists.
+            /// </summary>
             public const string AID_CONFLICT = "AID conflict: {0}";
+
+            /// <summary>
+            /// Error message indicating card has insufficient memory for application installation.
+            /// </summary>
             public const string INSUFFICIENT_MEMORY = "Insufficient memory for application";
+
+            /// <summary>
+            /// Error template for load failures. Format: "Load failed: {0}" with details.
+            /// </summary>
             public const string LOAD_FAILED = "Load failed: {0}";
+
+            /// <summary>
+            /// Error template for install failures. Format: "Install failed: {0}" with details.
+            /// </summary>
             public const string INSTALL_FAILED = "Install failed: {0}";
         }
 
@@ -168,13 +436,44 @@ public static partial class Constants
         /// </summary>
         public static class CapFile
         {
+            /// <summary>
+            /// Error template for invalid CAP files. Format: "Invalid CAP file: {0}" with details.
+            /// </summary>
             public const string INVALID_CAP_FILE = "Invalid CAP file: {0}";
+
+            /// <summary>
+            /// Error template for profile read failures. Format: "Failed to read profile file: {0}".
+            /// </summary>
             public const string FAILED_TO_READ_PROFILE = "Failed to read profile file: {0}";
+
+            /// <summary>
+            /// Error template for profile load failures. Format: "Failed to load profile: {0}".
+            /// </summary>
             public const string FAILED_TO_LOAD_PROFILE = "Failed to load profile: {0}";
+
+            /// <summary>
+            /// Error template for JSON format errors. Format: "Invalid JSON format: {0}" with details.
+            /// </summary>
             public const string INVALID_JSON_FORMAT = "Invalid JSON format: {0}";
+
+            /// <summary>
+            /// Error message indicating JSON profile deserialization failed.
+            /// </summary>
             public const string FAILED_TO_DESERIALIZE = "Failed to deserialize JSON profile";
+
+            /// <summary>
+            /// Error template for parsing failures. Format: "Failed to parse {0}: {1}" where {0} is item type.
+            /// </summary>
             public const string FAILED_TO_PARSE = "Failed to parse {0}: {1}";
+
+            /// <summary>
+            /// Error template for missing CAP components. Format: "Missing CAP file component: {0}".
+            /// </summary>
             public const string COMPONENT_MISSING = "Missing CAP file component: {0}";
+
+            /// <summary>
+            /// Error template for invalid CAP components. Format: "Invalid CAP file component: {0}".
+            /// </summary>
             public const string COMPONENT_INVALID = "Invalid CAP file component: {0}";
         }
 
@@ -183,12 +482,39 @@ public static partial class Constants
         /// </summary>
         public static class Keys
         {
+            /// <summary>
+            /// Error template for invalid key sets. Format: "Invalid key set: {0}" with details.
+            /// </summary>
             public const string INVALID_KEY_SET = "Invalid key set: {0}";
+
+            /// <summary>
+            /// Error template for key not found. Format: "Key not found: {0}" where {0} is key identifier.
+            /// </summary>
             public const string KEY_NOT_FOUND = "Key not found: {0}";
+
+            /// <summary>
+            /// Error template for invalid key version. Format: "Invalid key version: {0}".
+            /// </summary>
             public const string KEY_VERSION_INVALID = "Invalid key version: {0}";
+
+            /// <summary>
+            /// Error template for unsupported key types. Format: "Unsupported key type: {0}".
+            /// </summary>
             public const string UNSUPPORTED_KEY_TYPE = "Unsupported key type: {0}";
+
+            /// <summary>
+            /// Error template for key derivation errors. Format: "Key derivation error: {0}" with details.
+            /// </summary>
             public const string KEY_DERIVATION_ERROR = "Key derivation error: {0}";
+
+            /// <summary>
+            /// Error template for invalid key data. Format: "Invalid key data: {0}" with details.
+            /// </summary>
             public const string INVALID_KEY_DATA = "Invalid key data: {0}";
+
+            /// <summary>
+            /// Error template for keystore errors. Format: "Keystore error: {0}" with details.
+            /// </summary>
             public const string KEYSTORE_ERROR = "Keystore error: {0}";
         }
 
@@ -197,14 +523,41 @@ public static partial class Constants
         /// </summary>
         public static class Testing
         {
+            /// <summary>
+            /// Generic test failure error message.
+            /// </summary>
             public const string TEST_FAILURE = "Test failure";
+
+            /// <summary>
+            /// Error template for test failures with details. Format: "Test failure: {0}".
+            /// </summary>
             public const string TEST_FAILURE_DETAILS = "Test failure: {0}";
+
+            /// <summary>
+            /// Error message indicating ISD (Issuer Security Domain) selection failed during testing.
+            /// </summary>
             public const string ISD_SELECTION_FAILED = "Test failure - ISD selection failed";
+
+            /// <summary>
+            /// Error message indicating card information retrieval failed during testing.
+            /// </summary>
             public const string CARD_INFO_RETRIEVAL_FAILED =
                 "Test failure - card info retrieval failed";
+
+            /// <summary>
+            /// Error message for empty card service that supports no operations (virtual card configuration issue).
+            /// </summary>
             public const string NO_OPERATION_SUPPORTED =
                 "Empty card service - no operation supported";
+
+            /// <summary>
+            /// Error message indicating empty card service has no ATR (Answer To Reset) configured.
+            /// </summary>
             public const string NO_ATR_AVAILABLE = "Empty card service - no ATR available";
+
+            /// <summary>
+            /// Error message indicating test context does not support secure channel operations.
+            /// </summary>
             public const string TEST_CONTEXT_NO_SECURE_CHANNELS =
                 "Test context does not support secure channels";
         }

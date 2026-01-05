@@ -50,10 +50,10 @@ public class InstallCommandTests
         Result<InstallCommand.InstallForLoadCommand, SmartCardError> result =
             InstallCommand.InstallForLoadCommand.Create(
                 _validPackageAid,
-                maxDataBlockSize: 2048,
-                securityDomainAid: _validSecurityDomainAid,
-                hash: _validHash,
-                installToken: _validInstallToken
+                maxDataBlockSize: Maybe<ushort>.From((ushort)2048),
+                securityDomainAid: Maybe<byte[]>.From(_validSecurityDomainAid),
+                hash: Maybe<byte[]>.From(_validHash),
+                installToken: Maybe<byte[]>.From(_validInstallToken)
             );
 
         _ = result.IsSuccess.Should().BeTrue();
@@ -73,7 +73,10 @@ public class InstallCommandTests
     public void InstallForLoadCommand_Create_WithMaxDataBlockSize_EncodesCorrectly()
     {
         Result<InstallCommand.InstallForLoadCommand, SmartCardError> result =
-            InstallCommand.InstallForLoadCommand.Create(_validPackageAid, maxDataBlockSize: 1024);
+            InstallCommand.InstallForLoadCommand.Create(
+                _validPackageAid,
+                maxDataBlockSize: Maybe<ushort>.From((ushort)1024)
+            );
 
         _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
@@ -130,10 +133,10 @@ public class InstallCommandTests
         var command = InstallCommand
             .InstallForLoadCommand.Create(
                 _validPackageAid,
-                maxDataBlockSize: 2048,
-                securityDomainAid: _validSecurityDomainAid,
-                hash: _validHash,
-                installToken: _validInstallToken
+                maxDataBlockSize: Maybe<ushort>.From((ushort)2048),
+                securityDomainAid: Maybe<byte[]>.From(_validSecurityDomainAid),
+                hash: Maybe<byte[]>.From(_validHash),
+                installToken: Maybe<byte[]>.From(_validInstallToken)
             )
             .Value;
 
@@ -251,8 +254,8 @@ public class InstallCommandTests
                 _validModuleAid,
                 _validAppletAid,
                 _validPrivileges,
-                _validInstallParameters,
-                _validInstallToken
+                Maybe<byte[]>.From(_validInstallParameters),
+                Maybe<byte[]>.From(_validInstallToken)
             );
 
         _ = result.IsSuccess.Should().BeTrue();
@@ -453,8 +456,8 @@ public class InstallCommandTests
                 _validModuleAid,
                 _validAppletAid,
                 _validPrivileges,
-                _validInstallParameters,
-                _validInstallToken
+                Maybe<byte[]>.From(_validInstallParameters),
+                Maybe<byte[]>.From(_validInstallToken)
             )
             .Value;
 
@@ -560,10 +563,10 @@ public class InstallCommandTests
         Result<InstallCommand.InstallForLoadCommand, SmartCardError> result =
             InstallCommandBuilder.CreateForLoad(
                 _validPackageAid,
-                _validSecurityDomainAid,
-                _validHash,
-                2048,
-                _validInstallToken
+                securityDomainAid: Maybe<byte[]>.From(_validSecurityDomainAid),
+                hash: Maybe<byte[]>.From(_validHash),
+                maxDataBlockSize: Maybe<ushort>.From((ushort)2048),
+                installToken: Maybe<byte[]>.From(_validInstallToken)
             );
 
         _ = result.IsSuccess.Should().BeTrue();
@@ -582,10 +585,10 @@ public class InstallCommandTests
             InstallCommandBuilder.CreateForInstall(
                 _validPackageAid,
                 _validAppletAid,
-                _validModuleAid,
-                _validPrivileges,
-                _validInstallParameters,
-                _validInstallToken
+                Maybe<byte[]>.From(_validModuleAid),
+                Maybe<byte[]>.From(_validPrivileges),
+                Maybe<byte[]>.From(_validInstallParameters),
+                Maybe<byte[]>.From(_validInstallToken)
             );
 
         _ = result.IsSuccess.Should().BeTrue();
@@ -603,12 +606,7 @@ public class InstallCommandTests
     public void InstallCommandBuilder_CreateForInstall_WithNullModuleAid_UsesPackageAid()
     {
         Result<InstallCommand.InstallForInstallCommand, SmartCardError> result =
-            InstallCommandBuilder.CreateForInstall(
-                _validPackageAid,
-                _validAppletAid,
-                moduleAid: null,
-                privileges: null
-            );
+            InstallCommandBuilder.CreateForInstall(_validPackageAid, _validAppletAid);
 
         _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
@@ -623,10 +621,10 @@ public class InstallCommandTests
             InstallCommandBuilder.CreateForInstallAndMakeSelectable(
                 _validPackageAid,
                 _validAppletAid,
-                _validModuleAid,
-                _validPrivileges,
-                _validInstallParameters,
-                _validInstallToken
+                Maybe<byte[]>.From(_validModuleAid),
+                Maybe<byte[]>.From(_validPrivileges),
+                Maybe<byte[]>.From(_validInstallParameters),
+                Maybe<byte[]>.From(_validInstallToken)
             );
 
         _ = result.IsSuccess.Should().BeTrue();
@@ -641,9 +639,7 @@ public class InstallCommandTests
         Result<InstallCommand.InstallForInstallCommand, SmartCardError> result =
             InstallCommandBuilder.CreateForInstallAndMakeSelectable(
                 _validPackageAid,
-                _validAppletAid,
-                moduleAid: null,
-                privileges: null
+                _validAppletAid
             );
 
         _ = result.IsSuccess.Should().BeTrue();
@@ -666,7 +662,7 @@ public class InstallCommandTests
     public void InstallCommandResponse_Success_WithData_CreatesSuccessResponse()
     {
         byte[] responseData = [0x01, 0x02, 0x03];
-        var response = InstallCommandResponse.Success(responseData);
+        var response = InstallCommandResponse.Success(Maybe<byte[]>.From(responseData));
 
         _ = response.IsSuccess.Should().BeTrue();
         _ = response.StatusWord.Should().Be(0x9000);
@@ -689,7 +685,7 @@ public class InstallCommandTests
     {
         ushort statusWord = 0x6A82;
         byte[] responseData = [0x01, 0x02, 0x03];
-        var response = InstallCommandResponse.Failure(statusWord, responseData);
+        var response = InstallCommandResponse.Failure(statusWord, Maybe<byte[]>.From(responseData));
 
         _ = response.IsSuccess.Should().BeFalse();
         _ = response.StatusWord.Should().Be(statusWord);
@@ -712,7 +708,10 @@ public class InstallCommandTests
     public void InstallForLoadCommand_WithLargeMaxDataBlockSize_EncodesCorrectly()
     {
         Result<InstallCommand.InstallForLoadCommand, SmartCardError> result =
-            InstallCommand.InstallForLoadCommand.Create(_validPackageAid, maxDataBlockSize: 65535);
+            InstallCommand.InstallForLoadCommand.Create(
+                _validPackageAid,
+                maxDataBlockSize: Maybe<ushort>.From((ushort)65535)
+            );
 
         _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;
@@ -724,7 +723,10 @@ public class InstallCommandTests
     public void InstallForLoadCommand_WithMinimumMaxDataBlockSize_EncodesCorrectly()
     {
         Result<InstallCommand.InstallForLoadCommand, SmartCardError> result =
-            InstallCommand.InstallForLoadCommand.Create(_validPackageAid, maxDataBlockSize: 1);
+            InstallCommand.InstallForLoadCommand.Create(
+                _validPackageAid,
+                maxDataBlockSize: Maybe<ushort>.From((ushort)1)
+            );
 
         _ = result.IsSuccess.Should().BeTrue();
         var command = result.Value;

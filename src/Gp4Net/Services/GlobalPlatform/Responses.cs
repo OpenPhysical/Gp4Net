@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Linq;
 using CSharpFunctionalExtensions;
@@ -224,9 +225,9 @@ public static class Responses
                     appType,
                     Version: Maybe<string>.None,
                     AssociatedSecurityDomain: Maybe<byte[]>.None,
-                    ExecutableLoadFileAid: entry is { ExecutableLoadFileAid: { Length: > 0 } c4 }
-                        ? Maybe<byte[]>.From(c4)
-                        : Maybe<byte[]>.None
+                    ExecutableLoadFileAid: entry.ExecutableLoadFileAid.Map(c4 =>
+                        c4.Length == 0 ? Array.Empty<byte>() : (byte[])c4.Clone()
+                    )
                 );
             }),
         ];

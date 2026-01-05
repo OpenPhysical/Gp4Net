@@ -4,11 +4,14 @@ using System.ComponentModel;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using CSharpFunctionalExtensions;
 using Gp4Net.Core;
 using Gp4Net.Domain.CapFile;
 using Gp4Net.Services;
+using Gp4Net.Tool.Commands.Common;
+using Gp4Net.Tool.Infrastructure;
 using Gp4Net.Tool.Pipeline;
 using JetBrains.Annotations;
 using Spectre.Console;
@@ -20,6 +23,7 @@ namespace Gp4Net.Tool.Commands.Applet;
 /// Command to validate a CAP file without installing it.
 /// </summary>
 [PublicAPI]
+[CliCommand("validate", "Validate a CAP file without installing it", "applet")]
 public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 {
     private readonly IDisplayService _displayService;
@@ -130,14 +134,18 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
     {
         return await Task.Run(() =>
         {
-            DisplayCapFileInformation(capFile);
-            DisplayMemoryEstimate(capFileData);
-            DisplaySecurityAnalysis(capFile);
-            DisplayDetailedInformation(capFile, settings.Verbose);
+            if (settings.Format == OutputFormat.Json)
+            {
+                DisplayJsonOutput(capFile, settings);
+            }
+            else
+            {
+                DisplayCapFileInformation(capFile);
+                DisplayMemoryEstimate(capFileData);
+                DisplaySecurityAnalysis(capFile);
+                DisplayDetailedInformation(capFile, settings.Verbose);
 
-            _ = Maybe<ManifestInfo>
-                .From(capFile.Manifest)
-                .Match(
+                _ = capFile.Manifest.Match(
                     manifest =>
                     {
                         DisplayManifestInformation(manifest, _packageRegistry);
@@ -146,49 +154,120 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
                     () => true
                 );
 
-            DisplayClassFileInfo(capFileData);
+                DisplayClassFileInfo(capFileData);
 
-            if (settings.Verbose)
-            {
-                DisplayStaticFieldArrays(capFile);
+                if (settings.Verbose)
+                {
+                    DisplayStaticFieldArrays(capFile);
+                }
             }
 
             return Result.Success<bool, SmartCardError>(true);
         });
     }
 
+    private void DisplayJsonOutput(CapFileStructure capFile, Settings settings)
+    {
+        var components = capFile.Components.Select(c => ComponentSummary.FromComponent(c)).ToList();
+
+        var errors = new List<ValidationMessage>();
+        var warnings = new List<ValidationMessage>();
+        var infos = new List<ValidationMessage>();
+
+        if (!capFile.Manifest.HasValue)
+        {
+            warnings.Add(
+                ValidationMessage.Warning(
+                    "MANIFEST-MISSING",
+                    "Manifest not found",
+                    Maybe<string>.From("META-INF/MANIFEST.MF"),
+                    Maybe<string>.From("Add manifest with Package-Name and Package-Version")
+                )
+            );
+        }
+
+        var debugComponent = capFile.Components.FirstOrDefault(c =>
+            c.Tag == Constants.Constants.JavaCard.ComponentTags.DEBUG
+        );
+        if (debugComponent != null)
+        {
+            infos.Add(
+                ValidationMessage.Info(
+                    "DEBUG-COMPONENT",
+                    "Debug component included",
+                    Maybe<string>.From(
+                        $"Component tag 0x{debugComponent.Tag:X2}, {debugComponent.Size} bytes"
+                    ),
+                    Maybe<string>.From("Strip debug component for production builds")
+                )
+            );
+        }
+
+        var validationResult = CapValidationResult.FromCapFile(
+            settings.CapFile,
+            capFile,
+            components,
+            errors,
+            warnings,
+            infos
+        );
+
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = System
+                .Text
+                .Json
+                .Serialization
+                .JsonIgnoreCondition
+                .WhenWritingNull,
+            Converters = { new Tool.Common.ByteArrayHexConverter() },
+        };
+
+        string json = JsonSerializer.Serialize(validationResult, options);
+        AnsiConsole.WriteLine(json);
+    }
+
     private void DisplayCapFileInformation(CapFileStructure capFile)
     {
         var table = new Table()
-            .AddColumn("Property")
-            .AddColumn("Value")
-            .Title("[bold]CAP File Information[/]")
-            .Border(TableBorder.Rounded);
+            .AddColumn("[cyan]Property[/]")
+            .AddColumn("[cyan]Value[/]")
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Blue);
 
-        _ = table.AddRow("Format", "ZIP/JAR");
-        _ = table.AddRow("Package AID", $"[dim]{Convert.ToHexString(capFile.PackageAid)}[/]");
+        table.Caption = new TableTitle("[dim]Summary[/]");
+
+        _ = table.AddRow("[cyan]Format[/]", "[green]ZIP/JAR[/]");
         _ = table.AddRow(
-            "Package Version",
-            $"{capFile.PackageVersion.Major}.{capFile.PackageVersion.Minor}"
+            "[cyan]Package AID[/]",
+            $"[cyan]{Convert.ToHexString(capFile.PackageAid)}[/]"
         );
         _ = table.AddRow(
-            "CAP File Version",
-            $"{capFile.CapFileVersion.Major}.{capFile.CapFileVersion.Minor}"
+            "[cyan]Package Version[/]",
+            $"[yellow]{capFile.PackageVersion.Major}.{capFile.PackageVersion.Minor}[/]"
+        );
+        _ = table.AddRow(
+            "[cyan]CAP File Version[/]",
+            $"[yellow]{capFile.CapFileVersion.Major}.{capFile.CapFileVersion.Minor}[/]"
         );
 
         // Create header flags display functionally
         string headerFlags = CreateHeaderFlagsDisplay(capFile.HeaderFlags);
-        _ = table.AddRow("Header Flags", headerFlags);
+        _ = table.AddRow("[cyan]Header Flags[/]", $"[yellow]{headerFlags}[/]");
 
-        _ = table.AddRow("Total Size", $"{capFile.TotalSize} bytes");
-        _ = table.AddRow("Components", capFile.Components.Count.ToString());
-        _ = table.AddRow("Applets", capFile.Applets.Count.ToString());
+        _ = table.AddRow("[cyan]Total Size[/]", $"[green]{capFile.TotalSize} bytes[/]");
+        _ = table.AddRow("[cyan]Components[/]", $"[green]{capFile.Components.Count}[/]");
+        _ = table.AddRow("[cyan]Applets[/]", $"[green]{capFile.Applets.Count}[/]");
 
         // Add load blocks estimate
         byte[] binaryData = capFile.ToBinaryFormat();
         int estimatedBlocks = (int)Math.Ceiling((double)binaryData.Length / 245);
-        _ = table.AddRow("Est. Load Blocks", estimatedBlocks.ToString());
+        _ = table.AddRow("[cyan]Est. Load Blocks[/]", $"[green]{estimatedBlocks}[/]");
 
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[bold blue]CAP File Information:[/]");
         AnsiConsole.Write(table);
     }
 
@@ -215,22 +294,27 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
     private static void DisplayDetailedInformation(CapFileStructure capFile, bool verbose)
     {
-        AnsiConsole.MarkupLine("[bold]Components:[/]");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[bold blue]Components:[/]");
 
         var componentsTable = new Table()
-            .AddColumn("Tag")
-            .AddColumn("Name")
-            .AddColumn("Size")
-            .AddColumn("Notes");
+            .AddColumn("[cyan]Tag[/]")
+            .AddColumn("[cyan]Name[/]")
+            .AddColumn("[cyan]Size[/]")
+            .AddColumn("[cyan]Notes[/]")
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Blue);
+
+        componentsTable.Caption = new TableTitle("[dim]Component Overview[/]");
 
         foreach (var component in capFile.Components)
         {
             string componentName = GetComponentName(component.Tag);
             string notes = GetComponentNotes(component.Tag, component.Size);
             _ = componentsTable.AddRow(
-                $"0x{component.Tag:X2}",
+                $"[cyan]0x{component.Tag:X2}[/]",
                 componentName,
-                $"{component.Size} bytes",
+                $"[green]{component.Size} bytes[/]",
                 notes
             );
         }
@@ -240,15 +324,21 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         if (capFile.Applets.Count > 0)
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[bold]Applets:[/]");
+            AnsiConsole.MarkupLine("[bold green]Applets:[/]");
 
-            var appletsTable = new Table().AddColumn("AID").AddColumn("Install Method Offset");
+            var appletsTable = new Table()
+                .AddColumn("[cyan]AID[/]")
+                .AddColumn("[cyan]Install Method Offset[/]")
+                .Border(TableBorder.Rounded)
+                .BorderColor(Color.Green);
+
+            appletsTable.Caption = new TableTitle("[dim]Applet Install Targets[/]");
 
             foreach (var applet in capFile.Applets)
             {
                 _ = appletsTable.AddRow(
-                    $"[dim]{Convert.ToHexString(applet.Aid)}[/]",
-                    $"0x{applet.InstallMethodOffset:X4}"
+                    $"[cyan]{Convert.ToHexString(applet.Aid)}[/]",
+                    $"[yellow]0x{applet.InstallMethodOffset:X4}[/]"
                 );
             }
 
@@ -258,9 +348,16 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
     private static void DisplaySecurityAnalysis(CapFileStructure capFile)
     {
-        AnsiConsole.MarkupLine("[bold]Security Analysis:[/]");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[bold yellow]Security Analysis:[/]");
 
-        var securityTable = new Table().AddColumn("Aspect").AddColumn("Details");
+        var securityTable = new Table()
+            .AddColumn("[cyan]Aspect[/]")
+            .AddColumn("[cyan]Details[/]")
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Yellow);
+
+        securityTable.Caption = new TableTitle("[dim]Security Signals[/]");
 
         // Analyze header flags from security perspective
         List<string> capabilities = [];
@@ -281,11 +378,14 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
         if (capabilities.Count > 0)
         {
-            _ = securityTable.AddRow("Capabilities", string.Join("\n", capabilities));
+            _ = securityTable.AddRow(
+                "[cyan]Capabilities[/]",
+                string.Join("\n", capabilities.Select(capability => $"[green]{capability}[/]"))
+            );
         }
         else
         {
-            _ = securityTable.AddRow("Capabilities", "[dim]None declared[/]");
+            _ = securityTable.AddRow("[cyan]Capabilities[/]", "[dim]None declared[/]");
         }
 
         // Check for sensitive components
@@ -312,16 +412,21 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         if (sensitiveComponents.Count > 0)
         {
             _ = securityTable.AddRow(
-                "Sensitive Components",
+                "[cyan]Sensitive Components[/]",
                 string.Join("\n", sensitiveComponents)
             );
         }
 
         // Analyze imports for crypto usage
-        if (capFile.Manifest?.ImportedPackages is { Count: > 0 })
+        capFile.Manifest.Execute(manifest =>
         {
+            if (manifest.ImportedPackages.Count == 0)
+            {
+                return;
+            }
+
             List<string> cryptoImports = [];
-            foreach (var import in capFile.Manifest.ImportedPackages)
+            foreach (var import in manifest.ImportedPackages)
             {
                 string aidUpper = import.Aid.ToUpper().Replace(":", "").Replace("0X", "");
                 if (aidUpper.Contains("A0000000620102"))
@@ -337,9 +442,12 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
 
             if (cryptoImports.Count > 0)
             {
-                _ = securityTable.AddRow("Crypto Usage", string.Join("\n", cryptoImports));
+                _ = securityTable.AddRow(
+                    "[cyan]Crypto Usage[/]",
+                    string.Join("\n", cryptoImports)
+                );
             }
-        }
+        });
 
         // Static field analysis summary
         var staticFieldComponent = capFile.Components.FirstOrDefault(c =>
@@ -348,8 +456,8 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         if (staticFieldComponent is { Size: > 0 })
         {
             _ = securityTable.AddRow(
-                "Static Data",
-                $"{staticFieldComponent.Size} bytes (use --verbose to inspect)"
+                "[cyan]Static Data[/]",
+                $"[green]{staticFieldComponent.Size} bytes[/] [dim](use --verbose to inspect)[/]"
             );
         }
 
@@ -359,9 +467,12 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
             List<string> appletInfo = [];
             foreach (var applet in capFile.Applets)
             {
-                appletInfo.Add($"AID: {Convert.ToHexString(applet.Aid)}");
+                appletInfo.Add($"AID: [cyan]{Convert.ToHexString(applet.Aid)}[/]");
             }
-            _ = securityTable.AddRow("Installable Applets", string.Join("\n", appletInfo));
+            _ = securityTable.AddRow(
+                "[cyan]Installable Applets[/]",
+                string.Join("\n", appletInfo)
+            );
         }
 
         AnsiConsole.Write(securityTable);
@@ -373,13 +484,20 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         {
             var memoryReq = CapFileLoadingWorkflow.EstimateMemoryRequirements(capFileData);
 
-            AnsiConsole.MarkupLine("[bold]Memory Requirements (Estimated):[/]");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[bold green]Memory Requirements (Estimated):[/]");
 
-            var memoryTable = new Table().AddColumn("Memory Type").AddColumn("Estimated Size");
+            var memoryTable = new Table()
+                .AddColumn("[cyan]Memory Type[/]")
+                .AddColumn("[cyan]Estimated Size[/]")
+                .Border(TableBorder.Rounded)
+                .BorderColor(Color.Green);
 
-            _ = memoryTable.AddRow("Code Memory", $"{memoryReq.CodeMemory} bytes");
-            _ = memoryTable.AddRow("Data Memory", $"{memoryReq.DataMemory} bytes");
-            _ = memoryTable.AddRow("Total Size", $"{memoryReq.TotalSize} bytes");
+            memoryTable.Caption = new TableTitle("[dim]Estimated Load Footprint[/]");
+
+            _ = memoryTable.AddRow("[cyan]Code Memory[/]", $"[green]{memoryReq.CodeMemory} bytes[/]");
+            _ = memoryTable.AddRow("[cyan]Data Memory[/]", $"[green]{memoryReq.DataMemory} bytes[/]");
+            _ = memoryTable.AddRow("[cyan]Total Size[/]", $"[green]{memoryReq.TotalSize} bytes[/]");
 
             AnsiConsole.Write(memoryTable);
         }
@@ -398,64 +516,66 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
     {
         try
         {
-            AnsiConsole.MarkupLine("[bold]Manifest Information:[/]");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[bold magenta]Manifest Information:[/]");
 
-            var manifestTable = new Table().AddColumn("Property").AddColumn("Value");
+            var manifestTable = new Table()
+                .AddColumn("[cyan]Property[/]")
+                .AddColumn("[cyan]Value[/]")
+                .Border(TableBorder.Rounded)
+                .BorderColor(Color.Purple);
 
-            if (!string.IsNullOrEmpty(manifest.PackageName))
-            {
-                _ = manifestTable.AddRow("Package Name", Markup.Escape(manifest.PackageName));
-            }
+            manifestTable.Caption = new TableTitle("[dim]Package Manifest[/]");
 
-            if (!string.IsNullOrEmpty(manifest.CapFileVersion))
-            {
-                _ = manifestTable.AddRow(
-                    "CAP File Version",
-                    Markup.Escape(manifest.CapFileVersion)
-                );
-            }
+            manifest.PackageName.Execute(value =>
+                manifestTable.AddRow("[cyan]Package Name[/]", $"[green]{Markup.Escape(value)}[/]")
+            );
 
-            if (!string.IsNullOrEmpty(manifest.ConverterVersion))
-            {
-                _ = manifestTable.AddRow(
-                    "Converter Version",
-                    Markup.Escape(manifest.ConverterVersion)
-                );
-            }
+            manifest.CapFileVersion.Execute(value =>
+                manifestTable.AddRow("[cyan]CAP File Version[/]", $"[yellow]{Markup.Escape(value)}[/]")
+            );
 
-            if (!string.IsNullOrEmpty(manifest.ConverterProvider))
-            {
-                _ = manifestTable.AddRow(
-                    "Converter Provider",
-                    Markup.Escape(manifest.ConverterProvider)
-                );
-            }
+            manifest.ConverterVersion.Execute(value =>
+                manifestTable.AddRow(
+                    "[cyan]Converter Version[/]",
+                    $"[yellow]{Markup.Escape(value)}[/]"
+                )
+            );
 
-            if (!string.IsNullOrEmpty(manifest.CreationTime))
-            {
-                _ = manifestTable.AddRow("Creation Time", Markup.Escape(manifest.CreationTime));
-            }
+            manifest.ConverterProvider.Execute(value =>
+                manifestTable.AddRow(
+                    "[cyan]Converter Provider[/]",
+                    $"[green]{Markup.Escape(value)}[/]"
+                )
+            );
 
-            if (manifest.IntegerSupportRequired.HasValue)
-            {
-                _ = manifestTable.AddRow(
-                    "Integer Support Required",
-                    manifest.IntegerSupportRequired.Value ? "Yes" : "No"
-                );
-            }
+            manifest.CreationTime.Execute(value =>
+                manifestTable.AddRow("[cyan]Creation Time[/]", $"[dim]{Markup.Escape(value)}[/]")
+            );
+
+            manifest.IntegerSupportRequired.Execute(value =>
+                manifestTable.AddRow(
+                    "[cyan]Integer Support Required[/]",
+                    value ? "[green]Yes[/]" : "[red]No[/]"
+                )
+            );
 
             AnsiConsole.Write(manifestTable);
 
             if (manifest.ImportedPackages.Count > 0)
             {
                 AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("[bold]Import Dependencies:[/]");
+                AnsiConsole.MarkupLine("[bold blue]Import Dependencies:[/]");
 
                 var importsTable = new Table()
-                    .AddColumn("Package AID")
-                    .AddColumn("Required Version")
-                    .AddColumn("Resolved Package")
-                    .AddColumn("SDK Version");
+                    .AddColumn("[cyan]Package AID[/]")
+                    .AddColumn("[cyan]Required Version[/]")
+                    .AddColumn("[cyan]Resolved Package[/]")
+                    .AddColumn("[cyan]SDK Version[/]")
+                    .Border(TableBorder.Rounded)
+                    .BorderColor(Color.Blue);
+
+                importsTable.Caption = new TableTitle("[dim]Import Resolution[/]");
 
                 foreach (var import in manifest.ImportedPackages)
                 {
@@ -472,8 +592,8 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
                     }
 
                     _ = importsTable.AddRow(
-                        $"[dim]{formattedAid}[/]",
-                        Markup.Escape(import.Version),
+                        $"[cyan]{formattedAid}[/]",
+                        $"[yellow]{Markup.Escape(import.Version)}[/]",
                         resolvedName,
                         sdkVersion
                     );
@@ -539,7 +659,8 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
     {
         try
         {
-            AnsiConsole.MarkupLine("[bold]Class File Analysis:[/]");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[bold cyan]Class File Analysis:[/]");
 
             // Check if this is a ZIP/JAR file
             using var stream = new MemoryStream(capFileData);
@@ -778,6 +899,13 @@ public class ValidateCommand : AsyncCommand<ValidateCommand.Settings>
         [CommandOption("-v|--verbose")]
         [Description("Show verbose analysis including static field arrays")]
         public bool Verbose { get; set; }
+
+        /// <summary>
+        /// Gets or sets the output format for validation results.
+        /// </summary>
+        [CommandOption("-f|--format")]
+        [Description("Output format: table (default) or json")]
+        public OutputFormat Format { get; set; } = OutputFormat.Table;
 
         /// <summary>
         /// Validates the command settings.

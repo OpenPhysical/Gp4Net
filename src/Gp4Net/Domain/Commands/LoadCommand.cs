@@ -578,7 +578,8 @@ public static class CapFileLoader
         }
 
         return capFileResult.Match(
-            capFile => capFile.PackageAid.Length > 0
+            capFile =>
+                capFile.PackageAid.Length > 0
                 && capFile.Components.Count > 0
                 && capFile.TotalSize > 0,
             _ => false

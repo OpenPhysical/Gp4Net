@@ -61,16 +61,15 @@ public static class Applications
         var loadFilesWithModulesResult = await loadFilesWithModulesTask;
 
         // Combine results functionally using railway-oriented programming
-        return isdResult
-            .Bind(isd =>
-                appsResult.Bind(apps =>
-                    loadFilesResult.Bind(loadFiles =>
-                        loadFilesWithModulesResult.Bind(loadFilesWithModules =>
-                            CombineIntoCardContent(isd, apps, loadFiles, loadFilesWithModules)
-                        )
+        return isdResult.Bind(isd =>
+            appsResult.Bind(apps =>
+                loadFilesResult.Bind(loadFiles =>
+                    loadFilesWithModulesResult.Bind(loadFilesWithModules =>
+                        CombineIntoCardContent(isd, apps, loadFiles, loadFilesWithModules)
                     )
                 )
-            );
+            )
+        );
     }
 
     /// <summary>

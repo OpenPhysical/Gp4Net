@@ -506,18 +506,20 @@ public static partial class TlvService
                 {
                     if (responseValue.Length == 0)
                     {
-                        return Result.Success<ImmutableList<ApplicationStatusEntry>, SmartCardError>(
-                            ImmutableList<ApplicationStatusEntry>.Empty
-                        );
+                        return Result.Success<
+                            ImmutableList<ApplicationStatusEntry>,
+                            SmartCardError
+                        >(ImmutableList<ApplicationStatusEntry>.Empty);
                     }
 
                     var tlvParseResult = TlvParser.ParseMultiple([.. responseValue]);
 
                     if (tlvParseResult.IsFailure)
                     {
-                        return Result.Success<ImmutableList<ApplicationStatusEntry>, SmartCardError>(
-                            ImmutableList<ApplicationStatusEntry>.Empty
-                        );
+                        return Result.Success<
+                            ImmutableList<ApplicationStatusEntry>,
+                            SmartCardError
+                        >(ImmutableList<ApplicationStatusEntry>.Empty);
                     }
 
                     return ParseApplicationStatusEntries(tlvParseResult.Value)
@@ -673,9 +675,8 @@ public static partial class TlvService
                 Some: tlv => tlv.TlvData.Bytes.ToArray(),
                 None: () => []
             );
-            byte[] executableLoadFile = executableLoadFileTlv.Match(
-                Some: tlv => tlv.TlvData.Bytes.ToArray(),
-                None: () => []
+            Maybe<byte[]> executableLoadFile = executableLoadFileTlv.Map(tlv =>
+                tlv.TlvData.Bytes.ToArray()
             );
 
             return new ApplicationStatusEntry(

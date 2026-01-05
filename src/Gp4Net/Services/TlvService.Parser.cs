@@ -77,14 +77,13 @@ public static partial class TlvService
 
             // Build list of parsed objects using a local builder
             var builder = ImmutableArray.CreateBuilder<TlvObject>();
-            var offset = 0;
+            int bytesConsumed = 0;
 
-            // Parse all objects using functional chaining
-            Func<int, UnitResult<SmartCardError>> parseNext = null;
-            parseNext = currentOffset =>
+            UnitResult<SmartCardError> ParseRemaining(int currentOffset)
             {
                 if (currentOffset >= data.Length)
                 {
+                    bytesConsumed = currentOffset;
                     return UnitResult.Success<SmartCardError>();
                 }
 
@@ -93,26 +92,25 @@ public static partial class TlvService
                         parseResult =>
                         {
                             builder.Add(parseResult.Object);
-                            return parseNext(currentOffset + parseResult.BytesConsumed);
+                            return ParseRemaining(currentOffset + parseResult.BytesConsumed);
                         },
                         error =>
                         {
-                            // If we've parsed at least one object, that's success
+                            bytesConsumed = currentOffset;
                             return builder.Count > 0
                                 ? UnitResult.Success<SmartCardError>()
                                 : UnitResult.Failure(error);
                         }
                     );
-            };
+            }
 
-            return parseNext(0)
-                .Match(
-                    () =>
-                        Result.Success<ParseResult, SmartCardError>(
-                            new ParseResult(builder.ToImmutable(), offset)
-                        ),
-                    error => Result.Failure<ParseResult, SmartCardError>(error)
-                );
+            return ParseRemaining(0).Match(
+                () =>
+                    Result.Success<ParseResult, SmartCardError>(
+                        new ParseResult(builder.ToImmutable(), bytesConsumed)
+                    ),
+                error => Result.Failure<ParseResult, SmartCardError>(error)
+            );
         }
 
         /// <summary>
@@ -201,7 +199,7 @@ public static partial class TlvService
             var currentOffset = offset + 1;
 
             // Collect tag bytes using functional iteration
-            Func<int, Result<(TlvTag, int), SmartCardError>> collectBytes = null;
+            Func<int, Result<(TlvTag, int), SmartCardError>> collectBytes = null!;
             collectBytes = pos =>
             {
                 if (pos >= data.Length)

@@ -54,9 +54,10 @@ public class PackageRegistry
     /// <param name="aid">The AID bytes.</param>
     /// <param name="packageInfo">The resolved package information, if found.</param>
     /// <returns>True if the AID was resolved, false otherwise.</returns>
-    public bool TryResolveAid(byte[] aid, out PackageInfo packageInfo)
+    public bool TryResolveAid(byte[] aid, out PackageInfo? packageInfo)
     {
-        string aidHex = Convert.ToHexString(aid).ToUpper();
+        ArgumentNullException.ThrowIfNull(aid);
+        string aidHex = Convert.ToHexString(aid).ToUpperInvariant();
         return TryResolveAid(aidHex, out packageInfo);
     }
 
@@ -66,9 +67,15 @@ public class PackageRegistry
     /// <param name="aidHex">The AID as a hex string.</param>
     /// <param name="packageInfo">The resolved package information, if found.</param>
     /// <returns>True if the AID was resolved, false otherwise.</returns>
-    public bool TryResolveAid(string aidHex, out PackageInfo packageInfo)
+    public bool TryResolveAid(string? aidHex, out PackageInfo? packageInfo)
     {
-        return _aidLookup.TryGetValue(aidHex.ToUpper(), out packageInfo);
+        packageInfo = null;
+        if (string.IsNullOrWhiteSpace(aidHex))
+        {
+            return false;
+        }
+
+        return _aidLookup.TryGetValue(aidHex.ToUpperInvariant(), out packageInfo);
     }
 
     /// <summary>
@@ -87,7 +94,8 @@ public class PackageRegistry
     /// <returns>A formatted hex string.</returns>
     public static string FormatAidAsHex(byte[] aid)
     {
-        return Convert.ToHexString(aid).ToUpper();
+        ArgumentNullException.ThrowIfNull(aid);
+        return Convert.ToHexString(aid).ToUpperInvariant();
     }
 
     private static Result<
@@ -155,10 +163,18 @@ public class PackageRegistry
             }
         );
 
-        // Create AID lookup from packages with non-empty AIDs
+        // Create AID lookup from packages with non-empty AIDs, de-duplicated by AID.
         var aidLookup = packages
             .Values.Where(pkg => !string.IsNullOrEmpty(pkg.Aid))
-            .ToImmutableDictionary(pkg => pkg.Aid.ToUpper(), pkg => pkg);
+            .GroupBy(pkg => pkg.Aid.ToUpperInvariant())
+            .ToImmutableDictionary(
+                group => group.Key,
+                group => group
+                    .OrderByDescending(pkg => pkg.MajorVersion)
+                    .ThenByDescending(pkg => pkg.MinorVersion)
+                    .ThenByDescending(pkg => pkg.Version, StringComparer.OrdinalIgnoreCase)
+                    .First()
+            );
 
         return Result.Success<
             (ImmutableDictionary<string, PackageInfo>, ImmutableDictionary<string, PackageInfo>),
@@ -168,18 +184,18 @@ public class PackageRegistry
 
     private class PackageDatabase
     {
-        public Dictionary<string, PackageEntry> Packages { get; set; }
+        public Dictionary<string, PackageEntry> Packages { get; set; } = new();
     }
 
     private class PackageEntry
     {
-        public string Name { get; set; }
-        public string Aid { get; set; }
-        public string Version { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Aid { get; set; } = string.Empty;
+        public string Version { get; set; } = string.Empty;
         public int MajorVersion { get; set; }
         public int MinorVersion { get; set; }
-        public string SourceFile { get; set; }
-        public string SdkVersion { get; set; }
+        public string SourceFile { get; set; } = string.Empty;
+        public string SdkVersion { get; set; } = string.Empty;
     }
 }
 

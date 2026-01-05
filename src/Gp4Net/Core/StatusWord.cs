@@ -108,7 +108,7 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
     }
 
     /// <inheritdoc />
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
         return obj is StatusWord other && Equals(other);
     }
@@ -140,7 +140,7 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
     /// <returns>The status word with description if known.</returns>
     public string ToDescriptiveString()
     {
-        string description = _value switch
+        string? description = _value switch
         {
             0x9000 => "Success",
             0x6982 => "Security Status Not Satisfied",
@@ -172,6 +172,6 @@ public readonly struct StatusWord : IEquatable<StatusWord>, IComparable<StatusWo
             _ => null,
         };
 
-        return description != null ? $"0x{_value:X4} ({description})" : ToString();
+        return description is string value ? $"0x{_value:X4} ({value})" : ToString();
     }
 }

@@ -1,12 +1,12 @@
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8"?>
 <RunSettings>
   <DataCollectionRunSettings>
     <DataCollectors>
       <DataCollector friendlyName="XPlat code coverage">
         <Configuration>
           <Format>cobertura</Format>
-          <Exclude>[Gp4Net.Tool]*</Exclude> <!-- Exclude CLI tool from coverage as it's mainly for user interaction -->
-          <ExcludeByAttribute>CompilerGenerated,GeneratedCode,ExcludeFromCodeCoverage</ExcludeByAttribute>
+          <!-- Use attribute-based exclusions aligned with .NET 9 guidance; avoid GeneratedCode to prevent coverage loss -->
+          <ExcludeByAttribute>ExcludeFromCodeCoverage</ExcludeByAttribute>
           <ExcludeByFile>**/obj/**,**/bin/**</ExcludeByFile>
         </Configuration>
       </DataCollector>

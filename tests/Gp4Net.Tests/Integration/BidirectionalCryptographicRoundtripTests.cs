@@ -74,7 +74,11 @@ public class BidirectionalCryptographicRoundtripTests
     {
         var result = CreateTestCard().Bind(card => PerformDecryptorServiceTest(card));
 
-        Assert.That(result.IsSuccess, Is.True, result.IsFailure ? $"Decryptor service test failed: {result.Error}" : string.Empty);
+        Assert.That(
+            result.IsSuccess,
+            Is.True,
+            result.IsFailure ? $"Decryptor service test failed: {result.Error}" : string.Empty
+        );
     }
 
     /// <summary>

@@ -136,7 +136,6 @@ public class TraceValidationTests
         }
     }
 
-
     [Test]
     public void ValidateExchange_Should_Handle_Error_Response()
     {

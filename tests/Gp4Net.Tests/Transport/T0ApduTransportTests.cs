@@ -26,7 +26,7 @@ public class T0ApduTransportTests
         var virtualCardService = new VirtualCardService();
         virtualCardService.SetupTestEnvironment();
         // Connect to the first virtual reader
-        var readers = virtualCardService.GetReaders();
+        var readers = virtualCardService.GetReadersLegacy();
         if (readers.Count > 0)
         {
             virtualCardService.Connect(readers[0]);

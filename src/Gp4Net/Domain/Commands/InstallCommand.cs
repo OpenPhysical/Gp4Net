@@ -145,6 +145,17 @@ public abstract record InstallCommand : IApduCommand
         return Result.Success<ImmutableArray<byte>, SmartCardError>([.. packageAid]);
     }
 
+    private static ImmutableArray<byte> ToImmutableByteArray(Maybe<byte[]> source)
+    {
+        return source.Match(
+            value =>
+                value.Length == 0
+                    ? ImmutableArray<byte>.Empty
+                    : ImmutableArray.Create((byte[])value.Clone()),
+            () => ImmutableArray<byte>.Empty
+        );
+    }
+
     /// <summary>
     /// INSTALL [for load] command implementation.
     /// </summary>
@@ -181,10 +192,10 @@ public abstract record InstallCommand : IApduCommand
         /// </summary>
         private InstallForLoadCommand(
             ImmutableArray<byte> packageAid,
-            ImmutableArray<byte> securityDomainAid = default,
-            ImmutableArray<byte> hash = default,
-            ImmutableArray<byte> loadParameters = default,
-            ImmutableArray<byte> installToken = default
+            ImmutableArray<byte> securityDomainAid,
+            ImmutableArray<byte> hash,
+            ImmutableArray<byte> loadParameters,
+            ImmutableArray<byte> installToken
         )
             : base(packageAid)
         {
@@ -205,10 +216,10 @@ public abstract record InstallCommand : IApduCommand
         /// <returns>A Result containing the command or an error.</returns>
         public static Result<InstallForLoadCommand, SmartCardError> Create(
             byte[] packageAid,
-            ushort? maxDataBlockSize = null,
-            byte[] securityDomainAid = null,
-            byte[] hash = null,
-            byte[] installToken = null
+            Maybe<ushort> maxDataBlockSize = default,
+            Maybe<byte[]> securityDomainAid = default,
+            Maybe<byte[]> hash = default,
+            Maybe<byte[]> installToken = default
         )
         {
             var packageAidResult = ValidatePackageAid(packageAid);
@@ -220,22 +231,20 @@ public abstract record InstallCommand : IApduCommand
             }
 
             // Convert maxDataBlockSize to load parameters if provided
-            byte[] loadParameters = maxDataBlockSize.HasValue
-                ?
-                [
-                    0xC9,
-                    0x02,
-                    (byte)(maxDataBlockSize.Value >> 8),
-                    (byte)(maxDataBlockSize.Value & 0xFF),
-                ]
-                : null;
+            Maybe<byte[]> loadParameters = maxDataBlockSize.Map(size => new byte[]
+            {
+                0xC9,
+                0x02,
+                (byte)(size >> 8),
+                (byte)(size & 0xFF),
+            });
 
             var command = new InstallForLoadCommand(
                 packageAidResult.Value,
-                securityDomainAid?.ToImmutableArray() ?? default,
-                hash?.ToImmutableArray() ?? default,
-                loadParameters?.ToImmutableArray() ?? default,
-                installToken?.ToImmutableArray() ?? default
+                ToImmutableByteArray(securityDomainAid),
+                ToImmutableByteArray(hash),
+                ToImmutableByteArray(loadParameters),
+                ToImmutableByteArray(installToken)
             );
 
             return Result.Success<InstallForLoadCommand, SmartCardError>(command);
@@ -368,10 +377,10 @@ public abstract record InstallCommand : IApduCommand
             InstallType type,
             ImmutableArray<byte> packageAid,
             ImmutableArray<byte> appletAid,
-            ImmutableArray<byte> moduleAid = default,
-            ImmutableArray<byte> privileges = default,
-            ImmutableArray<byte> installParameters = default,
-            ImmutableArray<byte> installToken = default
+            ImmutableArray<byte> moduleAid,
+            ImmutableArray<byte> privileges,
+            ImmutableArray<byte> installParameters,
+            ImmutableArray<byte> installToken
         )
             : base(packageAid)
         {
@@ -398,8 +407,8 @@ public abstract record InstallCommand : IApduCommand
             byte[] moduleAid,
             byte[] applicationAid,
             byte[] privileges,
-            byte[] installParameters = null,
-            byte[] installToken = null
+            Maybe<byte[]> installParameters = default,
+            Maybe<byte[]> installToken = default
         )
         {
             var packageAidResult = ValidatePackageAid(packageAid);
@@ -437,8 +446,8 @@ public abstract record InstallCommand : IApduCommand
                 [.. applicationAid],
                 [.. moduleAid],
                 [.. privileges],
-                installParameters?.ToImmutableArray() ?? default,
-                installToken?.ToImmutableArray() ?? default
+                ToImmutableByteArray(installParameters),
+                ToImmutableByteArray(installToken)
             );
 
             return Result.Success<InstallForInstallCommand, SmartCardError>(command);
@@ -459,8 +468,8 @@ public abstract record InstallCommand : IApduCommand
             byte[] moduleAid,
             byte[] applicationAid,
             byte[] privileges,
-            byte[] installParameters = null,
-            byte[] installToken = null
+            Maybe<byte[]> installParameters = default,
+            Maybe<byte[]> installToken = default
         )
         {
             var packageAidResult = ValidatePackageAid(packageAid);
@@ -498,8 +507,8 @@ public abstract record InstallCommand : IApduCommand
                 [.. applicationAid],
                 [.. moduleAid],
                 [.. privileges],
-                installParameters?.ToImmutableArray() ?? default,
-                installToken?.ToImmutableArray() ?? default
+                ToImmutableByteArray(installParameters),
+                ToImmutableByteArray(installToken)
             );
 
             return Result.Success<InstallForInstallCommand, SmartCardError>(command);
@@ -626,10 +635,10 @@ public static class InstallCommandBuilder
     /// <returns>A Result containing the command or an error.</returns>
     public static Result<InstallCommand.InstallForLoadCommand, SmartCardError> CreateForLoad(
         byte[] packageAid,
-        byte[] securityDomainAid = null,
-        byte[] hash = null,
-        ushort? maxDataBlockSize = null,
-        byte[] installToken = null
+        Maybe<byte[]> securityDomainAid = default,
+        Maybe<byte[]> hash = default,
+        Maybe<ushort> maxDataBlockSize = default,
+        Maybe<byte[]> installToken = default
     )
     {
         return InstallCommand.InstallForLoadCommand.Create(
@@ -654,17 +663,20 @@ public static class InstallCommandBuilder
     public static Result<InstallCommand.InstallForInstallCommand, SmartCardError> CreateForInstall(
         byte[] packageAid,
         byte[] appletAid,
-        byte[] moduleAid = null,
-        byte[] privileges = null,
-        byte[] installParameters = null,
-        byte[] installToken = null
+        Maybe<byte[]> moduleAid = default,
+        Maybe<byte[]> privileges = default,
+        Maybe<byte[]> installParameters = default,
+        Maybe<byte[]> installToken = default
     )
     {
+        byte[] resolvedModuleAid = moduleAid.Match(value => value, () => packageAid);
+        byte[] resolvedPrivileges = privileges.Match(value => value, () => new byte[] { 0x00 });
+
         return InstallCommand.InstallForInstallCommand.Create(
             packageAid,
-            moduleAid ?? packageAid, // Use package AID as module AID if not specified
+            resolvedModuleAid,
             appletAid,
-            privileges ?? [0x00], // Default to no privileges
+            resolvedPrivileges,
             installParameters,
             installToken
         );
@@ -686,17 +698,20 @@ public static class InstallCommandBuilder
     > CreateForInstallAndMakeSelectable(
         byte[] packageAid,
         byte[] appletAid,
-        byte[] moduleAid = null,
-        byte[] privileges = null,
-        byte[] installParameters = null,
-        byte[] installToken = null
+        Maybe<byte[]> moduleAid = default,
+        Maybe<byte[]> privileges = default,
+        Maybe<byte[]> installParameters = default,
+        Maybe<byte[]> installToken = default
     )
     {
+        byte[] resolvedModuleAid = moduleAid.Match(value => value, () => packageAid);
+        byte[] resolvedPrivileges = privileges.Match(value => value, () => new byte[] { 0x00 });
+
         return InstallCommand.InstallForInstallCommand.CreateAndMakeSelectable(
             packageAid,
-            moduleAid ?? packageAid, // Use package AID as module AID if not specified
+            resolvedModuleAid,
             appletAid,
-            privileges ?? [0x00], // Default to no privileges
+            resolvedPrivileges,
             installParameters,
             installToken
         );
@@ -720,18 +735,23 @@ public record InstallCommandResponse(ImmutableArray<byte> Data, StatusWord Statu
     /// <summary>
     /// Creates a successful response.
     /// </summary>
-    public static InstallCommandResponse Success(byte[] data = null)
-    {
-        return new(data?.ToImmutableArray() ?? [], Constants.Constants.StatusWords.Legacy.Success);
-    }
+    public static InstallCommandResponse Success(Maybe<byte[]> data = default) =>
+        new(
+            data.Match(bytes => bytes.ToImmutableArray(), () => ImmutableArray<byte>.Empty),
+            Constants.Constants.StatusWords.Legacy.Success
+        );
 
     /// <summary>
     /// Creates a failed response.
     /// </summary>
-    public static InstallCommandResponse Failure(ushort statusWord, byte[] data = null)
-    {
-        return new(data?.ToImmutableArray() ?? [], statusWord);
-    }
+    public static InstallCommandResponse Failure(
+        ushort statusWord,
+        Maybe<byte[]> data = default
+    ) =>
+        new(
+            data.Match(bytes => bytes.ToImmutableArray(), () => ImmutableArray<byte>.Empty),
+            statusWord
+        );
 
     /// <summary>
     /// Parses a response from raw data.
